@@ -15,9 +15,16 @@ const REFRESH_KEY = 'fe_refresh_token';
 export const tokenStorage = {
   getAccess:   () => (typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY)   : null),
   getRefresh:  () => (typeof window !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null),
-  setAccess:   (t: string) => localStorage.setItem(TOKEN_KEY, t),
+  setAccess:   (t: string) => {
+    localStorage.setItem(TOKEN_KEY, t);
+    document.cookie = `${TOKEN_KEY}=${t}; path=/; SameSite=Lax; max-age=86400`;
+  },
   setRefresh:  (t: string) => localStorage.setItem(REFRESH_KEY, t),
-  clear:       () => { localStorage.removeItem(TOKEN_KEY); localStorage.removeItem(REFRESH_KEY); },
+  clear:       () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_KEY);
+    document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+  },
 };
 
 // ── Base fetch wrapper ────────────────────────────────────────────────────
