@@ -1,0 +1,241 @@
+import { Module } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, Min, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PaymentMethod, PurchaseOrderStatus, StockMovementType } from '@prisma/client';
+import { PrismaService } from '@/prisma/prisma.service';
+import { PaginationDto } from '@/common/dto/pagination.dto';
+import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
+import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
+import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
+
+export class CreateSupplierDto {
+  @ApiProperty() @IsString() name: string;
+  @ApiProperty() @IsString() phone: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() contactPerson?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() gstNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() creditDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() creditLimit?: number;
+}
+
+export class PurchaseItemDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsString() productName: string;
+  @ApiProperty() @IsString() variantName: string;
+  @ApiProperty() @IsString() sku: string;
+  @ApiProperty() @IsInt() @Min(1) orderedQty: number;
+  @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+}
+
+export class CreatePurchaseOrderDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() expectedDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
+}
+
+export class ReceiveItemDto {
+  @ApiProperty() @IsString() itemId: string;
+  @ApiProperty() @IsInt() @Min(0) receivedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
+}
+
+@Injectable()
+export class SuppliersService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryService: InventoryService,
+  ) {}
+
+  async createSupplier(tenantId: string, dto: CreateSupplierDto) {
+    const code = `SUP-${Date.now().toString(36).toUpperCase()}`;
+    return this.prisma.supplier.create({ data: { tenantId, code, ...dto } });
+  }
+
+  async findAllSuppliers(tenantId: string, query: PaginationDto) {
+    const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const where = {
+      tenantId,
+      ...(query.search && {
+        OR: [
+          { name: { contains: query.search, mode: 'insensitive' as const } },
+          { phone: { contains: query.search } },
+        ],
+      }),
+    };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.supplier.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.supplier.count({ where }),
+    ]);
+    return paginate(data, total, query.page ?? 1, query.limit ?? 20);
+  }
+
+  async findOneSupplier(id: string, tenantId: string) {
+    const supplier = await this.prisma.supplier.findFirst({
+      where: { id, tenantId },
+      include: { purchases: { orderBy: { createdAt: 'desc' }, take: 10 }, payments: { take: 10 } },
+    });
+    if (!supplier) throw new NotFoundException('Supplier not found');
+    return supplier;
+  }
+
+  async createPurchaseOrder(tenantId: string, branchId: string, userId: string, dto: CreatePurchaseOrderDto) {
+    const poNumber = `PO-${Date.now().toString(36).toUpperCase()}`;
+    const subtotal = dto.items.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
+    const taxAmount = dto.items.reduce((s, i) => s + (i.unitCost * i.orderedQty * (i.taxRate ?? 0)) / 100, 0);
+
+    return this.prisma.purchaseOrder.create({
+      data: {
+        tenantId, branchId,
+        supplierId: dto.supplierId,
+        poNumber, subtotal, taxAmount,
+        total: subtotal + taxAmount,
+        expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
+        notes: dto.notes,
+        createdBy: userId,
+        items: {
+          create: dto.items.map((item) => ({
+            variantId: item.variantId,
+            productName: item.productName,
+            variantName: item.variantName,
+            sku: item.sku,
+            orderedQty: item.orderedQty,
+            unitCost: item.unitCost,
+            taxRate: item.taxRate ?? 0,
+            taxAmount: (item.unitCost * item.orderedQty * (item.taxRate ?? 0)) / 100,
+            total: item.unitCost * item.orderedQty,
+          })),
+        },
+      },
+      include: { items: true, supplier: true },
+    });
+  }
+
+  async findAllPOs(tenantId: string, query: PaginationDto & { status?: PurchaseOrderStatus }) {
+    const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const where = { tenantId, ...(query.status && { status: query.status }) };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.purchaseOrder.findMany({
+        where, skip, take,
+        include: { supplier: true, _count: { select: { items: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.purchaseOrder.count({ where }),
+    ]);
+    return paginate(data, total, query.page ?? 1, query.limit ?? 20);
+  }
+
+  async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id: poId, tenantId },
+      include: { items: true },
+    });
+    if (!po) throw new NotFoundException('Purchase order not found');
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        await tx.purchaseOrderItem.update({
+          where: { id: item.itemId },
+          data: { receivedQty: { increment: item.receivedQty }, rejectedQty: { increment: item.rejectedQty ?? 0 } },
+        });
+        const poItem = po.items.find((i) => i.id === item.itemId);
+        if (poItem && item.receivedQty > 0) {
+          await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+            variantId: poItem.variantId,
+            quantity: item.receivedQty,
+            movementType: StockMovementType.PURCHASE,
+            referenceId: poId,
+          });
+        }
+      }
+
+      const allReceived = await tx.purchaseOrderItem.findMany({ where: { purchaseId: poId } });
+      const fullyReceived = allReceived.every((i) => i.receivedQty >= i.orderedQty);
+      const partiallyReceived = allReceived.some((i) => i.receivedQty > 0);
+
+      await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          status: fullyReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          receivedDate: fullyReceived ? new Date() : undefined,
+        },
+      });
+    });
+
+    return this.prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { items: true } });
+  }
+}
+
+@ApiTags('Suppliers')
+@ApiBearerAuth('access-token')
+@Controller({ path: 'suppliers', version: '1' })
+export class SuppliersController {
+  constructor(private readonly suppliersService: SuppliersService) {}
+
+  @Post()
+  @RequirePermissions('suppliers:create')
+  create(@CurrentUser() user: IAuthUser, @Body() dto: CreateSupplierDto) {
+    return this.suppliersService.createSupplier(user.tenantId, dto);
+  }
+
+  @Get()
+  @RequirePermissions('suppliers:read')
+  findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto) {
+    return this.suppliersService.findAllSuppliers(user.tenantId, query);
+  }
+
+  @Get(':id')
+  @RequirePermissions('suppliers:read')
+  findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.findOneSupplier(id, user.tenantId);
+  }
+}
+
+@ApiTags('Purchases')
+@ApiBearerAuth('access-token')
+@Controller({ path: 'purchases', version: '1' })
+export class PurchasesController {
+  constructor(private readonly suppliersService: SuppliersService) {}
+
+  @Post()
+  @RequirePermissions('purchases:create')
+  @ApiOperation({ summary: 'Create purchase order' })
+  create(@CurrentUser() user: IAuthUser, @Body() dto: CreatePurchaseOrderDto) {
+    return this.suppliersService.createPurchaseOrder(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get()
+  @RequirePermissions('purchases:read')
+  findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { status?: PurchaseOrderStatus }) {
+    return this.suppliersService.findAllPOs(user.tenantId, query);
+  }
+
+  @Post(':id/receive')
+  @RequirePermissions('purchases:update')
+  @ApiOperation({ summary: 'Receive items from purchase order' })
+  receive(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() body: { items: ReceiveItemDto[] },
+  ) {
+    return this.suppliersService.receiveItems(id, user.tenantId, user.branchId ?? '', user.id, body.items);
+  }
+}
+
+@Module({
+  imports: [InventoryModule],
+  controllers: [SuppliersController, PurchasesController],
+  providers: [SuppliersService],
+  exports: [SuppliersService],
+})
+export class SuppliersModule {}
+
+@Module({ imports: [], controllers: [], providers: [] })
+export class PurchasesModule {}

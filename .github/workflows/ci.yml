@@ -1,0 +1,159 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/fashionerp-api
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fashionerp
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: fashionerp_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/api/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate
+        env:
+          DATABASE_URL: postgresql://fashionerp:test_password@localhost:5432/fashionerp_test
+
+      - name: Run Prisma migrations
+        run: pnpm prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://fashionerp:test_password@localhost:5432/fashionerp_test
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type check
+        run: pnpm tsc --noEmit
+
+      - name: Unit tests
+        run: pnpm test --coverage
+        env:
+          DATABASE_URL: postgresql://fashionerp:test_password@localhost:5432/fashionerp_test
+          JWT_ACCESS_SECRET: test_access_secret_at_least_32_characters
+          JWT_REFRESH_SECRET: test_refresh_secret_at_least_32_characters
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: E2E tests
+        run: pnpm test:e2e
+        env:
+          DATABASE_URL: postgresql://fashionerp:test_password@localhost:5432/fashionerp_test
+          JWT_ACCESS_SECRET: test_access_secret_at_least_32_characters
+          JWT_REFRESH_SECRET: test_refresh_secret_at_least_32_characters
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          directory: apps/api/coverage
+          flags: api
+
+  build-and-push:
+    name: Build & Push Docker Image
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/api
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Production
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "Deploying to Kubernetes cluster..."
+          # kubectl set image deployment/fashionerp-api api=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          # kubectl rollout status deployment/fashionerp-api

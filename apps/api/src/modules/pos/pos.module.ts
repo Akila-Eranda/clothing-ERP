@@ -1,0 +1,378 @@
+import { Module } from '@nestjs/common';
+import {
+  Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { PaymentMethod, SaleStatus, StockMovementType } from '@prisma/client';
+import { PrismaService } from '@/prisma/prisma.service';
+import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
+import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { InventoryService } from '@/modules/inventory/inventory.module';
+import { InventoryModule } from '@/modules/inventory/inventory.module';
+import { nanoid } from 'nanoid';
+import * as dayjs from 'dayjs';
+
+export class SaleItemDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() discountType?: string;
+  @ApiProperty() @IsNumber() @Min(0) costPrice: number;
+  @ApiProperty() @IsString() productName: string;
+  @ApiProperty() @IsString() variantName: string;
+  @ApiProperty() @IsString() sku: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+}
+
+export class SalePaymentDto {
+  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
+  @ApiProperty() @IsNumber() @Min(0) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+}
+
+export class CreateSaleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() customerId?: string;
+  @ApiProperty({ type: [SaleItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => SaleItemDto) items: SaleItemDto[];
+  @ApiProperty({ type: [SalePaymentDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => SalePaymentDto) payments: SalePaymentDto[];
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discountAmount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) loyaltyPointsToRedeem?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() couponCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class HoldBillDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() label?: string;
+  @ApiProperty() data: object;
+}
+
+@Injectable()
+export class PosService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventoryService: InventoryService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
+
+  async createSale(tenantId: string, branchId: string, cashierId: string, dto: CreateSaleDto) {
+    const invoiceNumber = await this.generateInvoiceNumber(tenantId);
+
+    const subtotal = dto.items.reduce((sum, item) => {
+      const lineTotal = item.unitPrice * item.quantity;
+      const discount = item.discountType === 'PERCENTAGE'
+        ? (lineTotal * (item.discount ?? 0)) / 100
+        : (item.discount ?? 0);
+      return sum + lineTotal - discount;
+    }, 0);
+
+    const taxAmount = dto.items.reduce((sum, item) => {
+      const lineTotal = item.unitPrice * item.quantity;
+      const discount = item.discountType === 'PERCENTAGE'
+        ? (lineTotal * (item.discount ?? 0)) / 100
+        : (item.discount ?? 0);
+      const taxable = lineTotal - discount;
+      return sum + (taxable * (item.taxRate ?? 0)) / 100;
+    }, 0);
+
+    const totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
+    const discountAmount = dto.discountAmount ?? 0;
+    const total = subtotal + taxAmount - discountAmount;
+    const roundOff = Math.round(total) - total;
+    const finalTotal = total + roundOff;
+    const changeDue = Math.max(0, totalPaid - finalTotal);
+
+    let loyaltyDiscount = 0;
+    let pointsRedeemed = 0;
+    let pointsEarned = 0;
+
+    if (dto.customerId && dto.loyaltyPointsToRedeem) {
+      const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
+      if (customer && customer.loyaltyPoints >= dto.loyaltyPointsToRedeem) {
+        loyaltyDiscount = dto.loyaltyPointsToRedeem * 0.1;
+        pointsRedeemed = dto.loyaltyPointsToRedeem;
+      }
+    }
+
+    const sale = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.sale.create({
+        data: {
+          tenantId,
+          branchId,
+          customerId: dto.customerId,
+          cashierId,
+          invoiceNumber,
+          status: SaleStatus.COMPLETED,
+          subtotal,
+          discountAmount,
+          taxAmount,
+          roundOff,
+          loyaltyDiscount,
+          total: finalTotal - loyaltyDiscount,
+          amountPaid: totalPaid,
+          changeDue,
+          paymentMethod: dto.payments[0]?.method ?? PaymentMethod.CASH,
+          pointsRedeemed,
+          notes: dto.notes,
+          couponCode: dto.couponCode,
+          items: {
+            create: dto.items.map((item) => {
+              const lineTotal = item.unitPrice * item.quantity;
+              const discount = item.discountType === 'PERCENTAGE'
+                ? (lineTotal * (item.discount ?? 0)) / 100
+                : (item.discount ?? 0);
+              const taxAmt = ((lineTotal - discount) * (item.taxRate ?? 0)) / 100;
+              return {
+                variantId: item.variantId,
+                productName: item.productName,
+                variantName: item.variantName,
+                sku: item.sku,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                costPrice: item.costPrice,
+                discount: item.discount ?? 0,
+                discountType: item.discountType ?? 'FIXED',
+                taxRate: item.taxRate ?? 0,
+                taxAmount: taxAmt,
+                total: lineTotal - discount + taxAmt,
+              };
+            }),
+          },
+          payments: {
+            create: dto.payments.map((p) => ({
+              method: p.method,
+              amount: p.amount,
+              reference: p.reference,
+            })),
+          },
+        },
+        include: {
+          items: true,
+          payments: true,
+          customer: true,
+        },
+      });
+
+      // Update inventory
+      for (const item of dto.items) {
+        await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
+          variantId: item.variantId,
+          quantity: -item.quantity,
+          movementType: StockMovementType.SALE,
+          referenceId: created.id,
+        });
+      }
+
+      // Update customer stats + loyalty
+      if (dto.customerId) {
+        pointsEarned = Math.floor(finalTotal / 100);
+        await tx.customer.update({
+          where: { id: dto.customerId },
+          data: {
+            totalSpent: { increment: finalTotal },
+            totalOrders: { increment: 1 },
+            loyaltyPoints: { increment: pointsEarned - pointsRedeemed },
+            lastPurchaseAt: new Date(),
+          },
+        });
+
+        if (pointsEarned > 0) {
+          await tx.loyaltyTransaction.create({
+            data: {
+              customerId: dto.customerId,
+              tenantId,
+              points: pointsEarned,
+              type: 'EARNED',
+              description: `Sale ${invoiceNumber}`,
+              referenceId: created.id,
+            },
+          });
+        }
+      }
+
+      return created;
+    });
+
+    this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: finalTotal });
+    return sale;
+  }
+
+  async getSales(tenantId: string, branchId: string, query: { page?: number; limit?: number; search?: string; date?: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const skip = (page - 1) * limit;
+    const where = {
+      tenantId,
+      branchId,
+      ...(query.search && {
+        OR: [
+          { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
+          { customer: { phone: { contains: query.search } } },
+        ],
+      }),
+      ...(query.date && {
+        invoiceDate: {
+          gte: dayjs(query.date).startOf('day').toDate(),
+          lte: dayjs(query.date).endOf('day').toDate(),
+        },
+      }),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.sale.findMany({
+        where,
+        skip,
+        take: limit,
+        include: { customer: true, cashier: true, _count: { select: { items: true } } },
+        orderBy: { invoiceDate: 'desc' },
+      }),
+      this.prisma.sale.count({ where }),
+    ]);
+
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async getSaleById(id: string, tenantId: string) {
+    const sale = await this.prisma.sale.findFirst({
+      where: { id, tenantId },
+      include: {
+        items: { include: { variant: { include: { product: true } } } },
+        payments: true,
+        customer: true,
+        cashier: true,
+      },
+    });
+    if (!sale) throw new NotFoundException('Sale not found');
+    return sale;
+  }
+
+  async holdBill(tenantId: string, branchId: string, cashierId: string, dto: HoldBillDto) {
+    return this.prisma.heldBill.create({
+      data: { tenantId, branchId, cashierId, label: dto.label, data: dto.data as object },
+    });
+  }
+
+  async getHeldBills(tenantId: string, branchId: string) {
+    return this.prisma.heldBill.findMany({
+      where: { tenantId, branchId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async deleteHeldBill(id: string) {
+    return this.prisma.heldBill.delete({ where: { id } });
+  }
+
+  async getDailySummary(tenantId: string, branchId: string, date?: string) {
+    const targetDate = date ? dayjs(date) : dayjs();
+    const where = {
+      tenantId,
+      branchId,
+      status: SaleStatus.COMPLETED,
+      invoiceDate: {
+        gte: targetDate.startOf('day').toDate(),
+        lte: targetDate.endOf('day').toDate(),
+      },
+    };
+
+    const [sales, totals] = await this.prisma.$transaction([
+      this.prisma.sale.findMany({ where, include: { payments: true } }),
+      this.prisma.sale.aggregate({
+        where,
+        _sum: { total: true, taxAmount: true, discountAmount: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
+      for (const payment of sale.payments) {
+        acc[payment.method] = (acc[payment.method] ?? 0) + payment.amount;
+      }
+      return acc;
+    }, {});
+
+    return {
+      date: targetDate.format('YYYY-MM-DD'),
+      totalSales: totals._count.id,
+      totalRevenue: totals._sum.total ?? 0,
+      totalTax: totals._sum.taxAmount ?? 0,
+      totalDiscount: totals._sum.discountAmount ?? 0,
+      byPaymentMethod,
+    };
+  }
+
+  private async generateInvoiceNumber(tenantId: string): Promise<string> {
+    const prefix = 'INV';
+    const date = dayjs().format('YYYYMMDD');
+    const count = await this.prisma.sale.count({
+      where: { tenantId, invoiceDate: { gte: dayjs().startOf('day').toDate() } },
+    });
+    return `${prefix}-${date}-${String(count + 1).padStart(4, '0')}`;
+  }
+}
+
+@ApiTags('POS')
+@ApiBearerAuth('access-token')
+@Controller({ path: 'pos', version: '1' })
+export class PosController {
+  constructor(private readonly posService: PosService) {}
+
+  @Post('sale')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Process a POS sale transaction' })
+  createSale(@CurrentUser() user: IAuthUser, @Body() dto: CreateSaleDto) {
+    return this.posService.createSale(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('sales')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'List sales for branch' })
+  getSales(@CurrentUser() user: IAuthUser, @Query() query: { page?: number; limit?: number; search?: string; date?: string }) {
+    return this.posService.getSales(user.tenantId, user.branchId ?? '', query);
+  }
+
+  @Get('sales/:id')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Get sale details' })
+  getSaleById(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.posService.getSaleById(id, user.tenantId);
+  }
+
+  @Post('hold')
+  @ApiOperation({ summary: 'Hold a bill for later' })
+  holdBill(@CurrentUser() user: IAuthUser, @Body() dto: HoldBillDto) {
+    return this.posService.holdBill(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('hold')
+  @ApiOperation({ summary: 'Get held bills' })
+  getHeldBills(@CurrentUser() user: IAuthUser) {
+    return this.posService.getHeldBills(user.tenantId, user.branchId ?? '');
+  }
+
+  @Delete('hold/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete held bill' })
+  deleteHeldBill(@Param('id') id: string) {
+    return this.posService.deleteHeldBill(id);
+  }
+
+  @Get('summary')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Get daily sales summary' })
+  getDailySummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
+    return this.posService.getDailySummary(user.tenantId, user.branchId ?? '', date);
+  }
+}
+
+@Module({
+  imports: [InventoryModule],
+  controllers: [PosController],
+  providers: [PosService],
+  exports: [PosService],
+})
+export class PosModule {}

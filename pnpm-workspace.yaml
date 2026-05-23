@@ -1,0 +1,15 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+overrides:
+  bullmq: "5.77.1"
+
+onlyBuiltDependencies:
+  - "@nestjs/core"
+  - "@prisma/client"
+  - "@prisma/engines"
+  - "msgpackr-extract"
+  - "prisma"
+  - "sharp"
+  - "unrs-resolver"
