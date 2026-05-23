@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,7 +22,6 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
   const { loginWithApi } = useAuthStore();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -37,7 +36,7 @@ export default function LoginPage() {
     try {
       await loginWithApi(data.email, data.password);
       toast.success("Welcome back!");
-      router.push("/dashboard");
+      window.location.href = '/dashboard';
     } catch (err: any) {
       toast.error(err?.message ?? "Invalid email or password");
     } finally {
