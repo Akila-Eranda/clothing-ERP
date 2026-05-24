@@ -32,6 +32,7 @@ RUN pnpm install --prod --frozen-lockfile
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
 USER nestjs

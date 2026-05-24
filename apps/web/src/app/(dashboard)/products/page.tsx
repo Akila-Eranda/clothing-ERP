@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Plus, Upload, Package, AlertTriangle, TrendingUp, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { formatNumber } from "@/lib/utils";
 import { DUMMY_PRODUCTS } from "@/lib/constants";
+import { AddProductModal } from "@/components/products/add-product-modal";
 
 const STATS = [
   { label: "Total Products",  value: "1,284", icon: Package,       color: "text-blue-500",   bg: "bg-blue-500/10" },
@@ -103,6 +105,7 @@ const columns: ColumnDef<Product>[] = [
 ];
 
 export default function ProductsPage() {
+  const [modalOpen, setModalOpen] = useState(false);
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -112,7 +115,7 @@ export default function ProductsPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="gap-1.5"><Upload className="h-3.5 w-3.5" />Import</Button>
-          <Button variant="gradient" size="sm" className="gap-1.5"><Plus className="h-3.5 w-3.5" />Add Product</Button>
+          <Button variant="gradient" size="sm" className="gap-1.5" onClick={() => setModalOpen(true)}><Plus className="h-3.5 w-3.5" />Add Product</Button>
         </div>
       </div>
 
@@ -175,6 +178,7 @@ export default function ProductsPage() {
         ]}
         isShowExportButtons={{ isShow: true, fileName: "products-export" }}
       />
+      <AddProductModal open={modalOpen} onClose={() => setModalOpen(false)} onCreated={() => setModalOpen(false)} />
     </div>
   );
 }

@@ -26,6 +26,9 @@ export class CreateProductDto {
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsBoolean() hasVariants?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() trackInventory?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() seoTitle?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() seoDescription?: string;
 }
 
 export class CreateCategoryDto {
@@ -73,6 +76,9 @@ export class ProductsService {
         tags: dto.tags ?? [],
         hasVariants: dto.hasVariants ?? true,
         trackInventory: dto.trackInventory ?? true,
+        barcode: dto.barcode,
+        seoTitle: dto.seoTitle,
+        seoDescription: dto.seoDescription,
       },
       include: { category: true, brand: true, variants: true },
     });
