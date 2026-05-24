@@ -1,19 +1,19 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { motion } from "framer-motion";
 import {
-  Plus, Search, Phone, Mail, Star, Crown,
-  Users, UserCheck, Gift, MoreHorizontal, Eye, Edit, Trash2,
+  Plus, Star, Crown,
+  Users, Gift, Eye, Edit, Trash2,
   RefreshCw, Download, Diamond, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber, getInitials } from "@/lib/utils";
@@ -40,15 +40,96 @@ function exportCsv(customers: Customer[]) {
   a.click();
 }
 
+// ── Column builder ────────────────────────────────────────────────────────
+function buildColumns(
+  onView:   (c: Customer) => void,
+  onEdit:   (c: Customer) => void,
+  onDelete: (c: Customer) => void,
+): ColumnDef<Customer>[] {
+  return [
+    {
+      id: "customer",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => {
+        const c = row.original;
+        const name = `${c.firstName} ${c.lastName ?? ""}`.trim();
+        const tierConf = TIER_CONF[c.tier] ?? TIER_CONF.BRONZE;
+        const TierIcon = tierConf.icon;
+        return (
+          <div className="flex items-center gap-2.5">
+            <Avatar className="h-8 w-8 shrink-0">
+              <AvatarFallback className="text-xs font-bold">{getInitials(name)}</AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="text-sm font-semibold">{name}</p>
+              <div className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 ${tierConf.bg} ${tierConf.color}`}>
+                <TierIcon className="h-2 w-2" />{tierConf.label}
+              </div>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "phone",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Phone" />,
+      cell: ({ row }) => <span className="text-sm font-mono">{row.original.phone}</span>,
+    },
+    {
+      accessorKey: "email",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground truncate max-w-[160px] block">
+          {row.original.email ?? "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "totalSpent",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Total Spent" />,
+      cell: ({ row }) => <span className="text-sm font-semibold">₹{formatNumber(row.original.totalSpent)}</span>,
+    },
+    {
+      accessorKey: "totalOrders",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Orders" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.totalOrders}</span>,
+    },
+    {
+      accessorKey: "loyaltyPoints",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Points" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold text-amber-500">{formatNumber(row.original.loyaltyPoints)}</span>
+      ),
+    },
+    {
+      accessorKey: "walletBalance",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Wallet" />,
+      cell: ({ row }) => (
+        <span className={`text-sm font-semibold ${row.original.walletBalance > 0 ? "text-emerald-500" : "text-muted-foreground"}`}>
+          ₹{formatNumber(row.original.walletBalance)}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <TableActionsRow
+          showAction={{ action: () => onView(row.original), tooltip: "View Profile" }}
+          editAction={{ action: () => onEdit(row.original) }}
+          deleteAction={{ action: () => onDelete(row.original) }}
+        />
+      ),
+    },
+  ];
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function CustomersPage() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [loading, setLoading]     = useState(true);
-  const [search, setSearch]       = useState("");
-  const [tierFilter, setTierFilter] = useState("ALL");
-  const [addOpen, setAddOpen]     = useState(false);
+  const [customers, setCustomers]       = useState<Customer[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [addOpen, setAddOpen]           = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | undefined>();
-  const [viewId, setViewId]       = useState<string | null>(null);
+  const [viewId, setViewId]             = useState<string | null>(null);
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
@@ -70,25 +151,23 @@ export default function CustomersPage() {
     } catch (e: unknown) { toast.error((e as Error).message ?? "Delete failed"); }
   };
 
-  // filter
-  const filtered = customers.filter((c) => {
-    const q = search.toLowerCase();
-    const matchSearch = !q || `${c.firstName} ${c.lastName ?? ""}`.toLowerCase().includes(q) ||
-      c.phone.includes(q) || c.email?.toLowerCase().includes(q);
-    const matchTier = tierFilter === "ALL" || c.tier === tierFilter;
-    return matchSearch && matchTier;
-  });
-
   // stats
-  const totalPoints  = customers.reduce((s, c) => s + c.loyaltyPoints, 0);
-  const totalWallet  = customers.reduce((s, c) => s + c.walletBalance, 0);
-  const premium      = customers.filter((c) => ["GOLD","PLATINUM","DIAMOND"].includes(c.tier)).length;
+  const totalPoints = customers.reduce((s, c) => s + c.loyaltyPoints, 0);
+  const totalWallet = customers.reduce((s, c) => s + c.walletBalance, 0);
+  const premium     = customers.filter((c) => ["GOLD","PLATINUM","DIAMOND"].includes(c.tier)).length;
+
   const STATS = [
-    { label: "Total Customers",  value: customers.length,           icon: Users,    color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Gold+ Members",    value: premium,                    icon: Crown,    color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "Loyalty Points",   value: formatNumber(totalPoints),  icon: Gift,     color: "text-violet-500",  bg: "bg-violet-500/10" },
-    { label: "Wallet Balance",   value: `₹${formatNumber(totalWallet)}`, icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total Customers", value: customers.length,                    icon: Users,   color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Gold+ Members",   value: premium,                             icon: Crown,   color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Loyalty Points",  value: formatNumber(totalPoints),           icon: Gift,    color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Wallet Balance",  value: `₹${formatNumber(totalWallet)}`,    icon: Wallet,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
+
+  const columns = buildColumns(
+    (c) => setViewId(c.id),
+    (c) => { setEditCustomer(c); setAddOpen(true); },
+    handleDelete,
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -123,112 +202,24 @@ export default function CustomersPage() {
         ))}
       </div>
 
-      {/* Search + filter bar */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[220px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search name, phone, email…" className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <Select value={tierFilter} onValueChange={setTierFilter}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Tiers</SelectItem>
-            {Object.entries(TIER_CONF).map(([v, c]) => (
-              <SelectItem key={v} value={v}>{c.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <span className="text-xs text-muted-foreground self-center">{filtered.length} customers</span>
-      </div>
-
-      {/* Customer cards */}
-      {filtered.length === 0 && !loading && (
-        <div className="text-center py-16 text-muted-foreground">
-          <UserCheck className="h-10 w-10 mx-auto mb-3 opacity-30" />
-          <p className="font-medium">No customers found</p>
-          <p className="text-sm mt-1">Try adjusting your search or add a new customer</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {filtered.map((customer, i) => {
-          const tierConf = TIER_CONF[customer.tier] ?? TIER_CONF.BRONZE;
-          const TierIcon = tierConf.icon;
-          const name = `${customer.firstName} ${customer.lastName ?? ""}`.trim();
-          return (
-            <motion.div key={customer.id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}>
-              <Card className="hover:shadow-md transition-shadow group cursor-pointer" onClick={() => setViewId(customer.id)}>
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-11 w-11 shrink-0">
-                        <AvatarFallback className="text-sm font-semibold">{getInitials(name)}</AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold text-sm">{name}</p>
-                        <div className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 ${tierConf.bg} ${tierConf.color}`}>
-                          <TierIcon className="h-2.5 w-2.5" />{tierConf.label}
-                        </div>
-                      </div>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon-sm" className="h-7 w-7 opacity-0 group-hover:opacity-100">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={() => setViewId(customer.id)}>
-                          <Eye className="mr-2 h-4 w-4" />View Profile
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setEditCustomer(customer); setAddOpen(true); }}>
-                          <Edit className="mr-2 h-4 w-4" />Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDelete(customer)}>
-                          <Trash2 className="mr-2 h-4 w-4" />Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-
-                  <div className="space-y-1 mb-3">
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Phone className="h-3 w-3 shrink-0" />{customer.phone}
-                    </div>
-                    {customer.email && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Mail className="h-3 w-3 shrink-0" /><span className="truncate">{customer.email}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 pt-3 border-t">
-                    <div className="text-center">
-                      <p className="text-sm font-bold">₹{formatNumber(customer.totalSpent)}</p>
-                      <p className="text-[10px] text-muted-foreground">Spent</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-bold">{customer.totalOrders}</p>
-                      <p className="text-[10px] text-muted-foreground">Orders</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-sm font-bold text-amber-500">{formatNumber(customer.loyaltyPoints)}</p>
-                      <p className="text-[10px] text-muted-foreground">Points</p>
-                    </div>
-                  </div>
-
-                  {customer.walletBalance > 0 && (
-                    <div className="mt-2 pt-2 border-t flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
-                      <Wallet className="h-3 w-3" />Wallet: ₹{formatNumber(customer.walletBalance)}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
+      {/* Table */}
+      <ClientSideTable
+        data={customers}
+        columns={columns}
+        pageCount={Math.ceil(customers.length / 10)}
+        searchableColumns={[
+          { id: "phone", title: "Phone" },
+          { id: "email", title: "Email" },
+        ]}
+        filterableColumns={[
+          {
+            id: "tier",
+            title: "Tier",
+            options: Object.entries(TIER_CONF).map(([v, c]) => ({ value: v, label: c.label })),
+          },
+        ]}
+        isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
+      />
 
       {/* Modals */}
       <AddCustomerModal
