@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min,
+  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -9,6 +10,19 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { nanoid } from 'nanoid';
 import slugify from 'slugify';
+
+export class CreateVariantDto {
+  @ApiProperty() @IsString() sku: string;
+  @ApiProperty() @IsString() name: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() size?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() color?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
+  @ApiProperty() @IsNumber() @Min(0) sellingPrice: number;
+  @ApiProperty() @IsNumber() @Min(0) costPrice: number;
+  @ApiProperty() @IsNumber() @Min(0) mrp: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+}
 
 export class CreateProductDto {
   @ApiProperty() @IsString() name: string;
@@ -29,6 +43,9 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() seoTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() seoDescription?: string;
+  @ApiPropertyOptional({ type: [CreateVariantDto] })
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
+  variants?: CreateVariantDto[];
 }
 
 export class CreateCategoryDto {
@@ -56,7 +73,7 @@ export class ProductsService {
     const existing = await this.prisma.product.findFirst({ where: { tenantId, slug } });
     if (existing) throw new ConflictException('Product with this name already exists');
 
-    return this.prisma.product.create({
+    const product = await this.prisma.product.create({
       data: {
         tenantId,
         name: dto.name,
@@ -80,8 +97,29 @@ export class ProductsService {
         seoTitle: dto.seoTitle,
         seoDescription: dto.seoDescription,
       },
-      include: { category: true, brand: true, variants: true },
+      include: { category: true, brand: true, _count: { select: { variants: true } } },
     });
+
+    if (dto.variants?.length) {
+      await this.prisma.productVariant.createMany({
+        data: dto.variants.map((v, i) => ({
+          productId: product.id,
+          sku: v.sku,
+          name: v.name,
+          size: v.size,
+          color: v.color,
+          material: v.material,
+          style: v.style,
+          sellingPrice: v.sellingPrice,
+          costPrice: v.costPrice,
+          mrp: v.mrp,
+          taxRate: v.taxRate ?? dto.taxRate ?? 18,
+          sortOrder: i,
+        })),
+      });
+    }
+
+    return product;
   }
 
   async findAll(tenantId: string, query: PaginationDto & { categoryId?: string; status?: ProductStatus }) {
@@ -150,6 +188,27 @@ export class ProductsService {
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
     return this.prisma.product.delete({ where: { id } });
+  }
+
+  async addVariants(productId: string, tenantId: string, variants: CreateVariantDto[]) {
+    await this.findOne(productId, tenantId);
+    await this.prisma.productVariant.createMany({
+      data: variants.map((v, i) => ({
+        productId,
+        sku: v.sku,
+        name: v.name,
+        size: v.size,
+        color: v.color,
+        material: v.material,
+        style: v.style,
+        sellingPrice: v.sellingPrice,
+        costPrice: v.costPrice,
+        mrp: v.mrp,
+        taxRate: v.taxRate ?? 18,
+        sortOrder: i,
+      })),
+    });
+    return this.findOne(productId, tenantId);
   }
 
   async bulkUpdateStatus(ids: string[], tenantId: string, status: ProductStatus) {

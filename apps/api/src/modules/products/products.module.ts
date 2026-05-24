@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProductStatus } from '@prisma/client';
-import { ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto } from './products.service';
+import { ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto, CreateVariantDto } from './products.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -56,6 +56,13 @@ export class ProductsController {
   @ApiOperation({ summary: 'Bulk update product status' })
   bulkStatus(@CurrentUser() user: IAuthUser, @Body() body: { ids: string[]; status: ProductStatus }) {
     return this.productsService.bulkUpdateStatus(body.ids, user.tenantId, body.status);
+  }
+
+  @Post(':id/variants')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Add variants to existing product' })
+  addVariants(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { variants: CreateVariantDto[] }) {
+    return this.productsService.addVariants(id, user.tenantId, body.variants);
   }
 
   @Delete(':id')

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   Info, Layers, DollarSign, ImageIcon, Tag, Settings2,
   CheckCircle2, Plus, Trash2, X, Loader2, Sparkles, Package,
+  Zap, List, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -133,6 +134,23 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       toast.error("Selling price, cost price, and MRP are required"); setTab("pricing"); return;
     }
     setLoading(true);
+    const validAttrs = form.attributes.filter((a) => a.values.length > 0);
+    const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
+    const variants = variantCombos.map((combo) => {
+      const sku = genSku(form.name, combo);
+      const v: Record<string, unknown> = {
+        sku, name: combo.join(" / "),
+        sellingPrice: parseFloat(form.sellingPrice) || 0,
+        costPrice: parseFloat(form.costPrice) || 0,
+        mrp: parseFloat(form.mrp) || 0,
+        taxRate: parseFloat(form.taxRate) || 18,
+      };
+      validAttrs.forEach((attr, idx) => {
+        const k = attr.name.toLowerCase();
+        if (["size","color","material","style"].includes(k)) v[k] = combo[idx];
+      });
+      return v;
+    });
     const payload = {
       name: form.name.trim(),
       description: form.description || undefined,
@@ -151,6 +169,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       trackInventory: form.trackInventory,
       seoTitle: form.seoTitle || undefined,
       seoDescription: form.seoDescription || undefined,
+      variants: variants.length > 0 ? variants : undefined,
     };
     try {
       if (editProduct) {
@@ -258,10 +277,31 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     </div>
   );
 
+  // ── Color swatch map ────────────────────────────────────────────────────
+  const COLOR_HEX: Record<string, string> = {
+    black: "#1a1a1a", white: "#f5f5f5", red: "#ef4444", blue: "#3b82f6",
+    green: "#22c55e", yellow: "#eab308", purple: "#8b5cf6", pink: "#ec4899",
+    orange: "#f97316", navy: "#1e3a8a", grey: "#9ca3af", gray: "#9ca3af",
+    olive: "#6b7c3a", brown: "#92400e", cream: "#fef3c7", beige: "#d4a574",
+    maroon: "#7f1d1d", teal: "#0d9488", cyan: "#06b6d4", indigo: "#6366f1",
+  };
+  const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
+
+  const autoGenerate = () => {
+    const updated = form.attributes.map((a) => {
+      const n = a.name.toLowerCase();
+      if (n === "size")  return { ...a, values: ["S", "M", "L", "XL"] };
+      if (n === "color") return { ...a, values: ["Black", "White", "Navy", "Olive"] };
+      return a;
+    });
+    set("attributes", updated);
+  };
+
   const renderVariants = () => {
-    const variants = cartesian(form.attributes);
-    const a0 = form.attributes[0];
-    const a1 = form.attributes[1];
+    const allVariants = cartesian(form.attributes);
+    const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
+    const a0 = validAttrs[0];
+    const a1 = validAttrs[1];
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -278,79 +318,105 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         {form.hasVariants ? (
           <div className="grid grid-cols-3 gap-5">
             <div className="col-span-2 space-y-4">
-              {/* Attributes */}
+              {/* 1. Select Variant Attributes */}
               <div className="rounded-xl border p-4 space-y-4 bg-card">
-                <h4 className="font-semibold text-sm">1. Select Variant Attributes</h4>
+                <div>
+                  <h4 className="font-semibold text-sm">1. Select Variant Attributes</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5">Choose attributes that best describe your product</p>
+                </div>
+
                 {form.attributes.map((attr, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input value={attr.name} className="w-28 h-8 text-sm"
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Input value={attr.name} className="w-24 h-7 text-xs font-semibold border-0 bg-transparent px-0 focus-visible:ring-0"
                         onChange={(e) => { const a = [...form.attributes]; a[i] = { ...a[i], name: e.target.value }; set("attributes", a); }}
-                        placeholder="e.g. Size" />
-                      {form.attributes.length > 1 && (
-                        <Button variant="ghost" size="icon-sm" onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
-                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                        </Button>
-                      )}
+                        placeholder="Attribute" />
+                      <div className="flex items-center gap-0.5">
+                        <button className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[40px] bg-background cursor-text"
+                    {/* Tag input row */}
+                    <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[42px] bg-background cursor-text"
                       onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
-                      {attr.values.map((v, vi) => (
-                        <Badge key={vi} variant="secondary" className="gap-1 pl-2 pr-1 h-6">
-                          {v}
-                          <button className="hover:text-destructive" onClick={() => {
-                            const a = form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) });
-                            set("attributes", a);
-                          }}><X className="h-3 w-3" /></button>
-                        </Badge>
-                      ))}
-                      <input className="flex-1 min-w-[120px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
-                        placeholder="Add value, press Enter..."
+                      {attr.values.map((v, vi) => {
+                        const hex = attr.name.toLowerCase() === "color" ? getColorHex(v) : null;
+                        return (
+                          <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
+                            {hex && <span className="h-3.5 w-3.5 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
+                            {v}
+                            <button className="hover:text-destructive ml-0.5" onClick={(e) => {
+                              e.stopPropagation();
+                              const a = form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) });
+                              set("attributes", a);
+                            }}><X className="h-3 w-3" /></button>
+                          </Badge>
+                        );
+                      })}
+                      <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
+                        placeholder={`Add ${attr.name}…`}
                         value={attr.input}
                         onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }}
                       />
+                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
                   </div>
                 ))}
+
                 <div className="flex items-center justify-between">
-                  <Button variant="outline" size="sm" className="gap-1 h-8" onClick={() =>
-                    set("attributes", [...form.attributes, { name: "Color", values: [], input: "" }])}>
-                    <Plus className="h-3.5 w-3.5" /> Add Attribute
-                  </Button>
-                  <span className="text-xs text-muted-foreground font-medium">Total Variants: <span className="text-primary font-bold">{variants.length}</span></span>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() =>
+                      set("attributes", [...form.attributes, { name: "Color", values: [], input: "" }])}>
+                      <Plus className="h-3.5 w-3.5" /> Add Attribute
+                    </Button>
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
+                      <Zap className="h-3.5 w-3.5" /> Auto Generate
+                    </Button>
+                  </div>
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Total Variants: <span className="font-bold text-primary">{allVariants.length}</span>
+                  </span>
                 </div>
               </div>
 
-              {/* Variant Preview */}
-              {variants.length > 0 && (
+              {/* 2. Variant Preview */}
+              {allVariants.length > 0 && (
                 <div className="rounded-xl border p-4 space-y-3 bg-card">
-                  <div className="flex items-center justify-between">
+                  <div>
                     <h4 className="font-semibold text-sm">2. Variant Preview</h4>
-                    <Button variant="ghost" size="sm" className="text-destructive text-xs h-7 gap-1" onClick={() =>
-                      set("attributes", form.attributes.map((a) => ({ ...a, values: [], input: "" })))}>
-                      <Trash2 className="h-3 w-3" /> Clear All
-                    </Button>
+                    <p className="text-xs text-muted-foreground mt-0.5">Preview all variants combination</p>
                   </div>
-                  {a0?.values.length > 0 && a1?.values.length > 0 ? (
+
+                  {a0 && a1 ? (
                     <div className="overflow-auto rounded-lg border">
                       <table className="w-full text-xs border-collapse">
                         <thead>
-                          <tr>
-                            <th className="border-b border-r px-3 py-2 bg-muted/60 text-left text-muted-foreground">
-                              {a0.name} \ {a1.name}
+                          <tr className="bg-muted/40">
+                            <th className="border-b border-r px-3 py-2 text-left text-muted-foreground font-medium">
+                              {a0.name}&nbsp;\&nbsp;{a1.name}
                             </th>
-                            {a1.values.map((v) => (
-                              <th key={v} className="border-b border-r px-3 py-2 bg-muted/60 text-center font-medium">{v}</th>
-                            ))}
+                            {a1.values.map((v) => {
+                              const hex = a1.name.toLowerCase() === "color" ? getColorHex(v) : null;
+                              return (
+                                <th key={v} className="border-b border-r last:border-r-0 px-3 py-2 text-center font-medium">
+                                  <div className="flex flex-col items-center gap-1">
+                                    {hex && <span className="h-6 w-6 rounded-full border border-border/60 block" style={{ backgroundColor: hex }} />}
+                                    {v}
+                                  </div>
+                                </th>
+                              );
+                            })}
                           </tr>
                         </thead>
                         <tbody>
                           {a0.values.map((row) => (
-                            <tr key={row}>
-                              <td className="border-r px-3 py-2 bg-muted/30 font-medium">{row}</td>
+                            <tr key={row} className="hover:bg-muted/20 transition-colors">
+                              <td className="border-r px-3 py-2.5 bg-muted/20 font-semibold">{row}</td>
                               {a1.values.map((col) => (
-                                <td key={col} className="border-r last:border-r-0 px-3 py-2 text-center font-mono text-muted-foreground">
+                                <td key={col} className="border-r last:border-r-0 px-3 py-2.5 text-center font-mono text-[11px] text-muted-foreground">
                                   {genSku(form.name, [row, col])}
                                 </td>
                               ))}
@@ -361,38 +427,59 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                     </div>
                   ) : (
                     <div className="space-y-1">
-                      {variants.slice(0, 15).map((combo, i) => (
+                      {allVariants.slice(0, 12).map((combo, i) => (
                         <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-muted/30 text-xs">
                           <span className="font-mono text-primary">{genSku(form.name, combo)}</span>
                           <span className="text-muted-foreground">{combo.join(" / ")}</span>
                         </div>
                       ))}
-                      {variants.length > 15 && <p className="text-xs text-muted-foreground pl-1">+{variants.length - 15} more variants</p>}
+                      {allVariants.length > 12 && <p className="text-xs text-muted-foreground pl-1">+{allVariants.length - 12} more variants</p>}
                     </div>
                   )}
+
+                  <div className="flex items-center justify-between pt-1">
+                    <label className="flex items-center gap-2 cursor-default">
+                      <input type="checkbox" defaultChecked readOnly className="h-3.5 w-3.5 accent-primary" />
+                      <span className="text-xs text-muted-foreground">Auto generate SKUs</span>
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                        <List className="h-3 w-3" /> Edit in List View
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+                        onClick={() => set("attributes", form.attributes.map((a) => ({ ...a, values: [], input: "" })))}>
+                        <Trash2 className="h-3 w-3" /> Clear All
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* Summary */}
+            {/* Variant Summary */}
             <div className="rounded-xl border p-4 bg-card h-fit space-y-3">
               <h4 className="font-semibold text-sm">Variant Summary</h4>
               <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Attributes</span><span className="font-medium">{form.attributes.filter((a) => a.values.length).length}</span></div>
-                {form.attributes.filter((a) => a.values.length).map((a, i) => (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Attributes</span>
+                  <span className="font-medium">{validAttrs.length}</span>
+                </div>
+                {validAttrs.map((a, i) => (
                   <div key={i} className="flex justify-between text-xs pl-2">
                     <span className="text-muted-foreground">{a.name}</span>
-                    <span className="font-medium text-right max-w-[120px]">{a.values.length} ({a.values.join(", ")})</span>
+                    <span className="font-medium text-right max-w-[130px] truncate">
+                      {a.values.length}&nbsp;({a.values.join(", ")})
+                    </span>
                   </div>
                 ))}
                 <div className="border-t pt-2.5 flex justify-between">
                   <span className="text-muted-foreground">Total Variants</span>
-                  <span className="font-bold text-primary text-base">{variants.length}</span>
+                  <span className="font-bold text-primary text-base">{allVariants.length}</span>
                 </div>
               </div>
-              {variants.length > 0 && (
-                <div className="mt-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">All variants will be created with default pricing & inventory.</p>
+              {allVariants.length > 0 && (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">All variants will be created with default pricing &amp; inventory.</p>
                 </div>
               )}
             </div>
