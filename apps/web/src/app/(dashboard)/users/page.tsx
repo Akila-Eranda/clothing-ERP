@@ -2,11 +2,14 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Shield, Search, Plus, MoreHorizontal, CheckCircle, XCircle, User, Mail } from "lucide-react";
+import { Shield, Plus, MoreHorizontal, CheckCircle, XCircle, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 
 const DUMMY_USERS = [
   { id: "U001", name: "Arun Kumar", email: "arun@demo.com", role: "Branch Manager", roleType: "BRANCH_MANAGER", status: "active", lastLogin: "2 hours ago", branch: "Main Store" },
@@ -33,15 +36,68 @@ const ROLE_COLORS: Record<string, string> = {
   STAFF: "bg-amber-500/10 text-amber-500 border-amber-500/20",
 };
 
+type DummyUser = typeof DUMMY_USERS[number];
+
+const userColumns: ColumnDef<DummyUser>[] = [
+  {
+    accessorKey: "name",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="User" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-3">
+        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
+          {row.original.name.split(" ").map((n) => n[0]).join("")}
+        </div>
+        <div>
+          <p className="font-medium">{row.original.name}</p>
+          <p className="text-xs text-muted-foreground">{row.original.email}</p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "role",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Role" />,
+    cell: ({ row }) => (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[row.original.roleType] ?? "bg-muted"}`}>
+        {row.original.role}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "branch",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.branch}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    cell: ({ row }) => (
+      row.original.status === "active"
+        ? <CheckCircle className="h-4 w-4 text-emerald-500" />
+        : <XCircle className="h-4 w-4 text-muted-foreground" />
+    ),
+  },
+  {
+    accessorKey: "lastLogin",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Last Login" />,
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.lastLogin}</span>,
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <TableActionsRow
+        editAction={{ action: () => console.log("edit", row.original.id) }}
+        deleteAction={{ action: () => console.log("delete", row.original.id) }}
+        dropMoreActions={[
+          { text: "Change Role", function: () => console.log("role", row.original.id) },
+          { text: "Reset Password", function: () => console.log("reset", row.original.id) },
+        ]}
+      />
+    ),
+  },
+];
+
 export default function UsersPage() {
-  const [search, setSearch] = React.useState("");
-
-  const filteredUsers = DUMMY_USERS.filter((u) =>
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase()) ||
-    u.role.toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -60,72 +116,35 @@ export default function UsersPage() {
           <TabsTrigger value="roles">Roles ({DUMMY_ROLES.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="users" className="mt-4 space-y-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search users..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-
-          <div className="rounded-xl border bg-card overflow-hidden">
-            <table className="w-full text-sm">
-              <thead><tr className="border-b bg-muted/30">
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">User</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Branch</th>
-                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Last Login</th>
-                <th className="px-4 py-3" />
-              </tr></thead>
-              <tbody>
-                {filteredUsers.map((user, i) => (
-                  <motion.tr
-                    key={user.id}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary">
-                          {user.name.split(" ").map((n) => n[0]).join("")}
-                        </div>
-                        <div>
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-xs text-muted-foreground">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[user.roleType] ?? "bg-muted"}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">{user.branch}</td>
-                    <td className="px-4 py-3 text-center">
-                      {user.status === "active"
-                        ? <CheckCircle className="h-4 w-4 text-emerald-500 inline" />
-                        : <XCircle className="h-4 w-4 text-muted-foreground inline" />}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">{user.lastLogin}</td>
-                    <td className="px-4 py-3">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>Edit User</DropdownMenuItem>
-                          <DropdownMenuItem>Change Role</DropdownMenuItem>
-                          <DropdownMenuItem>Reset Password</DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">{user.status === "active" ? "Deactivate" : "Activate"}</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <TabsContent value="users" className="mt-4">
+          <ClientSideTable
+            data={DUMMY_USERS}
+            columns={userColumns}
+            pageCount={Math.ceil(DUMMY_USERS.length / 10)}
+            searchableColumns={[
+              { id: "name", title: "Name" },
+              { id: "email", title: "Email" },
+            ]}
+            filterableColumns={[
+              {
+                id: "status",
+                title: "Status",
+                options: [
+                  { label: "Active", value: "active" },
+                  { label: "Inactive", value: "inactive" },
+                ],
+              },
+              {
+                id: "roleType",
+                title: "Role",
+                options: [
+                  { label: "Branch Manager", value: "BRANCH_MANAGER" },
+                  { label: "Cashier", value: "CASHIER" },
+                  { label: "Staff", value: "STAFF" },
+                ],
+              },
+            ]}
+          />
         </TabsContent>
 
         <TabsContent value="roles" className="mt-4">
