@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Info, Layers, DollarSign, Warehouse, ImageIcon, Tag, Settings2,
+  Info, Layers, DollarSign, ImageIcon, Tag, Settings2,
   CheckCircle2, Plus, Trash2, X, Loader2, Sparkles, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,20 @@ import { api } from "@/lib/api";
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
 interface Brand    { id: string; name: string; slug: string; }
+
+export interface Product {
+  id: string; name: string; slug: string; sku: string;
+  barcode?: string | null; description?: string | null; shortDesc?: string | null;
+  categoryId?: string | null; brandId?: string | null; hsn?: string | null;
+  taxRate: number; costPrice: number; sellingPrice: number; mrp: number;
+  status: string; images: string[]; tags: string[];
+  hasVariants: boolean; trackInventory: boolean; isFeatured: boolean;
+  seoTitle?: string | null; seoDescription?: string | null;
+  createdAt: string; updatedAt: string;
+  category?: { id: string; name: string; slug: string } | null;
+  brand?:    { id: string; name: string; slug: string } | null;
+  _count: { variants: number };
+}
 
 interface VariantAttr { name: string; values: string[]; input: string; }
 
@@ -45,7 +59,6 @@ const TABS = [
   { id: "basic",      label: "Basic Information", icon: Info },
   { id: "variants",   label: "Variants",           icon: Layers },
   { id: "pricing",    label: "Pricing",            icon: DollarSign },
-  { id: "inventory",  label: "Inventory",          icon: Warehouse },
   { id: "images",     label: "Images",             icon: ImageIcon },
   { id: "seo",        label: "SEO & Tags",         icon: Tag },
   { id: "additional", label: "Additional",         icon: Settings2 },
@@ -66,9 +79,9 @@ function genSku(name: string, combo: string[]): string {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────
-interface Props { open: boolean; onClose: () => void; onCreated?: () => void; }
+interface Props { open: boolean; onClose: () => void; onCreated?: () => void; editProduct?: Product; }
 
-export function AddProductModal({ open, onClose, onCreated }: Props) {
+export function AddProductModal({ open, onClose, onCreated, editProduct }: Props) {
   const [tab, setTab]               = useState<TabId>("basic");
   const [form, setForm]             = useState<Form>(INITIAL);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -83,6 +96,30 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
     api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => {});
   }, [open]);
 
+  useEffect(() => {
+    if (editProduct) {
+      setForm({
+        name: editProduct.name, barcode: editProduct.barcode ?? "",
+        description: editProduct.description ?? "", shortDesc: editProduct.shortDesc ?? "",
+        categoryId: editProduct.categoryId ?? "", brandId: editProduct.brandId ?? "",
+        hsn: editProduct.hsn ?? "",
+        status: editProduct.status === "ACTIVE" ? "ACTIVE" : "DRAFT",
+        tags: editProduct.tags ?? [], tagInput: "",
+        sellingPrice: editProduct.sellingPrice.toString(),
+        costPrice: editProduct.costPrice.toString(),
+        mrp: editProduct.mrp.toString(),
+        taxRate: editProduct.taxRate.toString(),
+        hasVariants: editProduct.hasVariants,
+        attributes: [{ name: "Size", values: [], input: "" }],
+        trackInventory: editProduct.trackInventory,
+        seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
+      });
+    } else {
+      setForm(INITIAL);
+    }
+    setTab("basic"); setDone(new Set());
+  }, [editProduct, open]);
+
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
 
@@ -92,36 +129,42 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
 
   const submit = async (status: "ACTIVE" | "DRAFT") => {
     if (!form.name.trim()) { toast.error("Product name is required"); setTab("basic"); return; }
-    if (!form.sellingPrice || !form.costPrice || !form.mrp) {
+    if (!editProduct && (!form.sellingPrice || !form.costPrice || !form.mrp)) {
       toast.error("Selling price, cost price, and MRP are required"); setTab("pricing"); return;
     }
     setLoading(true);
+    const payload = {
+      name: form.name.trim(),
+      description: form.description || undefined,
+      shortDesc: form.shortDesc || undefined,
+      categoryId: form.categoryId || undefined,
+      brandId: form.brandId || undefined,
+      hsn: form.hsn || undefined,
+      barcode: form.barcode || undefined,
+      sellingPrice: form.sellingPrice ? parseFloat(form.sellingPrice) : undefined,
+      costPrice: form.costPrice ? parseFloat(form.costPrice) : undefined,
+      mrp: form.mrp ? parseFloat(form.mrp) : undefined,
+      taxRate: parseFloat(form.taxRate) || 18,
+      status,
+      tags: form.tags,
+      hasVariants: form.hasVariants,
+      trackInventory: form.trackInventory,
+      seoTitle: form.seoTitle || undefined,
+      seoDescription: form.seoDescription || undefined,
+    };
     try {
-      await api.post("/products", {
-        name: form.name.trim(),
-        description: form.description || undefined,
-        shortDesc: form.shortDesc || undefined,
-        categoryId: form.categoryId || undefined,
-        brandId: form.brandId || undefined,
-        hsn: form.hsn || undefined,
-        barcode: form.barcode || undefined,
-        sellingPrice: parseFloat(form.sellingPrice),
-        costPrice: parseFloat(form.costPrice),
-        mrp: parseFloat(form.mrp),
-        taxRate: parseFloat(form.taxRate) || 18,
-        status,
-        tags: form.tags,
-        hasVariants: form.hasVariants,
-        trackInventory: form.trackInventory,
-        seoTitle: form.seoTitle || undefined,
-        seoDescription: form.seoDescription || undefined,
-      });
-      toast.success(`"${form.name}" ${status === "DRAFT" ? "saved as draft" : "created"} successfully!`);
+      if (editProduct) {
+        await api.put(`/products/${editProduct.id}`, payload);
+        toast.success(`"${form.name}" updated successfully!`);
+      } else {
+        await api.post("/products", payload);
+        toast.success(`"${form.name}" ${status === "DRAFT" ? "saved as draft" : "created"} successfully!`);
+      }
       onCreated?.();
-      if (again) { setForm(INITIAL); setTab("basic"); setDone(new Set()); }
+      if (!editProduct && again) { setForm(INITIAL); setTab("basic"); setDone(new Set()); }
       else handleClose();
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Failed to create product");
+      toast.error((e as Error).message ?? (editProduct ? "Failed to update" : "Failed to create product"));
     } finally { setLoading(false); }
   };
 
@@ -156,7 +199,7 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold">SKU <span className="text-muted-foreground font-normal">(auto-generated)</span></Label>
-          <Input placeholder="Auto-generated on save" disabled className="bg-muted/50 cursor-not-allowed" />
+          <Input value={editProduct?.sku ?? ""} placeholder="Auto-generated on save" disabled className="bg-muted/50 cursor-not-allowed" readOnly />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold">Barcode</Label>
@@ -424,31 +467,6 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
     </div>
   );
 
-  const renderInventory = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-bold">Inventory</h3>
-        <p className="text-sm text-muted-foreground">Configure inventory tracking settings</p>
-      </div>
-      <div className="rounded-xl border p-5 bg-card space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-sm">Track Inventory</p>
-            <p className="text-xs text-muted-foreground">Enable stock tracking for this product</p>
-          </div>
-          <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
-        </div>
-        {form.trackInventory && (
-          <div className="pt-3 border-t space-y-1.5">
-            <Label className="text-xs font-semibold">Initial Stock Quantity</Label>
-            <Input type="number" min="0" placeholder="0" defaultValue="0" className="max-w-[160px]" />
-            <p className="text-xs text-muted-foreground">Stock will be set after product is created via stock adjustment</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
   const renderImages = () => (
     <div className="space-y-6">
       <div>
@@ -528,7 +546,7 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
 
   const content: Record<TabId, () => React.ReactNode> = {
     basic: renderBasic, variants: renderVariants, pricing: renderPricing,
-    inventory: renderInventory, images: renderImages, seo: renderSeo, additional: renderAdditional,
+    images: renderImages, seo: renderSeo, additional: renderAdditional,
   };
 
   return (
@@ -540,8 +558,8 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
             <Package className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">Add New Product</h2>
-            <p className="text-xs text-muted-foreground">Add a new product to your inventory</p>
+            <h2 className="text-lg font-bold">{editProduct ? "Edit Product" : "Add New Product"}</h2>
+            <p className="text-xs text-muted-foreground">{editProduct ? `Editing: ${editProduct.name}` : "Add a new product to your inventory"}</p>
           </div>
           <button onClick={handleClose} className="ml-auto p-2 rounded-lg hover:bg-muted transition-colors"><X className="h-4 w-4" /></button>
         </div>
@@ -586,8 +604,12 @@ export function AddProductModal({ open, onClose, onCreated }: Props) {
 
         {/* Footer */}
         <div className="flex items-center px-6 py-4 border-t bg-background/80 shrink-0 gap-3">
-          <Switch checked={again} onCheckedChange={setAgain} id="again" />
-          <Label htmlFor="again" className="text-sm cursor-pointer select-none">Create another product</Label>
+          {!editProduct && (
+            <>
+              <Switch checked={again} onCheckedChange={setAgain} id="again" />
+              <Label htmlFor="again" className="text-sm cursor-pointer select-none">Create another product</Label>
+            </>
+          )}
           <div className="ml-auto flex gap-2">
             <Button variant="outline" onClick={handleClose} disabled={loading}>Cancel</Button>
             <Button variant="outline" onClick={() => submit("DRAFT")} disabled={loading} className="gap-1.5">
