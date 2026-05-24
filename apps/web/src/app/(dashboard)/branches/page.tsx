@@ -1,132 +1,210 @@
 "use client";
 
-import * as React from "react";
-import { motion } from "framer-motion";
-import { Building2, MapPin, Phone, Users, Package, TrendingUp, Plus, MoreHorizontal } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Building2, MapPin, Phone, Mail, Users, Package, Plus, RefreshCw, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { AddBranchModal, type Branch } from "@/components/branches/add-branch-modal";
 
-const DUMMY_BRANCHES = [
-  { id: "B001", name: "Main Store - Bandra", code: "HO-001", city: "Mumbai", state: "Maharashtra", phone: "+91 22 1234 5678", staff: 12, stock: 1842, monthlyRevenue: 680000, isHQ: true, manager: "Arun Kumar" },
-  { id: "B002", name: "Andheri Branch", code: "BR-002", city: "Mumbai", state: "Maharashtra", phone: "+91 22 9876 5432", staff: 8, stock: 1124, monthlyRevenue: 425000, isHQ: false, manager: "Priya Singh" },
-  { id: "B003", name: "Pune Branch", code: "BR-003", city: "Pune", state: "Maharashtra", phone: "+91 20 1234 5678", staff: 6, stock: 896, monthlyRevenue: 310000, isHQ: false, manager: "Vikram Joshi" },
-  { id: "B004", name: "Nashik Outlet", code: "BR-004", city: "Nashik", state: "Maharashtra", phone: "+91 253 123 4567", staff: 4, stock: 612, monthlyRevenue: 185000, isHQ: false, manager: "Sunita Patil" },
-];
+// ── Columns ───────────────────────────────────────────────────────────────
+function buildColumns(
+  onEdit:   (b: Branch) => void,
+  onDelete: (b: Branch) => void,
+): ColumnDef<Branch>[] {
+  return [
+    {
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
+      cell: ({ row }) => {
+        const b = row.original;
+        return (
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Building2 className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold">{b.name}</p>
+                {b.isDefault && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <Star className="h-2 w-2" />HQ
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-mono">{b.code}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "location",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Location" />,
+      cell: ({ row }) => {
+        const b = row.original;
+        const loc = [b.city, b.state].filter(Boolean).join(", ");
+        return (
+          <div className="space-y-0.5">
+            {loc && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="h-3 w-3 shrink-0" />{loc}</div>}
+            {b.address && <p className="text-[10px] text-muted-foreground truncate max-w-[180px]">{b.address}</p>}
+          </div>
+        );
+      },
+    },
+    {
+      id: "contact",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Contact" />,
+      cell: ({ row }) => {
+        const b = row.original;
+        return (
+          <div className="space-y-0.5">
+            {b.phone && <div className="flex items-center gap-1.5 text-xs font-mono"><Phone className="h-3 w-3 text-muted-foreground" />{b.phone}</div>}
+            {b.email && <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Mail className="h-3 w-3" /><span className="truncate max-w-[140px]">{b.email}</span></div>}
+          </div>
+        );
+      },
+    },
+    {
+      id: "staff",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Staff" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Users className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="font-semibold">{row.original._count?.users ?? 0}</span>
+        </div>
+      ),
+    },
+    {
+      id: "inventory",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock Items" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="font-semibold">{(row.original._count?.inventory ?? 0).toLocaleString()}</span>
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => (
+        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
+          {row.original.isActive ? "Active" : "Inactive"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <TableActionsRow
+          editAction={{ action: () => onEdit(row.original) }}
+          deleteAction={{ action: () => onDelete(row.original) }}
+        />
+      ),
+    },
+  ];
+}
 
+// ── Page ─────────────────────────────────────────────────────────────────
 export default function BranchesPage() {
-  const [search, setSearch] = React.useState("");
-  const filtered = DUMMY_BRANCHES.filter((b) =>
-    b.name.toLowerCase().includes(search.toLowerCase()) || b.city.toLowerCase().includes(search.toLowerCase())
+  const [branches, setBranches]       = useState<Branch[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [addOpen, setAddOpen]         = useState(false);
+  const [editBranch, setEditBranch]   = useState<Branch | undefined>();
+
+  const fetchBranches = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ data: Branch[] }>("/branches?limit=100");
+      setBranches(res.data?.data ?? (res.data as unknown as Branch[]) ?? []);
+    } catch { toast.error("Failed to load branches"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => { fetchBranches(); }, [fetchBranches]);
+
+  const handleDelete = async (b: Branch) => {
+    if (!window.confirm(`Delete "${b.name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/branches/${b.id}`);
+      toast.success("Branch deleted");
+      fetchBranches();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Delete failed"); }
+  };
+
+  const totalStaff = branches.reduce((s, b) => s + (b._count?.users ?? 0), 0);
+  const totalStock = branches.reduce((s, b) => s + (b._count?.inventory ?? 0), 0);
+  const activeCount = branches.filter((b) => b.isActive).length;
+
+  const STATS = [
+    { label: "Total Branches",  value: branches.length,          icon: Building2, color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Active Branches", value: activeCount,              icon: Building2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total Staff",     value: totalStaff,               icon: Users,     color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Stock Items",     value: totalStock.toLocaleString(), icon: Package, color: "text-amber-500",   bg: "bg-amber-500/10" },
+  ];
+
+  const columns = buildColumns(
+    (b) => { setEditBranch(b); setAddOpen(true); },
+    handleDelete,
   );
 
-  const totalRevenue = DUMMY_BRANCHES.reduce((s, b) => s + b.monthlyRevenue, 0);
-  const totalStaff = DUMMY_BRANCHES.reduce((s, b) => s + b.staff, 0);
-
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Branches</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage all store locations and branches</p>
+          <h1 className="text-2xl font-bold">Branches</h1>
+          <p className="text-sm text-muted-foreground">Manage all store locations and branches</p>
         </div>
-        <Button variant="gradient" className="gap-2">
-          <Plus className="h-4 w-4" /> Add Branch
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={fetchBranches} className="gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => { setEditBranch(undefined); setAddOpen(true); }}>
+            <Plus className="h-3.5 w-3.5" /> Add Branch
+          </Button>
+        </div>
       </div>
 
-      {/* Summary */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Total Branches", value: DUMMY_BRANCHES.length },
-          { label: "Total Staff", value: totalStaff },
-          { label: "Total Stock", value: DUMMY_BRANCHES.reduce((s, b) => s + b.stock, 0).toLocaleString() },
-          { label: "Combined Revenue", value: `₹${(totalRevenue / 1000).toFixed(0)}K` },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className="text-2xl font-bold mt-1">{s.value}</p>
-          </div>
+      {/* Stats */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {STATS.map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
+              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
-      <div className="relative max-w-sm">
-        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search branches..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-      </div>
+      {/* Table */}
+      <ClientSideTable
+        data={branches}
+        columns={columns}
+        pageCount={Math.ceil(branches.length / 10)}
+        searchableColumns={[{ id: "name", title: "Branch Name" }]}
+        filterableColumns={[{
+          id: "isActive", title: "Status",
+          options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],
+        }]}
+        isShowExportButtons={{ isShow: true, fileName: "branches-export" }}
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filtered.map((branch, i) => (
-          <motion.div
-            key={branch.id}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.07 }}
-            className="rounded-xl border bg-card p-5 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                  <Building2 className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold">{branch.name}</p>
-                    {branch.isHQ && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary/10 text-primary">HQ</span>}
-                  </div>
-                  <p className="text-xs text-muted-foreground font-mono">{branch.code}</p>
-                </div>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-4 w-4" /></Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>View Details</DropdownMenuItem>
-                  <DropdownMenuItem>Edit Branch</DropdownMenuItem>
-                  <DropdownMenuItem>View Inventory</DropdownMenuItem>
-                  <DropdownMenuItem>View Sales</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                <span>{branch.city}, {branch.state}</span>
-              </div>
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Phone className="h-3.5 w-3.5 shrink-0" />
-                <span>{branch.phone}</span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                  <Users className="h-3.5 w-3.5" />
-                </div>
-                <p className="text-lg font-bold">{branch.staff}</p>
-                <p className="text-[10px] text-muted-foreground">Staff</p>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                  <Package className="h-3.5 w-3.5" />
-                </div>
-                <p className="text-lg font-bold">{branch.stock.toLocaleString()}</p>
-                <p className="text-[10px] text-muted-foreground">Stock</p>
-              </div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                </div>
-                <p className="text-lg font-bold text-primary">₹{(branch.monthlyRevenue / 1000).toFixed(0)}K</p>
-                <p className="text-[10px] text-muted-foreground">Revenue</p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      {/* Modal */}
+      <AddBranchModal
+        open={addOpen}
+        onClose={() => { setAddOpen(false); setEditBranch(undefined); }}
+        onSaved={() => { fetchBranches(); setAddOpen(false); setEditBranch(undefined); }}
+        editBranch={editBranch}
+      />
     </div>
   );
 }
