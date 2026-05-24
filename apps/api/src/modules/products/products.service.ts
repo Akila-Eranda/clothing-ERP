@@ -190,10 +190,26 @@ export class ProductsService {
 
   async findAllBrands(tenantId: string) {
     return this.prisma.brand.findMany({
-      where: { tenantId, isActive: true },
+      where: { tenantId },
       include: { _count: { select: { products: true } } },
       orderBy: { name: 'asc' },
     });
+  }
+
+  async updateBrand(id: string, tenantId: string, dto: CreateBrandDto) {
+    const existing = await this.prisma.brand.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Brand not found');
+    return this.prisma.brand.update({
+      where: { id },
+      data: { name: dto.name, description: dto.description, logo: dto.logo },
+      include: { _count: { select: { products: true } } },
+    });
+  }
+
+  async removeBrand(id: string, tenantId: string) {
+    const existing = await this.prisma.brand.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Brand not found');
+    return this.prisma.brand.delete({ where: { id } });
   }
 
   private generateSlug(name: string): string {

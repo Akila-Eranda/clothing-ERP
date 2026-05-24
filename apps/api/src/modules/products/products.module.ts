@@ -110,6 +110,19 @@ export class BrandsController {
   findAll(@CurrentUser() user: IAuthUser) {
     return this.productsService.findAllBrands(user.tenantId);
   }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update brand' })
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: CreateBrandDto) {
+    return this.productsService.updateBrand(id, user.tenantId, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete brand' })
+  remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.productsService.removeBrand(id, user.tenantId);
+  }
 }
 
 @Module({
