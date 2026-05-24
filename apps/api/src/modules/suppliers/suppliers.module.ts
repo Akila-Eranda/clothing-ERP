@@ -132,6 +132,24 @@ export class SuppliersService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
+  async findOnePO(id: string, tenantId: string) {
+    const po = await this.prisma.purchaseOrder.findFirst({
+      where: { id, tenantId },
+      include: {
+        supplier: true,
+        items: { include: { variant: { include: { product: true } } } },
+      },
+    });
+    if (!po) throw new NotFoundException('Purchase order not found');
+    return po;
+  }
+
+  async updatePOStatus(id: string, tenantId: string, status: PurchaseOrderStatus) {
+    const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
+    if (!po) throw new NotFoundException('Purchase order not found');
+    return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
+  }
+
   async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
     const po = await this.prisma.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
@@ -215,6 +233,24 @@ export class PurchasesController {
   @RequirePermissions('purchases:read')
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { status?: PurchaseOrderStatus }) {
     return this.suppliersService.findAllPOs(user.tenantId, query);
+  }
+
+  @Get(':id')
+  @RequirePermissions('purchases:read')
+  @ApiOperation({ summary: 'Get purchase order details' })
+  findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.findOnePO(id, user.tenantId);
+  }
+
+  @Put(':id/status')
+  @RequirePermissions('purchases:update')
+  @ApiOperation({ summary: 'Update PO status' })
+  updateStatus(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body('status') status: PurchaseOrderStatus,
+  ) {
+    return this.suppliersService.updatePOStatus(id, user.tenantId, status);
   }
 
   @Post(':id/receive')

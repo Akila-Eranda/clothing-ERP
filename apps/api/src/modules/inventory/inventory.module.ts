@@ -46,10 +46,8 @@ export class InventoryService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
-      branchId,
-      ...(query.lowStock === true && {
-        quantity: { lte: this.prisma.inventory.fields?.reorderPoint as unknown as number },
-      }),
+      ...(branchId && { branchId }),
+      ...(query.lowStock === true && { quantity: { lte: 5 } }),
       ...(query.search && {
         variant: {
           OR: [
@@ -80,7 +78,7 @@ export class InventoryService {
     return this.prisma.inventory.findMany({
       where: {
         tenantId,
-        branchId,
+        ...(branchId && { branchId }),
         quantity: { lte: 5 },
       },
       include: { variant: { include: { product: true } } },
@@ -90,8 +88,9 @@ export class InventoryService {
   }
 
   async adjustStock(tenantId: string, branchId: string, userId: string, dto: AdjustStockDto) {
+    const effectiveBranch = branchId || await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } }).then(b => b?.id ?? 'default');
     const inventory = await this.prisma.inventory.findFirst({
-      where: { tenantId, branchId, variantId: dto.variantId },
+      where: { tenantId, branchId: effectiveBranch, variantId: dto.variantId },
     });
 
     const currentQty = inventory?.quantity ?? 0;
@@ -108,7 +107,7 @@ export class InventoryService {
         : await tx.inventory.create({
             data: {
               tenantId,
-              branchId,
+              branchId: effectiveBranch,
               variantId: dto.variantId,
               quantity: Math.max(0, dto.quantity),
             },
@@ -117,7 +116,7 @@ export class InventoryService {
       await tx.inventoryLog.create({
         data: {
           tenantId,
-          branchId,
+          branchId: effectiveBranch,
           variantId: dto.variantId,
           movementType: dto.movementType,
           quantityChange: newQty - currentQty,
