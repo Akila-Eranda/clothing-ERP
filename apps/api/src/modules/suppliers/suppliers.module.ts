@@ -86,6 +86,16 @@ export class SuppliersService {
     return supplier;
   }
 
+  async updateSupplier(id: string, tenantId: string, dto: Partial<CreateSupplierDto>) {
+    await this.findOneSupplier(id, tenantId);
+    return this.prisma.supplier.update({ where: { id }, data: dto as object });
+  }
+
+  async removeSupplier(id: string, tenantId: string) {
+    await this.findOneSupplier(id, tenantId);
+    return this.prisma.supplier.delete({ where: { id } });
+  }
+
   async createPurchaseOrder(tenantId: string, branchId: string, userId: string, dto: CreatePurchaseOrderDto) {
     const poNumber = `PO-${Date.now().toString(36).toUpperCase()}`;
     const subtotal = dto.items.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
@@ -213,6 +223,19 @@ export class SuppliersController {
   @RequirePermissions('suppliers:read')
   findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
     return this.suppliersService.findOneSupplier(id, user.tenantId);
+  }
+
+  @Put(':id')
+  @RequirePermissions('suppliers:update')
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateSupplierDto>) {
+    return this.suppliersService.updateSupplier(id, user.tenantId, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissions('suppliers:delete')
+  remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.removeSupplier(id, user.tenantId);
   }
 }
 
