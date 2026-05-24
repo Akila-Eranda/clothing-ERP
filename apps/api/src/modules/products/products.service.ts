@@ -116,7 +116,6 @@ export class ProductsService {
           sellingPrice: v.sellingPrice,
           costPrice: v.costPrice,
           mrp: v.mrp,
-          taxRate: v.taxRate ?? dto.taxRate ?? 18,
           sortOrder: i,
         })),
       });
@@ -207,7 +206,6 @@ export class ProductsService {
         sellingPrice: v.sellingPrice,
         costPrice: v.costPrice,
         mrp: v.mrp,
-        taxRate: v.taxRate ?? 18,
         sortOrder: i,
       })),
     });

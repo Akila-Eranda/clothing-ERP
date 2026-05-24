@@ -21,6 +21,12 @@ import { api } from "@/lib/api";
 interface Category { id: string; name: string; }
 interface Brand    { id: string; name: string; }
 interface VariantAttr { name: string; values: string[]; input: string; }
+interface VariantRow {
+  key: string; sku: string; name: string;
+  size?: string; color?: string; material?: string; style?: string;
+  sellingPrice: string; costPrice: string; mrp: string;
+  active: boolean;
+}
 
 interface Form {
   name: string; barcode: string; description: string; shortDesc: string;
@@ -82,6 +88,8 @@ export default function AddProductPage() {
   const [brands, setBrands]         = useState<Brand[]>([]);
   const [loading, setLoading]       = useState(false);
   const [done, setDone]             = useState<Set<TabId>>(new Set());
+  const [listView, setListView]     = useState(false);
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
   useEffect(() => {
     api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => {});
@@ -103,6 +111,39 @@ export default function AddProductPage() {
     set("attributes", a);
   };
 
+  const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
+    const validAttrs = attrs.filter((a) => a.values.length > 0);
+    return combos.map((combo) => {
+      const row: VariantRow = {
+        key: combo.join("|"),
+        sku: genSku(form.name, combo),
+        name: combo.join(" / "),
+        sellingPrice: form.sellingPrice,
+        costPrice: form.costPrice,
+        mrp: form.mrp,
+        active: true,
+      };
+      validAttrs.forEach((attr, idx) => {
+        const k = attr.name.toLowerCase();
+        if (k === "size") row.size = combo[idx];
+        else if (k === "color") row.color = combo[idx];
+        else if (k === "material") row.material = combo[idx];
+        else if (k === "style") row.style = combo[idx];
+      });
+      return row;
+    });
+  };
+
+  const openListView = () => {
+    const combos = cartesian(form.attributes);
+    if (!combos.length) { toast.error("Add attribute values first"); return; }
+    setVariantRows(buildRows(combos, form.attributes));
+    setListView(true);
+  };
+
+  const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
+    setVariantRows((rows) => rows.map((r) => r.key === key ? { ...r, [field]: value } : r));
+
   const autoGenerate = () => {
     const updated = form.attributes.map((a) => {
       const n = a.name.toLowerCase();
@@ -119,23 +160,35 @@ export default function AddProductPage() {
       toast.error("Selling price, cost price and MRP are required"); setTab("pricing"); return;
     }
     setLoading(true);
-    const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
-    const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
-    const variants = variantCombos.map((combo) => {
-      const sku = genSku(form.name, combo);
-      const v: Record<string, unknown> = {
-        sku, name: combo.join(" / "),
-        sellingPrice: parseFloat(form.sellingPrice) || 0,
-        costPrice: parseFloat(form.costPrice) || 0,
-        mrp: parseFloat(form.mrp) || 0,
-        taxRate: parseFloat(form.taxRate) || 18,
-      };
-      validAttrs.forEach((attr, idx) => {
-        const k = attr.name.toLowerCase();
-        if (["size", "color", "material", "style"].includes(k)) v[k] = combo[idx];
-      });
-      return v;
-    });
+
+    let variants: Record<string, unknown>[] = [];
+    if (form.hasVariants) {
+      if (listView && variantRows.length > 0) {
+        variants = variantRows.filter((r) => r.active).map((r) => ({
+          sku: r.sku, name: r.name,
+          size: r.size, color: r.color, material: r.material, style: r.style,
+          sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
+          costPrice:    parseFloat(r.costPrice)    || parseFloat(form.costPrice)    || 0,
+          mrp:          parseFloat(r.mrp)          || parseFloat(form.mrp)          || 0,
+        }));
+      } else {
+        const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
+        const variantCombos = validAttrs.length > 0 ? cartesian(form.attributes) : [];
+        variants = variantCombos.map((combo) => {
+          const v: Record<string, unknown> = {
+            sku: genSku(form.name, combo), name: combo.join(" / "),
+            sellingPrice: parseFloat(form.sellingPrice) || 0,
+            costPrice:    parseFloat(form.costPrice)    || 0,
+            mrp:          parseFloat(form.mrp)          || 0,
+          };
+          validAttrs.forEach((attr, idx) => {
+            const k = attr.name.toLowerCase();
+            if (["size", "color", "material", "style"].includes(k)) v[k] = combo[idx];
+          });
+          return v;
+        });
+      }
+    }
     try {
       await api.post("/products", {
         name: form.name.trim(),
@@ -234,6 +287,109 @@ export default function AddProductPage() {
     const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
     const a0 = validAttrs[0];
     const a1 = validAttrs[1];
+
+    if (listView) return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold">Edit Variants</h3>
+            <p className="text-sm text-muted-foreground">{variantRows.length} variants — edit SKU, prices per variant</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setListView(false)}>
+              <Layers className="h-3.5 w-3.5" /> Back to Grid
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => {
+              setVariantRows(buildRows(cartesian(form.attributes), form.attributes));
+            }}>
+              <Zap className="h-3.5 w-3.5" /> Regenerate
+            </Button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border overflow-hidden bg-card">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-muted/40 border-b">
+                <tr>
+                  <th className="px-3 py-2.5 text-left font-semibold w-8">#</th>
+                  <th className="px-3 py-2.5 text-left font-semibold">SKU</th>
+                  <th className="px-3 py-2.5 text-left font-semibold">Variant</th>
+                  {variantRows[0]?.size  !== undefined && <th className="px-3 py-2.5 text-left font-semibold">Size</th>}
+                  {variantRows[0]?.color !== undefined && <th className="px-3 py-2.5 text-left font-semibold">Color</th>}
+                  <th className="px-3 py-2.5 text-right font-semibold">Selling ₹</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Cost ₹</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">MRP ₹</th>
+                  <th className="px-3 py-2.5 text-center font-semibold">Active</th>
+                  <th className="px-2 py-2.5 w-8"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {variantRows.map((row, idx) => {
+                  const hex = row.color ? getColorHex(row.color) : null;
+                  return (
+                    <tr key={row.key} className={`hover:bg-muted/10 transition-colors ${!row.active ? "opacity-40" : ""}`}>
+                      <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                      <td className="px-3 py-2">
+                        <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)}
+                          className="h-7 text-xs font-mono w-32" />
+                      </td>
+                      <td className="px-3 py-2 font-medium">{row.name}</td>
+                      {row.size  !== undefined && <td className="px-3 py-2">
+                        <Badge variant="secondary" className="text-[10px]">{row.size}</Badge>
+                      </td>}
+                      {row.color !== undefined && <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5">
+                          {hex && <span className="h-4 w-4 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
+                          <span>{row.color}</span>
+                        </div>
+                      </td>}
+                      <td className="px-3 py-2">
+                        <Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)}
+                          className="h-7 text-xs text-right w-24" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" value={row.costPrice} onChange={(e) => updateRow(row.key, "costPrice", e.target.value)}
+                          className="h-7 text-xs text-right w-24" />
+                      </td>
+                      <td className="px-3 py-2">
+                        <Input type="number" value={row.mrp} onChange={(e) => updateRow(row.key, "mrp", e.target.value)}
+                          className="h-7 text-xs text-right w-24" />
+                      </td>
+                      <td className="px-3 py-2 text-center">
+                        <Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} />
+                      </td>
+                      <td className="px-2 py-2">
+                        <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
+                          className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-3 border-t bg-muted/10 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">
+              {variantRows.filter((r) => r.active).length} of {variantRows.length} variants active
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
+                setVariantRows((r) => r.map((x) => ({ ...x, active: true })))}>
+                Enable All
+              </Button>
+              <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
+                onClick={() => setVariantRows([])}>
+                <Trash2 className="h-3 w-3" /> Clear All
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -367,7 +523,7 @@ export default function AddProductPage() {
                       <span className="text-xs text-muted-foreground">Auto generate SKUs</span>
                     </label>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={openListView}>
                         <List className="h-3 w-3" /> Edit in List View
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
