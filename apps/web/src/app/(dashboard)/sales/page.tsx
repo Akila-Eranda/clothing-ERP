@@ -1,14 +1,14 @@
 "use client";
 
-import * as React from "react";
-import { motion } from "framer-motion";
-import { Receipt, Search, Filter, Download, Eye, TrendingUp, ShoppingCart, DollarSign, RotateCcw } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { TrendingUp, ShoppingCart, DollarSign, RotateCcw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatNumber } from "@/lib/utils";
 import { DUMMY_RECENT_SALES } from "@/lib/constants";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 
 const STATS = [
   { label: "Today's Sales", value: "₹1,28,450", icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -17,18 +17,70 @@ const STATS = [
   { label: "Returns", value: "12", icon: RotateCcw, color: "text-amber-500", bg: "bg-amber-500/10" },
 ];
 
-export default function SalesPage() {
-  const [search, setSearch] = React.useState("");
+type Sale = typeof DUMMY_RECENT_SALES[number];
 
+const columns: ColumnDef<Sale>[] = [
+  {
+    accessorKey: "id",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice" />,
+    cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.id}</span>,
+  },
+  {
+    accessorKey: "customer",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+    cell: ({ row }) => <span className="text-sm font-medium">{row.original.customer}</span>,
+  },
+  {
+    accessorKey: "items",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
+    cell: ({ row }) => <span className="text-sm">{row.original.items}</span>,
+  },
+  {
+    accessorKey: "method",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,
+    cell: ({ row }) => <span className="capitalize text-sm text-muted-foreground">{row.original.method}</span>,
+  },
+  {
+    accessorKey: "amount",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+    cell: ({ row }) => <span className="text-sm font-semibold">₹{formatNumber(row.original.amount)}</span>,
+  },
+  {
+    accessorKey: "time",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.time}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    cell: ({ row }) => (
+      <Badge variant={row.original.status === "completed" ? "success" : "warning"} className="text-[10px] capitalize">
+        {row.original.status}
+      </Badge>
+    ),
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <TableActionsRow
+        showAction={{ action: () => console.log("view", row.original.id) }}
+        downloadAction={{ action: () => console.log("download", row.original.id) }}
+        dropMoreActions={[
+          { text: "Print Receipt", function: () => console.log("print", row.original.id) },
+          { text: "Refund", function: () => console.log("refund", row.original.id) },
+        ]}
+      />
+    ),
+  },
+];
+
+export default function SalesPage() {
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Sales</h1>
           <p className="text-sm text-muted-foreground">View and manage all sales transactions</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-3.5 w-3.5" />Export</Button>
         </div>
       </div>
 
@@ -41,48 +93,36 @@ export default function SalesPage() {
         ))}
       </div>
 
-      <Card>
-        <div className="p-4 border-b border-border flex gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search invoices..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-          <Button variant="outline" size="sm" className="gap-1.5"><Filter className="h-3.5 w-3.5" />Filter</Button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-border">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Invoice</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Customer</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Time</th>
-                <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Amount</th>
-                <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {DUMMY_RECENT_SALES.filter(s => s.customer.toLowerCase().includes(search.toLowerCase())).map((sale, i) => (
-                <motion.tr key={sale.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.04 }}
-                  className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{sale.id}</td>
-                  <td className="px-4 py-3 text-sm font-medium">{sale.customer}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{sale.time}</td>
-                  <td className="px-4 py-3 text-right text-sm font-semibold">₹{formatNumber(sale.amount)}</td>
-                  <td className="px-4 py-3">
-                    <Badge variant={sale.status === "completed" ? "success" : "warning"} className="text-[10px] capitalize">
-                      {sale.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Button variant="ghost" size="icon-sm" className="h-7 w-7"><Eye className="h-4 w-4" /></Button>
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <ClientSideTable
+        data={DUMMY_RECENT_SALES}
+        columns={columns}
+        pageCount={Math.ceil(DUMMY_RECENT_SALES.length / 10)}
+        searchableColumns={[
+          { id: "customer", title: "Customer" },
+          { id: "id", title: "Invoice" },
+        ]}
+        filterableColumns={[
+          {
+            id: "status",
+            title: "Status",
+            options: [
+              { label: "Completed", value: "completed" },
+              { label: "Refunded", value: "refunded" },
+              { label: "Pending", value: "pending" },
+            ],
+          },
+          {
+            id: "method",
+            title: "Payment Method",
+            options: [
+              { label: "UPI", value: "upi" },
+              { label: "Card", value: "card" },
+              { label: "Cash", value: "cash" },
+            ],
+          },
+        ]}
+        isShowExportButtons
+      />
     </div>
   );
 }
