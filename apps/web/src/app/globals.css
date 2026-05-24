@@ -2,6 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --tc-background: 0 0% 100%;
+  --tc-foreground: 222.2 84% 4.9%;
+  --tc-card: 0 0% 100%;
+  --tc-card-foreground: 222.2 84% 4.9%;
+  --tc-popover: 0 0% 100%;
+  --tc-popover-foreground: 222.2 84% 4.9%;
+  --tc-primary: 221.2 83.2% 53.3%;
+  --tc-primary-foreground: 210 40% 98%;
+  --tc-secondary: 210 40% 96.1%;
+  --tc-secondary-foreground: 222.2 47.4% 11.2%;
+  --tc-muted: 210 40% 96.1%;
+  --tc-muted-foreground: 215.4 16.3% 46.9%;
+  --tc-accent: 210 40% 96.1%;
+  --tc-accent-foreground: 222.2 47.4% 11.2%;
+  --tc-destructive: 0 84.2% 60.2%;
+  --tc-destructive-foreground: 210 40% 98%;
+  --tc-border: 214.3 31.8% 91.4%;
+  --tc-input: 214.3 31.8% 91.4%;
+  --tc-ring: 221.2 83.2% 53.3%;
+  --tc-radius: 0.5rem;
+}
+
+.dark {
+  --tc-background: 222.2 84% 4.9%;
+  --tc-foreground: 210 40% 98%;
+  --tc-card: 222.2 84% 4.9%;
+  --tc-card-foreground: 210 40% 98%;
+  --tc-popover: 222.2 84% 4.9%;
+  --tc-popover-foreground: 210 40% 98%;
+  --tc-primary: 217.2 91.2% 59.8%;
+  --tc-primary-foreground: 222.2 47.4% 11.2%;
+  --tc-secondary: 217.2 32.6% 17.5%;
+  --tc-secondary-foreground: 210 40% 98%;
+  --tc-muted: 217.2 32.6% 17.5%;
+  --tc-muted-foreground: 215 20.2% 65.1%;
+  --tc-accent: 217.2 32.6% 17.5%;
+  --tc-accent-foreground: 210 40% 98%;
+  --tc-destructive: 0 62.8% 30.6%;
+  --tc-destructive-foreground: 210 40% 98%;
+  --tc-border: 217.2 32.6% 17.5%;
+  --tc-input: 217.2 32.6% 17.5%;
+  --tc-ring: 224.3 76.3% 48%;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
