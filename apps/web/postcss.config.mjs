@@ -1,12 +1,7 @@
-/** @type {import('postcss-load-config').Config} */
+/** @type {import('postcss').Config} */
 const config = {
   plugins: {
-    tailwindcss: {
-      content: [
-        "./src/**/*.{ts,tsx}",
-        "./node_modules/react-table-craft/dist/**/*.{js,mjs}",
-      ],
-    },
+    tailwindcss: {},
     autoprefixer: {},
   },
 };
