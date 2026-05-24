@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Tag, Plus, Package, RefreshCw, FolderTree } from "lucide-react";
+import { Tag, Plus, Package, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
@@ -24,16 +24,9 @@ function buildColumns(
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5">
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            {row.original.parentId
-              ? <FolderTree className="h-4 w-4 text-primary/60" />
-              : <Tag className="h-4 w-4 text-primary" />}
+            <Tag className="h-4 w-4 text-primary" />
           </div>
-          <div>
-            <span className="text-sm font-semibold">{row.original.name}</span>
-            {row.original.parentId && (
-              <p className="text-[10px] text-muted-foreground">Subcategory</p>
-            )}
-          </div>
+          <span className="text-sm font-semibold">{row.original.name}</span>
         </div>
       ),
     },
@@ -100,8 +93,8 @@ export default function CategoriesPage() {
   const [modalOpen, setModalOpen]   = useState(false);
   const [subParentId, setSubParentId] = useState<string | undefined>();
 
-  // Flatten tree for table rows (root + children shown flat)
-  const flatRows = categories.flatMap((c) => [c, ...c.children]);
+  // Only root categories in the table; subcategories shown as chips inside each row
+  const flatRows = categories;
 
   const fetchCategories = useCallback(async () => {
     setLoading(true);
