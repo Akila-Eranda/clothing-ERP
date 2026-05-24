@@ -1,12 +1,12 @@
 "use client";
 
-import * as React from "react";
-import { motion } from "framer-motion";
-import { RotateCcw, Search, Plus, CheckCircle, Clock, XCircle, Package, Eye } from "lucide-react";
+import { Plus, CheckCircle, Clock, XCircle, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 
 const DUMMY_RETURNS = [
   { id: "RET-001", saleId: "INV-2024-1891", customer: "Priya Sharma", items: 2, amount: 2800, status: "approved", date: "Dec 18, 2024", reason: "Size mismatch" },
@@ -17,30 +17,91 @@ const DUMMY_RETURNS = [
 ];
 
 const STATUS_CONFIG = {
-  approved: { label: "Approved", icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10 border-emerald-500/20" },
-  pending: { label: "Pending", icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10 border-amber-500/20" },
-  completed: { label: "Completed", icon: CheckCircle, color: "text-blue-500", bg: "bg-blue-500/10 border-blue-500/20" },
-  rejected: { label: "Rejected", icon: XCircle, color: "text-red-500", bg: "bg-red-500/10 border-red-500/20" },
+  approved: { label: "Approved", icon: CheckCircle, variant: "success" },
+  pending:  { label: "Pending",  icon: Clock,        variant: "warning" },
+  completed:{ label: "Completed",icon: CheckCircle,  variant: "default" },
+  rejected: { label: "Rejected", icon: XCircle,      variant: "danger"  },
 } as const;
 
+type Return = typeof DUMMY_RETURNS[number];
+
+const columns: ColumnDef<Return>[] = [
+  {
+    accessorKey: "id",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Return ID" />,
+    cell: ({ row }) => <span className="font-mono text-xs font-medium text-primary">{row.original.id}</span>,
+  },
+  {
+    accessorKey: "saleId",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice" />,
+    cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.saleId}</span>,
+  },
+  {
+    accessorKey: "customer",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+    cell: ({ row }) => <span className="text-sm font-medium">{row.original.customer}</span>,
+  },
+  {
+    accessorKey: "reason",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Reason" />,
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.reason}</span>,
+  },
+  {
+    accessorKey: "items",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
+    cell: ({ row }) => (
+      <span className="inline-flex items-center gap-1 text-xs">
+        <Package className="h-3.5 w-3.5 text-muted-foreground" />{row.original.items}
+      </span>
+    ),
+  },
+  {
+    accessorKey: "amount",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+    cell: ({ row }) => <span className="text-sm font-bold">₹{row.original.amount.toLocaleString()}</span>,
+  },
+  {
+    accessorKey: "date",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.date}</span>,
+  },
+  {
+    accessorKey: "status",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    cell: ({ row }) => {
+      const cfg = STATUS_CONFIG[row.original.status as keyof typeof STATUS_CONFIG];
+      const Icon = cfg.icon;
+      return (
+        <Badge variant={cfg.variant as "success" | "warning" | "default" | "danger"} className="text-[10px] gap-1">
+          <Icon className="h-3 w-3" />{cfg.label}
+        </Badge>
+      );
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <TableActionsRow
+        showAction={{ action: () => console.log("view", row.original.id) }}
+        editAction={{ action: () => console.log("edit", row.original.id) }}
+        dropMoreActions={[
+          { text: "Approve", function: () => console.log("approve", row.original.id) },
+          { text: "Reject",  function: () => console.log("reject",  row.original.id) },
+          { text: "Process Refund", function: () => console.log("refund", row.original.id) },
+        ]}
+      />
+    ),
+  },
+];
+
+const stats = [
+  { label: "Total Returns",  value: DUMMY_RETURNS.length,                                                                                  color: "text-foreground" },
+  { label: "Pending",        value: DUMMY_RETURNS.filter((r) => r.status === "pending").length,                                            color: "text-amber-500" },
+  { label: "Approved",       value: DUMMY_RETURNS.filter((r) => r.status === "approved").length,                                           color: "text-emerald-500" },
+  { label: "Total Refunded", value: `₹${DUMMY_RETURNS.filter((r) => r.status === "completed").reduce((s, r) => s + r.amount, 0).toLocaleString()}`, color: "text-blue-500" },
+];
+
 export default function ReturnsPage() {
-  const [search, setSearch] = React.useState("");
-  const [filter, setFilter] = React.useState("all");
-
-  const filtered = DUMMY_RETURNS.filter((r) => {
-    const matchSearch = r.customer.toLowerCase().includes(search.toLowerCase()) ||
-      r.saleId.toLowerCase().includes(search.toLowerCase()) || r.id.toLowerCase().includes(search.toLowerCase());
-    const matchFilter = filter === "all" || r.status === filter;
-    return matchSearch && matchFilter;
-  });
-
-  const stats = [
-    { label: "Total Returns", value: DUMMY_RETURNS.length, color: "text-foreground" },
-    { label: "Pending", value: DUMMY_RETURNS.filter((r) => r.status === "pending").length, color: "text-amber-500" },
-    { label: "Approved", value: DUMMY_RETURNS.filter((r) => r.status === "approved").length, color: "text-emerald-500" },
-    { label: "Total Refunded", value: `₹${DUMMY_RETURNS.filter((r) => r.status === "completed").reduce((s, r) => s + r.amount, 0).toLocaleString()}`, color: "text-blue-500" },
-  ];
-
   return (
     <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
@@ -53,7 +114,6 @@ export default function ReturnsPage() {
         </Button>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
@@ -63,86 +123,29 @@ export default function ReturnsPage() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search returns..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <div className="flex gap-1.5">
-          {["all", "pending", "approved", "completed", "rejected"].map((s) => (
-            <button
-              key={s}
-              onClick={() => setFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium capitalize transition-colors ${filter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="rounded-xl border bg-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/30">
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Return ID</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Sale Invoice</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Customer</th>
-                <th className="text-left px-4 py-3 font-medium text-muted-foreground">Reason</th>
-                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Items</th>
-                <th className="text-right px-4 py-3 font-medium text-muted-foreground">Amount</th>
-                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Status</th>
-                <th className="text-center px-4 py-3 font-medium text-muted-foreground">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((ret, i) => {
-                const cfg = STATUS_CONFIG[ret.status as keyof typeof STATUS_CONFIG];
-                const Icon = cfg.icon;
-                return (
-                  <motion.tr
-                    key={ret.id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.04 }}
-                    className="border-b last:border-0 hover:bg-muted/20 transition-colors"
-                  >
-                    <td className="px-4 py-3 font-mono font-medium text-primary">{ret.id}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{ret.saleId}</td>
-                    <td className="px-4 py-3 font-medium">{ret.customer}</td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[160px] truncate">{ret.reason}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className="inline-flex items-center gap-1 text-xs">
-                        <Package className="h-3.5 w-3.5 text-muted-foreground" />{ret.items}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold">₹{ret.amount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center">
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${cfg.bg} ${cfg.color}`}>
-                        <Icon className="h-3 w-3" />{cfg.label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <Button variant="ghost" size="icon-sm">
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-              <RotateCcw className="h-10 w-10 mb-3 opacity-20" />
-              <p className="font-medium">No returns found</p>
-            </div>
-          )}
-        </div>
-      </div>
+      <ClientSideTable
+        data={DUMMY_RETURNS}
+        columns={columns}
+        pageCount={Math.ceil(DUMMY_RETURNS.length / 10)}
+        searchableColumns={[
+          { id: "customer", title: "Customer" },
+          { id: "id",       title: "Return ID" },
+          { id: "saleId",   title: "Invoice" },
+        ]}
+        filterableColumns={[
+          {
+            id: "status",
+            title: "Status",
+            options: [
+              { label: "Pending",   value: "pending" },
+              { label: "Approved",  value: "approved" },
+              { label: "Completed", value: "completed" },
+              { label: "Rejected",  value: "rejected" },
+            ],
+          },
+        ]}
+        isShowExportButtons={{ isShow: true, fileName: "returns-export" }}
+      />
     </div>
   );
 }

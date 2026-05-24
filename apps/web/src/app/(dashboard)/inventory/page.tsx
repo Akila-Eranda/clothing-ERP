@@ -1,17 +1,17 @@
 "use client";
 
-import * as React from "react";
-import { motion } from "framer-motion";
 import {
-  Warehouse, Search, Filter, AlertTriangle, ArrowUpDown, Package,
-  TrendingDown, TrendingUp, BarChart3, Download, RefreshCw,
+  AlertTriangle, ArrowUpDown, Package,
+  TrendingDown, BarChart3, Download, RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { formatNumber } from "@/lib/utils";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 import { DUMMY_PRODUCTS, DUMMY_LOW_STOCK } from "@/lib/constants";
 
 const STATS = [
@@ -21,21 +21,74 @@ const STATS = [
   { label: "Out of Stock", value: "8", icon: AlertTriangle, color: "text-red-500", bg: "bg-red-500/10" },
 ];
 
+type InventoryProduct = typeof DUMMY_PRODUCTS[number];
+
+const getStockStatus = (stock: number) =>
+  stock === 0 ? "out_of_stock" : stock < 10 ? "low_stock" : "in_stock";
+
+const inventoryColumns: ColumnDef<InventoryProduct>[] = [
+  {
+    accessorKey: "name",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+    cell: ({ row }) => (
+      <div>
+        <p className="text-sm font-medium">{row.original.name}</p>
+        <p className="text-xs text-muted-foreground font-mono">{row.original.sku}</p>
+      </div>
+    ),
+  },
+  {
+    accessorKey: "category",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.category}</span>,
+  },
+  {
+    accessorKey: "stock",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Stock" />,
+    cell: ({ row }) => {
+      const pct = Math.min((row.original.stock / 100) * 100, 100);
+      const barColor = row.original.stock === 0 ? "bg-red-500" : row.original.stock < 10 ? "bg-amber-500" : "bg-emerald-500";
+      return (
+        <div className="flex items-center gap-2 min-w-[140px]">
+          <span className={`text-sm font-bold w-8 ${row.original.stock < 10 ? "text-amber-500" : ""}`}>
+            {row.original.stock}
+          </span>
+          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[10px] text-muted-foreground w-7 text-right">{pct.toFixed(0)}%</span>
+        </div>
+      );
+    },
+  },
+  {
+    id: "stockStatus",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+    cell: ({ row }) => {
+      const s = getStockStatus(row.original.stock);
+      return (
+        <Badge variant={s === "out_of_stock" ? "danger" : s === "low_stock" ? "warning" : "success"} className="text-[10px]">
+          {s === "out_of_stock" ? "Out of Stock" : s === "low_stock" ? "Low Stock" : "In Stock"}
+        </Badge>
+      );
+    },
+  },
+  {
+    id: "actions",
+    cell: ({ row }) => (
+      <TableActionsRow
+        editAction={{ action: () => console.log("adjust", row.original.id) }}
+        dropMoreActions={[
+          { text: "Stock Adjustment", function: () => console.log("adjust", row.original.id) },
+          { text: "View History",     function: () => console.log("history", row.original.id) },
+          { text: "Create PO",        function: () => console.log("po", row.original.id) },
+        ]}
+      />
+    ),
+  },
+];
+
 export default function InventoryPage() {
-  const [search, setSearch] = React.useState("");
-
-  const filtered = DUMMY_PRODUCTS.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.sku.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const getStockPercent = (stock: number, max = 100) => Math.min((stock / max) * 100, 100);
-  const getStockColor = (stock: number) => {
-    if (stock === 0) return "bg-red-500";
-    if (stock < 10) return "bg-amber-500";
-    return "bg-emerald-500";
-  };
-
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -44,127 +97,60 @@ export default function InventoryPage() {
           <p className="text-sm text-muted-foreground">Track stock levels, movements, and alerts</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <RefreshCw className="h-3.5 w-3.5" />
-            Sync
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </Button>
-          <Button variant="gradient" size="sm" className="gap-1.5">
-            <ArrowUpDown className="h-3.5 w-3.5" />
-            Stock Adjustment
-          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5"><RefreshCw className="h-3.5 w-3.5" />Sync</Button>
+          <Button variant="outline" size="sm" className="gap-1.5"><Download className="h-3.5 w-3.5" />Export</Button>
+          <Button variant="gradient" size="sm" className="gap-1.5"><ArrowUpDown className="h-3.5 w-3.5" />Stock Adjustment</Button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map((s) => (
           <Card key={s.label}>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
-              </div>
-              <div>
-                <p className="text-xl font-bold">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-              </div>
+              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
+              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Inventory Table */}
-        <div className="xl:col-span-2 space-y-4">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search inventory..."
-                className="pl-9"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              <Filter className="h-3.5 w-3.5" />
-              Filter
-            </Button>
-          </div>
-
-          <Card>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Product</th>
-                    <th className="text-right px-4 py-3 text-xs font-semibold text-muted-foreground">Stock</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground min-w-[120px]">Level</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-muted-foreground">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((product, i) => (
-                    <motion.tr
-                      key={product.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: i * 0.03 }}
-                      className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium">{product.name}</p>
-                          <p className="text-xs text-muted-foreground font-mono">{product.sku}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`text-sm font-bold ${product.stock < 10 ? "text-amber-500" : ""}`}>
-                          {product.stock}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-                            <div
-                              className={`h-full rounded-full ${getStockColor(product.stock)}`}
-                              style={{ width: `${getStockPercent(product.stock)}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-muted-foreground w-8 text-right">
-                            {getStockPercent(product.stock).toFixed(0)}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Badge
-                          variant={product.stock === 0 ? "danger" : product.stock < 10 ? "warning" : "success"}
-                          className="text-[10px] capitalize"
-                        >
-                          {product.stock === 0 ? "Out of Stock" : product.stock < 10 ? "Low Stock" : "In Stock"}
-                        </Badge>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </Card>
+        <div className="xl:col-span-2">
+          <ClientSideTable
+            data={DUMMY_PRODUCTS}
+            columns={inventoryColumns}
+            pageCount={Math.ceil(DUMMY_PRODUCTS.length / 10)}
+            searchableColumns={[
+              { id: "name", title: "Product" },
+              { id: "sku",  title: "SKU" },
+            ]}
+            filterableColumns={[
+              {
+                id: "category",
+                title: "Category",
+                options: [
+                  { label: "T-Shirts",   value: "T-Shirts" },
+                  { label: "Jeans",      value: "Jeans" },
+                  { label: "Dresses",    value: "Dresses" },
+                  { label: "Shirts",     value: "Shirts" },
+                  { label: "Footwear",   value: "Footwear" },
+                  { label: "Jackets",    value: "Jackets" },
+                  { label: "Activewear", value: "Activewear" },
+                  { label: "Ethnic",     value: "Ethnic" },
+                ],
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "inventory-export" }}
+          />
         </div>
 
-        {/* Low Stock Alerts panel */}
         <div className="space-y-4">
           <Card className="border-amber-500/20">
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4 text-amber-500" />
                 Reorder Alerts
-                <Badge variant="warning" className="ml-auto text-[10px]">
-                  {DUMMY_LOW_STOCK.length}
-                </Badge>
+                <Badge variant="warning" className="ml-auto text-[10px]">{DUMMY_LOW_STOCK.length}</Badge>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -181,9 +167,7 @@ export default function InventoryPage() {
                     </div>
                   </div>
                   <Progress value={(item.stock / item.minStock) * 100} className="h-1" />
-                  <Button size="sm" variant="warning" className="w-full h-7 text-xs">
-                    Create Purchase Order
-                  </Button>
+                  <Button size="sm" variant="warning" className="w-full h-7 text-xs">Create Purchase Order</Button>
                 </div>
               ))}
             </CardContent>
