@@ -121,7 +121,7 @@ export default function SalesPage() {
             ],
           },
         ]}
-        isShowExportButtons
+        isShowExportButtons={{ isShow: true, fileName: "sales-export" }}
       />
     </div>
   );
