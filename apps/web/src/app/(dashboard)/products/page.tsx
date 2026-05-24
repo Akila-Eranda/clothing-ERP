@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -141,6 +142,7 @@ function buildColumns(
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
+  const router = useRouter();
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
   const [addOpen, setAddOpen]       = useState(false);
@@ -222,7 +224,7 @@ export default function ProductsPage() {
             <Upload className="h-3.5 w-3.5" /> Import CSV
           </Button>
           <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-          <Button size="sm" className="gap-1.5" onClick={() => { setEditProduct(undefined); setAddOpen(true); }}>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push("/products/new")}>
             <Plus className="h-3.5 w-3.5" /> Add Product
           </Button>
         </div>
