@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt,
 } from 'class-validator';
@@ -67,11 +67,14 @@ export class ProductsService {
 
   // ── Products ─────────────────────────────────────────────
   async create(tenantId: string, dto: CreateProductDto) {
-    const slug = this.generateSlug(dto.name);
+    const baseSlug = this.generateSlug(dto.name);
     const sku = `PRD-${nanoid(8).toUpperCase()}`;
 
-    const existing = await this.prisma.product.findFirst({ where: { tenantId, slug } });
-    if (existing) throw new ConflictException('Product with this name already exists');
+    let slug = baseSlug;
+    let suffix = 1;
+    while (await this.prisma.product.findFirst({ where: { tenantId, slug } })) {
+      slug = `${baseSlug}-${suffix++}`;
+    }
 
     const product = await this.prisma.product.create({
       data: {
