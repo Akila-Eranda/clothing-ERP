@@ -17,6 +17,22 @@ import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { nanoid } from 'nanoid';
 import * as dayjs from 'dayjs';
 
+export class ReturnItemDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() unitPrice: number;
+  @ApiProperty() @IsString() productName: string;
+  @ApiProperty() @IsString() variantName: string;
+  @ApiProperty() @IsString() sku: string;
+}
+
+export class ReturnSaleDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() originalSaleId?: string;
+  @ApiProperty({ type: [ReturnItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => ReturnItemDto) items: ReturnItemDto[];
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() refundMethod?: string;
+}
+
 export class SaleItemDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiProperty() @IsInt() @Min(1) quantity: number;
@@ -305,6 +321,43 @@ export class PosService {
     };
   }
 
+  async lookupBarcode(tenantId: string, branchId: string, code: string) {
+    const variant = await this.prisma.productVariant.findFirst({
+      where: {
+        isActive: true,
+        product: { tenantId, status: 'ACTIVE' },
+        OR: [{ barcode: code }, { sku: code }],
+      },
+      include: {
+        product: { include: { category: true } },
+        inventory: { where: branchId ? { branchId } : {}, select: { quantity: true }, take: 1 },
+      },
+    });
+    if (!variant) throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
+    return {
+      variantId: variant.id, productName: variant.product.name, variantName: variant.name,
+      sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
+      costPrice: variant.costPrice, color: variant.color, size: variant.size,
+      stock: variant.inventory[0]?.quantity ?? 0,
+    };
+  }
+
+  async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
+    const refundNumber = `RET-${dayjs().format('YYYYMMDD')}-${nanoid(4).toUpperCase()}`;
+    const total = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+
+    for (const item of dto.items) {
+      await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+        variantId: item.variantId,
+        quantity: item.quantity,
+        movementType: StockMovementType.RETURN,
+        referenceId: refundNumber,
+        notes: dto.reason ?? 'Customer return',
+      });
+    }
+    return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
+  }
+
   async getProducts(tenantId: string, branchId: string) {
     const variants = await this.prisma.productVariant.findMany({
       where: {
@@ -403,6 +456,19 @@ export class PosController {
   @ApiOperation({ summary: 'Get all active products/variants for POS with current stock' })
   getProducts(@CurrentUser() user: IAuthUser) {
     return this.posService.getProducts(user.tenantId, user.branchId ?? '');
+  }
+
+  @Get('barcode/:code')
+  @ApiOperation({ summary: 'Lookup variant by barcode or SKU' })
+  lookupBarcode(@CurrentUser() user: IAuthUser, @Param('code') code: string) {
+    return this.posService.lookupBarcode(user.tenantId, user.branchId ?? '', code);
+  }
+
+  @Post('returns')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Process a return/exchange' })
+  processReturn(@CurrentUser() user: IAuthUser, @Body() dto: ReturnSaleDto) {
+    return this.posService.processReturn(user.tenantId, user.branchId ?? '', user.id, dto);
   }
 }
 

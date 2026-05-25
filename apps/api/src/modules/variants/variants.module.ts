@@ -30,6 +30,13 @@ export class CreateVariantDto {
 export class VariantsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private generateEAN13(): string {
+    const digits = [2, ...Array.from({ length: 11 }, () => Math.floor(Math.random() * 10))];
+    const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0);
+    const check = (10 - (sum % 10)) % 10;
+    return [...digits, check].join('');
+  }
+
   async create(productId: string, tenantId: string, dto: CreateVariantDto) {
     const product = await this.prisma.product.findFirst({ where: { id: productId, tenantId } });
     if (!product) throw new NotFoundException('Product not found');
@@ -37,6 +44,8 @@ export class VariantsService {
     const sku = `${product.sku}-${nanoid(6).toUpperCase()}`;
     const existing = await this.prisma.productVariant.findFirst({ where: { productId, sku } });
     if (existing) throw new ConflictException('Variant with this name already exists');
+
+    const barcode = dto.barcode || this.generateEAN13();
 
     return this.prisma.productVariant.create({
       data: {
@@ -50,7 +59,7 @@ export class VariantsService {
         sellingPrice: dto.sellingPrice,
         costPrice: dto.costPrice,
         mrp: dto.mrp,
-        barcode: dto.barcode,
+        barcode,
         images: dto.images ?? [],
       },
     });

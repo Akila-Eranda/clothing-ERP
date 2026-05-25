@@ -52,25 +52,55 @@ function BarcodeEl({ value, id }: { value: string; id: string }) {
   return <svg ref={ref} className="max-w-full" />;
 }
 
-// ── Label card (one printable sticker) ───────────────────────────────────
-function Label({ item, shopName }: { item: POItem; shopName: string }) {
+type LabelFormat = "sticker" | "hangtag";
+
+// ── Sticker Label (thermal 60×40mm) ──────────────────────────────────────
+function StickerLabel({ item, shopName }: { item: POItem; shopName: string }) {
+  const barcodeVal = item.variant?.barcode || item.sku;
+  const price = item.variant?.sellingPrice ?? item.unitCost;
+  const variantLine = [item.variant?.color, item.variant?.size].filter(Boolean).join(" / ") || item.variantName;
+  return (
+    <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
+      style={{ width: "7.5cm", minHeight: "4.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
+      <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
+      <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
+      {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
+      <BarcodeEl value={barcodeVal} id={item.id} />
+      <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>
+      <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+    </div>
+  );
+}
+
+// ── Hang Tag (clothing hang tag, portrait) ────────────────────────────────
+function HangTag({ item, shopName }: { item: POItem; shopName: string }) {
   const barcodeVal = item.variant?.barcode || item.sku;
   const price = item.variant?.sellingPrice ?? item.unitCost;
   const color = item.variant?.color;
   const size  = item.variant?.size;
-  const variantLine = [color, size].filter(Boolean).join(" / ") || item.variantName;
-
   return (
-    <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-1 text-center"
-      style={{ width: "9cm", minHeight: "5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
-      <p className="text-[9px] font-bold tracking-widest uppercase text-gray-500">{shopName}</p>
-      <p className="text-[12px] font-bold leading-tight">{item.productName}</p>
-      {variantLine && (
-        <p className="text-[10px] text-gray-600">{variantLine}</p>
-      )}
-      <BarcodeEl value={barcodeVal} id={item.id} />
-      <p className="text-[9px] font-mono text-gray-500">{item.sku}</p>
-      <p className="text-[15px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+    <div className="label-card bg-white border-2 border-gray-800 rounded-lg flex flex-col items-center gap-1 text-center overflow-hidden"
+      style={{ width: "6cm", minHeight: "10cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
+      {/* Header band */}
+      <div className="w-full bg-gray-900 py-2 px-3">
+        <p className="text-[11px] font-extrabold tracking-widest uppercase text-white">{shopName}</p>
+      </div>
+      {/* Hole */}
+      <div className="w-5 h-5 rounded-full border-2 border-gray-400 mt-1" />
+      <div className="px-3 py-1 flex flex-col items-center gap-1 flex-1">
+        <p className="text-[13px] font-bold leading-snug text-gray-900">{item.productName}</p>
+        {(color || size) && (
+          <div className="flex gap-2 mt-0.5">
+            {size  && <span className="text-[9px] border border-gray-300 rounded px-1.5 py-0.5 font-semibold text-gray-600">{size}</span>}
+            {color && <span className="text-[9px] border border-gray-300 rounded px-1.5 py-0.5 font-semibold text-gray-600">{color}</span>}
+          </div>
+        )}
+        <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+        <div className="border-t w-full mt-1 pt-1">
+          <BarcodeEl value={barcodeVal} id={item.id} />
+          <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -83,6 +113,7 @@ export default function PrintTagsPage() {
   const [po,      setPo]      = useState<PO | null>(null);
   const [loading, setLoading] = useState(true);
   const [qtys,    setQtys]    = useState<Record<string, number>>({});
+  const [format,  setFormat]  = useState<LabelFormat>("sticker");
 
   const load = useCallback(async () => {
     try {
@@ -156,12 +187,22 @@ export default function PrintTagsPage() {
               <p className="text-sm text-muted-foreground">{po.poNumber} · {po.supplier.name}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <span className="text-sm text-muted-foreground font-medium">
-              Total labels: <strong className="text-foreground">{totalLabels}</strong>
+              Total: <strong className="text-foreground">{totalLabels}</strong> labels
             </span>
-            <Button onClick={handlePrint} className="gap-2 px-6">
-              <Printer className="h-4 w-4" /> Print Tags
+            <div className="flex rounded-lg border overflow-hidden">
+              <button onClick={() => setFormat("sticker")}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors ${ format === "sticker" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted" }`}>
+                🏷️ Sticker
+              </button>
+              <button onClick={() => setFormat("hangtag")}
+                className={`px-3 py-1.5 text-xs font-medium border-l transition-colors ${ format === "hangtag" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted" }`}>
+                🎫 Hang Tag
+              </button>
+            </div>
+            <Button onClick={handlePrint} className="gap-2 px-5">
+              <Printer className="h-4 w-4" /> Print
             </Button>
           </div>
         </div>
@@ -223,9 +264,11 @@ export default function PrintTagsPage() {
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {expandedLabels.map(({ item, key }) => (
-                  <Label key={key} item={item} shopName={shopName} />
-                ))}
+                {expandedLabels.map(({ item, key }) =>
+                  format === "hangtag"
+                    ? <HangTag key={key} item={item} shopName={shopName} />
+                    : <StickerLabel key={key} item={item} shopName={shopName} />
+                )}
               </div>
             )}
           </div>
@@ -235,9 +278,11 @@ export default function PrintTagsPage() {
 
       {/* ── Print-only labels ── */}
       <div className="print-grid hidden print:flex">
-        {expandedLabels.map(({ item, key }) => (
-          <Label key={key} item={item} shopName={shopName} />
-        ))}
+        {expandedLabels.map(({ item, key }) =>
+          format === "hangtag"
+            ? <HangTag key={key} item={item} shopName={shopName} />
+            : <StickerLabel key={key} item={item} shopName={shopName} />
+        )}
       </div>
     </>
   );

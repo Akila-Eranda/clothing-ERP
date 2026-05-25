@@ -162,6 +162,10 @@ export default function PODetailPage() {
                   </Button>
                 )}
                 <Button variant="outline" size="sm" className="gap-1.5"
+                  onClick={() => router.push(`/purchases/${po.id}/grn`)}>
+                  <Package className="h-3.5 w-3.5" /> GRN
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5"
                   onClick={() => router.push(`/purchases/${po.id}/print-tags`)}>
                   <Tag className="h-3.5 w-3.5" /> Print Tags
                 </Button>
