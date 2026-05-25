@@ -82,7 +82,7 @@ export class SuppliersService {
       }),
     };
     const [data, total] = await this.prisma.$transaction([
-      this.prisma.supplier.findMany({ where, skip, take, orderBy: { name: 'asc' } }),
+      this.prisma.supplier.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: { _count: { select: { purchases: true } } } }),
       this.prisma.supplier.count({ where }),
     ]);
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
@@ -120,6 +120,7 @@ export class SuppliersService {
     const discountAmount = itemsData.reduce((s, i) => s + i.discount, 0);
     const taxAmount  = itemsData.reduce((s, i) => s + i.taxAmount, 0);
     return this.prisma.purchaseOrder.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         tenantId, branchId, supplierId: dto.supplierId,
         poNumber, subtotal, discountAmount, taxAmount,
@@ -128,7 +129,7 @@ export class SuppliersService {
         notes: dto.notes, reference: dto.reference, paymentTerms: dto.paymentTerms,
         createdBy: userId,
         items: { create: itemsData },
-      },
+      } as any,
       include: { items: true, supplier: true },
     });
   }

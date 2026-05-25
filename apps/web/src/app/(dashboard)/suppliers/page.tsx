@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Truck, Plus, Phone, Mail, MapPin, Star, Users, ShoppingBag, RefreshCw, CreditCard } from "lucide-react";
+import { Truck, Plus, Phone, Mail, MapPin, Users, ShoppingBag, RefreshCw, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,14 +12,14 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
-import { AddSupplierModal, type Supplier } from "@/components/suppliers/add-supplier-modal";
+import { type Supplier } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
+  onView:   (s: Supplier) => void,
   onEdit:   (s: Supplier) => void,
   onDelete: (s: Supplier) => void,
-  onPOs:    (s: Supplier) => void,
 ): ColumnDef<Supplier>[] {
   return [
     {
@@ -110,11 +110,9 @@ function buildColumns(
       id: "actions",
       cell: ({ row }) => (
         <TableActionsRow
+          showAction={{ action: () => onView(row.original) }}
           editAction={{ action: () => onEdit(row.original) }}
           deleteAction={{ action: () => onDelete(row.original) }}
-          dropMoreActions={[
-            { text: "View Purchase Orders", function: () => onPOs(row.original) },
-          ]}
         />
       ),
     },
@@ -126,9 +124,6 @@ export default function SuppliersPage() {
   const router = useRouter();
   const [suppliers, setSuppliers]       = useState<Supplier[]>([]);
   const [loading, setLoading]           = useState(true);
-  const [addOpen, setAddOpen]           = useState(false);
-  const [editSupplier, setEditSupplier] = useState<Supplier | undefined>();
-
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
@@ -156,14 +151,14 @@ export default function SuppliersPage() {
   const STATS = [
     { label: "Total Suppliers",  value: suppliers.length, icon: Truck,       color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Active",           value: activeCount,      icon: Users,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Credit Limit",     value: `₹${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-500", bg: "bg-violet-500/10" },
-    { label: "Outstanding",      value: `₹${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Credit Limit",     value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-500", bg: "bg-violet-500/10" },
+    { label: "Outstanding",      value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-500", bg: "bg-amber-500/10" },
   ];
 
   const columns = buildColumns(
-    (s) => { setEditSupplier(s); setAddOpen(true); },
+    (s) => router.push(`/suppliers/${s.id}`),
+    (s) => router.push(`/suppliers/${s.id}/edit`),
     handleDelete,
-    (s) => router.push(`/purchases?supplier=${s.id}`),
   );
 
   return (
@@ -178,7 +173,7 @@ export default function SuppliersPage() {
           <Button variant="outline" size="sm" onClick={fetchSuppliers} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setEditSupplier(undefined); setAddOpen(true); }}>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push("/suppliers/new")}>
             <Plus className="h-3.5 w-3.5" /> Add Supplier
           </Button>
         </div>
@@ -215,13 +210,6 @@ export default function SuppliersPage() {
         isShowExportButtons={{ isShow: true, fileName: "suppliers-export" }}
       />
 
-      {/* Modal */}
-      <AddSupplierModal
-        open={addOpen}
-        onClose={() => { setAddOpen(false); setEditSupplier(undefined); }}
-        onSaved={() => { fetchSuppliers(); setAddOpen(false); setEditSupplier(undefined); }}
-        editSupplier={editSupplier}
-      />
     </div>
   );
 }
