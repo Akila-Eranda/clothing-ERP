@@ -6,7 +6,6 @@ import { Printer, ArrowLeft, Minus, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import JsBarcode from "jsbarcode";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface POItem {
@@ -37,24 +36,19 @@ interface PO {
 // ── Barcode SVG component ─────────────────────────────────────────────────
 function BarcodeEl({ value, id }: { value: string; id: string }) {
   const ref = useRef<SVGSVGElement>(null);
+  const safe = (v: string) => v.replace(/[^\x20-\x7E]/g, "").slice(0, 40);
   useEffect(() => {
     if (!ref.current) return;
-    try {
-      JsBarcode(ref.current, value, {
-        format: "CODE128",
-        width: 1.8,
-        height: 42,
-        displayValue: true,
-        fontSize: 10,
-        margin: 4,
-      });
-    } catch {
-      // fallback for invalid barcode values
-      JsBarcode(ref.current, id.slice(0, 12), {
-        format: "CODE128", width: 1.8, height: 42, displayValue: true, fontSize: 10, margin: 4,
-      });
-    }
-  }, [value, id]);
+    const el = ref.current;
+    import("jsbarcode").then(({ default: JsBarcode }) => {
+      const val = safe(value) || safe(id).slice(0, 20);
+      try {
+        JsBarcode(el, val, { format: "CODE128", width: 1.6, height: 44, displayValue: true, fontSize: 11, margin: 4 });
+      } catch {
+        JsBarcode(el, "000000000000", { format: "CODE128", width: 1.6, height: 44, displayValue: true, fontSize: 11, margin: 4 });
+      }
+    });
+  }, [value, id]); // eslint-disable-line
   return <svg ref={ref} className="max-w-full" />;
 }
 
@@ -64,16 +58,15 @@ function Label({ item, shopName }: { item: POItem; shopName: string }) {
   const price = item.variant?.sellingPrice ?? item.unitCost;
   const color = item.variant?.color;
   const size  = item.variant?.size;
+  const variantLine = [color, size].filter(Boolean).join(" / ") || item.variantName;
 
   return (
     <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-1 text-center"
       style={{ width: "9cm", minHeight: "5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
       <p className="text-[9px] font-bold tracking-widest uppercase text-gray-500">{shopName}</p>
       <p className="text-[12px] font-bold leading-tight">{item.productName}</p>
-      {(color || size) && (
-        <p className="text-[10px] text-gray-600">
-          {[color, size].filter(Boolean).join(" / ")}
-        </p>
+      {variantLine && (
+        <p className="text-[10px] text-gray-600">{variantLine}</p>
       )}
       <BarcodeEl value={barcodeVal} id={item.id} />
       <p className="text-[9px] font-mono text-gray-500">{item.sku}</p>
