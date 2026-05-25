@@ -45,6 +45,10 @@ export class CreatePurchaseOrderDto {
   @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
 }
 
+export class UpdatePOStatusDto {
+  @ApiProperty({ enum: PurchaseOrderStatus }) @IsEnum(PurchaseOrderStatus) status: PurchaseOrderStatus;
+}
+
 export class ReceiveItemDto {
   @ApiProperty() @IsString() itemId: string;
   @ApiProperty() @IsInt() @Min(0) receivedQty: number;
@@ -275,9 +279,9 @@ export class PurchasesController {
   updateStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('status') status: PurchaseOrderStatus,
+    @Body() dto: UpdatePOStatusDto,
   ) {
-    return this.suppliersService.updatePOStatus(id, user.tenantId, status);
+    return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status);
   }
 
   @Post(':id/receive')
