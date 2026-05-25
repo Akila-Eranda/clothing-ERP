@@ -77,7 +77,7 @@ function PaymentModal({
   onClose, onSaved,
 }: {
   supplierId: string;
-  purchases: { id: string; poNumber: string; total: number; paidAmount: number }[];
+  purchases: { id: string; poNumber: string; total: number; paidAmount: number; orderDate: string }[];
   balance: number;
   onClose: () => void;
   onSaved: () => void;
@@ -89,12 +89,23 @@ function PaymentModal({
   const [notes,      setNotes]      = useState("");
   const [loading,    setLoading]    = useState(false);
 
-  const unpaidPOs = purchases.filter((p) => p.total > p.paidAmount);
+  const unpaidPOs   = purchases.filter((p) => p.total > p.paidAmount);
+  const totalDue    = unpaidPOs.reduce((s, p) => s + (p.total - p.paidAmount), 0);
+
+  const selectPO = (id: string) => {
+    if (id === purchaseId) {
+      setPurchaseId("none");
+      setAmount("");
+    } else {
+      const po = unpaidPOs.find((p) => p.id === id);
+      setPurchaseId(id);
+      if (po) setAmount(String((po.total - po.paidAmount).toFixed(2)));
+    }
+  };
 
   const submit = async () => {
     const amt = parseFloat(amount);
     if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
-    if (!method) { toast.error("Select a payment method"); return; }
     setLoading(true);
     try {
       await api.post(`/suppliers/${supplierId}/payments`, {
@@ -114,28 +125,103 @@ function PaymentModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md border overflow-hidden">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-xl border overflow-hidden max-h-[92vh] flex flex-col">
+
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b">
+        <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
           <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
             <Banknote className="h-4 w-4 text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-base font-bold">Record Payment</h2>
-            {balance > 0 && (
-              <p className="text-xs text-muted-foreground">Outstanding: <span className="text-amber-500 font-semibold">LKR {balance.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span></p>
-            )}
+            <h2 className="text-base font-bold">Record Supplier Payment</h2>
+            <p className="text-xs text-muted-foreground">
+              Total outstanding: <span className="text-amber-500 font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
+            </p>
           </div>
           <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* Body */}
-        <div className="px-5 py-4 space-y-4">
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+          {/* Outstanding breakdown table */}
+          {unpaidPOs.length > 0 ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Outstanding Purchase Orders — click a row to select &amp; auto-fill amount
+              </p>
+              <div className="border rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">PO #</th>
+                      <th className="px-3 py-2 text-right">Total</th>
+                      <th className="px-3 py-2 text-right">Paid</th>
+                      <th className="px-3 py-2 text-right font-bold text-amber-600">Due</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {unpaidPOs.map((p) => {
+                      const due      = p.total - p.paidAmount;
+                      const selected = purchaseId === p.id;
+                      return (
+                        <tr key={p.id}
+                          onClick={() => selectPO(p.id)}
+                          className={`cursor-pointer transition-colors ${
+                            selected
+                              ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-inset ring-emerald-400"
+                              : "hover:bg-muted/20"
+                          }`}>
+                          <td className="px-3 py-2.5">
+                            <div className="flex items-center gap-2">
+                              {selected && <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
+                              <span className="font-mono text-xs font-semibold text-primary">{p.poNumber}</span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground ml-4">
+                              {new Date(p.orderDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2.5 text-right text-xs">{p.total.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2.5 text-right text-xs text-emerald-600">{p.paidAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-amber-600">{due.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="bg-muted/30 border-t">
+                    <tr>
+                      <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-right text-muted-foreground">Total Due</td>
+                      <td className="px-3 py-2 text-right font-bold text-amber-600">
+                        {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              {purchaseId !== "none" && (
+                <p className="text-xs text-emerald-600 font-medium">
+                  ✓ Linked to {unpaidPOs.find((p) => p.id === purchaseId)?.poNumber} — click again to deselect
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
+              All purchase orders are fully paid. Recording a general advance payment.
+            </div>
+          )}
+
+          {/* Payment fields */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Amount (LKR) <span className="text-destructive">*</span></Label>
               <Input type="number" min="0.01" placeholder="0.00" value={amount}
                 onChange={(e) => setAmount(e.target.value)} autoFocus />
+              {totalDue > 0 && (
+                <button type="button" className="text-[10px] text-primary underline"
+                  onClick={() => setAmount(String(totalDue.toFixed(2)))}>
+                  Fill total due ({totalDue.toLocaleString("en-LK", { maximumFractionDigits: 0 })})
+                </button>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Payment Method <span className="text-destructive">*</span></Label>
@@ -147,23 +233,6 @@ function PaymentModal({
               </Select>
             </div>
           </div>
-
-          {unpaidPOs.length > 0 && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Link to Purchase Order <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
-              <Select value={purchaseId} onValueChange={setPurchaseId}>
-                <SelectTrigger><SelectValue placeholder="Select PO…" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No specific PO</SelectItem>
-                  {unpaidPOs.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.poNumber} — LKR {(p.total - p.paidAmount).toLocaleString("en-LK", { maximumFractionDigits: 0 })} due
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Reference / Cheque No.</Label>
@@ -177,12 +246,21 @@ function PaymentModal({
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
-          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
-            Record Payment
-          </Button>
+        <div className="flex justify-between items-center gap-3 px-5 py-4 border-t bg-muted/10 shrink-0">
+          <div className="text-sm">
+            {amount && parseFloat(amount) > 0 && (
+              <span className="text-muted-foreground">
+                Paying: <strong className="text-foreground">LKR {parseFloat(amount).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</strong>
+              </span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+            <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
+              Record Payment
+            </Button>
+          </div>
         </div>
       </div>
     </div>
