@@ -174,7 +174,7 @@ export default function ExpensesPage() {
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="bg-white border-b px-6 py-4 sticky top-0 z-10">
-        <div className="max-w-[1400px] mx-auto flex items-center justify-between">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-red-500 rounded-xl p-2.5"><TrendingDown className="h-5 w-5 text-white" /></div>
             <div>
@@ -193,7 +193,7 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      <div className="max-w-[1400px] mx-auto px-6 py-6 space-y-6">
+      <div className="px-6 py-6 space-y-6">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
         <div className="bg-white border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
