@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ShoppingBag, Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, PackageCheck, Truck, AlertCircle } from "lucide-react";
+import { ShoppingBag, Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, Truck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -17,15 +17,16 @@ import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/re
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
-  DRAFT:              { label: "Draft",      variant: "secondary", icon: FileText },
-  CONFIRMED:          { label: "Confirmed",  variant: "info",      icon: Clock },
-  SENT:               { label: "Sent",       variant: "info",      icon: Truck },
-  PARTIALLY_RECEIVED: { label: "Partial",    variant: "warning",   icon: AlertCircle },
-  RECEIVED:           { label: "Received",   variant: "success",   icon: CheckCircle2 },
-  CANCELLED:          { label: "Cancelled",  variant: "danger",    icon: XCircle },
+  DRAFT:              { label: "Draft",    variant: "secondary", icon: FileText },
+  CONFIRMED:          { label: "Ordered",  variant: "info",      icon: Clock },
+  SENT:               { label: "Ordered",  variant: "info",      icon: Clock },
+  PARTIALLY_RECEIVED: { label: "Ordered",  variant: "info",      icon: Clock },
+  RECEIVED:           { label: "Received", variant: "success",   icon: CheckCircle2 },
+  CANCELLED:          { label: "Cancelled",variant: "danger",    icon: XCircle },
 };
 
 const RECEIVABLE = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"];
+const ORDERABLE  = ["DRAFT"];
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
@@ -101,8 +102,7 @@ function buildColumns(
             showAction={canReceive ? { action: () => onReceive(po), tooltip: "Receive Items" } : undefined}
             dropMoreActions={[
               ...(canReceive ? [{ text: "Receive Items", function: () => onReceive(po) }] : []),
-              ...(po.status === "DRAFT" ? [{ text: "Mark as Confirmed", function: () => onUpdateStatus(po, "CONFIRMED") }] : []),
-              ...(po.status === "CONFIRMED" ? [{ text: "Mark as Sent", function: () => onUpdateStatus(po, "SENT") }] : []),
+              ...(ORDERABLE.includes(po.status) ? [{ text: "Mark as Ordered", function: () => onUpdateStatus(po, "CONFIRMED") }] : []),
               ...(po.status !== "CANCELLED" && po.status !== "RECEIVED" ? [{ text: "Cancel PO", function: () => onUpdateStatus(po, "CANCELLED") }] : []),
             ]}
           />
@@ -147,15 +147,15 @@ export default function PurchasesPage() {
 
   // Stats
   const total    = pos.length;
-  const pending  = pos.filter((p) => ["DRAFT","CONFIRMED","SENT"].includes(p.status)).length;
-  const transit  = pos.filter((p) => p.status === "PARTIALLY_RECEIVED").length;
+  const pending  = pos.filter((p) => p.status === "DRAFT").length;
+  const ordered  = pos.filter((p) => ["CONFIRMED","SENT","PARTIALLY_RECEIVED"].includes(p.status)).length;
   const received = pos.filter((p) => p.status === "RECEIVED").length;
   const totalValue = pos.reduce((s, p) => s + p.total, 0);
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Pending",     value: pending,                                 icon: Clock,         color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "Partial",     value: transit,                                 icon: Truck,         color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Draft",       value: pending,                                 icon: FileText,      color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Ordered",     value: ordered,                                 icon: Truck,         color: "text-violet-500",  bg: "bg-violet-500/10" },
     { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
