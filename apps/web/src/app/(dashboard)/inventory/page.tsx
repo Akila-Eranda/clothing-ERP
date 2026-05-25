@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AlertTriangle, ArrowUpDown, Package, TrendingDown, BarChart3, Download, RefreshCw, ShoppingBag } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
@@ -23,7 +22,6 @@ function getStockStatus(qty: number) {
 }
 
 function buildColumns(
-  onAdjust: (item: InventoryItem) => void,
   onCreatePO: (item: InventoryItem) => void,
 ): ColumnDef<InventoryItem>[] {
   return [
@@ -85,9 +83,7 @@ function buildColumns(
       id: "actions",
       cell: ({ row }) => (
         <TableActionsRow
-          editAction={{ action: () => onAdjust(row.original) }}
           dropMoreActions={[
-            { text: "Adjust Stock",       function: () => onAdjust(row.original) },
             { text: "Create Purchase Order", function: () => onCreatePO(row.original) },
           ]}
         />
@@ -127,13 +123,12 @@ export default function InventoryPage() {
 
   const STATS = [
     { label: "Total SKUs",        value: totalSKUs,                            icon: Package,      color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Inventory Value",   value: `₹${(invValue / 100000).toFixed(1)}L`, icon: BarChart3,    color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Inventory Value",   value: `LKR ${(invValue / 100000).toFixed(1)}L`, icon: BarChart3,    color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Low Stock Items",   value: lowCount,                              icon: TrendingDown, color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Out of Stock",      value: outCount,                              icon: AlertTriangle,color: "text-red-500",     bg: "bg-red-500/10" },
   ];
 
   const columns = buildColumns(
-    (item) => setAdjustItem(item),
     (item) => { setPrefillVariant(item.variantId); setPoOpen(true); },
   );
 
@@ -199,7 +194,6 @@ export default function InventoryPage() {
               )}
               {lowStock.map((item) => {
                 const reorder = item.reorderPoint ?? 5;
-                const pct = Math.min((item.quantity / reorder) * 100, 100);
                 return (
                   <div key={item.id} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 space-y-2">
                     <div className="flex justify-between items-start">
@@ -214,11 +208,16 @@ export default function InventoryPage() {
                         <p className="text-[10px] text-muted-foreground">/ {reorder} min</p>
                       </div>
                     </div>
-                    <Progress value={pct} className="h-1" />
-                    <Button size="sm" variant="warning" className="w-full h-7 text-xs gap-1.5"
-                      onClick={() => { setPrefillVariant(item.variantId); setPoOpen(true); }}>
-                      <ShoppingBag className="h-3 w-3" /> Create Purchase Order
-                    </Button>
+                    <div className="flex gap-1.5">
+                      <Button size="sm" variant="warning" className="flex-1 h-7 text-xs gap-1.5"
+                        onClick={() => { setPrefillVariant(item.variantId); setPoOpen(true); }}>
+                        <ShoppingBag className="h-3 w-3" /> Create Purchase Order
+                      </Button>
+                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5"
+                        onClick={() => setAdjustItem(item)}>
+                        <ArrowUpDown className="h-3 w-3" /> Stock Adjustment
+                      </Button>
+                    </div>
                   </div>
                 );
               })}

@@ -152,7 +152,7 @@ export function AddEmployeeModal({ open, onClose, onSaved, editEmployee }: Props
             </F>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <F label="Basic Salary (₹/mo)" req>
+            <F label="Basic Salary (LKR/mo)" req>
               <Input type="number" min={0} placeholder="35000" value={form.basicSalary} onChange={(e) => set("basicSalary", e.target.value)} />
             </F>
             <F label="Joining Date" req>

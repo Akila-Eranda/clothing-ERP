@@ -60,7 +60,7 @@ function buildColumns(
     {
       accessorKey: "total",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">₹{row.original.total.toFixed(2)}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">LKR {row.original.total.toFixed(2)}</span>,
     },
     {
       accessorKey: "orderDate",
@@ -196,7 +196,7 @@ export default function PurchasesPage() {
       <div className="rounded-xl border bg-card p-4 flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Total Purchase Value</p>
-          <p className="text-2xl font-black mt-0.5">₹{totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+          <p className="text-2xl font-black mt-0.5">LKR {totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">PO Workflow</p>

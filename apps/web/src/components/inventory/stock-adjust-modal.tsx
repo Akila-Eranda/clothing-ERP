@@ -35,7 +35,7 @@ const MOVEMENT_TYPES = [
   { value: "PURCHASE",   label: "Purchase / Restock", icon: Plus,        desc: "Add stock from purchase" },
   { value: "RETURN",     label: "Customer Return",    icon: Plus,        desc: "Add stock from return" },
   { value: "SALE",       label: "Sale Correction",    icon: Minus,       desc: "Deduct stock (correction)" },
-  { value: "TRANSFER",   label: "Transfer Out",       icon: Minus,       desc: "Move stock to another branch" },
+  { value: "TRANSFER_OUT", label: "Transfer Out",     icon: Minus,       desc: "Move stock to another branch" },
   { value: "DAMAGE",     label: "Damage / Write-off", icon: Minus,       desc: "Remove damaged stock" },
 ];
 
@@ -143,7 +143,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
               <p className="text-[11px] text-muted-foreground">
                 New total:{" "}
                 <span className="font-semibold text-foreground">
-                  {["SALE","TRANSFER","DAMAGE"].includes(movementType)
+                  {["SALE","TRANSFER_OUT","DAMAGE"].includes(movementType)
                     ? Math.max(0, item.quantity - parseInt(quantity))
                     : item.quantity + parseInt(quantity)}
                 </span>

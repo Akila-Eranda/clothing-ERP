@@ -94,9 +94,11 @@ export class InventoryService {
     });
 
     const currentQty = inventory?.quantity ?? 0;
+    const deductionTypes: StockMovementType[] = [StockMovementType.SALE, StockMovementType.TRANSFER_OUT, StockMovementType.DAMAGE];
+    const delta = deductionTypes.includes(dto.movementType) ? -dto.quantity : dto.quantity;
     const newQty = dto.movementType === StockMovementType.ADJUSTMENT
       ? dto.quantity
-      : currentQty + dto.quantity;
+      : currentQty + delta;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const updated = inventory

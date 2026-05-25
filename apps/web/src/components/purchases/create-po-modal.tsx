@@ -275,7 +275,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                   <table className="w-full text-xs">
                     <thead className="bg-muted/30 sticky top-0">
                       <tr>
-                        {["Product / Variant", "SKU", "Qty", "Cost (₹)", "Tax%", "Total", ""].map((h) => (
+                        {["Product / Variant", "SKU", "Qty", "Cost (LKR)", "Tax%", "Total", ""].map((h) => (
                           <th key={h} className="text-left px-2 py-2 text-[10px] font-semibold text-muted-foreground whitespace-nowrap">{h}</th>
                         ))}
                       </tr>
@@ -303,7 +303,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                               onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)} />
                           </td>
                           <td className="px-2 py-1.5 font-semibold whitespace-nowrap">
-                            ₹{(item.unitCost * item.orderedQty).toFixed(0)}
+                            LKR {(item.unitCost * item.orderedQty).toFixed(0)}
                           </td>
                           <td className="px-2 py-1.5">
                             <button onClick={() => removeItem(idx)} className="p-0.5 rounded hover:bg-destructive/10 text-destructive">
@@ -315,9 +315,9 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                     </tbody>
                   </table>
                   <div className="border-t bg-muted/20 px-4 py-2 flex justify-end gap-5 text-xs sticky bottom-0">
-                    <span>Subtotal: <strong>₹{subtotal.toFixed(2)}</strong></span>
-                    <span>Tax: <strong>₹{taxTotal.toFixed(2)}</strong></span>
-                    <span className="text-sm font-bold text-primary">₹{grandTotal.toFixed(2)}</span>
+                    <span>Subtotal: <strong>LKR {subtotal.toFixed(2)}</strong></span>
+                    <span>Tax: <strong>LKR {taxTotal.toFixed(2)}</strong></span>
+                    <span className="text-sm font-bold text-primary">LKR {grandTotal.toFixed(2)}</span>
                   </div>
                 </div>
               )}

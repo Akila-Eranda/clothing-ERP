@@ -82,40 +82,56 @@ function PaymentModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [amount,     setAmount]     = useState("");
   const [method,     setMethod]     = useState("BANK_TRANSFER");
-  const [purchaseId, setPurchaseId] = useState("none");
+  const [selected,   setSelected]   = useState<Set<string>>(new Set());
   const [reference,  setReference]  = useState("");
   const [notes,      setNotes]      = useState("");
   const [loading,    setLoading]    = useState(false);
 
-  const unpaidPOs   = purchases.filter((p) => p.total > p.paidAmount);
-  const totalDue    = unpaidPOs.reduce((s, p) => s + (p.total - p.paidAmount), 0);
+  const unpaidPOs = purchases.filter((p) => p.total > p.paidAmount);
+  const totalDue  = unpaidPOs.reduce((s, p) => s + (p.total - p.paidAmount), 0);
+  const allSelected = unpaidPOs.length > 0 && selected.size === unpaidPOs.length;
+  const selectedDue = unpaidPOs
+    .filter((p) => selected.has(p.id))
+    .reduce((s, p) => s + (p.total - p.paidAmount), 0);
 
-  const selectPO = (id: string) => {
-    if (id === purchaseId) {
-      setPurchaseId("none");
-      setAmount("");
-    } else {
-      const po = unpaidPOs.find((p) => p.id === id);
-      setPurchaseId(id);
-      if (po) setAmount(String((po.total - po.paidAmount).toFixed(2)));
-    }
+  const togglePO = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(unpaidPOs.map((p) => p.id)));
   };
 
   const submit = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (selectedDue <= 0 && selected.size === 0) { toast.error("Select at least one purchase order"); return; }
     setLoading(true);
     try {
-      await api.post(`/suppliers/${supplierId}/payments`, {
-        amount: amt,
-        method,
-        purchaseId: purchaseId !== "none" ? purchaseId : undefined,
-        reference:  reference  || undefined,
-        notes:      notes      || undefined,
-      });
-      toast.success(`Payment of LKR ${amt.toLocaleString("en-LK")} recorded`);
+      if (selected.size === 0) {
+        toast.error("Select at least one purchase order");
+        return;
+      }
+      const selectedPOs = unpaidPOs.filter((p) => selected.has(p.id));
+      for (const po of selectedPOs) {
+        const due = po.total - po.paidAmount;
+        await api.post(`/suppliers/${supplierId}/payments`, {
+          amount:     due,
+          method,
+          purchaseId: po.id,
+          reference:  reference || undefined,
+          notes:      notes     || undefined,
+        });
+      }
+      toast.success(
+        selectedPOs.length === 1
+          ? `Payment of LKR ${selectedDue.toLocaleString("en-LK")} recorded`
+          : `${selectedPOs.length} payments totalling LKR ${selectedDue.toLocaleString("en-LK")} recorded`
+      );
       onSaved();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to record payment");

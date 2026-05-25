@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   UserCog, Plus, Users, Clock, DollarSign, RefreshCw,
   Phone, Mail, CheckCircle2, XCircle, AlertCircle, Loader2,
-  CalendarDays, Banknote, ChevronLeft, ChevronRight,
+  CalendarDays, Banknote, ChevronLeft, ChevronRight, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,214 @@ const ATTN_STATUS: Record<AttendanceStatus, { label: string; color: string; bg: 
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function downloadPayslip(p: Payroll, month: number, year: number) {
+  const monthName = MONTHS[month - 1].toUpperCase();
+  const empName   = `${p.employee.firstName} ${p.employee.lastName}`;
+  const gross     = p.basicSalary + p.allowances + p.bonus;
+  const periodEnd = new Date(year, month, 0).getDate();
+  const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>Payslip - ${empName} - ${monthName} ${year}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #000; background: #fff; padding: 30px; max-width: 700px; margin: auto; }
+  .center { text-align: center; }
+  .bold { font-weight: bold; }
+  .divider { border-top: 1px dashed #000; margin: 6px 0; }
+  .solid { border-top: 2px solid #000; margin: 6px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 2px 0; vertical-align: top; }
+  td.right { text-align: right; }
+  .section-title { font-weight: bold; font-size: 13px; margin: 10px 0 4px; }
+  .net-row td { font-weight: bold; font-size: 14px; padding: 6px 0; }
+  @media print {
+    body { padding: 10px; }
+    button { display: none; }
+  }
+</style></head><body>
+<div class="center bold" style="font-size:22px;letter-spacing:4px;">HEXALYTE</div>
+<div class="center bold" style="font-size:12px;letter-spacing:6px;">INNOVATION</div>
+<div class="center" style="margin-top:4px;">No. 45, Textile Road, Colombo 11, Sri Lanka</div>
+<div class="center">Tel: 077 123 4567 &nbsp;|&nbsp; info@hexalyte.com</div>
+<div class="divider"></div>
+<div class="center bold" style="font-size:16px;letter-spacing:4px;margin:8px 0 2px;">PAYSLIP</div>
+<div class="center">For the Month of ${monthName} ${year}</div>
+<div class="divider"></div>
+<table>
+  <tr><td>Payslip No.</td><td>: PS-${year}-${String(month).padStart(2,"0")}-${p.employee.code.replace("EMP-","")}</td><td>Employee ID</td><td class="right">: ${p.employee.code}</td></tr>
+  <tr><td>Employee Name</td><td>: ${empName}</td><td>Designation</td><td class="right">: ${p.employee.designation ?? "—"}</td></tr>
+  <tr><td>Payroll Period</td><td>: 01 ${MONTHS[month-1].slice(0,3)} ${year} - ${periodEnd} ${MONTHS[month-1].slice(0,3)} ${year}</td><td>Payment Date</td><td class="right">: ${p.paidAt ? new Date(p.paidAt).toLocaleDateString("en-LK",{day:"2-digit",month:"short",year:"numeric"}) : "Pending"}</td></tr>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td class="bold section-title">EARNINGS</td><td class="right bold section-title">AMOUNT (LKR)</td></tr>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td>Basic Salary</td><td class="right">${fmt(p.basicSalary)}</td></tr>
+  ${p.allowances > 0 ? `<tr><td>Allowances</td><td class="right">${fmt(p.allowances)}</td></tr>` : ""}
+  ${p.bonus > 0 ? `<tr><td>Bonus</td><td class="right">${fmt(p.bonus)}</td></tr>` : ""}
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td class="bold">TOTAL EARNINGS</td><td class="right bold">${fmt(gross)}</td></tr>
+</table>
+<br/>
+<table>
+  <tr><td class="bold section-title">DEDUCTIONS</td><td class="right bold section-title">AMOUNT (LKR)</td></tr>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td>Total Deductions</td><td class="right">${fmt(p.deductions)}</td></tr>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td class="bold">TOTAL DEDUCTIONS</td><td class="right bold">${fmt(p.deductions)}</td></tr>
+</table>
+<div class="solid"></div>
+<table class="net-row">
+  <tr><td>NET PAY</td><td class="right">LKR ${fmt(p.netSalary)}</td></tr>
+</table>
+<div class="solid"></div>
+<div style="margin-top:12px;font-size:10px;" class="center">This is a computer generated payslip. No signature is required.</div>
+<div style="margin-top:6px;" class="center bold">THANK YOU!</div>
+<div style="margin-top:16px;text-align:center;">
+  <button onclick="window.print()" style="font-family:sans-serif;padding:8px 24px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save as PDF</button>
+</div>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) { alert("Please allow popups to download payslip."); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
+// ── Attendance columns ───────────────────────────────────────────────────
+function buildAttnColumns(
+  attnMap: Record<string, AttendanceStatus>,
+  setAttnMap: React.Dispatch<React.SetStateAction<Record<string, AttendanceStatus>>>,
+): ColumnDef<EmpWithAttendance>[] {
+  return [
+    {
+      id: "employee",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-sm">{row.original.firstName} {row.original.lastName}</p>
+          <p className="text-[10px] text-muted-foreground font-mono">{row.original.code}</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "designation",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Designation" />,
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.designation ?? "—"}</span>,
+    },
+    {
+      id: "branch",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.branch?.name ?? "—"}</span>,
+    },
+    {
+      id: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const status = attnMap[row.original.id] as AttendanceStatus | undefined;
+        const conf = status ? ATTN_STATUS[status] : null;
+        return conf ? (
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${conf.bg} ${conf.color}`}>
+            <conf.icon className="h-2.5 w-2.5" />{conf.label}
+          </span>
+        ) : <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
+      id: "markAs",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Mark As" />,
+      cell: ({ row }) => (
+        <div className="flex gap-1">
+          {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as AttendanceStatus[]).map((s) => {
+            const c = ATTN_STATUS[s];
+            return (
+              <button key={s} onClick={() => setAttnMap((p) => ({ ...p, [row.original.id]: s }))}
+                className={`text-[9px] font-bold px-1.5 py-1 rounded border transition-all ${
+                  attnMap[row.original.id] === s ? `${c.bg} ${c.color} border-current` : "border-border hover:bg-muted"
+                }`}>
+                {s === "HALF_DAY" ? "H" : s === "ON_LEAVE" ? "L" : s[0]}
+              </button>
+            );
+          })}
+        </div>
+      ),
+    },
+  ];
+}
+
+// ── Payroll columns ────────────────────────────────────────────────────────
+function buildPayrollColumns(
+  payMonth: number,
+  payYear: number,
+  onMarkPaid: (id: string) => void,
+): ColumnDef<Payroll>[] {
+  return [
+    {
+      id: "employee",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium text-sm">{row.original.employee.firstName} {row.original.employee.lastName}</p>
+          <p className="text-[10px] text-muted-foreground font-mono">{row.original.employee.code}</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: "basicSalary",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Basic" />,
+      cell: ({ row }) => <span className="text-sm">LKR {row.original.basicSalary.toLocaleString()}</span>,
+    },
+    {
+      id: "bonusAllowances",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Bonus + Allow." />,
+      cell: ({ row }) => <span className="text-sm text-emerald-600">+LKR {(row.original.bonus + row.original.allowances).toLocaleString()}</span>,
+    },
+    {
+      accessorKey: "deductions",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Deductions" />,
+      cell: ({ row }) => <span className="text-sm text-red-500">-LKR {row.original.deductions.toLocaleString()}</span>,
+    },
+    {
+      accessorKey: "netSalary",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Net Pay" />,
+      cell: ({ row }) => <span className="text-sm font-bold text-primary">LKR {row.original.netSalary.toLocaleString()}</span>,
+    },
+    {
+      id: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => (
+        <Badge variant={row.original.isPaid ? "success" : "warning"} className="text-[10px]">
+          {row.original.isPaid ? "Paid" : "Pending"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <div className="flex gap-1.5">
+          {!row.original.isPaid && (
+            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => onMarkPaid(row.original.id)}>
+              <CheckCircle2 className="h-3 w-3" /> Mark Paid
+            </Button>
+          )}
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => downloadPayslip(row.original, payMonth, payYear)}>
+            <Download className="h-3 w-3" /> Payslip
+          </Button>
+        </div>
+      ),
+    },
+  ];
+}
 
 // ── Employee columns ──────────────────────────────────────────────────────
 function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employee) => void): ColumnDef<Employee>[] {
@@ -92,7 +300,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
     {
       accessorKey: "basicSalary",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">₹{row.original.basicSalary.toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">LKR {row.original.basicSalary.toLocaleString()}</span>,
     },
     {
       accessorKey: "joiningDate",
@@ -231,7 +439,7 @@ export default function HRPage() {
   const STATS = [
     { label: "Total Employees", value: employees.length, icon: Users,    color: "text-blue-500",   bg: "bg-blue-500/10" },
     { label: "Active",          value: activeCount,      icon: UserCog,  color: "text-emerald-500",bg: "bg-emerald-500/10" },
-    { label: "Monthly Payroll", value: `₹${(totalPayroll / 1000).toFixed(0)}K`, icon: DollarSign, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, icon: DollarSign, color: "text-purple-500", bg: "bg-purple-500/10" },
     { label: "Departments",     value: [...new Set(employees.map((e) => e.department).filter(Boolean))].length, icon: Banknote, color: "text-amber-500", bg: "bg-amber-500/10" },
   ];
 
@@ -239,6 +447,9 @@ export default function HRPage() {
     (e) => { setEditEmployee(e); setAddOpen(true); },
     handleDeactivate,
   );
+
+  const attnColumns = buildAttnColumns(attnMap, setAttnMap);
+  const payrollColumns = buildPayrollColumns(payMonth, payYear, markPaid);
 
   const unpaidEmployees = employees.filter((e) => e.isActive && !payrolls.find((p) => p.employeeId === e.id));
 
@@ -323,67 +534,33 @@ export default function HRPage() {
           {attnLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : attnRows.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground">
+            <div className="text-center py-12 text-muted-foreground border rounded-xl">
               <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
               <p>Click Load to fetch employees for this date</p>
             </div>
           ) : (
             <>
-              <div className="rounded-xl border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      {["Employee", "Designation", "Branch", "Status", "Mark As"].map((h) => (
-                        <th key={h} className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {attnRows.map((emp) => {
-                      const status = attnMap[emp.id] as AttendanceStatus | undefined;
-                      const conf = status ? ATTN_STATUS[status] : null;
-                      return (
-                        <tr key={emp.id} className="border-t hover:bg-muted/20">
-                          <td className="px-4 py-2.5">
-                            <p className="font-medium">{emp.firstName} {emp.lastName}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{emp.code}</p>
-                          </td>
-                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{emp.designation ?? "—"}</td>
-                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{emp.branch?.name ?? "—"}</td>
-                          <td className="px-4 py-2.5">
-                            {conf ? (
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${conf.bg} ${conf.color}`}>
-                                <conf.icon className="h-2.5 w-2.5" />{conf.label}
-                              </span>
-                            ) : <span className="text-xs text-muted-foreground">—</span>}
-                          </td>
-                          <td className="px-4 py-2.5">
-                            <div className="flex gap-1">
-                              {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as AttendanceStatus[]).map((s) => {
-                                const c = ATTN_STATUS[s];
-                                return (
-                                  <button key={s} onClick={() => setAttnMap((p) => ({ ...p, [emp.id]: s }))}
-                                    className={`text-[9px] font-bold px-1.5 py-1 rounded border transition-all ${
-                                      attnMap[emp.id] === s ? `${c.bg} ${c.color} border-current` : "border-border hover:bg-muted"
-                                    }`}>
-                                    {s === "HALF_DAY" ? "H" : s === "ON_LEAVE" ? "L" : s[0]}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <ClientSideTable
+                data={attnRows}
+                columns={attnColumns}
+                pageCount={Math.ceil(attnRows.length / 10)}
+                searchableColumns={[{ id: "designation", title: "Employee / Role" }]}
+                filterableColumns={[]}
+                isShowExportButtons={{ isShow: false, fileName: "" }}
+              />
               <div className="flex justify-between items-center">
-                <p className="text-xs text-muted-foreground">
-                  {Object.values(attnMap).filter((s) => s === "PRESENT").length} present ·{" "}
-                  {Object.values(attnMap).filter((s) => s === "ABSENT").length} absent ·{" "}
-                  {attnRows.length - Object.keys(attnMap).length} unmarked
-                </p>
+                <div className="flex gap-3 text-xs">
+                  {Object.entries(ATTN_STATUS).map(([k, v]) => {
+                    const Icon = v.icon;
+                    const count = Object.values(attnMap).filter((s) => s === k).length;
+                    return count > 0 ? (
+                      <span key={k} className={`inline-flex items-center gap-1 font-semibold ${v.color}`}>
+                        <Icon className="h-3 w-3" />{count} {v.label}
+                      </span>
+                    ) : null;
+                  })}
+                  <span className="text-muted-foreground">{attnRows.length - Object.keys(attnMap).length} unmarked</span>
+                </div>
                 <Button onClick={saveAttendance} disabled={attnSaving} className="gap-1.5">
                   {attnSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
                   Save Attendance
@@ -436,11 +613,11 @@ export default function HRPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Bonus (₹)</Label>
+                <Label className="text-[10px] text-muted-foreground">Bonus (LKR)</Label>
                 <Input className="w-24 h-8 text-xs" type="number" min={0} value={genBonus} onChange={(e) => setGenBonus(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Deductions (₹)</Label>
+                <Label className="text-[10px] text-muted-foreground">Deductions (LKR)</Label>
                 <Input className="w-24 h-8 text-xs" type="number" min={0} value={genDeduct} onChange={(e) => setGenDeduct(e.target.value)} />
               </div>
               <Button size="sm" onClick={generatePayroll} disabled={genLoading || !genEmpId} className="gap-1.5">
@@ -459,54 +636,25 @@ export default function HRPage() {
             </div>
           ) : (
             <>
-              <div className="rounded-xl border overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/30">
-                    <tr>
-                      {["Employee", "Basic", "Bonus", "Deductions", "Net Pay", "Status", ""].map((h) => (
-                        <th key={h} className={`px-4 py-2.5 text-xs font-semibold text-muted-foreground ${h ? "text-left" : ""}`}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payrolls.map((p) => (
-                      <tr key={p.id} className="border-t hover:bg-muted/20">
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{p.employee.firstName} {p.employee.lastName}</p>
-                          <p className="text-[10px] text-muted-foreground font-mono">{p.employee.code}</p>
-                        </td>
-                        <td className="px-4 py-3">₹{p.basicSalary.toLocaleString()}</td>
-                        <td className="px-4 py-3 text-emerald-600">+₹{(p.bonus + p.allowances).toLocaleString()}</td>
-                        <td className="px-4 py-3 text-red-500">-₹{p.deductions.toLocaleString()}</td>
-                        <td className="px-4 py-3 font-bold text-primary">₹{p.netSalary.toLocaleString()}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant={p.isPaid ? "success" : "warning"} className="text-[10px]">
-                            {p.isPaid ? "Paid" : "Pending"}
-                          </Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          {!p.isPaid && (
-                            <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => markPaid(p.id)}>
-                              <CheckCircle2 className="h-3 w-3" /> Mark Paid
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr className="border-t bg-muted/30 font-bold">
-                      <td className="px-4 py-3">Total</td>
-                      <td className="px-4 py-3">₹{payrolls.reduce((s,p) => s+p.basicSalary, 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-emerald-600">+₹{payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-red-500">-₹{payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</td>
-                      <td className="px-4 py-3 text-primary">₹{payrolls.reduce((s,p) => s+p.netSalary, 0).toLocaleString()}</td>
-                      <td colSpan={2} className="px-4 py-3 text-xs text-muted-foreground">
-                        {payrolls.filter((p) => p.isPaid).length}/{payrolls.length} paid
-                      </td>
-                    </tr>
-                  </tfoot>
-                </table>
+              <ClientSideTable
+                data={payrolls}
+                columns={payrollColumns}
+                pageCount={Math.ceil(payrolls.length / 10)}
+                searchableColumns={[{ id: "employee", title: "Employee" }]}
+                filterableColumns={[{
+                  id: "status",
+                  title: "Status",
+                  options: [{ value: "true", label: "Paid" }, { value: "false", label: "Pending" }],
+                }]}
+                isShowExportButtons={{ isShow: true, fileName: `payroll-${MONTHS[payMonth-1]}-${payYear}` }}
+              />
+              {/* Totals summary */}
+              <div className="rounded-xl border bg-muted/10 p-4 flex flex-wrap gap-6 text-sm">
+                <div><p className="text-xs text-muted-foreground">Total Basic</p><p className="font-bold">LKR {payrolls.reduce((s,p) => s+p.basicSalary, 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total Bonus + Allow.</p><p className="font-bold text-emerald-600">+LKR {payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="font-bold text-red-500">-LKR {payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</p></div>
+                <div><p className="text-xs text-muted-foreground">Total Net Pay</p><p className="font-bold text-primary">LKR {payrolls.reduce((s,p) => s+p.netSalary, 0).toLocaleString()}</p></div>
+                <div className="ml-auto text-right"><p className="text-xs text-muted-foreground">Paid</p><p className="font-bold">{payrolls.filter((p) => p.isPaid).length}/{payrolls.length}</p></div>
               </div>
             </>
           )}
