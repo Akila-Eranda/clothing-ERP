@@ -75,7 +75,16 @@ export class PosService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  async resolveBranchId(tenantId: string, branchId: string): Promise<string> {
+    if (branchId) return branchId;
+    const branch = await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } });
+    if (!branch) throw new NotFoundException('No branch found for this tenant');
+    return branch.id;
+  }
+
   async createSale(tenantId: string, branchId: string, cashierId: string, dto: CreateSaleDto) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    branchId = resolvedBranchId;
     const invoiceNumber = await this.generateInvoiceNumber(tenantId);
 
     const subtotal = dto.items.reduce((sum, item) => {
@@ -267,8 +276,9 @@ export class PosService {
   }
 
   async holdBill(tenantId: string, branchId: string, cashierId: string, dto: HoldBillDto) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     return this.prisma.heldBill.create({
-      data: { tenantId, branchId, cashierId, label: dto.label, data: dto.data as object },
+      data: { tenantId, branchId: resolvedBranchId, cashierId, label: dto.label, data: dto.data as object },
     });
   }
 
@@ -284,10 +294,11 @@ export class PosService {
   }
 
   async getDailySummary(tenantId: string, branchId: string, date?: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const targetDate = date ? dayjs(date) : dayjs();
     const where = {
       tenantId,
-      branchId,
+      branchId: resolvedBranchId,
       status: SaleStatus.COMPLETED,
       invoiceDate: {
         gte: targetDate.startOf('day').toDate(),
