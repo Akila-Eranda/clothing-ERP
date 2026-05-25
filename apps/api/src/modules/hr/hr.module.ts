@@ -218,30 +218,13 @@ export class HrController {
     return this.hrService.findAll(user.tenantId, query);
   }
 
-  @Get(':id')
+  // ── Static routes MUST come before :id routes ──────────────────────────
+
+  @Get('attendance/daily')
   @RequirePermissions('hr:read')
-  findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.hrService.findOne(id, user.tenantId);
-  }
-
-  @Put(':id')
-  @RequirePermissions('hr:update')
-  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateEmployeeDto>) {
-    return this.hrService.updateEmployee(id, user.tenantId, dto);
-  }
-
-  @Delete(':id')
-  @RequirePermissions('hr:update')
-  @ApiOperation({ summary: 'Deactivate employee' })
-  deactivate(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.hrService.deactivateEmployee(id, user.tenantId);
-  }
-
-  @Post('attendance')
-  @RequirePermissions('hr:update')
-  @ApiOperation({ summary: 'Mark/update employee attendance' })
-  markAttendance(@CurrentUser() user: IAuthUser, @Body() dto: MarkAttendanceDto) {
-    return this.hrService.markAttendance(user.tenantId, dto);
+  @ApiOperation({ summary: 'Get all employees with attendance for a date' })
+  getAttendanceBulk(@CurrentUser() user: IAuthUser, @Query('date') date: string) {
+    return this.hrService.getAttendanceBulk(user.tenantId, date ?? dayjs().format('YYYY-MM-DD'));
   }
 
   @Post('attendance/bulk')
@@ -251,17 +234,11 @@ export class HrController {
     return this.hrService.markAttendanceBulk(user.tenantId, body.date, body.rows);
   }
 
-  @Get('attendance/daily')
-  @RequirePermissions('hr:read')
-  @ApiOperation({ summary: 'Get all employees with attendance for a date' })
-  getAttendanceBulk(@CurrentUser() user: IAuthUser, @Query('date') date: string) {
-    return this.hrService.getAttendanceBulk(user.tenantId, date ?? dayjs().format('YYYY-MM-DD'));
-  }
-
-  @Get(':id/attendance')
-  @RequirePermissions('hr:read')
-  getAttendance(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Query('month') month: string) {
-    return this.hrService.getAttendance(user.tenantId, id, month ?? dayjs().format('YYYY-MM'));
+  @Post('attendance')
+  @RequirePermissions('hr:update')
+  @ApiOperation({ summary: 'Mark/update employee attendance' })
+  markAttendance(@CurrentUser() user: IAuthUser, @Body() dto: MarkAttendanceDto) {
+    return this.hrService.markAttendance(user.tenantId, dto);
   }
 
   @Get('payroll')
@@ -282,6 +259,33 @@ export class HrController {
   @RequirePermissions('hr:update')
   markPaid(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
     return this.hrService.markPayrollPaid(id, user.tenantId);
+  }
+
+  // ── Dynamic :id routes MUST come last ──────────────────────────────────
+
+  @Get(':id')
+  @RequirePermissions('hr:read')
+  findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.hrService.findOne(id, user.tenantId);
+  }
+
+  @Put(':id')
+  @RequirePermissions('hr:update')
+  update(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: Partial<CreateEmployeeDto>) {
+    return this.hrService.updateEmployee(id, user.tenantId, dto);
+  }
+
+  @Delete(':id')
+  @RequirePermissions('hr:update')
+  @ApiOperation({ summary: 'Deactivate employee' })
+  deactivate(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.hrService.deactivateEmployee(id, user.tenantId);
+  }
+
+  @Get(':id/attendance')
+  @RequirePermissions('hr:read')
+  getAttendance(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Query('month') month: string) {
+    return this.hrService.getAttendance(user.tenantId, id, month ?? dayjs().format('YYYY-MM'));
   }
 }
 
