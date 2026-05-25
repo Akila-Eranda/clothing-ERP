@@ -241,6 +241,40 @@ export class ProductsService {
     return this.findOne(productId, tenantId);
   }
 
+  async seedVariants(tenantId: string) {
+    const products = await this.prisma.product.findMany({
+      where: { tenantId },
+      include: { _count: { select: { variants: true } } },
+    });
+    const orphans = products.filter((p) => p._count.variants === 0);
+    if (!orphans.length) return { seeded: 0, message: 'All products already have variants' };
+
+    const branch = await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } });
+
+    let seeded = 0;
+    for (const p of orphans) {
+      const variant = await this.prisma.productVariant.create({
+        data: {
+          productId: p.id,
+          sku: p.sku,
+          name: 'Default',
+          sellingPrice: p.sellingPrice,
+          costPrice: p.costPrice,
+          mrp: p.mrp,
+        },
+      });
+      if (branch) {
+        await this.prisma.inventory.upsert({
+          where: { branchId_variantId: { branchId: branch.id, variantId: variant.id } },
+          update: {},
+          create: { tenantId, branchId: branch.id, variantId: variant.id, quantity: 0 },
+        });
+      }
+      seeded++;
+    }
+    return { seeded, message: `Created default variant + inventory for ${seeded} products` };
+  }
+
   async bulkUpdateStatus(ids: string[], tenantId: string, status: ProductStatus) {
     return this.prisma.product.updateMany({ where: { id: { in: ids }, tenantId }, data: { status } });
   }

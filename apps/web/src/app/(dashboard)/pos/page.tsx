@@ -75,8 +75,9 @@ export default function POSPage() {
   const loadProducts = React.useCallback(async () => {
     setProductsLoading(true);
     try {
-      const res = await api.get<ProductItem[] | { data: ProductItem[] }>("/pos/products");
-      const raw = (Array.isArray(res.data) ? res.data : (res.data as { data: ProductItem[] })?.data ?? []) as ProductItem[];
+      await api.post("/products/seed-variants").catch(() => {});
+      const res = await api.get<ProductItem[]>("/pos/products");
+      const raw = Array.isArray(res.data) ? res.data : [];
       setProducts(raw);
       const cats = ["All", ...Array.from(new Set(raw.map((p) => p.category).filter(Boolean)))];
       setCategories(cats);

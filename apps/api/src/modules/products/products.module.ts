@@ -58,6 +58,12 @@ export class ProductsController {
     return this.productsService.bulkUpdateStatus(body.ids, user.tenantId, body.status);
   }
 
+  @Post('seed-variants')
+  @ApiOperation({ summary: 'Seed default variant+inventory for products that have none' })
+  seedVariants(@CurrentUser() user: IAuthUser) {
+    return this.productsService.seedVariants(user.tenantId);
+  }
+
   @Post(':id/variants')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Add variants to existing product' })
