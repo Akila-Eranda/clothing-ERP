@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
-  ArrowLeft, ChevronRight, Package, CheckCircle2, XCircle,
-  Clock, Printer, Download, MoreHorizontal, Ban,
+  Package, CheckCircle2, XCircle,
+  Clock, Printer, Download, Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -143,50 +143,31 @@ export default function PODetailPage() {
   const amountDue  = po.total - po.paidAmount;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ── Header ── */}
-      <div className="sticky top-0 z-20 bg-background border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/purchases")}>
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">Purchase Order</h1>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchases</span>
-              <ChevronRight className="h-3 w-3" />
-              <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchase Orders</span>
-              <ChevronRight className="h-3 w-3" />
-              <span className="text-foreground font-medium">{po.poNumber}</span>
-            </div>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          {canReceive && (
-            <Button size="sm" className="gap-1.5" onClick={() => setReceiveOpen(true)}>
-              <Package className="h-3.5 w-3.5" /> Receive Items
-            </Button>
-          )}
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Printer className="h-3.5 w-3.5" /> Print
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" /> Download
-          </Button>
-        </div>
-      </div>
-
-      <div className="p-6 space-y-5 max-w-[1400px] mx-auto">
+    <div className="min-h-screen bg-muted/30">
+      <div className="p-6 space-y-5">
 
         {/* ── Top 3-column ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] gap-4">
 
           {/* PO info */}
           <div className="border rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${statusConf.color}`}>
                 {statusConf.label}
               </span>
+              <div className="flex gap-2 ml-auto">
+                {canReceive && (
+                  <Button size="sm" className="gap-1.5" onClick={() => setReceiveOpen(true)}>
+                    <Package className="h-3.5 w-3.5" /> Receive Items
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Printer className="h-3.5 w-3.5" /> Print
+                </Button>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Download className="h-3.5 w-3.5" /> Download
+                </Button>
+              </div>
             </div>
             <h2 className="text-2xl font-bold font-mono">{po.poNumber}</h2>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
