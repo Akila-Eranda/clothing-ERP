@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2,
-  Search, RotateCcw, DollarSign, ArrowLeftRight, Eye, ChevronRight,
+  Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -470,6 +470,13 @@ export default function ReturnsPage() {
           </div>
         );
       },
+    },
+    {
+      accessorKey: "returnType",
+      header: () => null,
+      cell: () => null,
+      enableHiding: true,
+      enableSorting: false,
     },
     {
       id: "invoice",
