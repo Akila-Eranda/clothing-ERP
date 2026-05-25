@@ -405,7 +405,7 @@ export default function AccountingPage() {
       {/* ── TABS (overlapping banner) ───────────────────── */}
       <div className="max-w-[1600px] mx-auto px-6 -mt-14 pb-12 space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="bg-card border rounded-2xl shadow-xl p-1.5 inline-flex flex-wrap gap-0.5">
+          <TabsList className="bg-card border rounded-2xl shadow-xl p-1.5 h-auto flex-wrap gap-0.5 inline-flex">
             {[
               { value: "overview", icon: BarChart2,    label: "Overview" },
               { value: "expenses", icon: TrendingDown, label: "Expenses" },
@@ -419,7 +419,7 @@ export default function AccountingPage() {
                 <t.icon className="h-3.5 w-3.5" />{t.label}
               </TabsTrigger>
             ))}
-          </div>
+          </TabsList>
 
           {/* ── OVERVIEW ─────────────────────────────────── */}
           <TabsContent value="overview" className="space-y-4 mt-0">
