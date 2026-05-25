@@ -58,6 +58,15 @@ export class ReceiveItemDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
 }
 
+export class RecordPaymentDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() paidAt?: string;
+}
+
 @Injectable()
 export class SuppliersService {
   constructor(
@@ -166,6 +175,44 @@ export class SuppliersService {
     return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
   }
 
+  async recordPayment(supplierId: string, tenantId: string, dto: RecordPaymentDto) {
+    await this.findOneSupplier(supplierId, tenantId);
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.supplierPayment.create({
+        data: {
+          tenantId,
+          supplierId,
+          purchaseId: dto.purchaseId || undefined,
+          amount:     dto.amount,
+          method:     dto.method,
+          reference:  dto.reference,
+          notes:      dto.notes,
+          paidAt:     dto.paidAt ? new Date(dto.paidAt) : new Date(),
+        },
+      });
+      await tx.supplier.update({
+        where: { id: supplierId },
+        data: { balance: { decrement: dto.amount } },
+      });
+      if (dto.purchaseId) {
+        await tx.purchaseOrder.update({
+          where: { id: dto.purchaseId },
+          data: { paidAmount: { increment: dto.amount } },
+        });
+      }
+      return payment;
+    });
+  }
+
+  async getPayments(supplierId: string, tenantId: string) {
+    await this.findOneSupplier(supplierId, tenantId);
+    return this.prisma.supplierPayment.findMany({
+      where: { supplierId, tenantId },
+      orderBy: { paidAt: 'desc' },
+      include: { purchase: { select: { poNumber: true } } },
+    });
+  }
+
   async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
     const po = await this.prisma.purchaseOrder.findFirst({
       where: { id: poId, tenantId },
@@ -243,6 +290,20 @@ export class SuppliersController {
   remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
     return this.suppliersService.removeSupplier(id, user.tenantId);
   }
+
+  @Post(':id/payments')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Record a payment to supplier' })
+  recordPayment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: RecordPaymentDto) {
+    return this.suppliersService.recordPayment(id, user.tenantId, dto);
+  }
+
+  @Get(':id/payments')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List payments for a supplier' })
+  getPayments(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.getPayments(id, user.tenantId);
+  }
 }
 
 @ApiTags('Purchases')
@@ -282,16 +343,6 @@ export class PurchasesController {
     return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status);
   }
 
-  @Post(':id/receive')
-  @RequirePermissions('purchases:update')
-  @ApiOperation({ summary: 'Receive items from purchase order' })
-  receive(
-    @CurrentUser() user: IAuthUser,
-    @Param('id') id: string,
-    @Body() body: { items: ReceiveItemDto[] },
-  ) {
-    return this.suppliersService.receiveItems(id, user.tenantId, user.branchId ?? '', user.id, body.items);
-  }
 }
 
 @Module({

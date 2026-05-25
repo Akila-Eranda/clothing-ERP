@@ -4,10 +4,14 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronRight, Pencil, Phone, Mail, MapPin,
-  Package, CreditCard, Star, Calendar, TrendingUp,
+  Package, CreditCard, Star, Calendar, TrendingUp, X, Loader2, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 
@@ -58,12 +62,140 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
+// ── Payment Methods (supplier-relevant subset) ───────────────────────────
+const PAY_METHODS = [
+  { value: "CASH",          label: "Cash" },
+  { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  { value: "UPI",           label: "UPI" },
+  { value: "CARD",          label: "Card" },
+  { value: "WALLET",        label: "Wallet" },
+];
+
+// ── Record Payment Modal ──────────────────────────────────────────────────
+function PaymentModal({
+  supplierId, purchases, balance,
+  onClose, onSaved,
+}: {
+  supplierId: string;
+  purchases: { id: string; poNumber: string; total: number; paidAmount: number }[];
+  balance: number;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [amount,     setAmount]     = useState("");
+  const [method,     setMethod]     = useState("BANK_TRANSFER");
+  const [purchaseId, setPurchaseId] = useState("none");
+  const [reference,  setReference]  = useState("");
+  const [notes,      setNotes]      = useState("");
+  const [loading,    setLoading]    = useState(false);
+
+  const unpaidPOs = purchases.filter((p) => p.total > p.paidAmount);
+
+  const submit = async () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (!method) { toast.error("Select a payment method"); return; }
+    setLoading(true);
+    try {
+      await api.post(`/suppliers/${supplierId}/payments`, {
+        amount: amt,
+        method,
+        purchaseId: purchaseId !== "none" ? purchaseId : undefined,
+        reference:  reference  || undefined,
+        notes:      notes      || undefined,
+      });
+      toast.success(`Payment of LKR ${amt.toLocaleString("en-LK")} recorded`);
+      onSaved();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to record payment");
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md border overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center gap-3 px-5 py-4 border-b">
+          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
+            <Banknote className="h-4 w-4 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold">Record Payment</h2>
+            {balance > 0 && (
+              <p className="text-xs text-muted-foreground">Outstanding: <span className="text-amber-500 font-semibold">LKR {balance.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span></p>
+            )}
+          </div>
+          <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Amount (LKR) <span className="text-destructive">*</span></Label>
+              <Input type="number" min="0.01" placeholder="0.00" value={amount}
+                onChange={(e) => setAmount(e.target.value)} autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Payment Method <span className="text-destructive">*</span></Label>
+              <Select value={method} onValueChange={setMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {PAY_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {unpaidPOs.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Link to Purchase Order <span className="text-xs font-normal text-muted-foreground">(optional)</span></Label>
+              <Select value={purchaseId} onValueChange={setPurchaseId}>
+                <SelectTrigger><SelectValue placeholder="Select PO…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No specific PO</SelectItem>
+                  {unpaidPOs.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.poNumber} — LKR {(p.total - p.paidAmount).toLocaleString("en-LK", { maximumFractionDigits: 0 })} due
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Reference / Cheque No.</Label>
+            <Input placeholder="e.g. CHQ-001 or TXN-12345" value={reference} onChange={(e) => setReference(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Notes</Label>
+            <Textarea rows={2} placeholder="Payment notes…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
+            Record Payment
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function SupplierDetailPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
   const [supplier, setSupplier]     = useState<SupplierDetail | null>(null);
   const [loading, setLoading]       = useState(true);
+  const [payOpen, setPayOpen]       = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -322,6 +454,10 @@ export default function SupplierDetailPage() {
             <Button className="w-full gap-2" onClick={() => router.push(`/suppliers/${id}/edit`)}>
               <Pencil className="h-4 w-4" /> Edit Supplier
             </Button>
+            <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
+              onClick={() => setPayOpen(true)}>
+              <Banknote className="h-4 w-4" /> Record Payment
+            </Button>
             <Button variant="outline" className="w-full gap-2"
               onClick={() => router.push(`/purchases/new?supplier=${id}`)}>
               <Package className="h-4 w-4" /> New Purchase Order
@@ -336,6 +472,16 @@ export default function SupplierDetailPage() {
 
       </div>
       </div>
+
+      {payOpen && supplier && (
+        <PaymentModal
+          supplierId={id}
+          purchases={supplier.purchases}
+          balance={supplier.balance}
+          onClose={() => setPayOpen(false)}
+          onSaved={() => { setPayOpen(false); load(); }}
+        />
+      )}
     </div>
   );
 }
