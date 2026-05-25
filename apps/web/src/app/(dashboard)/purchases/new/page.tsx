@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2, ChevronRight, Search, X } from "lucide-react";
+import { Plus, Trash2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -139,26 +139,7 @@ export default function CreatePOPage() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      {/* ── Sticky header ── */}
-      <div className="sticky top-0 z-20 bg-background border-b px-8 py-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => router.push("/purchases")}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Create Purchase Order</h1>
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
-              <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => router.push("/purchases")}>Purchases</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => router.push("/purchases")}>Purchase Orders</span>
-              <ChevronRight className="h-3.5 w-3.5" />
-              <span className="text-foreground font-medium">Create Purchase Order</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="p-8 space-y-6 max-w-[1400px] mx-auto">
+      <div className="p-6 space-y-6">
 
         {/* ── Top section: 3 columns ── */}
         <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_300px] gap-5">
