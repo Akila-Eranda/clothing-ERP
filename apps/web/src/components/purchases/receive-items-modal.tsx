@@ -30,7 +30,7 @@ export interface PurchaseOrder {
   orderDate: string;
   expectedDate?: string | null;
   notes?: string | null;
-  supplier: { id: string; name: string; phone: string };
+  supplier: { id: string; name: string; phone?: string | null };
   items?: POItem[];
   _count?: { items: number };
 }

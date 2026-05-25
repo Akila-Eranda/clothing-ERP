@@ -35,13 +35,16 @@ export class PurchaseItemDto {
   @ApiProperty() @IsString() sku: string;
   @ApiProperty() @IsInt() @Min(1) orderedQty: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
-  @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) taxRate?: number;
 }
 
 export class CreatePurchaseOrderDto {
   @ApiProperty() @IsString() supplierId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() expectedDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() paymentTerms?: string;
   @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
 }
 
@@ -105,32 +108,26 @@ export class SuppliersService {
   }
 
   async createPurchaseOrder(tenantId: string, branchId: string, userId: string, dto: CreatePurchaseOrderDto) {
-    const poNumber = `PO-${Date.now().toString(36).toUpperCase()}`;
-    const subtotal = dto.items.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
-    const taxAmount = dto.items.reduce((s, i) => s + (i.unitCost * i.orderedQty * (i.taxRate ?? 0)) / 100, 0);
-
+    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const itemsData = dto.items.map((item) => {
+      const lineTotal = item.unitCost * item.orderedQty;
+      const disc = item.discount ?? 0;
+      const taxable = lineTotal - disc;
+      const tax = (taxable * (item.taxRate ?? 0)) / 100;
+      return { variantId: item.variantId, productName: item.productName, variantName: item.variantName, sku: item.sku, orderedQty: item.orderedQty, unitCost: item.unitCost, discount: disc, taxRate: item.taxRate ?? 0, taxAmount: tax, total: taxable + tax };
+    });
+    const subtotal   = itemsData.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
+    const discountAmount = itemsData.reduce((s, i) => s + i.discount, 0);
+    const taxAmount  = itemsData.reduce((s, i) => s + i.taxAmount, 0);
     return this.prisma.purchaseOrder.create({
       data: {
-        tenantId, branchId,
-        supplierId: dto.supplierId,
-        poNumber, subtotal, taxAmount,
-        total: subtotal + taxAmount,
+        tenantId, branchId, supplierId: dto.supplierId,
+        poNumber, subtotal, discountAmount, taxAmount,
+        total: subtotal - discountAmount + taxAmount,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
-        notes: dto.notes,
+        notes: dto.notes, reference: dto.reference, paymentTerms: dto.paymentTerms,
         createdBy: userId,
-        items: {
-          create: dto.items.map((item) => ({
-            variantId: item.variantId,
-            productName: item.productName,
-            variantName: item.variantName,
-            sku: item.sku,
-            orderedQty: item.orderedQty,
-            unitCost: item.unitCost,
-            taxRate: item.taxRate ?? 0,
-            taxAmount: (item.unitCost * item.orderedQty * (item.taxRate ?? 0)) / 100,
-            total: item.unitCost * item.orderedQty,
-          })),
-        },
+        items: { create: itemsData },
       },
       include: { items: true, supplier: true },
     });

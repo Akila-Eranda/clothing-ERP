@@ -11,8 +11,8 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { CreatePOModal } from "@/components/purchases/create-po-modal";
 import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/receive-items-modal";
+import { useRouter } from "next/navigation";
 
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
@@ -30,6 +30,7 @@ const ORDERABLE  = ["DRAFT"];
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
+  onView: (po: PurchaseOrder) => void,
   onReceive: (po: PurchaseOrder) => void,
   onUpdateStatus: (po: PurchaseOrder, status: string) => void,
 ): ColumnDef<PurchaseOrder>[] {
@@ -38,7 +39,7 @@ function buildColumns(
       accessorKey: "poNumber",
       header: ({ column }) => <DataTableColumnHeader column={column} title="PO Number" />,
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-blue-500 font-semibold">{row.original.poNumber}</span>
+        <button onClick={() => onView(row.original)} className="font-mono text-xs text-blue-500 font-semibold hover:underline">{row.original.poNumber}</button>
       ),
     },
     {
@@ -114,10 +115,10 @@ function buildColumns(
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function PurchasesPage() {
-  const [pos, setPos]               = useState<PurchaseOrder[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [receivePO, setReceivePO]   = useState<PurchaseOrder | null>(null);
+  const router = useRouter();
+  const [pos, setPos]             = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
 
   const fetchPOs = useCallback(async () => {
     setLoading(true);
@@ -159,7 +160,7 @@ export default function PurchasesPage() {
     { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
-  const columns = buildColumns(loadReceive, handleUpdateStatus);
+  const columns = buildColumns((po) => router.push(`/purchases/${po.id}`), loadReceive, handleUpdateStatus);
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -173,7 +174,7 @@ export default function PurchasesPage() {
           <Button variant="outline" size="sm" onClick={fetchPOs} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
             <Plus className="h-3.5 w-3.5" /> New PO
           </Button>
         </div>
@@ -200,7 +201,7 @@ export default function PurchasesPage() {
         <div className="text-right">
           <p className="text-xs text-muted-foreground">PO Workflow</p>
           <div className="flex items-center gap-1.5 mt-1 text-xs font-medium text-muted-foreground">
-            {["Draft","→ Ordered","→ In Transit","→ Received"].map((s) => (
+            {["Draft","→ Ordered","→ Received"].map((s) => (
               <span key={s} className="bg-muted/50 px-2 py-0.5 rounded-full">{s}</span>
             ))}
           </div>
@@ -223,8 +224,6 @@ export default function PurchasesPage() {
         isShowExportButtons={{ isShow: true, fileName: "purchase-orders-export" }}
       />
 
-      {/* Modals */}
-      <CreatePOModal open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => { fetchPOs(); setCreateOpen(false); }} />
       <ReceiveItemsModal po={receivePO} onClose={() => setReceivePO(null)} onReceived={fetchPOs} />
     </div>
   );

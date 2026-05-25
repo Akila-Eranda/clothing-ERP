@@ -1021,6 +1021,8 @@ model PurchaseOrder {
   total           Float               @default(0)
   paidAmount      Float               @default(0)
   notes           String?
+  reference       String?
+  paymentTerms    String?
   createdBy       String?
   approvedBy      String?
   createdAt       DateTime            @default(now())
@@ -1047,6 +1049,7 @@ model PurchaseOrderItem {
   receivedQty   Int      @default(0)
   rejectedQty   Int      @default(0)
   unitCost      Float
+  discount      Float    @default(0)
   taxRate       Float    @default(0)
   taxAmount     Float    @default(0)
   total         Float
