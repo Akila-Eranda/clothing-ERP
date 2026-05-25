@@ -124,21 +124,26 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
 }
 
 // ── Account Modal ────────────────────────────────────────────────────────────
-function AccountModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [code, setCode]     = useState("");
-  const [name, setName]     = useState("");
-  const [type, setType]     = useState("ASSET");
-  const [desc, setDesc]     = useState("");
+function AccountModal({ edit, onClose, onSaved }: { edit?: Account | null; onClose: () => void; onSaved: () => void }) {
+  const [code, setCode]     = useState(edit?.code ?? "");
+  const [name, setName]     = useState(edit?.name ?? "");
+  const [type, setType]     = useState(edit?.type ?? "ASSET");
+  const [desc, setDesc]     = useState(edit?.description ?? "");
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
     if (!code || !name) { toast.error("Code and Name are required"); return; }
     setSaving(true);
     try {
-      await api.post("/accounting/accounts", { code, name, type, description: desc || undefined });
-      toast.success("Account created");
+      if (edit) {
+        await api.put(`/accounting/accounts/${edit.id}`, { code, name, type, description: desc || undefined });
+        toast.success("Account updated");
+      } else {
+        await api.post("/accounting/accounts", { code, name, type, description: desc || undefined });
+        toast.success("Account created");
+      }
       onSaved(); onClose();
-    } catch { toast.error("Failed to create account"); }
+    } catch { toast.error(edit ? "Failed to update account" : "Failed to create account"); }
     finally { setSaving(false); }
   };
 
@@ -146,7 +151,7 @@ function AccountModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-sm flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-bold">New Account</h2>
+          <h2 className="font-bold">{edit ? "Edit Account" : "New Account"}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
         <div className="px-6 py-4 space-y-3">
@@ -164,7 +169,7 @@ function AccountModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Create"}</Button>
+          <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : edit ? "Save Changes" : "Create"}</Button>
         </div>
       </div>
     </div>
@@ -292,6 +297,7 @@ export default function AccountingPage() {
   const [addExpenseOpen, setAddExpenseOpen]   = useState(false);
   const [editExpense, setEditExpense]         = useState<Expense | null>(null);
   const [addAccountOpen, setAddAccountOpen]   = useState(false);
+  const [editAccount, setEditAccount]         = useState<Account | null>(null);
   const [addJournalOpen, setAddJournalOpen]   = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -327,6 +333,12 @@ export default function AccountingPage() {
     if (!confirm("Delete this expense?")) return;
     try { await api.delete(`/accounting/expenses/${id}`); toast.success("Deleted"); loadAll(); }
     catch { toast.error("Failed to delete"); }
+  };
+
+  const deleteAccount = async (id: string) => {
+    if (!confirm("Delete this account? This cannot be undone.")) return;
+    try { await api.delete(`/accounting/accounts/${id}`); toast.success("Account deleted"); loadAll(); }
+    catch { toast.error("Failed to delete account"); }
   };
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -674,12 +686,23 @@ export default function AccountingPage() {
                   </CardHeader>
                   <CardContent className="px-5 pb-4 pt-3">
                     <div className="rounded-xl border overflow-hidden divide-y">
+                      <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                        <span className="col-span-1">Code</span>
+                        <span className="col-span-4">Account Name</span>
+                        <span className="col-span-4 hidden lg:block">Description</span>
+                        <span className="col-span-2 text-right">Balance</span>
+                        <span className="col-span-1"></span>
+                      </div>
                       {accts.map((acct) => (
-                        <div key={acct.id} className="flex items-center gap-4 px-4 py-3 hover:bg-slate-50 transition-colors">
-                          <span className="font-mono text-xs text-muted-foreground w-14 shrink-0">{acct.code}</span>
-                          <span className="flex-1 text-sm font-medium">{acct.name}</span>
-                          {acct.description && <span className="text-xs text-muted-foreground hidden lg:block max-w-[200px] truncate">{acct.description}</span>}
-                          <span className={`font-bold text-sm shrink-0 ${acct.balance < 0 ? "text-red-500" : acct.balance > 0 ? "" : "text-muted-foreground"}`}>LKR {formatNumber(acct.balance)}</span>
+                        <div key={acct.id} className="grid grid-cols-12 gap-2 items-center px-4 py-3 hover:bg-slate-50 transition-colors">
+                          <span className="col-span-1 font-mono text-xs text-slate-400">{acct.code}</span>
+                          <span className="col-span-4 text-sm font-medium">{acct.name}</span>
+                          <span className="col-span-4 text-xs text-muted-foreground hidden lg:block truncate">{acct.description ?? "—"}</span>
+                          <span className={`col-span-2 font-bold text-sm text-right ${acct.balance < 0 ? "text-red-500" : acct.balance === 0 ? "text-slate-400" : "text-slate-800"}`}>LKR {formatNumber(acct.balance)}</span>
+                          <div className="col-span-1 flex items-center justify-end gap-1">
+                            <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600 transition-colors"><Pencil className="h-3 w-3" /></button>
+                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3" /></button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -786,10 +809,92 @@ export default function AccountingPage() {
           </TabsContent>
 
           {/* ══ BANKING ══ */}
-          <TabsContent value="banking" className="m-0">
-            <div className="h-64 flex items-center justify-center text-slate-400 bg-white rounded-xl border shadow-sm">
-              <div className="text-center"><CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" /><p className="text-sm font-medium">Banking module coming soon</p></div>
+          <TabsContent value="banking" className="m-0 space-y-5">
+            {/* Cash Position Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { label: "Total Cash Position",  value: accounts.filter(a=>a.type==="ASSET").reduce((s,a)=>s+a.balance,0),  icon: Wallet,    bg: "bg-blue-600",    sub: `${accounts.filter(a=>a.type==="ASSET").length} asset accounts` },
+                { label: "Total Inflow (Period)", value: cashFlow?.totalInflow ?? 0,  icon: ArrowUpRight,   bg: "bg-emerald-600", sub: "From sales revenue" },
+                { label: "Total Outflow (Period)",value: cashFlow?.totalOutflow ?? 0, icon: ArrowDownRight, bg: "bg-red-500",     sub: "Expenses & payments" },
+              ].map((item) => (
+                <Card key={item.label} className="bg-white border shadow-sm">
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className={`${item.bg} rounded-full p-3 shrink-0`}><item.icon className="h-5 w-5 text-white" /></div>
+                    <div>
+                      <p className="text-xs text-slate-500 font-medium">{item.label}</p>
+                      <p className="text-xl font-bold text-slate-800 mt-0.5">LKR {formatNumber(item.value)}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
+
+            {/* Bank / Cash Account Cards */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">Cash &amp; Bank Accounts</h3>
+                <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-8" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />Add Account</Button>
+              </div>
+              {accounts.filter(a=>a.type==="ASSET").length === 0 ? (
+                <div className="h-32 flex items-center justify-center bg-white rounded-xl border text-slate-400 text-sm">No asset accounts yet</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {accounts.filter(a=>a.type==="ASSET").map((acct) => (
+                    <Card key={acct.id} className="bg-white border shadow-sm hover:shadow-md transition-shadow">
+                      <CardContent className="p-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="bg-blue-100 rounded-lg p-2"><CreditCard className="h-4 w-4 text-blue-600" /></div>
+                            <div><p className="text-xs font-semibold text-slate-700">{acct.name}</p><p className="text-[10px] text-slate-400 font-mono">{acct.code}</p></div>
+                          </div>
+                          <div className="flex gap-1">
+                            <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600"><Pencil className="h-3 w-3" /></button>
+                            <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
+                          </div>
+                        </div>
+                        <p className={`text-xl font-bold ${acct.balance < 0 ? "text-red-500" : "text-slate-800"}`}>LKR {formatNumber(acct.balance)}</p>
+                        <p className="text-xs text-slate-400 mt-1">{acct.description || "Asset Account"}</p>
+                        <div className={`mt-3 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${acct.balance >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
+                          {acct.balance >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+                          {acct.balance >= 0 ? "Positive" : "Negative"} balance
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Cash Flow Chart */}
+            {cashFlow && cashFlow.data.length > 0 && (
+              <Card className="bg-white border shadow-sm">
+                <CardHeader className="pb-2 flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-semibold text-slate-700">Cash Flow — Daily</CardTitle>
+                  <div className="flex gap-2">
+                    <PresetBar range={cfRange} onApply={(p) => setCfRange({ start: p.start, end: p.end })} />
+                    <Button size="sm" variant="outline" onClick={loadAll} className="h-7 px-2"><RefreshCw className="h-3 w-3" /></Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <AreaChart data={cashFlow.data}>
+                      <defs>
+                        <linearGradient id="bkiGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
+                        <linearGradient id="bkoGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/><stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/></linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "10px", fontSize: "12px" }} />
+                      <Legend />
+                      <Area type="monotone" dataKey="inflow"  name="Inflow"  stroke="#10b981" fill="url(#bkiGrad)" strokeWidth={2} dot={false} />
+                      <Area type="monotone" dataKey="outflow" name="Outflow" stroke="#f43f5e" fill="url(#bkoGrad)" strokeWidth={2} dot={false} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           {/* ══ SETTINGS ══ */}
@@ -806,7 +911,7 @@ export default function AccountingPage() {
       {(addExpenseOpen || editExpense) && (
         <ExpenseModal edit={editExpense} onClose={() => { setAddExpenseOpen(false); setEditExpense(null); }} onSaved={loadAll} />
       )}
-      {addAccountOpen && <AccountModal onClose={() => setAddAccountOpen(false)} onSaved={loadAll} />}
+      {(addAccountOpen || editAccount) && <AccountModal edit={editAccount} onClose={() => { setAddAccountOpen(false); setEditAccount(null); }} onSaved={loadAll} />}
       {addJournalOpen && <JournalModal accounts={accounts} onClose={() => setAddJournalOpen(false)} onSaved={loadAll} />}
     </div>
   );
