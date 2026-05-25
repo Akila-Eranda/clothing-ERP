@@ -12,8 +12,7 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { AddProductModal, type Product } from "@/components/products/add-product-modal";
-import { ViewProductModal } from "@/components/products/view-product-modal";
+import { type Product } from "@/components/products/add-product-modal";
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
@@ -145,9 +144,6 @@ export default function ProductsPage() {
   const router = useRouter();
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [addOpen, setAddOpen]       = useState(false);
-  const [viewProduct, setViewProduct] = useState<Product | null>(null);
-  const [editProduct, setEditProduct] = useState<Product | undefined>();
   const [importing, setImporting]   = useState(false);
   const importRef                   = useRef<HTMLInputElement>(null);
 
@@ -201,7 +197,7 @@ export default function ProductsPage() {
 
   const columns = buildColumns(
     (p) => router.push(`/products/${p.id}`),
-    (p) => { setEditProduct(p); setAddOpen(true); },
+    (p) => router.push(`/products/${p.id}/edit`),
     handleDelete,
   );
 
@@ -272,18 +268,6 @@ export default function ProductsPage() {
         {" "}— tags separated by <span className="font-mono">|</span>, status: ACTIVE or DRAFT
       </p>
 
-      {/* Modals */}
-      <AddProductModal
-        open={addOpen}
-        onClose={() => { setAddOpen(false); setEditProduct(undefined); }}
-        onCreated={() => { setAddOpen(false); setEditProduct(undefined); fetch(); }}
-        editProduct={editProduct}
-      />
-      <ViewProductModal
-        product={viewProduct}
-        onClose={() => setViewProduct(null)}
-        onEdit={(p) => { setViewProduct(null); setEditProduct(p); setAddOpen(true); }}
-      />
     </div>
   );
 }

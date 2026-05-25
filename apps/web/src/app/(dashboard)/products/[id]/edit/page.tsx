@@ -210,7 +210,7 @@ export default function EditProductPage() {
 
     let variants: Record<string, unknown>[] | undefined = undefined;
     if (form.hasVariants && variantRows.length > 0) {
-      variants = variantRows.filter((r) => r.active).map((r) => ({
+      variants = variantRows.map((r) => ({
         id:           r.id,
         sku:          r.sku,
         name:         r.name,
@@ -221,11 +221,12 @@ export default function EditProductPage() {
         sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
         costPrice:    parseFloat(r.costPrice)    || parseFloat(form.costPrice)    || 0,
         mrp:          parseFloat(r.mrp)          || parseFloat(form.mrp)          || 0,
+        isActive:     r.active,
       }));
     }
 
     try {
-      await api.patch(`/products/${id}`, {
+      await api.put(`/products/${id}`, {
         name:           form.name.trim(),
         description:    form.description  || undefined,
         shortDesc:      form.shortDesc    || undefined,

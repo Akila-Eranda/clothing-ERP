@@ -205,15 +205,50 @@ export class ProductsService {
     return product;
   }
 
-  async update(id: string, tenantId: string, dto: Partial<CreateProductDto>) {
+  async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
     await this.findOne(id, tenantId);
-    const data: Record<string, unknown> = { ...dto };
+    const { variants, ...productFields } = dto as Record<string, unknown>;
+    const data: Record<string, unknown> = { ...productFields };
     if (dto.name) data.slug = this.generateSlug(dto.name);
-    return this.prisma.product.update({
-      where: { id },
-      data,
-      include: { category: true, brand: true, variants: true },
-    });
+    await this.prisma.product.update({ where: { id }, data });
+    if (Array.isArray(variants) && variants.length > 0) {
+      for (const v of variants as (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[]) {
+        if (v.id) {
+          await this.prisma.productVariant.update({
+            where: { id: v.id },
+            data: {
+              ...(v.sku          !== undefined && { sku:          v.sku }),
+              ...(v.name         !== undefined && { name:         v.name }),
+              ...(v.size         !== undefined && { size:         v.size ?? null }),
+              ...(v.color        !== undefined && { color:        v.color ?? null }),
+              ...(v.material     !== undefined && { material:     v.material ?? null }),
+              ...(v.style        !== undefined && { style:        v.style ?? null }),
+              ...(v.sellingPrice !== undefined && { sellingPrice: v.sellingPrice }),
+              ...(v.costPrice    !== undefined && { costPrice:    v.costPrice }),
+              ...(v.mrp          !== undefined && { mrp:          v.mrp }),
+              ...(v.isActive     !== undefined && { isActive:     v.isActive }),
+            },
+          });
+        } else {
+          await this.prisma.productVariant.create({
+            data: {
+              productId:    id,
+              sku:          v.sku!,
+              name:         v.name!,
+              size:         v.size,
+              color:        v.color,
+              material:     v.material,
+              style:        v.style,
+              sellingPrice: v.sellingPrice ?? 0,
+              costPrice:    v.costPrice    ?? 0,
+              mrp:          v.mrp          ?? 0,
+              sortOrder:    0,
+            },
+          });
+        }
+      }
+    }
+    return this.findOne(id, tenantId);
   }
 
   async updateStatus(id: string, tenantId: string, status: ProductStatus) {
