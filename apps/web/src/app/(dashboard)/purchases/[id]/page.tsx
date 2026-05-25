@@ -53,8 +53,6 @@ function fmtDate(d?: string | null) {
   return new Date(d).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
 }
 
-const TABS = ["Items", "Delivery Address", "Payments", "Activity Log"] as const;
-type Tab = typeof TABS[number];
 
 // ── Status timeline ────────────────────────────────────────────────────────
 function StatusTimeline({ status, orderDate }: { status: string; orderDate: string }) {
@@ -101,7 +99,6 @@ export default function PODetailPage() {
 
   const [po,       setPo]       = useState<PO | null>(null);
   const [loading,  setLoading]  = useState(true);
-  const [tab,      setTab]      = useState<Tab>("Items");
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [acting,   setActing]   = useState(false);
 
@@ -262,22 +259,13 @@ export default function PODetailPage() {
           </div>
         </div>
 
-        {/* ── Tabs ── */}
+        {/* ── Items ── */}
         <div className="border rounded-xl overflow-hidden">
-          <div className="border-b flex gap-0">
-            {TABS.map((t) => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`px-5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors
-                  ${tab === t ? "border-primary text-primary bg-primary/5" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-                {t}
-                {t === "Items" && ` (${po.items?.length ?? po._count?.items ?? 0})`}
-              </button>
-            ))}
+          <div className="px-4 py-2.5 border-b bg-muted/20 flex items-center gap-2">
+            <h3 className="font-semibold text-sm">Items</h3>
+            <span className="text-xs text-muted-foreground">({po.items?.length ?? po._count?.items ?? 0})</span>
           </div>
-
-          {/* Items tab */}
-          {tab === "Items" && (
-            <div className="overflow-x-auto">
+          <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/20">
                   <tr>
@@ -325,47 +313,11 @@ export default function PODetailPage() {
                 </tfoot>
               </table>
             </div>
-          )}
-
-          {tab === "Delivery Address" && (
-            <div className="p-5 text-sm text-muted-foreground">Delivery address not configured</div>
-          )}
-          {tab === "Payments" && (
-            <div className="p-5 text-sm text-muted-foreground">No payment records</div>
-          )}
-          {tab === "Activity Log" && (
-            <div className="p-5 space-y-2 text-xs">
-              <div className="flex gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-primary mt-1.5 shrink-0" />
-                <div>
-                  <p className="font-medium">Purchase Order Created</p>
-                  <p className="text-muted-foreground">{new Date(po.createdAt).toLocaleString()}</p>
-                </div>
-              </div>
-              {po.status !== "DRAFT" && (
-                <div className="flex gap-3">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
-                  <div>
-                    <p className="font-medium">Status → {statusConf.label}</p>
-                    <p className="text-muted-foreground">{new Date(po.updatedAt).toLocaleString()}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {/* ── Bottom section ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-          {/* Delivery address */}
-          <div className="border rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-sm">Delivery Address</h3>
-              <Button variant="ghost" size="sm" className="text-xs h-7">Edit</Button>
-            </div>
-            <p className="text-xs text-muted-foreground">No delivery address configured</p>
-          </div>
 
           {/* Other info */}
           <div className="border rounded-xl p-4">
