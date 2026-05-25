@@ -19,12 +19,23 @@ export class ReturnItemDto {
   @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
 }
 
+export class ExchangeItemDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() productName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() variantName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() sku?: string;
+}
+
 export class CreateReturnDto {
   @ApiProperty() @IsString() originalSaleId: string;
   @ApiProperty({ enum: ReturnReason }) @IsEnum(ReturnReason) reason: ReturnReason;
+  @ApiPropertyOptional() @IsOptional() @IsString() returnType?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() restockItems?: boolean;
   @ApiProperty({ type: [ReturnItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => ReturnItemDto) items: ReturnItemDto[];
+  @ApiPropertyOptional({ type: [ExchangeItemDto] }) @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => ExchangeItemDto) exchangeItems?: ExchangeItemDto[];
 }
 
 @Injectable()
@@ -38,30 +49,41 @@ export class ReturnsService {
     const sale = await this.prisma.sale.findFirst({ where: { id: dto.originalSaleId, tenantId } });
     if (!sale) throw new NotFoundException('Original sale not found');
 
-    const returnNumber = `RET-${Date.now().toString(36).toUpperCase()}`;
-    const totalAmount = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const returnType = dto.returnType ?? 'RETURN';
+    const returnNumber = `${returnType === 'EXCHANGE' ? 'EXC' : 'RET'}-${Date.now().toString(36).toUpperCase()}`;
+    const totalAmount    = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const exchangeAmount = (dto.exchangeItems ?? []).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+    const refundAmount   = returnType === 'EXCHANGE' ? Math.max(0, totalAmount - exchangeAmount) : totalAmount;
 
     const ret = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.return.create({
-        data: {
-          tenantId, branchId,
-          originalSaleId: dto.originalSaleId,
-          returnNumber, reason: dto.reason, notes: dto.notes,
-          restockItems: dto.restockItems ?? true,
-          totalAmount, refundAmount: totalAmount,
-          processedBy: userId,
-          items: { create: dto.items.map((item) => ({ ...item, totalAmount: item.unitPrice * item.quantity })) },
-        },
-        include: { items: true },
-      });
+      const createData: any = {
+        tenantId, branchId,
+        originalSaleId: dto.originalSaleId,
+        returnNumber, reason: dto.reason, notes: dto.notes,
+        returnType, exchangeAmount, exchangeData: dto.exchangeItems ?? null,
+        restockItems: dto.restockItems ?? true,
+        totalAmount, refundAmount,
+        processedBy: userId,
+        items: { create: dto.items.map((item) => ({ variantId: item.variantId, quantity: item.quantity, unitPrice: item.unitPrice, totalAmount: item.unitPrice * item.quantity })) },
+      };
+      const created = await tx.return.create({ data: createData, include: { items: true } });
 
+      // Restock returned items
       if (dto.restockItems !== false) {
         for (const item of dto.items) {
           await this.inventoryService.adjustStock(tenantId, branchId, userId, {
-            variantId: item.variantId,
-            quantity: item.quantity,
-            movementType: StockMovementType.RETURN,
-            referenceId: created.id,
+            variantId: item.variantId, quantity: item.quantity,
+            movementType: StockMovementType.RETURN, referenceId: created.id,
+          });
+        }
+      }
+
+      // Deduct exchange items from inventory
+      if (returnType === 'EXCHANGE' && dto.exchangeItems?.length) {
+        for (const item of dto.exchangeItems) {
+          await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+            variantId: item.variantId, quantity: item.quantity,
+            movementType: StockMovementType.SALE, referenceId: created.id,
           });
         }
       }
@@ -76,9 +98,11 @@ export class ReturnsService {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const [data, total] = await this.prisma.$transaction([
       this.prisma.return.findMany({
-        where: { tenantId },
-        skip, take,
-        include: { items: true, originalSale: { select: { invoiceNumber: true } } },
+        where: { tenantId }, skip, take,
+        include: {
+          items: { include: { variant: { include: { product: { select: { name: true } } } } } },
+          originalSale: { select: { invoiceNumber: true } },
+        },
         orderBy: { createdAt: 'desc' },
       }),
       this.prisma.return.count({ where: { tenantId } }),
@@ -89,7 +113,10 @@ export class ReturnsService {
   async findOne(id: string, tenantId: string) {
     const ret = await this.prisma.return.findFirst({
       where: { id, tenantId },
-      include: { items: { include: { variant: { include: { product: true } } } }, originalSale: true },
+      include: {
+        items: { include: { variant: { include: { product: { select: { name: true } } } } } },
+        originalSale: { select: { invoiceNumber: true, total: true, customer: { select: { firstName: true, lastName: true } } } },
+      },
     });
     if (!ret) throw new NotFoundException('Return not found');
     return ret;
@@ -99,7 +126,10 @@ export class ReturnsService {
     await this.findOne(id, tenantId);
     return this.prisma.return.update({
       where: { id },
-      data: { status, ...(status === ReturnStatus.APPROVED && { approvedBy: userId }) },
+      data: {
+        status,
+        ...(status === ReturnStatus.APPROVED && { approvedBy: userId }),
+      },
     });
   }
 }
@@ -112,7 +142,7 @@ export class ReturnsController {
 
   @Post()
   @RequirePermissions('sales:create')
-  @ApiOperation({ summary: 'Create a return/refund' })
+  @ApiOperation({ summary: 'Create a return or exchange' })
   create(@CurrentUser() user: IAuthUser, @Body() dto: CreateReturnDto) {
     return this.returnsService.create(user.tenantId, user.branchId ?? '', user.id, dto);
   }

@@ -894,9 +894,12 @@ model Return {
   returnNumber    String
   reason          ReturnReason
   status          ReturnStatus @default(INITIATED)
+  returnType      String       @default("RETURN")
   notes           String?
   totalAmount     Float
   refundAmount    Float        @default(0)
+  exchangeAmount  Float        @default(0)
+  exchangeData    Json?
   restockItems    Boolean      @default(true)
   processedBy     String?
   approvedBy      String?

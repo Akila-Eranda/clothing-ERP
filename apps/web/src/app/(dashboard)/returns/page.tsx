@@ -1,7 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2, Search, AlertCircle, RotateCcw, DollarSign } from "lucide-react";
+import {
+  Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2,
+  Search, RotateCcw, DollarSign, ArrowLeftRight, Eye, ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,17 +21,26 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
+interface ExchangeItem { variantId: string; quantity: number; unitPrice: number; productName?: string; variantName?: string; sku?: string; }
 interface ReturnRecord {
   id: string; returnNumber: string; reason: string; status: string;
-  notes?: string; totalAmount: number; refundAmount: number;
+  returnType: string; notes?: string;
+  totalAmount: number; refundAmount: number; exchangeAmount: number;
+  exchangeData?: ExchangeItem[] | null;
   restockItems: boolean; createdAt: string;
   originalSale?: { invoiceNumber: string } | null;
-  items?: { id: string; variantId: string; quantity: number; unitPrice: number; totalAmount: number }[];
+  items?: { id: string; variantId: string; quantity: number; unitPrice: number; totalAmount: number;
+    variant?: { sku: string; product?: { name: string } | null } | null }[];
 }
 interface SaleLookup {
   id: string; invoiceNumber: string; total: number;
-  customer?: { name: string } | null;
+  customer?: { firstName: string; lastName?: string } | null;
   items: { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number }[];
+}
+interface VariantLookup {
+  id: string; sku: string; price: number;
+  product: { name: string };
+  size?: string | null; color?: string | null;
 }
 
 const REASONS: { value: string; label: string }[] = [
@@ -41,15 +53,107 @@ const REASONS: { value: string; label: string }[] = [
 ];
 
 const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.ElementType }> = {
-  INITIATED:       { label: "Initiated",       variant: "warning", icon: Clock },
-  APPROVED:        { label: "Approved",        variant: "success", icon: CheckCircle },
-  REJECTED:        { label: "Rejected",        variant: "danger",  icon: XCircle },
-  COMPLETED:       { label: "Completed",       variant: "default", icon: CheckCircle },
-  REFUND_PROCESSED:{ label: "Refund Processed",variant: "success", icon: DollarSign },
+  INITIATED:        { label: "Initiated",        variant: "warning", icon: Clock },
+  APPROVED:         { label: "Approved",         variant: "success", icon: CheckCircle },
+  REJECTED:         { label: "Rejected",         variant: "danger",  icon: XCircle },
+  COMPLETED:        { label: "Completed",        variant: "default", icon: CheckCircle },
+  REFUND_PROCESSED: { label: "Refund Processed", variant: "success", icon: DollarSign },
 };
 
-// ── New Return Modal ────────────────────────────────────────────────────────
+// ── Detail Modal ────────────────────────────────────────────────────────────
+function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () => void }) {
+  const cfg = STATUS_CFG[record.status] ?? STATUS_CFG.INITIATED;
+  const Icon = cfg.icon;
+  const isExchange = record.returnType === "EXCHANGE";
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
+          <div className="flex items-center gap-2">
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${isExchange ? "bg-violet-500/10" : "bg-primary/10"}`}>
+              {isExchange ? <ArrowLeftRight className="h-4 w-4 text-violet-600" /> : <RotateCcw className="h-4 w-4 text-primary" />}
+            </div>
+            <div>
+              <h2 className="font-bold font-mono text-sm">{record.returnNumber}</h2>
+              <p className="text-xs text-muted-foreground">{record.originalSale?.invoiceNumber ?? "—"}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge variant={cfg.variant as "success"|"warning"|"danger"|"default"} className="text-[10px] gap-1">
+              <Icon className="h-3 w-3" />{cfg.label}
+            </Badge>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="p-3 rounded-xl border bg-muted/10">
+              <p className="text-xs text-muted-foreground">Return Value</p>
+              <p className="font-bold text-sm">LKR {formatNumber(record.totalAmount)}</p>
+            </div>
+            {isExchange && (
+              <div className="p-3 rounded-xl border bg-violet-500/10">
+                <p className="text-xs text-muted-foreground">Exchange Value</p>
+                <p className="font-bold text-sm text-violet-600">LKR {formatNumber(record.exchangeAmount ?? 0)}</p>
+              </div>
+            )}
+            <div className={`p-3 rounded-xl border ${isExchange ? "bg-emerald-500/10" : "bg-blue-500/10"}`}>
+              <p className="text-xs text-muted-foreground">{isExchange ? "Balance Due" : "Refund"}</p>
+              <p className={`font-bold text-sm ${isExchange ? "text-emerald-600" : "text-blue-600"}`}>LKR {formatNumber(record.refundAmount)}</p>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-semibold mb-2">Returned Items</p>
+            <div className="rounded-xl border divide-y overflow-hidden">
+              {(record.items ?? []).map((item, i) => (
+                <div key={i} className="flex items-center justify-between px-3 py-2.5 text-xs">
+                  <div>
+                    <p className="font-medium">{item.variant?.product?.name ?? "—"}</p>
+                    <p className="text-muted-foreground font-mono">{item.variant?.sku ?? "—"}</p>
+                  </div>
+                  <div className="text-right">
+                    <p>Qty: {item.quantity}</p>
+                    <p className="font-semibold">LKR {formatNumber(item.totalAmount)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {isExchange && (record.exchangeData ?? []).length > 0 && (
+            <div>
+              <p className="text-xs font-semibold mb-2 text-violet-600">Exchange Items (Given to Customer)</p>
+              <div className="rounded-xl border border-violet-500/20 divide-y overflow-hidden">
+                {(record.exchangeData ?? []).map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2.5 text-xs bg-violet-500/5">
+                    <div>
+                      <p className="font-medium">{item.productName ?? "—"}</p>
+                      <p className="text-muted-foreground font-mono">{item.sku ?? "—"}</p>
+                    </div>
+                    <div className="text-right">
+                      <p>Qty: {item.quantity}</p>
+                      <p className="font-semibold text-violet-600">LKR {formatNumber(item.unitPrice * item.quantity)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {record.notes && (
+            <div className="p-3 rounded-xl border bg-muted/10 text-xs">
+              <p className="font-semibold mb-1">Notes</p>
+              <p className="text-muted-foreground">{record.notes}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── New Return / Exchange Modal ─────────────────────────────────────────────
 function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [mode, setMode]                   = useState<"RETURN" | "EXCHANGE">("RETURN");
   const [invoiceSearch, setInvoiceSearch] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [foundSale, setFoundSale]         = useState<SaleLookup | null>(null);
@@ -58,6 +162,11 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [notes, setNotes]                 = useState("");
   const [restock, setRestock]             = useState(true);
   const [submitting, setSubmitting]       = useState(false);
+
+  // Exchange items
+  const [skuSearch, setSkuSearch]           = useState("");
+  const [skuLoading, setSkuLoading]         = useState(false);
+  const [exchangeItems, setExchangeItems]   = useState<ExchangeItem[]>([]);
 
   const searchInvoice = async () => {
     if (!invoiceSearch.trim()) return;
@@ -75,6 +184,37 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     finally { setSearchLoading(false); }
   };
 
+  const lookupSku = async () => {
+    if (!skuSearch.trim()) return;
+    setSkuLoading(true);
+    try {
+      const res = await api.get<VariantLookup>(`/pos/barcode/${encodeURIComponent(skuSearch)}`);
+      const v = res.data;
+      if (!v?.id) { toast.error("SKU not found"); return; }
+      const exists = exchangeItems.find((i) => i.variantId === v.id);
+      if (exists) {
+        setExchangeItems((p) => p.map((i) => i.variantId === v.id ? { ...i, quantity: i.quantity + 1 } : i));
+      } else {
+        setExchangeItems((p) => [...p, {
+          variantId: v.id, quantity: 1, unitPrice: v.price,
+          productName: v.product.name,
+          variantName: [v.size, v.color].filter(Boolean).join(" / ") || undefined,
+          sku: v.sku,
+        }]);
+      }
+      setSkuSearch("");
+      toast.success(`Added: ${v.product.name}`);
+    } catch { toast.error("SKU not found"); }
+    finally { setSkuLoading(false); }
+  };
+
+  const returnTotal    = foundSale
+    ? foundSale.items.filter((i) => selectedItems[i.id]?.selected).reduce((s, i) => s + i.unitPrice * (selectedItems[i.id]?.quantity ?? 0), 0)
+    : 0;
+  const exchangeTotal  = exchangeItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const balanceDue     = Math.max(0, exchangeTotal - returnTotal);
+  const refundDue      = mode === "RETURN" ? returnTotal : Math.max(0, returnTotal - exchangeTotal);
+
   const submit = async () => {
     if (!foundSale) { toast.error("Select a sale first"); return; }
     if (!reason) { toast.error("Select a reason"); return; }
@@ -82,10 +222,15 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       .filter((i) => selectedItems[i.id]?.selected && (selectedItems[i.id]?.quantity ?? 0) > 0)
       .map((i) => ({ variantId: i.variantId, quantity: selectedItems[i.id].quantity, unitPrice: i.unitPrice }));
     if (!items.length) { toast.error("Select at least one item"); return; }
+    if (mode === "EXCHANGE" && !exchangeItems.length) { toast.error("Add at least one exchange item"); return; }
     setSubmitting(true);
     try {
-      await api.post("/returns", { originalSaleId: foundSale.id, reason, notes: notes || undefined, restockItems: restock, items });
-      toast.success("Return created");
+      await api.post("/returns", {
+        originalSaleId: foundSale.id, reason, notes: notes || undefined,
+        restockItems: restock, items, returnType: mode,
+        ...(mode === "EXCHANGE" ? { exchangeItems } : {}),
+      });
+      toast.success(mode === "EXCHANGE" ? "Exchange created" : "Return created");
       onSaved(); onClose();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
     finally { setSubmitting(false); }
@@ -94,18 +239,32 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl bg-primary/10 flex items-center justify-center">
-              <RotateCcw className="h-4 w-4 text-primary" />
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${mode === "EXCHANGE" ? "bg-violet-500/10" : "bg-primary/10"}`}>
+              {mode === "EXCHANGE" ? <ArrowLeftRight className="h-4 w-4 text-violet-600" /> : <RotateCcw className="h-4 w-4 text-primary" />}
             </div>
-            <h2 className="font-bold">New Return / Refund</h2>
+            <h2 className="font-bold">New Return / Exchange</h2>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {/* Mode toggle */}
+          <div className="flex rounded-xl overflow-hidden border p-1 gap-1 bg-muted/30">
+            {(["RETURN", "EXCHANGE"] as const).map((m) => (
+              <button key={m} onClick={() => setMode(m)}
+                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg transition-all ${
+                  mode === m ? (m === "EXCHANGE" ? "bg-violet-600 text-white" : "bg-primary text-white") : "text-muted-foreground hover:text-foreground"
+                }`}>
+                {m === "EXCHANGE" ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                {m === "EXCHANGE" ? "Exchange" : "Return / Refund"}
+              </button>
+            ))}
+          </div>
+
           {/* Invoice search */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Invoice Number *</Label>
@@ -124,12 +283,15 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
             <>
               <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/20 text-xs">
                 <p className="font-semibold text-emerald-600">{foundSale.invoiceNumber}</p>
-                <p className="text-muted-foreground">{foundSale.customer?.name ?? "Walk-in"} · ₹{formatNumber(foundSale.total)}</p>
+                <p className="text-muted-foreground">
+                  {foundSale.customer ? `${foundSale.customer.firstName} ${foundSale.customer.lastName ?? ""}`.trim() : "Walk-in"}
+                  {" · LKR "}{formatNumber(foundSale.total)}
+                </p>
               </div>
 
-              {/* Items */}
+              {/* Return items */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Select Items *</Label>
+                <Label className="text-xs font-semibold">Items to Return *</Label>
                 <div className="rounded-xl border overflow-hidden divide-y">
                   {foundSale.items.map((item) => {
                     const sel = selectedItems[item.id] ?? { selected: false, quantity: 1 };
@@ -149,12 +311,70 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
                             className="w-14 h-6 text-xs text-center p-1" disabled={!sel.selected} />
                           <span className="text-[10px] text-muted-foreground">/{item.quantity}</span>
                         </div>
-                        <span className="text-xs font-semibold shrink-0">₹{formatNumber(item.unitPrice * sel.quantity)}</span>
+                        <span className="text-xs font-semibold shrink-0">LKR {formatNumber(item.unitPrice * (sel.selected ? sel.quantity : 0))}</span>
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* Exchange items */}
+              {mode === "EXCHANGE" && (
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold text-violet-600">Exchange Items (Give to Customer) *</Label>
+                  <div className="flex gap-2">
+                    <Input placeholder="Scan / enter SKU…" value={skuSearch}
+                      onChange={(e) => setSkuSearch(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") lookupSku(); }} />
+                    <Button variant="outline" onClick={lookupSku} disabled={skuLoading} className="shrink-0 gap-1.5">
+                      {skuLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                      Add
+                    </Button>
+                  </div>
+                  {exchangeItems.length > 0 && (
+                    <div className="rounded-xl border border-violet-500/20 overflow-hidden divide-y">
+                      {exchangeItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-3 px-3 py-2.5 bg-violet-500/5">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-violet-700">{item.productName}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{item.sku}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <Input type="number" min={1} value={item.quantity}
+                              onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
+                              className="w-14 h-6 text-xs text-center p-1" />
+                          </div>
+                          <span className="text-xs font-semibold text-violet-600 shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
+                          <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Exchange summary */}
+                  {exchangeItems.length > 0 && (
+                    <div className="flex gap-3 text-xs">
+                      <div className="flex-1 p-2.5 rounded-lg border bg-muted/10 text-center">
+                        <p className="text-muted-foreground">Return Value</p>
+                        <p className="font-bold">LKR {formatNumber(returnTotal)}</p>
+                      </div>
+                      <div className="flex items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></div>
+                      <div className="flex-1 p-2.5 rounded-lg border bg-violet-500/10 text-center">
+                        <p className="text-muted-foreground">Exchange Value</p>
+                        <p className="font-bold text-violet-600">LKR {formatNumber(exchangeTotal)}</p>
+                      </div>
+                      <div className="flex items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></div>
+                      <div className={`flex-1 p-2.5 rounded-lg border text-center ${balanceDue > 0 ? "bg-red-500/10" : "bg-emerald-500/10"}`}>
+                        <p className="text-muted-foreground">{balanceDue > 0 ? "Balance Due" : "Refund Due"}</p>
+                        <p className={`font-bold ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Reason */}
               <div className="space-y-1.5">
@@ -176,7 +396,7 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
               {/* Restock toggle */}
               <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/10">
                 <div>
-                  <p className="text-sm font-medium">Restock Items</p>
+                  <p className="text-sm font-medium">Restock Returned Items</p>
                   <p className="text-xs text-muted-foreground">Add returned items back to inventory</p>
                 </div>
                 <Switch checked={restock} onCheckedChange={setRestock} />
@@ -187,9 +407,10 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
           <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting || !foundSale} className="gap-1.5 min-w-[120px]">
-            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
-            Create Return
+          <Button onClick={submit} disabled={submitting || !foundSale}
+            className={`gap-1.5 min-w-[140px] ${mode === "EXCHANGE" ? "bg-violet-600 hover:bg-violet-700" : ""}`}>
+            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : mode === "EXCHANGE" ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+            {mode === "EXCHANGE" ? "Create Exchange" : "Create Return"}
           </Button>
         </div>
       </div>
@@ -199,9 +420,10 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function ReturnsPage() {
-  const [returns, setReturns]   = useState<ReturnRecord[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [addOpen, setAddOpen]   = useState(false);
+  const [returns, setReturns]         = useState<ReturnRecord[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [addOpen, setAddOpen]         = useState(false);
+  const [detailRecord, setDetailRecord] = useState<ReturnRecord | null>(null);
 
   const fetchReturns = useCallback(async () => {
     setLoading(true);
@@ -217,7 +439,7 @@ export default function ReturnsPage() {
   const updateStatus = async (id: string, status: string, label: string) => {
     try {
       await api.put(`/returns/${id}/status`, { status });
-      toast.success(`Return ${label}`);
+      toast.success(`Marked as ${label}`);
       fetchReturns();
     } catch { toast.error("Failed to update status"); }
   };
@@ -227,17 +449,27 @@ export default function ReturnsPage() {
     .reduce((s, r) => s + r.refundAmount, 0);
 
   const STATS = [
-    { label: "Total Returns", value: returns.length,                                          color: "text-foreground",   bg: "bg-muted/40",       icon: RotateCcw },
-    { label: "Pending",       value: returns.filter((r) => r.status === "INITIATED").length,  color: "text-amber-500",    bg: "bg-amber-500/10",   icon: Clock },
-    { label: "Approved",      value: returns.filter((r) => r.status === "APPROVED").length,   color: "text-emerald-500",  bg: "bg-emerald-500/10", icon: CheckCircle },
-    { label: "Total Refunded",value: `₹${formatNumber(totalRefunded)}`,                       color: "text-blue-500",     bg: "bg-blue-500/10",    icon: DollarSign },
+    { label: "Total",         value: returns.length,                                                   color: "text-foreground",   bg: "bg-muted/40",         icon: RotateCcw },
+    { label: "Exchanges",     value: returns.filter((r) => r.returnType === "EXCHANGE").length,        color: "text-violet-500",   bg: "bg-violet-500/10",    icon: ArrowLeftRight },
+    { label: "Pending",       value: returns.filter((r) => r.status === "INITIATED").length,           color: "text-amber-500",    bg: "bg-amber-500/10",     icon: Clock },
+    { label: "Total Refunded",value: `LKR ${formatNumber(totalRefunded)}`,                             color: "text-blue-500",     bg: "bg-blue-500/10",      icon: DollarSign },
   ];
 
   const columns: ColumnDef<ReturnRecord>[] = [
     {
       accessorKey: "returnNumber",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Return ID" />,
-      cell: ({ row }) => <span className="font-mono text-xs font-medium text-primary">{row.original.returnNumber}</span>,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="ID" />,
+      cell: ({ row }) => {
+        const isExchange = row.original.returnType === "EXCHANGE";
+        return (
+          <div className="flex items-center gap-1.5">
+            <span className={`inline-flex items-center justify-center h-5 w-5 rounded-md text-[9px] font-bold ${isExchange ? "bg-violet-500/10 text-violet-600" : "bg-primary/10 text-primary"}`}>
+              {isExchange ? "EX" : "RT"}
+            </span>
+            <span className="font-mono text-xs font-medium">{row.original.returnNumber}</span>
+          </div>
+        );
+      },
     },
     {
       id: "invoice",
@@ -263,15 +495,25 @@ export default function ReturnsPage() {
     },
     {
       accessorKey: "totalAmount",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
-      cell: ({ row }) => <span className="text-sm font-bold">₹{formatNumber(row.original.totalAmount)}</span>,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Value" />,
+      cell: ({ row }) => {
+        const isExchange = row.original.returnType === "EXCHANGE";
+        return (
+          <div>
+            <p className="text-sm font-bold">LKR {formatNumber(row.original.totalAmount)}</p>
+            {isExchange && row.original.refundAmount > 0 && (
+              <p className="text-[10px] text-emerald-600">+LKR {formatNumber(row.original.refundAmount)} back</p>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "createdAt",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          {new Date(row.original.createdAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
         </span>
       ),
     },
@@ -292,13 +534,20 @@ export default function ReturnsPage() {
       id: "actions",
       cell: ({ row }) => {
         const s = row.original.status;
-        const moreActions = [];
+        const isExchange = row.original.returnType === "EXCHANGE";
+        const moreActions = [
+          { text: "View Details", function: () => setDetailRecord(row.original) },
+        ];
         if (s === "INITIATED") {
-          moreActions.push({ text: "Approve",        function: () => updateStatus(row.original.id, "APPROVED",         "approved") });
-          moreActions.push({ text: "Reject",         function: () => updateStatus(row.original.id, "REJECTED",         "rejected") });
+          moreActions.push({ text: "Approve",        function: () => updateStatus(row.original.id, "APPROVED", "Approved") });
+          moreActions.push({ text: "Reject",         function: () => updateStatus(row.original.id, "REJECTED", "Rejected") });
         }
         if (s === "APPROVED") {
-          moreActions.push({ text: "Process Refund", function: () => updateStatus(row.original.id, "REFUND_PROCESSED", "refund processed") });
+          if (isExchange) {
+            moreActions.push({ text: "Mark Completed", function: () => updateStatus(row.original.id, "COMPLETED", "Completed") });
+          } else {
+            moreActions.push({ text: "Process Refund", function: () => updateStatus(row.original.id, "REFUND_PROCESSED", "Refund Processed") });
+          }
         }
         return <TableActionsRow dropMoreActions={moreActions} />;
       },
@@ -310,15 +559,15 @@ export default function ReturnsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Returns & Refunds</h1>
-          <p className="text-sm text-muted-foreground">Manage product returns and process refunds</p>
+          <h1 className="text-2xl font-bold">Returns & Exchanges</h1>
+          <p className="text-sm text-muted-foreground">Manage product returns, refunds, and exchanges</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={fetchReturns} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> New Return
+            <Plus className="h-3.5 w-3.5" /> New Request
           </Button>
         </div>
       </div>
@@ -338,24 +587,32 @@ export default function ReturnsPage() {
         data={returns}
         columns={columns}
         pageCount={Math.ceil(returns.length / 10)}
-        searchableColumns={[
-          { id: "returnNumber", title: "Return ID" },
+        searchableColumns={[{ id: "returnNumber", title: "Return / Exchange ID" }]}
+        filterableColumns={[
+          {
+            id: "status", title: "Status",
+            options: [
+              { label: "Initiated",        value: "INITIATED" },
+              { label: "Approved",         value: "APPROVED" },
+              { label: "Rejected",         value: "REJECTED" },
+              { label: "Completed",        value: "COMPLETED" },
+              { label: "Refund Processed", value: "REFUND_PROCESSED" },
+            ],
+          },
+          {
+            id: "returnType", title: "Type",
+            options: [
+              { label: "Return", value: "RETURN" },
+              { label: "Exchange", value: "EXCHANGE" },
+            ],
+          },
         ]}
-        filterableColumns={[{
-          id: "status", title: "Status",
-          options: [
-            { label: "Initiated",        value: "INITIATED" },
-            { label: "Approved",         value: "APPROVED" },
-            { label: "Rejected",         value: "REJECTED" },
-            { label: "Completed",        value: "COMPLETED" },
-            { label: "Refund Processed", value: "REFUND_PROCESSED" },
-          ],
-        }]}
-        isShowExportButtons={{ isShow: true, fileName: "returns-export" }}
+        isShowExportButtons={{ isShow: true, fileName: "returns-exchanges-export" }}
       />
 
-      {/* Modal */}
-      {addOpen && <NewReturnModal onClose={() => setAddOpen(false)} onSaved={() => { fetchReturns(); setAddOpen(false); }} />}
+      {/* Modals */}
+      {addOpen && <NewReturnModal onClose={() => setAddOpen(false)} onSaved={() => { fetchReturns(); }} />}
+      {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
     </div>
   );
 }
