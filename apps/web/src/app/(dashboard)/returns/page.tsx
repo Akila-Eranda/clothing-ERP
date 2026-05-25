@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2,
-  Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight,
+  Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -60,6 +60,134 @@ const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.E
   REFUND_PROCESSED: { label: "Refund Processed", variant: "success", icon: DollarSign },
 };
 
+// ── Bill printer ────────────────────────────────────────────────────────────
+function printBill(record: ReturnRecord) {
+  const isExchange = record.returnType === "EXCHANGE";
+  const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const dateStr = new Date(record.createdAt).toLocaleString("en-LK", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  const reason = REASONS.find((r) => r.value === record.reason)?.label ?? record.reason;
+
+  const returnItemsHtml = (record.items ?? []).map((item) => `
+    <tr>
+      <td>${item.variant?.product?.name ?? "—"}</td>
+      <td class="center">${item.variant?.sku ?? "—"}</td>
+      <td class="center">${item.quantity}</td>
+      <td class="right">LKR ${fmt(item.unitPrice)}</td>
+      <td class="right">LKR ${fmt(item.totalAmount)}</td>
+    </tr>`).join("");
+
+  const exchangeItemsHtml = isExchange
+    ? (record.exchangeData ?? []).map((item) => `
+    <tr class="exchange-row">
+      <td>${item.productName ?? "—"}</td>
+      <td class="center">${item.sku ?? "—"}</td>
+      <td class="center">${item.quantity}</td>
+      <td class="right">LKR ${fmt(item.unitPrice)}</td>
+      <td class="right">LKR ${fmt(item.unitPrice * item.quantity)}</td>
+    </tr>`).join("")
+    : "";
+
+  const balanceLine = isExchange
+    ? record.refundAmount > 0
+      ? `<tr class="total-row"><td colspan="3">Refund to Customer</td><td colspan="2" class="right">LKR ${fmt(record.refundAmount)}</td></tr>`
+      : record.exchangeAmount > record.totalAmount
+        ? `<tr class="total-row"><td colspan="3">Balance Due from Customer</td><td colspan="2" class="right">LKR ${fmt(record.exchangeAmount - record.totalAmount)}</td></tr>`
+        : `<tr class="total-row"><td colspan="3">No Balance Due</td><td colspan="2" class="right">—</td></tr>`
+    : `<tr class="total-row"><td colspan="3">Total Refund</td><td colspan="2" class="right">LKR ${fmt(record.refundAmount)}</td></tr>`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<title>${isExchange ? "Exchange" : "Return"} Bill - ${record.returnNumber}</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;padding:24px;max-width:680px;margin:auto}
+  .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
+  .divider{border-top:1px dashed #000;margin:6px 0}.solid{border-top:2px solid #000;margin:6px 0}
+  table{width:100%;border-collapse:collapse}
+  td,th{padding:3px 4px;vertical-align:top}
+  th{font-weight:bold;border-bottom:1px solid #000;text-align:left}
+  th.center,td.center{text-align:center}th.right,td.right{text-align:right}
+  .section-label{font-weight:bold;font-size:13px;margin:10px 0 4px;letter-spacing:1px}
+  .exchange-row td{background:#f5f0ff}
+  .total-row td{font-weight:bold;border-top:1px solid #000;padding-top:5px}
+  .meta-table td{padding:2px 0}
+  @media print{button{display:none}}
+</style></head><body>
+
+<div class="center bold" style="font-size:22px;letter-spacing:4px;">HEXALYTE</div>
+<div class="center bold" style="font-size:11px;letter-spacing:6px;">INNOVATION</div>
+<div class="center" style="margin-top:3px;font-size:11px;">No. 45, Textile Road, Colombo 11, Sri Lanka</div>
+<div class="center" style="font-size:11px;">Tel: 077 123 4567</div>
+<div class="divider"></div>
+<div class="center bold" style="font-size:15px;letter-spacing:3px;margin:8px 0 2px;">${isExchange ? "EXCHANGE BILL" : "RETURN / REFUND RECEIPT"}</div>
+<div class="divider"></div>
+
+<table class="meta-table" style="margin-bottom:6px;">
+  <tr><td class="bold" style="width:45%">${isExchange ? "Exchange No." : "Return No."}</td><td>: ${record.returnNumber}</td></tr>
+  <tr><td class="bold">Original Invoice</td><td>: ${record.originalSale?.invoiceNumber ?? "—"}</td></tr>
+  <tr><td class="bold">Date &amp; Time</td><td>: ${dateStr}</td></tr>
+  <tr><td class="bold">Reason</td><td>: ${reason}</td></tr>
+  <tr><td class="bold">Status</td><td>: ${record.status}</td></tr>
+  ${record.notes ? `<tr><td class="bold">Notes</td><td>: ${record.notes}</td></tr>` : ""}
+</table>
+<div class="divider"></div>
+
+<div class="section-label">ITEMS RETURNED BY CUSTOMER</div>
+<table>
+  <thead><tr>
+    <th>Product</th><th class="center">SKU</th><th class="center">Qty</th>
+    <th class="right">Unit Price</th><th class="right">Total</th>
+  </tr></thead>
+  <tbody>${returnItemsHtml}</tbody>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td colspan="3" class="bold">Return Value</td><td colspan="2" class="right bold">LKR ${fmt(record.totalAmount)}</td></tr>
+</table>
+
+${isExchange ? `
+<br/>
+<div class="section-label" style="color:#4b00a0;">ITEMS GIVEN TO CUSTOMER (EXCHANGE)</div>
+<table>
+  <thead><tr>
+    <th>Product</th><th class="center">SKU</th><th class="center">Qty</th>
+    <th class="right">Unit Price</th><th class="right">Total</th>
+  </tr></thead>
+  <tbody>${exchangeItemsHtml}</tbody>
+</table>
+<div class="divider"></div>
+<table>
+  <tr><td colspan="3" class="bold">Exchange Value</td><td colspan="2" class="right bold">LKR ${fmt(record.exchangeAmount)}</td></tr>
+</table>` : ""}
+
+<div class="solid"></div>
+<table>
+  ${balanceLine}
+</table>
+<div class="solid"></div>
+
+<div style="margin-top:18px;display:flex;justify-content:space-between;font-size:11px;">
+  <div style="text-align:center;width:45%">
+    <div style="border-top:1px solid #000;margin-top:28px;padding-top:4px;">Staff Signature</div>
+  </div>
+  <div style="text-align:center;width:45%">
+    <div style="border-top:1px solid #000;margin-top:28px;padding-top:4px;">Customer Signature</div>
+  </div>
+</div>
+
+<div style="margin-top:14px;text-align:center;font-size:10px;">
+  Thank you for your business. This is an official ${isExchange ? "exchange" : "return"} document.
+</div>
+<div style="margin-top:12px;text-align:center;">
+  <button onclick="window.print()" style="font-family:sans-serif;padding:8px 24px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save as PDF</button>
+</div>
+</body></html>`;
+
+  const win = window.open("", "_blank");
+  if (!win) { alert("Please allow popups to print the bill."); return; }
+  win.document.write(html);
+  win.document.close();
+}
+
 // ── Detail Modal ────────────────────────────────────────────────────────────
 function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () => void }) {
   const cfg = STATUS_CFG[record.status] ?? STATUS_CFG.INITIATED;
@@ -83,6 +211,12 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
             <Badge variant={cfg.variant as "success"|"warning"|"danger"|"default"} className="text-[10px] gap-1">
               <Icon className="h-3 w-3" />{cfg.label}
             </Badge>
+            <button onClick={() => printBill(record)}
+              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-muted ${
+                isExchange ? "text-violet-600 border-violet-200" : "text-primary border-primary/20"
+              }`}>
+              <Printer className="h-3.5 w-3.5" /> Print
+            </button>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
           </div>
         </div>
@@ -575,6 +709,7 @@ export default function ReturnsPage() {
         const isExchange = row.original.returnType === "EXCHANGE";
         const moreActions = [
           { text: "View Details", function: () => setDetailRecord(row.original) },
+          { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printBill(row.original) },
         ];
         if (s === "INITIATED") {
           moreActions.push({ text: "Approve",        function: () => updateStatus(row.original.id, "APPROVED", "Approved") });
