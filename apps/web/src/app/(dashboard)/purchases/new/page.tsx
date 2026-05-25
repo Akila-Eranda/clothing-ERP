@@ -138,86 +138,96 @@ export default function CreatePOPage() {
   const fmt = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* ── Top bar ── */}
-      <div className="sticky top-0 z-20 bg-background border-b px-6 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => router.push("/purchases")}>
-            <ArrowLeft className="h-4 w-4" />
+    <div className="min-h-screen bg-muted/30">
+      {/* ── Sticky header ── */}
+      <div className="sticky top-0 z-20 bg-background border-b px-8 py-4 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => router.push("/purchases")}>
+            <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Create Purchase Order</h1>
-            <div className="flex items-center gap-1 text-sm text-muted-foreground">
-              <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchases</span>
-              <ChevronRight className="h-3 w-3" /><span>Purchase Orders</span>
-              <ChevronRight className="h-3 w-3" /><span className="text-foreground">Create Purchase Order</span>
+            <h1 className="text-2xl font-bold tracking-tight">Create Purchase Order</h1>
+            <div className="flex items-center gap-1.5 text-sm text-muted-foreground mt-0.5">
+              <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => router.push("/purchases")}>Purchases</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="cursor-pointer hover:text-foreground transition-colors" onClick={() => router.push("/purchases")}>Purchase Orders</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+              <span className="text-foreground font-medium">Create Purchase Order</span>
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => router.push("/purchases")}>Cancel</Button>
-          <Button variant="outline" size="sm" disabled={saving} onClick={() => submit(false)}>Save as Draft</Button>
-          <Button size="sm" disabled={saving} onClick={() => submit(true)} className="bg-primary gap-1.5">
+        <div className="flex gap-2.5">
+          <Button variant="outline" onClick={() => router.push("/purchases")}>Cancel</Button>
+          <Button variant="outline" disabled={saving} onClick={() => submit(false)}>Save as Draft</Button>
+          <Button disabled={saving} onClick={() => submit(true)} className="gap-2 px-5">
             Save &amp; Send PO
           </Button>
         </div>
       </div>
 
-      <div className="p-6 space-y-5 max-w-[1400px] mx-auto">
+      <div className="p-8 space-y-6 max-w-[1400px] mx-auto">
 
-        {/* ── Top 4-column section ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_280px] gap-4">
+        {/* ── Top section: 3 columns ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr_300px] gap-5">
 
-          {/* PO Details */}
-          <div className="border rounded-xl p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Purchase Order Details</h3>
+          {/* ── PO Details ── */}
+          <div className="bg-background border rounded-2xl p-6 space-y-4 shadow-sm">
+            <h3 className="font-semibold text-base border-b pb-2">Purchase Order Details</h3>
+
             <div>
-              <label className="text-xs text-muted-foreground">PO Number</label>
-              <Input value="Auto-generated" disabled className="mt-1 text-xs bg-muted/30" />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">PO Number</label>
+              <Input value="Auto-generated" disabled className="mt-1.5 bg-muted/40 text-sm" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Order Date</label>
-                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} className="mt-1 text-xs" readOnly />
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Order Date</label>
+                <Input type="date" defaultValue={new Date().toISOString().split("T")[0]} className="mt-1.5 text-sm" readOnly />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Expected Date</label>
-                <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="mt-1 text-xs" />
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Expected Delivery</label>
+                <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="mt-1.5 text-sm" />
               </div>
             </div>
+
             <div>
-              <label className="text-xs text-muted-foreground">Reference</label>
-              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="REF-XXXXXX" className="mt-1 text-xs" />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Reference</label>
+              <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. REF-2026-001" className="mt-1.5 text-sm" />
             </div>
+
             <div>
-              <label className="text-xs text-muted-foreground">Payment Terms</label>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Payment Terms</label>
               <select value={paymentTerms} onChange={(e) => setPaymentTerms(e.target.value)}
-                className="mt-1 w-full text-xs border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                className="mt-1.5 w-full text-sm border rounded-lg px-3 py-2.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
                 {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
+
             <div>
-              <label className="text-xs text-muted-foreground">Notes</label>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-                placeholder="Notes for the supplier..."
-                className="mt-1 w-full text-xs border rounded-md px-3 py-2 bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring" />
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Internal Notes</label>
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={3}
+                placeholder="Notes visible to your team only..."
+                className="mt-1.5 w-full text-sm border rounded-lg px-3 py-2.5 bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring" />
             </div>
           </div>
 
-          {/* Supplier */}
-          <div className="border rounded-xl p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Supplier Information</h3>
-            <div className="flex gap-2">
+          {/* ── Supplier ── */}
+          <div className="bg-background border rounded-2xl p-6 space-y-4 shadow-sm">
+            <h3 className="font-semibold text-base border-b pb-2">Supplier</h3>
+
+            <div>
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select Supplier *</label>
               <select value={supplierId} onChange={(e) => handleSupplierChange(e.target.value)}
-                className="flex-1 text-xs border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                <option value="">Select supplier...</option>
+                className="mt-1.5 w-full text-sm border rounded-lg px-3 py-2.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
+                <option value="">Choose a supplier...</option>
                 {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
+
             {supplier ? (
-              <div className="mt-2 space-y-2 text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-sm shrink-0">
+              <div className="rounded-xl border bg-muted/20 p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary text-base shrink-0">
                     {supplier.name.slice(0, 2).toUpperCase()}
                   </div>
                   <div>
@@ -225,134 +235,141 @@ export default function CreatePOPage() {
                     {supplier.contactPerson && <p className="text-xs text-muted-foreground">{supplier.contactPerson}</p>}
                   </div>
                 </div>
-                {supplier.phone    && <p className="text-xs text-muted-foreground flex gap-2">📞 {supplier.phone}</p>}
-                {supplier.email    && <p className="text-xs text-muted-foreground flex gap-2">✉️ {supplier.email}</p>}
-                {supplier.address  && <p className="text-xs text-muted-foreground flex gap-2">📍 {supplier.address}{supplier.city ? `, ${supplier.city}` : ""}</p>}
+                <div className="space-y-1.5">
+                  {supplier.phone   && <p className="text-xs text-muted-foreground flex items-center gap-2">📞 {supplier.phone}</p>}
+                  {supplier.email   && <p className="text-xs text-muted-foreground flex items-center gap-2">✉️ {supplier.email}</p>}
+                  {supplier.address && <p className="text-xs text-muted-foreground flex items-center gap-2">📍 {supplier.address}{supplier.city ? `, ${supplier.city}` : ""}</p>}
+                </div>
               </div>
             ) : (
-              <div className="py-8 text-center text-xs text-muted-foreground">Select a supplier to see details</div>
+              <div className="rounded-xl border-2 border-dashed p-8 text-center">
+                <p className="text-sm text-muted-foreground">Select a supplier to see their details</p>
+              </div>
             )}
           </div>
 
-          {/* Other Info */}
-          <div className="border rounded-xl p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Other Information</h3>
-            <div>
-              <label className="text-xs text-muted-foreground">Currency</label>
-              <select className="mt-1 w-full text-xs border rounded-md px-3 py-2 bg-background focus:outline-none focus:ring-2 focus:ring-ring">
-                <option>LKR – Sri Lankan Rupee</option>
-                <option>USD – US Dollar</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Attachment</label>
-              <div className="mt-1 border-2 border-dashed rounded-lg p-4 text-center text-xs text-muted-foreground hover:bg-muted/20 cursor-pointer">
-                <p className="font-medium">Drag &amp; drop files here or <span className="text-primary">Browse Files</span></p>
-                <p className="text-[10px] mt-1">PDF, JPG, PNG (Max. 5MB)</p>
-              </div>
-            </div>
-          </div>
+          {/* ── Order Summary ── */}
+          <div className="bg-background border rounded-2xl p-6 shadow-sm flex flex-col gap-4">
+            <h3 className="font-semibold text-base border-b pb-2">Order Summary</h3>
 
-          {/* Order Summary */}
-          <div className="border rounded-xl p-4 space-y-3 bg-muted/10">
-            <h3 className="font-semibold text-sm">Order Summary</h3>
-            <div className="space-y-2 text-sm">
-              {[
-                ["Sub Total",     `LKR ${fmt(subtotal)}`],
-                ["Discount",      `LKR ${fmt(totalDisc)}`],
-                ["Tax (VAT)",     `LKR ${fmt(totalTax)}`],
-              ].map(([label, val]) => (
-                <div key={label} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span>{val}</span>
-                </div>
-              ))}
-              <div className="border-t pt-2 flex justify-between font-bold">
-                <span>Total Amount</span>
-                <span className="text-primary">LKR {fmt(grandTotal)}</span>
+            <div className="space-y-3 flex-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Sub Total</span>
+                <span className="font-medium">LKR {fmt(subtotal)}</span>
               </div>
-              <div className="mt-3 rounded-lg bg-background border p-2 space-y-1.5">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Amount Paid</span><span>LKR 0.00</span>
-                </div>
-                <div className="flex justify-between text-xs font-semibold text-red-500">
-                  <span>Amount Due</span><span>LKR {fmt(grandTotal)}</span>
-                </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Discount</span>
+                <span className="font-medium text-green-600">− LKR {fmt(totalDisc)}</span>
               </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Tax (VAT)</span>
+                <span className="font-medium">LKR {fmt(totalTax)}</span>
+              </div>
+            </div>
+
+            <div className="border-t pt-3">
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-base">Total</span>
+                <span className="font-bold text-xl text-primary">LKR {fmt(grandTotal)}</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Amount Paid</span><span>LKR 0.00</span>
+              </div>
+              <div className="flex justify-between text-sm font-semibold text-red-500">
+                <span>Amount Due</span><span>LKR {fmt(grandTotal)}</span>
+              </div>
+            </div>
+
+            <div className="pt-1 space-y-2">
+              <Button className="w-full gap-2" disabled={saving} onClick={() => submit(true)}>
+                Save &amp; Send PO
+              </Button>
+              <Button variant="outline" className="w-full" disabled={saving} onClick={() => submit(false)}>
+                Save as Draft
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* ── Items ── */}
-        <div className="border rounded-xl">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h3 className="font-semibold text-sm">Items</h3>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={addRow}>
-              <Plus className="h-3.5 w-3.5" /> Add Item
+        {/* ── Items table ── */}
+        <div className="bg-background border rounded-2xl shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b">
+            <div className="flex items-center gap-3">
+              <h3 className="font-semibold text-base">Order Items</h3>
+              {items.length > 0 && (
+                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">{items.length}</span>
+              )}
+            </div>
+            <Button size="sm" onClick={addRow} className="gap-1.5">
+              <Plus className="h-4 w-4" /> Add Item
             </Button>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-muted/30 border-b">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
-                  <th className="px-3 py-2 text-left w-6">#</th>
-                  <th className="px-3 py-2 text-left min-w-[200px]">Item *</th>
-                  <th className="px-3 py-2 text-left w-28">SKU</th>
-                  <th className="px-3 py-2 text-left w-28">Variant</th>
-                  <th className="px-3 py-2 text-right w-20">Ordered Qty</th>
-                  <th className="px-3 py-2 text-right w-28">Unit Cost</th>
-                  <th className="px-3 py-2 text-right w-24">Discount</th>
-                  <th className="px-3 py-2 text-right w-24">Tax (%)</th>
-                  <th className="px-3 py-2 text-right w-28">Amount</th>
-                  <th className="px-3 py-2 w-8"></th>
+                  <th className="px-4 py-3 text-left w-8">#</th>
+                  <th className="px-4 py-3 text-left min-w-[220px]">Item</th>
+                  <th className="px-4 py-3 text-left w-32">SKU</th>
+                  <th className="px-4 py-3 text-left w-28">Variant</th>
+                  <th className="px-4 py-3 text-right w-24">Qty</th>
+                  <th className="px-4 py-3 text-right w-32">Unit Cost (LKR)</th>
+                  <th className="px-4 py-3 text-right w-28">Discount</th>
+                  <th className="px-4 py-3 text-right w-24">Tax %</th>
+                  <th className="px-4 py-3 text-right w-32">Amount (LKR)</th>
+                  <th className="px-4 py-3 w-10"></th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y">
                 {items.map((item, idx) => {
                   const { total } = calcItem(item);
                   const q = searchQ[idx] ?? "";
                   return (
-                    <tr key={idx} className="border-b hover:bg-muted/10">
-                      <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                    <tr key={idx} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
 
                       {/* Item search */}
-                      <td className="px-3 py-2 relative">
+                      <td className="px-4 py-3 relative">
                         <div className="relative">
-                          <div className="flex items-center gap-1 border rounded-md px-2 py-1.5 bg-background cursor-pointer"
+                          <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-background cursor-pointer hover:border-primary/50 transition-colors"
                             onClick={() => setSearchOpen(searchOpen === idx ? null : idx)}>
                             {item.variantId ? (
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium truncate">{item.productName}</p>
-                                <p className="text-muted-foreground text-[10px]">{item.sku}</p>
+                                <p className="font-medium text-sm truncate">{item.productName}</p>
+                                <p className="text-muted-foreground text-xs">{item.sku}</p>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground flex-1">Search by product name / SKU</span>
+                              <span className="text-muted-foreground text-sm flex-1">Search product / SKU...</span>
                             )}
-                            <Search className="h-3 w-3 text-muted-foreground shrink-0" />
+                            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           </div>
                           {searchOpen === idx && (
-                            <div className="absolute top-full left-0 z-50 w-72 bg-background border rounded-lg shadow-lg mt-1">
-                              <div className="p-2 border-b">
-                                <input autoFocus
-                                  value={q}
+                            <div className="absolute top-full left-0 z-50 w-80 bg-background border rounded-xl shadow-xl mt-1.5">
+                              <div className="p-3 border-b">
+                                <input autoFocus value={q}
                                   onChange={(e) => setSearchQ((p) => p.map((x, i) => i === idx ? e.target.value : x))}
-                                  placeholder="Search..."
-                                  className="w-full text-xs px-2 py-1.5 border rounded focus:outline-none focus:ring-1 focus:ring-ring"
+                                  placeholder="Search by name or SKU..."
+                                  className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                               </div>
-                              <div className="max-h-48 overflow-y-auto">
-                                {filteredVariants(q).length === 0 && (
-                                  <p className="px-3 py-4 text-center text-muted-foreground text-xs">No variants found</p>
-                                )}
-                                {filteredVariants(q).map((v) => (
+                              <div className="max-h-52 overflow-y-auto">
+                                {filteredVariants(q).length === 0 ? (
+                                  <p className="px-4 py-6 text-center text-muted-foreground text-sm">No products found</p>
+                                ) : filteredVariants(q).map((v) => (
                                   <div key={v.variantId} onClick={() => selectVariant(idx, v)}
-                                    className="px-3 py-2 hover:bg-muted/50 cursor-pointer flex items-center gap-2">
+                                    className="px-4 py-2.5 hover:bg-muted/50 cursor-pointer flex items-center gap-3 border-b last:border-0">
                                     <div className="flex-1 min-w-0">
-                                      <p className="font-medium truncate">{v.productName}</p>
-                                      <p className="text-muted-foreground text-[10px]">{v.sku} · {v.variantName}</p>
+                                      <p className="font-medium text-sm truncate">{v.productName}</p>
+                                      <p className="text-muted-foreground text-xs">{v.sku} · {v.variantName}</p>
                                     </div>
-                                    <span className="text-[10px] text-muted-foreground shrink-0">Stock: {v.stock}</span>
+                                    <div className="text-right shrink-0">
+                                      <p className="text-xs font-semibold">LKR {v.costPrice.toLocaleString()}</p>
+                                      <p className="text-xs text-muted-foreground">Stock: {v.stock}</p>
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -361,52 +378,58 @@ export default function CreatePOPage() {
                         </div>
                       </td>
 
-                      <td className="px-3 py-2 font-mono text-muted-foreground">{item.sku || "—"}</td>
-                      <td className="px-3 py-2 text-muted-foreground">{item.variantName || "—"}</td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.sku || "—"}</td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.variantName || "—"}</td>
+                      <td className="px-4 py-3">
                         <input type="number" min={1} value={item.orderedQty}
                           onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 text-right text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring" />
+                          className="w-16 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <input type="number" min={0} step="0.01" value={item.unitCost}
                           onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
-                          className="w-24 text-right text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring" />
+                          className="w-28 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <input type="number" min={0} step="0.01" value={item.discount}
                           onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
-                          className="w-20 text-right text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring" />
+                          className="w-24 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-4 py-3">
                         <input type="number" min={0} max={100} step="0.1" value={item.taxRate}
                           onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                          className="w-16 text-right text-xs border rounded px-2 py-1 bg-background focus:outline-none focus:ring-1 focus:ring-ring" />
+                          className="w-20 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
                       </td>
-                      <td className="px-3 py-2 text-right font-semibold">{fmt(total)}</td>
-                      <td className="px-3 py-2">
-                        <button onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-600">
-                          <Trash2 className="h-3.5 w-3.5" />
+                      <td className="px-4 py-3 text-right font-semibold text-sm">{fmt(total)}</td>
+                      <td className="px-4 py-3">
+                        <button onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50">
+                          <Trash2 className="h-4 w-4" />
                         </button>
                       </td>
                     </tr>
                   );
                 })}
                 {items.length === 0 && (
-                  <tr><td colSpan={10} className="py-10 text-center text-muted-foreground text-xs">
-                    No items added. Click <strong>+ Add Item</strong> to begin.
-                  </td></tr>
+                  <tr>
+                    <td colSpan={10} className="py-16 text-center">
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                        <Plus className="h-8 w-8 opacity-30" />
+                        <p className="text-sm">No items added yet.</p>
+                        <button onClick={addRow} className="text-sm text-primary hover:underline font-medium">+ Add your first item</button>
+                      </div>
+                    </td>
+                  </tr>
                 )}
               </tbody>
               {items.length > 0 && (
-                <tfoot className="bg-muted/20 border-t font-semibold text-xs">
+                <tfoot className="bg-muted/30 border-t">
                   <tr>
-                    <td colSpan={4} className="px-3 py-2">Total Items: {items.length}</td>
-                    <td className="px-3 py-2 text-right">{totalQty}</td>
+                    <td colSpan={4} className="px-4 py-3 text-sm font-semibold">Total Items: {items.length}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold">{totalQty}</td>
                     <td />
-                    <td className="px-3 py-2 text-right">{fmt(totalDisc)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(totalTax)}</td>
-                    <td className="px-3 py-2 text-right">{fmt(grandTotal)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmt(totalDisc)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmt(totalTax)}</td>
+                    <td className="px-4 py-3 text-right text-sm font-bold text-primary">{fmt(grandTotal)}</td>
                     <td />
                   </tr>
                 </tfoot>
@@ -414,29 +437,16 @@ export default function CreatePOPage() {
             </table>
           </div>
           {items.length > 0 && (
-            <div className="px-4 py-2 border-t">
-              <button onClick={addRow} className="text-xs text-primary hover:underline flex items-center gap-1">
-                <Plus className="h-3 w-3" /> Add New Row
+            <div className="px-6 py-3 border-t bg-muted/10">
+              <button onClick={addRow} className="text-sm text-primary hover:underline flex items-center gap-1.5 font-medium">
+                <Plus className="h-3.5 w-3.5" /> Add Another Row
               </button>
             </div>
           )}
         </div>
 
-        {/* ── Bottom actions ── */}
-        <div className="flex items-center justify-between pt-2">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
-            <input type="checkbox" className="rounded" />
-            Save as Draft
-          </label>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push("/purchases")}>Cancel</Button>
-            <Button variant="outline" disabled={saving} onClick={() => submit(false)}>Save as Draft</Button>
-            <Button disabled={saving} onClick={() => submit(true)}>Save &amp; Send PO</Button>
-          </div>
-        </div>
       </div>
 
-      {/* Close search on outside click */}
       {searchOpen !== null && (
         <div className="fixed inset-0 z-40" onClick={() => setSearchOpen(null)} />
       )}
