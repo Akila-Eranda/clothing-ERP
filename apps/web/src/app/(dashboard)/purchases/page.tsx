@@ -17,16 +17,15 @@ import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/re
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
-  DRAFT:              { label: "Draft",              variant: "secondary", icon: FileText },
-  ORDERED:            { label: "Ordered",            variant: "info",      icon: Clock },
-  SENT:               { label: "Sent",               variant: "info",      icon: Truck },
-  IN_TRANSIT:         { label: "In Transit",         variant: "warning",   icon: Truck },
-  PARTIALLY_RECEIVED: { label: "Partial",            variant: "warning",   icon: AlertCircle },
-  RECEIVED:           { label: "Received",           variant: "success",   icon: CheckCircle2 },
-  CANCELLED:          { label: "Cancelled",          variant: "danger",    icon: XCircle },
+  DRAFT:              { label: "Draft",      variant: "secondary", icon: FileText },
+  CONFIRMED:          { label: "Confirmed",  variant: "info",      icon: Clock },
+  SENT:               { label: "Sent",       variant: "info",      icon: Truck },
+  PARTIALLY_RECEIVED: { label: "Partial",    variant: "warning",   icon: AlertCircle },
+  RECEIVED:           { label: "Received",   variant: "success",   icon: CheckCircle2 },
+  CANCELLED:          { label: "Cancelled",  variant: "danger",    icon: XCircle },
 };
 
-const RECEIVABLE = ["ORDERED", "SENT", "IN_TRANSIT", "PARTIALLY_RECEIVED"];
+const RECEIVABLE = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"];
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
@@ -102,8 +101,8 @@ function buildColumns(
             showAction={canReceive ? { action: () => onReceive(po), tooltip: "Receive Items" } : undefined}
             dropMoreActions={[
               ...(canReceive ? [{ text: "Receive Items", function: () => onReceive(po) }] : []),
-              ...(po.status === "DRAFT" ? [{ text: "Mark as Ordered", function: () => onUpdateStatus(po, "ORDERED") }] : []),
-              ...(po.status === "ORDERED" ? [{ text: "Mark In Transit", function: () => onUpdateStatus(po, "IN_TRANSIT") }] : []),
+              ...(po.status === "DRAFT" ? [{ text: "Mark as Confirmed", function: () => onUpdateStatus(po, "CONFIRMED") }] : []),
+              ...(po.status === "CONFIRMED" ? [{ text: "Mark as Sent", function: () => onUpdateStatus(po, "SENT") }] : []),
               ...(po.status !== "CANCELLED" && po.status !== "RECEIVED" ? [{ text: "Cancel PO", function: () => onUpdateStatus(po, "CANCELLED") }] : []),
             ]}
           />
@@ -148,15 +147,15 @@ export default function PurchasesPage() {
 
   // Stats
   const total    = pos.length;
-  const pending  = pos.filter((p) => ["DRAFT","ORDERED","SENT"].includes(p.status)).length;
-  const transit  = pos.filter((p) => ["IN_TRANSIT","PARTIALLY_RECEIVED"].includes(p.status)).length;
+  const pending  = pos.filter((p) => ["DRAFT","CONFIRMED","SENT"].includes(p.status)).length;
+  const transit  = pos.filter((p) => p.status === "PARTIALLY_RECEIVED").length;
   const received = pos.filter((p) => p.status === "RECEIVED").length;
   const totalValue = pos.reduce((s, p) => s + p.total, 0);
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Pending",     value: pending,                                 icon: Clock,         color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "In Transit",  value: transit,                                 icon: Truck,         color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Partial",     value: transit,                                 icon: Truck,         color: "text-violet-500",  bg: "bg-violet-500/10" },
     { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
