@@ -153,33 +153,33 @@ export default function ExpensesPage() {
 
   // ── Table columns ──────────────────────────────────────────────────────────
   const columns: ColumnDef<Expense>[] = [
-    { accessorKey: "reference",    header: ({ column }) => <DataTableColumnHeader column={column} title="Ref" />,         cell: ({ row }) => <span className="font-mono text-xs text-slate-400">{row.original.reference ?? "—"}</span> },
-    { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="font-medium text-sm text-slate-800">{row.original.description}</span> },
+    { accessorKey: "reference",    header: ({ column }) => <DataTableColumnHeader column={column} title="Ref" />,         cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.reference ?? "—"}</span> },
+    { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="font-medium text-sm text-foreground">{row.original.description}</span> },
     { accessorKey: "categoryId",   header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,    cell: ({ row }) => {
       const cat = row.original.categoryId;
       const idx = catData.findIndex((c) => c.name === cat);
       const color = idx >= 0 ? catData[idx].color : "#94a3b8";
       return cat
-        ? <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-slate-100"><span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{cat}</span>
+        ? <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-muted"><span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />{cat}</span>
         : <span className="text-slate-400 text-xs">—</span>;
     }},
-    { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,     cell: ({ row }) => <span className="text-xs text-slate-500 capitalize">{row.original.paymentMethod?.replace(/_/g, " ") ?? "—"}</span> },
-    { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,       cell: ({ row }) => <span className="text-xs text-slate-500">{new Date(row.original.date).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}</span> },
+    { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,     cell: ({ row }) => <span className="text-xs text-muted-foreground capitalize">{row.original.paymentMethod?.replace(/_/g, " ") ?? "—"}</span> },
+    { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}</span> },
     { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,     cell: ({ row }) => <span className="font-bold text-red-500">LKR {formatNumber(row.original.amount)}</span> },
     { id: "actions", cell: ({ row }) => <TableActionsRow dropMoreActions={[{ text: "Edit", function: () => setEditItem(row.original) }, { text: "Delete", function: () => deleteExpense(row.original.id) }]} /> },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="bg-white border-b px-6 py-4 sticky top-0 z-10">
+      <div className="bg-card border-b px-6 py-4 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="bg-red-500 rounded-xl p-2.5"><TrendingDown className="h-5 w-5 text-white" /></div>
             <div>
-              <h1 className="text-lg font-bold text-slate-800">Expenses</h1>
-              <p className="text-xs text-slate-500">Track and manage all business expenses</p>
+              <h1 className="text-lg font-bold text-foreground">Expenses</h1>
+              <p className="text-xs text-muted-foreground">Track and manage all business expenses</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -196,19 +196,19 @@ export default function ExpensesPage() {
       <div className="px-6 py-6 space-y-6">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
-        <div className="bg-white border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
+        <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setRange({ start: p.start, end: p.end })}
-              className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-white text-slate-500 hover:bg-slate-50 border-slate-200"}`}>
+              className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-background text-muted-foreground hover:bg-muted border"}`}>
               {p.label}
             </button>
           ))}
-          <div className="w-px h-4 bg-slate-200" />
+          <div className="w-px h-4 bg-border" />
           <Input type="date" value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} className="h-7 text-xs w-32" />
-          <span className="text-slate-400 text-xs">–</span>
+          <span className="text-muted-foreground text-xs">–</span>
           <Input type="date" value={range.end} onChange={(e) => setRange((r) => ({ ...r, end: e.target.value }))} className="h-7 text-xs w-32" />
           <Button size="sm" variant="outline" onClick={load} className="h-7 px-3 text-xs ml-1">Apply</Button>
-          <span className="ml-auto text-xs text-slate-400">{expenses.length} entries found</span>
+          <span className="ml-auto text-xs text-muted-foreground">{expenses.length} entries found</span>
         </div>
 
         {/* ── KPI Cards ───────────────────────────────────────────────────── */}
@@ -219,13 +219,13 @@ export default function ExpensesPage() {
             { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry" },
             { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories` },
           ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string }[]).map((kpi) => (
-            <Card key={kpi.label} className="bg-white border shadow-sm hover:shadow-md transition-shadow">
+            <Card key={kpi.label} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
               <CardContent className="p-5 flex items-center gap-4">
                 <div className={`${kpi.bg} rounded-full p-2.5 shrink-0`}><kpi.icon className="h-5 w-5 text-white" /></div>
                 <div className="min-w-0">
-                  <p className="text-xs text-slate-500 font-medium">{kpi.label}</p>
-                  <p className="text-xl font-bold text-slate-800 truncate">{kpi.value}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">{kpi.sub}</p>
+                  <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
+                  <p className="text-xl font-bold text-foreground truncate">{kpi.value}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</p>
                 </div>
               </CardContent>
             </Card>
@@ -237,9 +237,9 @@ export default function ExpensesPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
             {/* Category donut */}
-            <Card className="lg:col-span-2 bg-white border shadow-sm">
+            <Card className="lg:col-span-2 bg-card border shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700">By Category</CardTitle>
+                <CardTitle className="text-sm font-semibold text-foreground">By Category</CardTitle>
               </CardHeader>
               <CardContent>
                 <ResponsiveContainer width="100%" height={180}>
@@ -254,9 +254,9 @@ export default function ExpensesPage() {
                   {catData.map((c) => (
                     <div key={c.name} className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: c.color }} />
-                      <span className="text-xs text-slate-500 flex-1 truncate">{c.name}</span>
-                      <span className="text-xs font-semibold text-slate-700">LKR {formatNumber(c.amount)}</span>
-                      <span className="text-xs text-slate-400 w-8 text-right">{total > 0 ? ((c.amount / total) * 100).toFixed(0) : 0}%</span>
+                      <span className="text-xs text-muted-foreground flex-1 truncate">{c.name}</span>
+                      <span className="text-xs font-semibold text-foreground">LKR {formatNumber(c.amount)}</span>
+                      <span className="text-xs text-muted-foreground w-8 text-right">{total > 0 ? ((c.amount / total) * 100).toFixed(0) : 0}%</span>
                     </div>
                   ))}
                 </div>
@@ -264,9 +264,9 @@ export default function ExpensesPage() {
             </Card>
 
             {/* Payment method bar */}
-            <Card className="lg:col-span-3 bg-white border shadow-sm">
+            <Card className="lg:col-span-3 bg-card border shadow-sm">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-slate-700">By Payment Method</CardTitle>
+                <CardTitle className="text-sm font-semibold text-foreground">By Payment Method</CardTitle>
               </CardHeader>
               <CardContent>
                 {methodData.length > 0 ? (
@@ -280,7 +280,7 @@ export default function ExpensesPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-[280px] flex items-center justify-center text-slate-400 text-sm">No data</div>
+                  <div className="h-[280px] flex items-center justify-center text-muted-foreground text-sm">No data</div>
                 )}
               </CardContent>
             </Card>
@@ -289,19 +289,19 @@ export default function ExpensesPage() {
 
         {/* ── Category breakdown bars ──────────────────────────────────────── */}
         {catData.length > 0 && (
-          <Card className="bg-white border shadow-sm">
+          <Card className="bg-card border shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-700">Expense Breakdown by Category</CardTitle>
+              <CardTitle className="text-sm font-semibold text-foreground">Expense Breakdown by Category</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2.5">
               {catData.map((c) => (
                 <div key={c.name} className="flex items-center gap-3">
-                  <span className="text-xs text-slate-500 w-24 shrink-0 truncate">{c.name}</span>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <span className="text-xs text-muted-foreground w-24 shrink-0 truncate">{c.name}</span>
+                  <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${total > 0 ? (c.amount / total) * 100 : 0}%`, background: c.color }} />
                   </div>
-                  <span className="text-xs font-semibold text-slate-700 w-32 text-right shrink-0">LKR {formatNumber(c.amount)}</span>
-                  <span className="text-xs text-slate-400 w-8 text-right shrink-0">{total > 0 ? ((c.amount / total) * 100).toFixed(0) : 0}%</span>
+                  <span className="text-xs font-semibold text-foreground w-32 text-right shrink-0">LKR {formatNumber(c.amount)}</span>
+                  <span className="text-xs text-muted-foreground w-8 text-right shrink-0">{total > 0 ? ((c.amount / total) * 100).toFixed(0) : 0}%</span>
                 </div>
               ))}
             </CardContent>
@@ -309,23 +309,23 @@ export default function ExpensesPage() {
         )}
 
         {/* ── Expenses Table ───────────────────────────────────────────────── */}
-        <Card className="bg-white border shadow-sm">
+        <Card className="bg-card border shadow-sm">
           <CardHeader className="pb-3 flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-slate-700">All Expenses</CardTitle>
+            <CardTitle className="text-sm font-semibold text-foreground">All Expenses</CardTitle>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-400 bg-slate-100 px-2.5 py-1 rounded-full">{expenses.length} records · LKR {formatNumber(total)}</span>
+              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{expenses.length} records · LKR {formatNumber(total)}</span>
               <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddOpen(true)}><Plus className="h-3 w-3" />Add</Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="h-40 flex items-center justify-center text-slate-400">
+              <div className="h-40 flex items-center justify-center text-muted-foreground">
                 <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
               </div>
             ) : expenses.length === 0 ? (
-              <div className="h-40 flex flex-col items-center justify-center text-slate-400">
+              <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
                 <TrendingDown className="h-10 w-10 mb-2 opacity-20" />
-                <p className="text-sm font-medium">No expenses for this period</p>
+                <p className="text-sm font-medium text-muted-foreground">No expenses for this period</p>
                 <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-red-500 hover:underline">Record the first one →</button>
               </div>
             ) : (
