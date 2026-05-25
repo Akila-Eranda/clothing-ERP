@@ -68,26 +68,6 @@ export class ReturnsService {
       };
       const created = await tx.return.create({ data: createData, include: { items: true } });
 
-      // Restock returned items
-      if (dto.restockItems !== false) {
-        for (const item of dto.items) {
-          await this.inventoryService.adjustStock(tenantId, branchId, userId, {
-            variantId: item.variantId, quantity: item.quantity,
-            movementType: StockMovementType.RETURN, referenceId: created.id,
-          });
-        }
-      }
-
-      // Deduct exchange items from inventory
-      if (returnType === 'EXCHANGE' && dto.exchangeItems?.length) {
-        for (const item of dto.exchangeItems) {
-          await this.inventoryService.adjustStock(tenantId, branchId, userId, {
-            variantId: item.variantId, quantity: item.quantity,
-            movementType: StockMovementType.SALE, referenceId: created.id,
-          });
-        }
-      }
-
       return created;
     });
 
@@ -123,13 +103,38 @@ export class ReturnsService {
   }
 
   async updateStatus(id: string, tenantId: string, status: ReturnStatus, userId: string) {
-    await this.findOne(id, tenantId);
+    const ret = await this.findOne(id, tenantId);
+    const r = ret as any;
+
+    if (status === ReturnStatus.APPROVED && r.status === ReturnStatus.INITIATED) {
+      if (r.restockItems) {
+        for (const item of r.items) {
+          await this.inventoryService.adjustStock(tenantId, r.branchId, userId, {
+            variantId: item.variantId, quantity: item.quantity,
+            movementType: StockMovementType.RETURN, referenceId: r.id,
+          });
+        }
+      }
+      if (r.returnType === 'EXCHANGE') {
+        const exchangeData = (r.exchangeData as any[]) ?? [];
+        for (const item of exchangeData) {
+          if (item?.variantId) {
+            await this.inventoryService.adjustStock(tenantId, r.branchId, userId, {
+              variantId: item.variantId, quantity: item.quantity,
+              movementType: StockMovementType.SALE, referenceId: r.id,
+            });
+          }
+        }
+      }
+      await this.prisma.sale.update({
+        where: { id: r.originalSaleId },
+        data: { status: 'REFUNDED' },
+      });
+    }
+
     return this.prisma.return.update({
       where: { id },
-      data: {
-        status,
-        ...(status === ReturnStatus.APPROVED && { approvedBy: userId }),
-      },
+      data: { status, ...(status === ReturnStatus.APPROVED && { approvedBy: userId }) },
     });
   }
 }

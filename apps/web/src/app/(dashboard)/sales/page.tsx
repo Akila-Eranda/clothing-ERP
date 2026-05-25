@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { TrendingUp, ShoppingCart, DollarSign, RotateCcw, RefreshCw, Eye, X, Package, Loader2, User, CalendarDays, CreditCard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -116,6 +117,7 @@ function SaleDetailModal({ saleId, onClose }: { saleId: string; onClose: () => v
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function SalesPage() {
+  const router = useRouter();
   const today = new Date().toISOString().split("T")[0];
   const [sales, setSales]           = useState<Sale[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -211,6 +213,7 @@ export default function SalesPage() {
           showAction={{ action: () => setViewId(row.original.id) }}
           dropMoreActions={[
             { text: "View Details", function: () => setViewId(row.original.id) },
+            ...(row.original.status !== "REFUNDED" ? [{ text: "Process Return / Exchange", function: () => router.push(`/returns?invoice=${row.original.invoiceNumber}`) }] : []),
           ]}
         />
       ),

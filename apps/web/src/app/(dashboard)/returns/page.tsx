@@ -152,9 +152,9 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
 }
 
 // ── New Return / Exchange Modal ─────────────────────────────────────────────
-function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => void; onSaved: () => void; initialInvoice?: string }) {
   const [mode, setMode]                   = useState<"RETURN" | "EXCHANGE">("RETURN");
-  const [invoiceSearch, setInvoiceSearch] = useState("");
+  const [invoiceSearch, setInvoiceSearch] = useState(initialInvoice ?? "");
   const [searchLoading, setSearchLoading] = useState(false);
   const [foundSale, setFoundSale]         = useState<SaleLookup | null>(null);
   const [selectedItems, setSelectedItems] = useState<Record<string, { selected: boolean; quantity: number }>>({});
@@ -168,11 +168,12 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
   const [skuLoading, setSkuLoading]         = useState(false);
   const [exchangeItems, setExchangeItems]   = useState<ExchangeItem[]>([]);
 
-  const searchInvoice = async () => {
-    if (!invoiceSearch.trim()) return;
+  const searchInvoice = async (override?: string) => {
+    const query = override ?? invoiceSearch;
+    if (!query.trim()) return;
     setSearchLoading(true);
     try {
-      const listRes = await api.get<{ data: any[] }>(`/pos/sales?search=${encodeURIComponent(invoiceSearch)}&limit=1`);
+      const listRes = await api.get<{ data: any[] }>(`/pos/sales?search=${encodeURIComponent(query)}&limit=1`);
       const list = (listRes.data?.data ?? listRes.data ?? []) as any[];
       if (list.length === 0) { toast.error("Invoice not found"); return; }
       const detailRes = await api.get<any>(`/pos/sales/${list[0].id}`);
@@ -192,9 +193,15 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
       const init: Record<string, { selected: boolean; quantity: number }> = {};
       sale.items.forEach((item) => { init[item.id] = { selected: true, quantity: item.quantity }; });
       setSelectedItems(init);
-    } catch { toast.error("Search failed"); }
+    } catch { toast.error("Invoice not found"); }
     finally { setSearchLoading(false); }
   };
+
+  // Auto-search when pre-filled from sales page
+  useEffect(() => {
+    if (initialInvoice) searchInvoice(initialInvoice);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const lookupSku = async () => {
     if (!skuSearch.trim()) return;
@@ -432,10 +439,11 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function ReturnsPage() {
-  const [returns, setReturns]         = useState<ReturnRecord[]>([]);
-  const [loading, setLoading]         = useState(true);
-  const [addOpen, setAddOpen]         = useState(false);
-  const [detailRecord, setDetailRecord] = useState<ReturnRecord | null>(null);
+  const [returns, setReturns]             = useState<ReturnRecord[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [addOpen, setAddOpen]             = useState(false);
+  const [initialInvoice, setInitialInvoice] = useState<string | undefined>();
+  const [detailRecord, setDetailRecord]   = useState<ReturnRecord | null>(null);
 
   const fetchReturns = useCallback(async () => {
     setLoading(true);
@@ -446,12 +454,23 @@ export default function ReturnsPage() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { fetchReturns(); }, [fetchReturns]);
+  useEffect(() => {
+    fetchReturns();
+    // Pre-fill from sales page navigation (?invoice=INV-xxx)
+    if (typeof window !== "undefined") {
+      const inv = new URLSearchParams(window.location.search).get("invoice");
+      if (inv) { setInitialInvoice(inv); setAddOpen(true); }
+    }
+  }, [fetchReturns]);
 
   const updateStatus = async (id: string, status: string, label: string) => {
     try {
       await api.put(`/returns/${id}/status`, { status });
-      toast.success(`Marked as ${label}`);
+      if (status === "APPROVED") {
+        toast.success("Return approved — stock restored to inventory");
+      } else {
+        toast.success(`Marked as ${label}`);
+      }
       fetchReturns();
     } catch { toast.error("Failed to update status"); }
   };
@@ -630,7 +649,13 @@ export default function ReturnsPage() {
       />
 
       {/* Modals */}
-      {addOpen && <NewReturnModal onClose={() => setAddOpen(false)} onSaved={() => { fetchReturns(); }} />}
+      {addOpen && (
+        <NewReturnModal
+          onClose={() => { setAddOpen(false); setInitialInvoice(undefined); }}
+          onSaved={() => fetchReturns()}
+          initialInvoice={initialInvoice}
+        />
+      )}
       {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
     </div>
   );
