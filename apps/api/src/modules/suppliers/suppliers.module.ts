@@ -19,7 +19,11 @@ export class CreateSupplierDto {
   @ApiPropertyOptional() @IsOptional() @IsString() contactPerson?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() state?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() pincode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() gstNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() creditDays?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() creditLimit?: number;
 }
