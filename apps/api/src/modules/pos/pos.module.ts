@@ -227,12 +227,13 @@ export class PosService {
   }
 
   async getSales(tenantId: string, branchId: string, query: { page?: number; limit?: number; search?: string; date?: string }) {
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const page  = parseInt(String(query.page  ?? 1),  10);
+    const limit = parseInt(String(query.limit ?? 20), 10);
     const skip = (page - 1) * limit;
     const where = {
       tenantId,
-      branchId,
+      branchId: resolvedBranchId,
       ...(query.search && {
         OR: [
           { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
@@ -283,8 +284,9 @@ export class PosService {
   }
 
   async getHeldBills(tenantId: string, branchId: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     return this.prisma.heldBill.findMany({
-      where: { tenantId, branchId },
+      where: { tenantId, branchId: resolvedBranchId },
       orderBy: { createdAt: 'desc' },
     });
   }
