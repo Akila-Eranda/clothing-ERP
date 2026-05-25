@@ -125,7 +125,7 @@ function PaymentModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-xl border overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl border overflow-hidden max-h-[92vh] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
