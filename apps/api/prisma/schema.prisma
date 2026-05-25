@@ -1022,7 +1022,7 @@ model PurchaseOrder {
   paidAmount      Float               @default(0)
   notes           String?
   reference       String?
-  paymentTerms    String?
+  paymentTerms    String?  @map("paymentterms")
   createdBy       String?
   approvedBy      String?
   createdAt       DateTime            @default(now())
