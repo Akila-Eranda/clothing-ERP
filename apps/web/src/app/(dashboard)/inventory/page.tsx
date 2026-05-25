@@ -208,16 +208,10 @@ export default function InventoryPage() {
                         <p className="text-[10px] text-muted-foreground">/ {reorder} min</p>
                       </div>
                     </div>
-                    <div className="flex gap-1.5">
-                      <Button size="sm" variant="warning" className="flex-1 h-7 text-xs gap-1.5"
-                        onClick={() => { setPrefillVariant(item.variantId); setPoOpen(true); }}>
-                        <ShoppingBag className="h-3 w-3" /> Create Purchase Order
-                      </Button>
-                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5"
-                        onClick={() => setAdjustItem(item)}>
-                        <ArrowUpDown className="h-3 w-3" /> Stock Adjustment
-                      </Button>
-                    </div>
+                    <Button size="sm" variant="warning" className="w-full h-7 text-xs gap-1.5"
+                      onClick={() => { setPrefillVariant(item.variantId); setPoOpen(true); }}>
+                      <ShoppingBag className="h-3 w-3" /> Create Purchase Order
+                    </Button>
                   </div>
                 );
               })}
