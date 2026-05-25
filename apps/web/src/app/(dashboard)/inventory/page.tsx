@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { AlertTriangle, ArrowUpDown, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
@@ -95,7 +95,6 @@ function buildColumns(
 export default function InventoryPage() {
   const router = useRouter();
   const [stock, setStock]           = useState<InventoryItem[]>([]);
-  const [lowStock, setLowStock]     = useState<InventoryItem[]>([]);
   const [loading, setLoading]       = useState(true);
   const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [poOpen, setPoOpen]         = useState(false);
@@ -104,12 +103,8 @@ export default function InventoryPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockRes, lowRes] = await Promise.all([
-        api.get<{ data: InventoryItem[] }>("/inventory?limit=500"),
-        api.get<InventoryItem[]>("/inventory/low-stock"),
-      ]);
+      const stockRes = await api.get<{ data: InventoryItem[] }>("/inventory?limit=500");
       setStock(stockRes.data?.data ?? (stockRes.data as unknown as InventoryItem[]) ?? []);
-      setLowStock((lowRes.data as unknown as InventoryItem[]) ?? []);
     } catch { toast.error("Failed to load inventory"); }
     finally { setLoading(false); }
   }, []);
@@ -165,60 +160,14 @@ export default function InventoryPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Main table */}
-        <div className="xl:col-span-2">
-          <ClientSideTable
-            data={stock}
-            columns={columns}
-            pageCount={Math.ceil(stock.length / 10)}
-            searchableColumns={[]}
-            filterableColumns={[]}
-            isShowExportButtons={{ isShow: true, fileName: "inventory-export" }}
-          />
-        </div>
-
-        {/* Reorder alerts */}
-        <div>
-          <Card className="border-amber-500/20">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
-                Reorder Alerts
-                <Badge variant="warning" className="ml-auto text-[10px]">{lowStock.length}</Badge>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 max-h-[520px] overflow-y-auto">
-              {lowStock.length === 0 && (
-                <p className="text-xs text-muted-foreground text-center py-6">All stock levels are healthy</p>
-              )}
-              {lowStock.map((item) => {
-                const reorder = item.reorderPoint ?? 5;
-                return (
-                  <div key={item.id} className="p-3 rounded-lg bg-amber-500/5 border border-amber-500/10 space-y-2">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{item.variant.product.name}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{item.variant.sku}</p>
-                      </div>
-                      <div className="text-right shrink-0 ml-2">
-                        <p className={`text-sm font-bold ${item.quantity === 0 ? "text-red-500" : "text-amber-500"}`}>
-                          {item.quantity}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">/ {reorder} min</p>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="warning" className="w-full h-7 text-xs gap-1.5"
-                      onClick={() => { setPrefillVariant(item.variantId); setPoOpen(true); }}>
-                      <ShoppingBag className="h-3 w-3" /> Create Purchase Order
-                    </Button>
-                  </div>
-                );
-              })}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      <ClientSideTable
+        data={stock}
+        columns={columns}
+        pageCount={Math.ceil(stock.length / 10)}
+        searchableColumns={[]}
+        filterableColumns={[]}
+        isShowExportButtons={{ isShow: true, fileName: "inventory-export" }}
+      />
 
       {/* Modals */}
       <StockAdjustModal
