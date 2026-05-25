@@ -35,6 +35,15 @@ const INIT: Form = {
 
 interface Props { open: boolean; onClose: () => void; onSaved: () => void; editSupplier?: Supplier; }
 
+function F({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <Label className="text-xs font-semibold">{label}{req && <span className="text-destructive ml-0.5">*</span>}</Label>
+      {children}
+    </div>
+  );
+}
+
 export function AddSupplierModal({ open, onClose, onSaved, editSupplier }: Props) {
   const [form, setForm]       = useState<Form>(INIT);
   const [loading, setLoading] = useState(false);
@@ -85,13 +94,6 @@ export function AddSupplierModal({ open, onClose, onSaved, editSupplier }: Props
   };
 
   if (!open) return null;
-
-  const F = ({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) => (
-    <div className="space-y-1.5">
-      <Label className="text-xs font-semibold">{label}{req && <span className="text-destructive ml-0.5">*</span>}</Label>
-      {children}
-    </div>
-  );
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
