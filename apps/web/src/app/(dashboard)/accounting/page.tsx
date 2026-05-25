@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   BookOpen, TrendingUp, TrendingDown, DollarSign, Plus, RefreshCw,
   X, Loader2, Trash2, Pencil, ArrowUpRight, ArrowDownRight, FileText,
@@ -285,6 +285,7 @@ export default function AccountingPage() {
   const [cashFlow, setCashFlow]       = useState<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number } | null>(null);
   const [journalEntries, setJournal]  = useState<JournalEntry[]>([]);
   const [balanceSheet, setBS]         = useState<BalanceSheet | null>(null);
+  const [thisMonthPL, setThisMonthPL] = useState<PLReport | null>(null);
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState("dashboard");
 
@@ -296,7 +297,9 @@ export default function AccountingPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [expRes, accRes, plRes, cfRes, jeRes, bsRes, monthRes] = await Promise.all([
+      const tmStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
+      const tmEnd   = new Date().toISOString().split("T")[0];
+      const [expRes, accRes, plRes, cfRes, jeRes, bsRes, monthRes, tmRes] = await Promise.all([
         api.get<{ data: Expense[] }>("/accounting/expenses?limit=200"),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
@@ -304,6 +307,7 @@ export default function AccountingPage() {
         api.get<{ data: JournalEntry[] }>("/accounting/journal-entries?limit=50"),
         api.get<BalanceSheet>("/accounting/balance-sheet"),
         api.get<PLData[]>("/accounting/monthly-pl?months=6"),
+        api.get<PLReport>(`/accounting/profit-loss?startDate=${tmStart}&endDate=${tmEnd}`),
       ]);
       setExpenses((expRes.data?.data ?? expRes.data ?? []) as Expense[]);
       setAccounts((Array.isArray(accRes.data) ? accRes.data : []) as Account[]);
@@ -312,6 +316,7 @@ export default function AccountingPage() {
       setJournal((jeRes.data?.data ?? []) as JournalEntry[]);
       setBS(bsRes.data as BalanceSheet);
       setMonthlyPL((Array.isArray(monthRes.data) ? monthRes.data : []) as PLData[]);
+      setThisMonthPL(tmRes.data as PLReport);
     } catch { toast.error("Failed to load accounting data"); }
     finally { setLoading(false); }
   }, [plRange, cfRange]);
@@ -334,6 +339,28 @@ export default function AccountingPage() {
   const recentExp  = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
   const expByCat   = CATEGORIES.map((cat, i) => ({ name: cat, value: expenses.filter((e) => e.categoryId === cat).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i % CAT_COLORS.length] })).filter((c) => c.value > 0);
   const topAccounts = [...accounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 8);
+
+  // ── This-month KPI values (always current month, independent of range filter)
+  const tmRevenue   = thisMonthPL?.revenue?.net ?? 0;
+  const tmProfit    = thisMonthPL?.netProfit ?? 0;
+  const tmMargin    = tmRevenue > 0 ? ((tmProfit / tmRevenue) * 100).toFixed(1) : "0";
+  const tmSales     = thisMonthPL?.salesCount ?? 0;
+
+  // ── Month-over-month % change from monthlyPL (last 2 months)
+  const lastM = monthlyPL.at(-1);
+  const prevM = monthlyPL.at(-2);
+  const revMoM    = lastM && prevM && prevM.revenue !== 0
+    ? ((lastM.revenue - prevM.revenue) / Math.abs(prevM.revenue)) * 100 : null;
+  const profitMoM = lastM && prevM && prevM.profit !== 0
+    ? ((lastM.profit - prevM.profit) / Math.abs(prevM.profit)) * 100 : null;
+
+  // ── Balance sheet ratios
+  const bsAssets  = balanceSheet?.assets.total ?? 0;
+  const bsLiab    = balanceSheet?.liabilities.total ?? 0;
+  const bsEquity  = balanceSheet?.equity.total ?? 0;
+  const bsRetained = balanceSheet?.equity?.retainedEarnings ?? 0;
+  const debtRatio  = bsAssets > 0 ? (bsLiab / bsAssets) * 100 : 0;
+  const equityRatio = bsAssets > 0 ? (bsEquity / bsAssets) * 100 : 0;
 
   // ── Table columns ──────────────────────────────────────────────────────────
   const expenseCols: ColumnDef<Expense>[] = [
@@ -393,12 +420,12 @@ export default function AccountingPage() {
             {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
               {([
-                { label: "Total Assets",       value: balanceSheet?.assets.total ?? 0,      icon: CreditCard,  bg: "bg-blue-600",    up: true,           change: `${accounts.filter(a=>a.type==="ASSET").length} accounts` },
-                { label: "Total Liabilities",  value: balanceSheet?.liabilities.total ?? 0, icon: Wallet,      bg: "bg-purple-600",  up: false,          change: `${accounts.filter(a=>a.type==="LIABILITY").length} accounts` },
-                { label: "Total Equity",       value: balanceSheet?.equity.total ?? 0,      icon: BarChart2,   bg: "bg-emerald-600", up: true,           change: `${accounts.filter(a=>a.type==="EQUITY").length} accounts` },
-                { label: "Total Income (MTD)", value: revenue,                              icon: TrendingUp,  bg: "bg-orange-500",  up: true,           change: `${pl?.salesCount ?? 0} sales` },
-                { label: "Net Profit (MTD)",   value: netProfit,                            icon: DollarSign,  bg: "bg-teal-600",    up: netProfit >= 0, change: `Margin: ${margin}%` },
-              ] as const).map((kpi) => (
+                { label: "Total Assets",       value: bsAssets,   icon: CreditCard,  bg: "bg-blue-600",    up: bsEquity > 0,         change: bsAssets > 0 ? `Equity ratio: ${equityRatio.toFixed(1)}%` : "No balance sheet data" },
+                { label: "Total Liabilities",  value: bsLiab,     icon: Wallet,      bg: "bg-purple-600",  up: bsLiab < bsAssets,    change: bsAssets > 0 ? `Debt ratio: ${debtRatio.toFixed(1)}%` : "No balance sheet data" },
+                { label: "Total Equity",       value: bsEquity,   icon: BarChart2,   bg: "bg-emerald-600", up: bsEquity >= 0,        change: bsAssets > 0 ? `Retained: LKR ${formatNumber(Math.abs(bsRetained))}` : "No balance sheet data" },
+                { label: "Total Income (MTD)", value: tmRevenue,  icon: TrendingUp,  bg: "bg-orange-500",  up: revMoM !== null ? revMoM >= 0 : tmRevenue > 0,    change: revMoM !== null ? `${revMoM >= 0 ? "+" : ""}${revMoM.toFixed(1)}% from last month` : `${tmSales} sales this month` },
+                { label: "Net Profit (MTD)",   value: tmProfit,   icon: DollarSign,  bg: "bg-teal-600",    up: profitMoM !== null ? profitMoM >= 0 : tmProfit >= 0, change: profitMoM !== null ? `${profitMoM >= 0 ? "+" : ""}${profitMoM.toFixed(1)}% from last month` : `Margin: ${tmMargin}%` },
+              ] as { label: string; value: number; icon: React.ComponentType<{className?: string}>; bg: string; up: boolean; change: string }[]).map((kpi) => (
                 <Card key={kpi.label} className="bg-white shadow-sm hover:shadow-md transition-shadow border">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-3">
