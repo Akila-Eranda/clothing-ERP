@@ -305,22 +305,23 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
   );
 }
 
-// ── New Return / Exchange Modal ─────────────────────────────────────────────
+// ── New Return / Exchange Modal — 4-step wizard ─────────────────────────────
+const STEPS = ["Type", "Invoice", "Items", "Confirm"];
+
 function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => void; onSaved: () => void; initialInvoice?: string }) {
+  const [step, setStep]                   = useState(initialInvoice ? 1 : 0);
   const [mode, setMode]                   = useState<"RETURN" | "EXCHANGE">("RETURN");
   const [invoiceSearch, setInvoiceSearch] = useState(initialInvoice ?? "");
   const [searchLoading, setSearchLoading] = useState(false);
   const [foundSale, setFoundSale]         = useState<SaleLookup | null>(null);
   const [selectedItems, setSelectedItems] = useState<Record<string, { selected: boolean; quantity: number }>>({});
+  const [skuSearch, setSkuSearch]         = useState("");
+  const [skuLoading, setSkuLoading]       = useState(false);
+  const [exchangeItems, setExchangeItems] = useState<ExchangeItem[]>([]);
   const [reason, setReason]               = useState("");
   const [notes, setNotes]                 = useState("");
   const [restock, setRestock]             = useState(true);
   const [submitting, setSubmitting]       = useState(false);
-
-  // Exchange items
-  const [skuSearch, setSkuSearch]           = useState("");
-  const [skuLoading, setSkuLoading]         = useState(false);
-  const [exchangeItems, setExchangeItems]   = useState<ExchangeItem[]>([]);
 
   const searchInvoice = async (override?: string) => {
     const query = override ?? invoiceSearch;
@@ -347,11 +348,11 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
       const init: Record<string, { selected: boolean; quantity: number }> = {};
       sale.items.forEach((item) => { init[item.id] = { selected: true, quantity: item.quantity }; });
       setSelectedItems(init);
+      setStep(2);
     } catch { toast.error("Invoice not found"); }
     finally { setSearchLoading(false); }
   };
 
-  // Auto-search when pre-filled from sales page
   useEffect(() => {
     if (initialInvoice) searchInvoice(initialInvoice);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,21 +382,30 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
     finally { setSkuLoading(false); }
   };
 
-  const returnTotal    = foundSale
+  const returnTotal   = foundSale
     ? foundSale.items.filter((i) => selectedItems[i.id]?.selected).reduce((s, i) => s + i.unitPrice * (selectedItems[i.id]?.quantity ?? 0), 0)
     : 0;
-  const exchangeTotal  = exchangeItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-  const balanceDue     = Math.max(0, exchangeTotal - returnTotal);
-  const refundDue      = mode === "RETURN" ? returnTotal : Math.max(0, returnTotal - exchangeTotal);
+  const exchangeTotal = exchangeItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const balanceDue    = Math.max(0, exchangeTotal - returnTotal);
+  const refundDue     = mode === "RETURN" ? returnTotal : Math.max(0, returnTotal - exchangeTotal);
+
+  const canNext = () => {
+    if (step === 0) return true;
+    if (step === 1) return !!foundSale;
+    if (step === 2) {
+      const hasReturn = foundSale?.items.some((i) => selectedItems[i.id]?.selected && (selectedItems[i.id]?.quantity ?? 0) > 0);
+      if (!hasReturn) return false;
+      if (mode === "EXCHANGE" && exchangeItems.length === 0) return false;
+      return true;
+    }
+    return true;
+  };
 
   const submit = async () => {
-    if (!foundSale) { toast.error("Select a sale first"); return; }
-    if (!reason) { toast.error("Select a reason"); return; }
+    if (!foundSale || !reason) { toast.error("Select a reason"); return; }
     const items = foundSale.items
       .filter((i) => selectedItems[i.id]?.selected && (selectedItems[i.id]?.quantity ?? 0) > 0)
       .map((i) => ({ variantId: i.variantId, quantity: selectedItems[i.id].quantity, unitPrice: i.unitPrice }));
-    if (!items.length) { toast.error("Select at least one item"); return; }
-    if (mode === "EXCHANGE" && !exchangeItems.length) { toast.error("Add at least one exchange item"); return; }
     setSubmitting(true);
     try {
       await api.post("/returns", {
@@ -403,144 +413,204 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
         restockItems: restock, items, returnType: mode,
         ...(mode === "EXCHANGE" ? { exchangeItems } : {}),
       });
-      toast.success(mode === "EXCHANGE" ? "Exchange created" : "Return created");
+      toast.success(mode === "EXCHANGE" ? "Exchange created successfully" : "Return created successfully");
       onSaved(); onClose();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
     finally { setSubmitting(false); }
   };
 
+  const isExchange = mode === "EXCHANGE";
+  const accent = isExchange ? "violet" : "primary";
+
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg max-h-[92vh] flex flex-col overflow-hidden">
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-          <div className="flex items-center gap-2">
-            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${mode === "EXCHANGE" ? "bg-violet-500/10" : "bg-primary/10"}`}>
-              {mode === "EXCHANGE" ? <ArrowLeftRight className="h-4 w-4 text-violet-600" /> : <RotateCcw className="h-4 w-4 text-primary" />}
+          <div className="flex items-center gap-2.5">
+            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${isExchange ? "bg-violet-500/10" : "bg-primary/10"}`}>
+              {isExchange ? <ArrowLeftRight className={`h-4 w-4 text-violet-600`} /> : <RotateCcw className="h-4 w-4 text-primary" />}
             </div>
-            <h2 className="font-bold">New Return / Exchange</h2>
+            <div>
+              <h2 className="font-bold text-sm leading-tight">
+                {step === 0 ? "New Request" : isExchange ? "Exchange" : "Return / Refund"}
+              </h2>
+              <p className="text-[10px] text-muted-foreground">Step {step + 1} of {STEPS.length} — {STEPS[step]}</p>
+            </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {/* Mode toggle */}
-          <div className="flex rounded-xl overflow-hidden border p-1 gap-1 bg-muted/30">
-            {(["RETURN", "EXCHANGE"] as const).map((m) => (
-              <button key={m} onClick={() => setMode(m)}
-                className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-lg transition-all ${
-                  mode === m ? (m === "EXCHANGE" ? "bg-violet-600 text-white" : "bg-primary text-white") : "text-muted-foreground hover:text-foreground"
-                }`}>
-                {m === "EXCHANGE" ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
-                {m === "EXCHANGE" ? "Exchange" : "Return / Refund"}
-              </button>
-            ))}
-          </div>
-
-          {/* Invoice search */}
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Invoice Number *</Label>
-            <div className="flex gap-2">
-              <Input placeholder="INV-20240101-0001" value={invoiceSearch}
-                onChange={(e) => setInvoiceSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") searchInvoice(); }} autoFocus />
-              <Button variant="outline" onClick={searchInvoice} disabled={searchLoading} className="shrink-0 gap-1.5">
-                {searchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
-                Find
-              </Button>
+        {/* Step dots */}
+        <div className="flex items-center gap-0 px-6 pt-3 pb-1 shrink-0">
+          {STEPS.map((label, i) => (
+            <div key={i} className="flex items-center flex-1">
+              <div className={`flex items-center justify-center h-6 w-6 rounded-full text-[10px] font-bold border-2 transition-all ${
+                i < step ? (isExchange ? "bg-violet-600 border-violet-600 text-white" : "bg-primary border-primary text-white")
+                : i === step ? (isExchange ? "border-violet-600 text-violet-600" : "border-primary text-primary")
+                : "border-muted-foreground/30 text-muted-foreground/40"
+              }`}>{i < step ? "✓" : i + 1}</div>
+              <p className={`text-[9px] ml-1 font-medium ${i === step ? (isExchange ? "text-violet-600" : "text-primary") : "text-muted-foreground/50"}`}>{label}</p>
+              {i < STEPS.length - 1 && <div className={`flex-1 h-px mx-2 ${i < step ? (isExchange ? "bg-violet-400" : "bg-primary/60") : "bg-muted-foreground/20"}`} />}
             </div>
-          </div>
+          ))}
+        </div>
 
-          {foundSale && (
-            <>
-              <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/20 text-xs">
-                <p className="font-semibold text-emerald-600">{foundSale.invoiceNumber}</p>
-                <p className="text-muted-foreground">
-                  {foundSale.customer ? `${foundSale.customer.firstName} ${foundSale.customer.lastName ?? ""}`.trim() : "Walk-in"}
-                  {" · LKR "}{formatNumber(foundSale.total)}
-                </p>
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+
+          {/* ── STEP 0: Choose type ── */}
+          {step === 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground mb-4">Select the type of request you want to create.</p>
+              <button onClick={() => { setMode("RETURN"); setStep(1); }}
+                className={`w-full flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all hover:border-primary ${mode === "RETURN" ? "border-primary bg-primary/5" : "border-border"}`}>
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <RotateCcw className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm">Return &amp; Refund</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Customer returns items and receives a cash/credit refund. Stock is added back to inventory on approval.</p>
+                </div>
+              </button>
+              <button onClick={() => { setMode("EXCHANGE"); setStep(1); }}
+                className={`w-full flex items-start gap-4 p-4 rounded-2xl border-2 text-left transition-all hover:border-violet-500 ${mode === "EXCHANGE" ? "border-violet-500 bg-violet-500/5" : "border-border"}`}>
+                <div className="h-10 w-10 rounded-xl bg-violet-500/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <ArrowLeftRight className="h-5 w-5 text-violet-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-violet-700">Exchange</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Customer returns items and receives different items in return. Any price difference is collected or refunded.</p>
+                </div>
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 1: Find invoice ── */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className={`flex items-center gap-2 p-3 rounded-xl text-xs font-medium ${isExchange ? "bg-violet-500/10 text-violet-700" : "bg-primary/10 text-primary"}`}>
+                {isExchange ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                {isExchange ? "Exchange — Enter the original invoice number" : "Return — Enter the original invoice number"}
               </div>
-
-              {/* Return items */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Items to Return *</Label>
+                <Label className="text-xs font-semibold">Invoice Number *</Label>
+                <div className="flex gap-2">
+                  <Input placeholder="e.g. INV-20240101-0001" value={invoiceSearch}
+                    onChange={(e) => setInvoiceSearch(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") searchInvoice(); }} autoFocus />
+                  <Button variant="outline" onClick={() => searchInvoice()} disabled={searchLoading} className="shrink-0 gap-1.5">
+                    {searchLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                    Search
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">You can also navigate here directly from the Sales page using the "Process Return" action.</p>
+              </div>
+              {foundSale && (
+                <div className="p-3 rounded-xl border bg-emerald-500/5 border-emerald-500/30 text-xs space-y-1">
+                  <div className="flex items-center gap-1.5"><CheckCircle className="h-3.5 w-3.5 text-emerald-600" /><span className="font-bold text-emerald-700">{foundSale.invoiceNumber}</span></div>
+                  <p className="text-muted-foreground">{foundSale.customer ? `${foundSale.customer.firstName} ${foundSale.customer.lastName ?? ""}`.trim() : "Walk-in"} · LKR {formatNumber(foundSale.total)}</p>
+                  <p className="text-muted-foreground">{foundSale.items.length} item(s)</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── STEP 2: Items ── */}
+          {step === 2 && foundSale && (
+            <div className="space-y-4">
+              {/* Returned items */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <div className="h-5 w-5 rounded-md bg-red-500/10 flex items-center justify-center"><RotateCcw className="h-3 w-3 text-red-600" /></div>
+                  <p className="text-xs font-bold">Items Customer is Returning</p>
+                </div>
                 <div className="rounded-xl border overflow-hidden divide-y">
                   {foundSale.items.map((item) => {
                     const sel = selectedItems[item.id] ?? { selected: false, quantity: 1 };
                     return (
-                      <div key={item.id} className={`flex items-center gap-3 px-3 py-2.5 ${sel.selected ? "" : "opacity-40"}`}>
+                      <div key={item.id} className={`flex items-center gap-3 px-3 py-2.5 transition-opacity ${sel.selected ? "" : "opacity-40"}`}>
                         <input type="checkbox" checked={sel.selected}
                           onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, selected: e.target.checked } }))}
-                          className="h-3.5 w-3.5 accent-primary" />
+                          className="h-3.5 w-3.5 accent-primary shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium truncate">{item.productName}</p>
-                          <p className="text-[10px] text-muted-foreground">{item.variantName} · {item.sku}</p>
+                          <p className="text-[10px] text-muted-foreground font-mono">{item.variantName} · {item.sku}</p>
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <span className="text-[10px] text-muted-foreground">Qty:</span>
+                        <div className="flex items-center gap-1 shrink-0">
                           <Input type="number" min={1} max={item.quantity} value={sel.quantity}
                             onChange={(e) => setSelectedItems((p) => ({ ...p, [item.id]: { ...sel, quantity: Math.min(item.quantity, parseInt(e.target.value) || 1) } }))}
-                            className="w-14 h-6 text-xs text-center p-1" disabled={!sel.selected} />
+                            className="w-14 h-7 text-xs text-center px-1" disabled={!sel.selected} />
                           <span className="text-[10px] text-muted-foreground">/{item.quantity}</span>
                         </div>
-                        <span className="text-xs font-semibold shrink-0">LKR {formatNumber(item.unitPrice * (sel.selected ? sel.quantity : 0))}</span>
+                        <span className="text-xs font-semibold shrink-0 w-20 text-right">LKR {formatNumber(item.unitPrice * (sel.selected ? sel.quantity : 0))}</span>
                       </div>
                     );
                   })}
                 </div>
+                <div className="flex justify-end text-xs">
+                  <span className="text-muted-foreground mr-2">Return Value:</span>
+                  <span className="font-bold">LKR {formatNumber(returnTotal)}</span>
+                </div>
               </div>
 
               {/* Exchange items */}
-              {mode === "EXCHANGE" && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-violet-600">Exchange Items (Give to Customer) *</Label>
+              {isExchange && (
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-5 w-5 rounded-md bg-violet-500/10 flex items-center justify-center"><ArrowLeftRight className="h-3 w-3 text-violet-600" /></div>
+                    <p className="text-xs font-bold text-violet-700">Items to Give Customer (Exchange)</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Scan or type the SKU of each new item the customer will receive.</p>
                   <div className="flex gap-2">
-                    <Input placeholder="Scan / enter SKU…" value={skuSearch}
+                    <Input placeholder="Scan barcode / type SKU…" value={skuSearch}
                       onChange={(e) => setSkuSearch(e.target.value)}
                       onKeyDown={(e) => { if (e.key === "Enter") lookupSku(); }} />
-                    <Button variant="outline" onClick={lookupSku} disabled={skuLoading} className="shrink-0 gap-1.5">
-                      {skuLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                    <Button variant="outline" onClick={lookupSku} disabled={skuLoading}
+                      className="shrink-0 gap-1.5 border-violet-300 text-violet-700 hover:bg-violet-50">
+                      {skuLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Package className="h-3.5 w-3.5" />}
                       Add
                     </Button>
                   </div>
+                  {exchangeItems.length === 0 && (
+                    <div className="rounded-xl border border-dashed border-violet-300 bg-violet-500/5 p-4 text-center text-xs text-violet-500">
+                      No exchange items added yet.<br/>Scan a barcode or type a SKU above.
+                    </div>
+                  )}
                   {exchangeItems.length > 0 && (
-                    <div className="rounded-xl border border-violet-500/20 overflow-hidden divide-y">
+                    <div className="rounded-xl border border-violet-200 overflow-hidden divide-y">
                       {exchangeItems.map((item, idx) => (
                         <div key={idx} className="flex items-center gap-3 px-3 py-2.5 bg-violet-500/5">
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs font-medium text-violet-700">{item.productName}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{item.sku}</p>
+                            <p className="text-xs font-semibold text-violet-800">{item.productName}</p>
+                            <p className="text-[10px] text-muted-foreground font-mono">{item.variantName ? `${item.variantName} · ` : ""}{item.sku}</p>
                           </div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <Input type="number" min={1} value={item.quantity}
-                              onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
-                              className="w-14 h-6 text-xs text-center p-1" />
-                          </div>
-                          <span className="text-xs font-semibold text-violet-600 shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
-                          <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500">
+                          <Input type="number" min={1} value={item.quantity}
+                            onChange={(e) => setExchangeItems((p) => p.map((x, i) => i === idx ? { ...x, quantity: parseInt(e.target.value) || 1 } : x))}
+                            className="w-14 h-7 text-xs text-center px-1 shrink-0" />
+                          <span className="text-xs font-bold text-violet-700 w-20 text-right shrink-0">LKR {formatNumber(item.unitPrice * item.quantity)}</span>
+                          <button onClick={() => setExchangeItems((p) => p.filter((_, i) => i !== idx))} className="p-1 hover:text-red-500 shrink-0">
                             <X className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       ))}
                     </div>
                   )}
-                  {/* Exchange summary */}
                   {exchangeItems.length > 0 && (
-                    <div className="flex gap-3 text-xs">
-                      <div className="flex-1 p-2.5 rounded-lg border bg-muted/10 text-center">
-                        <p className="text-muted-foreground">Return Value</p>
-                        <p className="font-bold">LKR {formatNumber(returnTotal)}</p>
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                      <div className="p-2.5 rounded-xl border bg-muted/10 text-center text-xs">
+                        <p className="text-muted-foreground">Returning</p>
+                        <p className="font-bold mt-0.5">LKR {formatNumber(returnTotal)}</p>
                       </div>
-                      <div className="flex items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></div>
-                      <div className="flex-1 p-2.5 rounded-lg border bg-violet-500/10 text-center">
-                        <p className="text-muted-foreground">Exchange Value</p>
-                        <p className="font-bold text-violet-600">LKR {formatNumber(exchangeTotal)}</p>
+                      <div className="p-2.5 rounded-xl border bg-violet-500/10 text-center text-xs">
+                        <p className="text-muted-foreground">Exchange</p>
+                        <p className="font-bold mt-0.5 text-violet-700">LKR {formatNumber(exchangeTotal)}</p>
                       </div>
-                      <div className="flex items-center text-muted-foreground"><ChevronRight className="h-4 w-4" /></div>
-                      <div className={`flex-1 p-2.5 rounded-lg border text-center ${balanceDue > 0 ? "bg-red-500/10" : "bg-emerald-500/10"}`}>
-                        <p className="text-muted-foreground">{balanceDue > 0 ? "Balance Due" : "Refund Due"}</p>
-                        <p className={`font-bold ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                      <div className={`p-2.5 rounded-xl border text-center text-xs ${balanceDue > 0 ? "bg-red-500/10" : "bg-emerald-500/10"}`}>
+                        <p className="text-muted-foreground">{balanceDue > 0 ? "Collect" : "Refund"}</p>
+                        <p className={`font-bold mt-0.5 ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
                           LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}
                         </p>
                       </div>
@@ -548,43 +618,80 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
                   )}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── STEP 3: Confirm ── */}
+          {step === 3 && foundSale && (
+            <div className="space-y-4">
+              {/* Summary card */}
+              <div className={`rounded-xl border p-4 space-y-2 text-xs ${isExchange ? "bg-violet-500/5 border-violet-200" : "bg-primary/5"}`}>
+                <p className="font-bold text-sm">{isExchange ? "Exchange Summary" : "Return Summary"}</p>
+                <div className="flex justify-between"><span className="text-muted-foreground">Invoice</span><span className="font-mono font-semibold">{foundSale.invoiceNumber}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Items returning</span><span>{foundSale.items.filter((i) => selectedItems[i.id]?.selected).length}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Return value</span><span className="font-bold">LKR {formatNumber(returnTotal)}</span></div>
+                {isExchange && <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Exchange items</span><span>{exchangeItems.length}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Exchange value</span><span className="font-bold text-violet-700">LKR {formatNumber(exchangeTotal)}</span></div>
+                  <div className={`flex justify-between font-bold border-t pt-2 ${balanceDue > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                    <span>{balanceDue > 0 ? "Collect from customer" : "Refund to customer"}</span>
+                    <span>LKR {formatNumber(balanceDue > 0 ? balanceDue : refundDue)}</span>
+                  </div>
+                </>}
+                {!isExchange && (
+                  <div className="flex justify-between font-bold border-t pt-2 text-emerald-600">
+                    <span>Refund to customer</span>
+                    <span>LKR {formatNumber(returnTotal)}</span>
+                  </div>
+                )}
+              </div>
 
               {/* Reason */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Reason *</Label>
+                <Label className="text-xs font-semibold">Reason for Return *</Label>
                 <Select value={reason} onValueChange={setReason}>
-                  <SelectTrigger><SelectValue placeholder="Select reason…" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select a reason…" /></SelectTrigger>
                   <SelectContent>{REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
               {/* Notes */}
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Notes</Label>
+                <Label className="text-xs font-semibold">Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
                 <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Additional details…" rows={2}
+                  placeholder="Any extra details…" rows={2}
                   className="w-full text-xs rounded-xl border bg-background px-3 py-2 outline-none focus:ring-1 ring-primary resize-none" />
               </div>
 
-              {/* Restock toggle */}
+              {/* Restock */}
               <div className="flex items-center justify-between p-3 rounded-xl border bg-muted/10">
                 <div>
-                  <p className="text-sm font-medium">Restock Returned Items</p>
-                  <p className="text-xs text-muted-foreground">Add returned items back to inventory</p>
+                  <p className="text-sm font-medium">Restock Returned Items on Approval</p>
+                  <p className="text-xs text-muted-foreground">Items will be added back to inventory when this request is approved.</p>
                 </div>
                 <Switch checked={restock} onCheckedChange={setRestock} />
               </div>
-            </>
+            </div>
           )}
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
-          <Button variant="outline" onClick={onClose} disabled={submitting}>Cancel</Button>
-          <Button onClick={submit} disabled={submitting || !foundSale}
-            className={`gap-1.5 min-w-[140px] ${mode === "EXCHANGE" ? "bg-violet-600 hover:bg-violet-700" : ""}`}>
-            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : mode === "EXCHANGE" ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
-            {mode === "EXCHANGE" ? "Create Exchange" : "Create Return"}
+        {/* Footer nav */}
+        <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10 shrink-0">
+          <Button variant="outline" onClick={() => step === 0 ? onClose() : setStep((s) => s - 1)} disabled={submitting}>
+            {step === 0 ? "Cancel" : "← Back"}
           </Button>
+          {step < 3 ? (
+            <Button onClick={() => setStep((s) => s + 1)} disabled={!canNext()}
+              className={isExchange ? "bg-violet-600 hover:bg-violet-700" : ""}>
+              Next →
+            </Button>
+          ) : (
+            <Button onClick={submit} disabled={submitting || !reason}
+              className={`gap-1.5 min-w-[150px] ${isExchange ? "bg-violet-600 hover:bg-violet-700" : ""}`}>
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isExchange ? <ArrowLeftRight className="h-3.5 w-3.5" /> : <RotateCcw className="h-3.5 w-3.5" />}
+              {submitting ? "Submitting…" : isExchange ? "Create Exchange" : "Create Return"}
+            </Button>
+          )}
         </div>
       </div>
     </div>
