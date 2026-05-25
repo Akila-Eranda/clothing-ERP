@@ -20,7 +20,7 @@ import { api } from "@/lib/api";
 
 // ── Types ────────────────────────────────────────────────────────────────
 interface ProductItem {
-  inventoryId: string; variantId: string;
+  variantId: string;
   productName: string; variantName: string; sku: string;
   unitPrice: number; costPrice: number; stock: number;
   category: string; color?: string; size?: string;
@@ -75,28 +75,10 @@ export default function POSPage() {
   const loadProducts = React.useCallback(async () => {
     setProductsLoading(true);
     try {
-      const res = await api.get<{ data: unknown[] }>("/inventory?limit=500");
-      const raw = (res.data?.data ?? res.data ?? []) as Record<string, unknown>[];
-      const mapped: ProductItem[] = raw.map((inv) => {
-        const v = inv.variant as Record<string, unknown>;
-        const p = v?.product as Record<string, unknown>;
-        const cat = (p?.category as Record<string, unknown>)?.name as string ?? "Other";
-        return {
-          inventoryId: inv.id as string,
-          variantId: v?.id as string ?? "",
-          productName: p?.name as string ?? "",
-          variantName: v?.name as string ?? "",
-          sku: v?.sku as string ?? "",
-          unitPrice: v?.sellingPrice as number ?? 0,
-          costPrice: v?.costPrice as number ?? 0,
-          stock: inv.quantity as number ?? 0,
-          category: cat,
-          color: v?.color as string | undefined,
-          size: v?.size as string | undefined,
-        };
-      });
-      setProducts(mapped);
-      const cats = ["All", ...Array.from(new Set(mapped.map((p) => p.category).filter(Boolean)))];
+      const res = await api.get<ProductItem[] | { data: ProductItem[] }>("/pos/products");
+      const raw = (Array.isArray(res.data) ? res.data : (res.data as { data: ProductItem[] })?.data ?? []) as ProductItem[];
+      setProducts(raw);
+      const cats = ["All", ...Array.from(new Set(raw.map((p) => p.category).filter(Boolean)))];
       setCategories(cats);
     } catch { toast.error("Failed to load products"); }
     finally { setProductsLoading(false); }

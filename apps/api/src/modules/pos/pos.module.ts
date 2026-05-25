@@ -305,6 +305,37 @@ export class PosService {
     };
   }
 
+  async getProducts(tenantId: string, branchId: string) {
+    const variants = await this.prisma.productVariant.findMany({
+      where: {
+        isActive: true,
+        product: { tenantId, status: 'ACTIVE' },
+      },
+      include: {
+        product: { include: { category: true } },
+        inventory: {
+          where: branchId ? { branchId } : {},
+          select: { quantity: true },
+          take: 1,
+        },
+      },
+      orderBy: [{ product: { name: 'asc' } }, { name: 'asc' }],
+    });
+
+    return variants.map((v) => ({
+      variantId:   v.id,
+      productName: v.product.name,
+      variantName: v.name,
+      sku:         v.sku,
+      unitPrice:   v.sellingPrice,
+      costPrice:   v.costPrice,
+      category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
+      color:       v.color ?? undefined,
+      size:        v.size  ?? undefined,
+      stock:       v.inventory[0]?.quantity ?? 0,
+    }));
+  }
+
   private async generateInvoiceNumber(tenantId: string): Promise<string> {
     const prefix = 'INV';
     const date = dayjs().format('YYYYMMDD');
@@ -366,6 +397,12 @@ export class PosController {
   @ApiOperation({ summary: 'Get daily sales summary' })
   getDailySummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
     return this.posService.getDailySummary(user.tenantId, user.branchId ?? '', date);
+  }
+
+  @Get('products')
+  @ApiOperation({ summary: 'Get all active products/variants for POS with current stock' })
+  getProducts(@CurrentUser() user: IAuthUser) {
+    return this.posService.getProducts(user.tenantId, user.branchId ?? '');
   }
 }
 

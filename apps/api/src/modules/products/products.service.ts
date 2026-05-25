@@ -118,6 +118,35 @@ export class ProductsService {
           mrp: v.mrp,
           sortOrder: i,
         })),
+        skipDuplicates: true,
+      });
+    } else {
+      await this.prisma.productVariant.create({
+        data: {
+          productId: product.id,
+          sku: product.sku,
+          name: 'Default',
+          sellingPrice: dto.sellingPrice,
+          costPrice: dto.costPrice,
+          mrp: dto.mrp,
+        },
+      });
+    }
+
+    const createdVariants = await this.prisma.productVariant.findMany({
+      where: { productId: product.id },
+      select: { id: true },
+    });
+    const branch = await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } });
+    if (branch && createdVariants.length) {
+      await this.prisma.inventory.createMany({
+        data: createdVariants.map((v) => ({
+          tenantId,
+          branchId: branch.id,
+          variantId: v.id,
+          quantity: 0,
+        })),
+        skipDuplicates: true,
       });
     }
 
