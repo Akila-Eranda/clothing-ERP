@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle2, XCircle,
-  Clock, Printer, Download, Ban,
+  Clock, Printer, Download, Ban, Tag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -161,6 +161,10 @@ export default function PODetailPage() {
                     <Package className="h-3.5 w-3.5" /> Receive Items
                   </Button>
                 )}
+                <Button variant="outline" size="sm" className="gap-1.5"
+                  onClick={() => router.push(`/purchases/${po.id}/print-tags`)}>
+                  <Tag className="h-3.5 w-3.5" /> Print Tags
+                </Button>
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Printer className="h-3.5 w-3.5" /> Print
                 </Button>

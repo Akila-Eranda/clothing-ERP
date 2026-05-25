@@ -1,0 +1,251 @@
+"use client";
+
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { Printer, ArrowLeft, Minus, Plus, Tag } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import JsBarcode from "jsbarcode";
+
+// ── Types ─────────────────────────────────────────────────────────────────
+interface POItem {
+  id: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  orderedQty: number;
+  receivedQty: number;
+  unitCost: number;
+  variant?: {
+    id: string;
+    barcode?: string | null;
+    sellingPrice: number;
+    color?: string | null;
+    size?: string | null;
+    product?: { name: string };
+  };
+}
+interface PO {
+  id: string;
+  poNumber: string;
+  status: string;
+  items: POItem[];
+  supplier: { name: string };
+}
+
+// ── Barcode SVG component ─────────────────────────────────────────────────
+function BarcodeEl({ value, id }: { value: string; id: string }) {
+  const ref = useRef<SVGSVGElement>(null);
+  useEffect(() => {
+    if (!ref.current) return;
+    try {
+      JsBarcode(ref.current, value, {
+        format: "CODE128",
+        width: 1.8,
+        height: 42,
+        displayValue: true,
+        fontSize: 10,
+        margin: 4,
+      });
+    } catch {
+      // fallback for invalid barcode values
+      JsBarcode(ref.current, id.slice(0, 12), {
+        format: "CODE128", width: 1.8, height: 42, displayValue: true, fontSize: 10, margin: 4,
+      });
+    }
+  }, [value, id]);
+  return <svg ref={ref} className="max-w-full" />;
+}
+
+// ── Label card (one printable sticker) ───────────────────────────────────
+function Label({ item, shopName }: { item: POItem; shopName: string }) {
+  const barcodeVal = item.variant?.barcode || item.sku;
+  const price = item.variant?.sellingPrice ?? item.unitCost;
+  const color = item.variant?.color;
+  const size  = item.variant?.size;
+
+  return (
+    <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-1 text-center"
+      style={{ width: "9cm", minHeight: "5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
+      <p className="text-[9px] font-bold tracking-widest uppercase text-gray-500">{shopName}</p>
+      <p className="text-[12px] font-bold leading-tight">{item.productName}</p>
+      {(color || size) && (
+        <p className="text-[10px] text-gray-600">
+          {[color, size].filter(Boolean).join(" / ")}
+        </p>
+      )}
+      <BarcodeEl value={barcodeVal} id={item.id} />
+      <p className="text-[9px] font-mono text-gray-500">{item.sku}</p>
+      <p className="text-[15px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────
+export default function PrintTagsPage() {
+  const { id } = useParams<{ id: string }>();
+  const router = useRouter();
+
+  const [po,      setPo]      = useState<PO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [qtys,    setQtys]    = useState<Record<string, number>>({});
+
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get<PO>(`/purchases/${id}`);
+      setPo(res.data);
+      const init: Record<string, number> = {};
+      res.data.items.forEach((it) => {
+        init[it.id] = it.receivedQty > 0 ? it.receivedQty : it.orderedQty;
+      });
+      setQtys(init);
+    } catch { toast.error("Failed to load PO"); }
+    finally { setLoading(false); }
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const adjustQty = (itemId: string, delta: number) =>
+    setQtys((p) => ({ ...p, [itemId]: Math.max(0, (p[itemId] ?? 1) + delta) }));
+
+  const totalLabels = Object.values(qtys).reduce((s, v) => s + v, 0);
+
+  const handlePrint = () => window.print();
+
+  if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
+  if (!po)     return <div className="flex items-center justify-center min-h-screen text-muted-foreground">PO not found</div>;
+
+  const shopName = "FashionERP";
+
+  // Expand items by qty for print
+  const expandedLabels: { item: POItem; key: string }[] = [];
+  po.items.forEach((item) => {
+    const q = qtys[item.id] ?? 0;
+    for (let i = 0; i < q; i++) {
+      expandedLabels.push({ item, key: `${item.id}-${i}` });
+    }
+  });
+
+  return (
+    <>
+      {/* ── Print CSS ── */}
+      <style>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+          .print-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            padding: 6px;
+          }
+          .label-card {
+            width: 9cm;
+            min-height: 5cm;
+            border: 1px solid #ccc !important;
+            page-break-inside: avoid;
+          }
+        }
+      `}</style>
+
+      {/* ── Screen controls ── */}
+      <div className="no-print min-h-screen bg-muted/30">
+        <div className="bg-background border-b px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" onClick={() => router.push(`/purchases/${id}`)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold flex items-center gap-2">
+                <Tag className="h-5 w-5 text-primary" /> Print Barcode Tags
+              </h1>
+              <p className="text-sm text-muted-foreground">{po.poNumber} · {po.supplier.name}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground font-medium">
+              Total labels: <strong className="text-foreground">{totalLabels}</strong>
+            </span>
+            <Button onClick={handlePrint} className="gap-2 px-6">
+              <Printer className="h-4 w-4" /> Print Tags
+            </Button>
+          </div>
+        </div>
+
+        <div className="p-6 max-w-[1200px] mx-auto space-y-5">
+
+          {/* Qty controls */}
+          <div className="bg-background border rounded-2xl overflow-hidden shadow-sm">
+            <div className="px-5 py-3 border-b bg-muted/20">
+              <h3 className="font-semibold text-sm">Set Label Quantity Per Variant</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Defaults to received qty. Adjust as needed.</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase tracking-wide text-muted-foreground bg-muted/10">
+                <tr>
+                  <th className="px-5 py-2.5 text-left">Item</th>
+                  <th className="px-5 py-2.5 text-left w-28">SKU</th>
+                  <th className="px-5 py-2.5 text-left w-20">Size</th>
+                  <th className="px-5 py-2.5 text-left w-20">Color</th>
+                  <th className="px-5 py-2.5 text-right w-24">Ordered</th>
+                  <th className="px-5 py-2.5 text-right w-24">Received</th>
+                  <th className="px-5 py-2.5 text-center w-36">Print Qty</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {po.items.map((item) => (
+                  <tr key={item.id} className="hover:bg-muted/10">
+                    <td className="px-5 py-3 font-medium">{item.productName}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                    <td className="px-5 py-3 text-xs">{item.variant?.size ?? "—"}</td>
+                    <td className="px-5 py-3 text-xs">{item.variant?.color ?? "—"}</td>
+                    <td className="px-5 py-3 text-right text-muted-foreground">{item.orderedQty}</td>
+                    <td className="px-5 py-3 text-right text-green-600 font-medium">{item.receivedQty}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => adjustQty(item.id, -1)}
+                          className="h-7 w-7 rounded-lg border flex items-center justify-center hover:bg-muted transition-colors">
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="w-8 text-center font-semibold">{qtys[item.id] ?? 0}</span>
+                        <button onClick={() => adjustQty(item.id, 1)}
+                          className="h-7 w-7 rounded-lg border flex items-center justify-center hover:bg-muted transition-colors">
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Label preview */}
+          <div className="bg-background border rounded-2xl p-5 shadow-sm">
+            <h3 className="font-semibold text-sm mb-4">Label Preview ({totalLabels} labels)</h3>
+            {totalLabels === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                Set qty above to preview labels
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {expandedLabels.map(({ item, key }) => (
+                  <Label key={key} item={item} shopName={shopName} />
+                ))}
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
+
+      {/* ── Print-only labels ── */}
+      <div className="print-grid hidden print:flex">
+        {expandedLabels.map(({ item, key }) => (
+          <Label key={key} item={item} shopName={shopName} />
+        ))}
+      </div>
+    </>
+  );
+}
