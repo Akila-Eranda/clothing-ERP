@@ -11,8 +11,10 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 
 interface Supplier { id: string; name: string; contactPerson?: string | null; phone: string; }
-interface Variant  { id: string; name: string; sku: string; sellingPrice: number; costPrice: number; }
-interface ProductOpt { id: string; name: string; sku: string; variants?: Variant[]; }
+interface VariantOpt {
+  variantId: string; productName: string; variantName: string; sku: string;
+  unitPrice: number; costPrice: number; category: string; color?: string; size?: string; stock: number;
+}
 
 interface LineItem {
   variantId: string; productName: string; variantName: string; sku: string;
@@ -28,7 +30,7 @@ interface Props {
 
 export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Props) {
   const [suppliers, setSuppliers]       = useState<Supplier[]>([]);
-  const [products, setProducts]         = useState<ProductOpt[]>([]);
+  const [variants, setVariants]         = useState<VariantOpt[]>([]);
   const [supplierId, setSupplierId]     = useState("");
   const [expectedDate, setExpectedDate] = useState("");
   const [notes, setNotes]               = useState("");
@@ -39,24 +41,30 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
   useEffect(() => {
     if (!open) return;
     api.get<{ data: Supplier[] }>("/suppliers?limit=200").then((r) => setSuppliers(r.data?.data ?? (r.data as unknown as Supplier[]) ?? [])).catch(() => {});
-    api.get<{ data: ProductOpt[] }>("/products?limit=500").then((r) => setProducts(r.data?.data ?? (r.data as unknown as ProductOpt[]) ?? [])).catch(() => {});
+    api.get<VariantOpt[]>("/pos/products").then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   }, [open]);
 
   useEffect(() => {
     if (!open) { setSupplierId(""); setExpectedDate(""); setNotes(""); setItems([]); setProductSearch(""); }
   }, [open]);
 
-  const filteredProducts = products.filter((p) =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  const filteredVariants = variants.filter((v) => {
+    const q = productSearch.toLowerCase();
+    return v.productName.toLowerCase().includes(q) ||
+      v.variantName.toLowerCase().includes(q) ||
+      v.sku.toLowerCase().includes(q);
+  });
 
-  const addItem = (p: ProductOpt) => {
+  const addItem = (v: VariantOpt) => {
+    if (items.some((i) => i.variantId === v.variantId)) {
+      toast.error("Variant already added"); return;
+    }
     setItems((prev) => [
       ...prev,
       {
-        variantId: p.id, productName: p.name, variantName: p.name, sku: p.sku ?? "",
-        orderedQty: 1, unitCost: 0, taxRate: 18,
+        variantId: v.variantId, productName: v.productName,
+        variantName: v.variantName, sku: v.sku,
+        orderedQty: 1, unitCost: v.costPrice || 0, taxRate: 0,
       },
     ]);
     setProductSearch("");
@@ -147,17 +155,17 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
             </div>
             {productSearch && (
               <div className="border rounded-xl overflow-hidden max-h-44 overflow-y-auto bg-background shadow-lg">
-                {filteredProducts.slice(0, 8).map((p) => (
-                  <button key={p.id} onClick={() => addItem(p)}
+                {filteredVariants.slice(0, 10).map((v) => (
+                  <button key={v.variantId} onClick={() => addItem(v)}
                     className="w-full px-4 py-2.5 text-left hover:bg-muted/50 flex items-center justify-between gap-2 border-b last:border-0">
                     <div>
-                      <p className="text-sm font-medium">{p.name}</p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{p.sku}</p>
+                      <p className="text-sm font-medium">{v.productName} {v.variantName !== "Default" && <span className="text-muted-foreground">— {v.variantName}</span>}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{v.sku} · Stock: {v.stock}</p>
                     </div>
                     <Plus className="h-3.5 w-3.5 text-primary shrink-0" />
                   </button>
                 ))}
-                {filteredProducts.length === 0 && (
+                {filteredVariants.length === 0 && (
                   <p className="text-sm text-muted-foreground text-center py-4">No products found</p>
                 )}
               </div>
