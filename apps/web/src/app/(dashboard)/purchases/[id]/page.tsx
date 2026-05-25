@@ -151,8 +151,8 @@ export default function PODetailPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-base font-bold">Purchase Order</h1>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <h1 className="text-2xl font-bold">Purchase Order</h1>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchases</span>
               <ChevronRight className="h-3 w-3" />
               <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchase Orders</span>

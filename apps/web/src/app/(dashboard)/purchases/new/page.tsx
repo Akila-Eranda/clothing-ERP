@@ -15,7 +15,7 @@ interface Supplier {
 }
 interface VariantOpt {
   variantId: string; productName: string; variantName: string; sku: string;
-  size?: string | null; color?: string | null; costPrice: number; taxRate: number;
+  size?: string | null; color?: string | null; costPrice: number; taxRate?: number;
   stock: number;
 }
 interface LineItem {
@@ -88,8 +88,8 @@ export default function CreatePOPage() {
     setItems((p) => p.map((it, i) => i === idx ? {
       ...it, variantId: v.variantId, productName: v.productName,
       variantName: v.variantName, sku: v.sku, size: v.size ?? undefined,
-      color: v.color ?? undefined, unitCost: v.costPrice, taxRate: v.taxRate,
-    } : it));
+      color: v.color ?? undefined, unitCost: v.costPrice, taxRate: v.taxRate ?? 0,
+    } as LineItem : it));
     setSearchQ((p) => p.map((q, i) => i === idx ? `${v.productName} — ${v.variantName}` : q));
     setSearchOpen(null);
   };
@@ -146,8 +146,8 @@ export default function CreatePOPage() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-base font-bold">Create Purchase Order</h1>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <h1 className="text-2xl font-bold">Create Purchase Order</h1>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
               <span className="cursor-pointer hover:underline" onClick={() => router.push("/purchases")}>Purchases</span>
               <ChevronRight className="h-3 w-3" /><span>Purchase Orders</span>
               <ChevronRight className="h-3 w-3" /><span className="text-foreground">Create Purchase Order</span>
