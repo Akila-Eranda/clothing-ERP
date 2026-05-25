@@ -244,16 +244,37 @@ function JournalModal({ accounts, onClose, onSaved }: { accounts: Account[]; onC
   );
 }
 
+// ── Date presets (module level) ────────────────────────────────────────────
+const _now = new Date();
+const DATE_PRESETS = [
+  { label: "This Month", start: new Date(_now.getFullYear(), _now.getMonth(), 1).toISOString().split("T")[0],    end: _now.toISOString().split("T")[0] },
+  { label: "Last Month", start: new Date(_now.getFullYear(), _now.getMonth()-1, 1).toISOString().split("T")[0],  end: new Date(_now.getFullYear(), _now.getMonth(), 0).toISOString().split("T")[0] },
+  { label: "Last 3M",    start: new Date(_now.getFullYear(), _now.getMonth()-3, 1).toISOString().split("T")[0],  end: _now.toISOString().split("T")[0] },
+  { label: "This Year",  start: `${_now.getFullYear()}-01-01`, end: _now.toISOString().split("T")[0] },
+];
+const DEFAULT_RANGE = DATE_PRESETS[1];
+
+type Preset = typeof DATE_PRESETS[0];
+function PresetBar({ range, onApply }: { range: { start: string; end: string }; onApply: (p: Preset) => void }) {
+  return (
+    <div className="flex gap-1.5 flex-wrap items-center">
+      {DATE_PRESETS.map((p) => (
+        <button key={p.label} onClick={() => onApply(p)}
+          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition-all ${
+            range.start === p.start && range.end === p.end
+              ? "bg-primary text-primary-foreground border-primary"
+              : "bg-background text-muted-foreground hover:bg-muted border-border"
+          }`}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function AccountingPage() {
-  const now = new Date();
-  const DATE_PRESETS = [
-    { label: "This Month",  start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0],   end: now.toISOString().split("T")[0] },
-    { label: "Last Month",  start: new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().split("T")[0], end: new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0] },
-    { label: "Last 3M",     start: new Date(now.getFullYear(), now.getMonth()-3, 1).toISOString().split("T")[0], end: now.toISOString().split("T")[0] },
-    { label: "This Year",   start: `${now.getFullYear()}-01-01`, end: now.toISOString().split("T")[0] },
-  ];
-  const defaultRange = DATE_PRESETS[1];
+  const defaultRange = DEFAULT_RANGE;
 
   const [plRange, setPlRange]         = useState({ start: defaultRange.start, end: defaultRange.end });
   const [cfRange, setCfRange]         = useState({ start: defaultRange.start, end: defaultRange.end });
@@ -338,17 +359,6 @@ export default function AccountingPage() {
     { id: "lines",                header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.lines?.length ?? 0} lines</span> },
     { accessorKey: "isPosted",    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,      cell: ({ row }) => <Badge variant={row.original.isPosted ? "success" : "warning"} className="text-[10px]">{row.original.isPosted ? "Posted" : "Draft"}</Badge> },
   ];
-
-  const PresetBar = ({ range, onApply }: { range: { start: string; end: string }; onApply: (p: typeof DATE_PRESETS[0]) => void }) => (
-    <div className="flex gap-1.5 flex-wrap items-center">
-      {DATE_PRESETS.map((p) => (
-        <button key={p.label} onClick={() => onApply(p)}
-          className={`px-2.5 py-1 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground hover:bg-muted border-border"}`}>
-          {p.label}
-        </button>
-      ))}
-    </div>
-  );
 
   return (
     <div className="min-h-screen bg-muted/30">
