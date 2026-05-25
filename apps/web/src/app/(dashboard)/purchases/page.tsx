@@ -54,7 +54,7 @@ function buildColumns(
     {
       id: "items",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.items.length} items</span>,
+      cell: ({ row }) => <span className="text-sm">{row.original._count?.items ?? row.original.items?.length ?? 0} items</span>,
     },
     {
       accessorKey: "total",

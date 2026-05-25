@@ -31,7 +31,8 @@ export interface PurchaseOrder {
   expectedDate?: string | null;
   notes?: string | null;
   supplier: { id: string; name: string; phone: string };
-  items: POItem[];
+  items?: POItem[];
+  _count?: { items: number };
 }
 
 interface ReceiveRow { itemId: string; receivedQty: number; rejectedQty: number; }
@@ -48,7 +49,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
   useEffect(() => {
     if (po) {
-      setRows(po.items.map((i) => ({
+      setRows((po.items ?? []).map((i) => ({
         itemId: i.id,
         receivedQty: Math.max(0, i.orderedQty - i.receivedQty),
         rejectedQty: 0,
@@ -123,7 +124,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {po.items.map((item, idx) => {
+                {(po.items ?? []).map((item, idx) => {
                   const remaining = item.orderedQty - item.receivedQty;
                   const fullyReceived = remaining <= 0;
                   return (
