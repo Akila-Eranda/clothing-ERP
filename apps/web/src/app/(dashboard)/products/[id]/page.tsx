@@ -121,10 +121,10 @@ export default function ProductDetailPage() {
   const images = product.images;
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="h-full flex flex-col bg-muted/30">
 
       {/* ── Top bar ── */}
-      <div className="bg-background border-b px-6 py-3 flex items-center justify-between">
+      <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push("/products")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
           <ArrowLeft className="h-4 w-4" /> Back to Products
@@ -140,7 +140,8 @@ export default function ProductDetailPage() {
       </div>
 
       {/* ── Body ── */}
-      <div className="p-6 max-w-[1300px] mx-auto grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+      <div className="flex-1 overflow-y-auto">
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══ */}
         <div className="space-y-5">
@@ -415,6 +416,7 @@ export default function ProductDetailPage() {
         </div>
         {/* ══ END SIDEBAR ══ */}
 
+      </div>
       </div>
     </div>
   );
