@@ -5,11 +5,13 @@ import {
   UserCog, Plus, Users, Clock, DollarSign, RefreshCw,
   Phone, Mail, CheckCircle2, XCircle, AlertCircle, Loader2,
   CalendarDays, Banknote, ChevronLeft, ChevronRight, Download,
+  X, FileText, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
@@ -22,8 +24,19 @@ import { api } from "@/lib/api";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
 
 // ── Types ────────────────────────────────────────────────────────────────
-type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE";
+type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE" | "LEAVE" | "HOLIDAY";
 interface EmpWithAttendance extends Employee { todayAttendance: { status: AttendanceStatus } | null }
+interface LeaveRequest {
+  id: string; employeeId: string; startDate: string; endDate: string;
+  leaveType: string; reason?: string | null; status: string;
+  notes?: string | null; createdAt: string;
+  employee: { firstName: string; lastName: string; code: string; department?: string | null; designation?: string | null };
+}
+interface AttnSummaryRow {
+  id: string; firstName: string; lastName: string; code: string;
+  designation?: string | null; department?: string | null;
+  summary: Record<string, number>;
+}
 interface Payroll {
   id: string; employeeId: string; month: number; year: number;
   basicSalary: number; allowances: number; bonus: number; deductions: number; netSalary: number;
@@ -32,12 +45,16 @@ interface Payroll {
 }
 
 // ── Attendance status config ──────────────────────────────────────────────
-const ATTN_STATUS: Record<AttendanceStatus, { label: string; color: string; bg: string; icon: React.ElementType }> = {
+const LEAVE_TYPES = ["CASUAL","SICK","ANNUAL","MATERNITY","PATERNITY","OTHER"];
+
+const ATTN_STATUS: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   PRESENT:  { label: "Present",   color: "text-emerald-600", bg: "bg-emerald-500/10", icon: CheckCircle2 },
   ABSENT:   { label: "Absent",    color: "text-red-600",     bg: "bg-red-500/10",     icon: XCircle },
   HALF_DAY: { label: "Half Day",  color: "text-amber-600",   bg: "bg-amber-500/10",   icon: AlertCircle },
   ON_LEAVE: { label: "Leave",     color: "text-violet-600",  bg: "bg-violet-500/10",  icon: CalendarDays },
+  LEAVE:    { label: "Leave",     color: "text-violet-600",  bg: "bg-violet-500/10",  icon: CalendarDays },
   LATE:     { label: "Late",      color: "text-blue-600",    bg: "bg-blue-500/10",    icon: Clock },
+  HOLIDAY:  { label: "Holiday",   color: "text-sky-600",     bg: "bg-sky-500/10",     icon: CalendarDays },
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -123,6 +140,184 @@ function downloadPayslip(p: Payroll, month: number, year: number) {
   if (!win) { alert("Please allow popups to download payslip."); return; }
   win.document.write(html);
   win.document.close();
+}
+
+// ── GenerateAllModal ────────────────────────────────────────────────────
+function GenerateAllModal({ month, year, onClose, onDone }: { month: number; year: number; onClose: () => void; onDone: () => void }) {
+  const [allowances, setAllowances]     = useState("0");
+  const [bonus, setBonus]               = useState("0");
+  const [deductAbsent, setDeductAbsent] = useState(false);
+  const [perDay, setPerDay]             = useState("0");
+  const [loading, setLoading]           = useState(false);
+
+  const submit = async () => {
+    setLoading(true);
+    try {
+      const res = await api.post("/hr/employees/payroll/bulk", {
+        month, year,
+        allowances: parseFloat(allowances) || 0,
+        bonus:      parseFloat(bonus)      || 0,
+        deductAbsent,
+        absentDeduction: parseFloat(perDay) || 0,
+      });
+      const count = ((res as any).data as any[])?.length ?? 0;
+      toast.success(`Payroll generated for ${count} employees`);
+      onDone(); onClose();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b">
+          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center"><DollarSign className="h-4 w-4 text-emerald-600" /></div>
+          <div><h2 className="font-bold text-base">Generate All Payrolls</h2><p className="text-xs text-muted-foreground">{MONTHS[month-1]} {year} · All active employees</p></div>
+          <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label className="text-xs font-semibold">Allowances (LKR)</Label><Input type="number" min={0} value={allowances} onChange={(e) => setAllowances(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label className="text-xs font-semibold">Bonus (LKR)</Label><Input type="number" min={0} value={bonus} onChange={(e) => setBonus(e.target.value)} /></div>
+          </div>
+          <div className="p-3 rounded-xl border space-y-3">
+            <div className="flex items-center justify-between">
+              <div><p className="text-sm font-medium">Deduct Absent Days</p><p className="text-xs text-muted-foreground">Auto-deduct based on attendance records</p></div>
+              <Switch checked={deductAbsent} onCheckedChange={setDeductAbsent} />
+            </div>
+            {deductAbsent && <div className="space-y-1.5"><Label className="text-xs font-semibold">Deduction per Absent Day (LKR)</Label><Input type="number" min={0} value={perDay} onChange={(e) => setPerDay(e.target.value)} /></div>}
+          </div>
+          <p className="text-xs text-amber-600 bg-amber-500/10 rounded-lg px-3 py-2">Existing payroll entries for this month will be overwritten.</p>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button onClick={submit} disabled={loading} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 min-w-[140px]">
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DollarSign className="h-3.5 w-3.5" />} Generate All
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── NewLeaveModal ────────────────────────────────────────────────────────
+function NewLeaveModal({ employees, onClose, onSaved }: { employees: Employee[]; onClose: () => void; onSaved: () => void }) {
+  const [empId, setEmpId]         = useState("");
+  const [startDate, setStart]     = useState(new Date().toISOString().split("T")[0]);
+  const [endDate, setEnd]         = useState(new Date().toISOString().split("T")[0]);
+  const [leaveType, setType]      = useState("CASUAL");
+  const [reason, setReason]       = useState("");
+  const [loading, setLoading]     = useState(false);
+
+  const days = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1);
+
+  const submit = async () => {
+    if (!empId) { toast.error("Select an employee"); return; }
+    setLoading(true);
+    try {
+      await api.post("/hr/employees/leaves", { employeeId: empId, startDate, endDate, leaveType, reason: reason || undefined });
+      toast.success("Leave request created");
+      onSaved(); onClose();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b">
+          <div className="h-9 w-9 rounded-xl bg-violet-500/10 flex items-center justify-center"><CalendarDays className="h-4 w-4 text-violet-600" /></div>
+          <div><h2 className="font-bold text-base">New Leave Request</h2><p className="text-xs text-muted-foreground">Submit a leave for an employee</p></div>
+          <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Employee *</Label>
+            <Select value={empId} onValueChange={setEmpId}>
+              <SelectTrigger><SelectValue placeholder="Select employee…" /></SelectTrigger>
+              <SelectContent>{employees.filter((e) => e.isActive).map((e) => <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.code})</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Leave Type</Label>
+            <Select value={leaveType} onValueChange={setType}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{LEAVE_TYPES.map((t) => <SelectItem key={t} value={t}>{t.charAt(0)+t.slice(1).toLowerCase()} Leave</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label className="text-xs font-semibold">Start Date *</Label><Input type="date" value={startDate} onChange={(e) => setStart(e.target.value)} /></div>
+            <div className="space-y-1.5"><Label className="text-xs font-semibold">End Date *</Label><Input type="date" value={endDate} min={startDate} onChange={(e) => setEnd(e.target.value)} /></div>
+          </div>
+          <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 font-medium">Duration: {days} day{days > 1 ? "s" : ""}</p>
+          <div className="space-y-1.5"><Label className="text-xs font-semibold">Reason</Label><Input placeholder="Brief reason for leave…" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
+        </div>
+        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button onClick={submit} disabled={loading || !empId} className="gap-1.5 min-w-[130px]">
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5" />} Submit Leave
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Monthly summary columns ──────────────────────────────────────────────
+function buildAttnSummaryColumns(): ColumnDef<AttnSummaryRow>[] {
+  return [
+    { id: "employee", header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+      cell: ({ row }) => <div><p className="font-medium text-sm">{row.original.firstName} {row.original.lastName}</p><p className="text-[10px] text-muted-foreground">{row.original.designation ?? row.original.department ?? "—"}</p></div> },
+    { id: "present",  header: ({ column }) => <DataTableColumnHeader column={column} title="Present" />,  cell: ({ row }) => <span className="text-sm font-bold text-emerald-600">{row.original.summary.PRESENT ?? 0}</span> },
+    { id: "absent",   header: ({ column }) => <DataTableColumnHeader column={column} title="Absent" />,   cell: ({ row }) => <span className="text-sm font-bold text-red-500">{row.original.summary.ABSENT ?? 0}</span> },
+    { id: "halfday",  header: ({ column }) => <DataTableColumnHeader column={column} title="Half Day" />, cell: ({ row }) => <span className="text-sm text-amber-600">{row.original.summary.HALF_DAY ?? 0}</span> },
+    { id: "leave",    header: ({ column }) => <DataTableColumnHeader column={column} title="On Leave" />, cell: ({ row }) => <span className="text-sm text-violet-600">{(row.original.summary.ON_LEAVE ?? 0) + (row.original.summary.LEAVE ?? 0)}</span> },
+    { id: "late",     header: ({ column }) => <DataTableColumnHeader column={column} title="Late" />,     cell: ({ row }) => <span className="text-sm text-blue-500">{row.original.summary.LATE ?? 0}</span> },
+    { id: "pct", header: ({ column }) => <DataTableColumnHeader column={column} title="Att. %" />,
+      cell: ({ row }) => {
+        const s = row.original.summary;
+        const total = (s.PRESENT??0)+(s.ABSENT??0)+(s.HALF_DAY??0)+(s.ON_LEAVE??0)+(s.LATE??0)+(s.LEAVE??0);
+        const pct = total > 0 ? Math.round(((s.PRESENT??0)+(s.LATE??0))/total*100) : 0;
+        return <span className={`text-sm font-bold ${pct>=90?"text-emerald-600":pct>=75?"text-amber-600":"text-red-500"}`}>{pct}%</span>;
+      },
+    },
+  ];
+}
+
+// ── Leave request columns ────────────────────────────────────────────────
+function buildLeaveColumns(onUpdate: (id: string, status: string) => void): ColumnDef<LeaveRequest>[] {
+  return [
+    { id: "employee", header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+      cell: ({ row }) => <div><p className="font-medium text-sm">{row.original.employee.firstName} {row.original.employee.lastName}</p><p className="text-[10px] text-muted-foreground font-mono">{row.original.employee.code}</p></div> },
+    { accessorKey: "leaveType", header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+      cell: ({ row }) => <Badge variant="secondary" className="text-[10px] uppercase">{row.original.leaveType}</Badge> },
+    { id: "dates", header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
+      cell: ({ row }) => {
+        const s = new Date(row.original.startDate), e = new Date(row.original.endDate);
+        const d = Math.round((e.getTime()-s.getTime())/86400000)+1;
+        return <div><p className="text-xs">{s.toLocaleDateString("en-LK",{day:"2-digit",month:"short"})} – {e.toLocaleDateString("en-LK",{day:"2-digit",month:"short",year:"numeric"})}</p><p className="text-[10px] text-muted-foreground">{d} day{d>1?"s":""}</p></div>;
+      },
+    },
+    { accessorKey: "reason", header: ({ column }) => <DataTableColumnHeader column={column} title="Reason" />,
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.reason ?? "—"}</span> },
+    { id: "status", accessorKey: "status", header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const s = row.original.status;
+        const v = s==="APPROVED"?"success":s==="REJECTED"?"danger":"warning";
+        return <Badge variant={v as "success"|"danger"|"warning"} className="text-[10px]">{s}</Badge>;
+      },
+    },
+    { id: "actions", cell: ({ row }) => {
+        if (row.original.status !== "PENDING") return null;
+        return (
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50 gap-1" onClick={() => onUpdate(row.original.id,"APPROVED")}><CheckCircle2 className="h-3 w-3" /> Approve</Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs text-red-500 border-red-200 hover:bg-red-50 gap-1" onClick={() => onUpdate(row.original.id,"REJECTED")}><XCircle className="h-3 w-3" /> Reject</Button>
+          </div>
+        );
+      },
+    },
+  ];
 }
 
 // ── Attendance columns ───────────────────────────────────────────────────
@@ -350,15 +545,29 @@ export default function HRPage() {
   const [attnLoading, setAttnLoading]   = useState(false);
   const [attnSaving, setAttnSaving]     = useState(false);
 
+  // Attendance – monthly summary
+  const [attnView, setAttnView]           = useState<"daily"|"monthly">("daily");
+  const [summaryMonth, setSummaryMonth]   = useState(now.toISOString().slice(0,7));
+  const [summaryRows, setSummaryRows]     = useState<AttnSummaryRow[]>([]);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
   // Payroll
-  const [payMonth, setPayMonth]   = useState(now.getMonth() + 1);
-  const [payYear, setPayYear]     = useState(now.getFullYear());
-  const [payrolls, setPayrolls]   = useState<Payroll[]>([]);
-  const [payLoading, setPayLoading] = useState(false);
-  const [genEmpId, setGenEmpId]   = useState("");
-  const [genBonus, setGenBonus]   = useState("0");
-  const [genDeduct, setGenDeduct] = useState("0");
-  const [genLoading, setGenLoading] = useState(false);
+  const [payMonth, setPayMonth]       = useState(now.getMonth() + 1);
+  const [payYear, setPayYear]         = useState(now.getFullYear());
+  const [payrolls, setPayrolls]       = useState<Payroll[]>([]);
+  const [payLoading, setPayLoading]   = useState(false);
+  const [genEmpId, setGenEmpId]       = useState("");
+  const [genAllowances, setGenAllowances] = useState("0");
+  const [genBonus, setGenBonus]       = useState("0");
+  const [genDeduct, setGenDeduct]     = useState("0");
+  const [genLoading, setGenLoading]   = useState(false);
+  const [genAllOpen, setGenAllOpen]   = useState(false);
+
+  // Leaves
+  const [leaves, setLeaves]           = useState<LeaveRequest[]>([]);
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [leaveStatus, setLeaveStatus] = useState("ALL");
+  const [newLeaveOpen, setNewLeaveOpen] = useState(false);
 
   // ── Fetch employees ───────────────────────────────────────────────────
   const fetchEmployees = useCallback(async () => {
@@ -392,6 +601,27 @@ export default function HRPage() {
     finally { setAttnLoading(false); }
   }, [attnDate]);
 
+  // ── Fetch monthly attendance summary ─────────────────────────────────
+  const fetchMonthlySummary = useCallback(async () => {
+    setSummaryLoading(true);
+    try {
+      const res = await api.get<AttnSummaryRow[]>(`/hr/employees/attendance/monthly-summary?month=${summaryMonth}`);
+      setSummaryRows((res.data as unknown as AttnSummaryRow[]) ?? []);
+    } catch { toast.error("Failed to load summary"); }
+    finally { setSummaryLoading(false); }
+  }, [summaryMonth]);
+
+  // ── Fetch leaves ──────────────────────────────────────────────────────
+  const fetchLeaves = useCallback(async () => {
+    setLeaveLoading(true);
+    try {
+      const q = leaveStatus !== "ALL" ? `?status=${leaveStatus}` : "";
+      const res = await api.get<LeaveRequest[]>(`/hr/employees/leaves${q}`);
+      setLeaves((res.data as unknown as LeaveRequest[]) ?? []);
+    } catch { toast.error("Failed to load leaves"); }
+    finally { setLeaveLoading(false); }
+  }, [leaveStatus]);
+
   // ── Fetch payroll ──────────────────────────────────────────────────────
   const fetchPayrolls = useCallback(async () => {
     setPayLoading(true);
@@ -419,13 +649,23 @@ export default function HRPage() {
     try {
       await api.post("/hr/employees/payroll", {
         employeeId: genEmpId, month: payMonth, year: payYear,
-        bonus: parseFloat(genBonus) || 0, deductions: parseFloat(genDeduct) || 0,
+        allowances: parseFloat(genAllowances) || 0,
+        bonus: parseFloat(genBonus) || 0,
+        deductions: parseFloat(genDeduct) || 0,
       });
       toast.success("Payroll generated");
-      setGenEmpId(""); setGenBonus("0"); setGenDeduct("0");
+      setGenEmpId(""); setGenAllowances("0"); setGenBonus("0"); setGenDeduct("0");
       fetchPayrolls();
     } catch { toast.error("Failed"); }
     finally { setGenLoading(false); }
+  };
+
+  const updateLeaveStatus = async (id: string, status: string) => {
+    try {
+      await api.put(`/hr/employees/leaves/${id}/status`, { status });
+      toast.success(status === "APPROVED" ? "Leave approved" : "Leave rejected");
+      fetchLeaves();
+    } catch { toast.error("Failed to update leave"); }
   };
 
   const markPaid = async (id: string) => {
@@ -434,22 +674,21 @@ export default function HRPage() {
   };
 
   // Stats
-  const activeCount  = employees.filter((e) => e.isActive).length;
-  const totalPayroll = employees.reduce((s, e) => s + e.basicSalary, 0);
+  const activeCount    = employees.filter((e) => e.isActive).length;
+  const totalPayroll   = employees.reduce((s, e) => s + e.basicSalary, 0);
+  const pendingLeaves  = leaves.filter((l) => l.status === "PENDING").length;
   const STATS = [
-    { label: "Total Employees", value: employees.length, icon: Users,    color: "text-blue-500",   bg: "bg-blue-500/10" },
-    { label: "Active",          value: activeCount,      icon: UserCog,  color: "text-emerald-500",bg: "bg-emerald-500/10" },
+    { label: "Total Employees", value: employees.length, icon: Users,     color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Active",          value: activeCount,      icon: UserCog,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, icon: DollarSign, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { label: "Departments",     value: [...new Set(employees.map((e) => e.department).filter(Boolean))].length, icon: Banknote, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Pending Leaves",  value: pendingLeaves,    icon: FileText,  color: "text-amber-500",   bg: "bg-amber-500/10" },
   ];
 
-  const empColumns = buildEmpColumns(
-    (e) => { setEditEmployee(e); setAddOpen(true); },
-    handleDeactivate,
-  );
-
-  const attnColumns = buildAttnColumns(attnMap, setAttnMap);
-  const payrollColumns = buildPayrollColumns(payMonth, payYear, markPaid);
+  const empColumns         = buildEmpColumns((e) => { setEditEmployee(e); setAddOpen(true); }, handleDeactivate);
+  const attnColumns        = buildAttnColumns(attnMap, setAttnMap);
+  const attnSummaryColumns = buildAttnSummaryColumns();
+  const payrollColumns     = buildPayrollColumns(payMonth, payYear, markPaid);
+  const leaveColumns       = buildLeaveColumns(updateLeaveStatus);
 
   const unpaidEmployees = employees.filter((e) => e.isActive && !payrolls.find((p) => p.employeeId === e.id));
 
@@ -489,6 +728,12 @@ export default function HRPage() {
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="attendance" onClick={fetchAttendance}>Attendance</TabsTrigger>
           <TabsTrigger value="payroll" onClick={fetchPayrolls}>Payroll</TabsTrigger>
+          <TabsTrigger value="leaves" onClick={fetchLeaves} className="gap-1.5">
+            Leaves
+            {pendingLeaves > 0 && (
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">{pendingLeaves}</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {/* ── Employees ── */}
@@ -508,64 +753,72 @@ export default function HRPage() {
 
         {/* ── Attendance ── */}
         <TabsContent value="attendance" className="mt-4 space-y-4">
-          <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <button onClick={() => { const d = new Date(attnDate); d.setDate(d.getDate()-1); setAttnDate(d.toISOString().split("T")[0]); }}
-                className="p-1.5 rounded-lg border hover:bg-muted"><ChevronLeft className="h-4 w-4" /></button>
-              <Input type="date" value={attnDate} onChange={(e) => setAttnDate(e.target.value)} className="w-40 text-sm" />
-              <button onClick={() => { const d = new Date(attnDate); d.setDate(d.getDate()+1); setAttnDate(d.toISOString().split("T")[0]); }}
-                className="p-1.5 rounded-lg border hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
-            </div>
-            <Button size="sm" variant="outline" onClick={fetchAttendance} className="gap-1.5" disabled={attnLoading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${attnLoading ? "animate-spin" : ""}`} /> Load
-            </Button>
-            <div className="flex gap-1.5 ml-auto flex-wrap">
-              {Object.entries(ATTN_STATUS).map(([k, v]) => {
-                const Icon = v.icon;
-                return (
-                  <span key={k} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${v.bg} ${v.color}`}>
-                    <Icon className="h-2.5 w-2.5" />{v.label}
-                  </span>
-                );
-              })}
-            </div>
+          {/* View toggle */}
+          <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-muted/30">
+            <button onClick={() => setAttnView("daily")}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${attnView==="daily"?"bg-background shadow text-foreground":"text-muted-foreground hover:text-foreground"}`}>Daily</button>
+            <button onClick={() => setAttnView("monthly")}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${attnView==="monthly"?"bg-background shadow text-foreground":"text-muted-foreground hover:text-foreground"}`}>Monthly Summary</button>
           </div>
 
-          {attnLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : attnRows.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-xl">
-              <Users className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>Click Load to fetch employees for this date</p>
-            </div>
+          {attnView === "daily" ? (
+            <>
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <button onClick={() => { const d = new Date(attnDate); d.setDate(d.getDate()-1); setAttnDate(d.toISOString().split("T")[0]); }}
+                    className="p-1.5 rounded-lg border hover:bg-muted"><ChevronLeft className="h-4 w-4" /></button>
+                  <Input type="date" value={attnDate} onChange={(e) => setAttnDate(e.target.value)} className="w-40 text-sm" />
+                  <button onClick={() => { const d = new Date(attnDate); d.setDate(d.getDate()+1); setAttnDate(d.toISOString().split("T")[0]); }}
+                    className="p-1.5 rounded-lg border hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchAttendance} className="gap-1.5" disabled={attnLoading}>
+                  <RefreshCw className={`h-3.5 w-3.5 ${attnLoading ? "animate-spin" : ""}`} /> Load
+                </Button>
+                <div className="flex gap-1.5 ml-auto flex-wrap">
+                  {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as const).map((k) => {
+                    const v = ATTN_STATUS[k]; const Icon = v.icon;
+                    return <span key={k} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${v.bg} ${v.color}`}><Icon className="h-2.5 w-2.5" />{v.label}</span>;
+                  })}
+                </div>
+              </div>
+              {attnLoading ? (
+                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : attnRows.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border rounded-xl"><Users className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load to fetch employees for this date</p></div>
+              ) : (
+                <>
+                  <ClientSideTable data={attnRows} columns={attnColumns} pageCount={Math.ceil(attnRows.length/10)} searchableColumns={[{id:"designation",title:"Employee / Role"}]} filterableColumns={[]} isShowExportButtons={{isShow:false,fileName:""}} />
+                  <div className="flex justify-between items-center">
+                    <div className="flex gap-3 text-xs flex-wrap">
+                      {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as const).map((k) => {
+                        const v = ATTN_STATUS[k]; const Icon = v.icon;
+                        const count = Object.values(attnMap).filter((s) => s === k).length;
+                        return count > 0 ? <span key={k} className={`inline-flex items-center gap-1 font-semibold ${v.color}`}><Icon className="h-3 w-3" />{count} {v.label}</span> : null;
+                      })}
+                      <span className="text-muted-foreground">{attnRows.length - Object.keys(attnMap).length} unmarked</span>
+                    </div>
+                    <Button onClick={saveAttendance} disabled={attnSaving} className="gap-1.5">
+                      {attnSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Save Attendance
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
           ) : (
             <>
-              <ClientSideTable
-                data={attnRows}
-                columns={attnColumns}
-                pageCount={Math.ceil(attnRows.length / 10)}
-                searchableColumns={[{ id: "designation", title: "Employee / Role" }]}
-                filterableColumns={[]}
-                isShowExportButtons={{ isShow: false, fileName: "" }}
-              />
-              <div className="flex justify-between items-center">
-                <div className="flex gap-3 text-xs">
-                  {Object.entries(ATTN_STATUS).map(([k, v]) => {
-                    const Icon = v.icon;
-                    const count = Object.values(attnMap).filter((s) => s === k).length;
-                    return count > 0 ? (
-                      <span key={k} className={`inline-flex items-center gap-1 font-semibold ${v.color}`}>
-                        <Icon className="h-3 w-3" />{count} {v.label}
-                      </span>
-                    ) : null;
-                  })}
-                  <span className="text-muted-foreground">{attnRows.length - Object.keys(attnMap).length} unmarked</span>
-                </div>
-                <Button onClick={saveAttendance} disabled={attnSaving} className="gap-1.5">
-                  {attnSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
-                  Save Attendance
+              <div className="flex items-center gap-3 flex-wrap">
+                <Input type="month" value={summaryMonth} onChange={(e) => setSummaryMonth(e.target.value)} className="w-44 text-sm" />
+                <Button size="sm" variant="outline" onClick={fetchMonthlySummary} className="gap-1.5" disabled={summaryLoading}>
+                  <BarChart3 className={`h-3.5 w-3.5 ${summaryLoading ? "animate-spin" : ""}`} /> Load Summary
                 </Button>
               </div>
+              {summaryLoading ? (
+                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : summaryRows.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border rounded-xl"><BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load Summary to view monthly attendance</p></div>
+              ) : (
+                <ClientSideTable data={summaryRows} columns={attnSummaryColumns} pageCount={Math.ceil(summaryRows.length/10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{isShow:true,fileName:`attendance-${summaryMonth}`}} />
+              )}
             </>
           )}
         </TabsContent>
@@ -595,6 +848,9 @@ export default function HRPage() {
             <Button size="sm" variant="outline" onClick={fetchPayrolls} className="gap-1.5" disabled={payLoading}>
               <RefreshCw className={`h-3.5 w-3.5 ${payLoading ? "animate-spin" : ""}`} /> Load
             </Button>
+            <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 ml-auto" onClick={() => setGenAllOpen(true)}>
+              <DollarSign className="h-3.5 w-3.5" /> Generate All
+            </Button>
           </div>
 
           {/* Generate for individual */}
@@ -604,13 +860,17 @@ export default function HRPage() {
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">Employee</Label>
                 <Select value={genEmpId} onValueChange={setGenEmpId}>
-                  <SelectTrigger className="w-48 h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
+                  <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
-                    {unpaidEmployees.map((e) => (
+                    {employees.filter((e) => e.isActive).map((e) => (
                       <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground">Allowances (LKR)</Label>
+                <Input className="w-24 h-8 text-xs" type="number" min={0} value={genAllowances} onChange={(e) => setGenAllowances(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground">Bonus (LKR)</Label>
@@ -632,7 +892,7 @@ export default function HRPage() {
           ) : payrolls.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border rounded-xl">
               <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>No payroll generated for {MONTHS[payMonth-1]} {payYear}</p>
+              <p>No payroll for {MONTHS[payMonth-1]} {payYear} — click Load or Generate All</p>
             </div>
           ) : (
             <>
@@ -642,7 +902,7 @@ export default function HRPage() {
                 pageCount={Math.ceil(payrolls.length / 10)}
                 searchableColumns={[{ id: "employee", title: "Employee" }]}
                 filterableColumns={[{
-                  id: "status",
+                  id: "isPaid",
                   title: "Status",
                   options: [{ value: "true", label: "Paid" }, { value: "false", label: "Pending" }],
                 }]}
@@ -659,15 +919,68 @@ export default function HRPage() {
             </>
           )}
         </TabsContent>
+
+        {/* ── Leaves ── */}
+        <TabsContent value="leaves" className="mt-4 space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30 text-xs">
+              {["ALL","PENDING","APPROVED","REJECTED"].map((s) => (
+                <button key={s} onClick={() => { setLeaveStatus(s); }}
+                  className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
+                    leaveStatus === s ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}>{s}</button>
+              ))}
+            </div>
+            <Button size="sm" variant="outline" onClick={fetchLeaves} className="gap-1.5" disabled={leaveLoading}>
+              <RefreshCw className={`h-3.5 w-3.5 ${leaveLoading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button size="sm" className="gap-1.5 ml-auto" onClick={() => setNewLeaveOpen(true)}>
+              <Plus className="h-3.5 w-3.5" /> New Leave Request
+            </Button>
+          </div>
+
+          {leaveLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : leaves.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground border rounded-xl">
+              <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p>No leave requests found</p>
+            </div>
+          ) : (
+            <>
+              <ClientSideTable
+                data={leaves} columns={leaveColumns}
+                pageCount={Math.ceil(leaves.length / 10)}
+                searchableColumns={[]}
+                filterableColumns={[{
+                  id: "status", title: "Status",
+                  options: [{ value: "PENDING", label: "Pending" }, { value: "APPROVED", label: "Approved" }, { value: "REJECTED", label: "Rejected" }],
+                }, {
+                  id: "leaveType", title: "Type",
+                  options: LEAVE_TYPES.map((t) => ({ value: t, label: t.charAt(0)+t.slice(1).toLowerCase() })),
+                }]}
+                isShowExportButtons={{ isShow: true, fileName: "leave-requests" }}
+              />
+              <div className="rounded-xl border bg-muted/10 p-4 flex flex-wrap gap-6 text-sm">
+                <div><p className="text-xs text-muted-foreground">Total Requests</p><p className="font-bold">{leaves.length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{leaves.filter((l)=>l.status==="PENDING").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{leaves.filter((l)=>l.status==="APPROVED").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Rejected</p><p className="font-bold text-red-500">{leaves.filter((l)=>l.status==="REJECTED").length}</p></div>
+              </div>
+            </>
+          )}
+        </TabsContent>
       </Tabs>
 
-      {/* Modal */}
+      {/* Modals */}
       <AddEmployeeModal
         open={addOpen}
         onClose={() => { setAddOpen(false); setEditEmployee(undefined); }}
         onSaved={() => { fetchEmployees(); setAddOpen(false); setEditEmployee(undefined); }}
         editEmployee={editEmployee}
       />
+      {genAllOpen && <GenerateAllModal month={payMonth} year={payYear} onClose={() => setGenAllOpen(false)} onDone={fetchPayrolls} />}
+      {newLeaveOpen && <NewLeaveModal employees={employees} onClose={() => setNewLeaveOpen(false)} onSaved={fetchLeaves} />}
     </div>
   );
 }

@@ -163,6 +163,8 @@ enum AttendanceStatus {
   HALF_DAY
   LEAVE
   HOLIDAY
+  ON_LEAVE
+  LATE
 }
 
 enum EmploymentType {
@@ -1202,6 +1204,7 @@ model Employee {
   attendances     Attendance[]
   payrolls        Payroll[]
   shifts          EmployeeShift[]
+  leaveRequests   LeaveRequest[]
 
   @@index([tenantId])
   @@map("employees")
@@ -1248,6 +1251,26 @@ model Payroll {
   @@unique([employeeId, month, year])
   @@index([employeeId])
   @@map("payrolls")
+}
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  employeeId  String
+  tenantId    String
+  startDate   DateTime
+  endDate     DateTime
+  leaveType   String   @default("CASUAL")
+  reason      String?
+  status      String   @default("PENDING")
+  approvedBy  String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("leave_requests")
 }
 
 model Shift {

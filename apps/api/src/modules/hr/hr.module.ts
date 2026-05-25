@@ -43,6 +43,15 @@ export class CreatePayrollDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) deductions?: number;
 }
 
+export class CreateLeaveRequestDto {
+  @ApiProperty() @IsString() employeeId: string;
+  @ApiProperty() @IsDateString() startDate: string;
+  @ApiProperty() @IsDateString() endDate: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() leaveType?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
 @Injectable()
 export class HrService {
   constructor(private readonly prisma: PrismaService) {}
@@ -198,6 +207,83 @@ export class HrService {
       create: { tenantId, employeeId: dto.employeeId, month: dto.month, year: dto.year, basicSalary: employee.basicSalary, allowances: dto.allowances ?? 0, bonus: dto.bonus ?? 0, deductions: dto.deductions ?? 0, netSalary },
     });
   }
+
+  async generatePayrollBulk(tenantId: string, month: number, year: number, opts: { allowances?: number; bonus?: number; deductAbsent?: boolean; absentDeduction?: number }) {
+    const employees = await this.prisma.employee.findMany({ where: { tenantId, isActive: true } });
+    const results: any[] = [];
+    for (const emp of employees) {
+      let deductions = 0;
+      if (opts.deductAbsent) {
+        const start = dayjs(`${year}-${String(month).padStart(2,'0')}-01`).startOf('month').toDate();
+        const end   = dayjs(`${year}-${String(month).padStart(2,'0')}-01`).endOf('month').toDate();
+        const absentDays = await this.prisma.attendance.count({
+          where: { tenantId, employeeId: emp.id, date: { gte: start, lte: end }, status: 'ABSENT' as any },
+        });
+        deductions = absentDays * (opts.absentDeduction ?? 0);
+      }
+      const gross = emp.basicSalary + (opts.allowances ?? 0) + (opts.bonus ?? 0);
+      const netSalary = Math.max(0, gross - deductions);
+      const p = await this.prisma.payroll.upsert({
+        where: { employeeId_month_year: { employeeId: emp.id, month, year } },
+        update: { basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, netSalary },
+        create: { tenantId, employeeId: emp.id, month, year, basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, netSalary },
+      });
+      results.push(p);
+    }
+    return results;
+  }
+
+  async getAttendanceSummary(tenantId: string, month: string) {
+    const start = dayjs(month).startOf('month').toDate();
+    const end   = dayjs(month).endOf('month').toDate();
+    const employees = await this.prisma.employee.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true, firstName: true, lastName: true, code: true, designation: true, department: true, basicSalary: true },
+      orderBy: { firstName: 'asc' },
+    });
+    const attendances = await this.prisma.attendance.findMany({
+      where: { tenantId, date: { gte: start, lte: end } },
+    });
+    const map = new Map<string, Record<string, number>>();
+    attendances.forEach((a) => {
+      if (!map.has(a.employeeId)) map.set(a.employeeId, { PRESENT: 0, ABSENT: 0, HALF_DAY: 0, ON_LEAVE: 0, LATE: 0, LEAVE: 0, HOLIDAY: 0 });
+      const entry = map.get(a.employeeId)!;
+      const s = a.status as string;
+      entry[s] = (entry[s] ?? 0) + 1;
+    });
+    return employees.map((e) => ({ ...e, summary: map.get(e.id) ?? { PRESENT: 0, ABSENT: 0, HALF_DAY: 0, ON_LEAVE: 0, LATE: 0, LEAVE: 0, HOLIDAY: 0 } }));
+  }
+
+  async createLeaveRequest(tenantId: string, dto: CreateLeaveRequestDto) {
+    await this.findOne(dto.employeeId, tenantId);
+    return this.prisma.leaveRequest.create({
+      data: { tenantId, employeeId: dto.employeeId, startDate: new Date(dto.startDate), endDate: new Date(dto.endDate), leaveType: dto.leaveType ?? 'CASUAL', reason: dto.reason, notes: dto.notes },
+      include: { employee: { select: { firstName: true, lastName: true, code: true, department: true } } },
+    });
+  }
+
+  async getLeaveRequests(tenantId: string, query: { status?: string; month?: number; year?: number }) {
+    const where: any = { tenantId };
+    if (query.status) where.status = query.status;
+    if (query.month && query.year) {
+      where.startDate = { gte: new Date(query.year, query.month - 1, 1), lt: new Date(query.year, query.month, 1) };
+    }
+    return this.prisma.leaveRequest.findMany({
+      where,
+      include: { employee: { select: { firstName: true, lastName: true, code: true, department: true, designation: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateLeaveStatus(id: string, tenantId: string, status: string, userId: string) {
+    const leave = await this.prisma.leaveRequest.findFirst({ where: { id, tenantId } });
+    if (!leave) throw new NotFoundException('Leave request not found');
+    return this.prisma.leaveRequest.update({
+      where: { id },
+      data: { status, ...(status === 'APPROVED' && { approvedBy: userId }) },
+      include: { employee: { select: { firstName: true, lastName: true, code: true } } },
+    });
+  }
 }
 
 @ApiTags('HR')
@@ -225,6 +311,41 @@ export class HrController {
   @ApiOperation({ summary: 'Get all employees with attendance for a date' })
   getAttendanceBulk(@CurrentUser() user: IAuthUser, @Query('date') date: string) {
     return this.hrService.getAttendanceBulk(user.tenantId, date ?? dayjs().format('YYYY-MM-DD'));
+  }
+
+  @Get('attendance/monthly-summary')
+  @RequirePermissions('hr:read')
+  @ApiOperation({ summary: 'Monthly attendance summary per employee' })
+  getAttendanceSummary(@CurrentUser() user: IAuthUser, @Query('month') month: string) {
+    return this.hrService.getAttendanceSummary(user.tenantId, month ?? dayjs().format('YYYY-MM'));
+  }
+
+  @Post('payroll/bulk')
+  @RequirePermissions('hr:create')
+  @ApiOperation({ summary: 'Generate payroll for all active employees' })
+  generatePayrollBulk(@CurrentUser() user: IAuthUser, @Body() body: { month: number; year: number; allowances?: number; bonus?: number; deductAbsent?: boolean; absentDeduction?: number }) {
+    return this.hrService.generatePayrollBulk(user.tenantId, body.month, body.year, body);
+  }
+
+  @Post('leaves')
+  @RequirePermissions('hr:create')
+  @ApiOperation({ summary: 'Create a leave request' })
+  createLeave(@CurrentUser() user: IAuthUser, @Body() dto: CreateLeaveRequestDto) {
+    return this.hrService.createLeaveRequest(user.tenantId, dto);
+  }
+
+  @Get('leaves')
+  @RequirePermissions('hr:read')
+  @ApiOperation({ summary: 'Get leave requests' })
+  getLeaves(@CurrentUser() user: IAuthUser, @Query('status') status: string, @Query('month') month: string, @Query('year') year: string) {
+    return this.hrService.getLeaveRequests(user.tenantId, { status, month: month ? parseInt(month) : undefined, year: year ? parseInt(year) : undefined });
+  }
+
+  @Put('leaves/:id/status')
+  @RequirePermissions('hr:update')
+  @ApiOperation({ summary: 'Approve or reject a leave request' })
+  updateLeaveStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body('status') status: string) {
+    return this.hrService.updateLeaveStatus(id, user.tenantId, status, user.id);
   }
 
   @Post('attendance/bulk')
