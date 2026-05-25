@@ -109,7 +109,7 @@ function buildColumns(
     {
       accessorKey: "sellingPrice",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Price" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">₹{row.original.sellingPrice.toFixed(2)}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">LKR {row.original.sellingPrice.toFixed(2)}</span>,
     },
     {
       id: "variants",
