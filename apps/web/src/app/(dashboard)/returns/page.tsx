@@ -172,13 +172,25 @@ function NewReturnModal({ onClose, onSaved }: { onClose: () => void; onSaved: ()
     if (!invoiceSearch.trim()) return;
     setSearchLoading(true);
     try {
-      const res = await api.get<{ data: SaleLookup[] }>(`/pos/sales?search=${encodeURIComponent(invoiceSearch)}&limit=1`);
-      const list = (res.data?.data ?? res.data ?? []) as SaleLookup[];
+      const listRes = await api.get<{ data: any[] }>(`/pos/sales?search=${encodeURIComponent(invoiceSearch)}&limit=1`);
+      const list = (listRes.data?.data ?? listRes.data ?? []) as any[];
       if (list.length === 0) { toast.error("Invoice not found"); return; }
-      const sale = list[0];
+      const detailRes = await api.get<any>(`/pos/sales/${list[0].id}`);
+      const s = detailRes.data as any;
+      const sale: SaleLookup = {
+        id: s.id, invoiceNumber: s.invoiceNumber, total: s.total,
+        customer: s.customer ? { firstName: s.customer.firstName, lastName: s.customer.lastName } : null,
+        items: (s.items ?? []).map((item: any) => ({
+          id: item.id, variantId: item.variantId,
+          productName: item.productName ?? item.variant?.product?.name ?? "Unknown",
+          variantName: item.variantName ?? "",
+          sku: item.sku ?? item.variant?.sku ?? "",
+          quantity: item.quantity, unitPrice: item.unitPrice,
+        })),
+      };
       setFoundSale(sale);
       const init: Record<string, { selected: boolean; quantity: number }> = {};
-      sale.items?.forEach((item) => { init[item.id] = { selected: true, quantity: item.quantity }; });
+      sale.items.forEach((item) => { init[item.id] = { selected: true, quantity: item.quantity }; });
       setSelectedItems(init);
     } catch { toast.error("Search failed"); }
     finally { setSearchLoading(false); }
