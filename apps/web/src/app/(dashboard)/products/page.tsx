@@ -200,7 +200,7 @@ export default function ProductsPage() {
   ];
 
   const columns = buildColumns(
-    (p) => setViewProduct(p),
+    (p) => router.push(`/products/${p.id}`),
     (p) => { setEditProduct(p); setAddOpen(true); },
     handleDelete,
   );

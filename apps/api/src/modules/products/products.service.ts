@@ -192,7 +192,12 @@ export class ProductsService {
       include: {
         category: true,
         brand: true,
-        variants: true,
+        variants: {
+          include: {
+            inventory: { include: { branch: true } },
+          },
+          orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+        },
         collections: { include: { collection: true } },
       },
     });
