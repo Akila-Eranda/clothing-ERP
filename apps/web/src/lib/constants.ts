@@ -2,9 +2,9 @@ export const APP_NAME = "FashionERP";
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Enterprise AI-Powered Fashion Retail Management";
 
-export const CURRENCY = "INR";
-export const CURRENCY_SYMBOL = "₹";
-export const LOCALE = "en-IN";
+export const CURRENCY = "LKR";
+export const CURRENCY_SYMBOL = "LKR";
+export const LOCALE = "en-LK";
 
 export const DEFAULT_PAGE_SIZE = 20;
 export const MAX_PAGE_SIZE = 100;
@@ -60,8 +60,8 @@ export const MEMBERSHIP_TIERS = {
   platinum: { label: "Platinum", minPoints: 15000, discount: 12, color: "#E5E4E2" },
 };
 
-export const LOYALTY_RATE = 1; // 1 point per ₹1 spent
-export const LOYALTY_REDEMPTION_RATE = 0.5; // ₹0.5 per point
+export const LOYALTY_RATE = 1; // 1 point per LKR 1 spent
+export const LOYALTY_REDEMPTION_RATE = 0.5; // LKR 0.5 per point
 
 export const ORDER_STATUSES = [
   { label: "Pending", value: "pending", color: "amber" },
@@ -152,7 +152,7 @@ export const DUMMY_REVENUE_DATA = Array.from({ length: 30 }, (_, i) => {
   date.setDate(date.getDate() - (29 - i));
   const base = 150000 + Math.random() * 100000;
   return {
-    date: date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }),
+    date: date.toLocaleDateString("en-LK", { day: "2-digit", month: "short" }),
     revenue: Math.round(base),
     profit: Math.round(base * 0.28),
     orders: Math.round(20 + Math.random() * 60),

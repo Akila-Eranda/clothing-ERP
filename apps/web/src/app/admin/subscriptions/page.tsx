@@ -122,7 +122,7 @@ export default function SubscriptionsPage() {
                   <td className="px-4 py-3 text-xs text-gray-600">{t.currency}</td>
                   <td className="px-4 py-3 text-xs text-gray-600">{t.country}</td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {new Date(t.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+                    {new Date(t.createdAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })}
                   </td>
                   <td className="px-4 py-3">
                     <button onClick={() => setEditTenant(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">

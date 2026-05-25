@@ -152,7 +152,7 @@ export function AddSupplierModal({ open, onClose, onSaved, editSupplier }: Props
             <F label="Credit Days">
               <Input type="number" min={0} value={form.creditDays} onChange={(e) => set("creditDays", e.target.value)} />
             </F>
-            <F label="Credit Limit (₹)">
+            <F label="Credit Limit (LKR )">
               <Input type="number" min={0} value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
             </F>
           </div>

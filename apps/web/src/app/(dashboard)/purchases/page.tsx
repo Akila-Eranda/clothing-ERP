@@ -67,7 +67,7 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Order Date" />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.orderDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          {new Date(row.original.orderDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
         </span>
       ),
     },
@@ -76,7 +76,7 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Expected" />,
       cell: ({ row }) => row.original.expectedDate ? (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.expectedDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+          {new Date(row.original.expectedDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
         </span>
       ) : <span className="text-xs text-muted-foreground">—</span>,
     },
@@ -196,7 +196,7 @@ export default function PurchasesPage() {
       <div className="rounded-xl border bg-card p-4 flex items-center justify-between">
         <div>
           <p className="text-xs text-muted-foreground">Total Purchase Value</p>
-          <p className="text-2xl font-black mt-0.5">LKR {totalValue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+          <p className="text-2xl font-black mt-0.5">LKR {totalValue.toLocaleString("en-LK", { maximumFractionDigits: 0 })}</p>
         </div>
         <div className="text-right">
           <p className="text-xs text-muted-foreground">PO Workflow</p>

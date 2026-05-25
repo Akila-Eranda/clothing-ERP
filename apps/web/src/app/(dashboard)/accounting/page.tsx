@@ -55,9 +55,9 @@ export default function AccountingPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Monthly Revenue", value: `₹${(totalRevenue / 1000).toFixed(0)}K`, icon: TrendingUp, delta: "+12.4%", positive: true },
-          { label: "Total Expenses", value: `₹${(totalExpenses / 1000).toFixed(0)}K`, icon: TrendingDown, delta: "+4.2%", positive: false },
-          { label: "Net Profit", value: `₹${(netProfit / 1000).toFixed(0)}K`, icon: DollarSign, delta: "+18.1%", positive: true },
+          { label: "Monthly Revenue", value: `LKR ${(totalRevenue / 1000).toFixed(0)}K`, icon: TrendingUp, delta: "+12.4%", positive: true },
+          { label: "Total Expenses", value: `LKR ${(totalExpenses / 1000).toFixed(0)}K`, icon: TrendingDown, delta: "+4.2%", positive: false },
+          { label: "Net Profit", value: `LKR ${(netProfit / 1000).toFixed(0)}K`, icon: DollarSign, delta: "+18.1%", positive: true },
           { label: "Profit Margin", value: `${profitMargin}%`, icon: BookOpen, delta: "+2.3%", positive: true },
         ].map((card, i) => (
           <motion.div
@@ -94,8 +94,8 @@ export default function AccountingPage() {
               <BarChart data={MONTHLY_PL} barGap={4}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis tickFormatter={(v) => `₹${v / 1000}K`} tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, ""]} />
+                <YAxis tickFormatter={(v) => `LKR ${v / 1000}K`} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v: number) => [`LKR ${v.toLocaleString()}`, ""]} />
                 <Bar dataKey="revenue" name="Revenue" fill="#6366f1" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="expenses" name="Expenses" fill="#f43f5e" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="profit" name="Profit" fill="#10b981" radius={[4, 4, 0, 0]} />
@@ -108,7 +108,7 @@ export default function AccountingPage() {
           <div className="rounded-xl border bg-card overflow-hidden">
             <div className="p-4 border-b flex items-center justify-between">
               <h3 className="font-semibold">December 2024 Expenses</h3>
-              <p className="text-sm font-bold text-red-500">Total: ₹{EXPENSES.reduce((s, e) => s + e.amount, 0).toLocaleString()}</p>
+              <p className="text-sm font-bold text-red-500">Total: LKR {EXPENSES.reduce((s, e) => s + e.amount, 0).toLocaleString()}</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -126,7 +126,7 @@ export default function AccountingPage() {
                       <td className="px-4 py-3"><span className="px-2 py-0.5 rounded-full bg-muted text-xs font-medium">{exp.category}</span></td>
                       <td className="px-4 py-3 text-muted-foreground text-xs">{exp.date}</td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{exp.method}</td>
-                      <td className="px-4 py-3 text-right font-bold text-red-500">₹{exp.amount.toLocaleString()}</td>
+                      <td className="px-4 py-3 text-right font-bold text-red-500">LKR {exp.amount.toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -158,7 +158,7 @@ export default function AccountingPage() {
                   }`}>{acc.type}</span>
                 </div>
                 <p className={`text-xl font-bold mt-3 ${acc.balance >= 0 ? "text-foreground" : "text-red-500"}`}>
-                  {acc.balance < 0 ? "-" : ""}₹{Math.abs(acc.balance).toLocaleString()}
+                  {acc.balance < 0 ? "-" : ""}LKR {Math.abs(acc.balance).toLocaleString()}
                 </p>
               </motion.div>
             ))}

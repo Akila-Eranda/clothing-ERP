@@ -15,7 +15,7 @@ import { DUMMY_REVENUE_DATA, DUMMY_CATEGORY_DATA, CHART_COLORS } from "@/lib/con
 const KPI_DATA = [
   { label: "Revenue Growth", value: "+18.3%", sub: "vs last month", icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10", positive: true },
   { label: "Customer Acquisition", value: "+124", sub: "new this month", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", positive: true },
-  { label: "Avg Basket Size", value: "₹4,523", sub: "+6.2% vs last", icon: ShoppingCart, color: "text-violet-500", bg: "bg-violet-500/10", positive: true },
+  { label: "Avg Basket Size", value: "LKR 4,523", sub: "+6.2% vs last", icon: ShoppingCart, color: "text-violet-500", bg: "bg-violet-500/10", positive: true },
   { label: "Return Rate", value: "2.4%", sub: "-0.3% vs last", icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10", positive: true },
 ];
 
@@ -81,8 +81,8 @@ export default function AnalyticsPage() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                     <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={6} />
-                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`₹${formatNumber(v)}`, ""]} />
+                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `LKR ${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} />
                     <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#revA)" name="Revenue" />
                     <Area type="monotone" dataKey="profit" stroke={CHART_COLORS.success} strokeWidth={2} fill="transparent" name="Profit" />
                   </AreaChart>
@@ -121,7 +121,7 @@ export default function AnalyticsPage() {
                         <Cell key={i} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`₹${formatNumber(v)}`, "Revenue"]} />
+                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`LKR ${formatNumber(v)}`, "Revenue"]} />
                     <Legend formatter={(value) => <span className="text-xs">{value}</span>} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -138,7 +138,7 @@ export default function AnalyticsPage() {
                         <span className="text-sm font-medium">{cat.category}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">₹{formatNumber(cat.revenue)}</span>
+                        <span className="text-sm text-muted-foreground">LKR {formatNumber(cat.revenue)}</span>
                         <span className="text-sm font-bold w-10 text-right">{cat.percentage}%</span>
                       </div>
                     </div>

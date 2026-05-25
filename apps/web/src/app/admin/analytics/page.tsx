@@ -24,12 +24,12 @@ function buildMonthlyData(tenants: TenantRow[]) {
   const now = new Date()
   for (let i = 11; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
+    const key = d.toLocaleDateString('en-LK', { month: 'short', year: '2-digit' })
     map.set(key, 0)
   }
   tenants.forEach(t => {
     const d = new Date(t.createdAt)
-    const key = d.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' })
+    const key = d.toLocaleDateString('en-LK', { month: 'short', year: '2-digit' })
     if (map.has(key)) map.set(key, (map.get(key) ?? 0) + 1)
   })
   let cumulative = 0

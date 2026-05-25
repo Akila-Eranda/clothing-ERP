@@ -92,7 +92,7 @@ function buildColumns(
         const bal = row.original.balance ?? 0;
         return (
           <span className={`text-sm font-semibold ${bal > 0 ? "text-amber-500" : "text-emerald-500"}`}>
-            {bal > 0 ? `₹${formatNumber(bal)}` : "Clear"}
+            {bal > 0 ? `LKR ${formatNumber(bal)}` : "Clear"}
           </span>
         );
       },

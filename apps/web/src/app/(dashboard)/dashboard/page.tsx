@@ -27,13 +27,13 @@ import {
 const STATS = [
   {
     title: "Today's Revenue",
-    value: "₹1,28,450",
+    value: "LKR 1,28,450",
     change: "+18.2%",
     trend: "up",
     icon: DollarSign,
     color: "text-emerald-500",
     bg: "bg-emerald-500/10",
-    desc: "vs ₹1,08,650 yesterday",
+    desc: "vs LKR 1,08,650 yesterday",
   },
   {
     title: "Total Orders",
@@ -71,7 +71,7 @@ const AI_INSIGHTS = [
   { insight: "Sales 34% higher on Saturdays — consider extended hours", type: "opportunity", confidence: 94 },
   { insight: "Slim Fit Jeans trending +45% — restock recommended", type: "alert", confidence: 89 },
   { insight: "Customer retention drops after 45-day inactivity — automate re-engagement", type: "action", confidence: 82 },
-  { insight: "Bundling T-shirts + Jeans can increase AOV by ₹380 avg", type: "opportunity", confidence: 77 },
+  { insight: "Bundling T-shirts + Jeans can increase AOV by LKR 380 avg", type: "opportunity", confidence: 77 },
 ];
 
 const insightColors: Record<string, string> = {
@@ -209,10 +209,10 @@ export default function DashboardPage() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval={period === "7d" ? 0 : 4} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v / 1000).toFixed(0)}k`} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `LKR ${(v / 1000).toFixed(0)}k`} />
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                  formatter={(v: number) => [`₹${formatNumber(v)}`, ""]}
+                  formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]}
                 />
                 <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#revenue)" name="Revenue" />
                 <Area type="monotone" dataKey="profit" stroke={CHART_COLORS.success} strokeWidth={2} fill="url(#profit)" name="Profit" />
@@ -237,7 +237,7 @@ export default function DashboardPage() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                  formatter={(v: number) => [`₹${formatNumber(v)}`, ""]}
+                  formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -328,7 +328,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <span className="text-sm font-semibold shrink-0">
-                  ₹{formatNumber(product.revenue)}
+                  LKR {formatNumber(product.revenue)}
                 </span>
               </div>
             ))}
@@ -364,7 +364,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold">₹{formatNumber(sale.amount)}</p>
+                  <p className="text-sm font-semibold">LKR {formatNumber(sale.amount)}</p>
                   <Badge
                     variant={sale.status === "completed" ? "success" : "danger"}
                     className="text-[10px] h-4 px-1.5"

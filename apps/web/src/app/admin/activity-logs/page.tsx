@@ -103,7 +103,7 @@ export default function ActivityLogsPage() {
     if (diff < 60)    return `${Math.round(diff)}s ago`
     if (diff < 3600)  return `${Math.round(diff / 60)}m ago`
     if (diff < 86400) return `${Math.round(diff / 3600)}h ago`
-    return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
+    return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
   }
 
   return (

@@ -16,7 +16,7 @@ function Skeleton({ h = 'h-8', w = 'w-full' }: { h?: string; w?: string }) {
 }
 
 function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
+  return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
 const STATUS_BADGE: Record<string, string> = {

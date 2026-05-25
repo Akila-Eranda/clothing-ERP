@@ -87,7 +87,7 @@ function buildColumns(
     {
       accessorKey: "totalSpent",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Total Spent" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">₹{formatNumber(row.original.totalSpent)}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">LKR {formatNumber(row.original.totalSpent)}</span>,
     },
     {
       accessorKey: "totalOrders",
@@ -106,7 +106,7 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Wallet" />,
       cell: ({ row }) => (
         <span className={`text-sm font-semibold ${row.original.walletBalance > 0 ? "text-emerald-500" : "text-muted-foreground"}`}>
-          ₹{formatNumber(row.original.walletBalance)}
+          LKR {formatNumber(row.original.walletBalance)}
         </span>
       ),
     },
@@ -160,7 +160,7 @@ export default function CustomersPage() {
     { label: "Total Customers", value: customers.length,                    icon: Users,   color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Gold+ Members",   value: premium,                             icon: Crown,   color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Loyalty Points",  value: formatNumber(totalPoints),           icon: Gift,    color: "text-violet-500",  bg: "bg-violet-500/10" },
-    { label: "Wallet Balance",  value: `₹${formatNumber(totalWallet)}`,    icon: Wallet,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Wallet Balance",  value: `LKR ${formatNumber(totalWallet)}`,    icon: Wallet,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
   const columns = buildColumns(

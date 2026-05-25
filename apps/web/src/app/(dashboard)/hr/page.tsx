@@ -307,7 +307,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
       header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.joiningDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          {new Date(row.original.joiningDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
         </span>
       ),
     },

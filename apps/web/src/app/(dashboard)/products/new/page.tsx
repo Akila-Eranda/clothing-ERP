@@ -516,8 +516,8 @@ export default function AddProductPage() {
             {[
               ["Name",     form.name     || <span className="text-muted-foreground italic">Not set</span>],
               ["Category", categories.find((c) => c.id === form.categoryId)?.name || <span className="text-muted-foreground italic">None</span>],
-              ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-IN")}` : <span className="text-muted-foreground italic">â€”</span>],
-              ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-IN")}`    : <span className="text-muted-foreground italic">â€”</span>],
+              ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">â€”</span>],
+              ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}`    : <span className="text-muted-foreground italic">â€”</span>],
               ["Variants", form.hasVariants  ? `${allVariants.length} variants` : "No variants"],
               ["Status",   form.status],
             ].map(([label, val]) => (

@@ -60,9 +60,9 @@ export function ViewProductModal({ product, onClose, onEdit }: Props) {
           {/* Pricing */}
           <div className="grid grid-cols-4 gap-3">
             {[
-              { label: "Selling Price", value: `₹${product.sellingPrice.toFixed(2)}`, highlight: true },
-              { label: "Cost Price",    value: `₹${product.costPrice.toFixed(2)}` },
-              { label: "MRP",           value: `₹${product.mrp.toFixed(2)}` },
+              { label: "Selling Price", value: `LKR ${product.sellingPrice.toFixed(2)}`, highlight: true },
+              { label: "Cost Price",    value: `LKR ${product.costPrice.toFixed(2)}` },
+              { label: "MRP",           value: `LKR ${product.mrp.toFixed(2)}` },
               { label: "Margin",        value: `${margin}%`, color: "text-emerald-500" },
             ].map((p) => (
               <div key={p.label} className={`rounded-xl border p-3 ${p.highlight ? "bg-primary/5 border-primary/20" : "bg-card"}`}>
@@ -131,11 +131,11 @@ export function ViewProductModal({ product, onClose, onEdit }: Props) {
           <div className="flex items-center gap-6 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5" />
-              Created {new Date(product.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+              Created {new Date(product.createdAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
             </span>
             <span className="flex items-center gap-1.5">
               <BarChart3 className="h-3.5 w-3.5" />
-              Updated {new Date(product.updatedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+              Updated {new Date(product.updatedAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
             </span>
             <span className="flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5" />

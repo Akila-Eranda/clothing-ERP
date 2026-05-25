@@ -46,11 +46,11 @@ const STATUS_MAP: Record<string, { label: string; color: string; variant: "succe
 };
 
 function fmt(n: number) {
-  return `LKR ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `LKR ${n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 function fmtDate(d?: string | null) {
   if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" });
+  return new Date(d).toLocaleDateString("en-LK", { year: "numeric", month: "short", day: "2-digit" });
 }
 
 
@@ -285,10 +285,10 @@ export default function PODetailPage() {
                       <td className="px-3 py-2.5 text-xs">{item.variantName}</td>
                       <td className="px-3 py-2.5 text-xs text-muted-foreground">Pcs</td>
                       <td className="px-3 py-2.5 font-semibold text-xs">{item.orderedQty}</td>
-                      <td className="px-3 py-2.5 text-xs">{item.unitCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2.5 text-xs">{(item.discount ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2.5 text-xs">{item.taxAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                      <td className="px-3 py-2.5 font-semibold text-xs">{item.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-xs">{item.unitCost.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-xs">{(item.discount ?? 0).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 text-xs">{item.taxAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                      <td className="px-3 py-2.5 font-semibold text-xs">{item.total.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -297,7 +297,7 @@ export default function PODetailPage() {
                     <td colSpan={5} className="px-3 py-2">Total Items: {po.items?.length ?? 0}</td>
                     <td className="px-3 py-2">{po.items?.reduce((s, i) => s + i.orderedQty, 0) ?? 0}</td>
                     <td colSpan={2} />
-                    <td colSpan={2} className="px-3 py-2 text-right">{po.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td colSpan={2} className="px-3 py-2 text-right">{po.total.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
                   </tr>
                 </tfoot>
               </table>

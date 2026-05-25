@@ -505,17 +505,17 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         <div className="rounded-xl border p-5 space-y-4 bg-card">
           <h4 className="font-semibold text-sm">Price Details</h4>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Selling Price (₹) <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Selling Price (LKR ) <span className="text-destructive">*</span></Label>
             <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
               onChange={(e) => set("sellingPrice", e.target.value)} onBlur={() => form.sellingPrice && mark("pricing")} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Cost Price (₹) <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">Cost Price (LKR ) <span className="text-destructive">*</span></Label>
             <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
               onChange={(e) => set("costPrice", e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">MRP (₹) <span className="text-destructive">*</span></Label>
+            <Label className="text-xs font-semibold">MRP (LKR ) <span className="text-destructive">*</span></Label>
             <Input type="number" min="0" placeholder="0.00" value={form.mrp}
               onChange={(e) => set("mrp", e.target.value)} />
           </div>
@@ -535,9 +535,9 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           {form.sellingPrice && form.costPrice ? (
             <div className="space-y-3">
               {[
-                { label: "Selling Price", val: `₹${parseFloat(form.sellingPrice || "0").toFixed(2)}`, bold: true },
-                { label: "Cost Price",    val: `₹${parseFloat(form.costPrice    || "0").toFixed(2)}`, bold: false },
-                { label: "Gross Margin",  val: `₹${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-emerald-500" },
+                { label: "Selling Price", val: `LKR ${parseFloat(form.sellingPrice || "0").toFixed(2)}`, bold: true },
+                { label: "Cost Price",    val: `LKR ${parseFloat(form.costPrice    || "0").toFixed(2)}`, bold: false },
+                { label: "Gross Margin",  val: `LKR ${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-emerald-500" },
                 { label: "Margin %",      val: `${((parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")) / Math.max(parseFloat(form.sellingPrice || "1"), 0.01) * 100).toFixed(1)}%`, bold: true, color: "text-emerald-500" },
               ].map((r) => (
                 <div key={r.label} className="flex justify-between text-sm">

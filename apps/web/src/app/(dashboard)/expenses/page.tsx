@@ -60,7 +60,7 @@ export default function ExpensesPage() {
           return (
             <div key={c} className="rounded-xl border bg-card p-4">
               <p className="text-xs text-muted-foreground">{c}</p>
-              <p className="text-xl font-bold mt-1 text-red-500">₹{amt.toLocaleString()}</p>
+              <p className="text-xl font-bold mt-1 text-red-500">LKR {amt.toLocaleString()}</p>
             </div>
           );
         })}
@@ -88,7 +88,7 @@ export default function ExpensesPage() {
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/20">
           <span className="text-sm font-medium text-muted-foreground">{filtered.length} expenses</span>
-          <span className="text-sm font-bold text-red-500">Total: ₹{total.toLocaleString()}</span>
+          <span className="text-sm font-bold text-red-500">Total: LKR {total.toLocaleString()}</span>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -114,7 +114,7 @@ export default function ExpensesPage() {
                   <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${CAT_COLORS[exp.category] ?? "bg-muted"}`}>{exp.category}</span></td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{exp.date}</td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">{exp.method}</td>
-                  <td className="px-4 py-3 text-right font-bold text-red-500">₹{exp.amount.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-right font-bold text-red-500">LKR {exp.amount.toLocaleString()}</td>
                 </motion.tr>
               ))}
             </tbody>

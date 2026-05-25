@@ -229,7 +229,7 @@ export default function POSPage() {
                   {product.variantName && <p className="text-[10px] text-muted-foreground mb-0.5">{product.variantName}</p>}
                   <p className="text-[10px] text-muted-foreground font-mono">{product.sku}</p>
                   <div className="flex items-center justify-between mt-2">
-                    <span className="text-sm font-bold text-primary">₹{formatNumber(product.unitPrice)}</span>
+                    <span className="text-sm font-bold text-primary">LKR {formatNumber(product.unitPrice)}</span>
                     <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                       product.stock === 0 ? "bg-red-500/15 text-red-500" :
                       product.stock < 5 ? "bg-amber-500/15 text-amber-500" : "bg-emerald-500/15 text-emerald-500"
@@ -369,7 +369,7 @@ export default function POSPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold line-clamp-1">{item.productName}</p>
                       <p className="text-[10px] text-muted-foreground">{item.variantName}</p>
-                      <p className="text-xs font-bold text-primary mt-0.5">₹{formatNumber(item.unitPrice * item.quantity)}</p>
+                      <p className="text-xs font-bold text-primary mt-0.5">LKR {formatNumber(item.unitPrice * item.quantity)}</p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => updateQuantity(item.variantId, item.quantity - 1)}
@@ -404,11 +404,11 @@ export default function POSPage() {
         {/* Summary */}
         {items.length > 0 && (
           <div className="px-4 py-3 space-y-1.5 border-t border-border bg-muted/20">
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>₹{formatNumber(subtotal())}</span></div>
-            {discountAmount() > 0 && <div className="flex justify-between text-sm text-emerald-500"><span>Discount</span><span>-₹{formatNumber(discountAmount())}</span></div>}
-            <div className="flex justify-between text-sm"><span className="text-muted-foreground">GST ({taxRate}%)</span><span>₹{formatNumber(taxAmount())}</span></div>
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Subtotal</span><span>LKR {formatNumber(subtotal())}</span></div>
+            {discountAmount() > 0 && <div className="flex justify-between text-sm text-emerald-500"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
+            <div className="flex justify-between text-sm"><span className="text-muted-foreground">GST ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
             <Separator />
-            <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="text-primary">₹{formatNumber(totalAmt)}</span></div>
+            <div className="flex justify-between font-bold text-lg"><span>Total</span><span className="text-primary">LKR {formatNumber(totalAmt)}</span></div>
           </div>
         )}
 
@@ -416,7 +416,7 @@ export default function POSPage() {
         <div className="p-4 space-y-2 border-t border-border">
           {!showCheckout ? (
             <Button className="w-full h-12 text-base font-bold gap-2" disabled={items.length === 0} onClick={() => setShowCheckout(true)}>
-              <Receipt className="h-5 w-5" />Checkout — ₹{items.length > 0 ? formatNumber(totalAmt) : "0"}
+              <Receipt className="h-5 w-5" />Checkout — LKR {items.length > 0 ? formatNumber(totalAmt) : "0"}
               <kbd className="ml-auto text-xs opacity-70 font-mono">F2</kbd>
             </Button>
           ) : (
@@ -440,14 +440,14 @@ export default function POSPage() {
                     {[500, 1000, 2000, Math.ceil(totalAmt / 100) * 100].map((amt) => (
                       <button key={amt} onClick={() => setCashTendered(String(amt))}
                         className="py-1.5 text-xs rounded-md bg-muted hover:bg-muted/80 font-mono font-medium">
-                        ₹{formatNumber(amt)}
+                        LKR {formatNumber(amt)}
                       </button>
                     ))}
                   </div>
                   {cashTendered && parseFloat(cashTendered) >= totalAmt && (
                     <div className="flex justify-between text-sm p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
                       <span className="text-emerald-600 font-medium">Change</span>
-                      <span className="text-emerald-600 font-bold">₹{formatNumber(change)}</span>
+                      <span className="text-emerald-600 font-bold">LKR {formatNumber(change)}</span>
                     </div>
                   )}
                 </div>
@@ -482,9 +482,9 @@ export default function POSPage() {
                   <div className="flex justify-between"><span className="text-muted-foreground">Customer</span><span className="font-medium">{receipt.customerName}</span></div>
                 )}
                 <div className="flex justify-between"><span className="text-muted-foreground">Payment</span><span className="font-medium capitalize">{receipt.paymentMethod.toLowerCase()}</span></div>
-                <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary">₹{formatNumber(receipt.total)}</span></div>
+                <div className="flex justify-between font-bold text-base"><span>Total</span><span className="text-primary">LKR {formatNumber(receipt.total)}</span></div>
                 {receipt.changeDue > 0 && (
-                  <div className="flex justify-between text-emerald-500"><span>Change</span><span className="font-bold">₹{formatNumber(receipt.changeDue)}</span></div>
+                  <div className="flex justify-between text-emerald-500"><span>Change</span><span className="font-bold">LKR {formatNumber(receipt.changeDue)}</span></div>
                 )}
               </div>
               <div className="flex gap-2">

@@ -7,8 +7,8 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(
   amount: number,
-  currency: string = "INR",
-  locale: string = "en-IN"
+  currency: string = "LKR",
+  locale: string = "en-LK"
 ): string {
   return new Intl.NumberFormat(locale, {
     style: "currency",
@@ -18,7 +18,7 @@ export function formatCurrency(
   }).format(amount);
 }
 
-export function formatNumber(num: number, locale: string = "en-IN"): string {
+export function formatNumber(num: number, locale: string = "en-LK"): string {
   return new Intl.NumberFormat(locale).format(num);
 }
 
@@ -34,7 +34,7 @@ export function formatDate(
   options?: Intl.DateTimeFormatOptions
 ): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en-LK", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -44,7 +44,7 @@ export function formatDate(
 
 export function formatDateTime(date: Date | string): string {
   const d = typeof date === "string" ? new Date(date) : date;
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en-LK", {
     day: "2-digit",
     month: "short",
     year: "numeric",

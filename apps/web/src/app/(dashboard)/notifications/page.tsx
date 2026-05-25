@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 const DUMMY_NOTIFICATIONS = [
   { id: 1, type: "warning", title: "Low Stock Alert", message: "Men's Slim Fit Jeans (32x32) has only 3 units remaining", time: "5 min ago", read: false },
-  { id: 2, type: "success", title: "Sale Completed", message: "Invoice #INV-2024-1891 worth ₹8,450 processed successfully", time: "12 min ago", read: false },
+  { id: 2, type: "success", title: "Sale Completed", message: "Invoice #INV-2024-1891 worth LKR 8,450 processed successfully", time: "12 min ago", read: false },
   { id: 3, type: "info", title: "New Customer", message: "Priya Sharma registered as a Gold tier customer", time: "1 hour ago", read: false },
   { id: 4, type: "warning", title: "Purchase Order Due", message: "PO-2024-045 from TextileCo India is due for delivery today", time: "2 hours ago", read: true },
   { id: 5, type: "success", title: "Stock Transfer Complete", message: "Transfer of 50 units from Main Store to Andheri Branch completed", time: "3 hours ago", read: true },

@@ -67,7 +67,7 @@ function StickerLabel({ item, shopName }: { item: POItem; shopName: string }) {
       {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
       <BarcodeEl value={barcodeVal} id={item.id} />
       <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>
-      <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+      <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>
   );
 }
@@ -95,7 +95,7 @@ function HangTag({ item, shopName }: { item: POItem; shopName: string }) {
             {color && <span className="text-[9px] border border-gray-300 rounded px-1.5 py-0.5 font-semibold text-gray-600">{color}</span>}
           </div>
         )}
-        <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</p>
+        <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
         <div className="border-t w-full mt-1 pt-1">
           <BarcodeEl value={barcodeVal} id={item.id} />
           <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>

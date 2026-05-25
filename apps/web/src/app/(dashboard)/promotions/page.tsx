@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 const DUMMY_PROMOS = [
   { id: "PROMO001", name: "Winter Sale 2024", code: "WINTER20", type: "percentage", discount: 20, minOrder: 1000, maxDiscount: 500, uses: 142, maxUses: 500, active: true, expiry: "Dec 31, 2024" },
   { id: "PROMO002", name: "New Year Flash", code: "NY2025", type: "percentage", discount: 30, minOrder: 2000, maxDiscount: 1000, uses: 0, maxUses: 200, active: true, expiry: "Jan 2, 2025" },
-  { id: "PROMO003", name: "Flat ₹200 Off", code: "FLAT200", type: "fixed", discount: 200, minOrder: 800, maxDiscount: 200, uses: 89, maxUses: 1000, active: true, expiry: "Dec 25, 2024" },
+  { id: "PROMO003", name: "Flat LKR 200 Off", code: "FLAT200", type: "fixed", discount: 200, minOrder: 800, maxDiscount: 200, uses: 89, maxUses: 1000, active: true, expiry: "Dec 25, 2024" },
   { id: "PROMO004", name: "Buy 3 Get 1 Free", code: "B3G1", type: "bogo", discount: 100, minOrder: 0, maxDiscount: null, uses: 34, maxUses: 300, active: false, expiry: "Dec 15, 2024" },
   { id: "PROMO005", name: "Diwali Special", code: "DIWALI25", type: "percentage", discount: 25, minOrder: 1500, maxDiscount: 750, uses: 421, maxUses: 500, active: false, expiry: "Nov 5, 2024" },
 ];
@@ -37,7 +37,7 @@ export default function PromotionsPage() {
           { label: "Active Promos", value: promos.filter((p) => p.active).length, color: "text-emerald-500" },
           { label: "Total Coupons Used", value: promos.reduce((s, p) => s + p.uses, 0), color: "text-blue-500" },
           { label: "Avg Discount", value: "22%", color: "text-amber-500" },
-          { label: "Est. Revenue Impact", value: "₹42K", color: "text-primary" },
+          { label: "Est. Revenue Impact", value: "LKR 42K", color: "text-primary" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -65,7 +65,7 @@ export default function PromotionsPage() {
                     promo.type === "fixed" ? "bg-emerald-500/10 text-emerald-500" :
                     "bg-purple-500/10 text-purple-500"
                   }`}>
-                    {promo.type === "percentage" ? `${promo.discount}% off` : promo.type === "fixed" ? `₹${promo.discount} off` : "BOGO"}
+                    {promo.type === "percentage" ? `${promo.discount}% off` : promo.type === "fixed" ? `LKR ${promo.discount} off` : "BOGO"}
                   </span>
                 </div>
               </div>
@@ -77,8 +77,8 @@ export default function PromotionsPage() {
             </div>
 
             <div className="space-y-1.5 text-xs text-muted-foreground">
-              {promo.minOrder > 0 && <p>Min order: ₹{promo.minOrder.toLocaleString()}</p>}
-              {promo.maxDiscount && <p>Max discount: ₹{promo.maxDiscount.toLocaleString()}</p>}
+              {promo.minOrder > 0 && <p>Min order: LKR {promo.minOrder.toLocaleString()}</p>}
+              {promo.maxDiscount && <p>Max discount: LKR {promo.maxDiscount.toLocaleString()}</p>}
               <div className="flex items-center gap-1"><Clock className="h-3 w-3" /> Expires: {promo.expiry}</div>
             </div>
 

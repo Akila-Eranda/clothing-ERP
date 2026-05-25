@@ -55,7 +55,7 @@ function SaleDetailModal({ saleId, onClose }: { saleId: string; onClose: () => v
         <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
           <div>
             <h2 className="font-bold text-base">{sale?.invoiceNumber ?? "Loading…"}</h2>
-            <p className="text-xs text-muted-foreground">{sale ? new Date(sale.invoiceDate).toLocaleString("en-IN") : ""}</p>
+            <p className="text-xs text-muted-foreground">{sale ? new Date(sale.invoiceDate).toLocaleString("en-LK") : ""}</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
@@ -89,8 +89,8 @@ function SaleDetailModal({ saleId, onClose }: { saleId: string; onClose: () => v
                       <p className="text-[10px] text-muted-foreground">{item.variantName} · {item.sku}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className="text-xs font-semibold">₹{formatNumber(item.total)}</p>
-                      <p className="text-[10px] text-muted-foreground">x{item.quantity} @ ₹{formatNumber(item.unitPrice)}</p>
+                      <p className="text-xs font-semibold">LKR {formatNumber(item.total)}</p>
+                      <p className="text-[10px] text-muted-foreground">x{item.quantity} @ LKR {formatNumber(item.unitPrice)}</p>
                     </div>
                   </div>
                 ))}
@@ -99,13 +99,13 @@ function SaleDetailModal({ saleId, onClose }: { saleId: string; onClose: () => v
 
             {/* Totals */}
             <div className="rounded-xl border bg-muted/10 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>₹{formatNumber(sale.subtotal)}</span></div>
-              {sale.discountAmount > 0 && <div className="flex justify-between text-emerald-500"><span>Discount</span><span>-₹{formatNumber(sale.discountAmount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>₹{formatNumber(sale.taxAmount)}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>LKR {formatNumber(sale.subtotal)}</span></div>
+              {sale.discountAmount > 0 && <div className="flex justify-between text-emerald-500"><span>Discount</span><span>-LKR {formatNumber(sale.discountAmount)}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>LKR {formatNumber(sale.taxAmount)}</span></div>
               <div className="flex justify-between font-bold text-base border-t pt-1.5 mt-1.5">
-                <span>Total</span><span className="text-primary">₹{formatNumber(sale.total)}</span>
+                <span>Total</span><span className="text-primary">LKR {formatNumber(sale.total)}</span>
               </div>
-              {sale.changeDue > 0 && <div className="flex justify-between text-emerald-500 text-xs"><span>Change</span><span>₹{formatNumber(sale.changeDue)}</span></div>}
+              {sale.changeDue > 0 && <div className="flex justify-between text-emerald-500 text-xs"><span>Change</span><span>LKR {formatNumber(sale.changeDue)}</span></div>}
             </div>
           </div>
         ) : null}
@@ -146,10 +146,10 @@ export default function SalesPage() {
     : 0;
 
   const STATS = [
-    { label: "Total Revenue",   value: `₹${formatNumber(summary?.totalRevenue ?? 0)}`, icon: DollarSign,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Total Revenue",   value: `LKR ${formatNumber(summary?.totalRevenue ?? 0)}`, icon: DollarSign,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Total Orders",    value: summary?.totalSales ?? 0,                       icon: ShoppingCart, color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Avg Order Value", value: `₹${formatNumber(avgOrder)}`,                   icon: TrendingUp,   color: "text-violet-500",  bg: "bg-violet-500/10" },
-    { label: "Tax Collected",   value: `₹${formatNumber(summary?.totalTax ?? 0)}`,     icon: RotateCcw,    color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Avg Order Value", value: `LKR ${formatNumber(avgOrder)}`,                   icon: TrendingUp,   color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Tax Collected",   value: `LKR ${formatNumber(summary?.totalTax ?? 0)}`,     icon: RotateCcw,    color: "text-amber-500",   bg: "bg-amber-500/10" },
   ];
 
   const columns: ColumnDef<Sale>[] = [
@@ -185,14 +185,14 @@ export default function SalesPage() {
     {
       accessorKey: "total",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">₹{formatNumber(row.original.total)}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">LKR {formatNumber(row.original.total)}</span>,
     },
     {
       accessorKey: "invoiceDate",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.invoiceDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+          {new Date(row.original.invoiceDate).toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" })}
         </span>
       ),
     },
@@ -253,7 +253,7 @@ export default function SalesPage() {
           {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
             <div key={method} className="flex items-center gap-2 px-3 py-1.5 rounded-full border bg-card text-xs">
               <span className="capitalize text-muted-foreground">{method.toLowerCase()}</span>
-              <span className="font-bold">₹{formatNumber(amount)}</span>
+              <span className="font-bold">LKR {formatNumber(amount)}</span>
             </div>
           ))}
         </div>

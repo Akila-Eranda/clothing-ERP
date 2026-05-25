@@ -71,8 +71,8 @@ export default function ReportsPage() {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
                   <XAxis dataKey="date" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} interval={4} />
-                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `₹${(v/1000).toFixed(0)}k`} />
-                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`₹${formatNumber(v)}`, ""]} />
+                  <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `LKR ${(v/1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} />
                   <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#revGrad)" name="Revenue" />
                   <Area type="monotone" dataKey="profit" stroke={CHART_COLORS.success} strokeWidth={2} fill="transparent" name="Profit" />
                 </AreaChart>
@@ -116,7 +116,7 @@ export default function ReportsPage() {
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
                     <div className="h-full rounded-full" style={{ width: `${cat.percentage}%`, background: cat.color }} />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">₹{formatNumber(cat.revenue)} revenue</p>
+                  <p className="text-xs text-muted-foreground mt-2">LKR {formatNumber(cat.revenue)} revenue</p>
                 </CardContent>
               </Card>
             ))}

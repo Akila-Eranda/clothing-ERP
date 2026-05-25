@@ -10,7 +10,7 @@ const STATUS_BADGE: Record<string, string> = {
   SUSPENDED: 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700',
 }
 function fmtDate(s: string) {
-  return new Date(s).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })
+  return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
 const PER_PAGE = 25

@@ -69,7 +69,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     setActionLoading(true);
     try {
       await api.post(`/customers/${customer.id}/wallet/topup`, { amount: amt, description: "Manual top-up" });
-      toast.success(`₹${amt} added to wallet`);
+      toast.success(`LKR ${amt} added to wallet`);
       setWalletInput("");
       setCustomer((c) => c ? { ...c, walletBalance: c.walletBalance + amt } : c);
     } catch { toast.error("Failed"); }
@@ -156,7 +156,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
               {/* KPI row */}
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { label: "Total Spent", value: `₹${formatNumber(customer.totalSpent)}`, icon: ShoppingBag, color: "text-primary" },
+                  { label: "Total Spent", value: `LKR ${formatNumber(customer.totalSpent)}`, icon: ShoppingBag, color: "text-primary" },
                   { label: "Orders",      value: customer.totalOrders, icon: ShoppingBag, color: "text-blue-500" },
                   { label: "Loyalty Pts", value: formatNumber(customer.loyaltyPoints), icon: Gift, color: "text-amber-500" },
                 ].map((k) => (
@@ -168,11 +168,11 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl border bg-card p-3 text-center">
-                  <p className="text-xl font-black text-emerald-500">₹{formatNumber(customer.walletBalance)}</p>
+                  <p className="text-xl font-black text-emerald-500">LKR {formatNumber(customer.walletBalance)}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Wallet Balance</p>
                 </div>
                 <div className="rounded-xl border bg-card p-3 text-center">
-                  <p className="text-xl font-black">{customer.lastPurchaseAt ? new Date(customer.lastPurchaseAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                  <p className="text-xl font-black">{customer.lastPurchaseAt ? new Date(customer.lastPurchaseAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Last Purchase</p>
                 </div>
               </div>
@@ -186,12 +186,12 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 <div className="flex gap-3">
                   {customer.dateOfBirth && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" /> DOB: {new Date(customer.dateOfBirth).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      <Calendar className="h-3 w-3" /> DOB: {new Date(customer.dateOfBirth).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
                     </div>
                   )}
                   {customer.anniversary && (
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" /> Anniversary: {new Date(customer.anniversary).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      <Calendar className="h-3 w-3" /> Anniversary: {new Date(customer.anniversary).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
                     </div>
                   )}
                 </div>
@@ -206,10 +206,10 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 <div key={sale.id} className="flex items-center justify-between p-3 rounded-xl border hover:bg-muted/20 transition-colors">
                   <div>
                     <p className="text-sm font-semibold font-mono">{sale.invoiceNumber}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(sale.invoiceDate).toLocaleDateString("en-IN")} · {sale._count.items} items</p>
+                    <p className="text-xs text-muted-foreground">{new Date(sale.invoiceDate).toLocaleDateString("en-LK")} · {sale._count.items} items</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-bold">₹{formatNumber(sale.total)}</p>
+                    <p className="text-sm font-bold">LKR {formatNumber(sale.total)}</p>
                     <Badge variant="success" className="text-[9px]">{sale.status}</Badge>
                   </div>
                 </div>
@@ -239,7 +239,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <div key={txn.id} className="flex items-center justify-between p-2.5 rounded-lg border text-sm">
                     <div>
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-IN")}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-LK")}</p>
                     </div>
                     <span className={`font-bold text-sm ${txn.points > 0 ? "text-emerald-500" : "text-red-500"}`}>
                       {txn.points > 0 ? "+" : ""}{txn.points}
@@ -255,12 +255,12 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
               <div className="rounded-xl border bg-emerald-500/5 p-4 flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Wallet Balance</p>
-                  <p className="text-3xl font-black text-emerald-500">₹{formatNumber(customer.walletBalance)}</p>
+                  <p className="text-3xl font-black text-emerald-500">LKR {formatNumber(customer.walletBalance)}</p>
                 </div>
                 <Wallet className="h-10 w-10 text-emerald-500/30" />
               </div>
               <div className="flex gap-2">
-                <Input type="number" min={1} step={0.01} placeholder="Top-up amount (₹)…" value={walletInput}
+                <Input type="number" min={1} step={0.01} placeholder="Top-up amount (LKR )…" value={walletInput}
                   onChange={(e) => setWalletInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && topupWallet()} />
                 <Button onClick={topupWallet} disabled={actionLoading || !walletInput} className="gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700">
@@ -272,10 +272,10 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <div key={txn.id} className="flex items-center justify-between p-2.5 rounded-lg border text-sm">
                     <div>
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-IN")}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-LK")}</p>
                     </div>
                     <span className={`font-bold text-sm ${txn.amount > 0 ? "text-emerald-500" : "text-red-500"}`}>
-                      {txn.amount > 0 ? "+" : ""}₹{formatNumber(txn.amount)}
+                      {txn.amount > 0 ? "+" : ""}LKR {formatNumber(txn.amount)}
                     </span>
                   </div>
                 ))}

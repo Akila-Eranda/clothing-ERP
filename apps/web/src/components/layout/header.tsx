@@ -147,8 +147,8 @@ export function Header() {
             <DropdownMenuSeparator />
             {[
               { title: "Low stock alert", desc: "Running Sports Shoes (Size 9) — 2 left", time: "2m ago", type: "warning" },
-              { title: "New order received", desc: "INV-0891 — ₹12,500 via UPI", time: "15m ago", type: "success" },
-              { title: "Payment overdue", desc: "Supplier: DenimCo — ₹85,000", time: "1h ago", type: "danger" },
+              { title: "New order received", desc: "INV-0891 — LKR 12,500 via UPI", time: "15m ago", type: "success" },
+              { title: "Payment overdue", desc: "Supplier: DenimCo — LKR 85,000", time: "1h ago", type: "danger" },
               { title: "Birthday campaign sent", desc: "32 customers notified via WhatsApp", time: "3h ago", type: "info" },
             ].map((n, i) => (
               <DropdownMenuItem key={i} className="flex flex-col items-start gap-0.5 py-3 cursor-pointer">
