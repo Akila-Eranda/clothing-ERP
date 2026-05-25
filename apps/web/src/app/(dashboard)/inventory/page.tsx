@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { AlertTriangle, ArrowUpDown, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag } from "lucide-react";
+import { AlertTriangle, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
+import type { InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { CreatePOModal } from "@/components/purchases/create-po-modal";
 import { useRouter } from "next/navigation";
 
@@ -96,7 +96,6 @@ export default function InventoryPage() {
   const router = useRouter();
   const [stock, setStock]           = useState<InventoryItem[]>([]);
   const [loading, setLoading]       = useState(true);
-  const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [poOpen, setPoOpen]         = useState(false);
   const [prefillVariant, setPrefillVariant] = useState<string | undefined>();
 
@@ -142,9 +141,6 @@ export default function InventoryPage() {
           <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
             <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => setAdjustItem(stock[0] ?? null)}>
-            <ArrowUpDown className="h-3.5 w-3.5" /> Stock Adjustment
-          </Button>
         </div>
       </div>
 
@@ -170,12 +166,6 @@ export default function InventoryPage() {
       />
 
       {/* Modals */}
-      <StockAdjustModal
-        open={!!adjustItem}
-        item={adjustItem}
-        onClose={() => setAdjustItem(null)}
-        onAdjusted={fetchAll}
-      />
       <CreatePOModal
         open={poOpen}
         onClose={() => { setPoOpen(false); setPrefillVariant(undefined); }}
