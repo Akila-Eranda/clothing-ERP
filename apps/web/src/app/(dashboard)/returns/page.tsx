@@ -60,132 +60,152 @@ const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.E
   REFUND_PROCESSED: { label: "Refund Processed", variant: "success", icon: DollarSign },
 };
 
-// ── Bill printer ────────────────────────────────────────────────────────────
+// ── Thermal bill printer (80mm) ──────────────────────────────────────────────
 function printBill(record: ReturnRecord) {
   const isExchange = record.returnType === "EXCHANGE";
-  const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const dateStr = new Date(record.createdAt).toLocaleString("en-LK", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  const reason = REASONS.find((r) => r.value === record.reason)?.label ?? record.reason;
+  const fmt  = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const date = new Date(record.createdAt);
+  const dateStr = date.toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
+  const timeStr = date.toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" });
+  const reason  = REASONS.find((r) => r.value === record.reason)?.label ?? record.reason;
 
-  const returnItemsHtml = (record.items ?? []).map((item) => `
-    <tr>
-      <td>${item.variant?.product?.name ?? "—"}</td>
-      <td class="center">${item.variant?.sku ?? "—"}</td>
-      <td class="center">${item.quantity}</td>
-      <td class="right">LKR ${fmt(item.unitPrice)}</td>
-      <td class="right">LKR ${fmt(item.totalAmount)}</td>
-    </tr>`).join("");
+  // Pad text to fill thermal width (32 chars usable at 10px Courier on 80mm)
+  const pad = (left: string, right: string, width = 32) => {
+    const gap = Math.max(1, width - left.length - right.length);
+    return left + " ".repeat(gap) + right;
+  };
 
-  const exchangeItemsHtml = isExchange
-    ? (record.exchangeData ?? []).map((item) => `
-    <tr class="exchange-row">
-      <td>${item.productName ?? "—"}</td>
-      <td class="center">${item.sku ?? "—"}</td>
-      <td class="center">${item.quantity}</td>
-      <td class="right">LKR ${fmt(item.unitPrice)}</td>
-      <td class="right">LKR ${fmt(item.unitPrice * item.quantity)}</td>
-    </tr>`).join("")
-    : "";
+  const returnItemRows = (record.items ?? []).map((item) => {
+    const name = item.variant?.product?.name ?? "Unknown Item";
+    const sku  = item.variant?.sku ?? "—";
+    const qty  = item.quantity;
+    const total = fmt(item.totalAmount);
+    return `<div class="item-name">${name}</div>
+            <div class="item-detail">${pad(`  ${sku}  x${qty}`, `LKR ${total}`)}</div>`;
+  }).join('<div class="gap"></div>');
 
-  const balanceLine = isExchange
+  const exchangeItemRows = (record.exchangeData ?? []).map((item) => {
+    const name  = item.productName ?? "Unknown Item";
+    const sku   = item.sku ?? "—";
+    const qty   = item.quantity;
+    const total = fmt(item.unitPrice * item.quantity);
+    return `<div class="item-name exch">${name}</div>
+            <div class="item-detail">${pad(`  ${sku}  x${qty}`, `LKR ${total}`)}</div>`;
+  }).join('<div class="gap"></div>');
+
+  const balanceLabel = isExchange
     ? record.refundAmount > 0
-      ? `<tr class="total-row"><td colspan="3">Refund to Customer</td><td colspan="2" class="right">LKR ${fmt(record.refundAmount)}</td></tr>`
+      ? "REFUND TO CUSTOMER"
       : record.exchangeAmount > record.totalAmount
-        ? `<tr class="total-row"><td colspan="3">Balance Due from Customer</td><td colspan="2" class="right">LKR ${fmt(record.exchangeAmount - record.totalAmount)}</td></tr>`
-        : `<tr class="total-row"><td colspan="3">No Balance Due</td><td colspan="2" class="right">—</td></tr>`
-    : `<tr class="total-row"><td colspan="3">Total Refund</td><td colspan="2" class="right">LKR ${fmt(record.refundAmount)}</td></tr>`;
+        ? "BALANCE DUE"
+        : "NO BALANCE DUE"
+    : "TOTAL REFUND";
+  const balanceValue = isExchange
+    ? record.refundAmount > 0
+      ? `LKR ${fmt(record.refundAmount)}`
+      : record.exchangeAmount > record.totalAmount
+        ? `LKR ${fmt(record.exchangeAmount - record.totalAmount)}`
+        : "LKR 0.00"
+    : `LKR ${fmt(record.refundAmount)}`;
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>${isExchange ? "Exchange" : "Return"} Bill - ${record.returnNumber}</title>
+  const html = `<!DOCTYPE html><html><head>
+<meta charset="UTF-8">
+<title>${isExchange ? "EXC" : "RET"}-${record.returnNumber}</title>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;padding:24px;max-width:680px;margin:auto}
-  .center{text-align:center}.right{text-align:right}.bold{font-weight:bold}
-  .divider{border-top:1px dashed #000;margin:6px 0}.solid{border-top:2px solid #000;margin:6px 0}
-  table{width:100%;border-collapse:collapse}
-  td,th{padding:3px 4px;vertical-align:top}
-  th{font-weight:bold;border-bottom:1px solid #000;text-align:left}
-  th.center,td.center{text-align:center}th.right,td.right{text-align:right}
-  .section-label{font-weight:bold;font-size:13px;margin:10px 0 4px;letter-spacing:1px}
-  .exchange-row td{background:#f5f0ff}
-  .total-row td{font-weight:bold;border-top:1px solid #000;padding-top:5px}
-  .meta-table td{padding:2px 0}
-  @media print{button{display:none}}
+  @page { size: 80mm auto; margin: 3mm 2mm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 10.5px;
+    line-height: 1.4;
+    width: 72mm;
+    max-width: 72mm;
+    color: #000;
+    background: #fff;
+  }
+  .center { text-align: center; }
+  .right  { text-align: right; }
+  .bold   { font-weight: bold; }
+  .pre    { white-space: pre; font-family: inherit; font-size: inherit; }
+  .dash   { border-top: 1px dashed #000; margin: 3px 0; }
+  .solid  { border-top: 1.5px solid #000; margin: 3px 0; }
+  .dbl    { border-top: 3px double #000; margin: 4px 0; }
+  .section { font-weight: bold; margin: 4px 0 2px; font-size: 10px; letter-spacing: 0.5px; }
+  .exch-section { font-weight: bold; margin: 4px 0 2px; font-size: 10px; }
+  .item-name   { font-size: 10.5px; word-break: break-word; font-weight: bold; margin-top: 3px; }
+  .item-detail { font-size: 10px; white-space: pre; }
+  .exch { font-style: italic; }
+  .gap  { height: 1px; }
+  .meta-row { display: flex; justify-content: space-between; font-size: 10px; line-height: 1.5; }
+  .meta-label { font-weight: bold; }
+  .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; padding: 2px 0; }
+  .grand-row  { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; padding: 3px 0; }
+  .sig-table  { width: 100%; margin-top: 14px; }
+  .sig-table td { width: 50%; text-align: center; font-size: 9px; padding-top: 20px; border-top: 1px solid #000; }
+  .print-btn { display: block; margin: 10px auto; padding: 7px 20px; background: #111; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: sans-serif; }
+  @media print { .print-btn { display: none !important; } }
 </style></head><body>
 
-<div class="center bold" style="font-size:22px;letter-spacing:4px;">HEXALYTE</div>
-<div class="center bold" style="font-size:11px;letter-spacing:6px;">INNOVATION</div>
-<div class="center" style="margin-top:3px;font-size:11px;">No. 45, Textile Road, Colombo 11, Sri Lanka</div>
-<div class="center" style="font-size:11px;">Tel: 077 123 4567</div>
-<div class="divider"></div>
-<div class="center bold" style="font-size:15px;letter-spacing:3px;margin:8px 0 2px;">${isExchange ? "EXCHANGE BILL" : "RETURN / REFUND RECEIPT"}</div>
-<div class="divider"></div>
+<div class="center bold" style="font-size:15px;letter-spacing:3px;">HEXALYTE</div>
+<div class="center" style="font-size:9px;letter-spacing:4px;">INNOVATION</div>
+<div class="center" style="font-size:9px;margin-top:2px;">No. 45, Textile Road, Colombo 11</div>
+<div class="center" style="font-size:9px;">Tel: 077 123 4567</div>
+<div class="dbl"></div>
+<div class="center bold" style="font-size:12px;letter-spacing:2px;">${isExchange ? "** EXCHANGE BILL **" : "** RETURN RECEIPT **"}</div>
+<div class="dbl"></div>
 
-<table class="meta-table" style="margin-bottom:6px;">
-  <tr><td class="bold" style="width:45%">${isExchange ? "Exchange No." : "Return No."}</td><td>: ${record.returnNumber}</td></tr>
-  <tr><td class="bold">Original Invoice</td><td>: ${record.originalSale?.invoiceNumber ?? "—"}</td></tr>
-  <tr><td class="bold">Date &amp; Time</td><td>: ${dateStr}</td></tr>
-  <tr><td class="bold">Reason</td><td>: ${reason}</td></tr>
-  <tr><td class="bold">Status</td><td>: ${record.status}</td></tr>
-  ${record.notes ? `<tr><td class="bold">Notes</td><td>: ${record.notes}</td></tr>` : ""}
-</table>
-<div class="divider"></div>
+<div class="meta-row"><span class="meta-label">${isExchange ? "Exchange No" : "Return No"}</span><span>${record.returnNumber}</span></div>
+<div class="meta-row"><span class="meta-label">Invoice</span><span>${record.originalSale?.invoiceNumber ?? "—"}</span></div>
+<div class="meta-row"><span class="meta-label">Date</span><span>${dateStr}</span></div>
+<div class="meta-row"><span class="meta-label">Time</span><span>${timeStr}</span></div>
+<div class="meta-row"><span class="meta-label">Reason</span><span>${reason}</span></div>
+<div class="meta-row"><span class="meta-label">Status</span><span>${record.status}</span></div>
+${record.notes ? `<div class="meta-row"><span class="meta-label">Notes</span><span style="max-width:55%;text-align:right;font-size:9px;">${record.notes}</span></div>` : ""}
 
-<div class="section-label">ITEMS RETURNED BY CUSTOMER</div>
-<table>
-  <thead><tr>
-    <th>Product</th><th class="center">SKU</th><th class="center">Qty</th>
-    <th class="right">Unit Price</th><th class="right">Total</th>
-  </tr></thead>
-  <tbody>${returnItemsHtml}</tbody>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td colspan="3" class="bold">Return Value</td><td colspan="2" class="right bold">LKR ${fmt(record.totalAmount)}</td></tr>
-</table>
+<div class="dash"></div>
+<div class="section">ITEMS RETURNED BY CUSTOMER</div>
+<div class="dash"></div>
+${returnItemRows || '<div style="font-size:10px;font-style:italic;">No items recorded</div>'}
+<div class="dash"></div>
+<div class="total-row"><span>Return Value</span><span>LKR ${fmt(record.totalAmount)}</span></div>
 
 ${isExchange ? `
-<br/>
-<div class="section-label" style="color:#4b00a0;">ITEMS GIVEN TO CUSTOMER (EXCHANGE)</div>
-<table>
-  <thead><tr>
-    <th>Product</th><th class="center">SKU</th><th class="center">Qty</th>
-    <th class="right">Unit Price</th><th class="right">Total</th>
-  </tr></thead>
-  <tbody>${exchangeItemsHtml}</tbody>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td colspan="3" class="bold">Exchange Value</td><td colspan="2" class="right bold">LKR ${fmt(record.exchangeAmount)}</td></tr>
-</table>` : ""}
+<div class="dash"></div>
+<div class="exch-section">&#9654; ITEMS GIVEN TO CUSTOMER</div>
+<div class="dash"></div>
+${exchangeItemRows || '<div style="font-size:10px;font-style:italic;">No exchange items</div>'}
+<div class="dash"></div>
+<div class="total-row"><span>Exchange Value</span><span>LKR ${fmt(record.exchangeAmount)}</span></div>
+` : ""}
 
 <div class="solid"></div>
-<table>
-  ${balanceLine}
-</table>
+<div class="grand-row"><span>${balanceLabel}</span><span>${balanceValue}</span></div>
 <div class="solid"></div>
 
-<div style="margin-top:18px;display:flex;justify-content:space-between;font-size:11px;">
-  <div style="text-align:center;width:45%">
-    <div style="border-top:1px solid #000;margin-top:28px;padding-top:4px;">Staff Signature</div>
-  </div>
-  <div style="text-align:center;width:45%">
-    <div style="border-top:1px solid #000;margin-top:28px;padding-top:4px;">Customer Signature</div>
-  </div>
+<div style="margin-top:6px;font-size:9px;text-align:center;">
+  ${record.restockItems ? "&#10003; Items restocked to inventory" : "&#9675; Items not restocked"}
 </div>
 
-<div style="margin-top:14px;text-align:center;font-size:10px;">
-  Thank you for your business. This is an official ${isExchange ? "exchange" : "return"} document.
-</div>
-<div style="margin-top:12px;text-align:center;">
-  <button onclick="window.print()" style="font-family:sans-serif;padding:8px 24px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save as PDF</button>
-</div>
+<table class="sig-table">
+  <tr>
+    <td>Staff</td>
+    <td>Customer</td>
+  </tr>
+</table>
+
+<div class="dash" style="margin-top:10px;"></div>
+<div class="center" style="font-size:9px;margin-top:3px;">Thank you &amp; please keep this receipt</div>
+<div class="center" style="font-size:9px;">${new Date().getFullYear()} &copy; Hexalyte Innovation</div>
+
+<button class="print-btn" onclick="window.print()">&#128438; Print Receipt</button>
 </body></html>`;
 
   const win = window.open("", "_blank");
-  if (!win) { alert("Please allow popups to print the bill."); return; }
+  if (!win) { alert("Please allow popups to print the receipt."); return; }
   win.document.write(html);
   win.document.close();
+  // Auto-trigger print after a short delay for rendering
+  setTimeout(() => { try { win.print(); } catch (_) { /* user can click button */ } }, 400);
 }
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
