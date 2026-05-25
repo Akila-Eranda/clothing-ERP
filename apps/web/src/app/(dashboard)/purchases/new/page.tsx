@@ -156,13 +156,6 @@ export default function CreatePOPage() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2.5">
-          <Button variant="outline" onClick={() => router.push("/purchases")}>Cancel</Button>
-          <Button variant="outline" disabled={saving} onClick={() => submit(false)}>Save as Draft</Button>
-          <Button disabled={saving} onClick={() => submit(true)} className="gap-2 px-5">
-            Save &amp; Send PO
-          </Button>
-        </div>
       </div>
 
       <div className="p-8 space-y-6 max-w-[1400px] mx-auto">
