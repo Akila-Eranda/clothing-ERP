@@ -123,7 +123,7 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'api/v1/tenants/register', method: RequestMethod.POST },
         { path: 'api/v1/auth/login', method: RequestMethod.POST },
-        { path: 'health', method: RequestMethod.GET },
+        { path: 'api/v1/health', method: RequestMethod.GET },
       )
       .forRoutes('*');
   }
