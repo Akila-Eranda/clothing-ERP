@@ -539,8 +539,8 @@ export function POSOverlay() {
               <div className="rounded-xl border p-4" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <p className="text-xs font-semibold mb-3" style={{color:"#6a8ab8"}}>RETURN SUMMARY</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},{l:"Exchange Due",v:`LKR ${formatNumber(exchangeDue)}`}].map(f=>(
-                    <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5">{f.v}</p></div>
+                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},...(returnType==="EXCHANGE"?[{l:exchangeDue>0?"Customer Pays":"Refund",v:`LKR ${formatNumber(exchangeDue>0?exchangeDue:netRefund)}`}]:[])].map(f=>(
+                    <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"#f59e0b"}:f.l==="Refund"?{color:"#10b981"}:{}}>{f.v}</p></div>
                   ))}
                 </div>
                 {returnNotes&&<div className="mt-2"><p className="text-[10px]" style={{color:"#6a8ab8"}}>Notes</p><p className="text-white text-xs mt-0.5">{returnNotes}</p></div>}

@@ -241,22 +241,33 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
           </div>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="p-3 rounded-xl border bg-muted/10">
-              <p className="text-xs text-muted-foreground">Return Value</p>
-              <p className="font-bold text-sm">LKR {formatNumber(record.totalAmount)}</p>
-            </div>
-            {isExchange && (
-              <div className="p-3 rounded-xl border bg-violet-500/10">
-                <p className="text-xs text-muted-foreground">Exchange Value</p>
-                <p className="font-bold text-sm text-violet-600">LKR {formatNumber(record.exchangeAmount ?? 0)}</p>
+          {(() => {
+            const excDue = isExchange ? Math.max(0, (record.exchangeAmount ?? 0) - record.totalAmount) : 0;
+            const netRef = isExchange ? Math.max(0, record.totalAmount - (record.exchangeAmount ?? 0)) : record.refundAmount;
+            const balLabel = isExchange
+              ? excDue > 0 ? "Collect from Customer" : netRef > 0 ? "Refund to Customer" : "Even Exchange"
+              : "Refund to Customer";
+            const balColor = isExchange && excDue > 0 ? "text-amber-600" : "text-emerald-600";
+            const balBg    = isExchange && excDue > 0 ? "bg-amber-500/10" : "bg-emerald-500/10";
+            return (
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 rounded-xl border bg-muted/10">
+                  <p className="text-xs text-muted-foreground">Return Value</p>
+                  <p className="font-bold text-sm">LKR {formatNumber(record.totalAmount)}</p>
+                </div>
+                {isExchange && (
+                  <div className="p-3 rounded-xl border bg-violet-500/10">
+                    <p className="text-xs text-muted-foreground">Exchange Value</p>
+                    <p className="font-bold text-sm text-violet-600">LKR {formatNumber(record.exchangeAmount ?? 0)}</p>
+                  </div>
+                )}
+                <div className={`p-3 rounded-xl border ${balBg}`}>
+                  <p className="text-xs text-muted-foreground">{balLabel}</p>
+                  <p className={`font-bold text-sm ${balColor}`}>LKR {formatNumber(isExchange ? (excDue > 0 ? excDue : netRef) : record.refundAmount)}</p>
+                </div>
               </div>
-            )}
-            <div className={`p-3 rounded-xl border ${isExchange ? "bg-emerald-500/10" : "bg-blue-500/10"}`}>
-              <p className="text-xs text-muted-foreground">{isExchange ? "Balance Due" : "Refund"}</p>
-              <p className={`font-bold text-sm ${isExchange ? "text-emerald-600" : "text-blue-600"}`}>LKR {formatNumber(record.refundAmount)}</p>
-            </div>
-          </div>
+            );
+          })()}
           <div>
             <p className="text-xs font-semibold mb-2">Returned Items</p>
             <div className="rounded-xl border divide-y overflow-hidden">
@@ -328,10 +339,10 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
     if (!query.trim()) return;
     setSearchLoading(true);
     try {
-      const listRes = await api.get<{ data: any[] }>(`/pos/sales?search=${encodeURIComponent(query)}&limit=1`);
+      const listRes = await api.get<{ data: any[] }>(`/sales?search=${encodeURIComponent(query)}&limit=5`);
       const list = (listRes.data?.data ?? listRes.data ?? []) as any[];
       if (list.length === 0) { toast.error("Invoice not found"); return; }
-      const detailRes = await api.get<any>(`/pos/sales/${list[0].id}`);
+      const detailRes = await api.get<any>(`/sales/${list[0].id}`);
       const s = detailRes.data as any;
       const sale: SaleLookup = {
         id: s.id, invoiceNumber: s.invoiceNumber, total: s.total,
@@ -797,11 +808,16 @@ export default function ReturnsPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Value" />,
       cell: ({ row }) => {
         const isExchange = row.original.returnType === "EXCHANGE";
+        const excDue = isExchange ? Math.max(0, (row.original.exchangeAmount ?? 0) - row.original.totalAmount) : 0;
+        const netRef = isExchange ? Math.max(0, row.original.totalAmount - (row.original.exchangeAmount ?? 0)) : 0;
         return (
           <div>
             <p className="text-sm font-bold">LKR {formatNumber(row.original.totalAmount)}</p>
-            {isExchange && row.original.refundAmount > 0 && (
-              <p className="text-[10px] text-emerald-600">+LKR {formatNumber(row.original.refundAmount)} back</p>
+            {isExchange && excDue > 0 && (
+              <p className="text-[10px] text-amber-600">collect LKR {formatNumber(excDue)}</p>
+            )}
+            {isExchange && netRef > 0 && (
+              <p className="text-[10px] text-emerald-600">refund LKR {formatNumber(netRef)}</p>
             )}
           </div>
         );
