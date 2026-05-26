@@ -11,6 +11,26 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
 
+export class ReceiptSettingsDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() tagline?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() logoUrl?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address1?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address2?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() website?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() headerText?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() footerText?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() paperWidth?: string;
+  @ApiPropertyOptional() @IsOptional() showTax?: boolean;
+  @ApiPropertyOptional() @IsOptional() showDiscount?: boolean;
+  @ApiPropertyOptional() @IsOptional() showCashier?: boolean;
+  @ApiPropertyOptional() @IsOptional() showCustomer?: boolean;
+  @ApiPropertyOptional() @IsOptional() showBarcode?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() fontSize?: string;
+}
+
 export class RegisterTenantDto {
   @ApiProperty() @IsString() companyName: string;
   @ApiProperty() @IsString() subdomain: string;
@@ -122,6 +142,43 @@ export class TenantsService {
       },
     });
   }
+
+  async getReceiptSettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true, name: true, phone: true, email: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const s = (tenant.settings as Record<string, unknown>) ?? {};
+    const receipt = (s['receipt'] as Record<string, unknown>) ?? {};
+    return {
+      shopName:     receipt['shopName']     ?? tenant.name,
+      tagline:      receipt['tagline']      ?? '',
+      logoUrl:      receipt['logoUrl']      ?? '',
+      address1:     receipt['address1']     ?? '',
+      address2:     receipt['address2']     ?? '',
+      phone:        receipt['phone']        ?? tenant.phone ?? '',
+      email:        receipt['email']        ?? tenant.email ?? '',
+      website:      receipt['website']      ?? '',
+      headerText:   receipt['headerText']   ?? '',
+      footerText:   receipt['footerText']   ?? 'Thank you for shopping with us!',
+      paperWidth:   receipt['paperWidth']   ?? '80mm',
+      showTax:      receipt['showTax']      ?? true,
+      showDiscount: receipt['showDiscount'] ?? true,
+      showCashier:  receipt['showCashier']  ?? true,
+      showCustomer: receipt['showCustomer'] ?? true,
+      showBarcode:  receipt['showBarcode']  ?? false,
+      fontSize:     receipt['fontSize']     ?? 'medium',
+    };
+  }
+
+  async saveReceiptSettings(tenantId: string, dto: ReceiptSettingsDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const existing = (tenant.settings as Record<string, unknown>) ?? {};
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { settings: { ...existing, receipt: { ...dto } } },
+    });
+    return this.getReceiptSettings(tenantId);
+  }
 }
 
 @ApiTags('Tenants')
@@ -149,6 +206,21 @@ export class TenantsController {
   @ApiOperation({ summary: 'Update tenant settings' })
   update(@CurrentUser() user: IAuthUser, @Body() dto: Partial<RegisterTenantDto>) {
     return this.tenantsService.update(user.tenantId, dto);
+  }
+
+  @Get('receipt-settings')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get receipt/thermal print settings' })
+  getReceiptSettings(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.getReceiptSettings(user.tenantId);
+  }
+
+  @Put('receipt-settings')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Save receipt/thermal print settings' })
+  saveReceiptSettings(@CurrentUser() user: IAuthUser, @Body() dto: ReceiptSettingsDto) {
+    return this.tenantsService.saveReceiptSettings(user.tenantId, dto);
   }
 
   @Get()

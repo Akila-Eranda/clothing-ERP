@@ -5,7 +5,9 @@ import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
+  Printer, Image,
 } from "lucide-react";
+import { type ReceiptSettings, RECEIPT_DEFAULTS } from "@/lib/use-receipt-settings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,6 +121,41 @@ function AuditLogTab() {
   );
 }
 
+function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string }) {
+  const fs = s.fontSize === "small" ? "10px" : s.fontSize === "large" ? "14px" : "12px";
+  return (
+    <div style={{ fontFamily: "'Courier New', monospace", fontSize: fs, padding: "12px", background: "#fff", color: "#000", maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: "1px dashed #ccc" }}>
+      {s.logoUrl && <img src={s.logoUrl} alt="logo" style={{ maxWidth: "80px", display: "block", margin: "0 auto 4px" }} />}
+      <div style={{ textAlign: "center", fontWeight: 900, fontSize: "1.3em" }}>{s.shopName || "Shop Name"}</div>
+      {s.tagline && <div style={{ textAlign: "center", fontSize: "0.85em", marginBottom: 2 }}>{s.tagline}</div>}
+      {s.address1 && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.address1}</div>}
+      {s.address2 && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.address2}</div>}
+      {s.phone && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.phone}</div>}
+      {s.email && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.email}</div>}
+      {s.website && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.website}</div>}
+      {s.headerText && <div style={{ textAlign: "center", fontSize: "0.85em", marginTop: 4, fontStyle: "italic" }}>{s.headerText}</div>}
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Invoice:</span><span><b>INV-00001</b></span></div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Date:</span><span>{new Date().toLocaleDateString()}</span></div>
+      {s.showCashier && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Cashier:</span><span>{cashier || "Admin"}</span></div>}
+      {s.showCustomer && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Customer:</span><span>Walk-in</span></div>}
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ fontSize: "0.8em", fontWeight: "bold", marginBottom: 2 }}>ITEMS</div>
+      <div style={{ fontSize: "0.85em", fontWeight: "bold" }}>Sample T-Shirt (Blue / L)</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>2 x LKR 1,500.00</span><span>LKR 3,000.00</span></div>
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Subtotal</span><span>LKR 3,000.00</span></div>
+      {s.showDiscount && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Discount</span><span>-LKR 200.00</span></div>}
+      {s.showTax && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Tax (5%)</span><span>LKR 140.00</span></div>}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1em", fontWeight: 900, borderTop: "2px solid #000", paddingTop: 4, marginTop: 4 }}><span>TOTAL</span><span>LKR 2,940.00</span></div>
+      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Payment</span><span><b>CASH</b></span></div>
+      {s.showBarcode && <div style={{ textAlign: "center", fontSize: "0.75em", margin: "4px 0", fontFamily: "monospace", letterSpacing: 2 }}>||| ||| ||| INV-00001 ||| |||</div>}
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6 }}>{s.footerText}</div>
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
 
@@ -133,6 +170,9 @@ export default function SettingsPage() {
   const [pwForm, setPwForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [pwSaving, setPwSaving] = React.useState(false);
   const [showPw, setShowPw] = React.useState({ current: false, newPw: false, confirm: false });
+
+  const [receiptForm, setReceiptForm] = React.useState<ReceiptSettings>(RECEIPT_DEFAULTS);
+  const [receiptSaving, setReceiptSaving] = React.useState(false);
 
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = React.useState(false);
@@ -153,8 +193,22 @@ export default function SettingsPage() {
       setProfileForm({ firstName: u.firstName ?? "", lastName: u.lastName ?? "", phone: u.phone ?? "" });
     }).catch(() => {});
 
+    api.get<ReceiptSettings>("/tenants/receipt-settings").then(r => {
+      setReceiptForm({ ...RECEIPT_DEFAULTS, ...r.data });
+    }).catch(() => {});
+
     loadBranches();
   }, []);
+
+  async function saveReceipt() {
+    setReceiptSaving(true);
+    try {
+      await api.put("/tenants/receipt-settings", receiptForm);
+      try { localStorage.setItem("receipt_settings_cache", JSON.stringify(receiptForm)); } catch { /* noop */ }
+      toast.success("Receipt settings saved");
+    } catch { toast.error("Failed to save receipt settings"); }
+    finally { setReceiptSaving(false); }
+  }
 
   async function loadBranches() {
     setBranchesLoading(true);
@@ -239,6 +293,7 @@ export default function SettingsPage() {
       <Tabs defaultValue="general">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="general" className="gap-1.5"><Store className="h-3.5 w-3.5" />General</TabsTrigger>
+          <TabsTrigger value="receipt" className="gap-1.5"><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
           <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
           <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="branches" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
@@ -317,6 +372,134 @@ export default function SettingsPage() {
               ))}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="receipt" className="mt-6">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            {/* ── Form ── */}
+            <div className="space-y-5">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2"><Store className="h-4 w-4 text-primary" />Shop Identity</CardTitle>
+                  <CardDescription>Appears at the top of every printed receipt</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5 col-span-2">
+                      <Label>Shop Name</Label>
+                      <Input value={receiptForm.shopName} onChange={e => setReceiptForm(f => ({ ...f, shopName: e.target.value }))} placeholder="My Fashion Store" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label>Tagline</Label>
+                      <Input value={receiptForm.tagline} onChange={e => setReceiptForm(f => ({ ...f, tagline: e.target.value }))} placeholder="Quality you can feel" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="flex items-center gap-1.5"><Image className="h-3.5 w-3.5" />Logo URL</Label>
+                      <Input value={receiptForm.logoUrl} onChange={e => setReceiptForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://cdn.example.com/logo.png" />
+                      <p className="text-xs text-muted-foreground">Paste a public image URL (PNG/JPG, max ~80px wide)</p>
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Address Line 1</Label>
+                      <Input value={receiptForm.address1} onChange={e => setReceiptForm(f => ({ ...f, address1: e.target.value }))} placeholder="123 Main Street, Colombo" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label>Address Line 2</Label>
+                      <Input value={receiptForm.address2} onChange={e => setReceiptForm(f => ({ ...f, address2: e.target.value }))} placeholder="Western Province, Sri Lanka" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone</Label>
+                      <Input value={receiptForm.phone} onChange={e => setReceiptForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 11 234 5678" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email</Label>
+                      <Input value={receiptForm.email} onChange={e => setReceiptForm(f => ({ ...f, email: e.target.value }))} placeholder="hello@mystore.com" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" />Website</Label>
+                      <Input value={receiptForm.website} onChange={e => setReceiptForm(f => ({ ...f, website: e.target.value }))} placeholder="www.mystore.com" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Message &amp; Layout</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Header Message <span className="text-muted-foreground">(below address)</span></Label>
+                    <Input value={receiptForm.headerText} onChange={e => setReceiptForm(f => ({ ...f, headerText: e.target.value }))} placeholder="Promotions valid until June 30" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Footer Message <span className="text-muted-foreground">(bottom of receipt)</span></Label>
+                    <Input value={receiptForm.footerText} onChange={e => setReceiptForm(f => ({ ...f, footerText: e.target.value }))} placeholder="Thank you for shopping with us!" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Paper Width</Label>
+                      <select value={receiptForm.paperWidth} onChange={e => setReceiptForm(f => ({ ...f, paperWidth: e.target.value as "58mm" | "80mm" }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="58mm">58 mm (narrow)</option>
+                        <option value="80mm">80 mm (standard)</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Font Size</Label>
+                      <select value={receiptForm.fontSize} onChange={e => setReceiptForm(f => ({ ...f, fontSize: e.target.value as "small"|"medium"|"large" }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                        <option value="small">Small</option>
+                        <option value="medium">Medium</option>
+                        <option value="large">Large</option>
+                      </select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Show / Hide Sections</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1">
+                  {([
+                    { key: "showTax",      label: "Tax line",       desc: "Show tax amount on receipt" },
+                    { key: "showDiscount", label: "Discount line",   desc: "Show discount amount" },
+                    { key: "showCashier",  label: "Cashier name",    desc: "Show who processed the sale" },
+                    { key: "showCustomer", label: "Customer name",   desc: "Show customer if assigned" },
+                    { key: "showBarcode",  label: "Invoice barcode", desc: "Print scannable barcode at bottom" },
+                  ] as { key: keyof ReceiptSettings; label: string; desc: string }[]).map(item => (
+                    <div key={item.key} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                      <div>
+                        <p className="text-sm font-medium">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">{item.desc}</p>
+                      </div>
+                      <Switch
+                        checked={receiptForm[item.key] as boolean}
+                        onCheckedChange={v => setReceiptForm(f => ({ ...f, [item.key]: v }))}
+                      />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              <Button variant="gradient" onClick={saveReceipt} disabled={receiptSaving}>
+                {receiptSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
+                Save Receipt Settings
+              </Button>
+            </div>
+
+            {/* ── Live Preview ── */}
+            <div className="space-y-3">
+              <Card className="sticky top-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2"><Printer className="h-4 w-4 text-primary" />Live Preview</CardTitle>
+                  <CardDescription>Updates as you type — this is how your receipt will look</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ReceiptPreview s={receiptForm} cashier={me ? `${me.firstName} ${me.lastName}`.trim() : "Admin"} />
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="profile" className="mt-6 space-y-6">
