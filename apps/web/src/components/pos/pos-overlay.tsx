@@ -75,6 +75,9 @@ export function POSOverlay() {
   const [returnRestock, setReturnRestock] = React.useState(true);
   const [returnSubmitting, setReturnSubmitting] = React.useState(false);
   const [returnResult, setReturnResult] = React.useState<{returnNumber:string;refundAmount:number}|null>(null);
+  const [returnType, setReturnType] = React.useState<"RETURN"|"EXCHANGE">("RETURN");
+  const [exchangeItems, setExchangeItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
+  const [exchangeSearch, setExchangeSearch] = React.useState("");
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
@@ -97,7 +100,7 @@ export function POSOverlay() {
 
   React.useEffect(() => { if (posOpen) loadProducts(); }, [posOpen, loadProducts]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
-  React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); } }, [activeNav]);
+  React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); setReturnType("RETURN"); setExchangeItems(new Map()); setExchangeSearch(""); } }, [activeNav]);
 
   React.useEffect(() => {
     if (!customerSearch.trim()) { setCustomers([]); return; }
@@ -343,6 +346,11 @@ export function POSOverlay() {
       const REASONS = [{v:"DEFECTIVE",l:"Defective"},{v:"WRONG_ITEM",l:"Wrong Item"},{v:"SIZE_ISSUE",l:"Size Issue"},{v:"CUSTOMER_CHANGED_MIND",l:"Changed Mind"},{v:"DAMAGED",l:"Damaged"},{v:"OTHER",l:"Other"}];
       const selectedItems = Array.from(returnItems.entries()).filter(([,s])=>s.qty>0);
       const refundTotal = selectedItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
+      const selectedExchangeItems = Array.from(exchangeItems.entries()).filter(([,s])=>s.qty>0);
+      const exchangeTotal = selectedExchangeItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
+      const netRefund = returnType === "EXCHANGE" ? Math.max(0, refundTotal - exchangeTotal) : refundTotal;
+      const exchangeDue = returnType === "EXCHANGE" ? Math.max(0, exchangeTotal - refundTotal) : 0;
+      const exchangeProducts = products.filter(p=>{const q=exchangeSearch.toLowerCase();return !q||p.productName.toLowerCase().includes(q)||p.variantName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q);}).slice(0,30);
 
       const searchSale = async () => {
         if (!returnQuery.trim()) return;
@@ -364,9 +372,10 @@ export function POSOverlay() {
 
       const submitReturn = async () => {
         if (!returnSale || !returnReason || !selectedItems.length) return;
+        if (returnType === "EXCHANGE" && !selectedExchangeItems.length) { toast.error("Select exchange item"); return; }
         setReturnSubmitting(true);
         try {
-          const r = await api.post<{returnNumber:string;refundAmount:number}>("/returns", { originalSaleId:returnSale.id, reason:returnReason, returnType:"RETURN", notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})) });
+          const r = await api.post<{returnNumber:string;refundAmount:number}>("/returns", { originalSaleId:returnSale.id, reason:returnReason, returnType, notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})), exchangeItems:returnType==="EXCHANGE"?selectedExchangeItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice,productName:s.name,variantName:s.name,sku:products.find(p=>p.variantId===variantId)?.sku})):undefined });
           setReturnResult({returnNumber:r.data.returnNumber,refundAmount:r.data.refundAmount});
           setReturnStep("done"); toast.success(`Return ${r.data.returnNumber} created`);
         } catch(e:unknown){ toast.error((e as Error).message??"Return failed"); } finally { setReturnSubmitting(false); }
@@ -460,8 +469,39 @@ export function POSOverlay() {
                     );
                   })}
                 </div>
+                {returnType==="EXCHANGE"&&(
+                  <div className="shrink-0 rounded-xl border p-2 space-y-2" style={{background:"#0f1f3a",borderColor:"#1e3356",maxHeight:"230px"}}>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold shrink-0" style={{color:"#6a8ab8"}}>EXCHANGE ITEM</p>
+                      <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                    </div>
+                    <div className="grid gap-1 overflow-y-auto" style={{gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",maxHeight:"170px"}}>
+                      {exchangeProducts.map(p=>{
+                        const ex=exchangeItems.get(p.variantId);
+                        return(
+                          <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"#162338",borderColor:(ex?.qty??0)>0?"#4f6ef7":"#1e3356"}}>
+                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{background:getCardBg(p.color)}}><Package className="h-4 w-4 text-white/30"/></div>
+                            <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{p.variantName} · {p.sku}</p></div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
+                              <span className="text-white text-xs font-bold w-4 text-center">{ex?.qty??0}</span>
+                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);n.set(p.variantId,{qty:(cur?.qty??0)+1,unitPrice:p.unitPrice,name:`${p.productName} ${p.variantName}`.trim(),maxQty:p.stock});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-2.5 w-2.5 text-white"/></button>
+                            </div>
+                            <p className="text-[10px] font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="w-56 flex flex-col gap-2 shrink-0">
+                <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>RETURN TYPE</p>
+                <div className="grid grid-cols-2 gap-1">
+                  {[{v:"RETURN",l:"Refund"},{v:"EXCHANGE",l:"Exchange"}].map(t=>(
+                    <button key={t.v} onClick={()=>setReturnType(t.v as "RETURN"|"EXCHANGE")} className="h-8 rounded-xl text-xs font-bold transition-all border" style={{background:returnType===t.v?"#4f6ef7":"#162338",borderColor:returnType===t.v?"#4f6ef7":"#1e3356",color:returnType===t.v?"#fff":"#6a8ab8"}}>{t.l}</button>
+                  ))}
+                </div>
                 <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>RETURN REASON <span className="text-red-400">*</span></p>
                 <div className="space-y-1">
                   {REASONS.map(r=>(
@@ -480,7 +520,13 @@ export function POSOverlay() {
                 <div className="mt-auto p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
                   <p className="text-xs" style={{color:"#6a8ab8"}}>Items selected: {selectedItems.length}</p>
                   <p className="text-white font-bold text-lg mt-1">LKR {formatNumber(refundTotal)}</p>
-                  <p className="text-[10px]" style={{color:"#6a8ab8"}}>Refund amount</p>
+                  <p className="text-[10px]" style={{color:"#6a8ab8"}}>{returnType==="EXCHANGE"?"Return item value":"Refund amount"}</p>
+                  {returnType==="EXCHANGE"&&(
+                    <div className="mt-2 pt-2 border-t space-y-1" style={{borderColor:"#1e3356"}}>
+                      <div className="flex justify-between text-[10px]" style={{color:"#6a8ab8"}}><span>Exchange</span><span>LKR {formatNumber(exchangeTotal)}</span></div>
+                      <div className="flex justify-between text-[10px]" style={{color:exchangeDue>0?"#f59e0b":"#10b981"}}><span>{exchangeDue>0?"Customer Pays":"Refund"}</span><span>LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</span></div>
+                    </div>
+                  )}
                 </div>
                 <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Review Return →</button>
               </div>
@@ -493,7 +539,7 @@ export function POSOverlay() {
               <div className="rounded-xl border p-4" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <p className="text-xs font-semibold mb-3" style={{color:"#6a8ab8"}}>RETURN SUMMARY</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"}].map(f=>(
+                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},{l:"Exchange Due",v:`LKR ${formatNumber(exchangeDue)}`}].map(f=>(
                     <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5">{f.v}</p></div>
                   ))}
                 </div>
@@ -508,9 +554,26 @@ export function POSOverlay() {
                   </div>
                 ))}
               </div>
-              <div className="flex justify-between items-center p-4 rounded-xl border mt-1" style={{background:"rgba(16,185,129,0.08)",borderColor:"rgba(16,185,129,0.3)"}}>
-                <div><p className="text-xs" style={{color:"#10b981"}}>Total Refund Amount</p><p className="text-2xl font-bold text-white mt-0.5">LKR {formatNumber(refundTotal)}</p></div>
-                <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm Return</button>
+              {returnType==="EXCHANGE"&&(
+                <>
+                  <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>EXCHANGE ITEMS</p>
+                  <div className="space-y-1">
+                    {selectedExchangeItems.map(([variantId,sel])=>(
+                      <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                        <p className="text-white text-xs font-semibold">{sel.name}</p>
+                        <p className="text-xs font-mono" style={{color:"#6a8ab8"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between items-center p-4 rounded-xl border mt-1" style={{background:exchangeDue>0?"rgba(245,158,11,0.08)":"rgba(16,185,129,0.08)",borderColor:exchangeDue>0?"rgba(245,158,11,0.3)":"rgba(16,185,129,0.3)"}}>
+                <div>
+                  <p className="text-xs" style={{color:exchangeDue>0?"#f59e0b":"#10b981"}}>{exchangeDue>0?"Customer Pays Balance":"Total Refund Amount"}</p>
+                  <p className="text-2xl font-bold text-white mt-0.5">LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</p>
+                  {returnType==="EXCHANGE"&&<p className="text-[10px] mt-1" style={{color:"#6a8ab8"}}>Returned LKR {formatNumber(refundTotal)} - Exchange LKR {formatNumber(exchangeTotal)}</p>}
+                </div>
+                <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm {returnType==="EXCHANGE"?"Exchange":"Return"}</button>
               </div>
             </div>
           )}
@@ -520,7 +583,7 @@ export function POSOverlay() {
             <div className="flex-1 flex flex-col items-center justify-center gap-4">
               <div className="h-20 w-20 rounded-full flex items-center justify-center" style={{background:"rgba(16,185,129,0.15)"}}><CheckCircle2 className="h-10 w-10" style={{color:"#10b981"}}/></div>
               <div className="text-center">
-                <h3 className="text-white font-bold text-xl">Return Processed!</h3>
+                <h3 className="text-white font-bold text-xl">{returnType==="EXCHANGE"?"Exchange":"Return"} Processed!</h3>
                 <p className="text-xs mt-1 font-mono" style={{color:"#6a8ab8"}}>{returnResult.returnNumber}</p>
               </div>
               <div className="p-5 rounded-2xl border text-center" style={{background:"#162338",borderColor:"#1e3356",minWidth:"260px"}}>
@@ -530,7 +593,7 @@ export function POSOverlay() {
               </div>
               <div className="flex gap-3">
                 <button onClick={()=>{const w=window.open("","_blank","width=380,height=500");if(!w)return;w.document.write(`<!DOCTYPE html><html><head><title>Return Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>RETURN RECEIPT</h1><hr class="d"/><div class="row"><span>${returnResult.returnNumber}</span></div><div class="row"><span>Date: ${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice: ${returnSale?.invoiceNumber}</span></div><div class="row"><span>Reason: ${REASONS.find(r=>r.v===returnReason)?.l}</span></div><hr class="d"/>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} x${s.qty}</span><span>LKR ${s.unitPrice*s.qty}</span></div>`).join("")}<hr class="d"/><div class="row"><b>REFUND</b><b>LKR ${returnResult.refundAmount.toFixed(2)}</b></div><div class="foot">*** Thank You ***</div></body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Print Receipt</button>
-                <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
+                <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
               </div>
             </div>
           )}
