@@ -160,27 +160,34 @@ export function POSOverlay() {
     }
   }, [pinEntry]);
 
+  const buildReceiptHtml = React.useCallback((r: SaleReceipt): string => {
+    const rows=r.items.map(i=>`<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${i.qty>0?(i.price/i.qty).toFixed(2):"0.00"}</span><span>LKR ${i.price.toFixed(2)}</span></div>`).join("");
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:18px;font-weight:900;text-align:center}sub{font-size:10px;display:block;text-align:center;margin-bottom:2px}.d{border:none;border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:11px}.iname{font-size:11px;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:10px;line-height:1.6}@media print{@page{margin:0;size:80mm auto}body{padding:3mm}}</style></head><body><h1>FashionERP</h1><sub>Point of Sale Receipt</sub><hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div>${r.customerName?`<div class="row"><span>Customer:</span><span>${r.customerName}</span></div>`:""}<hr class="d"/><div style="font-size:10px;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${r.discount>0?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:""} ${r.tax>0?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:""}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div><hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<div class="foot">Thank you for shopping!<br/>*** FashionERP POS ***</div></body></html>`;
+  },[user]);
   const handleThermalPrint = React.useCallback(()=>{
     if(!receipt)return; const w=window.open("","_blank","width=400,height=700,scrollbars=yes"); if(!w){toast.error("Allow popups to print");return;}
     const rows=receipt.items.map(i=>`<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${i.qty>0?(i.price/i.qty).toFixed(2):"0.00"}</span><span>LKR ${i.price.toFixed(2)}</span></div>`).join("");
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:18px;font-weight:900;text-align:center}sub{font-size:10px;display:block;text-align:center;margin-bottom:2px}.d{border:none;border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:11px}.iname{font-size:11px;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:10px;line-height:1.6}@media print{@page{margin:0;size:80mm auto}body{padding:3mm}}</style></head><body><h1>FashionERP</h1><sub>Point of Sale Receipt</sub><hr class="d"/><div class="row"><span>Invoice:</span><span><b>${receipt.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div>${receipt.customerName?`<div class="row"><span>Customer:</span><span>${receipt.customerName}</span></div>`:""}<hr class="d"/><div style="font-size:10px;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${receipt.subtotal.toFixed(2)}</span></div>${receipt.discount>0?`<div class="row"><span>Discount</span><span>-LKR ${receipt.discount.toFixed(2)}</span></div>`:""}<div class="row"><span>Tax</span><span>LKR ${receipt.tax.toFixed(2)}</span></div><div class="tot"><span>TOTAL</span><span>LKR ${receipt.total.toFixed(2)}</span></div><hr class="d"/><div class="row"><span>Payment</span><span><b>${receipt.paymentMethod}</b></span></div>${receipt.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${receipt.cashTendered.toFixed(2)}</span></div>`:""}${receipt.changeDue>0?`<div class="row"><span>Change</span><span>LKR ${receipt.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/><div class="foot">*** Thank You for Shopping! ***<br/>Powered by FashionERP</div></body></html>`);
     w.document.close(); setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),1000);},250);
-  },[receipt,user]);
+  },[receipt,buildReceiptHtml]);
 
   const handleCheckout = React.useCallback(async()=>{
     if(!items.length||checkoutLoading)return;
     if(activePayment==="CASH"&&numpad&&parseFloat(numpad)<totalAmt){toast.error("Cash tendered less than total");return;}
     setCheckoutLoading(true);
+    const printWin=window.open("","_blank","width=400,height=700,scrollbars=yes");
     try {
       const pm=new Map(products.map(p=>[p.variantId,p]));
       const payload={customerId:customer?.id,items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),payments:[{method:activePayment,amount:activePayment==="CASH"&&numpad?parseFloat(numpad):totalAmt}],discountAmount:discountAmount(),notes:cartNotes};
       const res=await api.post<{invoiceNumber:string;total:number;changeDue:number}>("/pos/sale",payload);
       const s=res.data;
-      setReceipt({invoiceNumber:s.invoiceNumber,total:s.total,changeDue:s.changeDue??changeAmt,paymentMethod:activePayment,customerName:customer?.name,items:items.map(i=>({name:`${i.productName} ${i.variantName}`.trim(),qty:i.quantity,price:i.unitPrice*i.quantity})),subtotal:subtotal(),discount:discountAmount(),tax:taxAmount(),cashTendered:numpad?parseFloat(numpad):undefined});
+      const r:SaleReceipt={invoiceNumber:s.invoiceNumber,total:s.total,changeDue:s.changeDue??changeAmt,paymentMethod:activePayment,customerName:customer?.name,items:items.map(i=>({name:`${i.productName} ${i.variantName}`.trim(),qty:i.quantity,price:i.unitPrice*i.quantity})),subtotal:subtotal(),discount:discountAmount(),tax:taxAmount(),cashTendered:numpad?parseFloat(numpad):undefined};
+      setReceipt(r);
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
-      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");
-    } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes]);
+      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");
+      if(printWin){printWin.document.write(buildReceiptHtml(r));printWin.document.close();setTimeout(()=>{printWin.focus();printWin.print();setTimeout(()=>printWin.close(),1000);},250);}
+    } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");if(printWin)printWin.close();} finally{setCheckoutLoading(false);}
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes,buildReceiptHtml]);
 
   React.useEffect(() => {
     if (!posOpen) return;
@@ -192,7 +199,13 @@ export function POSOverlay() {
       if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const sku=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(sku){const found=products.find(p=>p.sku.toLowerCase()===sku.toLowerCase());if(found){handleAddProduct(found);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`SKU not found: ${sku}`);e.preventDefault();return;}}
       if(e.key==="F1"||(e.key==="?"&&!inInput)){e.preventDefault();setShowShortcuts(s=>!s);return;}
       if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(receipt){setReceipt(null);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
+      if(inInput&&e.key==="Enter"&&document.activeElement===searchRef.current){const first=filteredProducts[0];if(first){e.preventDefault();handleAddProduct(first);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}return;}
       if(inInput)return;
+      if(e.key==="p"||e.key==="P"){e.preventDefault();setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),50);return;}
+      if(e.key==="c"||e.key==="C"){e.preventDefault();setActiveNav("cart");return;}
+      if(e.key==="r"||e.key==="R"){e.preventDefault();setActiveNav("returns");return;}
+      if(e.key==="h"||e.key==="H"){e.preventDefault();setActiveNav("hold-bills");return;}
+      if(e.key==="u"||e.key==="U"){e.preventDefault();setActiveNav("customers");return;}
       if(e.key==="/"||((e.ctrlKey||e.metaKey)&&e.key==="f")){e.preventDefault();searchRef.current?.focus();return;}
       if(e.key==="F2"){e.preventDefault();searchRef.current?.focus();setActiveNav("products");return;}
       if(e.key==="F3"){e.preventDefault();if(items.length>0){holdBill();toast.success("Bill held");}return;}
@@ -212,7 +225,7 @@ export function POSOverlay() {
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,receipt,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,pinLocked,handlePinEntry]);
+  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,receipt,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,pinLocked,handlePinEntry,filteredProducts]);
 
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
@@ -838,7 +851,7 @@ export function POSOverlay() {
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} onKeyDown={e=>{if(e.key==="Enter"&&filteredProducts.length>0){e.preventDefault();handleAddProduct(filteredProducts[0]);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}}} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -1046,7 +1059,7 @@ export function POSOverlay() {
             <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-sm p-4" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
               <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {[["F2","Focus search"],["F3","Hold bill"],["F4","Customer search"],["F5","Refresh products"],["F8","Restore last held bill"],["F9 / Enter","Confirm payment"],["F12 / ESC","Close POS"],["Tab","Cycle payment method"],["","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["F1 / ?","This help"]].map(([k,d])=>(
+                {[["F2 / P","Focus search (Products)"],["C","Cart tab"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["F3","Hold bill"],["F8","Restore last held bill"],["F9 / Enter","Confirm payment"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["↑ ↓","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["F1 / ?","This help"]].map(([k,d])=>(
                   <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5">
                     <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
                     <span className="text-xs ml-3" style={{color:"#6a8ab8"}}>{d}</span>
