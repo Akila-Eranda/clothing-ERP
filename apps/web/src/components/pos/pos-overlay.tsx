@@ -16,7 +16,7 @@ interface ProductItem { variantId: string; productName: string; variantName: str
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; }
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
-interface OrderRow { id: string; invoiceNumber: string; customerName?: string; total: number; itemCount: number; paymentMethod: string; status: string; createdAt: string; }
+interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string } | null; _count?: { items: number }; payments?: { method: string }[]; }
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }];
 const NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw }, { id:"discounts", label:"Discounts", icon: Tag }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
@@ -54,7 +54,7 @@ export function POSOverlay() {
   const [now, setNow] = React.useState(new Date());
   const [todayStats, setTodayStats] = React.useState({ sales: 0, orders: 0, items: 0 });
   const [liked, setLiked] = React.useState<Set<string>>(new Set());
-  const [orders, setOrders] = React.useState<OrderRow[]>([]);
+  const [orders, setOrders] = React.useState<SaleRow[]>([]);
   const [ordersLoading, setOrdersLoading] = React.useState(false);
   const [inlineCustomerSearch, setInlineCustomerSearch] = React.useState("");
   const [inlineCustomers, setInlineCustomers] = React.useState<CustomerItem[]>([]);
@@ -75,10 +75,9 @@ export function POSOverlay() {
   const loadOrders = React.useCallback(async () => {
     setOrdersLoading(true);
     try {
-      const r = await api.get<{data?: OrderRow[]} | OrderRow[]>("/orders?limit=30&sort=createdAt:desc");
-      const raw = Array.isArray(r.data) ? r.data : ((r.data as {data?: OrderRow[]}).data ?? []);
-      setOrders(raw as OrderRow[]);
-    } catch { toast.error("Failed to load orders"); } finally { setOrdersLoading(false); }
+      const r = await api.get<{data?: SaleRow[]}>("/sales?limit=30");
+      setOrders(r.data?.data ?? []);
+    } catch { toast.error("Failed to load sales"); } finally { setOrdersLoading(false); }
   }, []);
 
   React.useEffect(() => { if (posOpen) loadProducts(); }, [posOpen, loadProducts]);
@@ -310,11 +309,11 @@ export function POSOverlay() {
               <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
               <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid #1a2b3a",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
                 <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
-                <td className="px-3 py-2 text-xs text-white">{o.customerName??"Walk-in"}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.itemCount}</td>
+                <td className="px-3 py-2 text-xs text-white">{o.customer?.name??"Walk-in"}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o._count?.items??0}</td>
                 <td className="px-3 py-2 text-xs font-bold font-mono text-white">LKR {formatNumber(o.total)}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.paymentMethod}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{new Date(o.createdAt).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.payments?.[0]?.method??"-"}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{new Date(o.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
                 <td className="px-3 py-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{o.status}</span></td>
               </tr>);})}</tbody>
             </table>
