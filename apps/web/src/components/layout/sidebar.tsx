@@ -118,8 +118,8 @@ export function Sidebar() {
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex h-screen flex-col overflow-hidden shrink-0"
         style={{
-          background: "var(--sidebar)",
-          borderRight: "1px solid rgba(255,255,255,0.06)",
+          background: "hsl(var(--sidebar-background))",
+          borderRight: "1px solid hsl(var(--sidebar-border))",
         }}
       >
         {/* ── Logo ── */}
@@ -127,7 +127,7 @@ export function Sidebar() {
           "flex h-[50px] items-center shrink-0 px-3",
           "border-b",
           sidebarCollapsed ? "justify-center" : "justify-between",
-        )} style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+        )} style={{ borderColor: "hsl(var(--sidebar-border))" }}>
           <div className="flex items-center gap-2.5 min-w-0">
             <div
               className="flex h-7 w-7 items-center justify-center rounded-lg shrink-0 shadow-lg"
@@ -146,7 +146,7 @@ export function Sidebar() {
                   className="overflow-hidden"
                 >
                   <p className="text-[14px] font-extrabold text-foreground whitespace-nowrap tracking-tight leading-none">FashionERP</p>
-                  <p className="text-[10px] whitespace-nowrap font-semibold tracking-widest uppercase leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>Enterprise</p>
+                  <p className="text-[10px] whitespace-nowrap font-semibold tracking-widest uppercase leading-none mt-0.5" style={{ color: "hsl(var(--sidebar-foreground)/0.4)" }}>Enterprise</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -155,9 +155,9 @@ export function Sidebar() {
             <button
               onClick={toggleSidebar}
               className="flex h-5 w-5 items-center justify-center rounded transition-colors"
-              style={{ color: "rgba(255,255,255,0.25)" }}
-              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
-              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+              style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground))")}
+              onMouseLeave={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.35)")}
             >
               <PanelLeftClose className="h-3 w-3" />
             </button>
@@ -169,9 +169,9 @@ export function Sidebar() {
           <button
             onClick={toggleSidebar}
             className="mx-auto mt-2 flex h-6 w-6 items-center justify-center rounded transition-colors"
-            style={{ color: "rgba(255,255,255,0.25)" }}
-            onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
-            onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+            style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground))")}
+            onMouseLeave={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.35)")}
           >
             <PanelLeftOpen className="h-3 w-3" />
           </button>
@@ -185,12 +185,12 @@ export function Sidebar() {
                 {!sidebarCollapsed ? (
                   <p
                     className="mb-1 px-1.5 text-[11px] font-bold uppercase tracking-[0.1em] select-none"
-                    style={{ color: "rgba(255,255,255,0.22)" }}
+                    style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}
                   >
                     {group.group}
                   </p>
                 ) : (
-                  gi > 0 && <div className="mx-auto my-2 h-px w-5" style={{ background: "rgba(255,255,255,0.07)" }} />
+                  gi > 0 && <div className="mx-auto my-2 h-px w-5" style={{ background: "hsl(var(--sidebar-border))" }} />
                 )}
 
                 <div className="space-y-[2px]">
@@ -206,20 +206,20 @@ export function Sidebar() {
                           sidebarCollapsed ? "h-9 w-full justify-center px-0" : "h-[34px] px-2.5",
                         )}
                         style={isActive ? {
-                          background: "linear-gradient(90deg,rgba(99,102,241,0.18),rgba(99,102,241,0.08))",
-                          color: "#a5b4fc",
+                          background: "hsl(var(--sidebar-accent))",
+                          color: "hsl(var(--sidebar-primary))",
                         } : {
-                          color: "rgba(255,255,255,0.42)",
+                          color: "hsl(var(--sidebar-foreground)/0.65)",
                         }}
-                        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "rgba(255,255,255,0.82)"; }}}
-                        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.42)"; }}}
+                        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}}
+                        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}}
                       >
                         {/* Glow left border */}
                         {isActive && (
                           <motion.span
                             layoutId="sb-bar"
                             className="absolute left-0 top-[4px] bottom-[4px] w-[2px] rounded-full"
-                            style={{ background: "linear-gradient(180deg,#818cf8,#6366f1)" }}
+                            style={{ background: "hsl(var(--sidebar-primary))" }}
                             transition={{ type: "spring", stiffness: 500, damping: 38 }}
                           />
                         )}
@@ -229,7 +229,7 @@ export function Sidebar() {
                           "relative z-10 flex items-center justify-center rounded-[5px] shrink-0 transition-all",
                           sidebarCollapsed ? "h-6 w-6" : "h-5 w-5",
                           isActive
-                            ? "bg-indigo-500/20 text-indigo-400"
+                            ? "text-inherit"
                             : "text-inherit",
                         )}>
                           <Icon className="h-3.5 w-3.5" />
@@ -244,8 +244,8 @@ export function Sidebar() {
                               <span
                                 className="relative z-10 ml-auto flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none"
                                 style={isActive
-                                  ? { background: "#6366f1", color: "#fff" }
-                                  : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }
+                                  ? { background: "hsl(var(--sidebar-primary))", color: "hsl(var(--sidebar-primary-foreground))" }
+                                  : { background: "hsl(var(--sidebar-accent))", color: "hsl(var(--sidebar-foreground)/0.6)" }
                                 }
                               >
                                 {item.badge}
@@ -281,12 +281,12 @@ export function Sidebar() {
         </ScrollArea>
 
         {/* ── Footer ── */}
-        <div className="shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+        <div className="shrink-0" style={{ borderTop: "1px solid hsl(var(--sidebar-border))" }}>
           {sidebarCollapsed ? (
             <div className="flex flex-col items-center gap-1 py-2 px-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/settings" className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "rgba(255,255,255,0.3)" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}>
+                  <Link href="/settings" className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "hsl(var(--sidebar-foreground)/0.5)" }} onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.5)"; }}>
                     <Settings className="h-3.5 w-3.5" />
                   </Link>
                 </TooltipTrigger>
@@ -294,7 +294,7 @@ export function Sidebar() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; }}>
+                  <button className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; }}>
                     <Avatar className="h-5 w-5">
                       <AvatarImage src={user?.avatar} />
                       <AvatarFallback className="text-[8px] font-bold text-white" style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
@@ -310,7 +310,7 @@ export function Sidebar() {
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={handleLogout} className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "rgba(255,255,255,0.3)" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.color = "#f87171"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}>
+                  <button onClick={handleLogout} className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "hsl(var(--sidebar-foreground)/0.5)" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.color = "#f87171"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.5)"; }}>
                     <LogOut className="h-3.5 w-3.5" />
                   </button>
                 </TooltipTrigger>
@@ -322,7 +322,7 @@ export function Sidebar() {
               {/* User card */}
               <div
                 className="flex items-center gap-2 rounded-[8px] px-2.5 py-2 mb-1.5"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+                style={{ background: "hsl(var(--sidebar-accent))", border: "1px solid hsl(var(--sidebar-border))" }}
               >
                 <div className="relative shrink-0">
                   <Avatar className="h-6 w-6">
@@ -334,10 +334,10 @@ export function Sidebar() {
                   <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-sidebar bg-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
+                  <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "hsl(var(--sidebar-foreground))" }}>
                     {user?.name || "Admin"}
                   </p>
-                  <p className="text-[11px] capitalize truncate leading-tight mt-px" style={{ color: "rgba(255,255,255,0.28)" }}>
+                  <p className="text-[11px] capitalize truncate leading-tight mt-px" style={{ color: "hsl(var(--sidebar-foreground)/0.45)" }}>
                     {user?.role?.replace(/_/g, " ") || "Administrator"}
                   </p>
                 </div>
@@ -347,18 +347,18 @@ export function Sidebar() {
                 <Link
                   href="/settings"
                   className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
-                  style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
+                  style={{ color: "hsl(var(--sidebar-foreground)/0.55)", border: "1px solid hsl(var(--sidebar-border))" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.55)"; }}
                 >
                   <Settings className="h-3.5 w-3.5" />Settings
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
-                  style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
-                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
+                  style={{ color: "hsl(var(--sidebar-foreground)/0.55)", border: "1px solid hsl(var(--sidebar-border))" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.55)"; e.currentTarget.style.borderColor = "hsl(var(--sidebar-border))"; }}
                 >
                   <LogOut className="h-3 w-3" />Sign out
                 </button>
