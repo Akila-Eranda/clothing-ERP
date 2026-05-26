@@ -63,6 +63,7 @@ export function POSOverlay() {
   const [inlineCustomers, setInlineCustomers] = React.useState<CustomerItem[]>([]);
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
+  const [discountInput, setDiscountInput] = React.useState("");
   const [showNewCust, setShowNewCust] = React.useState(false);
   const [newCustFirst, setNewCustFirst] = React.useState("");
   const [newCustLast, setNewCustLast] = React.useState("");
@@ -91,7 +92,7 @@ export function POSOverlay() {
   const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+  const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setTaxRate, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
 
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
 
@@ -248,7 +249,7 @@ export function POSOverlay() {
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):filteredProducts.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
-            <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(148px,1fr))"}}>
+            <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
               {filteredProducts.map(p=>{
                 const allVars=getVariants(p.productName);const totalStock=allVars.reduce((a,v)=>a+v.stock,0);const lowStock=totalStock>0&&totalStock<=10;
                 return (
@@ -267,7 +268,7 @@ export function POSOverlay() {
             </div>
           )}
         </div>
-        <div className="flex border-t shrink-0" style={{height:"230px",borderColor:"#1e3356"}}>
+        <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
           <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
             <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color)}}><Package className="h-5 w-5 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{p.color}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
@@ -724,6 +725,18 @@ export function POSOverlay() {
       return (
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <h2 className="text-white font-bold text-xl">POS Settings</h2>
+          {/* Tax Rate */}
+          <div className="rounded-2xl border p-5" style={{background:"#162338",borderColor:"#1e3356"}}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Receipt className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
+              <div><h3 className="text-white font-bold text-base">Tax Rate</h3><p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>Current: {taxRate}% {taxRate===0?"(Tax disabled)":""}</p></div>
+            </div>
+            <div className="flex items-center gap-3">
+              <input type="number" min="0" max="100" defaultValue={taxRate} onBlur={e=>{const v=Math.min(100,Math.max(0,parseFloat(e.target.value)||0));setTaxRate(v);toast.success(`Tax rate set to ${v}%`);}} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+              <span className="text-white font-bold text-lg">%</span>
+              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>{setTaxRate(v);toast.success(`Tax rate set to ${v}%`);}} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"#1a2b4a",color:taxRate===v?"#fff":"#6a8ab8"}}>{v}%</button>))}</div>
+            </div>
+          </div>
           {/* PIN Security */}
           <div className="rounded-2xl border p-5 space-y-4" style={{background:"#162338",borderColor:"#1e3356"}}>
             <div className="flex items-center gap-3">
@@ -910,8 +923,8 @@ export function POSOverlay() {
             <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
               <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
                 <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                <input type="number" value={discount||""} onChange={e=>setDiscount(parseFloat(e.target.value)||0,"percentage")} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
-                <button className="px-4 h-9 rounded-lg text-sm font-bold text-white" style={{background:"#4f6ef7"}}>Apply</button>
+                <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");if(v>0)toast.success(`${v}% discount applied`);}}} placeholder={discount>0?`${discount}% active`:"0"} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:`1px solid ${discount>0?"#10b981":"#1e3356"}`}}/>
+                <button onClick={()=>{const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");setDiscountInput("");if(v>0)toast.success(`${v}% discount applied`);else toast.info("Discount cleared");}} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Apply</button>
               </div>
               <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
                 <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>

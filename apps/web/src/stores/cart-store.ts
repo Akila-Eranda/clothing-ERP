@@ -50,7 +50,7 @@ export const useCartStore = create<CartStore>()(
       couponCode: null,
       loyaltyPointsToRedeem: 0,
       notes: "",
-      taxRate: 18,
+      taxRate: 0,
       heldBills: [],
 
       addItem: (newItem) =>
