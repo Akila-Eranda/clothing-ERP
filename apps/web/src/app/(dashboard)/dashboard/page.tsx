@@ -3,136 +3,203 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import {
-  TrendingUp, TrendingDown, ShoppingCart, Users, Package, DollarSign,
-  ArrowUpRight, ArrowDownRight, Sparkles, AlertTriangle, BarChart3,
-  RefreshCw, Download, Plus, Eye, Clock, Zap,
+  TrendingUp, ShoppingCart, Users, Package, DollarSign,
+  ArrowUpRight, ArrowDownRight, Sparkles, AlertTriangle,
+  RefreshCw, Plus, Eye, Clock, Zap, CreditCard,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency, formatNumber, getInitials } from "@/lib/utils";
-import {
-  DUMMY_REVENUE_DATA, DUMMY_CATEGORY_DATA, DUMMY_TOP_PRODUCTS,
-  DUMMY_RECENT_SALES, DUMMY_LOW_STOCK, CHART_COLORS,
-} from "@/lib/constants";
+import { formatNumber, getInitials } from "@/lib/utils";
+import { CHART_COLORS } from "@/lib/constants";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
-const STATS = [
-  {
-    title: "Today's Revenue",
-    value: "LKR 1,28,450",
-    change: "+18.2%",
-    trend: "up",
-    icon: DollarSign,
-    color: "text-emerald-500",
-    bg: "bg-emerald-500/10",
-    desc: "vs LKR 1,08,650 yesterday",
-  },
-  {
-    title: "Total Orders",
-    value: "284",
-    change: "+12.5%",
-    trend: "up",
-    icon: ShoppingCart,
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-    desc: "32 pending processing",
-  },
-  {
-    title: "Active Customers",
-    value: "1,847",
-    change: "+5.3%",
-    trend: "up",
-    icon: Users,
-    color: "text-violet-500",
-    bg: "bg-violet-500/10",
-    desc: "124 new this month",
-  },
-  {
-    title: "Low Stock Alerts",
-    value: "12",
-    change: "-3",
-    trend: "down",
-    icon: Package,
-    color: "text-amber-500",
-    bg: "bg-amber-500/10",
-    desc: "Requires immediate action",
-  },
-];
+// ── Types ────────────────────────────────────────────────────────────────────
+interface DailySummary {
+  date: string;
+  totalSales: number;
+  totalRevenue: number;
+  totalTax: number;
+  totalDiscount: number;
+  byPaymentMethod: Record<string, number>;
+}
+interface SaleRow {
+  id: string;
+  invoiceNumber: string;
+  total: number;
+  invoiceDate: string;
+  status: string;
+  customer?: { name: string } | null;
+}
+interface TopProduct {
+  variantId: string;
+  productName: string;
+  sku: string;
+  _sum: { quantity: number | null; total: number | null };
+}
+interface LowStockItem {
+  id: string;
+  quantity: number;
+  minStockLevel: number;
+  variant: { name: string; sku: string; product: { name: string } };
+}
+interface RevenuePoint {
+  invoiceDate: string;
+  total: number;
+  taxAmount: number;
+  discountAmount: number;
+}
 
-const AI_INSIGHTS = [
-  { insight: "Sales 34% higher on Saturdays — consider extended hours", type: "opportunity", confidence: 94 },
-  { insight: "Slim Fit Jeans trending +45% — restock recommended", type: "alert", confidence: 89 },
-  { insight: "Customer retention drops after 45-day inactivity — automate re-engagement", type: "action", confidence: 82 },
-  { insight: "Bundling T-shirts + Jeans can increase AOV by LKR 380 avg", type: "opportunity", confidence: 77 },
-];
+// ── Chart helpers ────────────────────────────────────────────────────────────
+const PMETHOD_COLORS: Record<string, string> = {
+  CASH: CHART_COLORS.chart4,
+  CARD: CHART_COLORS.chart1,
+  UPI: CHART_COLORS.chart2,
+  WALLET: CHART_COLORS.chart3,
+};
+
+function groupByDate(raw: RevenuePoint[], days: number) {
+  const map = new Map<string, { date: string; revenue: number; orders: number }>();
+  const since = Date.now() - days * 864e5;
+  raw
+    .filter((r) => new Date(r.invoiceDate).getTime() >= since)
+    .forEach((r) => {
+      const d = new Date(r.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" });
+      const prev = map.get(d) ?? { date: d, revenue: 0, orders: 0 };
+      map.set(d, { date: d, revenue: prev.revenue + r.total, orders: prev.orders + 1 });
+    });
+  return Array.from(map.values());
+}
 
 const insightColors: Record<string, string> = {
   opportunity: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-  alert: "text-amber-500 bg-amber-500/10 border-amber-500/20",
-  action: "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  alert:       "text-amber-500 bg-amber-500/10 border-amber-500/20",
+  action:      "text-blue-500 bg-blue-500/10 border-blue-500/20",
 };
-
 const insightIcons: Record<string, React.ElementType> = {
-  opportunity: TrendingUp,
-  alert: AlertTriangle,
-  action: Zap,
+  opportunity: TrendingUp, alert: AlertTriangle, action: Zap,
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.07 } },
-};
+const CV = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.07 } } };
+const IV = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } } };
 
-const itemVariants = {
-  hidden: { opacity: 0, y: 16 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
-};
-
+// ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
-  const [period, setPeriod] = React.useState<"7d" | "30d" | "90d">("30d");
+  const [period, setPeriod] = React.useState<"7d" | "30d">("30d");
+  const [loading, setLoading] = React.useState(true);
+  const [summary, setSummary]     = React.useState<DailySummary | null>(null);
+  const [recentSales, setRecentSales] = React.useState<SaleRow[]>([]);
+  const [topProducts, setTopProducts] = React.useState<TopProduct[]>([]);
+  const [lowStock, setLowStock]   = React.useState<LowStockItem[]>([]);
+  const [revenue, setRevenue]     = React.useState<RevenuePoint[]>([]);
+  const [custTotal, setCustTotal] = React.useState(0);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const [sumRes, salesRes, topRes, lowRes, revRes, custRes] = await Promise.allSettled([
+        api.get<DailySummary>("/pos/summary"),
+        api.get<{ data: SaleRow[] }>("/sales?limit=5"),
+        api.get<TopProduct[]>("/sales/top-products?days=30"),
+        api.get<LowStockItem[]>("/inventory/low-stock"),
+        api.get<RevenuePoint[]>("/sales/revenue?period=day"),
+        api.get<{ total: number }>("/customers?limit=1"),
+      ]);
+      if (sumRes.status  === "fulfilled") setSummary(sumRes.value.data);
+      if (salesRes.status === "fulfilled") setRecentSales(salesRes.value.data?.data ?? []);
+      if (topRes.status  === "fulfilled") setTopProducts(topRes.value.data ?? []);
+      if (lowRes.status  === "fulfilled") setLowStock(lowRes.value.data ?? []);
+      if (revRes.status  === "fulfilled") setRevenue(revRes.value.data ?? []);
+      if (custRes.status === "fulfilled") setCustTotal((custRes.value.data as unknown as { total?: number })?.total ?? 0);
+    } catch { toast.error("Failed to load dashboard"); }
+    finally { setLoading(false); }
+  }, []);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const chartData  = React.useMemo(() => groupByDate(revenue, period === "7d" ? 7 : 30), [revenue, period]);
+  const pmethods   = React.useMemo(() => Object.entries(summary?.byPaymentMethod ?? {}).map(([name, value]) => ({ name, value })), [summary]);
+
+  const AI_INSIGHTS = React.useMemo(() => {
+    const insights = [];
+    if (summary && summary.totalRevenue > 0) {
+      insights.push({ insight: `Today's revenue is LKR ${formatNumber(summary.totalRevenue)} from ${summary.totalSales} sale${summary.totalSales !== 1 ? "s" : ""}`, type: "opportunity", confidence: 98 });
+    }
+    if (lowStock.length > 0) {
+      insights.push({ insight: `${lowStock.length} product${lowStock.length > 1 ? "s are" : " is"} running low — restock soon to avoid lost sales`, type: "alert", confidence: 95 });
+    }
+    if (topProducts.length > 0) {
+      insights.push({ insight: `"${topProducts[0]?.productName}" is your best seller this month with ${topProducts[0]?._sum?.quantity ?? 0} units sold`, type: "opportunity", confidence: 90 });
+    }
+    if (summary && summary.totalDiscount > 0) {
+      const pct = ((summary.totalDiscount / (summary.totalRevenue + summary.totalDiscount)) * 100).toFixed(1);
+      insights.push({ insight: `Discount rate today is ${pct}% — review promo effectiveness`, type: "action", confidence: 80 });
+    }
+    if (insights.length === 0) {
+      insights.push({ insight: "No sales recorded today yet — open the POS terminal to start selling", type: "action", confidence: 100 });
+    }
+    return insights;
+  }, [summary, lowStock, topProducts]);
+
+  const statCards = [
+    {
+      title: "Today's Revenue",
+      value: loading ? "—" : `LKR ${formatNumber(summary?.totalRevenue ?? 0)}`,
+      sub: `${summary?.totalSales ?? 0} orders`,
+      icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/10",
+    },
+    {
+      title: "Today's Orders",
+      value: loading ? "—" : String(summary?.totalSales ?? 0),
+      sub: `LKR ${formatNumber(summary?.totalDiscount ?? 0)} discounted`,
+      icon: ShoppingCart, color: "text-blue-500", bg: "bg-blue-500/10",
+    },
+    {
+      title: "Total Customers",
+      value: loading ? "—" : formatNumber(custTotal),
+      sub: "registered in system",
+      icon: Users, color: "text-violet-500", bg: "bg-violet-500/10",
+    },
+    {
+      title: "Low Stock Alerts",
+      value: loading ? "—" : String(lowStock.length),
+      sub: lowStock.length > 0 ? "Requires restock" : "All stock OK",
+      icon: Package, color: "text-amber-500", bg: "bg-amber-500/10",
+    },
+  ];
 
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="show"
-      className="p-6 space-y-6 max-w-[1600px] mx-auto"
-    >
-      {/* Page header */}
-      <motion.div variants={itemVariants} className="flex items-center justify-between flex-wrap gap-4">
+    <motion.div variants={CV} initial="hidden" animate="show" className="p-6 space-y-6 max-w-[1600px] mx-auto">
+
+      {/* Header */}
+      <motion.div variants={IV} className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">AI Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            Real-time insights for your fashion retail business
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">Real-time insights for your fashion retail business</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-500">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live Data
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Download className="h-3.5 w-3.5" />
-            Export
-          </Button>
-          <Button variant="gradient" size="sm" className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" />
-            New Sale
+          <Button variant="outline" size="sm" className="gap-1.5" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh
           </Button>
         </div>
       </motion.div>
 
       {/* KPI Stats */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATS.map((stat) => {
+      <motion.div variants={IV} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
             <Card key={stat.title} className="hover:shadow-lg transition-shadow duration-300 group">
@@ -140,22 +207,8 @@ export default function DashboardPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-muted-foreground mb-1">{stat.title}</p>
-                    <p className="text-2xl font-bold tracking-tight">{stat.value}</p>
-                    <div className="flex items-center gap-1 mt-1.5">
-                      {stat.trend === "up" ? (
-                        <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                      ) : (
-                        <ArrowDownRight className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                      )}
-                      <span
-                        className={`text-xs font-semibold ${
-                          stat.trend === "up" ? "text-emerald-500" : "text-amber-500"
-                        }`}
-                      >
-                        {stat.change}
-                      </span>
-                      <span className="text-xs text-muted-foreground truncate">{stat.desc}</span>
-                    </div>
+                    {loading ? <Skeleton className="h-7 w-24 mb-1" /> : <p className="text-2xl font-bold tracking-tight">{stat.value}</p>}
+                    <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
                   </div>
                   <div className={`p-2.5 rounded-xl ${stat.bg} shrink-0 group-hover:scale-110 transition-transform`}>
                     <Icon className={`h-5 w-5 ${stat.color}`} />
@@ -168,26 +221,19 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Charts row */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* Revenue chart */}
         <Card className="xl:col-span-2">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div>
-                <CardTitle className="text-base">Revenue & Profit</CardTitle>
-                <CardDescription>Daily performance overview</CardDescription>
+                <CardTitle className="text-base">Revenue Trend</CardTitle>
+                <CardDescription>Daily revenue grouped by date</CardDescription>
               </div>
               <div className="flex gap-1">
-                {(["7d", "30d", "90d"] as const).map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPeriod(p)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
-                      period === p
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted"
-                    }`}
-                  >
+                {(["7d", "30d"] as const).map((p) => (
+                  <button key={p} onClick={() => setPeriod(p)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${period === p ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}>
                     {p}
                   </button>
                 ))}
@@ -195,67 +241,66 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="pb-4">
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={DUMMY_REVENUE_DATA.slice(period === "7d" ? -7 : period === "30d" ? -30 : -90)}>
-                <defs>
-                  <linearGradient id="revenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="profit" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={CHART_COLORS.success} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval={period === "7d" ? 0 : 4} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `LKR ${(v / 1000).toFixed(0)}k`} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                  formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]}
-                />
-                <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#revenue)" name="Revenue" />
-                <Area type="monotone" dataKey="profit" stroke={CHART_COLORS.success} strokeWidth={2} fill="url(#profit)" name="Profit" />
-              </AreaChart>
-            </ResponsiveContainer>
+            {loading ? <Skeleton className="h-[240px] w-full rounded-xl" /> : (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="rev-grad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} interval={period === "7d" ? 0 : 4} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
+                    formatter={(v: number) => [`LKR ${formatNumber(v)}`, "Revenue"]} />
+                  <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#rev-grad)" name="Revenue" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
-        {/* Category breakdown */}
+        {/* Payment method breakdown */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Sales by Category</CardTitle>
-            <CardDescription>This month's breakdown</CardDescription>
+            <CardTitle className="text-base">Payment Methods</CardTitle>
+            <CardDescription>Today's breakdown</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={DUMMY_CATEGORY_DATA} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="revenue">
-                  {DUMMY_CATEGORY_DATA.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
+            {loading ? <Skeleton className="h-[160px] w-full rounded-xl" /> : pmethods.length === 0 ? (
+              <div className="h-[160px] flex items-center justify-center text-sm text-muted-foreground">No sales today</div>
+            ) : (
+              <>
+                <ResponsiveContainer width="100%" height={160}>
+                  <PieChart>
+                    <Pie data={pmethods} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
+                      {pmethods.map((entry, i) => (
+                        <Cell key={i} fill={PMETHOD_COLORS[entry.name] ?? CHART_COLORS.chart5} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
+                      formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="mt-3 space-y-2">
+                  {pmethods.map((m) => (
+                    <div key={m.name} className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: PMETHOD_COLORS[m.name] ?? CHART_COLORS.chart5 }} />
+                      <span className="text-xs text-muted-foreground flex-1">{m.name}</span>
+                      <span className="text-xs font-semibold">LKR {formatNumber(m.value)}</span>
+                    </div>
                   ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                  formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mt-3 space-y-2">
-              {DUMMY_CATEGORY_DATA.map((cat) => (
-                <div key={cat.category} className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
-                  <span className="text-xs text-muted-foreground flex-1 truncate">{cat.category}</span>
-                  <span className="text-xs font-semibold">{cat.percentage}%</span>
                 </div>
-              ))}
-            </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </motion.div>
 
       {/* AI Insights + Top Products + Recent Sales */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {/* AI Insights */}
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-violet-500/5">
           <CardHeader className="pb-3">
@@ -270,29 +315,25 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {AI_INSIGHTS.map((insight, i) => {
-              const InsightIcon = insightIcons[insight.type];
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.1 * i }}
-                  className={`p-3 rounded-lg border ${insightColors[insight.type]} cursor-pointer hover:opacity-90 transition-opacity`}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <InsightIcon className="h-4 w-4 mt-0.5 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium leading-snug">{insight.insight}</p>
-                      <div className="flex items-center gap-1.5 mt-1.5">
-                        <Progress value={insight.confidence} className="h-1 flex-1" />
-                        <span className="text-[10px] font-semibold shrink-0">{insight.confidence}%</span>
+            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />) :
+              AI_INSIGHTS.map((insight, i) => {
+                const InsightIcon = insightIcons[insight.type];
+                return (
+                  <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * i }}
+                    className={`p-3 rounded-lg border ${insightColors[insight.type]} cursor-pointer hover:opacity-90 transition-opacity`}>
+                    <div className="flex items-start gap-2.5">
+                      <InsightIcon className="h-4 w-4 mt-0.5 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium leading-snug">{insight.insight}</p>
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                          <Progress value={insight.confidence} className="h-1 flex-1" />
+                          <span className="text-[10px] font-semibold shrink-0">{insight.confidence}%</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
           </CardContent>
         </Card>
 
@@ -302,36 +343,26 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">Top Products</CardTitle>
-                <CardDescription>By revenue this month</CardDescription>
+                <CardDescription>By quantity sold — last 30 days</CardDescription>
               </div>
-              <Button variant="ghost" size="icon-sm">
-                <Eye className="h-4 w-4" />
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {DUMMY_TOP_PRODUCTS.map((product, i) => (
-              <div key={product.id} className="flex items-center gap-3">
-                <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">#{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{product.name}</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{product.sold} sold</span>
-                    <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                    <span
-                      className={`text-xs font-medium ${
-                        product.stock < 10 ? "text-amber-500" : "text-muted-foreground"
-                      }`}
-                    >
-                      {product.stock} in stock
-                    </span>
+            {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />) :
+              topProducts.length === 0 ? <p className="text-sm text-muted-foreground">No sales data yet</p> :
+              topProducts.slice(0, 5).map((p, i) => (
+                <div key={p.variantId} className="flex items-center gap-3">
+                  <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{p.productName}</p>
+                    <p className="text-xs text-muted-foreground">{p.sku}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold">LKR {formatNumber(p._sum.total ?? 0)}</p>
+                    <p className="text-xs text-muted-foreground">{p._sum.quantity ?? 0} units</p>
                   </div>
                 </div>
-                <span className="text-sm font-semibold shrink-0">
-                  LKR {formatNumber(product.revenue)}
-                </span>
-              </div>
-            ))}
+              ))}
           </CardContent>
         </Card>
 
@@ -347,39 +378,40 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2.5">
-            {DUMMY_RECENT_SALES.map((sale) => (
-              <div key={sale.id} className="flex items-center gap-3">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="text-[10px] font-semibold">
-                    {getInitials(sale.customer)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{sale.customer}</p>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-xs text-muted-foreground">{sale.id}</span>
-                    <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                    <Clock className="h-2.5 w-2.5 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">{sale.time}</span>
+            {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />) :
+              recentSales.length === 0 ? <p className="text-sm text-muted-foreground">No recent sales</p> :
+              recentSales.map((sale) => (
+                <div key={sale.id} className="flex items-center gap-3">
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback className="text-[10px] font-semibold">
+                      {getInitials(sale.customer?.name ?? "Walk-in")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{sale.customer?.name ?? "Walk-in Customer"}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="text-xs text-muted-foreground">{sale.invoiceNumber}</span>
+                      <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+                      <Clock className="h-2.5 w-2.5 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(sale.invoiceDate).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-semibold">LKR {formatNumber(sale.total)}</p>
+                    <Badge variant={sale.status === "COMPLETED" ? "success" : "secondary"} className="text-[10px] h-4 px-1.5">
+                      {sale.status}
+                    </Badge>
                   </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-semibold">LKR {formatNumber(sale.amount)}</p>
-                  <Badge
-                    variant={sale.status === "completed" ? "success" : "danger"}
-                    className="text-[10px] h-4 px-1.5"
-                  >
-                    {sale.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
+              ))}
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Low Stock Alerts + Orders Bar Chart */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      {/* Low Stock + Daily Orders Bar */}
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Low Stock */}
         <Card className="border-amber-500/20">
           <CardHeader className="pb-3">
@@ -391,51 +423,55 @@ export default function DashboardPage() {
                 <CardTitle className="text-base">Low Stock Alerts</CardTitle>
                 <CardDescription>Items needing immediate restock</CardDescription>
               </div>
-              <Badge variant="warning" className="ml-auto">
-                {DUMMY_LOW_STOCK.length} items
-              </Badge>
+              {!loading && (
+                <Badge variant="warning" className="ml-auto">{lowStock.length} items</Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {DUMMY_LOW_STOCK.map((item) => (
-              <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.variant} · {item.sku}</p>
+            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />) :
+              lowStock.length === 0 ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-sm text-emerald-600 font-medium">
+                  All stock levels are healthy ✓
                 </div>
-                <div className="text-right shrink-0">
-                  <p className="text-sm font-bold text-amber-500">{item.stock} left</p>
-                  <p className="text-xs text-muted-foreground">min: {item.minStock}</p>
+              ) :
+              lowStock.slice(0, 5).map((item) => (
+                <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{item.variant.product.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.variant.name} · {item.variant.sku}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-bold text-amber-500">{item.quantity} left</p>
+                    <p className="text-xs text-muted-foreground">min: {item.minStockLevel}</p>
+                  </div>
                 </div>
-                <Button size="sm" variant="warning" className="shrink-0 h-7 text-xs px-2.5">
-                  Reorder
-                </Button>
-              </div>
-            ))}
+              ))}
           </CardContent>
         </Card>
 
-        {/* Orders trend */}
+        {/* Daily Orders Bar */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Daily Orders Trend</CardTitle>
-            <CardDescription>Last 30 days</CardDescription>
+            <CardDescription>Orders per day — last 30 days</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={DUMMY_REVENUE_DATA.slice(-14)} barSize={16}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
-                <Tooltip
-                  contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }}
-                />
-                <Bar dataKey="orders" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="Orders" />
-              </BarChart>
-            </ResponsiveContainer>
+            {loading ? <Skeleton className="h-[220px] w-full rounded-xl" /> : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={groupByDate(revenue, 14)} barSize={14}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} axisLine={false} tickLine={false} />
+                  <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
+                  <Bar dataKey="orders" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="Orders" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </motion.div>
+
     </motion.div>
   );
 }
