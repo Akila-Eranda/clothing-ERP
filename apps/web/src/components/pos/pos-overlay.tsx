@@ -1064,7 +1064,7 @@ export function POSOverlay() {
               <div className="flex gap-2 p-3 pt-0">
                 <button onClick={handleThermalPrint} className="h-9 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-3.5 w-3.5"/>Thermal</button>
                 <button onClick={handleA4Print} className="h-9 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><FileText className="h-3.5 w-3.5"/>A4</button>
-                <button onClick={()=>setReceipt(null)} className="flex-1 h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>New Sale</button>
+                <button onClick={()=>{setReceipt(null);setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);}} className="flex-1 h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>New Sale</button>
               </div>
             </motion.div>
           </motion.div>
