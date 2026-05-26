@@ -220,10 +220,10 @@ export function POSOverlay() {
             </div>
           )}
         </div>
-        <div className="flex border-t shrink-0" style={{height:"192px",borderColor:"#1e3356"}}>
-          <div className="w-52 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
-            <div className="flex items-center justify-between px-3 py-1.5 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-xs font-semibold text-white">Popular Items</span><button className="text-[10px]" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-white/5 transition-colors text-left"><div className="h-8 w-8 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color)}}><Package className="h-4 w-4 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{p.color}</p></div><span className="text-[10px] font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+        <div className="flex border-t shrink-0" style={{height:"230px",borderColor:"#1e3356"}}>
+          <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
+            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color)}}><Package className="h-5 w-5 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{p.color}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col border-r" style={{borderColor:"#1e3356"}}>
             {selectedProductName&&activeVariant?(
@@ -236,11 +236,11 @@ export function POSOverlay() {
                   <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} pcs</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
                 </div>
               </div>
-            ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-8 w-8 mb-1 opacity-30"/><p className="text-[11px]">Click a product to select variant</p></div>)}
+            ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-12 w-12 mb-2 opacity-30"/><p className="text-base font-semibold">Click a product to select variant</p></div>)}
           </div>
-          <div className="w-64 flex flex-col shrink-0">
-            <div className="flex items-center justify-between px-3 py-1.5 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-xs font-semibold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-0.5 rounded hover:bg-white/10"><Trash2 className="h-3 w-3" style={{color:"#6a8ab8"}}/></button>}</div>
-            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-6 w-6 mb-1 opacity-30"/><p className="text-[10px]">No recent scans</p></div>:recentScans.map(s=>(<div key={s.id} className="flex items-center gap-2 px-2 py-1.5 border-b" style={{borderColor:"#1a2b3a"}}><Scan className="h-3 w-3 shrink-0" style={{color:"#4f6ef7"}}/><div className="flex-1 min-w-0"><p className="text-white text-[10px] font-semibold truncate">{s.name}</p><p className="text-[9px] truncate" style={{color:"#6a8ab8"}}>{s.variant}</p></div><span className="text-[10px] font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span></div>))}</div>
+          <div className="w-80 flex flex-col shrink-0">
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>}</div>
+            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>(<div key={s.id} className="flex items-center gap-3 px-3 py-2.5 border-b" style={{borderColor:"#1a2b3a"}}><Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{s.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{s.variant}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span></div>))}</div>
           </div>
         </div>
       </div>
