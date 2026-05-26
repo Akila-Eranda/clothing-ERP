@@ -39,6 +39,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { BranchesModule } from './modules/branches/branches.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { FilesModule } from './modules/files/files.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
@@ -95,6 +96,7 @@ import { HealthModule } from './health/health.module';
     BranchesModule,
     TenantsModule,
     FilesModule,
+    PromotionsModule,
 
     // ── Infrastructure ────────────────────────────────────────
     HealthModule,
