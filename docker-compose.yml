@@ -72,6 +72,8 @@ services:
     build:
       context: ./apps/web
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: https://shop.clothing.api.hexalyte.com/api/v1
     container_name: fashionerp_web
     restart: unless-stopped
     depends_on:
