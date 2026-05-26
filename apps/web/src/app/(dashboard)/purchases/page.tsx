@@ -151,7 +151,7 @@ export default function PurchasesPage() {
   const pending  = pos.filter((p) => p.status === "DRAFT").length;
   const ordered  = pos.filter((p) => ["CONFIRMED","SENT","PARTIALLY_RECEIVED"].includes(p.status)).length;
   const received = pos.filter((p) => p.status === "RECEIVED").length;
-  const totalValue = pos.reduce((s, p) => s + p.total, 0);
+  const totalValue = pos.filter((p) => p.status !== "CANCELLED").reduce((s, p) => s + p.total, 0);
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-500",    bg: "bg-blue-500/10" },

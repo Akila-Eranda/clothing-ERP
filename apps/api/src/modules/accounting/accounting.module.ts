@@ -113,7 +113,7 @@ export class AccountingService {
 
     const [revenue, expenses, returns] = await this.prisma.$transaction([
       this.prisma.sale.aggregate({
-        where: { tenantId, invoiceDate: dateRange },
+        where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
         _sum: { total: true, taxAmount: true, discountAmount: true },
         _count: { _all: true },
       }),
@@ -123,7 +123,7 @@ export class AccountingService {
         _count: { _all: true },
       }),
       this.prisma.return.aggregate({
-        where: { tenantId, createdAt: dateRange },
+        where: { tenantId, createdAt: dateRange, status: { in: ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] } },
         _sum: { refundAmount: true },
       }),
     ]);
@@ -219,9 +219,10 @@ export class AccountingService {
 
   async getCashFlow(tenantId: string, startDate: string, endDate: string) {
     const dateRange = { gte: dayjs(startDate).startOf('day').toDate(), lte: dayjs(endDate).endOf('day').toDate() };
-    const [sales, expenses] = await Promise.all([
+    const [sales, expenses, refunds] = await Promise.all([
       this.prisma.sale.findMany({ where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } }, select: { total: true, invoiceDate: true } }),
       this.prisma.expense.findMany({ where: { tenantId, date: dateRange }, select: { amount: true, date: true, categoryId: true } }),
+      this.prisma.return.findMany({ where: { tenantId, createdAt: dateRange, status: { in: ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] } }, select: { refundAmount: true, createdAt: true } }),
     ]);
     const map: Record<string, { date: string; inflow: number; outflow: number }> = {};
     for (const s of sales) {
@@ -234,11 +235,16 @@ export class AccountingService {
       if (!map[key]) map[key] = { date: key, inflow: 0, outflow: 0 };
       map[key].outflow += e.amount;
     }
+    for (const r of refunds) {
+      const key = dayjs(r.createdAt).format('YYYY-MM-DD');
+      if (!map[key]) map[key] = { date: key, inflow: 0, outflow: 0 };
+      map[key].outflow += r.refundAmount;
+    }
     const data = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
     return {
       data,
       totalInflow:  sales.reduce((s, e) => s + e.total, 0),
-      totalOutflow: expenses.reduce((s, e) => s + e.amount, 0),
+      totalOutflow: expenses.reduce((s, e) => s + e.amount, 0) + refunds.reduce((s, r) => s + r.refundAmount, 0),
     };
   }
 
