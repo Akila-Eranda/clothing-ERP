@@ -147,7 +147,7 @@ export const authApi = {
     api.post<LoginResponse>('/auth/login', { email, password }),
 
   logout: () =>
-    api.post<null>('/auth/logout'),
+    api.delete<null>('/auth/logout'),
 
   me: () =>
     api.get<LoginResponse['user']>('/auth/me'),

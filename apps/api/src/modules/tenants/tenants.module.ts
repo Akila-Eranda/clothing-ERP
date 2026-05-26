@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { IsString, IsOptional, IsEmail } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlan, TenantStatus } from '@prisma/client';
+import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -98,6 +98,7 @@ export class TenantsService {
           firstName: dto.adminFirstName,
           lastName: dto.adminLastName,
           passwordHash,
+          status: UserStatus.ACTIVE,
           emailVerified: true,
           roles: { create: [{ roleId: adminRole.id }] },
         },
