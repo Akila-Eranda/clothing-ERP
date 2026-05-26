@@ -184,7 +184,7 @@ export function Sidebar() {
               <div key={group.group} className={cn(gi > 0 ? "mt-3.5" : "mt-1")}>
                 {!sidebarCollapsed ? (
                   <p
-                    className="mb-1 px-1.5 text-[11px] font-bold uppercase tracking-[0.1em] select-none"
+                    className="mb-1 px-1.5 text-[11.5px] font-bold uppercase tracking-[0.1em] select-none"
                     style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}
                   >
                     {group.group}
@@ -203,7 +203,7 @@ export function Sidebar() {
                         href={item.href}
                         className={cn(
                           "group relative flex items-center gap-2 rounded-[7px] transition-all duration-150 select-none overflow-hidden",
-                          sidebarCollapsed ? "h-9 w-full justify-center px-0" : "h-[34px] px-2.5",
+                          sidebarCollapsed ? "h-10 w-full justify-center px-0" : "h-[38px] px-2.5",
                         )}
                         style={isActive ? {
                           background: "hsl(var(--sidebar-accent))",
@@ -227,17 +227,17 @@ export function Sidebar() {
                         {/* Icon */}
                         <div className={cn(
                           "relative z-10 flex items-center justify-center rounded-[5px] shrink-0 transition-all",
-                          sidebarCollapsed ? "h-6 w-6" : "h-5 w-5",
+                          sidebarCollapsed ? "h-7 w-7" : "h-5 w-5",
                           isActive
                             ? "text-inherit"
                             : "text-inherit",
                         )}>
-                          <Icon className="h-3.5 w-3.5" />
+                          <Icon className="h-[17px] w-[17px]" />
                         </div>
 
                         {!sidebarCollapsed && (
                           <>
-                            <span className="relative z-10 truncate flex-1 text-[13px] font-medium leading-none">
+                            <span className="relative z-10 truncate flex-1 text-[14px] font-medium leading-none">
                               {item.label}
                             </span>
                             {item.badge ? (
@@ -334,10 +334,10 @@ export function Sidebar() {
                   <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-sidebar bg-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold truncate leading-tight" style={{ color: "hsl(var(--sidebar-foreground))" }}>
+                  <p className="text-[14px] font-semibold truncate leading-tight" style={{ color: "hsl(var(--sidebar-foreground))" }}>
                     {user?.name || "Admin"}
                   </p>
-                  <p className="text-[11px] capitalize truncate leading-tight mt-px" style={{ color: "hsl(var(--sidebar-foreground)/0.45)" }}>
+                  <p className="text-[12px] capitalize truncate leading-tight mt-px" style={{ color: "hsl(var(--sidebar-foreground)/0.45)" }}>
                     {user?.role?.replace(/_/g, " ") || "Administrator"}
                   </p>
                 </div>
@@ -346,21 +346,21 @@ export function Sidebar() {
               <div className="grid grid-cols-2 gap-1">
                 <Link
                   href="/settings"
-                  className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
+                  className="flex items-center justify-center gap-1 h-8 rounded-[6px] text-[13px] font-medium transition-colors"
                   style={{ color: "hsl(var(--sidebar-foreground)/0.55)", border: "1px solid hsl(var(--sidebar-border))" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.55)"; }}
                 >
-                  <Settings className="h-3.5 w-3.5" />Settings
+                  <Settings className="h-4 w-4" />Settings
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
+                  className="flex items-center justify-center gap-1 h-8 rounded-[6px] text-[13px] font-medium transition-colors"
                   style={{ color: "hsl(var(--sidebar-foreground)/0.55)", border: "1px solid hsl(var(--sidebar-border))" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.55)"; e.currentTarget.style.borderColor = "hsl(var(--sidebar-border))"; }}
                 >
-                  <LogOut className="h-3 w-3" />Sign out
+                  <LogOut className="h-4 w-4" />Sign out
                 </button>
               </div>
             </div>
