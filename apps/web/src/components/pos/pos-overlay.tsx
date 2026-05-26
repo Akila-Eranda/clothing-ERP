@@ -691,30 +691,30 @@ export function POSOverlay() {
           <div className="flex-1 min-w-0 overflow-hidden">{renderCenter()}</div>
 
           {/* CART PANEL */}
-          <div className="w-80 flex flex-col shrink-0 border-l" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-            <div className="flex items-center justify-between px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-              <span className="text-white font-bold text-sm">Cart ({itemCount()} Items)</span>
-              <button onClick={()=>{clearCart();setSelectedCartIdx(-1);}} className="flex items-center gap-1 text-[11px] font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-3 w-3"/>Clear Cart</button>
+          <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+              <span className="text-white font-bold text-lg">Cart ({itemCount()} Items)</span>
+              <button onClick={()=>{clearCart();setSelectedCartIdx(-1);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear Cart</button>
             </div>
             <div className="flex-1 overflow-y-auto">
               {items.length===0?(
-                <div className="flex flex-col items-center justify-center h-32" style={{color:"#4a6a8a"}}><ShoppingCart className="h-10 w-10 mb-2 opacity-20"/><p className="text-xs">Cart is empty</p></div>
+                <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p></div>
               ):(
-                <div className="p-2 space-y-1">
+                <div className="p-3 space-y-2">
                   <AnimatePresence>{items.map((item,idx)=>(
                     <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
-                      onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 p-2 rounded-xl cursor-pointer transition-all"
+                      onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
                       style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                      <div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(item.variantName)}}><Package className="h-5 w-5 text-white/20"/></div>
-                      <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{item.productName}</p><p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
-                        <span className="text-white text-xs font-bold w-5 text-center">{item.quantity}</span>
-                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-2.5 w-2.5 text-white"/></button>
+                      <div className="h-12 w-12 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(item.variantName)}}><Package className="h-6 w-6 text-white/20"/></div>
+                      <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{item.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
+                        <span className="text-white text-sm font-bold w-7 text-center">{item.quantity}</span>
+                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                       </div>
-                      <div className="text-right shrink-0 w-16 group">
-                        <p className="text-white text-[11px] font-bold">LKR {formatNumber(item.unitPrice*item.quantity)}</p>
-                        <button onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-3 w-3 mx-auto" style={{color:"#ef4444"}}/></button>
+                      <div className="text-right shrink-0 w-24 group">
+                        <p className="text-white text-sm font-bold">LKR {formatNumber(item.unitPrice*item.quantity)}</p>
+                        <button onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
                       </div>
                     </motion.div>
                   ))}</AnimatePresence>
@@ -722,50 +722,50 @@ export function POSOverlay() {
               )}
             </div>
             <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
-              <div className="flex items-center gap-2 px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
-                <span className="text-xs font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                <input type="number" value={discount||""} onChange={e=>setDiscount(parseFloat(e.target.value)||0,"percentage")} className="flex-1 h-7 rounded-lg px-2 text-xs text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
-                <button className="px-3 h-7 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Apply</button>
+              <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
+                <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
+                <input type="number" value={discount||""} onChange={e=>setDiscount(parseFloat(e.target.value)||0,"percentage")} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <button className="px-4 h-9 rounded-lg text-sm font-bold text-white" style={{background:"#4f6ef7"}}>Apply</button>
               </div>
-              <div className="px-3 py-2 space-y-1 border-b" style={{borderColor:"#1e3356"}}>
-                <div className="flex justify-between text-xs" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
-                {discountAmount()>0&&<div className="flex justify-between text-xs text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
-                <div className="flex justify-between text-xs" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
-                <div className="flex justify-between text-base font-bold text-white pt-1 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+              <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
+                <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
+                {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
+                <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
+                <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
               </div>
-              <div className="flex gap-1 px-2 py-1.5 border-b" style={{borderColor:"#1e3356"}}>
+              <div className="flex gap-1.5 px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
                 {PAY_METHODS.map(({value,label,icon:Icon})=>(
-                  <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-0.5 py-1.5 rounded-xl text-[10px] font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
-                    <Icon className="h-3.5 w-3.5"/>{label}
+                  <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
+                    <Icon className="h-4 w-4"/>{label}
                   </button>
                 ))}
               </div>
               {activePayment==="CASH"&&(
-                <div className="px-2 py-1.5 border-b" style={{borderColor:"#1e3356"}}>
-                  <div className="flex items-center justify-between mb-1"><span className="text-[11px] font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
-                  <div className="h-9 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-lg font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
+                <div className="px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
+                  <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+                  <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                   <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                     {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                       const isQuick=ki===3;const isDel=k==="DEL";
-                      return(<button key={`${ri}-${ki}`} onClick={()=>isQuick?setNumpad(k):handleNumpad(k)} className="h-8 rounded-lg text-xs font-bold transition-all active:scale-95" style={{background:isQuick?"#1e3356":isDel?"rgba(239,68,68,0.15)":"#1a2b4a",color:isQuick?"#6a8ab8":isDel?"#ef4444":"#fff"}}>
-                        {isDel?<Delete className="h-3.5 w-3.5 mx-auto"/>:k}
+                      return(<button key={`${ri}-${ki}`} onClick={()=>isQuick?setNumpad(k):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"#1e3356":isDel?"rgba(239,68,68,0.15)":"#1a2b4a",color:isQuick?"#6a8ab8":isDel?"#ef4444":"#fff"}}>
+                        {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
                       </button>);
                     }))}
                   </div>
                 </div>
               )}
               {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                <div className="flex justify-between items-center px-3 py-1.5 border-b" style={{borderColor:"#1e3356"}}>
-                  <span className="text-xs font-semibold text-green-400">Change</span>
-                  <span className="text-green-400 font-bold font-mono text-sm">LKR {formatNumber(changeAmt)}</span>
+                <div className="flex justify-between items-center px-4 py-2 border-b" style={{borderColor:"#1e3356"}}>
+                  <span className="text-sm font-semibold text-green-400">Change</span>
+                  <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
                 </div>
               )}
-              <div className="p-2 flex gap-2">
-                <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 h-11 rounded-xl flex items-center justify-center gap-2 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
-                  {checkoutLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}
-                  Confirm Payment<span className="text-[10px] opacity-70 font-mono">(F9)</span>
+              <div className="p-3 flex gap-2">
+                <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                  {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
+                  Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                 </button>
-                <button onClick={handleThermalPrint} className="h-11 w-11 rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}}><Printer className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+                <button onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}}><Printer className="h-5 w-5" style={{color:"#6a8ab8"}}/></button>
               </div>
             </div>
           </div>
