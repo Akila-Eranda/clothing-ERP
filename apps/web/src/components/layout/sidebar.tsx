@@ -3,13 +3,13 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import {
   LayoutDashboard, ShoppingCart, Package, Warehouse, Users, Truck, BookOpen,
   UserCog, Building2, FileBarChart, Zap, Bell, Settings, Shield, Receipt,
   RotateCcw, Tag, Star, ShoppingBag, TrendingDown, BarChart3,
-  PanelLeftOpen, LogOut, Moon, Sun, ShoppingBag as BagIcon,
+  PanelLeftOpen, PanelRightOpen, LogOut, Moon, Sun, ShoppingBag as BagIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -135,51 +135,53 @@ export function Sidebar() {
         }}
       >
         {/* ── Logo ── */}
-        <div className={cn(
-          "flex h-[64px] items-center shrink-0 px-4 gap-2.5",
-          sidebarCollapsed && "justify-center px-0",
-        )}>
-          <div
-            className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
-            style={{ background: "hsl(var(--sidebar-primary))" }}
-          >
-            <BagIcon className="h-5 w-5 text-white" />
+        {sidebarCollapsed ? (
+          /* Collapsed: full-height header is just the expand button */
+          <div className="flex h-[64px] flex-col items-center justify-center gap-1.5 shrink-0">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
+              style={{ background: "hsl(var(--sidebar-primary))" }}
+            >
+              <BagIcon className="h-5 w-5 text-white" />
+            </div>
+            <button
+              onClick={toggleSidebar}
+              className="flex h-6 w-9 items-center justify-center rounded-md transition-colors"
+              style={{ color: "hsl(var(--sidebar-foreground)/0.5)", background: "hsl(var(--sidebar-accent))" }}
+              onMouseEnter={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; e.currentTarget.style.background = "hsl(var(--sidebar-primary)/0.25)"; }}
+              onMouseLeave={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.5)"; e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; }}
+              title="Expand sidebar"
+            >
+              <PanelRightOpen className="h-3.5 w-3.5" />
+            </button>
           </div>
-          <AnimatePresence initial={false}>
-            {!sidebarCollapsed && (
-              <motion.span
-                key="logo-txt"
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -8 }}
-                transition={{ duration: 0.15 }}
-                className="text-[18px] font-black tracking-wide uppercase whitespace-nowrap"
-                style={{ color: "hsl(var(--sidebar-foreground))" }}
-              >
-                FashionERP
-              </motion.span>
-            )}
-          </AnimatePresence>
-
-          {/* Collapse toggle (expanded state only) */}
-          <AnimatePresence initial={false}>
-            {!sidebarCollapsed && (
-              <motion.button
-                key="collapse-btn"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={toggleSidebar}
-                className="ml-auto p-1 rounded-lg transition-colors"
-                style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}
-                onMouseEnter={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground))")}
-                onMouseLeave={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.35)")}
-              >
-                <PanelLeftOpen className="h-4 w-4" />
-              </motion.button>
-            )}
-          </AnimatePresence>
-        </div>
+        ) : (
+          /* Expanded: logo + title + collapse button */
+          <div className="flex h-[64px] items-center shrink-0 px-4 gap-2.5">
+            <div
+              className="flex h-9 w-9 items-center justify-center rounded-xl shrink-0"
+              style={{ background: "hsl(var(--sidebar-primary))" }}
+            >
+              <BagIcon className="h-5 w-5 text-white" />
+            </div>
+            <span
+              className="text-[18px] font-black tracking-wide uppercase whitespace-nowrap flex-1"
+              style={{ color: "hsl(var(--sidebar-foreground))" }}
+            >
+              FashionERP
+            </span>
+            <button
+              onClick={toggleSidebar}
+              className="p-1.5 rounded-lg transition-colors"
+              style={{ color: "hsl(var(--sidebar-foreground)/0.4)" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground))")}
+              onMouseLeave={e => (e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.4)")}
+              title="Collapse sidebar"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          </div>
+        )}
 
         {/* ── Divider ── */}
         <div className="mx-4 mb-2 h-px shrink-0" style={{ background: "hsl(var(--sidebar-border))" }} />
