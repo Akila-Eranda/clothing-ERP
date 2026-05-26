@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Warehouse, Users, Truck, BookOpen,
   UserCog, Building2, FileBarChart, Zap, Bell, Settings, Shield, Receipt,
   RotateCcw, Tag, Star, ShoppingBag, TrendingDown, BarChart3,
-  PanelLeftClose, PanelLeftOpen, Sparkles, LogOut,
+  PanelLeftClose, PanelLeftOpen, Sparkles, LogOut, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -42,57 +42,57 @@ const NAV_GROUPS: NavGroup[] = [
   {
     group: "Overview",
     items: [
-      { label: "Dashboard",  href: "/dashboard", icon: "LayoutDashboard" },
-      { label: "Analytics",  href: "/analytics",  icon: "BarChart3"       },
+      { label: "Dashboard", href: "/dashboard", icon: "LayoutDashboard" },
+      { label: "Analytics", href: "/analytics", icon: "BarChart3" },
     ],
   },
   {
     group: "Operations",
     items: [
       { label: "POS Terminal", href: "/pos",     icon: "ShoppingCart", highlight: true },
-      { label: "Sales",        href: "/sales",   icon: "Receipt"  },
+      { label: "Sales",        href: "/sales",   icon: "Receipt" },
       { label: "Returns",      href: "/returns", icon: "RotateCcw" },
     ],
   },
   {
     group: "Inventory",
     items: [
-      { label: "Products",   href: "/products",   icon: "Package"   },
-      { label: "Categories", href: "/categories", icon: "Tag"       },
-      { label: "Brands",     href: "/brands",     icon: "Star"      },
+      { label: "Products",   href: "/products",   icon: "Package" },
+      { label: "Categories", href: "/categories", icon: "Tag" },
+      { label: "Brands",     href: "/brands",     icon: "Star" },
       { label: "Inventory",  href: "/inventory",  icon: "Warehouse" },
     ],
   },
   {
     group: "People",
     items: [
-      { label: "Customers", href: "/customers", icon: "Users"      },
-      { label: "Suppliers", href: "/suppliers", icon: "Truck"      },
-      { label: "Purchases", href: "/purchases", icon: "ShoppingBag"},
-      { label: "HR & Payroll", href: "/hr",     icon: "UserCog"    },
+      { label: "Customers",    href: "/customers", icon: "Users" },
+      { label: "Suppliers",    href: "/suppliers", icon: "Truck" },
+      { label: "Purchases",    href: "/purchases", icon: "ShoppingBag" },
+      { label: "HR & Payroll", href: "/hr",        icon: "UserCog" },
     ],
   },
   {
     group: "Finance",
     items: [
-      { label: "Accounting", href: "/accounting", icon: "BookOpen"     },
+      { label: "Accounting", href: "/accounting", icon: "BookOpen" },
       { label: "Expenses",   href: "/expenses",   icon: "TrendingDown" },
     ],
   },
   {
     group: "Business",
     items: [
-      { label: "Branches",      href: "/branches",      icon: "Building2"  },
-      { label: "Reports",       href: "/reports",       icon: "FileBarChart"},
-      { label: "Promotions",    href: "/promotions",    icon: "Zap"        },
+      { label: "Branches",      href: "/branches",      icon: "Building2" },
+      { label: "Reports",       href: "/reports",       icon: "FileBarChart" },
+      { label: "Promotions",    href: "/promotions",    icon: "Zap" },
       { label: "Notifications", href: "/notifications", icon: "Bell", badge: 4 },
     ],
   },
   {
     group: "System",
     items: [
-      { label: "Settings",    href: "/settings", icon: "Settings" },
-      { label: "Users & Roles", href: "/users",  icon: "Shield"   },
+      { label: "Settings",      href: "/settings", icon: "Settings" },
+      { label: "Users & Roles", href: "/users",    icon: "Shield" },
     ],
   },
 ];
@@ -103,9 +103,9 @@ const NAV_GROUPS_WITHOUT_POS = NAV_GROUPS.map(g => ({
 })).filter(g => g.items.length > 0);
 
 export function Sidebar() {
-  const pathname  = usePathname();
+  const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
-  const router    = useRouter();
+  const router = useRouter();
   const { user, logoutApi } = useAuthStore();
 
   const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
@@ -114,63 +114,86 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <motion.aside
         initial={false}
-        animate={{ width: sidebarCollapsed ? 64 : 272 }}
-        transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
-        className="relative flex h-screen flex-col border-r border-border bg-sidebar overflow-hidden shrink-0"
+        animate={{ width: sidebarCollapsed ? 58 : 232 }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        className="relative flex h-screen flex-col overflow-hidden shrink-0"
+        style={{
+          background: "var(--sidebar)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+        }}
       >
         {/* ── Logo ── */}
         <div className={cn(
-          "flex h-14 items-center border-b border-border/60 shrink-0 px-3 gap-2",
+          "flex h-[50px] items-center shrink-0 px-3",
+          "border-b",
           sidebarCollapsed ? "justify-center" : "justify-between",
-        )}>
+        )} style={{ borderColor: "rgba(255,255,255,0.06)" }}>
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl gradient-primary shrink-0 shadow-sm">
-              <Sparkles className="h-4 w-4 text-white" />
+            <div
+              className="flex h-7 w-7 items-center justify-center rounded-lg shrink-0 shadow-lg"
+              style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+            >
+              <Sparkles className="h-3.5 w-3.5 text-white" />
             </div>
             <AnimatePresence initial={false}>
               {!sidebarCollapsed && (
                 <motion.div
                   key="logo-text"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: "auto" }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.18 }}
-                  className="leading-tight overflow-hidden"
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -6 }}
+                  transition={{ duration: 0.14 }}
+                  className="overflow-hidden"
                 >
-                  <p className="text-base font-bold text-foreground whitespace-nowrap tracking-tight">FashionERP</p>
-                  <p className="text-xs text-muted-foreground whitespace-nowrap">Enterprise</p>
+                  <p className="text-[12.5px] font-extrabold text-foreground whitespace-nowrap tracking-tight leading-none">FashionERP</p>
+                  <p className="text-[9.5px] whitespace-nowrap font-semibold tracking-widest uppercase leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>Enterprise</p>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
           {!sidebarCollapsed && (
-            <button onClick={toggleSidebar} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors shrink-0">
-              <PanelLeftClose className="h-3.5 w-3.5" />
+            <button
+              onClick={toggleSidebar}
+              className="flex h-5 w-5 items-center justify-center rounded transition-colors"
+              style={{ color: "rgba(255,255,255,0.25)" }}
+              onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+              onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+            >
+              <PanelLeftClose className="h-3 w-3" />
             </button>
           )}
         </div>
 
-        {/* ── Expand (collapsed) ── */}
+        {/* ── Expand (collapsed state) ── */}
         {sidebarCollapsed && (
-          <button onClick={toggleSidebar} className="mx-auto mt-2 flex h-7 w-7 items-center justify-center rounded-lg hover:bg-accent text-muted-foreground hover:text-foreground transition-colors">
-            <PanelLeftOpen className="h-3.5 w-3.5" />
+          <button
+            onClick={toggleSidebar}
+            className="mx-auto mt-2 flex h-6 w-6 items-center justify-center rounded transition-colors"
+            style={{ color: "rgba(255,255,255,0.25)" }}
+            onMouseEnter={e => (e.currentTarget.style.color = "rgba(255,255,255,0.7)")}
+            onMouseLeave={e => (e.currentTarget.style.color = "rgba(255,255,255,0.25)")}
+          >
+            <PanelLeftOpen className="h-3 w-3" />
           </button>
         )}
 
-        {/* ── Navigation ── */}
+        {/* ── Nav ── */}
         <ScrollArea className="flex-1 py-2">
           <nav className={cn(sidebarCollapsed ? "px-1.5" : "px-2")}>
             {NAV_GROUPS_WITHOUT_POS.map((group, gi) => (
-              <div key={group.group} className={cn("mb-0.5", gi > 0 ? "mt-3" : "mt-2")}>
+              <div key={group.group} className={cn(gi > 0 ? "mt-3.5" : "mt-1")}>
                 {!sidebarCollapsed ? (
-                  <p className="mb-1 px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/40 select-none">
+                  <p
+                    className="mb-1 px-1.5 text-[9.5px] font-bold uppercase tracking-[0.12em] select-none"
+                    style={{ color: "rgba(255,255,255,0.2)" }}
+                  >
                     {group.group}
                   </p>
                 ) : (
-                  gi > 0 && <div className="mx-auto my-2 h-px w-8 bg-border/60" />
+                  gi > 0 && <div className="mx-auto my-2 h-px w-5" style={{ background: "rgba(255,255,255,0.07)" }} />
                 )}
 
-                <div className="space-y-0.5">
+                <div className="space-y-[2px]">
                   {group.items.map((item) => {
                     const Icon = ICON_MAP[item.icon];
                     const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
@@ -179,38 +202,56 @@ export function Sidebar() {
                       <Link
                         href={item.href}
                         className={cn(
-                          "group relative flex items-center gap-2.5 rounded-lg text-[15px] font-medium transition-all duration-150 select-none overflow-hidden",
-                          sidebarCollapsed ? "h-11 w-full justify-center px-0" : "h-10 px-2.5",
-                          isActive
-                            ? "text-primary bg-primary/10"
-                            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                          "group relative flex items-center gap-2 rounded-[7px] transition-all duration-150 select-none overflow-hidden",
+                          sidebarCollapsed ? "h-8 w-full justify-center px-0" : "h-[30px] px-2",
                         )}
+                        style={isActive ? {
+                          background: "linear-gradient(90deg,rgba(99,102,241,0.18),rgba(99,102,241,0.08))",
+                          color: "#a5b4fc",
+                        } : {
+                          color: "rgba(255,255,255,0.42)",
+                        }}
+                        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "rgba(255,255,255,0.82)"; }}}
+                        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.42)"; }}}
                       >
+                        {/* Glow left border */}
                         {isActive && (
-                          <>
-                            <motion.span
-                              layoutId="nav-indicator"
-                              className="absolute left-0 top-1 bottom-1 w-0.5 rounded-full bg-primary"
-                              transition={{ type: "spring", stiffness: 400, damping: 38 }}
-                            />
-                            <motion.span
-                              layoutId="nav-bg"
-                              className="absolute inset-0 bg-primary/10 rounded-lg"
-                              transition={{ type: "spring", stiffness: 400, damping: 38 }}
-                            />
-                          </>
+                          <motion.span
+                            layoutId="sb-bar"
+                            className="absolute left-0 top-[4px] bottom-[4px] w-[2px] rounded-full"
+                            style={{ background: "linear-gradient(180deg,#818cf8,#6366f1)" }}
+                            transition={{ type: "spring", stiffness: 500, damping: 38 }}
+                          />
                         )}
-                        <Icon className="h-4 w-4 shrink-0 relative z-10" />
+
+                        {/* Icon */}
+                        <div className={cn(
+                          "relative z-10 flex items-center justify-center rounded-[5px] shrink-0 transition-all",
+                          sidebarCollapsed ? "h-6 w-6" : "h-5 w-5",
+                          isActive
+                            ? "bg-indigo-500/20 text-indigo-400"
+                            : "text-inherit",
+                        )}>
+                          <Icon className="h-3.5 w-3.5" />
+                        </div>
+
                         {!sidebarCollapsed && (
                           <>
-                            <span className="relative z-10 truncate flex-1">{item.label}</span>
-                            {item.badge && (
-                              <Badge
-                                variant={isActive ? "default" : "secondary"}
-                                className="relative z-10 h-4 min-w-4 px-1 text-[10px] leading-none"
+                            <span className="relative z-10 truncate flex-1 text-[11.5px] font-medium leading-none">
+                              {item.label}
+                            </span>
+                            {item.badge ? (
+                              <span
+                                className="relative z-10 ml-auto flex h-[16px] min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none"
+                                style={isActive
+                                  ? { background: "#6366f1", color: "#fff" }
+                                  : { background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.5)" }
+                                }
                               >
                                 {item.badge}
-                              </Badge>
+                              </span>
+                            ) : isActive && (
+                              <ChevronRight className="relative z-10 h-3 w-3 shrink-0 ml-auto opacity-40" />
                             )}
                           </>
                         )}
@@ -220,9 +261,13 @@ export function Sidebar() {
                     return sidebarCollapsed ? (
                       <Tooltip key={item.href}>
                         <TooltipTrigger asChild>{link}</TooltipTrigger>
-                        <TooltipContent side="right" className="flex items-center gap-2">
+                        <TooltipContent side="right" className="flex items-center gap-2 text-xs">
                           {item.label}
-                          {item.badge && <Badge variant="default" className="h-4 px-1 text-[10px]">{item.badge}</Badge>}
+                          {item.badge && (
+                            <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-bold text-primary-foreground">
+                              {item.badge}
+                            </span>
+                          )}
                         </TooltipContent>
                       </Tooltip>
                     ) : (
@@ -235,65 +280,87 @@ export function Sidebar() {
           </nav>
         </ScrollArea>
 
-        {/* ── User footer ── */}
-        <div className="border-t border-border/60 shrink-0">
+        {/* ── Footer ── */}
+        <div className="shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
           {sidebarCollapsed ? (
-            <div className="p-2">
+            <div className="flex flex-col items-center gap-1 py-2 px-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Link href="/settings" className="flex w-full items-center justify-center rounded-lg p-1.5 hover:bg-accent transition-colors mb-1">
-                    <Settings className="h-3.5 w-3.5 text-muted-foreground" />
+                  <Link href="/settings" className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "rgba(255,255,255,0.3)" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}>
+                    <Settings className="h-3.5 w-3.5" />
                   </Link>
                 </TooltipTrigger>
                 <TooltipContent side="right">Settings</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button className="flex w-full items-center justify-center rounded-lg p-1.5 hover:bg-accent transition-colors">
-                    <Avatar className="h-6 w-6">
+                  <button className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.07)"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; }}>
+                    <Avatar className="h-5 w-5">
                       <AvatarImage src={user?.avatar} />
-                      <AvatarFallback className="text-[9px] font-bold gradient-primary text-white">
+                      <AvatarFallback className="text-[8px] font-bold text-white" style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
                         {getInitials(user?.name || "U")}
                       </AvatarFallback>
                     </Avatar>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p className="font-medium">{user?.name || "User"}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role?.replace(/_/g, " ")}</p>
+                  <p className="text-[11px] font-semibold">{user?.name || "User"}</p>
+                  <p className="text-[10px] text-muted-foreground capitalize">{user?.role?.replace(/_/g, " ")}</p>
                 </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button onClick={handleLogout} className="flex h-7 w-7 items-center justify-center rounded-[6px] transition-colors" style={{ color: "rgba(255,255,255,0.3)" }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.1)"; e.currentTarget.style.color = "#f87171"; }} onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.3)"; }}>
+                    <LogOut className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">Sign out</TooltipContent>
               </Tooltip>
             </div>
           ) : (
-            <div className="p-3 space-y-2">
-              <div className="flex items-center gap-2.5 rounded-xl bg-muted/50 px-3 py-2.5">
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src={user?.avatar} />
-                  <AvatarFallback className="text-[11px] font-bold gradient-primary text-white">
-                    {getInitials(user?.name || "U")}
-                  </AvatarFallback>
-                </Avatar>
+            <div className="p-2.5">
+              {/* User card */}
+              <div
+                className="flex items-center gap-2 rounded-[8px] px-2.5 py-2 mb-1.5"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                <div className="relative shrink-0">
+                  <Avatar className="h-6 w-6">
+                    <AvatarImage src={user?.avatar} />
+                    <AvatarFallback className="text-[9px] font-bold text-white" style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+                      {getInitials(user?.name || "U")}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-sidebar bg-emerald-400" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[15px] font-semibold truncate text-foreground leading-tight">
+                  <p className="text-[11.5px] font-semibold truncate text-foreground leading-tight">
                     {user?.name || "Admin"}
                   </p>
-                  <p className="text-[12px] text-muted-foreground capitalize truncate leading-tight">
-                    {user?.email || user?.role?.replace(/_/g, " ") || "administrator"}
+                  <p className="text-[9.5px] capitalize truncate leading-tight mt-px" style={{ color: "rgba(255,255,255,0.28)" }}>
+                    {user?.role?.replace(/_/g, " ") || "Administrator"}
                   </p>
                 </div>
               </div>
-              <div className="flex gap-1.5">
+              {/* Action buttons */}
+              <div className="grid grid-cols-2 gap-1">
                 <Link
                   href="/settings"
-                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[13px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors border border-border/60"
+                  className="flex items-center justify-center gap-1 h-6 rounded-[6px] text-[10.5px] font-medium transition-colors"
+                  style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
                 >
-                  <Settings className="h-3.5 w-3.5" />Settings
+                  <Settings className="h-3 w-3" />Settings
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg text-[13px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors border border-border/60"
+                  className="flex items-center justify-center gap-1 h-6 rounded-[6px] text-[10.5px] font-medium transition-colors"
+                  style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
                 >
-                  <LogOut className="h-3.5 w-3.5" />Sign out
+                  <LogOut className="h-3 w-3" />Sign out
                 </button>
               </div>
             </div>
