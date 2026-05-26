@@ -343,6 +343,17 @@ export class PurchasesController {
     return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status);
   }
 
+  @Post(':id/receive')
+  @RequirePermissions('purchases:update')
+  @ApiOperation({ summary: 'Receive items for a purchase order' })
+  receiveItems(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body('items') items: ReceiveItemDto[],
+  ) {
+    return this.suppliersService.receiveItems(id, user.tenantId, user.branchId ?? '', user.id, items);
+  }
+
 }
 
 @Module({
