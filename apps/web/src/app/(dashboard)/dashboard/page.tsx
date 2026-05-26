@@ -113,12 +113,16 @@ export default function DashboardPage() {
         api.get<RevenuePoint[]>("/sales/revenue?period=day"),
         api.get<{ total: number }>("/customers?limit=1"),
       ]);
-      if (sumRes.status  === "fulfilled") setSummary(sumRes.value.data);
+      if (sumRes.status   === "fulfilled") setSummary(sumRes.value.data);
       if (salesRes.status === "fulfilled") setRecentSales(salesRes.value.data?.data ?? []);
-      if (topRes.status  === "fulfilled") setTopProducts(topRes.value.data ?? []);
-      if (lowRes.status  === "fulfilled") setLowStock(lowRes.value.data ?? []);
-      if (revRes.status  === "fulfilled") setRevenue(revRes.value.data ?? []);
-      if (custRes.status === "fulfilled") setCustTotal((custRes.value.data as unknown as { total?: number })?.total ?? 0);
+      if (topRes.status   === "fulfilled") setTopProducts(topRes.value.data ?? []);
+      if (lowRes.status   === "fulfilled") setLowStock(lowRes.value.data ?? []);
+      if (revRes.status   === "fulfilled") setRevenue(revRes.value.data ?? []);
+      if (custRes.status  === "fulfilled") setCustTotal((custRes.value.data as unknown as { total?: number })?.total ?? 0);
+      const errors = [sumRes, salesRes, topRes, lowRes, revRes, custRes]
+        .filter((r) => r.status === "rejected")
+        .map((r) => (r as PromiseRejectedResult).reason?.message);
+      if (errors.length > 0) toast.error(`Dashboard: ${errors[0]}`);
     } catch { toast.error("Failed to load dashboard"); }
     finally { setLoading(false); }
   }, []);

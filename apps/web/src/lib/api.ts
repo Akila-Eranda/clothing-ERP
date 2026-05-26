@@ -31,6 +31,18 @@ export const tokenStorage = {
   },
 };
 
+// ── Extract tenantId from JWT payload (fallback for existing sessions) ────
+function getTenantFromToken(): string | null {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('fe_access_token') : null;
+    if (!token) return null;
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return (payload.tenantId as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Base fetch wrapper ────────────────────────────────────────────────────
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
@@ -71,8 +83,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const tenantId = tokenStorage.getTenant();
-  if (tenantId) headers['x-tenant-id'] = tenantId;
+  const tenantId = tokenStorage.getTenant() || getTenantFromToken();
+  if (tenantId) {
+    headers['x-tenant-id'] = tenantId;
+    if (!tokenStorage.getTenant()) tokenStorage.setTenant(tenantId);
+  }
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
