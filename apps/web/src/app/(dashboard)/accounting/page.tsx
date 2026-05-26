@@ -392,12 +392,12 @@ export default function AccountingPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
         {/* ── Sub-navigation ───────────────────────────── */}
-        <div className="bg-white border-b sticky top-0 z-10">
-          <div className="max-w-[1600px] mx-auto px-6 flex items-center justify-between h-14">
+        <div className="bg-card border-b sticky top-0 z-10">
+          <div className="px-6 flex items-center justify-between h-14">
             <TabsList className="h-14 bg-transparent p-0 gap-0 rounded-none border-none">
               {[
                 { value: "dashboard",    label: "Dashboard" },
@@ -408,7 +408,7 @@ export default function AccountingPage() {
                 { value: "settings",     label: "Settings" },
               ].map((t) => (
                 <TabsTrigger key={t.value} value={t.value}
-                  className="h-14 px-4 rounded-none text-sm font-medium text-slate-500 border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-slate-700 transition-colors">
+                  className="h-14 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors">
                   {t.label}
                 </TabsTrigger>
               ))}
@@ -424,7 +424,7 @@ export default function AccountingPage() {
           </div>
         </div>
 
-        <div className="max-w-[1600px] mx-auto px-6 py-6">
+        <div className="px-6 py-6">
 
           {/* ══ DASHBOARD ══ */}
           <TabsContent value="dashboard" className="m-0 space-y-5">
@@ -438,15 +438,15 @@ export default function AccountingPage() {
                 { label: "Total Income (MTD)", value: tmRevenue,  icon: TrendingUp,  bg: "bg-orange-500",  up: revMoM !== null ? revMoM >= 0 : tmRevenue > 0,    change: revMoM !== null ? `${revMoM >= 0 ? "+" : ""}${revMoM.toFixed(1)}% from last month` : `${tmSales} sales this month` },
                 { label: "Net Profit (MTD)",   value: tmProfit,   icon: DollarSign,  bg: "bg-teal-600",    up: profitMoM !== null ? profitMoM >= 0 : tmProfit >= 0, change: profitMoM !== null ? `${profitMoM >= 0 ? "+" : ""}${profitMoM.toFixed(1)}% from last month` : `Margin: ${tmMargin}%` },
               ] as { label: string; value: number; icon: React.ComponentType<{className?: string}>; bg: string; up: boolean; change: string }[]).map((kpi) => (
-                <Card key={kpi.label} className="bg-white shadow-sm hover:shadow-md transition-shadow border">
+                <Card key={kpi.label} className="bg-card shadow-sm hover:shadow-md transition-shadow border">
                   <CardContent className="p-5">
                     <div className="flex items-center gap-3 mb-3">
                       <div className={`${kpi.bg} rounded-full p-2.5 shrink-0`}>
                         <kpi.icon className="h-5 w-5 text-white" />
                       </div>
-                      <p className="text-xs font-medium text-slate-500 leading-tight">{kpi.label}</p>
+                      <p className="text-xs font-medium text-muted-foreground leading-tight">{kpi.label}</p>
                     </div>
-                    <p className="text-xl font-bold text-slate-800">LKR {formatNumber(Math.abs(kpi.value))}</p>
+                    <p className="text-xl font-bold text-foreground">LKR {formatNumber(Math.abs(kpi.value))}</p>
                     <div className="flex items-center gap-1 mt-1.5">
                       {kpi.up ? <ArrowUpRight className="h-3.5 w-3.5 text-emerald-500 shrink-0" /> : <ArrowDownRight className="h-3.5 w-3.5 text-red-500 shrink-0" />}
                       <span className={`text-xs font-medium ${kpi.up ? "text-emerald-600" : "text-red-500"}`}>{kpi.change}</span>
@@ -460,9 +460,9 @@ export default function AccountingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
               {/* Income vs Expense Line Chart */}
-              <Card className="lg:col-span-3 bg-white shadow-sm border">
+              <Card className="lg:col-span-3 bg-card shadow-sm border">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-slate-700">Income vs Expense (This Month)</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-foreground">Income vs Expense (This Month)</CardTitle>
                   <Select defaultValue={DATE_PRESETS[0].label} onValueChange={(v) => { const p = DATE_PRESETS.find((d) => d.label === v); if (p) setCfRange({ start: p.start, end: p.end }); }}>
                     <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>{DATE_PRESETS.map((p) => <SelectItem key={p.label} value={p.label} className="text-xs">{p.label}</SelectItem>)}</SelectContent>
@@ -485,15 +485,15 @@ export default function AccountingPage() {
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="h-[250px] flex items-center justify-center text-slate-400 text-sm">No cash flow data for this period</div>
+                    <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">No cash flow data for this period</div>
                   )}
                 </CardContent>
               </Card>
 
               {/* Expense by Category Donut */}
-              <Card className="lg:col-span-2 bg-white shadow-sm border">
+              <Card className="lg:col-span-2 bg-card shadow-sm border">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-slate-700">Expense by Category (This Month)</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-foreground">Expense by Category (This Month)</CardTitle>
                   <Select defaultValue={DATE_PRESETS[0].label}>
                     <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>{DATE_PRESETS.map((p) => <SelectItem key={p.label} value={p.label} className="text-xs">{p.label}</SelectItem>)}</SelectContent>
@@ -515,18 +515,18 @@ export default function AccountingPage() {
                           <div key={cat.name} className="flex items-center justify-between gap-1">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
-                              <span className="text-xs text-slate-600 truncate">{cat.name}</span>
+                              <span className="text-xs text-foreground truncate">{cat.name}</span>
                             </div>
                             <div className="shrink-0 text-right ml-1">
-                              <span className="text-xs font-semibold text-slate-700 block">LKR {formatNumber(cat.value)}</span>
-                              <span className="text-[10px] text-slate-400">({expTotal > 0 ? ((cat.value/expTotal)*100).toFixed(1) : 0}%)</span>
+                              <span className="text-xs font-semibold text-foreground block">LKR {formatNumber(cat.value)}</span>
+                              <span className="text-[10px] text-muted-foreground">({expTotal > 0 ? ((cat.value/expTotal)*100).toFixed(1) : 0}%)</span>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   ) : (
-                    <div className="h-[175px] flex items-center justify-center text-slate-400 text-sm">No expense data</div>
+                    <div className="h-[175px] flex items-center justify-center text-muted-foreground text-sm">No expense data</div>
                   )}
                 </CardContent>
               </Card>
@@ -536,70 +536,70 @@ export default function AccountingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
               {/* Recent Transactions */}
-              <Card className="lg:col-span-3 bg-white shadow-sm border">
+              <Card className="lg:col-span-3 bg-card shadow-sm border">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-slate-700">Recent Transactions</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-foreground">Recent Transactions</CardTitle>
                   <button onClick={() => setActiveTab("transactions")} className="text-xs text-blue-600 hover:underline font-medium">View All</button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-y bg-slate-50">
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Date</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Reference</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Description</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Account</th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Type</th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Amount (LKR)</th>
+                        <tr className="border-y bg-muted/30">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Date</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Reference</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Description</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Account</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Type</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-muted-foreground">Amount (LKR)</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-border">
                         {recentExp.length > 0 ? recentExp.map((exp) => (
-                          <tr key={exp.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{new Date(exp.date).toLocaleDateString("en-LK",{day:"2-digit",month:"short",year:"numeric"})}</td>
+                          <tr key={exp.id} className="hover:bg-muted/50 transition-colors">
+                            <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(exp.date).toLocaleDateString("en-LK",{day:"2-digit",month:"short",year:"numeric"})}</td>
                             <td className="px-4 py-3 text-xs text-blue-600 font-medium whitespace-nowrap">{exp.reference || "—"}</td>
-                            <td className="px-4 py-3 text-xs text-slate-700 max-w-[160px] truncate">{exp.description}</td>
-                            <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{exp.categoryId || "General"}</td>
+                            <td className="px-4 py-3 text-xs text-foreground max-w-[160px] truncate">{exp.description}</td>
+                            <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">{exp.categoryId || "General"}</td>
                             <td className="px-4 py-3"><span className="inline-flex px-2 py-0.5 rounded text-[10px] font-semibold bg-red-100 text-red-600">Expense</span></td>
                             <td className="px-4 py-3 text-xs font-semibold text-red-500 text-right whitespace-nowrap">−{formatNumber(exp.amount)}</td>
                           </tr>
                         )) : (
-                          <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">No recent transactions</td></tr>
+                          <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No recent transactions</td></tr>
                         )}
                       </tbody>
                     </table>
                   </div>
-                  <div className="px-4 py-2.5 border-t bg-slate-50/50">
-                    <p className="text-xs text-slate-400">Showing 1 to {Math.min(5, recentExp.length)} of {expenses.length} entries</p>
+                  <div className="px-4 py-2.5 border-t bg-muted/30">
+                    <p className="text-xs text-muted-foreground">Showing 1 to {Math.min(5, recentExp.length)} of {expenses.length} entries</p>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Top Accounts */}
-              <Card className="lg:col-span-2 bg-white shadow-sm border">
+              <Card className="lg:col-span-2 bg-card shadow-sm border">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-slate-700">Top Accounts</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-foreground">Top Accounts</CardTitle>
                   <button onClick={() => setActiveTab("accounts")} className="text-xs text-blue-600 hover:underline font-medium">View All</button>
                 </CardHeader>
                 <CardContent className="p-0">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-y bg-slate-50">
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Account Name</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500">Account Type</th>
-                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500">Balance (LKR)</th>
+                      <tr className="border-y bg-muted/30">
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Account Name</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Account Type</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-semibold text-muted-foreground">Balance (LKR)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-border">
                       {topAccounts.length > 0 ? topAccounts.map((acct) => (
-                        <tr key={acct.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-4 py-3 text-xs font-medium text-slate-700">{acct.name}</td>
-                          <td className="px-4 py-3 text-xs text-slate-500">{ACCT_TYPE_CFG[acct.type]?.label ?? acct.type}</td>
-                          <td className="px-4 py-3 text-xs font-semibold text-right text-slate-700">{formatNumber(Math.abs(acct.balance))}</td>
+                        <tr key={acct.id} className="hover:bg-muted/50 transition-colors">
+                          <td className="px-4 py-3 text-xs font-medium text-foreground">{acct.name}</td>
+                          <td className="px-4 py-3 text-xs text-muted-foreground">{ACCT_TYPE_CFG[acct.type]?.label ?? acct.type}</td>
+                          <td className="px-4 py-3 text-xs font-semibold text-right text-foreground">{formatNumber(Math.abs(acct.balance))}</td>
                         </tr>
                       )) : (
-                        <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-400">No accounts found</td></tr>
+                        <tr><td colSpan={3} className="px-4 py-8 text-center text-sm text-muted-foreground">No accounts found</td></tr>
                       )}
                     </tbody>
                   </table>
@@ -608,7 +608,7 @@ export default function AccountingPage() {
             </div>
 
             {/* Quick Actions Bar */}
-            <Card className="bg-white shadow-sm border">
+            <Card className="bg-card shadow-sm border">
               <CardContent className="px-6 py-4">
                 <div className="flex items-center justify-around gap-1 flex-wrap">
                   {[
@@ -621,9 +621,9 @@ export default function AccountingPage() {
                     { icon: Wallet,     label: "Cash\nFlow",           fn: () => setActiveTab("reports") },
                   ].map((item) => (
                     <button key={item.label} onClick={item.fn}
-                      className="flex flex-col items-center gap-2 px-5 py-3 rounded-xl hover:bg-blue-50 group transition-colors min-w-[80px]">
-                      <item.icon className="h-5 w-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
-                      <span className="text-[11px] font-medium text-slate-500 group-hover:text-blue-600 text-center leading-tight transition-colors whitespace-pre-line">{item.label}</span>
+                      className="flex flex-col items-center gap-2 px-5 py-3 rounded-xl hover:bg-primary/5 group transition-colors min-w-[80px]">
+                      <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-blue-600 transition-colors" />
+                      <span className="text-[11px] font-medium text-muted-foreground group-hover:text-blue-600 text-center leading-tight transition-colors whitespace-pre-line">{item.label}</span>
                     </button>
                   ))}
                 </div>
@@ -633,7 +633,7 @@ export default function AccountingPage() {
 
           {/* ══ TRANSACTIONS ══ */}
           <TabsContent value="transactions" className="m-0 space-y-4">
-            <div className="flex items-center justify-between flex-wrap gap-3 bg-white border rounded-xl p-3 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-3 bg-card border rounded-xl p-3 shadow-sm">
               <div className="flex gap-2 items-center flex-wrap">
                 <PresetBar range={plRange} onApply={(p) => setPlRange({ start: p.start, end: p.end })} />
                 <div className="w-px h-4 bg-border" />
@@ -651,7 +651,7 @@ export default function AccountingPage() {
               filterableColumns={[{ id: "paymentMethod", title: "Method", options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g," "), value: m })) }, { id: "categoryId", title: "Category", options: CATEGORIES.map((c) => ({ label: c, value: c })) }]}
               isShowExportButtons={{ isShow: true, fileName: "expenses-export" }} />
             <div className="flex items-center justify-between pt-2">
-              <h2 className="text-sm font-semibold text-slate-700">Journal Entries</h2>
+              <h2 className="text-sm font-semibold text-foreground">Journal Entries</h2>
               <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddJournalOpen(true)}><Plus className="h-3.5 w-3.5" /> New Entry</Button>
             </div>
             <ClientSideTable data={journalEntries} columns={journalCols} pageCount={Math.ceil(journalEntries.length / 20)}
@@ -662,7 +662,7 @@ export default function AccountingPage() {
           {/* ══ CHART OF ACCOUNTS ══ */}
           <TabsContent value="accounts" className="m-0 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-slate-500">{accounts.length} accounts total</p>
+              <p className="text-sm text-muted-foreground">{accounts.length} accounts total</p>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="gap-1.5"><Scale className="h-3.5 w-3.5" />Trial Balance</Button>
                 <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />New Account</Button>
@@ -673,7 +673,7 @@ export default function AccountingPage() {
               if (!accts.length) return null;
               const total = accts.reduce((s, a) => s + a.balance, 0);
               return (
-                <Card key={typeKey} className="bg-white shadow-sm overflow-hidden border">
+                <Card key={typeKey} className="bg-card shadow-sm overflow-hidden border">
                   <div className={`h-1 bg-gradient-to-r ${cfg.grad}`} />
                   <CardHeader className="pb-0 pt-4 px-5">
                     <div className="flex items-center justify-between">
@@ -686,7 +686,7 @@ export default function AccountingPage() {
                   </CardHeader>
                   <CardContent className="px-5 pb-4 pt-3">
                     <div className="rounded-xl border overflow-hidden divide-y">
-                      <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-slate-50 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
+                      <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-muted/30 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
                         <span className="col-span-1">Code</span>
                         <span className="col-span-4">Account Name</span>
                         <span className="col-span-4 hidden lg:block">Description</span>
@@ -694,11 +694,11 @@ export default function AccountingPage() {
                         <span className="col-span-1"></span>
                       </div>
                       {accts.map((acct) => (
-                        <div key={acct.id} className="grid grid-cols-12 gap-2 items-center px-4 py-3 hover:bg-slate-50 transition-colors">
-                          <span className="col-span-1 font-mono text-xs text-slate-400">{acct.code}</span>
+                        <div key={acct.id} className="grid grid-cols-12 gap-2 items-center px-4 py-3 hover:bg-muted/50 transition-colors">
+                          <span className="col-span-1 font-mono text-xs text-muted-foreground">{acct.code}</span>
                           <span className="col-span-4 text-sm font-medium">{acct.name}</span>
                           <span className="col-span-4 text-xs text-muted-foreground hidden lg:block truncate">{acct.description ?? "—"}</span>
-                          <span className={`col-span-2 font-bold text-sm text-right ${acct.balance < 0 ? "text-red-500" : acct.balance === 0 ? "text-slate-400" : "text-slate-800"}`}>LKR {formatNumber(acct.balance)}</span>
+                          <span className={`col-span-2 font-bold text-sm text-right ${acct.balance < 0 ? "text-red-500" : acct.balance === 0 ? "text-muted-foreground" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</span>
                           <div className="col-span-1 flex items-center justify-end gap-1">
                             <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600 transition-colors"><Pencil className="h-3 w-3" /></button>
                             <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500 transition-colors"><Trash2 className="h-3 w-3" /></button>
@@ -714,7 +714,7 @@ export default function AccountingPage() {
 
           {/* ══ REPORTS ══ */}
           <TabsContent value="reports" className="m-0 space-y-4">
-            <div className="flex gap-2 items-center flex-wrap bg-white border rounded-xl p-3 shadow-sm">
+            <div className="flex gap-2 items-center flex-wrap bg-card border rounded-xl p-3 shadow-sm">
               <PresetBar range={plRange} onApply={(p) => setPlRange({ start: p.start, end: p.end })} />
               <div className="w-px h-4 bg-border" />
               <Input type="date" value={plRange.start} onChange={(e) => setPlRange((p) => ({ ...p, start: e.target.value }))} className="h-7 text-xs w-32" />
@@ -725,7 +725,7 @@ export default function AccountingPage() {
             </div>
             {pl ? (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                <Card className="lg:col-span-7 bg-white shadow-sm border">
+                <Card className="lg:col-span-7 bg-card shadow-sm border">
                   <CardContent className="p-8">
                     <div className="text-center mb-8">
                       <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-1.5 rounded-full text-xs font-bold tracking-wide mb-3">
@@ -770,7 +770,7 @@ export default function AccountingPage() {
                   </CardContent>
                 </Card>
                 <div className="lg:col-span-5 space-y-4">
-                  <Card className="bg-white shadow-sm border">
+                  <Card className="bg-card shadow-sm border">
                     <CardHeader className="pb-2"><CardTitle className="text-sm">6-Month Profit Trend</CardTitle></CardHeader>
                     <CardContent>
                       <ResponsiveContainer width="100%" height={160}>
@@ -784,7 +784,7 @@ export default function AccountingPage() {
                     </CardContent>
                   </Card>
                   {cashFlow && (
-                    <Card className="bg-white shadow-sm border">
+                    <Card className="bg-card shadow-sm border">
                       <CardHeader className="pb-2"><CardTitle className="text-sm">Cash Flow Summary</CardTitle></CardHeader>
                       <CardContent className="space-y-3">
                         {[{ label: "Total Inflow", value: cashFlow.totalInflow, color: "text-emerald-600" }, { label: "Total Outflow", value: cashFlow.totalOutflow, color: "text-red-500" }].map((row) => (
@@ -804,7 +804,7 @@ export default function AccountingPage() {
                 </div>
               </div>
             ) : (
-              <div className="h-40 flex items-center justify-center text-slate-400 bg-white rounded-xl border shadow-sm">No report data for selected period</div>
+              <div className="h-40 flex items-center justify-center text-muted-foreground bg-card rounded-xl border shadow-sm">No report data for selected period</div>
             )}
           </TabsContent>
 
@@ -817,13 +817,13 @@ export default function AccountingPage() {
                 { label: "Total Inflow (Period)", value: cashFlow?.totalInflow ?? 0,  icon: ArrowUpRight,   bg: "bg-emerald-600", sub: "From sales revenue" },
                 { label: "Total Outflow (Period)",value: cashFlow?.totalOutflow ?? 0, icon: ArrowDownRight, bg: "bg-red-500",     sub: "Expenses & payments" },
               ].map((item) => (
-                <Card key={item.label} className="bg-white border shadow-sm">
+                <Card key={item.label} className="bg-card border shadow-sm">
                   <CardContent className="p-5 flex items-center gap-4">
                     <div className={`${item.bg} rounded-full p-3 shrink-0`}><item.icon className="h-5 w-5 text-white" /></div>
                     <div>
-                      <p className="text-xs text-slate-500 font-medium">{item.label}</p>
-                      <p className="text-xl font-bold text-slate-800 mt-0.5">LKR {formatNumber(item.value)}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">{item.sub}</p>
+                      <p className="text-xs text-muted-foreground font-medium">{item.label}</p>
+                      <p className="text-xl font-bold text-foreground mt-0.5">LKR {formatNumber(item.value)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{item.sub}</p>
                     </div>
                   </CardContent>
                 </Card>
@@ -833,28 +833,28 @@ export default function AccountingPage() {
             {/* Bank / Cash Account Cards */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-slate-700">Cash &amp; Bank Accounts</h3>
+                <h3 className="text-sm font-semibold text-foreground">Cash &amp; Bank Accounts</h3>
                 <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-8" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />Add Account</Button>
               </div>
               {accounts.filter(a=>a.type==="ASSET").length === 0 ? (
-                <div className="h-32 flex items-center justify-center bg-white rounded-xl border text-slate-400 text-sm">No asset accounts yet</div>
+                <div className="h-32 flex items-center justify-center bg-card rounded-xl border text-muted-foreground text-sm">No asset accounts yet</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {accounts.filter(a=>a.type==="ASSET").map((acct) => (
-                    <Card key={acct.id} className="bg-white border shadow-sm hover:shadow-md transition-shadow">
+                    <Card key={acct.id} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
                       <CardContent className="p-5">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-2">
                             <div className="bg-blue-100 rounded-lg p-2"><CreditCard className="h-4 w-4 text-blue-600" /></div>
-                            <div><p className="text-xs font-semibold text-slate-700">{acct.name}</p><p className="text-[10px] text-slate-400 font-mono">{acct.code}</p></div>
+                            <div><p className="text-xs font-semibold text-foreground">{acct.name}</p><p className="text-[10px] text-muted-foreground font-mono">{acct.code}</p></div>
                           </div>
                           <div className="flex gap-1">
                             <button onClick={() => setEditAccount(acct)} className="p-1 rounded hover:bg-blue-50 hover:text-blue-600"><Pencil className="h-3 w-3" /></button>
                             <button onClick={() => deleteAccount(acct.id)} className="p-1 rounded hover:bg-red-50 hover:text-red-500"><Trash2 className="h-3 w-3" /></button>
                           </div>
                         </div>
-                        <p className={`text-xl font-bold ${acct.balance < 0 ? "text-red-500" : "text-slate-800"}`}>LKR {formatNumber(acct.balance)}</p>
-                        <p className="text-xs text-slate-400 mt-1">{acct.description || "Asset Account"}</p>
+                        <p className={`text-xl font-bold ${acct.balance < 0 ? "text-red-500" : "text-foreground"}`}>LKR {formatNumber(acct.balance)}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{acct.description || "Asset Account"}</p>
                         <div className={`mt-3 inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${acct.balance >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>
                           {acct.balance >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
                           {acct.balance >= 0 ? "Positive" : "Negative"} balance
@@ -868,9 +868,9 @@ export default function AccountingPage() {
 
             {/* Cash Flow Chart */}
             {cashFlow && cashFlow.data.length > 0 && (
-              <Card className="bg-white border shadow-sm">
+              <Card className="bg-card border shadow-sm">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-semibold text-slate-700">Cash Flow — Daily</CardTitle>
+                  <CardTitle className="text-sm font-semibold text-foreground">Cash Flow — Daily</CardTitle>
                   <div className="flex gap-2">
                     <PresetBar range={cfRange} onApply={(p) => setCfRange({ start: p.start, end: p.end })} />
                     <Button size="sm" variant="outline" onClick={loadAll} className="h-7 px-2"><RefreshCw className="h-3 w-3" /></Button>
@@ -899,7 +899,7 @@ export default function AccountingPage() {
 
           {/* ══ SETTINGS ══ */}
           <TabsContent value="settings" className="m-0">
-            <div className="h-64 flex items-center justify-center text-slate-400 bg-white rounded-xl border shadow-sm">
+            <div className="h-64 flex items-center justify-center text-muted-foreground bg-card rounded-xl border shadow-sm">
               <div className="text-center"><Scale className="h-10 w-10 mx-auto mb-3 opacity-30" /><p className="text-sm font-medium">Settings coming soon</p></div>
             </div>
           </TabsContent>
