@@ -138,8 +138,8 @@ export function Sidebar() {
                   transition={{ duration: 0.18 }}
                   className="leading-tight overflow-hidden"
                 >
-                  <p className="text-[13px] font-bold text-foreground whitespace-nowrap tracking-tight">FashionERP</p>
-                  <p className="text-[9px] text-muted-foreground whitespace-nowrap">Enterprise</p>
+                  <p className="text-sm font-bold text-foreground whitespace-nowrap tracking-tight">FashionERP</p>
+                  <p className="text-[11px] text-muted-foreground whitespace-nowrap">Enterprise</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -174,7 +174,7 @@ export function Sidebar() {
             </Tooltip>
           ) : (
             <Link href="/pos" className={cn(
-              "flex items-center gap-2.5 h-8 px-3 rounded-xl text-[12px] font-semibold transition-all duration-150",
+              "flex items-center gap-2.5 h-9 px-3 rounded-xl text-sm font-semibold transition-all duration-150",
               isPosActive
                 ? "gradient-primary text-white shadow-md"
                 : "bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20",
@@ -192,7 +192,7 @@ export function Sidebar() {
             {NAV_GROUPS_WITHOUT_POS.map((group, gi) => (
               <div key={group.group} className={cn("mb-0.5", gi > 0 ? "mt-3" : "mt-2")}>
                 {!sidebarCollapsed ? (
-                  <p className="mb-0.5 px-2 text-[9px] font-semibold uppercase tracking-widest text-muted-foreground/40 select-none">
+                  <p className="mb-1 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/40 select-none">
                     {group.group}
                   </p>
                 ) : (
@@ -208,8 +208,8 @@ export function Sidebar() {
                       <Link
                         href={item.href}
                         className={cn(
-                          "group relative flex items-center gap-2.5 rounded-lg text-[12px] font-medium transition-all duration-150 select-none overflow-hidden",
-                          sidebarCollapsed ? "h-9 w-full justify-center px-0" : "h-8 px-2.5",
+                          "group relative flex items-center gap-2.5 rounded-lg text-sm font-medium transition-all duration-150 select-none overflow-hidden",
+                          sidebarCollapsed ? "h-10 w-full justify-center px-0" : "h-9 px-2.5",
                           isActive
                             ? "text-primary bg-primary/10"
                             : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -303,10 +303,10 @@ export function Sidebar() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-semibold truncate text-foreground leading-tight">
+                  <p className="text-sm font-semibold truncate text-foreground leading-tight">
                     {user?.name || "Admin"}
                   </p>
-                  <p className="text-[10px] text-muted-foreground capitalize truncate leading-tight">
+                  <p className="text-xs text-muted-foreground capitalize truncate leading-tight">
                     {user?.email || user?.role?.replace(/_/g, " ") || "administrator"}
                   </p>
                 </div>
@@ -314,15 +314,15 @@ export function Sidebar() {
               <div className="flex gap-1.5">
                 <Link
                   href="/settings"
-                  className="flex-1 flex items-center justify-center gap-1.5 h-6 rounded-lg text-[10px] font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors border border-border/60"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-lg text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors border border-border/60"
                 >
-                  <Settings className="h-2.5 w-2.5" />Settings
+                  <Settings className="h-3 w-3" />Settings
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex-1 flex items-center justify-center gap-1.5 h-6 rounded-lg text-[10px] font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors border border-border/60"
+                  className="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-lg text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors border border-border/60"
                 >
-                  <LogOut className="h-2.5 w-2.5" />Sign out
+                  <LogOut className="h-3 w-3" />Sign out
                 </button>
               </div>
             </div>
