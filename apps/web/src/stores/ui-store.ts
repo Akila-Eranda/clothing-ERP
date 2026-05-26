@@ -9,6 +9,7 @@ interface UIStore {
   theme: "light" | "dark" | "system";
   commandOpen: boolean;
   activeModal: string | null;
+  posOpen: boolean;
 
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
@@ -18,6 +19,8 @@ interface UIStore {
   setCommandOpen: (open: boolean) => void;
   openModal: (id: string) => void;
   closeModal: () => void;
+  openPos: () => void;
+  closePos: () => void;
 }
 
 export const useUIStore = create<UIStore>()(
@@ -28,6 +31,7 @@ export const useUIStore = create<UIStore>()(
       theme: "dark",
       commandOpen: false,
       activeModal: null,
+      posOpen: false,
 
       toggleSidebar: () =>
         set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
@@ -46,6 +50,10 @@ export const useUIStore = create<UIStore>()(
       openModal: (activeModal) => set({ activeModal }),
 
       closeModal: () => set({ activeModal: null }),
+
+      openPos: () => set({ posOpen: true }),
+
+      closePos: () => set({ posOpen: false }),
     }),
     {
       name: "fashion-erp-ui",

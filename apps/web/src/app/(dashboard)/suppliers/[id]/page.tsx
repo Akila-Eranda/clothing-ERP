@@ -179,18 +179,18 @@ function PaymentModal({
                   <tbody className="divide-y">
                     {unpaidPOs.map((p) => {
                       const due      = p.total - p.paidAmount;
-                      const selected = purchaseId === p.id;
+                      const isSelected = selected.has(p.id);
                       return (
                         <tr key={p.id}
-                          onClick={() => selectPO(p.id)}
+                          onClick={() => togglePO(p.id)}
                           className={`cursor-pointer transition-colors ${
-                            selected
+                            isSelected
                               ? "bg-emerald-50 dark:bg-emerald-950/30 ring-1 ring-inset ring-emerald-400"
                               : "hover:bg-muted/20"
                           }`}>
                           <td className="px-3 py-2.5">
                             <div className="flex items-center gap-2">
-                              {selected && <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
+                              {isSelected && <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
                               <span className="font-mono text-xs font-semibold text-primary">{p.poNumber}</span>
                             </div>
                             <p className="text-[10px] text-muted-foreground ml-4">
@@ -214,9 +214,9 @@ function PaymentModal({
                   </tfoot>
                 </table>
               </div>
-              {purchaseId !== "none" && (
+              {selected.size > 0 && (
                 <p className="text-xs text-emerald-600 font-medium">
-                  ✓ Linked to {unpaidPOs.find((p) => p.id === purchaseId)?.poNumber} — click again to deselect
+                  ✓ {selected.size} purchase order{selected.size !== 1 ? "s" : ""} selected — click again to deselect
                 </p>
               )}
             </div>
@@ -228,17 +228,6 @@ function PaymentModal({
 
           {/* Payment fields */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Amount (LKR) <span className="text-destructive">*</span></Label>
-              <Input type="number" min="0.01" placeholder="0.00" value={amount}
-                onChange={(e) => setAmount(e.target.value)} autoFocus />
-              {totalDue > 0 && (
-                <button type="button" className="text-[10px] text-primary underline"
-                  onClick={() => setAmount(String(totalDue.toFixed(2)))}>
-                  Fill total due ({totalDue.toLocaleString("en-LK", { maximumFractionDigits: 0 })})
-                </button>
-              )}
-            </div>
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Payment Method <span className="text-destructive">*</span></Label>
               <Select value={method} onValueChange={setMethod}>
@@ -264,9 +253,9 @@ function PaymentModal({
         {/* Footer */}
         <div className="flex justify-between items-center gap-3 px-5 py-4 border-t bg-muted/10 shrink-0">
           <div className="text-sm">
-            {amount && parseFloat(amount) > 0 && (
+            {selectedDue > 0 && (
               <span className="text-muted-foreground">
-                Paying: <strong className="text-foreground">LKR {parseFloat(amount).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</strong>
+                Paying: <strong className="text-foreground">LKR {selectedDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</strong>
               </span>
             )}
           </div>

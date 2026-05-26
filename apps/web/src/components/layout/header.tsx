@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
-  Settings, User, LogOut, LifeBuoy, Keyboard,
+  Settings, User, LogOut, LifeBuoy, Keyboard, ShoppingCart,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export function Header() {
   const pathname = usePathname();
   const { theme, setTheme } = useTheme();
   const { user, logoutApi } = useAuthStore();
-  const { toggleMobileSidebar } = useUIStore();
+  const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = React.useState(false);
 
@@ -106,6 +106,16 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
+        {/* POS button */}
+        <Button
+          onClick={openPos}
+          size="sm"
+          className="h-8 gap-1.5 text-xs font-semibold gradient-primary text-white border-0 hover:opacity-90 shadow-sm"
+        >
+          <ShoppingCart className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">POS Terminal</span>
+        </Button>
+
         {/* Live indicator */}
         <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />

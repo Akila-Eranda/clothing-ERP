@@ -8,7 +8,7 @@ import {
   LayoutDashboard, ShoppingCart, Package, Warehouse, Users, Truck, BookOpen,
   UserCog, Building2, FileBarChart, Zap, Bell, Settings, Shield, Receipt,
   RotateCcw, Tag, Star, ShoppingBag, TrendingDown, BarChart3,
-  PanelLeftClose, PanelLeftOpen, Sparkles, LogOut, ChevronRight,
+  PanelLeftClose, PanelLeftOpen, Sparkles, LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -109,7 +109,6 @@ export function Sidebar() {
   const { user, logoutApi } = useAuthStore();
 
   const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
-  const isPosActive = pathname === "/pos" || pathname.startsWith("/pos/");
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -157,34 +156,6 @@ export function Sidebar() {
             <PanelLeftOpen className="h-3.5 w-3.5" />
           </button>
         )}
-
-        {/* ── POS CTA ── */}
-        <div className={cn("shrink-0", sidebarCollapsed ? "px-1.5 pt-2" : "px-3 pt-3")}>
-          {sidebarCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Link href="/pos" className={cn(
-                  "flex h-9 w-full items-center justify-center rounded-xl transition-all duration-150",
-                  isPosActive ? "gradient-primary shadow-md" : "bg-primary/10 hover:bg-primary/20",
-                )}>
-                  <ShoppingCart className={cn("h-4 w-4", isPosActive ? "text-white" : "text-primary")} />
-                </Link>
-              </TooltipTrigger>
-              <TooltipContent side="right">POS Terminal</TooltipContent>
-            </Tooltip>
-          ) : (
-            <Link href="/pos" className={cn(
-              "flex items-center gap-2.5 h-10 px-3 rounded-xl text-[15px] font-semibold transition-all duration-150",
-              isPosActive
-                ? "gradient-primary text-white shadow-md"
-                : "bg-primary/10 text-primary hover:bg-primary/20 border border-primary/20",
-            )}>
-              <ShoppingCart className="h-4 w-4 shrink-0" />
-              <span className="flex-1">POS Terminal</span>
-              {!isPosActive && <ChevronRight className="h-3 w-3 opacity-60 shrink-0" />}
-            </Link>
-          )}
-        </div>
 
         {/* ── Navigation ── */}
         <ScrollArea className="flex-1 py-2">
