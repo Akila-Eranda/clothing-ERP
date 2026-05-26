@@ -17,6 +17,9 @@ interface CustomerItem { id: string; name: string; phone: string; email?: string
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string } | null; _count?: { items: number }; payments?: { method: string }[]; }
+interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
+interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string; phone: string } | null; items: SaleItemDetail[]; }
+interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }];
 const NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw }, { id:"discounts", label:"Discounts", icon: Tag }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
@@ -60,6 +63,18 @@ export function POSOverlay() {
   const [inlineCustomers, setInlineCustomers] = React.useState<CustomerItem[]>([]);
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
+  const [returnStep, setReturnStep] = React.useState<"search"|"items"|"confirm"|"done">("search");
+  const [returnQuery, setReturnQuery] = React.useState("");
+  const [returnSearchRes, setReturnSearchRes] = React.useState<SaleRow[]>([]);
+  const [returnSearchLoading, setReturnSearchLoading] = React.useState(false);
+  const [returnSale, setReturnSale] = React.useState<SaleDetail | null>(null);
+  const [returnSaleLoading, setReturnSaleLoading] = React.useState(false);
+  const [returnItems, setReturnItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
+  const [returnReason, setReturnReason] = React.useState("");
+  const [returnNotes, setReturnNotes] = React.useState("");
+  const [returnRestock, setReturnRestock] = React.useState(true);
+  const [returnSubmitting, setReturnSubmitting] = React.useState(false);
+  const [returnResult, setReturnResult] = React.useState<{returnNumber:string;refundAmount:number}|null>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
@@ -82,6 +97,7 @@ export function POSOverlay() {
 
   React.useEffect(() => { if (posOpen) loadProducts(); }, [posOpen, loadProducts]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
+  React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); } }, [activeNav]);
 
   React.useEffect(() => {
     if (!customerSearch.trim()) { setCustomers([]); return; }
@@ -322,9 +338,208 @@ export function POSOverlay() {
       </div>
     );
 
-    // PLACEHOLDER for Returns, Discounts, Reports, Settings
+    // RETURNS FLOW
+    if (activeNav === "returns") {
+      const REASONS = [{v:"DEFECTIVE",l:"Defective"},{v:"WRONG_ITEM",l:"Wrong Item"},{v:"SIZE_ISSUE",l:"Size Issue"},{v:"CUSTOMER_CHANGED_MIND",l:"Changed Mind"},{v:"DAMAGED",l:"Damaged"},{v:"OTHER",l:"Other"}];
+      const selectedItems = Array.from(returnItems.entries()).filter(([,s])=>s.qty>0);
+      const refundTotal = selectedItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
+
+      const searchSale = async () => {
+        if (!returnQuery.trim()) return;
+        setReturnSearchLoading(true);
+        try { const r = await api.get<{data?:SaleRow[]}>(`/sales?search=${encodeURIComponent(returnQuery)}&limit=5`); setReturnSearchRes(r.data?.data??[]); if((r.data?.data??[]).length===0) toast.error("No sales found"); }
+        catch { toast.error("Search failed"); } finally { setReturnSearchLoading(false); }
+      };
+
+      const selectSale = async (row: SaleRow) => {
+        setReturnSaleLoading(true);
+        try {
+          const r = await api.get<SaleDetail>(`/sales/${row.id}`);
+          setReturnSale(r.data);
+          const m = new Map<string,ReturnItemSel>();
+          for (const it of r.data.items) m.set(it.variantId, { qty: it.quantity, unitPrice: it.unitPrice, name: `${it.productName} ${it.variantName}`.trim(), maxQty: it.quantity });
+          setReturnItems(m); setReturnStep("items");
+        } catch { toast.error("Failed to load sale"); } finally { setReturnSaleLoading(false); }
+      };
+
+      const submitReturn = async () => {
+        if (!returnSale || !returnReason || !selectedItems.length) return;
+        setReturnSubmitting(true);
+        try {
+          const r = await api.post<{returnNumber:string;refundAmount:number}>("/returns", { originalSaleId:returnSale.id, reason:returnReason, returnType:"RETURN", notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})) });
+          setReturnResult({returnNumber:r.data.returnNumber,refundAmount:r.data.refundAmount});
+          setReturnStep("done"); toast.success(`Return ${r.data.returnNumber} created`);
+        } catch(e:unknown){ toast.error((e as Error).message??"Return failed"); } finally { setReturnSubmitting(false); }
+      };
+
+      return (
+        <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
+          {/* HEADER + STEPS */}
+          <div className="flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <h2 className="text-white font-bold text-base">Process Return</h2>
+              <div className="flex items-center gap-1">
+                {["search","items","confirm","done"].map((s,i)=>(
+                  <React.Fragment key={s}>
+                    <div className="flex items-center gap-1">
+                      <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{background:["search","items","confirm","done"].indexOf(returnStep)>=i?"#4f6ef7":"#1a2b4a",color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#fff":"#4a6a8a"}}>{i+1}</div>
+                      <span className="text-[10px] capitalize" style={{color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#a0b4d4":"#4a6a8a"}}>{s=="search"?"Find Sale":s=="items"?"Select Items":s=="confirm"?"Confirm":"Done"}</span>
+                    </div>
+                    {i<3&&<div className="w-6 h-px mx-1" style={{background:"#1e3356"}}/>}
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+            {returnStep !== "search" && returnStep !== "done" && (
+              <button onClick={()=>{setReturnStep("search");setReturnSale(null);setReturnSearchRes([]);}} className="flex items-center gap-1.5 px-3 h-7 rounded-lg text-xs" style={{color:"#6a8ab8",border:"1px solid #1e3356"}}>← Back to Search</button>
+            )}
+          </div>
+
+          {/* STEP 1: SEARCH */}
+          {returnStep==="search"&&(
+            <div className="flex-1 flex flex-col gap-3">
+              <div className="flex gap-2">
+                <input value={returnQuery} onChange={e=>setReturnQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&searchSale()} placeholder="Enter invoice number or customer phone..." className="flex-1 h-10 px-4 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <button onClick={searchSale} disabled={returnSearchLoading||!returnQuery.trim()} className="px-5 h-10 rounded-xl text-sm font-bold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>{returnSearchLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Search className="h-4 w-4"/>}Search</button>
+              </div>
+              {returnSearchRes.length > 0 && (
+                <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
+                  <div className="px-3 py-2 border-b" style={{borderColor:"#1e3356"}}><p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
+                  {returnSearchRes.map(row=>(
+                    <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"#1a2b3a"}}>
+                      {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
+                        <p className="text-xs" style={{color:"#6a8ab8"}}>{row.customer?.name??"Walk-in"} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-white font-bold text-sm">LKR {formatNumber(row.total)}</p>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:STATUS_STYLE[row.status]?.bg??"rgba(100,100,100,0.15)",color:STATUS_STYLE[row.status]?.color??"#9ca3af"}}>{row.status}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 shrink-0" style={{color:"#4a6a8a"}}/>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {returnSearchRes.length===0&&!returnSearchLoading&&(
+                <div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><RotateCcw className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">Search a sale to start a return</p><p className="text-xs mt-1">Enter invoice number like INV-001 or customer phone</p></div>
+              )}
+            </div>
+          )}
+
+          {/* STEP 2: SELECT ITEMS + REASON */}
+          {returnStep==="items"&&returnSale&&(
+            <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+                <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{returnSale.customer?.name??"Walk-in"} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
+                  <div className="ml-auto text-right"><p className="text-white font-bold">LKR {formatNumber(returnSale.total)}</p><span className="text-[10px]" style={{color:STATUS_STYLE[returnSale.status]?.color??"#9ca3af"}}>{returnSale.status}</span></div>
+                </div>
+                <p className="text-xs font-semibold shrink-0" style={{color:"#6a8ab8"}}>SELECT ITEMS TO RETURN</p>
+                <div className="flex-1 overflow-y-auto space-y-1">
+                  {returnSale.items.map(it=>{
+                    const sel=returnItems.get(it.variantId);
+                    const isSelected=(sel?.qty??0)>0;
+                    return(
+                      <div key={it.variantId} className="flex items-center gap-3 p-2.5 rounded-xl border transition-all" style={{background:isSelected?"rgba(79,110,247,0.1)":"#162338",borderColor:isSelected?"#4f6ef7":"#1e3356"}}>
+                        <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"#4f6ef7":"transparent",borderColor:isSelected?"#4f6ef7":"#2a3a5c"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white text-xs font-semibold truncate">{it.productName}</p>
+                          <p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{it.variantName} · SKU: {it.sku}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty>0)n.set(it.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
+                          <span className="text-white text-xs font-bold w-6 text-center">{sel?.qty??0}</span>
+                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty<cur.maxQty)n.set(it.variantId,{...cur,qty:cur.qty+1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
+                        </div>
+                        <div className="text-right shrink-0 w-24">
+                          <p className="text-white text-xs font-bold">LKR {formatNumber(it.unitPrice * (sel?.qty??0))}</p>
+                          <p className="text-[10px]" style={{color:"#6a8ab8"}}>of {it.quantity} · LKR {formatNumber(it.unitPrice)} ea</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="w-56 flex flex-col gap-2 shrink-0">
+                <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>RETURN REASON <span className="text-red-400">*</span></p>
+                <div className="space-y-1">
+                  {REASONS.map(r=>(
+                    <button key={r.v} onClick={()=>setReturnReason(r.v)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border" style={{background:returnReason===r.v?"rgba(79,110,247,0.2)":"#162338",borderColor:returnReason===r.v?"#4f6ef7":"#1e3356",color:returnReason===r.v?"#fff":"#6a8ab8"}}>
+                      {returnReason===r.v&&<Check className="h-3.5 w-3.5 shrink-0" style={{color:"#4f6ef7"}}/>}
+                      {r.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs font-semibold mt-1" style={{color:"#6a8ab8"}}>NOTES (optional)</p>
+                <textarea value={returnNotes} onChange={e=>setReturnNotes(e.target.value)} rows={3} placeholder="Additional notes..." className="rounded-xl px-3 py-2 text-xs text-white outline-none resize-none" style={{background:"#162338",border:"1px solid #1e3356"}}/>
+                <label className="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer border" style={{background:returnRestock?"rgba(16,185,129,0.1)":"#162338",borderColor:returnRestock?"rgba(16,185,129,0.4)":"#1e3356"}}>
+                  <input type="checkbox" checked={returnRestock} onChange={e=>setReturnRestock(e.target.checked)} className="w-4 h-4 rounded accent-green-500"/>
+                  <span className="text-xs font-semibold" style={{color:returnRestock?"#10b981":"#6a8ab8"}}>Restock returned items</span>
+                </label>
+                <div className="mt-auto p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                  <p className="text-xs" style={{color:"#6a8ab8"}}>Items selected: {selectedItems.length}</p>
+                  <p className="text-white font-bold text-lg mt-1">LKR {formatNumber(refundTotal)}</p>
+                  <p className="text-[10px]" style={{color:"#6a8ab8"}}>Refund amount</p>
+                </div>
+                <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Review Return →</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: CONFIRM */}
+          {returnStep==="confirm"&&returnSale&&(
+            <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
+              <div className="rounded-xl border p-4" style={{background:"#162338",borderColor:"#1e3356"}}>
+                <p className="text-xs font-semibold mb-3" style={{color:"#6a8ab8"}}>RETURN SUMMARY</p>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"}].map(f=>(
+                    <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5">{f.v}</p></div>
+                  ))}
+                </div>
+                {returnNotes&&<div className="mt-2"><p className="text-[10px]" style={{color:"#6a8ab8"}}>Notes</p><p className="text-white text-xs mt-0.5">{returnNotes}</p></div>}
+              </div>
+              <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>ITEMS BEING RETURNED</p>
+              <div className="space-y-1">
+                {selectedItems.map(([variantId,sel])=>(
+                  <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                    <p className="text-white text-xs font-semibold">{sel.name}</p>
+                    <p className="text-xs font-mono" style={{color:"#6a8ab8"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center p-4 rounded-xl border mt-1" style={{background:"rgba(16,185,129,0.08)",borderColor:"rgba(16,185,129,0.3)"}}>
+                <div><p className="text-xs" style={{color:"#10b981"}}>Total Refund Amount</p><p className="text-2xl font-bold text-white mt-0.5">LKR {formatNumber(refundTotal)}</p></div>
+                <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm Return</button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 4: DONE */}
+          {returnStep==="done"&&returnResult&&(
+            <div className="flex-1 flex flex-col items-center justify-center gap-4">
+              <div className="h-20 w-20 rounded-full flex items-center justify-center" style={{background:"rgba(16,185,129,0.15)"}}><CheckCircle2 className="h-10 w-10" style={{color:"#10b981"}}/></div>
+              <div className="text-center">
+                <h3 className="text-white font-bold text-xl">Return Processed!</h3>
+                <p className="text-xs mt-1 font-mono" style={{color:"#6a8ab8"}}>{returnResult.returnNumber}</p>
+              </div>
+              <div className="p-5 rounded-2xl border text-center" style={{background:"#162338",borderColor:"#1e3356",minWidth:"260px"}}>
+                <p className="text-xs mb-1" style={{color:"#6a8ab8"}}>Refund Amount</p>
+                <p className="text-3xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
+                <p className="text-xs mt-2" style={{color:"#4a6a8a"}}>Status: INITIATED · Awaiting approval</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>{const w=window.open("","_blank","width=380,height=500");if(!w)return;w.document.write(`<!DOCTYPE html><html><head><title>Return Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>RETURN RECEIPT</h1><hr class="d"/><div class="row"><span>${returnResult.returnNumber}</span></div><div class="row"><span>Date: ${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice: ${returnSale?.invoiceNumber}</span></div><div class="row"><span>Reason: ${REASONS.find(r=>r.v===returnReason)?.l}</span></div><hr class="d"/>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} x${s.qty}</span><span>LKR ${s.unitPrice*s.qty}</span></div>`).join("")}<hr class="d"/><div class="row"><b>REFUND</b><b>LKR ${returnResult.refundAmount.toFixed(2)}</b></div><div class="foot">*** Thank You ***</div></body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Print Receipt</button>
+                <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // PLACEHOLDER for Discounts, Reports, Settings
     const PLACEHOLDERS: Record<string,{icon:React.ElementType;title:string;desc:string;path:string}> = {
-      "returns":{icon:RotateCcw,title:"Returns Management",desc:"Process customer returns, refunds and exchanges from the full dashboard module.",path:"/returns"},
       "discounts":{icon:Tag,title:"Discounts & Promotions",desc:"Create and manage discount codes, seasonal promotions and bundle offers.",path:"/promotions"},
       "reports":{icon:BarChart2,title:"Sales Reports",desc:"View detailed sales analytics, revenue trends and product performance charts.",path:"/reports"},
       "settings":{icon:Settings,title:"POS Settings",desc:"Configure tax rates, payment methods, receipt templates and printer settings.",path:"/settings"},
