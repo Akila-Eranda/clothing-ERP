@@ -9,6 +9,15 @@ export interface TenantRequest extends Request {
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
   use(req: TenantRequest, _res: Response, next: NextFunction): void {
+    const skip =
+      req.path.endsWith('/health') ||
+      req.path.includes('/auth/login') ||
+      req.path.includes('/auth/refresh') ||
+      req.path.includes('/auth/kc-') ||
+      req.path.includes('/tenants/register');
+
+    if (skip) return next();
+
     const tenantId =
       (req.headers['x-tenant-id'] as string) ||
       this.extractTenantFromHost(req.hostname);
