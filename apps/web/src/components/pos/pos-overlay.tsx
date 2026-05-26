@@ -63,6 +63,12 @@ export function POSOverlay() {
   const [inlineCustomers, setInlineCustomers] = React.useState<CustomerItem[]>([]);
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
+  const [showNewCust, setShowNewCust] = React.useState(false);
+  const [newCustFirst, setNewCustFirst] = React.useState("");
+  const [newCustLast, setNewCustLast] = React.useState("");
+  const [newCustPhone, setNewCustPhone] = React.useState("");
+  const [newCustEmail, setNewCustEmail] = React.useState("");
+  const [newCustSaving, setNewCustSaving] = React.useState(false);
   const [returnStep, setReturnStep] = React.useState<"search"|"items"|"confirm"|"done">("search");
   const [returnQuery, setReturnQuery] = React.useState("");
   const [returnSearchRes, setReturnSearchRes] = React.useState<SaleRow[]>([]);
@@ -207,6 +213,21 @@ export function POSOverlay() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,receipt,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,pinLocked,handlePinEntry]);
 
+  const saveNewCustomer = React.useCallback(async () => {
+    if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
+    setNewCustSaving(true);
+    try {
+      const res = await api.post<any>("/customers", { firstName: newCustFirst.trim(), lastName: newCustLast.trim()||undefined, phone: newCustPhone.trim(), email: newCustEmail.trim()||undefined });
+      const c = res.data;
+      const item: CustomerItem = { id:c.id, name:`${c.firstName} ${c.lastName??""}`.trim(), phone:c.phone, email:c.email, tier:c.tier?.toLowerCase(), loyaltyPoints:c.loyaltyPoints??0, walletBalance:c.walletBalance??0 };
+      applyCustomer(item);
+      setShowNewCust(false); setNewCustFirst(""); setNewCustLast(""); setNewCustPhone(""); setNewCustEmail("");
+      setInlineCustomerSearch(""); setInlineCustomers([]);
+    } catch(e:unknown){ toast.error((e as Error).message??"Failed to register customer"); }
+    finally { setNewCustSaving(false); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newCustFirst, newCustLast, newCustPhone, newCustEmail]);
+
   //  Helper: set customer from CustomerItem 
   const applyCustomer = (c: CustomerItem) => {
     setCustomer({ id:c.id, name:c.name, phone:c.phone, email:c.email, membershipTier:(c.tier?.toLowerCase() as "bronze")??"bronze", loyaltyPoints:c.loyaltyPoints, totalPurchases:0, totalSpent:0, creditLimit:0, outstandingBalance:0, isActive:true, createdAt:new Date() });
@@ -301,20 +322,50 @@ export function POSOverlay() {
     // CUSTOMERS
     if (activeNav === "customers") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="relative flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/><input value={inlineCustomerSearch} onChange={e=>setInlineCustomerSearch(e.target.value)} placeholder="Search customer by name or phone..." className="w-full pl-9 h-9 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
-          {inlineCustLoading&&<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>}
+        {/* Search bar + Register button */}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
+            <input value={inlineCustomerSearch} onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
+          </div>
+          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold text-white shrink-0 transition-all hover:opacity-90" style={{background:showNewCust?"#162338":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none"}}>
+            {showNewCust?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{showNewCust?"Cancel":"Register New"}
+          </button>
         </div>
-        {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}  <span className="capitalize">{customer.membershipTier}</span>  {customer.loyaltyPoints} pts</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}> Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
+        {/* Register form */}
+        {showNewCust&&(
+          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={{background:"#162338",borderColor:"#4f6ef7"}}>
+            <p className="text-white font-bold text-sm flex items-center gap-2"><User className="h-4 w-4" style={{color:"#4f6ef7"}}/>Register New Customer</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>First Name *</label><input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Last Name</label><input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Email</label><input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
+            </div>
+            <button onClick={saveNewCustomer} disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()} className="w-full h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40" style={{background:"#4f6ef7"}}>
+              {newCustSaving?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}{newCustSaving?"Saving...":"Save & Add to Bill"}
+            </button>
+          </div>
+        )}
+        {/* Active bill customer */}
+        {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone} · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
+        {/* Search results */}
         <div className="flex-1 overflow-y-auto">
-          {inlineCustomers.length===0&&!inlineCustomerSearch&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Search customers above</p></div>}
-          {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><AlertCircle className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm">No customers found</p></div>}
+          {inlineCustomers.length===0&&!inlineCustomerSearch&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Search existing or register a new customer</p></div>}
+          {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
+            <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"#4a6a8a"}}>
+              <AlertCircle className="h-8 w-8 opacity-30"/>
+              <p className="text-sm">No customers found</p>
+              <button onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(inlineCustomerSearch.trim()))setNewCustPhone(inlineCustomerSearch.trim());setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
+            </div>
+          )}
           <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))"}}>
             {inlineCustomers.map(c=>(
               <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
-                <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-[11px] truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}> {c.tier??"-"}</span><span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span></div></div>
-                <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?" Active":"Set"}</button>
+                <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span><span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span></div></div>
+                <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?"✓ Active":"Set"}</button>
               </div>
             ))}
           </div>
