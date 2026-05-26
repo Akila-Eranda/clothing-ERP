@@ -114,7 +114,7 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <motion.aside
         initial={false}
-        animate={{ width: sidebarCollapsed ? 58 : 232 }}
+        animate={{ width: sidebarCollapsed ? 60 : 256 }}
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex h-screen flex-col overflow-hidden shrink-0"
         style={{
@@ -145,8 +145,8 @@ export function Sidebar() {
                   transition={{ duration: 0.14 }}
                   className="overflow-hidden"
                 >
-                  <p className="text-[12.5px] font-extrabold text-foreground whitespace-nowrap tracking-tight leading-none">FashionERP</p>
-                  <p className="text-[9.5px] whitespace-nowrap font-semibold tracking-widest uppercase leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>Enterprise</p>
+                  <p className="text-[14px] font-extrabold text-foreground whitespace-nowrap tracking-tight leading-none">FashionERP</p>
+                  <p className="text-[10px] whitespace-nowrap font-semibold tracking-widest uppercase leading-none mt-0.5" style={{ color: "rgba(255,255,255,0.25)" }}>Enterprise</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -184,8 +184,8 @@ export function Sidebar() {
               <div key={group.group} className={cn(gi > 0 ? "mt-3.5" : "mt-1")}>
                 {!sidebarCollapsed ? (
                   <p
-                    className="mb-1 px-1.5 text-[9.5px] font-bold uppercase tracking-[0.12em] select-none"
-                    style={{ color: "rgba(255,255,255,0.2)" }}
+                    className="mb-1 px-1.5 text-[11px] font-bold uppercase tracking-[0.1em] select-none"
+                    style={{ color: "rgba(255,255,255,0.22)" }}
                   >
                     {group.group}
                   </p>
@@ -203,7 +203,7 @@ export function Sidebar() {
                         href={item.href}
                         className={cn(
                           "group relative flex items-center gap-2 rounded-[7px] transition-all duration-150 select-none overflow-hidden",
-                          sidebarCollapsed ? "h-8 w-full justify-center px-0" : "h-[30px] px-2",
+                          sidebarCollapsed ? "h-9 w-full justify-center px-0" : "h-[34px] px-2.5",
                         )}
                         style={isActive ? {
                           background: "linear-gradient(90deg,rgba(99,102,241,0.18),rgba(99,102,241,0.08))",
@@ -237,7 +237,7 @@ export function Sidebar() {
 
                         {!sidebarCollapsed && (
                           <>
-                            <span className="relative z-10 truncate flex-1 text-[11.5px] font-medium leading-none">
+                            <span className="relative z-10 truncate flex-1 text-[13px] font-medium leading-none">
                               {item.label}
                             </span>
                             {item.badge ? (
@@ -334,10 +334,10 @@ export function Sidebar() {
                   <span className="absolute -bottom-px -right-px h-2 w-2 rounded-full border border-sidebar bg-emerald-400" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11.5px] font-semibold truncate text-foreground leading-tight">
+                  <p className="text-[13px] font-semibold truncate text-foreground leading-tight">
                     {user?.name || "Admin"}
                   </p>
-                  <p className="text-[9.5px] capitalize truncate leading-tight mt-px" style={{ color: "rgba(255,255,255,0.28)" }}>
+                  <p className="text-[11px] capitalize truncate leading-tight mt-px" style={{ color: "rgba(255,255,255,0.28)" }}>
                     {user?.role?.replace(/_/g, " ") || "Administrator"}
                   </p>
                 </div>
@@ -346,16 +346,16 @@ export function Sidebar() {
               <div className="grid grid-cols-2 gap-1">
                 <Link
                   href="/settings"
-                  className="flex items-center justify-center gap-1 h-6 rounded-[6px] text-[10.5px] font-medium transition-colors"
+                  className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
                   style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; }}
                 >
-                  <Settings className="h-3 w-3" />Settings
+                  <Settings className="h-3.5 w-3.5" />Settings
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-1 h-6 rounded-[6px] text-[10.5px] font-medium transition-colors"
+                  className="flex items-center justify-center gap-1 h-7 rounded-[6px] text-[12px] font-medium transition-colors"
                   style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.07)" }}
                   onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.color = "#f87171"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.2)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "rgba(255,255,255,0.35)"; e.currentTarget.style.borderColor = "rgba(255,255,255,0.07)"; }}
