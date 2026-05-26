@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw } from "lucide-react";
+import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw, Printer, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,6 +24,30 @@ const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning
 
 // ── CSV helpers ───────────────────────────────────────────────────────────
 const CSV_HEADERS = ["name", "sellingPrice", "costPrice", "mrp", "taxRate", "description", "tags", "status"];
+
+function printLabels(products: Product[]) {
+  const w = window.open("", "_blank", "width=900,height=700,scrollbars=yes");
+  if (!w) { alert("Allow popups to print labels"); return; }
+  const labels = products.slice(0, 200).map(p => ({
+    name: p.name,
+    variant: "",
+    sku: p.sku,
+    barcode: p.barcode ?? p.sku,
+    price: p.sellingPrice,
+  }));
+  const html = labels.map(l => `
+    <div class="label">
+      <div class="brand">FashionERP</div>
+      <div class="pname">${l.name}</div>
+      ${l.variant ? `<div class="vname">${l.variant}</div>` : ""}
+      <div class="barcode-text">${l.barcode}</div>
+      <div class="sku">SKU: ${l.sku}</div>
+      <div class="price">LKR ${l.price.toLocaleString()}</div>
+    </div>
+  `).join("");
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Product Labels</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:#fff;padding:8mm}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm}.label{border:1px solid #ccc;border-radius:4px;padding:4mm;text-align:center;page-break-inside:avoid;height:38mm;display:flex;flex-direction:column;justify-content:center;gap:1mm}.brand{font-size:7px;text-transform:uppercase;letter-spacing:1px;color:#888}.pname{font-size:10px;font-weight:900;line-height:1.2}.vname{font-size:8px;color:#555}.barcode-text{font-family:'Courier New',monospace;font-size:14px;font-weight:bold;letter-spacing:2px;border:1px solid #000;padding:2px 4px;margin:2px auto;display:inline-block}.sku{font-size:7px;color:#888}.price{font-size:11px;font-weight:900;color:#1d4ed8}@media print{@page{margin:8mm;size:A4}body{padding:0}}</style></head><body><div class="grid">${html}</div><script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1000)}<\/script></body></html>`);
+  w.document.close();
+}
 
 function exportToCsv(products: Product[]) {
   const rows = products.map((p) => [
@@ -215,6 +239,9 @@ export default function ProductsPage() {
           </Button>
           <Button variant="outline" size="sm" onClick={() => exportToCsv(products)} className="gap-1.5" disabled={!products.length}>
             <Download className="h-3.5 w-3.5" /> Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => printLabels(products)} className="gap-1.5" disabled={!products.length}>
+            <Tag className="h-3.5 w-3.5" /> Print Labels
           </Button>
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
             <Upload className="h-3.5 w-3.5" /> Import CSV

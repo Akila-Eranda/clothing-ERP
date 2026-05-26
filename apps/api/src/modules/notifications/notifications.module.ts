@@ -3,6 +3,7 @@ import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { IsString, IsOptional, IsEnum, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationChannel, NotificationType } from '@prisma/client';
@@ -104,6 +105,52 @@ export class NotificationsService {
   @OnEvent('pos.sale.completed')
   async handleSaleCompleted(payload: { saleId: string; tenantId: string; total: number }) {
     // Could trigger external webhooks, emails, etc.
+  }
+
+  @OnEvent('pos.day.closed')
+  async handleDayClosed(payload: { tenantId: string; closedBy: string; totalRevenue: number; totalSales: number }) {
+    const admins = await this.prisma.user.findMany({
+      where: { tenantId: payload.tenantId, roles: { some: { role: { type: { in: ['SUPER_ADMIN', 'TENANT_ADMIN'] } } } } },
+      select: { id: true },
+    });
+    if (!admins.length) return;
+    await this.send(payload.tenantId, {
+      title: 'Day End Summary',
+      message: `Today's closing: ${payload.totalSales} sales · LKR ${payload.totalRevenue.toFixed(2)} revenue`,
+      type: NotificationType.DAILY_SUMMARY,
+      recipientIds: admins.map(a => a.id),
+    });
+  }
+
+  @Cron('0 8 * * *')
+  async sendBirthdayReminders() {
+    const today = new Date();
+    const month = today.getMonth() + 1;
+    const day   = today.getDate();
+    const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
+    for (const tenant of tenants) {
+      const customers = await this.prisma.customer.findMany({
+        where: { tenantId: tenant.id, isActive: true, dateOfBirth: { not: null } },
+        select: { id: true, firstName: true, lastName: true, dateOfBirth: true },
+      });
+      const birthdays = customers.filter(c => {
+        if (!c.dateOfBirth) return false;
+        const d = new Date(c.dateOfBirth);
+        return d.getMonth() + 1 === month && d.getDate() === day;
+      });
+      if (!birthdays.length) continue;
+      const admins = await this.prisma.user.findMany({
+        where: { tenantId: tenant.id, roles: { some: { role: { type: { in: ['SUPER_ADMIN', 'TENANT_ADMIN', 'CASHIER'] } } } } },
+        select: { id: true },
+      });
+      if (!admins.length) continue;
+      await this.send(tenant.id, {
+        title: `🎂 Birthday Reminders — ${birthdays.length} customer(s) today`,
+        message: birthdays.map(c => `${c.firstName} ${c.lastName ?? ''}`.trim()).join(', '),
+        type: NotificationType.BIRTHDAY_REMINDER,
+        recipientIds: admins.map(a => a.id),
+      });
+    }
   }
 }
 

@@ -399,7 +399,36 @@ export class PosService {
       color:       v.color ?? undefined,
       size:        v.size  ?? undefined,
       stock:       v.inventory[0]?.quantity ?? 0,
+      imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
     }));
+  }
+
+  async closeDaySession(tenantId: string, branchId: string, cashierId: string, notes?: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const now = dayjs();
+    const where = {
+      tenantId,
+      branchId: resolvedBranchId,
+      status: SaleStatus.COMPLETED,
+      invoiceDate: { gte: now.startOf('day').toDate(), lte: now.endOf('day').toDate() },
+    };
+    const [totals, byMethod] = await this.prisma.$transaction([
+      this.prisma.sale.aggregate({ where, _sum: { total: true, taxAmount: true, discountAmount: true }, _count: { id: true } }),
+      this.prisma.salePayment.groupBy({ by: ['method'], where: { sale: { ...where } }, _sum: { amount: true }, orderBy: { method: 'asc' } }),
+    ]);
+    const summary = {
+      date: now.format('YYYY-MM-DD'),
+      closedAt: now.toISOString(),
+      closedBy: cashierId,
+      notes: notes ?? '',
+      totalSales: totals._count.id,
+      totalRevenue: totals._sum.total ?? 0,
+      totalTax: totals._sum.taxAmount ?? 0,
+      totalDiscount: totals._sum.discountAmount ?? 0,
+      byPaymentMethod: Object.fromEntries(byMethod.map(m => [m.method, m._sum?.amount ?? 0])),
+    };
+    this.eventEmitter.emit('pos.day.closed', { tenantId, branchId: resolvedBranchId, ...summary });
+    return summary;
   }
 
   private async generateInvoiceNumber(tenantId: string): Promise<string> {
@@ -469,6 +498,13 @@ export class PosController {
   @ApiOperation({ summary: 'Get all active products/variants for POS with current stock' })
   getProducts(@CurrentUser() user: IAuthUser) {
     return this.posService.getProducts(user.tenantId, user.branchId ?? '');
+  }
+
+  @Post('day-end')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Close day session and get end-of-day summary' })
+  closeDaySession(@CurrentUser() user: IAuthUser, @Body('notes') notes?: string) {
+    return this.posService.closeDaySession(user.tenantId, user.branchId ?? '', user.id, notes);
   }
 
   @Get('barcode/:code')

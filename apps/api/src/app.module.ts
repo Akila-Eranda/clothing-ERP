@@ -40,6 +40,8 @@ import { BranchesModule } from './modules/branches/branches.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { FilesModule } from './modules/files/files.module';
 import { PromotionsModule } from './modules/promotions/promotions.module';
+import { AuditLogModule } from './modules/audit-log/audit-log.module';
+import { CollectionsModule } from './modules/collections/collections.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
@@ -97,6 +99,8 @@ import { HealthModule } from './health/health.module';
     TenantsModule,
     FilesModule,
     PromotionsModule,
+    AuditLogModule,
+    CollectionsModule,
 
     // ── Infrastructure ────────────────────────────────────────
     HealthModule,

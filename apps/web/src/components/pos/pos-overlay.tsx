@@ -90,6 +90,9 @@ export function POSOverlay() {
   const [pinError, setPinError] = React.useState(false);
   const [settingNewPin, setSettingNewPin] = React.useState("");
   const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
+  const [dayEndLoading, setDayEndLoading] = React.useState(false);
+  const [showDayEnd, setShowDayEnd] = React.useState(false);
+  const [dayEndSummary, setDayEndSummary] = React.useState<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}|null>(null);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setTaxRate, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
@@ -159,6 +162,27 @@ export function POSOverlay() {
       else { setPinError(true); setPinEntry(""); }
     }
   }, [pinEntry]);
+
+  const handleA4Print = React.useCallback(()=>{
+    if(!receipt)return;
+    const w=window.open("","_blank","width=900,height=700,scrollbars=yes");
+    if(!w){toast.error("Allow popups to print");return;}
+    const rows=receipt.items.map(i=>`<tr><td>${i.name}</td><td style="text-align:center">${i.qty}</td><td style="text-align:right">LKR ${(i.qty>0?i.price/i.qty:0).toFixed(2)}</td><td style="text-align:right">LKR ${i.price.toFixed(2)}</td></tr>`).join("");
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${receipt.invoiceNumber}</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;font-size:13px;padding:20mm 15mm;color:#111}h1{font-size:22px;font-weight:900;margin-bottom:2px}.sub{font-size:11px;color:#666;margin-bottom:16px}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;padding:12px;background:#f8f9fa;border-radius:6px}.info-label{font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.5px}.info-value{font-size:13px;font-weight:600;margin-top:2px}table{width:100%;border-collapse:collapse;margin:12px 0}th{background:#111;color:#fff;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}td{padding:8px 10px;border-bottom:1px solid #e5e7eb;font-size:12px}.totals{margin-top:8px;border-top:2px solid #111;padding-top:8px}.total-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px}.total-final{font-size:18px;font-weight:900;color:#1d4ed8;border-top:2px solid #1d4ed8;padding-top:8px;margin-top:4px}.footer{margin-top:20px;text-align:center;font-size:11px;color:#888}@media print{@page{margin:15mm}}</style></head><body><h1>FashionERP</h1><p class="sub">TAX INVOICE</p><div class="info-grid"><div><p class="info-label">Invoice No</p><p class="info-value">${receipt.invoiceNumber}</p></div><div><p class="info-label">Date</p><p class="info-value">${new Date().toLocaleDateString()}</p></div><div><p class="info-label">Cashier</p><p class="info-value">${user?.name??"Admin"}</p></div>${receipt.customerName?`<div><p class="info-label">Customer</p><p class="info-value">${receipt.customerName}</p></div>`:""}</div><table><thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Unit Price</th><th style="text-align:right">Amount</th></tr></thead><tbody>${rows}</tbody></table><div class="totals"><div class="total-row"><span>Subtotal</span><span>LKR ${receipt.subtotal.toFixed(2)}</span></div>${receipt.discount>0?`<div class="total-row" style="color:#16a34a"><span>Discount</span><span>-LKR ${receipt.discount.toFixed(2)}</span></div>`:""} ${receipt.tax>0?`<div class="total-row"><span>Tax</span><span>LKR ${receipt.tax.toFixed(2)}</span></div>`:""}<div class="total-row total-final"><span>TOTAL</span><span>LKR ${receipt.total.toFixed(2)}</span></div>${receipt.cashTendered?`<div class="total-row"><span>Cash Tendered</span><span>LKR ${receipt.cashTendered.toFixed(2)}</span></div><div class="total-row" style="color:#16a34a"><span>Change</span><span>LKR ${receipt.changeDue.toFixed(2)}</span></div>`:""}</div><p class="footer">Thank you for your purchase · FashionERP POS</p></body></html>`);
+    w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),1000);},250);
+  },[receipt,user]);
+
+  const handleDayEnd = React.useCallback(async()=>{
+    if(dayEndLoading)return;
+    setDayEndLoading(true);
+    try{
+      const r=await api.post<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}>("/pos/day-end",{});
+      setDayEndSummary(r.data);
+      setShowDayEnd(true);
+      toast.success("Day closed successfully");
+    }catch(e:unknown){toast.error((e as Error).message??"Day end failed");}
+    finally{setDayEndLoading(false);}
+  },[dayEndLoading]);
 
   const buildReceiptHtml = React.useCallback((r: SaleReceipt): string => {
     const rows=r.items.map(i=>`<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${i.qty>0?(i.price/i.qty).toFixed(2):"0.00"}</span><span>LKR ${i.price.toFixed(2)}</span></div>`).join("");
@@ -267,8 +291,8 @@ export function POSOverlay() {
                 const allVars=getVariants(p.productName);const totalStock=allVars.reduce((a,v)=>a+v.stock,0);const lowStock=totalStock>0&&totalStock<=10;
                 return (
                   <motion.div key={p.variantId} whileTap={{scale:0.96}} onClick={()=>handleCardClick(p)} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:selectedProductName===p.productName?"#4f6ef7":"#1e3356"}}>
-                    <div className="relative" style={{aspectRatio:"4/3",background:getCardBg(p.color)}}>
-                      <Package className="absolute inset-0 m-auto h-10 w-10 text-white/20"/>
+                    <div className="relative" style={{aspectRatio:"4/3",background:p.imageUrl?"#162338":getCardBg(p.color)}}>
+                      {p.imageUrl?<img src={p.imageUrl} alt={p.productName} className="absolute inset-0 w-full h-full object-cover opacity-90"/>:<Package className="absolute inset-0 m-auto h-10 w-10 text-white/20"/>}
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:totalStock===0?"#dc2626":totalStock<=10?"#d97706":"#16a34a"}}>{totalStock}</div>
                       {lowStock&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(220,38,38,0.85)",color:"#fff"}}>Low Stock</div>}
                       <button onClick={e=>{e.stopPropagation();setLiked(s=>{const n=new Set(s);n.has(p.variantId)?n.delete(p.variantId):n.add(p.variantId);return n;});}} className="absolute top-1.5 right-1.5 p-1 rounded-full" style={{background:"rgba(0,0,0,0.3)"}}><Heart className="h-3 w-3" style={{color:liked.has(p.variantId)?"#ef4444":"#fff",fill:liked.has(p.variantId)?"#ef4444":"none"}}/></button>
@@ -999,6 +1023,7 @@ export function POSOverlay() {
           <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
           <div className="text-xs shrink-0" style={{color:"#6a8ab8"}}>{now.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})}</div>
           <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <button onClick={handleDayEnd} disabled={dayEndLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}}>{dayEndLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<TrendingUp className="h-3.5 w-3.5"/>}Day End</button>
           <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
         </div>
 
@@ -1024,8 +1049,44 @@ export function POSOverlay() {
                 </div>
               </div>
               <div className="flex gap-2 p-3 pt-0">
-                <button onClick={handleThermalPrint} className="flex-1 h-9 rounded-xl flex items-center justify-center gap-1.5 text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Thermal Print</button>
+                <button onClick={handleThermalPrint} className="h-9 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-3.5 w-3.5"/>Thermal</button>
+                <button onClick={handleA4Print} className="h-9 px-3 rounded-xl flex items-center justify-center gap-1.5 text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><FileText className="h-3.5 w-3.5"/>A4</button>
                 <button onClick={()=>setReceipt(null)} className="flex-1 h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>New Sale</button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
+        {/* DAY END MODAL */}
+        <AnimatePresence>{showDayEnd&&dayEndSummary&&(
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.75)"}}>
+            <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-sm" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+              <div className="p-5 text-white text-center" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)"}}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{background:"rgba(255,255,255,0.2)"}}><TrendingUp className="h-6 w-6"/></div>
+                <h2 className="text-base font-bold">Day Closed</h2>
+                <p className="text-white/70 text-xs">{dayEndSummary.date}</p>
+              </div>
+              <div className="p-4 space-y-2.5">
+                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"#fff"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"#f59e0b"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
+                  <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"#1e3356"}}>
+                    <span className="text-xs" style={{color:"#6a8ab8"}}>{r.label}</span>
+                    <span className="text-sm font-bold" style={{color:r.color}}>{r.val}</span>
+                  </div>
+                ))}
+                {Object.entries(dayEndSummary.byPaymentMethod).length>0&&(
+                  <div className="pt-1">
+                    <p className="text-xs font-semibold mb-2" style={{color:"#6a8ab8"}}>By Payment Method</p>
+                    {Object.entries(dayEndSummary.byPaymentMethod).map(([method,amt])=>(
+                      <div key={method} className="flex justify-between text-xs py-1">
+                        <span className="text-white">{method}</span>
+                        <span className="font-bold" style={{color:"#4f6ef7"}}>LKR {formatNumber(amt)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="p-3 pt-0">
+                <button onClick={()=>setShowDayEnd(false)} className="w-full h-10 rounded-xl text-sm font-bold text-white" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>Close</button>
               </div>
             </motion.div>
           </motion.div>

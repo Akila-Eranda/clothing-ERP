@@ -80,6 +80,77 @@ export class ReportsService {
     });
   }
 
+  async profitReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const items = await this.prisma.saleItem.findMany({
+      where: { sale: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' }, ...(branchId && { branchId }) } },
+      select: { productName: true, variantName: true, sku: true, quantity: true, unitPrice: true, costPrice: true, discount: true, total: true, taxAmount: true },
+    });
+    const map: Record<string, { productName: string; variantName: string; sku: string; qty: number; revenue: number; cost: number; profit: number }> = {};
+    for (const i of items) {
+      const key = i.sku;
+      if (!map[key]) map[key] = { productName: i.productName, variantName: i.variantName, sku: i.sku, qty: 0, revenue: 0, cost: 0, profit: 0 };
+      map[key].qty     += i.quantity;
+      map[key].revenue += i.total;
+      map[key].cost    += i.costPrice * i.quantity;
+      map[key].profit  += i.total - (i.costPrice * i.quantity);
+    }
+    const rows = Object.values(map).sort((a, b) => b.profit - a.profit);
+    const totals = rows.reduce((acc, r) => ({ revenue: acc.revenue + r.revenue, cost: acc.cost + r.cost, profit: acc.profit + r.profit }), { revenue: 0, cost: 0, profit: 0 });
+    return { rows, totals, margin: totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(2) : '0' };
+  }
+
+  async bestSellingItems(tenantId: string, startDate: string, endDate: string, limit = 20, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const grouped = await this.prisma.saleItem.groupBy({
+      by: ['productName', 'sku'],
+      where: { sale: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' }, ...(branchId && { branchId }) } },
+      _sum: { quantity: true, total: true },
+      _count: { id: true },
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: limit,
+    });
+    return grouped.map(g => ({
+      productName: g.productName,
+      sku: g.sku,
+      totalQty: g._sum.quantity ?? 0,
+      totalRevenue: g._sum.total ?? 0,
+      orderCount: g._count.id,
+    }));
+  }
+
+  async cashierReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const grouped = await this.prisma.sale.groupBy({
+      by: ['cashierId'],
+      where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' }, ...(branchId && { branchId }) },
+      _sum: { total: true, discountAmount: true, taxAmount: true },
+      _count: { id: true },
+    });
+    const cashierIds = grouped.map(g => g.cashierId).filter(Boolean) as string[];
+    const users = cashierIds.length > 0
+      ? await this.prisma.user.findMany({ where: { id: { in: cashierIds } }, select: { id: true, firstName: true, lastName: true, email: true } })
+      : [];
+    const userMap = Object.fromEntries(users.map(u => [u.id, u]));
+    return grouped.map(g => ({
+      cashierId: g.cashierId,
+      cashierName: g.cashierId && userMap[g.cashierId] ? `${userMap[g.cashierId].firstName} ${userMap[g.cashierId].lastName}` : 'Unknown',
+      salesCount: g._count.id,
+      totalRevenue: g._sum.total ?? 0,
+      totalDiscount: g._sum.discountAmount ?? 0,
+      totalTax: g._sum.taxAmount ?? 0,
+    })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }
+
   async taxReport(tenantId: string, startDate: string, endDate: string) {
     const dateRange = {
       gte: dayjs(startDate).startOf('day').toDate(),
@@ -146,6 +217,27 @@ export class ReportsController {
   @ApiOperation({ summary: 'Tax/GST report' })
   taxReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
     return this.reportsService.taxReport(user.tenantId, start, end);
+  }
+
+  @Get('profit')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Profit report by product (revenue vs cost)' })
+  profitReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.profitReport(user.tenantId, start, end, branchId);
+  }
+
+  @Get('best-selling')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Best selling products by quantity' })
+  bestSellingItems(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('limit') limit?: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.bestSellingItems(user.tenantId, start, end, limit ? parseInt(limit) : 20, branchId);
+  }
+
+  @Get('cashier')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Sales performance by cashier' })
+  cashierReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.cashierReport(user.tenantId, start, end, branchId);
   }
 }
 

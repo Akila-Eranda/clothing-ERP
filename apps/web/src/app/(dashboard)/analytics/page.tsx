@@ -1,172 +1,275 @@
 "use client";
 
 import * as React from "react";
-import { BarChart3, TrendingUp, Users, ShoppingCart, DollarSign, Activity, Brain } from "lucide-react";
+import { BarChart3, TrendingUp, Users, ShoppingCart, DollarSign, RefreshCw, Package, User } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
-import { DUMMY_REVENUE_DATA, DUMMY_CATEGORY_DATA, CHART_COLORS } from "@/lib/constants";
 
-const KPI_DATA = [
-  { label: "Revenue Growth", value: "+18.3%", sub: "vs last month", icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10", positive: true },
-  { label: "Customer Acquisition", value: "+124", sub: "new this month", icon: Users, color: "text-blue-500", bg: "bg-blue-500/10", positive: true },
-  { label: "Avg Basket Size", value: "LKR 4,523", sub: "+6.2% vs last", icon: ShoppingCart, color: "text-violet-500", bg: "bg-violet-500/10", positive: true },
-  { label: "Return Rate", value: "2.4%", sub: "-0.3% vs last", icon: Activity, color: "text-amber-500", bg: "bg-amber-500/10", positive: true },
+const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#6366f1"];
+const TT_STYLE = { background:"hsl(var(--popover))", border:"1px solid hsl(var(--border))", borderRadius:"10px", fontSize:"11px" };
+const fmtDate = (d: Date) => d.toISOString().split("T")[0];
+const today = () => fmtDate(new Date());
+const monthStart = () => { const d = new Date(); d.setDate(1); return fmtDate(d); };
+const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate()-n); return fmtDate(d); };
+const PRESETS = [
+  { label:"Today", start:today(), end:today() },
+  { label:"This Week", start:daysAgo(6), end:today() },
+  { label:"This Month", start:monthStart(), end:today() },
+  { label:"Last 30 Days", start:daysAgo(29), end:today() },
+  { label:"Last 90 Days", start:daysAgo(89), end:today() },
 ];
 
-const AI_INSIGHTS = [
-  { type: "opportunity", text: "T-Shirts in size M are 40% faster selling than other sizes. Consider increasing stock by 50 units.", impact: "High" },
-  { type: "warning", text: "Weekend footfall dropped 12% last week. Consider running a weekend promotion.", impact: "Medium" },
-  { type: "trend", text: "Denim demand peaks every Friday–Saturday. Schedule restocking on Thursdays.", impact: "High" },
-  { type: "opportunity", text: "Gold tier customers have 3x higher AOV. Launch exclusive bundle offers to boost engagement.", impact: "High" },
-];
+interface BestItem { productName:string; sku:string; totalQty:number; totalRevenue:number; orderCount:number }
+interface CashierRow { cashierId:string|null; cashierName:string; salesCount:number; totalRevenue:number; totalDiscount:number }
+interface ProfitRow { productName:string; variantName:string; sku:string; qty:number; revenue:number; cost:number; profit:number }
+interface ProfitReport { rows:ProfitRow[]; totals:{revenue:number;cost:number;profit:number}; margin:string }
+interface MonthlyPL { month:string; revenue:number; expenses:number; profit:number }
 
 export default function AnalyticsPage() {
+  const [range, setRange] = React.useState({ label:"This Month", start:monthStart(), end:today() });
+  const [loading, setLoading] = React.useState(true);
+  const [bestSelling, setBestSelling] = React.useState<BestItem[]>([]);
+  const [cashier, setCashier] = React.useState<CashierRow[]>([]);
+  const [profit, setProfit] = React.useState<ProfitReport|null>(null);
+  const [monthly, setMonthly] = React.useState<MonthlyPL[]>([]);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const { start, end } = range;
+      const [bs, ca, pr, mo] = await Promise.all([
+        api.get<BestItem[]>(`/reports/best-selling?startDate=${start}&endDate=${end}&limit=15`),
+        api.get<CashierRow[]>(`/reports/cashier?startDate=${start}&endDate=${end}`),
+        api.get<ProfitReport>(`/reports/profit?startDate=${start}&endDate=${end}`),
+        api.get<MonthlyPL[]>(`/accounting/monthly-pl?months=12`),
+      ]);
+      setBestSelling(Array.isArray(bs.data) ? bs.data : []);
+      setCashier(Array.isArray(ca.data) ? ca.data : []);
+      setProfit(pr.data ?? null);
+      setMonthly(Array.isArray(mo.data) ? mo.data : []);
+    } catch { toast.error("Failed to load analytics"); }
+    finally { setLoading(false); }
+  }, [range.start, range.end]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const kpis = [
+    { label:"Total Revenue", val:`LKR ${formatNumber(profit?.totals.revenue??0)}`, icon:DollarSign, color:"text-emerald-500", bg:"bg-emerald-500/10" },
+    { label:"Total Cost", val:`LKR ${formatNumber(profit?.totals.cost??0)}`, icon:Package, color:"text-orange-500", bg:"bg-orange-500/10" },
+    { label:"Gross Profit", val:`LKR ${formatNumber(profit?.totals.profit??0)}`, icon:TrendingUp, color:"text-blue-500", bg:"bg-blue-500/10" },
+    { label:"Profit Margin", val:`${profit?.margin??'0'}%`, icon:BarChart3, color:"text-violet-500", bg:"bg-violet-500/10" },
+  ];
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="text-sm text-muted-foreground">AI-powered insights and business intelligence</p>
+          <p className="text-sm text-muted-foreground">Real-time business intelligence</p>
         </div>
-        <Badge variant="purple" className="gap-1.5 px-3 py-1.5">
-          <Brain className="h-3.5 w-3.5" />
-          AI Insights Active
-        </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          {PRESETS.map(p => (
+            <Button key={p.label} size="sm" variant={range.label===p.label?"default":"outline"} onClick={()=>setRange(p)}>{p.label}</Button>
+          ))}
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}><RefreshCw className={`h-3.5 w-3.5 ${loading?"animate-spin":""}`}/></Button>
+        </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPI cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {KPI_DATA.map((k) => (
+        {kpis.map(k => (
           <Card key={k.label}>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${k.bg}`}><k.icon className={`h-5 w-5 ${k.color}`} /></div>
+              <div className={`p-2.5 rounded-xl ${k.bg}`}><k.icon className={`h-5 w-5 ${k.color}`}/></div>
               <div>
-                <p className="text-xl font-bold">{k.value}</p>
+                <p className="text-xl font-bold">{k.val}</p>
                 <p className="text-xs text-muted-foreground">{k.label}</p>
-                <p className={`text-[10px] font-medium ${k.positive ? "text-emerald-500" : "text-red-500"}`}>{k.sub}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue="monthly">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="categories">Categories</TabsTrigger>
-          <TabsTrigger value="ai">AI Insights</TabsTrigger>
+          <TabsTrigger value="monthly">Monthly Trend</TabsTrigger>
+          <TabsTrigger value="bestselling">Best Selling</TabsTrigger>
+          <TabsTrigger value="profit">Profit by Product</TabsTrigger>
+          <TabsTrigger value="cashier">Cashier Performance</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        {/* Monthly Revenue vs Profit */}
+        <TabsContent value="monthly" className="mt-4">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Revenue vs Profit</CardTitle>
-                <CardDescription>Last 30 days daily trend</CardDescription>
-              </CardHeader>
+              <CardHeader><CardTitle className="text-base">Revenue vs Expenses vs Profit (12 months)</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <AreaChart data={DUMMY_REVENUE_DATA}>
-                    <defs>
-                      <linearGradient id="revA" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={CHART_COLORS.primary} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={CHART_COLORS.primary} stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} interval={6} />
-                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(v) => `LKR ${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} />
-                    <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS.primary} strokeWidth={2} fill="url(#revA)" name="Revenue" />
-                    <Area type="monotone" dataKey="profit" stroke={CHART_COLORS.success} strokeWidth={2} fill="transparent" name="Profit" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Daily Orders Volume</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={250}>
-                  <BarChart data={DUMMY_REVENUE_DATA.slice(-14)} barSize={18}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <YAxis tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} />
-                    <Bar dataKey="orders" fill={CHART_COLORS.primary} radius={[4, 4, 0, 0]} name="Orders" />
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={monthly} barSize={14}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
+                    <XAxis dataKey="month" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+                    <Tooltip contentStyle={TT_STYLE} formatter={(v:number)=>[`LKR ${formatNumber(v)}`,""]}/>
+                    <Legend formatter={v=><span className="text-xs">{v}</span>}/>
+                    <Bar dataKey="revenue" fill={COLORS[0]} radius={[3,3,0,0]} name="Revenue"/>
+                    <Bar dataKey="expenses" fill={COLORS[3]} radius={[3,3,0,0]} name="Expenses"/>
+                    <Bar dataKey="profit" fill={COLORS[1]} radius={[3,3,0,0]} name="Profit"/>
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Profit Trend</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <AreaChart data={monthly}>
+                    <defs>
+                      <linearGradient id="profitGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={COLORS[1]} stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor={COLORS[1]} stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
+                    <XAxis dataKey="month" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+                    <Tooltip contentStyle={TT_STYLE} formatter={(v:number)=>[`LKR ${formatNumber(v)}`,""]}/>
+                    <Area type="monotone" dataKey="profit" stroke={COLORS[1]} strokeWidth={2} fill="url(#profitGrad)" name="Profit"/>
+                  </AreaChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="categories" className="mt-4">
+        {/* Best Selling */}
+        <TabsContent value="bestselling" className="mt-4">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <Card>
-              <CardHeader><CardTitle className="text-base">Revenue by Category</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-base">Top Products by Quantity Sold</CardTitle></CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={280}>
-                  <PieChart>
-                    <Pie data={DUMMY_CATEGORY_DATA} cx="50%" cy="50%" innerRadius={70} outerRadius={110} dataKey="revenue" nameKey="category" paddingAngle={3}>
-                      {DUMMY_CATEGORY_DATA.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "12px", fontSize: 12 }} formatter={(v: number) => [`LKR ${formatNumber(v)}`, "Revenue"]} />
-                    <Legend formatter={(value) => <span className="text-xs">{value}</span>} />
-                  </PieChart>
+                <ResponsiveContainer width="100%" height={320}>
+                  <BarChart data={bestSelling.slice(0,10)} layout="vertical" barSize={14}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" horizontal={false}/>
+                    <XAxis type="number" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
+                    <YAxis type="category" dataKey="productName" tick={{fontSize:10}} axisLine={false} tickLine={false} width={120}/>
+                    <Tooltip contentStyle={TT_STYLE}/>
+                    <Bar dataKey="totalQty" radius={[0,3,3,0]} name="Qty Sold">
+                      {bestSelling.slice(0,10).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
             <Card>
-              <CardHeader><CardTitle className="text-base">Category Breakdown</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {DUMMY_CATEGORY_DATA.map((cat) => (
-                  <div key={cat.category}>
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2.5 w-2.5 rounded-full" style={{ background: cat.color }} />
-                        <span className="text-sm font-medium">{cat.category}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">LKR {formatNumber(cat.revenue)}</span>
-                        <span className="text-sm font-bold w-10 text-right">{cat.percentage}%</span>
-                      </div>
+              <CardHeader><CardTitle className="text-base">Top Products by Revenue</CardTitle></CardHeader>
+              <CardContent className="space-y-2 max-h-80 overflow-y-auto">
+                {bestSelling.map((b,i)=>(
+                  <div key={b.sku} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-muted-foreground w-5">{i+1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{b.productName}</p>
+                      <p className="text-xs text-muted-foreground">{b.sku} · {b.orderCount} orders</p>
                     </div>
-                    <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${cat.percentage}%`, background: cat.color }} />
+                    <div className="text-right">
+                      <p className="text-sm font-bold">LKR {formatNumber(b.totalRevenue)}</p>
+                      <p className="text-xs text-muted-foreground">{b.totalQty} units</p>
                     </div>
                   </div>
                 ))}
+                {!bestSelling.length && <p className="text-sm text-muted-foreground text-center py-8">No sales data for this period</p>}
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
-        <TabsContent value="ai" className="mt-4">
-          <div className="space-y-3">
-            {AI_INSIGHTS.map((insight, i) => (
-              <Card key={i} className={`border-l-4 ${insight.type === "opportunity" ? "border-l-emerald-500" : insight.type === "warning" ? "border-l-amber-500" : "border-l-blue-500"}`}>
-                <CardContent className="p-4 flex items-start gap-3">
-                  <Brain className={`h-5 w-5 mt-0.5 shrink-0 ${insight.type === "opportunity" ? "text-emerald-500" : insight.type === "warning" ? "text-amber-500" : "text-blue-500"}`} />
-                  <div className="flex-1">
-                    <p className="text-sm">{insight.text}</p>
+        {/* Profit by Product */}
+        <TabsContent value="profit" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Profit by Product — Total Margin: {profit?.margin ?? 0}%</CardTitle>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs text-muted-foreground">
+                    <th className="py-2 pr-4">Product</th>
+                    <th className="py-2 pr-4">SKU</th>
+                    <th className="py-2 pr-4 text-right">Qty</th>
+                    <th className="py-2 pr-4 text-right">Revenue</th>
+                    <th className="py-2 pr-4 text-right">Cost</th>
+                    <th className="py-2 pr-4 text-right">Profit</th>
+                    <th className="py-2 text-right">Margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {profit?.rows.map(r => {
+                    const margin = r.revenue > 0 ? ((r.profit/r.revenue)*100).toFixed(1) : '0';
+                    return (
+                      <tr key={r.sku} className="border-b hover:bg-muted/30 transition-colors">
+                        <td className="py-2 pr-4 font-medium">{r.productName} <span className="text-muted-foreground font-normal">{r.variantName}</span></td>
+                        <td className="py-2 pr-4 text-muted-foreground font-mono text-xs">{r.sku}</td>
+                        <td className="py-2 pr-4 text-right">{r.qty}</td>
+                        <td className="py-2 pr-4 text-right">LKR {formatNumber(r.revenue)}</td>
+                        <td className="py-2 pr-4 text-right text-red-500">LKR {formatNumber(r.cost)}</td>
+                        <td className="py-2 pr-4 text-right font-bold text-emerald-500">LKR {formatNumber(r.profit)}</td>
+                        <td className="py-2 text-right"><span className={`text-xs font-bold ${parseFloat(margin)>=20?"text-emerald-500":parseFloat(margin)>=10?"text-amber-500":"text-red-500"}`}>{margin}%</span></td>
+                      </tr>
+                    );
+                  })}
+                  {!profit?.rows.length && <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No data for this period</td></tr>}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Cashier Performance */}
+        <TabsContent value="cashier" className="mt-4">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader><CardTitle className="text-base">Revenue by Cashier</CardTitle></CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={cashier} barSize={28}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
+                    <XAxis dataKey="cashierName" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
+                    <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+                    <Tooltip contentStyle={TT_STYLE} formatter={(v:number)=>[`LKR ${formatNumber(v)}`,""]}/>
+                    <Bar dataKey="totalRevenue" radius={[4,4,0,0]} name="Revenue">
+                      {cashier.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle className="text-base">Cashier Summary</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {cashier.map((c,i)=>(
+                  <div key={c.cashierId??i} className="flex items-center gap-3 p-3 rounded-lg bg-muted/40">
+                    <div className={`h-8 w-8 rounded-full flex items-center justify-center text-white text-sm font-bold`} style={{background:COLORS[i%COLORS.length]}}>
+                      <User className="h-4 w-4"/>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold">{c.cashierName}</p>
+                      <p className="text-xs text-muted-foreground">{c.salesCount} sales · LKR {formatNumber(c.totalDiscount)} discount given</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold">LKR {formatNumber(c.totalRevenue)}</p>
+                    </div>
                   </div>
-                  <Badge variant={insight.impact === "High" ? "success" : "warning"} className="shrink-0 text-[10px]">
-                    {insight.impact} Impact
-                  </Badge>
-                </CardContent>
-              </Card>
-            ))}
+                ))}
+                {!cashier.length && <p className="text-sm text-muted-foreground text-center py-8">No data for this period</p>}
+              </CardContent>
+            </Card>
           </div>
         </TabsContent>
       </Tabs>

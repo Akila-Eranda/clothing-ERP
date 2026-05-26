@@ -4,7 +4,7 @@ import * as React from "react";
 import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
-  Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff,
+  Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,91 @@ type Me = { id: string; firstName: string; lastName: string; email: string; phon
 const TIMEZONES = ["Asia/Colombo","Asia/Kolkata","Asia/Dubai","Asia/Singapore","UTC","Europe/London","America/New_York"];
 const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
+
+interface AuditEntry { id:string; action:string; resource:string; resourceId?:string; userId?:string; user?:{firstName:string;lastName:string;email:string}|null; ipAddress?:string; createdAt:string; oldData?:object; newData?:object; }
+
+function AuditLogTab() {
+  const [logs, setLogs] = React.useState<AuditEntry[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const [page, setPage] = React.useState(1);
+  const [total, setTotal] = React.useState(0);
+  const [search, setSearch] = React.useState("");
+  const [resource, setResource] = React.useState("");
+
+  const load = React.useCallback(async (p=1) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({ page:String(p), limit:"25" });
+      if (search) params.set("action", search);
+      if (resource) params.set("resource", resource);
+      const r = await api.get<{data:AuditEntry[];total:number}>(`/audit-logs?${params}`);
+      setLogs(r.data?.data ?? []);
+      setTotal(r.data?.total ?? 0);
+      setPage(p);
+    } catch { toast.error("Failed to load audit logs"); }
+    finally { setLoading(false); }
+  }, [search, resource]);
+
+  React.useEffect(() => { load(1); }, [load]);
+
+  const totalPages = Math.ceil(total / 25);
+  const ACTION_COLORS: Record<string,string> = { CREATE:"bg-emerald-500/15 text-emerald-500", UPDATE:"bg-blue-500/15 text-blue-500", DELETE:"bg-red-500/15 text-red-500", DAY_END:"bg-violet-500/15 text-violet-500" };
+
+  return (
+    <TabsContent value="audit-log" className="mt-6">
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary"/>Audit Log</CardTitle>
+          <CardDescription>System activity and change history</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex gap-2 flex-wrap">
+            <Input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Filter by action..." className="w-48 h-9 text-sm"/>
+            <Input value={resource} onChange={e=>setResource(e.target.value)} placeholder="Filter by resource..." className="w-48 h-9 text-sm"/>
+            <Button size="sm" variant="outline" onClick={()=>load(1)} disabled={loading}><RefreshCw className={`h-3.5 w-3.5 ${loading?"animate-spin":""}`}/></Button>
+          </div>
+          {loading&&<div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}
+          {!loading&&(
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-muted-foreground">
+                    <th className="text-left py-2 pr-3">Action</th>
+                    <th className="text-left py-2 pr-3">Resource</th>
+                    <th className="text-left py-2 pr-3">User</th>
+                    <th className="text-left py-2 pr-3">IP</th>
+                    <th className="text-left py-2">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logs.map(l=>(
+                    <tr key={l.id} className="border-b hover:bg-muted/30 transition-colors">
+                      <td className="py-2 pr-3"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ACTION_COLORS[l.action]??"bg-muted text-muted-foreground"}`}>{l.action}</span></td>
+                      <td className="py-2 pr-3 text-sm font-medium">{l.resource}{l.resourceId&&<span className="text-xs text-muted-foreground ml-1">#{l.resourceId.slice(-6)}</span>}</td>
+                      <td className="py-2 pr-3 text-xs text-muted-foreground">{l.user?`${l.user.firstName} ${l.user.lastName}`:l.userId?"User":"System"}</td>
+                      <td className="py-2 pr-3 text-xs font-mono text-muted-foreground">{l.ipAddress??"-"}</td>
+                      <td className="py-2 text-xs text-muted-foreground">{new Date(l.createdAt).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                  {!logs.length&&<tr><td colSpan={5} className="py-8 text-center text-muted-foreground">No audit logs found</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <span className="text-xs text-muted-foreground">Page {page} of {totalPages} · {total} entries</span>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" disabled={page<=1} onClick={()=>load(page-1)}><ChevronLeft className="h-3.5 w-3.5"/></Button>
+                <Button size="sm" variant="outline" disabled={page>=totalPages} onClick={()=>load(page+1)}><ChevronRight className="h-3.5 w-3.5"/></Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </TabsContent>
+  );
+}
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
@@ -160,6 +245,7 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notifications</TabsTrigger>
           <TabsTrigger value="appearance" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Appearance</TabsTrigger>
           <TabsTrigger value="billing" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" />Billing</TabsTrigger>
+          <TabsTrigger value="audit-log" className="gap-1.5"><ClipboardList className="h-3.5 w-3.5" />Audit Log</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
@@ -481,6 +567,8 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <AuditLogTab />
       </Tabs>
 
       <p className="text-xs text-muted-foreground text-center">{APP_NAME} v{APP_VERSION} · Enterprise Edition</p>
