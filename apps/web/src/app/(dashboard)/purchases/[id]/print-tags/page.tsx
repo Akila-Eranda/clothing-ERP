@@ -207,7 +207,7 @@ export default function PrintTagsPage() {
           </div>
         </div>
 
-        <div className="p-6 max-w-[1200px] mx-auto space-y-5">
+        <div className="p-6 space-y-5">
 
           {/* Qty controls */}
           <div className="bg-background border rounded-2xl overflow-hidden shadow-sm">
