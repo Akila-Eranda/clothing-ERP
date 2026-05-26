@@ -1,7 +1,8 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsString, IsOptional, IsEmail } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
@@ -46,7 +47,10 @@ export class RegisterTenantDto {
 
 @Injectable()
 export class TenantsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async register(dto: RegisterTenantDto) {
     const existing = await this.prisma.tenant.findFirst({
@@ -90,7 +94,7 @@ export class TenantsService {
         },
       });
 
-      await tx.user.create({
+      const adminUser = await tx.user.create({
         data: {
           tenantId: tenant.id,
           branchId: branch.id,
@@ -104,7 +108,15 @@ export class TenantsService {
         },
       });
 
-      return { tenant, branch };
+      return { tenant, branch, adminUser };
+    }).then((result) => {
+      this.eventEmitter.emit('tenant.registered', {
+        email: dto.adminEmail,
+        name: dto.companyName,
+        subdomain: dto.subdomain,
+        adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
+      });
+      return result;
     });
   }
 

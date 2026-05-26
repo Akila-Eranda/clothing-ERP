@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -27,9 +27,14 @@ export class BranchesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(tenantId: string, dto: CreateBranchDto) {
-    return this.prisma.branch.create({
-      data: { tenantId, ...dto },
-    });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { maxBranches: true } });
+    if (tenant) {
+      const count = await this.prisma.branch.count({ where: { tenantId } });
+      if (count >= tenant.maxBranches) {
+        throw new ForbiddenException(`Branch limit reached (${tenant.maxBranches}). Upgrade your plan.`);
+      }
+    }
+    return this.prisma.branch.create({ data: { tenantId, ...dto } });
   }
 
   async findAll(tenantId: string, query: PaginationDto) {

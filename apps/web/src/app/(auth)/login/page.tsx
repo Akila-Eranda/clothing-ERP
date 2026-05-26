@@ -172,12 +172,23 @@ export default function LoginPage() {
           </div>
         </motion.div>
 
+        {/* Register link */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.35 }}
+          className="text-center text-sm text-muted-foreground mt-5"
+        >
+          Don&apos;t have an account?{" "}
+          <a href="/register" className="text-primary font-medium hover:underline">Start free trial</a>
+        </motion.p>
+
         {/* Features */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="mt-6 flex items-center justify-center gap-6 text-xs text-muted-foreground"
+          className="mt-4 flex items-center justify-center gap-6 text-xs text-muted-foreground"
         >
           {["AI-Powered", "Real-time Sync", "Multi-Branch", "Offline POS"].map((f) => (
             <span key={f} className="flex items-center gap-1">

@@ -11,18 +11,22 @@ export interface ApiResponse<T = unknown> {
 // ── Token helpers (localStorage) ─────────────────────────────────────────
 const TOKEN_KEY   = 'fe_access_token';
 const REFRESH_KEY = 'fe_refresh_token';
+const TENANT_KEY  = 'fe_tenant_id';
 
 export const tokenStorage = {
   getAccess:   () => (typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY)   : null),
   getRefresh:  () => (typeof window !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null),
+  getTenant:   () => (typeof window !== 'undefined' ? localStorage.getItem(TENANT_KEY)  : null),
   setAccess:   (t: string) => {
     localStorage.setItem(TOKEN_KEY, t);
     document.cookie = `${TOKEN_KEY}=${t}; path=/; SameSite=Lax; max-age=86400`;
   },
   setRefresh:  (t: string) => localStorage.setItem(REFRESH_KEY, t),
+  setTenant:   (id: string) => localStorage.setItem(TENANT_KEY, id),
   clear:       () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
+    localStorage.removeItem(TENANT_KEY);
     document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
   },
 };
@@ -66,6 +70,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
 
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const tenantId = tokenStorage.getTenant();
+  if (tenantId) headers['x-tenant-id'] = tenantId;
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 

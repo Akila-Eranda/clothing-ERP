@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { AuthService } from '@/modules/auth/auth.service';
@@ -28,6 +29,12 @@ export class UsersService {
     const passwordHash = await this.authService.hashPassword(dto.password);
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (tenant) {
+      const userCount = await this.prisma.user.count({ where: { tenantId } });
+      if (userCount >= tenant.maxUsers) {
+        throw new ForbiddenException(`User limit reached (${tenant.maxUsers}). Upgrade your plan.`);
+      }
+    }
 
     const user = await this.prisma.user.create({
       data: {

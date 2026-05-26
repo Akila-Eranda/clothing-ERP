@@ -48,6 +48,7 @@ export const useAuthStore = create<AuthStore>()(
           const { accessToken, refreshToken, user: apiUser } = res.data;
           tokenStorage.setAccess(accessToken);
           tokenStorage.setRefresh(refreshToken);
+          tokenStorage.setTenant(apiUser.tenantId);
           const user: User = {
             id: apiUser.id,
             name: `${apiUser.firstName} ${apiUser.lastName}`,

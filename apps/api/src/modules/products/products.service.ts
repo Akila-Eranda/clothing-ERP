@@ -74,6 +74,13 @@ export class ProductsService {
 
   // ── Products ─────────────────────────────────────────────
   async create(tenantId: string, dto: CreateProductDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { maxProducts: true } });
+    if (tenant) {
+      const count = await this.prisma.product.count({ where: { tenantId } });
+      if (count >= tenant.maxProducts) {
+        throw new Error(`Product limit reached (${tenant.maxProducts}). Upgrade your plan.`);
+      }
+    }
     const baseSlug = this.generateSlug(dto.name);
     const sku = `PRD-${nanoid(8).toUpperCase()}`;
 
