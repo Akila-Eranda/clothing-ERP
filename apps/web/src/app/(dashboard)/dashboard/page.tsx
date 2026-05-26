@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { CHART_COLORS } from "@/lib/constants";
-import api from "@/lib/api";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
