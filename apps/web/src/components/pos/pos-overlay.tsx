@@ -581,18 +581,58 @@ export function POSOverlay() {
           {/* STEP 4: DONE */}
           {returnStep==="done"&&returnResult&&(
             <div className="flex-1 flex flex-col items-center justify-center gap-4">
-              <div className="h-20 w-20 rounded-full flex items-center justify-center" style={{background:"rgba(16,185,129,0.15)"}}><CheckCircle2 className="h-10 w-10" style={{color:"#10b981"}}/></div>
+              <div className="h-20 w-20 rounded-full flex items-center justify-center" style={{background:exchangeDue>0?"rgba(245,158,11,0.15)":"rgba(16,185,129,0.15)"}}>
+                <CheckCircle2 className="h-10 w-10" style={{color:exchangeDue>0?"#f59e0b":"#10b981"}}/>
+              </div>
               <div className="text-center">
                 <h3 className="text-white font-bold text-xl">{returnType==="EXCHANGE"?"Exchange":"Return"} Processed!</h3>
                 <p className="text-xs mt-1 font-mono" style={{color:"#6a8ab8"}}>{returnResult.returnNumber}</p>
               </div>
-              <div className="p-5 rounded-2xl border text-center" style={{background:"#162338",borderColor:"#1e3356",minWidth:"260px"}}>
-                <p className="text-xs mb-1" style={{color:"#6a8ab8"}}>Refund Amount</p>
-                <p className="text-3xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
-                <p className="text-xs mt-2" style={{color:"#4a6a8a"}}>Status: INITIATED · Awaiting approval</p>
+              <div className="rounded-2xl border w-full max-w-sm overflow-hidden" style={{background:"#162338",borderColor:"#1e3356"}}>
+                {returnType==="EXCHANGE"&&(
+                  <div className="px-5 pt-4 pb-3 space-y-2 border-b" style={{borderColor:"#1e3356"}}>
+                    <div className="flex justify-between text-sm"><span style={{color:"#6a8ab8"}}>Returned value</span><span className="text-white font-semibold">LKR {formatNumber(refundTotal)}</span></div>
+                    <div className="flex justify-between text-sm"><span style={{color:"#6a8ab8"}}>Exchange value</span><span className="text-white font-semibold">LKR {formatNumber(exchangeTotal)}</span></div>
+                  </div>
+                )}
+                <div className="px-5 py-4 text-center">
+                  {returnType==="EXCHANGE"&&exchangeDue>0&&(<>
+                    <p className="text-sm font-semibold mb-1" style={{color:"#f59e0b"}}>Customer Pays Balance</p>
+                    <p className="text-4xl font-bold" style={{color:"#f59e0b"}}>LKR {formatNumber(exchangeDue)}</p>
+                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Collect from customer before completing exchange</p>
+                  </>)}
+                  {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund>0&&(<>
+                    <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund to Customer</p>
+                    <p className="text-4xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(netRefund)}</p>
+                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Return the difference to customer</p>
+                  </>)}
+                  {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund===0&&(<>
+                    <p className="text-sm font-semibold mb-1" style={{color:"#4f6ef7"}}>Even Exchange</p>
+                    <p className="text-4xl font-bold" style={{color:"#4f6ef7"}}>LKR 0.00</p>
+                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Equal value — no money changes hands</p>
+                  </>)}
+                  {returnType!=="EXCHANGE"&&(<>
+                    <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund Amount</p>
+                    <p className="text-4xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
+                  </>)}
+                  <p className="text-xs mt-3 font-semibold px-3 py-1 rounded-full inline-block" style={{background:"rgba(79,110,247,0.15)",color:"#4f6ef7"}}>INITIATED · Awaiting Approval</p>
+                </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={()=>{const w=window.open("","_blank","width=380,height=500");if(!w)return;w.document.write(`<!DOCTYPE html><html><head><title>Return Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>RETURN RECEIPT</h1><hr class="d"/><div class="row"><span>${returnResult.returnNumber}</span></div><div class="row"><span>Date: ${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice: ${returnSale?.invoiceNumber}</span></div><div class="row"><span>Reason: ${REASONS.find(r=>r.v===returnReason)?.l}</span></div><hr class="d"/>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} x${s.qty}</span><span>LKR ${s.unitPrice*s.qty}</span></div>`).join("")}<hr class="d"/><div class="row"><b>REFUND</b><b>LKR ${returnResult.refundAmount.toFixed(2)}</b></div><div class="foot">*** Thank You ***</div></body></html>`);w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Print Receipt</button>
+                <button onClick={()=>{
+                  const w=window.open("","_blank","width=380,height=600");if(!w)return;
+                  const isExc=returnType==="EXCHANGE";
+                  const balanceLine=isExc
+                    ?(exchangeDue>0
+                      ?`<div class="row tot amb"><span>CUSTOMER PAYS</span><span>LKR ${exchangeDue.toFixed(2)}</span></div>`
+                      :(netRefund>0
+                        ?`<div class="row tot grn"><span>REFUND</span><span>LKR ${netRefund.toFixed(2)}</span></div>`
+                        :`<div class="row tot blu"><span>EVEN EXCHANGE</span><span>LKR 0.00</span></div>`))
+                    :`<div class="row tot grn"><span>REFUND</span><span>LKR ${returnResult.refundAmount.toFixed(2)}</span></div>`;
+                  const exchRows=isExc&&selectedExchangeItems.length>0?`<hr class="d"/><div class="label">EXCHANGE ITEMS</div>${selectedExchangeItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Exchange Total</span><span>LKR ${exchangeTotal.toFixed(2)}</span></div>`:"";
+                  w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:#059669}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed · Awaiting Approval ***</div></body></html>`);
+                  w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);
+                }} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Print Receipt</button>
                 <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
               </div>
             </div>
