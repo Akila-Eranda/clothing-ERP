@@ -14,10 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { getInitials } from "@/lib/utils";
 
 const ICON_MAP: Record<string, React.ElementType> = {
   LayoutDashboard, BarChart3, ShoppingCart, Receipt, RotateCcw, Package, Tag,
@@ -58,7 +56,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const { sidebarCollapsed, toggleSidebar } = useUIStore();
   const router = useRouter();
-  const { user, logoutApi } = useAuthStore();
+  const { logoutApi } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
 
@@ -181,48 +179,6 @@ export function Sidebar() {
               </motion.button>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* ── User Profile ── */}
-        <div className={cn(
-          "shrink-0 px-4 pb-4",
-          sidebarCollapsed && "px-0 flex justify-center",
-        )}>
-          {sidebarCollapsed ? (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button onClick={toggleSidebar}>
-                  <Avatar className="h-10 w-10 ring-2" style={{ "--tw-ring-color": "hsl(var(--sidebar-primary)/0.4)" } as React.CSSProperties}>
-                    <AvatarImage src={user?.avatar} />
-                    <AvatarFallback className="text-[11px] font-bold text-white" style={{ background: "hsl(var(--sidebar-primary))" }}>
-                      {getInitials(user?.name || "U")}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <p className="font-semibold">{user?.name || "Admin"}</p>
-                <p className="text-[11px] capitalize text-muted-foreground">{user?.role?.replace(/_/g, " ")}</p>
-              </TooltipContent>
-            </Tooltip>
-          ) : (
-            <div className="flex items-center gap-3">
-              <Avatar className="h-11 w-11 shrink-0 ring-2" style={{ "--tw-ring-color": "hsl(var(--sidebar-primary)/0.3)" } as React.CSSProperties}>
-                <AvatarImage src={user?.avatar} />
-                <AvatarFallback className="text-[13px] font-bold text-white" style={{ background: "hsl(var(--sidebar-primary))" }}>
-                  {getInitials(user?.name || "U")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <p className="text-[15px] font-bold truncate leading-tight" style={{ color: "hsl(var(--sidebar-foreground))" }}>
-                  {user?.name || "Admin"}
-                </p>
-                <p className="text-[12px] capitalize truncate leading-tight mt-0.5" style={{ color: "hsl(var(--sidebar-foreground)/0.45)" }}>
-                  {user?.role?.replace(/_/g, " ") || "Administrator"}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* ── Divider ── */}
