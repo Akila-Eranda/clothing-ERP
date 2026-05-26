@@ -54,6 +54,10 @@ function onRefreshed(token: string) {
   refreshSubscribers.forEach((cb) => cb(token));
   refreshSubscribers = [];
 }
+function onRefreshFailed() {
+  refreshSubscribers.forEach((cb) => cb(''));
+  refreshSubscribers = [];
+}
 
 async function tryRefresh(): Promise<string | null> {
   const refreshToken = tokenStorage.getRefresh();
@@ -99,7 +103,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
       isRefreshing = false;
       if (newToken) {
         onRefreshed(newToken);
-        // Retry original request
         headers['Authorization'] = `Bearer ${newToken}`;
         const retried = await fetch(`${API_BASE}${path}`, { ...init, headers });
         if (!retried.ok) {
@@ -109,6 +112,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
         }
         return retried.json() as Promise<ApiResponse<T>>;
       } else {
+        onRefreshFailed();
         tokenStorage.clear();
         if (typeof window !== 'undefined') window.location.href = '/login';
         throw new Error('Session expired');
@@ -116,8 +120,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     } else {
       // Another request is already refreshing — wait for it
       return new Promise((resolve, reject) => {
-        subscribeRefresh(async (newToken) => {
-          headers['Authorization'] = `Bearer ${newToken}`;
+        subscribeRefresh(async (token) => {
+          if (!token) { reject(new Error('Session expired')); return; }
+          headers['Authorization'] = `Bearer ${token}`;
           try {
             const retried = await fetch(`${API_BASE}${path}`, { ...init, headers });
             resolve(retried.json() as Promise<ApiResponse<T>>);

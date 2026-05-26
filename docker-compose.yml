@@ -56,6 +56,7 @@ services:
       PORT: 3001
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://shop.hexalyte.com,https://admin3.hexalyte.com}
       FRONTEND_URL: ${FRONTEND_URL:-https://shop.hexalyte.com}
+      JWT_ACCESS_EXPIRY: ${JWT_ACCESS_EXPIRY:-60m}
       KEYCLOAK_URL: ${KEYCLOAK_URL:-https://auth.hexalyte.com}
       KC_REALM: ${KC_REALM:-fashion-erp}
       KC_CLIENT_ID: ${KC_CLIENT_ID:-fashion-erp-api}
