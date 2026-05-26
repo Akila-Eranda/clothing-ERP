@@ -39,8 +39,22 @@ const DISCOUNT_CFG = {
   BUY_X_GET_Y: { label: "Buy X Get Y",  icon: Gift,        bg: "bg-purple-500/10", text: "text-purple-500"  },
 } as const;
 
-const EMPTY_FORM = {
-  name: "", description: "", discountType: "PERCENTAGE" as const,
+type PromotionForm = {
+  name: string;
+  description: string;
+  discountType: Promotion["discountType"];
+  discountValue: number;
+  minOrderAmount: number;
+  maxDiscount: string;
+  usageLimit: string;
+  startsAt: string;
+  endsAt: string;
+  couponCode: string;
+  applicableTo: string;
+};
+
+const EMPTY_FORM: PromotionForm = {
+  name: "", description: "", discountType: "PERCENTAGE",
   discountValue: 0, minOrderAmount: 0, maxDiscount: "",
   usageLimit: "", startsAt: "", endsAt: "", couponCode: "", applicableTo: "ALL",
 };
@@ -53,7 +67,7 @@ export default function PromotionsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing]     = useState<Promotion | null>(null);
   const [saving, setSaving]       = useState(false);
-  const [form, setForm]           = useState({ ...EMPTY_FORM });
+  const [form, setForm]           = useState<PromotionForm>({ ...EMPTY_FORM });
 
   const load = useCallback(async () => {
     setLoading(true);

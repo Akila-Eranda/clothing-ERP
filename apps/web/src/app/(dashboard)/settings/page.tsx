@@ -1,7 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Settings, Store, Bell, Shield, Palette, Globe, CreditCard, Printer, Database } from "lucide-react";
+import {
+  Store, Bell, Shield, Palette, CreditCard, GitBranch,
+  User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
+  Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,11 +13,139 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { APP_NAME, APP_VERSION, CURRENCY_SYMBOL } from "@/lib/constants";
+import { Badge } from "@/components/ui/badge";
+import { APP_NAME, APP_VERSION } from "@/lib/constants";
+import { toast } from "sonner";
+import { useTheme } from "next-themes";
+import { api } from "@/lib/api";
+
+type Tenant = {
+  id: string; name: string; email: string; phone?: string;
+  country: string; currency: string; timezone: string; plan: string; status: string;
+};
+type Branch = {
+  id: string; name: string; code: string; address?: string; city?: string;
+  state?: string; phone?: string; email?: string; isDefault: boolean;
+  _count?: { users: number; inventory: number };
+};
+type Me = { id: string; firstName: string; lastName: string; email: string; phone?: string };
+
+const TIMEZONES = ["Asia/Colombo","Asia/Kolkata","Asia/Dubai","Asia/Singapore","UTC","Europe/London","America/New_York"];
+const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
+const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 export default function SettingsPage() {
+  const { theme, setTheme } = useTheme();
+
+  const [tenant, setTenant] = React.useState<Tenant | null>(null);
+  const [bizForm, setBizForm] = React.useState({ name: "", phone: "", country: "", currency: "", timezone: "" });
+  const [bizSaving, setBizSaving] = React.useState(false);
+
+  const [me, setMe] = React.useState<Me | null>(null);
+  const [profileForm, setProfileForm] = React.useState({ firstName: "", lastName: "", phone: "" });
+  const [profileSaving, setProfileSaving] = React.useState(false);
+
+  const [pwForm, setPwForm] = React.useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [pwSaving, setPwSaving] = React.useState(false);
+  const [showPw, setShowPw] = React.useState({ current: false, newPw: false, confirm: false });
+
+  const [branches, setBranches] = React.useState<Branch[]>([]);
+  const [branchesLoading, setBranchesLoading] = React.useState(false);
+  const [branchModal, setBranchModal] = React.useState<{ open: boolean; editing: Branch | null }>({ open: false, editing: null });
+  const [branchForm, setBranchForm] = React.useState({ name: "", code: "", address: "", city: "", state: "", phone: "", email: "" });
+  const [branchSaving, setBranchSaving] = React.useState(false);
+
+  React.useEffect(() => {
+    api.get<Tenant>("/tenants/me").then(r => {
+      const t = r.data;
+      setTenant(t);
+      setBizForm({ name: t.name ?? "", phone: t.phone ?? "", country: t.country ?? "", currency: t.currency ?? "", timezone: t.timezone ?? "" });
+    }).catch(() => {});
+
+    api.get<Me>("/auth/me").then(r => {
+      const u = r.data;
+      setMe(u);
+      setProfileForm({ firstName: u.firstName ?? "", lastName: u.lastName ?? "", phone: u.phone ?? "" });
+    }).catch(() => {});
+
+    loadBranches();
+  }, []);
+
+  async function loadBranches() {
+    setBranchesLoading(true);
+    try {
+      const r = await api.get<{ data: Branch[] } | Branch[]>("/branches?limit=50");
+      setBranches(Array.isArray(r.data) ? r.data : r.data.data);
+    } catch { toast.error("Failed to load branches"); }
+    finally { setBranchesLoading(false); }
+  }
+
+  async function saveBiz() {
+    setBizSaving(true);
+    try {
+      await api.put("/tenants/me", { companyName: bizForm.name, phone: bizForm.phone, country: bizForm.country, currency: bizForm.currency, timezone: bizForm.timezone });
+      toast.success("Business info updated");
+    } catch { toast.error("Failed to save"); }
+    finally { setBizSaving(false); }
+  }
+
+  async function saveProfile() {
+    if (!me) return;
+    setProfileSaving(true);
+    try {
+      await api.patch(`/users/${me.id}`, profileForm);
+      setMe(prev => prev ? { ...prev, ...profileForm } : prev);
+      toast.success("Profile updated");
+    } catch { toast.error("Failed to update profile"); }
+    finally { setProfileSaving(false); }
+  }
+
+  async function changePassword() {
+    if (pwForm.newPassword !== pwForm.confirmPassword) { toast.error("Passwords do not match"); return; }
+    if (pwForm.newPassword.length < 8) { toast.error("Password must be at least 8 characters"); return; }
+    setPwSaving(true);
+    try {
+      await api.post("/auth/change-password", { currentPassword: pwForm.currentPassword, newPassword: pwForm.newPassword });
+      setPwForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      toast.success("Password changed successfully");
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to change password");
+    } finally { setPwSaving(false); }
+  }
+
+  function openBranchModal(branch?: Branch) {
+    setBranchModal({ open: true, editing: branch ?? null });
+    setBranchForm(branch ? { name: branch.name, code: branch.code, address: branch.address ?? "", city: branch.city ?? "", state: branch.state ?? "", phone: branch.phone ?? "", email: branch.email ?? "" } : { name: "", code: "", address: "", city: "", state: "", phone: "", email: "" });
+  }
+
+  async function saveBranch() {
+    if (!branchForm.name || !branchForm.code) { toast.error("Name and code are required"); return; }
+    setBranchSaving(true);
+    try {
+      if (branchModal.editing) {
+        await api.put(`/branches/${branchModal.editing.id}`, branchForm);
+        toast.success("Branch updated");
+      } else {
+        await api.post("/branches", branchForm);
+        toast.success("Branch created");
+      }
+      setBranchModal({ open: false, editing: null });
+      loadBranches();
+    } catch (e: unknown) { toast.error(e instanceof Error ? e.message : "Failed to save branch"); }
+    finally { setBranchSaving(false); }
+  }
+
+  async function deleteBranch(id: string) {
+    if (!confirm("Delete this branch?")) return;
+    try {
+      await api.delete(`/branches/${id}`);
+      toast.success("Branch deleted");
+      loadBranches();
+    } catch { toast.error("Cannot delete branch — it may have users or inventory"); }
+  }
+
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
         <p className="text-sm text-muted-foreground">Configure your FashionERP workspace</p>
@@ -22,8 +154,10 @@ export default function SettingsPage() {
       <Tabs defaultValue="general">
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="general" className="gap-1.5"><Store className="h-3.5 w-3.5" />General</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notifications</TabsTrigger>
+          <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
           <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
+          <TabsTrigger value="branches" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
+          <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notifications</TabsTrigger>
           <TabsTrigger value="appearance" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Appearance</TabsTrigger>
           <TabsTrigger value="billing" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" />Billing</TabsTrigger>
         </TabsList>
@@ -31,33 +165,47 @@ export default function SettingsPage() {
         <TabsContent value="general" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Business Information</CardTitle>
-              <CardDescription>Basic details about your business</CardDescription>
+              <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Business Information</CardTitle>
+              <CardDescription>Details about your business synced from server</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Business Name</Label>
-                  <Input defaultValue="Fashion Store Mumbai" />
+                  <Label className="flex items-center gap-1.5"><Store className="h-3.5 w-3.5" />Business Name</Label>
+                  <Input value={bizForm.name} onChange={e => setBizForm(f => ({ ...f, name: e.target.value }))} placeholder="My Fashion Store" />
                 </div>
                 <div className="space-y-2">
-                  <Label>GST Number</Label>
-                  <Input defaultValue="27AABCU9603R1ZX" />
+                  <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone</Label>
+                  <Input value={bizForm.phone} onChange={e => setBizForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 77 123 4567" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input defaultValue="+91 98765 43210" />
+                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" />Country</Label>
+                  <select value={bizForm.country} onChange={e => setBizForm(f => ({ ...f, country: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input defaultValue="info@fashionstore.com" />
+                  <Label className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" />Currency</Label>
+                  <select value={bizForm.currency} onChange={e => setBizForm(f => ({ ...f, currency: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" />Timezone</Label>
+                  <select value={bizForm.timezone} onChange={e => setBizForm(f => ({ ...f, timezone: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                    {TIMEZONES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Address</Label>
-                <Input defaultValue="123, Fashion Street, Bandra West, Mumbai, Maharashtra 400050" />
-              </div>
-              <Button variant="gradient" size="sm">Save Changes</Button>
+              {tenant && (
+                <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+                  <span>Plan: <Badge variant="outline" className="text-xs">{tenant.plan}</Badge></span>
+                  <span>Status: <Badge variant={tenant.status === "ACTIVE" ? "default" : "secondary"} className="text-xs">{tenant.status}</Badge></span>
+                </div>
+              )}
+              <Button variant="gradient" size="sm" onClick={saveBiz} disabled={bizSaving}>
+                {bizSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}Save Changes
+              </Button>
             </CardContent>
           </Card>
 
@@ -68,69 +216,51 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout" },
-                { label: "Round off totals", desc: "Round total amount to nearest rupee" },
-                { label: "Allow negative stock", desc: "Enable sales even when stock is 0" },
-                { label: "Loyalty points on every sale", desc: "Auto-apply loyalty program" },
-              ].map((setting) => (
-                <div key={setting.label} className="flex items-center justify-between">
+                { key: "autoPrint", label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout", default: false },
+                { key: "roundOff", label: "Round off totals", desc: "Round total amount to nearest unit", default: true },
+                { key: "negativeStock", label: "Allow negative stock", desc: "Enable sales even when stock is 0", default: false },
+                { key: "loyalty", label: "Loyalty points on every sale", desc: "Auto-apply loyalty program", default: true },
+              ].map((s) => (
+                <div key={s.key} className="flex items-center justify-between py-0.5">
                   <div>
-                    <p className="text-sm font-medium">{setting.label}</p>
-                    <p className="text-xs text-muted-foreground">{setting.desc}</p>
+                    <p className="text-sm font-medium">{s.label}</p>
+                    <p className="text-xs text-muted-foreground">{s.desc}</p>
                   </div>
-                  <Switch defaultChecked={setting.label.includes("Loyalty")} />
+                  <Switch defaultChecked={s.default} />
                 </div>
               ))}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Tax Configuration</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>Default GST Rate (%)</Label>
-                  <Input defaultValue="18" type="number" />
-                </div>
-                <div className="space-y-2">
-                  <Label>CGST Rate (%)</Label>
-                  <Input defaultValue="9" type="number" />
-                </div>
-                <div className="space-y-2">
-                  <Label>SGST Rate (%)</Label>
-                  <Input defaultValue="9" type="number" />
-                </div>
-              </div>
-              <Button variant="gradient" size="sm">Save Tax Settings</Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="profile" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Notification Preferences</CardTitle>
-              <CardDescription>Choose what notifications you receive</CardDescription>
+              <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4 text-primary" />Personal Information</CardTitle>
+              <CardDescription>Your name and contact details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {[
-                { label: "Low stock alerts", desc: "Alert when products fall below minimum stock" },
-                { label: "New order notifications", desc: "Notify on every new sale" },
-                { label: "Daily sales summary", desc: "Receive end-of-day summary via WhatsApp" },
-                { label: "Customer birthday reminders", desc: "Get reminded of customer birthdays" },
-                { label: "Payment due alerts", desc: "Alert on overdue supplier payments" },
-                { label: "System health alerts", desc: "Notify on backup failures or sync errors" },
-              ].map((n) => (
-                <div key={n.label} className="flex items-center justify-between py-1">
-                  <div>
-                    <p className="text-sm font-medium">{n.label}</p>
-                    <p className="text-xs text-muted-foreground">{n.desc}</p>
-                  </div>
-                  <Switch defaultChecked />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>First Name</Label>
+                  <Input value={profileForm.firstName} onChange={e => setProfileForm(f => ({ ...f, firstName: e.target.value }))} />
                 </div>
-              ))}
+                <div className="space-y-2">
+                  <Label>Last Name</Label>
+                  <Input value={profileForm.lastName} onChange={e => setProfileForm(f => ({ ...f, lastName: e.target.value }))} />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5" />Email</Label>
+                  <Input value={me?.email ?? ""} disabled className="opacity-60" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone</Label>
+                  <Input value={profileForm.phone} onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 77 123 4567" />
+                </div>
+              </div>
+              <Button variant="gradient" size="sm" onClick={saveProfile} disabled={profileSaving}>
+                {profileSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}Update Profile
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -138,35 +268,190 @@ export default function SettingsPage() {
         <TabsContent value="security" className="mt-6 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Password & Authentication</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Key className="h-4 w-4 text-primary" />Change Password</CardTitle>
+              <CardDescription>Update your login password</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2"><Label>Current Password</Label><Input type="password" placeholder="••••••••" /></div>
-              <div className="space-y-2"><Label>New Password</Label><Input type="password" placeholder="••••••••" /></div>
-              <div className="space-y-2"><Label>Confirm Password</Label><Input type="password" placeholder="••••••••" /></div>
+              {(["currentPassword","newPassword","confirmPassword"] as const).map((field) => {
+                const labels = { currentPassword: "Current Password", newPassword: "New Password", confirmPassword: "Confirm New Password" };
+                const showKey = field === "currentPassword" ? "current" : field === "newPassword" ? "newPw" : "confirm";
+                return (
+                  <div key={field} className="space-y-2">
+                    <Label>{labels[field]}</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPw[showKey as keyof typeof showPw] ? "text" : "password"}
+                        placeholder="••••••••"
+                        value={pwForm[field]}
+                        onChange={e => setPwForm(f => ({ ...f, [field]: e.target.value }))}
+                        className="pr-9"
+                      />
+                      <button type="button" className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" onClick={() => setShowPw(s => ({ ...s, [showKey]: !s[showKey as keyof typeof showPw] }))}>
+                        {showPw[showKey as keyof typeof showPw] ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              {pwForm.newPassword && pwForm.confirmPassword && pwForm.newPassword !== pwForm.confirmPassword && (
+                <p className="text-xs text-destructive flex items-center gap-1"><X className="h-3 w-3" />Passwords do not match</p>
+              )}
               <Separator />
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Two-Factor Authentication</p>
-                  <p className="text-xs text-muted-foreground">Add extra security with 2FA via authenticator app</p>
-                </div>
-                <Switch />
-              </div>
-              <Button variant="gradient" size="sm">Update Password</Button>
+              <Button variant="gradient" size="sm" onClick={changePassword} disabled={pwSaving || !pwForm.currentPassword || !pwForm.newPassword}>
+                {pwSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Shield className="h-3.5 w-3.5 mr-1.5" />}Change Password
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="appearance" className="mt-6">
+        <TabsContent value="branches" className="mt-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold">Branches</h3>
+              <p className="text-sm text-muted-foreground">{branches.length} branch{branches.length !== 1 ? "es" : ""} configured</p>
+            </div>
+            <Button variant="gradient" size="sm" onClick={() => openBranchModal()}>
+              <Plus className="h-3.5 w-3.5 mr-1.5" />Add Branch
+            </Button>
+          </div>
+
+          {branchesLoading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <div className="grid gap-3">
+              {branches.map(b => (
+                <Card key={b.id} className="hover:border-primary/40 transition-colors">
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <GitBranch className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{b.name}</p>
+                            {b.isDefault && <Badge variant="default" className="text-xs px-1.5 py-0">Default</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground">Code: {b.code}</p>
+                          {(b.city || b.address) && (
+                            <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                              <MapPin className="h-3 w-3" />{[b.address, b.city, b.state].filter(Boolean).join(", ")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {b._count && <span className="mr-3">{b._count.users} users · {b._count.inventory} items</span>}
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openBranchModal(b)}><Pencil className="h-3.5 w-3.5" /></Button>
+                        {!b.isDefault && <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteBranch(b.id)}><Trash2 className="h-3.5 w-3.5" /></Button>}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              {branches.length === 0 && <p className="text-center text-sm text-muted-foreground py-8">No branches found</p>}
+            </div>
+          )}
+
+          {branchModal.open && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+              <Card className="w-full max-w-lg">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{branchModal.editing ? "Edit Branch" : "New Branch"}</CardTitle>
+                    <button onClick={() => setBranchModal({ open: false, editing: null })} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Branch Name *</Label>
+                      <Input value={branchForm.name} onChange={e => setBranchForm(f => ({ ...f, name: e.target.value }))} placeholder="Main Store" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Code *</Label>
+                      <Input value={branchForm.code} onChange={e => setBranchForm(f => ({ ...f, code: e.target.value }))} placeholder="HO-001" />
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label>Address</Label>
+                      <Input value={branchForm.address} onChange={e => setBranchForm(f => ({ ...f, address: e.target.value }))} placeholder="123, Main Street" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>City</Label>
+                      <Input value={branchForm.city} onChange={e => setBranchForm(f => ({ ...f, city: e.target.value }))} placeholder="Colombo" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>State / Province</Label>
+                      <Input value={branchForm.state} onChange={e => setBranchForm(f => ({ ...f, state: e.target.value }))} placeholder="Western" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Phone</Label>
+                      <Input value={branchForm.phone} onChange={e => setBranchForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 11 234 5678" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Email</Label>
+                      <Input value={branchForm.email} onChange={e => setBranchForm(f => ({ ...f, email: e.target.value }))} placeholder="branch@store.com" />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <Button variant="gradient" size="sm" onClick={saveBranch} disabled={branchSaving} className="flex-1">
+                      {branchSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
+                      {branchModal.editing ? "Update" : "Create"} Branch
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setBranchModal({ open: false, editing: null })}>Cancel</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="notifications" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Theme & Display</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><Bell className="h-4 w-4 text-primary" />Notification Preferences</CardTitle>
+              <CardDescription>Choose what notifications you receive</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-1">
+              {[
+                { label: "Low stock alerts", desc: "Alert when products fall below minimum stock", default: true },
+                { label: "New sale notifications", desc: "Notify on every new sale", default: true },
+                { label: "Daily sales summary", desc: "Receive end-of-day summary report", default: false },
+                { label: "Customer birthday reminders", desc: "Get reminded of customer birthdays", default: true },
+                { label: "Payment due alerts", desc: "Alert on overdue supplier payments", default: true },
+                { label: "System health alerts", desc: "Notify on backup failures or sync errors", default: false },
+                { label: "New purchase orders", desc: "Notify when purchase orders are created", default: true },
+                { label: "Return & exchange alerts", desc: "Notify when returns or exchanges are processed", default: false },
+              ].map((n) => (
+                <div key={n.label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                  <div>
+                    <p className="text-sm font-medium">{n.label}</p>
+                    <p className="text-xs text-muted-foreground">{n.desc}</p>
+                  </div>
+                  <Switch defaultChecked={n.default} />
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="appearance" className="mt-6 space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><Palette className="h-4 w-4 text-primary" />Theme & Display</CardTitle>
+              <CardDescription>Choose your preferred color scheme</CardDescription>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-3 gap-3">
-                {["Light", "Dark", "System"].map((theme) => (
-                  <button key={theme} className={`p-4 rounded-xl border-2 text-sm font-medium transition-all ${theme === "Dark" ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}>
-                    {theme}
+                {(["light","dark","system"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setTheme(t)}
+                    className={`p-4 rounded-xl border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+                  >
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-zinc-900" : t === "light" ? "bg-white border" : "bg-gradient-to-br from-white to-zinc-900"}`} />
+                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {theme === t && <Check className="h-3.5 w-3.5" />}
                   </button>
                 ))}
               </div>
@@ -177,18 +462,18 @@ export default function SettingsPage() {
         <TabsContent value="billing" className="mt-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Current Plan</CardTitle>
+              <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" />Subscription Plan</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-4 rounded-xl gradient-primary text-white mb-4">
-                <p className="text-sm font-semibold opacity-80">Current Plan</p>
-                <p className="text-2xl font-bold mt-1">Enterprise</p>
-                <p className="text-sm opacity-80 mt-1">Valid until Dec 31, 2025</p>
+              <div className="p-5 rounded-xl gradient-primary text-white mb-5">
+                <p className="text-xs font-semibold opacity-70 uppercase tracking-wide">Current Plan</p>
+                <p className="text-3xl font-bold mt-1">{tenant?.plan ?? "Enterprise"}</p>
+                <p className="text-sm opacity-70 mt-1">Full access · All features unlocked</p>
               </div>
-              <div className="space-y-2 text-sm">
-                {["Unlimited products & variants", "All POS terminals", "AI insights & analytics", "Multi-branch support", "API access", "Priority support"].map((f) => (
+              <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                {["Unlimited products & variants", "All POS terminals", "AI insights & analytics", "Multi-branch support", "Priority support", "API access", "Advanced reports", "Custom roles & permissions"].map((f) => (
                   <div key={f} className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
                     {f}
                   </div>
                 ))}
