@@ -958,22 +958,22 @@ export function POSOverlay() {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="flex items-center gap-4 px-4 h-10 border-t shrink-0" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+        <div className="flex items-center gap-5 px-5 h-14 border-t shrink-0" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
           {[{label:"Today Sales",value:`LKR ${formatNumber(todayStats.sales)}`,color:"#4f6ef7"},{label:"Orders",value:String(todayStats.orders)},{label:"Items Sold",value:String(todayStats.items)},{label:"Avg. Bill",value:todayStats.orders>0?`LKR ${formatNumber(todayStats.sales/todayStats.orders)}`:"LKR 0.00"}].map(s=>(
             <div key={s.label} className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px]" style={{color:"#4a6a8a"}}>{s.label}</span>
-              <span className="text-xs font-bold" style={{color:s.color||"#fff"}}>{s.value}</span>
+              <span className="text-xs font-medium" style={{color:"#4a6a8a"}}>{s.label}</span>
+              <span className="text-sm font-bold" style={{color:s.color||"#fff"}}>{s.value}</span>
             </div>
           ))}
           <div className="flex-1"/>
-          <div className="flex items-center gap-1.5 shrink-0" style={{color:"#10b981"}}><div className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"/><span className="text-[10px] font-semibold">Barcode Scanner</span><span className="text-[10px]" style={{color:"#6a8ab8"}}>Connected</span></div>
-          <div className="h-3 w-px" style={{background:"#1e3356"}}/>
-          <div className="flex items-center gap-1.5 shrink-0" style={{color:"#6a8ab8"}}><Printer className="h-3 w-3"/><span className="text-[10px]">Printer Ready</span></div>
-          <div className="h-3 w-px" style={{background:"#1e3356"}}/>
-          <div className="text-[10px] font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
-          <div className="text-[10px] shrink-0" style={{color:"#6a8ab8"}}>{now.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})}</div>
-          <div className="h-3 w-px" style={{background:"#1e3356"}}/>
-          <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3 w-3"/>F1</button>
+          <div className="flex items-center gap-2 shrink-0" style={{color:"#10b981"}}><div className="h-2 w-2 rounded-full bg-green-400 animate-pulse"/><span className="text-xs font-semibold">Barcode Scanner</span><span className="text-xs" style={{color:"#6a8ab8"}}>Connected</span></div>
+          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <div className="flex items-center gap-1.5 shrink-0" style={{color:"#6a8ab8"}}><Printer className="h-3.5 w-3.5"/><span className="text-xs">Printer Ready</span></div>
+          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
+          <div className="text-xs shrink-0" style={{color:"#6a8ab8"}}>{now.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})}</div>
+          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
         </div>
 
         {/* RECEIPT MODAL */}
