@@ -209,10 +209,10 @@ export function Sidebar() {
                           background: "hsl(var(--sidebar-accent))",
                           color: "hsl(var(--sidebar-primary))",
                         } : {
-                          color: "hsl(var(--sidebar-foreground)/0.65)",
+                          color: "hsl(var(--sidebar-foreground)/0.85)",
                         }}
                         onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}}
-                        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}}
+                        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.85)"; }}}
                       >
                         {/* Glow left border */}
                         {isActive && (
@@ -237,7 +237,7 @@ export function Sidebar() {
 
                         {!sidebarCollapsed && (
                           <>
-                            <span className="relative z-10 truncate flex-1 text-[14px] font-medium leading-none">
+                            <span className="relative z-10 truncate flex-1 text-[16px] font-medium leading-none">
                               {item.label}
                             </span>
                             {item.badge ? (
