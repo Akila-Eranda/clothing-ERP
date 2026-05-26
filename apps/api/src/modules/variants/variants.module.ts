@@ -106,6 +106,25 @@ export class VariantsService {
     if (!variant) throw new NotFoundException('Barcode not found');
     return variant;
   }
+
+  async backfillBarcodes(tenantId: string) {
+    const missing = await this.prisma.productVariant.findMany({
+      where: { product: { tenantId }, OR: [{ barcode: null }, { barcode: '' }] },
+      select: { id: true },
+    });
+    let filled = 0;
+    for (const v of missing) {
+      let barcode: string;
+      let attempts = 0;
+      do {
+        barcode = this.generateEAN13();
+        attempts++;
+      } while (attempts < 10 && await this.prisma.productVariant.findFirst({ where: { barcode } }));
+      await this.prisma.productVariant.update({ where: { id: v.id }, data: { barcode } });
+      filled++;
+    }
+    return { filled, total: missing.length };
+  }
 }
 
 @ApiTags('Variants')
@@ -168,6 +187,13 @@ export class VariantSearchController {
   @ApiOperation({ summary: 'Find variant by barcode (POS scan)' })
   findByBarcode(@CurrentUser() user: IAuthUser, @Param('barcode') barcode: string) {
     return this.variantsService.findByBarcode(barcode, user.tenantId);
+  }
+
+  @Post('backfill-barcodes')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Auto-fill unique EAN13 barcodes for all variants missing one' })
+  backfillBarcodes(@CurrentUser() user: IAuthUser) {
+    return this.variantsService.backfillBarcodes(user.tenantId);
   }
 }
 

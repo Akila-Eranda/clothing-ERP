@@ -12,7 +12,7 @@ import { formatNumber } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
-interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; }
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
@@ -220,7 +220,7 @@ export function POSOverlay() {
       if(pinLocked){if(/^\d$/.test(e.key)){handlePinEntry(e.key);return;}if(e.key==="Backspace"){handlePinEntry("DEL");return;}if(e.key==="Escape"){closePos();return;}return;}
       const ms=Date.now();const delta=ms-lastKeyTime.current;lastKeyTime.current=ms;
       if(e.key.length===1&&delta<60&&!e.ctrlKey&&!e.altKey){barcodeBuffer.current+=e.key;clearTimeout(barcodeTimer.current);barcodeTimer.current=setTimeout(()=>{barcodeBuffer.current="";},120);}else if(e.key!=="Enter"&&delta>60){clearTimeout(barcodeTimer.current);barcodeBuffer.current="";}
-      if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const sku=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(sku){const found=products.find(p=>p.sku.toLowerCase()===sku.toLowerCase());if(found){handleAddProduct(found);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`SKU not found: ${sku}`);e.preventDefault();return;}}
+      if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const code=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(code){const found=products.find(p=>(p.barcode&&p.barcode===code)||p.sku.toLowerCase()===code.toLowerCase());if(found){handleAddProduct(found);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`Barcode/SKU not found: ${code}`);e.preventDefault();return;}}
       if(e.key==="F1"||(e.key==="?"&&!inInput)){e.preventDefault();setShowShortcuts(s=>!s);return;}
       if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(receipt){setReceipt(null);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
       if(inInput&&e.key==="Enter"&&document.activeElement===searchRef.current){const first=filteredProducts[0];if(first){e.preventDefault();handleAddProduct(first);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}return;}

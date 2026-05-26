@@ -400,6 +400,7 @@ export class PosService {
       size:        v.size  ?? undefined,
       stock:       v.inventory[0]?.quantity ?? 0,
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
+      barcode:     v.barcode ?? undefined,
     }));
   }
 

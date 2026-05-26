@@ -65,6 +65,13 @@ export class CreateBrandDto {
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private generateEAN13(): string {
+    const digits = [2, ...Array.from({ length: 11 }, () => Math.floor(Math.random() * 10))];
+    const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0);
+    const check = (10 - (sum % 10)) % 10;
+    return [...digits, check].join('');
+  }
+
   // ── Products ─────────────────────────────────────────────
   async create(tenantId: string, dto: CreateProductDto) {
     const baseSlug = this.generateSlug(dto.name);
@@ -117,6 +124,7 @@ export class ProductsService {
           costPrice: v.costPrice,
           mrp: v.mrp,
           sortOrder: i,
+          barcode: this.generateEAN13(),
         })),
         skipDuplicates: true,
       });
@@ -129,6 +137,7 @@ export class ProductsService {
           sellingPrice: dto.sellingPrice,
           costPrice: dto.costPrice,
           mrp: dto.mrp,
+          barcode: this.generateEAN13(),
         },
       });
     }
@@ -276,6 +285,7 @@ export class ProductsService {
         costPrice: v.costPrice,
         mrp: v.mrp,
         sortOrder: i,
+        barcode: this.generateEAN13(),
       })),
     });
     return this.findOne(productId, tenantId);
@@ -301,6 +311,7 @@ export class ProductsService {
           sellingPrice: p.sellingPrice,
           costPrice: p.costPrice,
           mrp: p.mrp,
+          barcode: this.generateEAN13(),
         },
       });
       if (branch) {
