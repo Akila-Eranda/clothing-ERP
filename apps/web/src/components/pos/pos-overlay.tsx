@@ -78,6 +78,11 @@ export function POSOverlay() {
   const [returnType, setReturnType] = React.useState<"RETURN"|"EXCHANGE">("RETURN");
   const [exchangeItems, setExchangeItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
   const [exchangeSearch, setExchangeSearch] = React.useState("");
+  const [pinLocked, setPinLocked] = React.useState(false);
+  const [pinEntry, setPinEntry] = React.useState("");
+  const [pinError, setPinError] = React.useState(false);
+  const [settingNewPin, setSettingNewPin] = React.useState("");
+  const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
@@ -100,6 +105,14 @@ export function POSOverlay() {
 
   React.useEffect(() => { if (posOpen) loadProducts(); }, [posOpen, loadProducts]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
+  React.useEffect(() => {
+    if (posOpen) {
+      const stored = typeof window !== "undefined" ? localStorage.getItem("pos_pin") : null;
+      if (stored) { setPinLocked(true); setPinEntry(""); setPinError(false); }
+      else setPinLocked(false);
+    }
+  }, [posOpen]);
+
   React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); setReturnType("RETURN"); setExchangeItems(new Map()); setExchangeSearch(""); } }, [activeNav]);
 
   React.useEffect(() => {
@@ -128,6 +141,18 @@ export function POSOverlay() {
   const handleCardClick = React.useCallback((p:ProductItem)=>{ const c=getColors(p.productName),s=getSizes(p.productName); if(c.length<=1&&s.length<=1){handleAddProduct(p);return;} setSelectedProductName(p.productName);setSelColor(p.color??null);setSelSize(p.size??null); },[getColors,getSizes,handleAddProduct]);
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
+  const handlePinEntry = React.useCallback((digit: string) => {
+    if (digit === "DEL") { setPinEntry(p => p.slice(0,-1)); setPinError(false); return; }
+    const next = pinEntry + digit;
+    if (next.length > 4) return;
+    setPinEntry(next);
+    if (next.length === 4) {
+      const stored = localStorage.getItem("pos_pin");
+      if (next === stored) { setPinLocked(false); setPinEntry(""); setPinError(false); }
+      else { setPinError(true); setPinEntry(""); }
+    }
+  }, [pinEntry]);
+
   const handleThermalPrint = React.useCallback(()=>{
     if(!receipt)return; const w=window.open("","_blank","width=400,height=700,scrollbars=yes"); if(!w){toast.error("Allow popups to print");return;}
     const rows=receipt.items.map(i=>`<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${i.qty>0?(i.price/i.qty).toFixed(2):"0.00"}</span><span>LKR ${i.price.toFixed(2)}</span></div>`).join("");
@@ -154,6 +179,7 @@ export function POSOverlay() {
     if (!posOpen) return;
     const onKey = (e: KeyboardEvent) => {
       const inInput=["INPUT","TEXTAREA"].includes((document.activeElement as HTMLElement)?.tagName??"");
+      if(pinLocked){if(/^\d$/.test(e.key)){handlePinEntry(e.key);return;}if(e.key==="Backspace"){handlePinEntry("DEL");return;}if(e.key==="Escape"){closePos();return;}return;}
       const ms=Date.now();const delta=ms-lastKeyTime.current;lastKeyTime.current=ms;
       if(e.key.length===1&&delta<60&&!e.ctrlKey&&!e.altKey){barcodeBuffer.current+=e.key;clearTimeout(barcodeTimer.current);barcodeTimer.current=setTimeout(()=>{barcodeBuffer.current="";},120);}else if(e.key!=="Enter"&&delta>60){clearTimeout(barcodeTimer.current);barcodeBuffer.current="";}
       if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const sku=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(sku){const found=products.find(p=>p.sku.toLowerCase()===sku.toLowerCase());if(found){handleAddProduct(found);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`SKU not found: ${sku}`);e.preventDefault();return;}}
@@ -167,7 +193,7 @@ export function POSOverlay() {
       if(e.key==="F5"){e.preventDefault();loadProducts();return;}
       if(e.key==="F8"){e.preventDefault();if(heldBills.length>0){restoreHeldBill(heldBills[heldBills.length-1].id);toast.success("Bill restored");}return;}
       if(e.key==="F9"){e.preventDefault();handleCheckout();return;}
-      if(e.key==="F12"){e.preventDefault();closePos();return;}
+      if(e.key==="F12"){e.preventDefault();const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();return;}
       if(e.key==="Tab"){e.preventDefault();const i=PAY_METHODS.findIndex(m=>m.value===activePayment);setActivePayment(PAY_METHODS[(i+1)%PAY_METHODS.length].value);return;}
       if(e.key==="Enter"){e.preventDefault();handleCheckout();return;}
       if(activePayment==="CASH"){if(/^\d$/.test(e.key)){handleNumpad(e.key);return;}if(e.key==="."){handleNumpad(".");return;}if(e.key==="Backspace"){handleNumpad("DEL");return;}}
@@ -179,7 +205,7 @@ export function POSOverlay() {
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,receipt,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout]);
+  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,receipt,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,pinLocked,handlePinEntry]);
 
   //  Helper: set customer from CustomerItem 
   const applyCustomer = (c: CustomerItem) => {
@@ -194,7 +220,7 @@ export function POSOverlay() {
       <div className="flex flex-col h-full overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-none" style={{borderColor:"#1e3356"}}>
           {categories.map(cat=>(
-            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activeCategory===cat?"#fff":"#6a8ab8"}}>
+            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activeCategory===cat?"#fff":"#6a8ab8"}}>
               {cat}
             </button>
           ))}
@@ -213,7 +239,7 @@ export function POSOverlay() {
                       <button onClick={e=>{e.stopPropagation();setLiked(s=>{const n=new Set(s);n.has(p.variantId)?n.delete(p.variantId):n.add(p.variantId);return n;});}} className="absolute top-1.5 right-1.5 p-1 rounded-full" style={{background:"rgba(0,0,0,0.3)"}}><Heart className="h-3 w-3" style={{color:liked.has(p.variantId)?"#ef4444":"#fff",fill:liked.has(p.variantId)?"#ef4444":"none"}}/></button>
                       <button onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
-                    <div className="p-2"><p className="text-white text-xs font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-[11px] mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{p.color??p.variantName}</p><p className="text-sm font-bold mt-1" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p></div>
+                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{p.color??p.variantName}</p><p className="text-base font-bold mt-1" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p></div>
                   </motion.div>
                 );
               })}
@@ -641,11 +667,54 @@ export function POSOverlay() {
       );
     }
 
-    // PLACEHOLDER for Discounts, Reports, Settings
+    // SETTINGS PANEL
+    if (activeNav === "settings") {
+      const pinIsSet = typeof window !== "undefined" && !!localStorage.getItem("pos_pin");
+      return (
+        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+          <h2 className="text-white font-bold text-xl">POS Settings</h2>
+          {/* PIN Security */}
+          <div className="rounded-2xl border p-5 space-y-4" style={{background:"#162338",borderColor:"#1e3356"}}>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Lock className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
+              <div>
+                <h3 className="text-white font-bold text-base">Screen Lock PIN</h3>
+                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>{pinIsSet?"PIN is active — POS requires PIN on every open":"No PIN set — POS opens freely"}</p>
+              </div>
+              {pinIsSet&&<span className="ml-auto text-xs font-bold px-3 py-1 rounded-full" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active</span>}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1.5" style={{color:"#6a8ab8"}}>{pinIsSet?"New PIN":"Create PIN"} (4 digits)</label>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1.5" style={{color:"#6a8ab8"}}>Confirm PIN</label>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={()=>{if(settingNewPin.length!==4){toast.error("PIN must be 4 digits");return;}if(settingNewPin!==settingConfirmPin){toast.error("PINs do not match");return;}localStorage.setItem("pos_pin",settingNewPin);setSettingNewPin("");setSettingConfirmPin("");toast.success("PIN saved — screen will lock on next open");}} className="px-5 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>{pinIsSet?"Update PIN":"Save PIN"}</button>
+              {pinIsSet&&<button onClick={()=>{localStorage.removeItem("pos_pin");setSettingNewPin("");setSettingConfirmPin("");toast.success("PIN removed");}} className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#ef4444",color:"#ef4444"}}>Remove PIN</button>}
+              {pinIsSet&&<button onClick={()=>{setPinLocked(true);setPinEntry("");setPinError(false);}} className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10 ml-auto" style={{borderColor:"#1e3356",color:"#6a8ab8"}}><Lock className="h-3.5 w-3.5 inline mr-1.5"/>Lock Now</button>}
+            </div>
+          </div>
+          {/* Quick links */}
+          <div className="grid grid-cols-2 gap-3">
+            {([{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;onClick?:()=>void}[]).map((item,i)=>(
+              item.path
+                ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
+                :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // PLACEHOLDER for Discounts, Reports
     const PLACEHOLDERS: Record<string,{icon:React.ElementType;title:string;desc:string;path:string}> = {
       "discounts":{icon:Tag,title:"Discounts & Promotions",desc:"Create and manage discount codes, seasonal promotions and bundle offers.",path:"/promotions"},
       "reports":{icon:BarChart2,title:"Sales Reports",desc:"View detailed sales analytics, revenue trends and product performance charts.",path:"/reports"},
-      "settings":{icon:Settings,title:"POS Settings",desc:"Configure tax rates, payment methods, receipt templates and printer settings.",path:"/settings"},
     };
     const p=PLACEHOLDERS[activeNav];
     if(p){const Icon=p.icon;return(
@@ -667,6 +736,32 @@ export function POSOverlay() {
       <motion.div key="pos" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:0.15}}
         className={cn("fixed inset-0 z-[100] flex flex-col overflow-hidden",scanFlash&&"ring-4 ring-inset ring-green-500/70")}
         style={{background:"#0d1b2e"}}>
+
+        {/* PIN LOCK SCREEN */}
+        {pinLocked&&(
+          <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"#0d1b2e"}}>
+            <div className="flex flex-col items-center gap-2">
+              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
+              <h2 className="text-white font-bold text-2xl">POS Terminal</h2>
+              <p className="text-sm" style={{color:"#6a8ab8"}}>Enter your PIN to unlock</p>
+            </div>
+            <div className="flex gap-4 mb-2">
+              {[0,1,2,3].map(i=>(
+                <div key={i} className="h-4 w-4 rounded-full transition-all duration-150" style={{background:pinEntry.length>i?(pinError?"#ef4444":"#4f6ef7"):"#1e3356",transform:pinError&&pinEntry.length===0?"translateX(0)":"none"}}/>
+              ))}
+            </div>
+            {pinError&&<p className="text-sm font-semibold -mt-4" style={{color:"#ef4444"}}>Incorrect PIN. Try again.</p>}
+            <div className="grid gap-3" style={{gridTemplateColumns:"repeat(3,80px)"}}>
+              {[1,2,3,4,5,6,7,8,9].map(n=>(
+                <button key={n} onClick={()=>handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>{n}</button>
+              ))}
+              <button onClick={()=>handlePinEntry("DEL")} className="h-20 rounded-2xl text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>⌫</button>
+              <button onClick={()=>handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>0</button>
+              <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>Exit</button>
+            </div>
+            <p className="text-xs" style={{color:"#2a3a5c"}}>Logged in as {user?.name??"Admin"}</p>
+          </div>
+        )}
 
         {/* TOP BAR */}
         <div className="flex h-12 items-center gap-3 px-4 shrink-0 border-b" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
@@ -707,7 +802,7 @@ export function POSOverlay() {
               {NAV_ITEMS.map(item=>{
                 const active=activeNav===item.id;
                 return (
-                  <button key={item.id} onClick={()=>setActiveNav(item.id)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
+                  <button key={item.id} onClick={()=>setActiveNav(item.id)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"#6a8ab8"}}/>
                     {item.label}
@@ -722,7 +817,7 @@ export function POSOverlay() {
               <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <p className="text-white/70 text-[10px] mt-1"> {todayStats.orders} Orders  {todayStats.items} Items</p>
             </div>
-            <button onClick={closePos} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"#6a8ab8"}}>
+            <button onClick={()=>{const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();}} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"#6a8ab8"}}>
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
             </button>
           </div>
