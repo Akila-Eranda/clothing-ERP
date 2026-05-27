@@ -40,9 +40,19 @@ export class AuthService {
   ) {}
 
   // ── Login ──────────────────────────────────────────────────
-  async login(dto: LoginDto, ip?: string, userAgent?: string) {
+  async login(dto: LoginDto, ip?: string, userAgent?: string, tenantSlug?: string) {
+    // Resolve tenantId from slug when provided (multi-tenant isolation)
+    let tenantId: string | undefined;
+    if (tenantSlug) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: { OR: [{ subdomain: tenantSlug }, { id: tenantSlug }] },
+        select: { id: true },
+      });
+      if (tenant) tenantId = tenant.id;
+    }
+
     const user = await this.prisma.user.findFirst({
-      where: { email: dto.email.toLowerCase() },
+      where: { email: dto.email.toLowerCase(), ...(tenantId && { tenantId }) },
       include: {
         roles: {
           include: {

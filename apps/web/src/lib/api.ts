@@ -43,6 +43,22 @@ function getTenantFromToken(): string | null {
   }
 }
 
+// ── Extract tenant slug from subdomain (e.g. akila.shop.hexalyte.com → akila) ──
+function getTenantFromSubdomain(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const hostname = window.location.hostname; // e.g. akila.shop.hexalyte.com
+    const parts = hostname.split('.');
+    // Must be at least 4 parts: <slug>.shop.hexalyte.com
+    if (parts.length >= 4 && parts[1] === 'shop') return parts[0];
+    // Also handle localhost:<port> dev fallback via query param ?tenant=slug
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('tenant');
+  } catch {
+    return null;
+  }
+}
+
 // ── Base fetch wrapper ────────────────────────────────────────────────────
 let isRefreshing = false;
 let refreshSubscribers: ((token: string) => void)[] = [];
@@ -87,7 +103,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const tenantId = tokenStorage.getTenant() || getTenantFromToken();
+  const tenantId = tokenStorage.getTenant() || getTenantFromToken() || getTenantFromSubdomain();
   if (tenantId) {
     headers['x-tenant-id'] = tenantId;
     if (!tokenStorage.getTenant()) tokenStorage.setTenant(tenantId);

@@ -74,8 +74,9 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Req() req: Request,
     @Headers('user-agent') userAgent: string,
+    @Headers('x-tenant-id') tenantSlug?: string,
   ) {
-    return this.authService.login(dto, req.ip, userAgent);
+    return this.authService.login(dto, req.ip, userAgent, tenantSlug);
   }
 
   @Public()
