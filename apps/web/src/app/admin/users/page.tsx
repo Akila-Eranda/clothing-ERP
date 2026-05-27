@@ -130,9 +130,9 @@ export default function UsersPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                        {u.firstName.charAt(0)}{u.lastName.charAt(0)}
+                        {(u.firstName ?? '?').charAt(0)}{(u.lastName ?? '').charAt(0)}
                       </div>
-                      <p className="text-xs font-semibold text-gray-900">{u.firstName} {u.lastName}</p>
+                      <p className="text-xs font-semibold text-gray-900">{u.firstName ?? ''} {u.lastName ?? ''}</p>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{u.email}</td>
@@ -196,7 +196,7 @@ export default function UsersPage() {
               </div>
             </div>
             <p className="text-sm text-gray-600 mb-5">
-              Delete <strong>{confirmDelete.firstName} {confirmDelete.lastName}</strong>?
+              Delete <strong>{confirmDelete.firstName ?? ''} {confirmDelete.lastName ?? ''}</strong>?
             </p>
             <div className="flex justify-end gap-2">
               <button onClick={() => setConfirmDelete(null)} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>

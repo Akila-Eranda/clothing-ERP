@@ -60,8 +60,8 @@ export interface TenantRow {
 
 export interface UserRow {
   id: string
-  firstName: string
-  lastName: string
+  firstName: string | null
+  lastName: string | null
   email: string
   status: string
   gender?: string
