@@ -7,9 +7,9 @@ import { motion } from "framer-motion";
 import { useTheme } from "next-themes";
 import {
   LayoutDashboard, ShoppingCart, History, RotateCcw, Users,
-  Package, Smartphone, Truck, Wrench, Shield, ArrowLeftRight,
-  Wallet, TrendingDown, BarChart3, FileBarChart, FileText,
-  UserCog, Settings, LogOut, Moon, Sun, ChevronLeft, ChevronRight,
+  Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
+  Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
+  UserCog, Building2, Shield, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -47,25 +47,25 @@ function useNavGroups(): NavGroup[] {
       ],
     },
     {
-      title: "INVENTORY",
+      title: "PRODUCTS",
       items: [
-        { label: "Inventory",      href: "/inventory",  icon: Package },
-        { label: "IMEI Tracker",   href: "/imei",       icon: Smartphone, badge: "NEW" },
-        { label: "Suppliers & PO", href: "/suppliers",  icon: Truck },
+        { label: "Products",       href: "/products",   icon: Package },
+        { label: "Categories",     href: "/categories", icon: Layers },
+        { label: "Brands",         href: "/brands",     icon: Bookmark },
+        { label: "Inventory",      href: "/inventory",  icon: Warehouse },
       ],
     },
     {
-      title: "SERVICE",
+      title: "PROCUREMENT",
       items: [
-        { label: "Repair Jobs",    href: "/repairs",    icon: Wrench },
-        { label: "Warranty",       href: "/warranty",   icon: Shield },
-        { label: "Device Exchange",href: "/exchanges",  icon: ArrowLeftRight, badge: "NEW" },
+        { label: "Suppliers",      href: "/suppliers",  icon: Truck },
+        { label: "Purchases",      href: "/purchases",  icon: ShoppingBag },
       ],
     },
     {
       title: "FINANCE",
       items: [
-        { label: "Finance",        href: "/accounting", icon: Wallet },
+        { label: "Accounting",     href: "/accounting", icon: Wallet },
         { label: "Expenses",       href: "/expenses",   icon: TrendingDown, badge: "NEW" },
         { label: "Analytics",      href: "/analytics",  icon: BarChart3 },
       ],
@@ -73,14 +73,16 @@ function useNavGroups(): NavGroup[] {
     {
       title: "REPORTS",
       items: [
-        { label: "Reports",        href: "/reports",    icon: FileBarChart, badge: "NEW" },
-        { label: "Invoice",        href: "/invoices",   icon: FileText, badge: "NEW" },
+        { label: "Reports",        href: "/reports",    icon: FileBarChart },
+        { label: "Promotions",     href: "/promotions", icon: Zap },
       ],
     },
     {
       title: "HR & STAFF",
       items: [
-        { label: "Platform Admin", href: "/users",      icon: UserCog },
+        { label: "HR & Payroll",   href: "/hr",         icon: UserCog },
+        { label: "Branches",       href: "/branches",   icon: Building2 },
+        { label: "Users & Roles",  href: "/users",      icon: Shield },
       ],
     },
   ];
