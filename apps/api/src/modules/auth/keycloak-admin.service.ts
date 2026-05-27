@@ -45,8 +45,8 @@ export class KeycloakAdminService {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
         grant_type: 'client_credentials',
-        client_id: this.config.get<string>('keycloak.clientId')!,
-        client_secret: this.config.get<string>('keycloak.clientSecret')!,
+        client_id: this.config.get<string>('keycloak.adminClientId') || this.config.get<string>('keycloak.clientId')!,
+        client_secret: this.config.get<string>('keycloak.adminClientSecret') || this.config.get<string>('keycloak.clientSecret')!,
       }).toString(),
     });
     if (!res.ok) throw new Error(`KC admin token failed: ${res.status}`);
