@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard, Activity,
-  BarChart3, ScrollText, Settings, Shield, X, ShoppingBag,
+  BarChart3, ScrollText, Settings, Shield, X, ShoppingBag, Tag,
 } from 'lucide-react'
 
 const NAV = [
@@ -12,6 +12,7 @@ const NAV = [
   { href: '/admin/tenants',        label: 'Tenants',          icon: Building2       },
   { href: '/admin/users',          label: 'Users',            icon: Users           },
   { href: '/admin/subscriptions',  label: 'Subscriptions',    icon: CreditCard      },
+  { href: '/admin/plans',          label: 'Plans',            icon: Tag             },
   { href: '/admin/system-health',  label: 'System Health',    icon: Activity        },
   { href: '/admin/analytics',      label: 'Analytics',        icon: BarChart3       },
   { href: '/admin/activity-logs',  label: 'Activity Logs',    icon: ScrollText      },

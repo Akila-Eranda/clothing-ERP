@@ -14,6 +14,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/system-health': 'System Health',
   '/admin/analytics':     'Analytics',
   '/admin/activity-logs': 'Activity Logs',
+  '/admin/plans':         'Plans',
   '/admin/settings':      'Settings',
 }
 

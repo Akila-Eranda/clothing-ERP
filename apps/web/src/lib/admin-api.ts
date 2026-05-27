@@ -87,6 +87,66 @@ export interface PlatformStats {
   planBreakdown: { plan: string; count: number }[]
 }
 
+export interface PlanDef {
+  id: string
+  key: string
+  name: string
+  price: number
+  currency: string
+  interval: string
+  description: string
+  features: string[]
+  maxUsers: number
+  maxBranches: number
+}
+
+export const DEFAULT_PLANS: PlanDef[] = [
+  {
+    id: 'starter',
+    key: 'STARTER',
+    name: 'Starter',
+    price: 1199,
+    currency: 'Rs.',
+    interval: 'mo',
+    description: '3 users, 1 branch, basic POS + repairs',
+    features: ['3 Users', '1 Branch', 'Basic POS', 'Inventory', 'Repairs module'],
+    maxUsers: 3,
+    maxBranches: 1,
+  },
+  {
+    id: 'professional',
+    key: 'PROFESSIONAL',
+    name: 'Pro',
+    price: 4799,
+    currency: 'Rs.',
+    interval: 'mo',
+    description: '10 users, 3 branches, analytics, warranties',
+    features: ['10 Users', '3 Branches', 'Analytics', 'Warranties', 'HR module'],
+    maxUsers: 10,
+    maxBranches: 3,
+  },
+  {
+    id: 'enterprise',
+    key: 'ENTERPRISE',
+    name: 'Enterprise',
+    price: 14399,
+    currency: 'Rs.',
+    interval: 'mo',
+    description: 'Unlimited users, API access, white-label',
+    features: ['Unlimited Users', 'Unlimited Branches', 'API Access', 'White-label', 'Custom Domain'],
+    maxUsers: -1,
+    maxBranches: -1,
+  },
+]
+
+export async function fetchPlans(): Promise<PlanDef[]> {
+  try {
+    return await req<PlanDef[]>('/admin/plans')
+  } catch {
+    return DEFAULT_PLANS
+  }
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export async function adminLogin(email: string, password: string, tenantSlug: string) {
   const res = await fetch(`${API_BASE}/auth/login`, {
@@ -119,6 +179,7 @@ export async function updateTenant(id: string, data: Partial<TenantRow>) {
 export async function registerTenant(data: {
   name: string; subdomain: string; email: string; phone?: string
   plan: string; currency?: string; country?: string; timezone?: string
+  ownerName?: string; password?: string
 }) {
   return req<{ tenant: TenantRow }>('/tenants/register', { method: 'POST', body: JSON.stringify(data) })
 }
