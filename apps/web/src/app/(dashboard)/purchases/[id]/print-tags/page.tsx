@@ -55,9 +55,10 @@ function BarcodeEl({ value, id }: { value: string; id: string }) {
 type LabelFormat = "sticker" | "hangtag";
 
 // ── Sticker Label (thermal 60×40mm) ──────────────────────────────────────
-function StickerLabel({ item, shopName }: { item: POItem; shopName: string }) {
-  const barcodeVal = item.variant?.barcode || item.sku;
-  const price = item.variant?.sellingPrice ?? item.unitCost;
+function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
+  const baseCode   = item.variant?.barcode || item.sku;
+  const barcodeVal = `${baseCode}${serial.toString().padStart(3, "0")}`;
+  const price      = item.variant?.sellingPrice ?? item.unitCost;
   const variantLine = [item.variant?.color, item.variant?.size].filter(Boolean).join(" / ") || item.variantName;
   return (
     <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
@@ -65,17 +66,18 @@ function StickerLabel({ item, shopName }: { item: POItem; shopName: string }) {
       <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
       <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
       {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
-      <BarcodeEl value={barcodeVal} id={item.id} />
-      <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>
+      <BarcodeEl value={barcodeVal} id={`${item.id}-${serial}`} />
+      <p className="text-[8px] font-mono text-gray-400">{barcodeVal}</p>
       <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>
   );
 }
 
 // ── Hang Tag (clothing hang tag, portrait) ────────────────────────────────
-function HangTag({ item, shopName }: { item: POItem; shopName: string }) {
-  const barcodeVal = item.variant?.barcode || item.sku;
-  const price = item.variant?.sellingPrice ?? item.unitCost;
+function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
+  const baseCode   = item.variant?.barcode || item.sku;
+  const barcodeVal = `${baseCode}${serial.toString().padStart(3, "0")}`;
+  const price      = item.variant?.sellingPrice ?? item.unitCost;
   const color = item.variant?.color;
   const size  = item.variant?.size;
   return (
@@ -97,8 +99,8 @@ function HangTag({ item, shopName }: { item: POItem; shopName: string }) {
         )}
         <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
         <div className="border-t w-full mt-1 pt-1">
-          <BarcodeEl value={barcodeVal} id={item.id} />
-          <p className="text-[8px] font-mono text-gray-400">{item.sku}</p>
+          <BarcodeEl value={barcodeVal} id={`${item.id}-${serial}`} />
+          <p className="text-[8px] font-mono text-gray-400">{barcodeVal}</p>
         </div>
       </div>
     </div>
@@ -142,12 +144,12 @@ export default function PrintTagsPage() {
 
   const shopName = "FashionERP";
 
-  // Expand items by qty for print
-  const expandedLabels: { item: POItem; key: string }[] = [];
+  // Expand items by qty for print — each copy gets its own serial number
+  const expandedLabels: { item: POItem; key: string; serial: number }[] = [];
   po.items.forEach((item) => {
     const q = qtys[item.id] ?? 0;
     for (let i = 0; i < q; i++) {
-      expandedLabels.push({ item, key: `${item.id}-${i}` });
+      expandedLabels.push({ item, key: `${item.id}-${i}`, serial: i + 1 });
     }
   });
 
@@ -264,10 +266,10 @@ export default function PrintTagsPage() {
               </div>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {expandedLabels.map(({ item, key }) =>
+                {expandedLabels.map(({ item, key, serial }) =>
                   format === "hangtag"
-                    ? <HangTag key={key} item={item} shopName={shopName} />
-                    : <StickerLabel key={key} item={item} shopName={shopName} />
+                    ? <HangTag key={key} item={item} shopName={shopName} serial={serial} />
+                    : <StickerLabel key={key} item={item} shopName={shopName} serial={serial} />
                 )}
               </div>
             )}
@@ -278,10 +280,10 @@ export default function PrintTagsPage() {
 
       {/* ── Print-only labels ── */}
       <div className="print-grid hidden print:flex">
-        {expandedLabels.map(({ item, key }) =>
+        {expandedLabels.map(({ item, key, serial }) =>
           format === "hangtag"
-            ? <HangTag key={key} item={item} shopName={shopName} />
-            : <StickerLabel key={key} item={item} shopName={shopName} />
+            ? <HangTag key={key} item={item} shopName={shopName} serial={serial} />
+            : <StickerLabel key={key} item={item} shopName={shopName} serial={serial} />
         )}
       </div>
     </>
