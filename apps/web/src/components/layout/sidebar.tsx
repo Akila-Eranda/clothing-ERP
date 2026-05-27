@@ -120,6 +120,14 @@ export function Sidebar() {
 
   const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
 
+  /* ── theme-aware palette ── */
+  const bg       = isDark ? "#0f172a" : "#ffffff"
+  const border   = isDark ? "#1e293b" : "#e5e7eb"
+  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "rgba(15,23,42,0.55)"
+  const textFull = isDark ? "#ffffff" : "#111827"
+  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
+  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "rgba(15,23,42,0.30)"
+
   /* ── single nav item renderer ── */
   const renderItem = (item: NavItem, groupIdx: number) => {
     const isActive = !!item.href && (pathname === item.href || pathname.startsWith(item.href + "/"));
@@ -131,20 +139,20 @@ export function Sidebar() {
         key={key}
         href={item.href}
         className={cn(
-          "group relative flex items-center gap-2.5 rounded-xl text-sm transition-all duration-150 select-none",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-9 px-3 w-full",
+          "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
+          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
         )}
         style={isActive
-          ? { background: "rgba(99,102,241,0.1)", color: "#4f46e5" }
-          : { color: "hsl(var(--sidebar-foreground)/0.65)" }
+          ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
+          : { color: textMut }
         }
-        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}}
-        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}}
+        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
+        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
       >
-        <Icon className={cn("shrink-0 h-[18px] w-[18px]", isActive && "text-indigo-500")} strokeWidth={isActive ? 2.2 : 1.8} />
+        <Icon className={cn("shrink-0 h-5 w-5", isActive && "text-indigo-500")} strokeWidth={isActive ? 2.2 : 1.8} />
         {!sidebarCollapsed && (
           <>
-            <span className={cn("truncate flex-1 leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}>{item.label}</span>
+            <span className={cn("truncate flex-1 text-[15px] leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}>{item.label}</span>
             {item.badge && <NavBadge text={item.badge} />}
           </>
         )}
@@ -154,17 +162,17 @@ export function Sidebar() {
         key={key}
         onClick={item.action}
         className={cn(
-          "group relative flex items-center gap-2.5 rounded-xl text-sm transition-all duration-150 select-none cursor-pointer",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-9 px-3 w-full",
+          "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none cursor-pointer",
+          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
         )}
-        style={{ color: "hsl(var(--sidebar-foreground)/0.65)" }}
-        onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}
-        onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}
+        style={{ color: textMut }}
+        onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
+        onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
       >
-        <Icon className="shrink-0 h-[18px] w-[18px]" strokeWidth={1.8} />
+        <Icon className="shrink-0 h-5 w-5" strokeWidth={1.8} />
         {!sidebarCollapsed && (
           <>
-            <span className="truncate flex-1 leading-none font-medium">{item.label}</span>
+            <span className="truncate flex-1 text-[15px] leading-none font-medium">{item.label}</span>
             {item.badge && <NavBadge text={item.badge} />}
           </>
         )}
@@ -187,10 +195,10 @@ export function Sidebar() {
     <Tooltip key={label}>
       <TooltipTrigger asChild>
         <button onClick={onClick}
-          className="flex h-10 w-10 items-center justify-center mx-auto rounded-xl transition-colors"
-          style={{ color: "hsl(var(--sidebar-foreground)/0.6)" }}
-          onMouseEnter={e => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.1)" : "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = danger ? "#ef4444" : "hsl(var(--sidebar-foreground))"; }}
-          onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.6)"; }}
+          className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
+          style={{ color: textMut }}
+          onMouseEnter={e => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.1)" : hoverBg; e.currentTarget.style.color = danger ? "#ef4444" : textFull; }}
+          onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
         >{icon}</button>
       </TooltipTrigger>
       <TooltipContent side="right" className="text-xs">{label}</TooltipContent>
@@ -204,14 +212,14 @@ export function Sidebar() {
         animate={{ width: sidebarCollapsed ? 68 : 248 }}
         transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex h-screen flex-col shrink-0 overflow-hidden"
-        style={{ background: "hsl(var(--sidebar-background))", borderRight: "1px solid hsl(var(--sidebar-border))" }}
+        style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
         {/* ── Header: shop avatar + name + collapse btn ── */}
         <div className={cn("flex items-center shrink-0 gap-3 px-3 py-4", sidebarCollapsed && "justify-center")}>
           {/* Avatar */}
           <div
-            className="h-10 w-10 rounded-xl shrink-0 flex items-center justify-center text-white font-bold text-sm select-none"
+            className="h-11 w-11 rounded-xl shrink-0 flex items-center justify-center text-white font-bold text-sm select-none"
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
           >
             {initials}
@@ -220,16 +228,16 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold leading-tight truncate" style={{ color: "hsl(var(--sidebar-foreground))" }}>{shopName}</p>
+                <p className="text-[15px] font-bold leading-tight truncate" style={{ color: textFull }}>{shopName}</p>
                 <p className="text-xs font-semibold mt-0.5" style={{ color: "#6366f1" }}>{planLabel}</p>
               </div>
               {/* Collapse button */}
               <button
                 onClick={toggleSidebar}
                 className="h-7 w-7 flex items-center justify-center rounded-lg border transition-colors shrink-0"
-                style={{ borderColor: "hsl(var(--sidebar-border))", color: "hsl(var(--sidebar-foreground)/0.4)" }}
-                onMouseEnter={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; }}
-                onMouseLeave={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.4)"; e.currentTarget.style.background = ""; }}
+                style={{ borderColor: border, color: textMut }}
+                onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
+                onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = ""; }}
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
               </button>
@@ -240,9 +248,9 @@ export function Sidebar() {
             <button
               onClick={toggleSidebar}
               className="absolute right-1 top-4 h-6 w-6 flex items-center justify-center rounded-md border transition-colors"
-              style={{ borderColor: "hsl(var(--sidebar-border))", color: "hsl(var(--sidebar-foreground)/0.4)", background: "hsl(var(--sidebar-background))" }}
-              onMouseEnter={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}
-              onMouseLeave={e => { e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.4)"; }}
+              style={{ borderColor: border, color: textMut, background: bg }}
+              onMouseEnter={e => { e.currentTarget.style.color = textFull; }}
+              onMouseLeave={e => { e.currentTarget.style.color = textMut; }}
             >
               <ChevronRight className="h-3 w-3" />
             </button>
@@ -250,7 +258,7 @@ export function Sidebar() {
         </div>
 
         {/* ── Divider ── */}
-        <div className="mx-3 h-px shrink-0" style={{ background: "hsl(var(--sidebar-border))" }} />
+        <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
         {/* ── Nav groups ── */}
         <ScrollArea className="flex-1">
@@ -259,8 +267,8 @@ export function Sidebar() {
               <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                 {/* Section label */}
                 {!sidebarCollapsed && (
-                  <p className="px-3 mb-1 text-[10px] font-semibold tracking-wider uppercase select-none"
-                    style={{ color: "hsl(var(--sidebar-foreground)/0.35)" }}>
+                  <p className="px-3 mb-1 text-[11px] font-semibold tracking-wider uppercase select-none"
+                    style={{ color: sectLbl }}>
                     {group.title}
                   </p>
                 )}
@@ -273,7 +281,7 @@ export function Sidebar() {
         </ScrollArea>
 
         {/* ── Divider ── */}
-        <div className="mx-3 h-px shrink-0" style={{ background: "hsl(var(--sidebar-border))" }} />
+        <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
         {/* ── Bottom actions ── */}
         <div className={cn("shrink-0 py-2 space-y-0.5", sidebarCollapsed ? "px-1.5 flex flex-col items-center" : "px-2.5")}>
@@ -286,19 +294,19 @@ export function Sidebar() {
           ) : (
             <>
               <Link href="/settings"
-                className="flex h-9 items-center gap-2.5 rounded-xl px-3 text-sm font-medium transition-colors"
-                style={{ color: "hsl(var(--sidebar-foreground)/0.65)" }}
-                onMouseEnter={e => { e.currentTarget.style.background = "hsl(var(--sidebar-accent))"; e.currentTarget.style.color = "hsl(var(--sidebar-foreground))"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}
+                className="flex h-11 items-center gap-3 rounded-xl px-3 font-medium transition-colors"
+                style={{ color: textMut }}
+                onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
-                <Settings className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
-                <span className="flex-1">Settings</span>
+                <Settings className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                <span className="flex-1 text-[15px]">Settings</span>
               </Link>
 
               {/* Dark mode row */}
-              <div className="flex h-9 items-center gap-2.5 rounded-xl px-3" style={{ color: "hsl(var(--sidebar-foreground)/0.65)" }}>
-                <Moon className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
-                <span className="text-sm font-medium flex-1">Dark Mode</span>
+              <div className="flex h-11 items-center gap-3 rounded-xl px-3" style={{ color: textMut }}>
+                <Moon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                <span className="text-[15px] font-medium flex-1">Dark Mode</span>
                 <button
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
@@ -313,13 +321,13 @@ export function Sidebar() {
               </div>
 
               <button onClick={handleLogout}
-                className="flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-sm font-medium transition-colors"
-                style={{ color: "hsl(var(--sidebar-foreground)/0.65)" }}
+                className="flex h-11 w-full items-center gap-3 rounded-xl px-3 font-medium transition-colors"
+                style={{ color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.07)"; e.currentTarget.style.color = "#ef4444"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = "hsl(var(--sidebar-foreground)/0.65)"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
-                <LogOut className="h-[17px] w-[17px] shrink-0" strokeWidth={1.8} />
-                <span>Logout</span>
+                <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.8} />
+                <span className="text-[15px]">Logout</span>
               </button>
             </>
           )}
