@@ -362,16 +362,17 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
 
   const STEP_LABELS = ['Shop Details', 'Plan', 'Provisioning', 'Done']
   const circ = (n: number) =>
-    `w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${step >= n ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-400'}`
+    `w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${step >= n ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white/30'}`
   const line = (n: number) =>
-    `flex-1 h-0.5 mx-1 transition-colors ${step > n ? 'bg-gray-900' : 'bg-gray-200'}`
+    `flex-1 h-0.5 mx-1 transition-colors ${step > n ? 'bg-indigo-600' : 'bg-white/10'}`
+  const inp = 'w-full px-4 py-2.5 text-sm rounded-xl outline-none text-white placeholder:text-white/30 bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30'
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-[520px] shadow-2xl">
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="rounded-2xl w-full max-w-[520px] shadow-2xl overflow-hidden" style={{background:'#0f172a',border:'1px solid rgba(255,255,255,0.08)'}}>
 
         {/* Step progress */}
-        <div className="px-7 pt-7 pb-5 border-b border-gray-100">
+        <div className="px-7 pt-7 pb-5" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
           <div className="flex items-center">
             <div className={circ(1)}>{step > 1 ? <Check size={13}/> : 1}</div>
             <div className={line(1)}/>
@@ -380,7 +381,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
             <div className={circ(3)}>{step > 3 ? <Check size={13}/> : 3}</div>
             <div className={line(3)}/>
             <div className={circ(4)}>4</div>
-            <span className="text-sm font-semibold text-gray-600 ml-3 shrink-0">{STEP_LABELS[step - 1]}</span>
+            <span className="text-sm font-semibold ml-3 shrink-0" style={{color:'rgba(255,255,255,0.7)'}}>{STEP_LABELS[step - 1]}</span>
           </div>
         </div>
 
@@ -389,35 +390,35 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {/* ── Step 1: Shop Details ── */}
           {step === 1 && (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-gray-900">Shop Details</h3>
+              <h3 className="text-base font-bold text-white">Shop Details</h3>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Shop Name</label>
-                <input className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-gray-900/10" placeholder="e.g. iRepair Hub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop Name</label>
+                <input className={inp} placeholder="e.g. FashionHub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Owner Name</label>
-                <input className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-gray-900/10" placeholder="e.g. Kamal Perera" value={form.ownerName} onChange={e => setForm(f => ({...f, ownerName: e.target.value}))}/>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Owner Name</label>
+                <input className={inp} placeholder="e.g. Kamal Perera" value={form.ownerName} onChange={e => setForm(f => ({...f, ownerName: e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-                <input type="email" className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-gray-900/10" placeholder="owner@shop.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}/>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Email</label>
+                <input type="email" className={inp} placeholder="owner@shop.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Phone</label>
-                <input className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-gray-900/10" placeholder="+94771234567" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}/>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Phone</label>
+                <input className={inp} placeholder="+94771234567" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}/>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                  Password <span className="font-normal text-gray-400">(leave blank to auto-generate)</span>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>
+                  Password <span className="font-normal" style={{color:'rgba(255,255,255,0.3)'}}>( leave blank to auto-generate)</span>
                 </label>
                 <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} className="w-full px-4 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-gray-900/10 pr-14" placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
-                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400 font-medium hover:text-gray-600">{showPass ? 'Hide' : 'Show'}</button>
+                  <input type={showPass ? 'text' : 'password'} className={inp + ' pr-14'} placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
+                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium" style={{color:'rgba(255,255,255,0.4)'}}>{showPass ? 'Hide' : 'Show'}</button>
                 </div>
               </div>
               <div className="flex justify-between pt-2">
-                <button onClick={onClose} className="px-5 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">Cancel</button>
-                <button onClick={() => setStep(2)} disabled={!canNext} className="px-5 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-40">Next →</button>
+                <button onClick={onClose} className="px-5 py-2.5 text-sm rounded-xl transition-colors" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>Cancel</button>
+                <button onClick={() => setStep(2)} disabled={!canNext} className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-40" style={{background:'#4f46e5'}}>Next →</button>
               </div>
             </div>
           )}
@@ -425,27 +426,27 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {/* ── Step 2: Plan ── */}
           {step === 2 && (
             <div className="space-y-4">
-              <h3 className="text-base font-bold text-gray-900">Select Plan</h3>
+              <h3 className="text-base font-bold text-white">Select Plan</h3>
               <div className="space-y-2.5">
                 {plans.map(p => (
-                  <label key={p.key} className={`flex items-center justify-between p-4 rounded-xl border-2 cursor-pointer transition-all ${form.plan === p.key ? 'border-gray-900 bg-gray-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                  <label key={p.key} className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all" style={form.plan === p.key ? {border:'2px solid #4f46e5',background:'rgba(79,70,229,0.1)'} : {border:'2px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)'}}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${form.plan === p.key ? 'border-gray-900' : 'border-gray-300'}`}>
-                        {form.plan === p.key && <div className="w-2 h-2 rounded-full bg-gray-900"/>}
+                      <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{borderColor: form.plan === p.key ? '#4f46e5' : 'rgba(255,255,255,0.2)'}}>
+                        {form.plan === p.key && <div className="w-2 h-2 rounded-full" style={{background:'#4f46e5'}}/>}
                       </div>
                       <input type="radio" name="plan" value={p.key} checked={form.plan === p.key} onChange={() => setForm(f => ({...f, plan: p.key}))} className="sr-only"/>
                       <div>
-                        <p className="text-sm font-bold text-gray-900">{p.name}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{p.description}</p>
+                        <p className="text-sm font-bold text-white">{p.name}</p>
+                        <p className="text-xs mt-0.5" style={{color:'rgba(255,255,255,0.4)'}}>{p.description}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900 shrink-0 ml-4">{p.currency}{p.price.toLocaleString()}/{p.interval}</span>
+                    <span className="text-sm font-bold shrink-0 ml-4 text-white">{p.currency}{p.price.toLocaleString()}/{p.interval}</span>
                   </label>
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <button onClick={() => setStep(1)} className="px-5 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50">← Back</button>
-                <button onClick={() => setStep(3)} className="px-5 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800">Next →</button>
+                <button onClick={() => setStep(1)} className="px-5 py-2.5 text-sm rounded-xl" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>← Back</button>
+                <button onClick={() => setStep(3)} className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Next →</button>
               </div>
             </div>
           )}
@@ -454,26 +455,26 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <h3 className="text-base font-bold text-gray-900">Auto-Provisioning</h3>
-                <p className="text-sm text-gray-500 mt-0.5">The following will be created automatically:</p>
+                <h3 className="text-base font-bold text-white">Auto-Provisioning</h3>
+                <p className="text-sm mt-0.5" style={{color:'rgba(255,255,255,0.4)'}}>The following will be created automatically:</p>
               </div>
               <div className="space-y-2">
                 {provItems.map(item => (
-                  <div key={item.key} className={`flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-300 ${provDone.includes(item.key) ? 'border-green-100 bg-green-50' : 'border-gray-100 bg-gray-50'}`}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${provDone.includes(item.key) ? 'bg-green-500' : 'bg-white border border-gray-200'}`}>
-                      {provDone.includes(item.key) ? <Check size={13} className="text-white"/> : <div className="w-2 h-2 rounded-full bg-gray-300"/>}
+                  <div key={item.key} className="flex items-center gap-3 p-3.5 rounded-xl transition-all duration-300" style={provDone.includes(item.key) ? {border:'1px solid rgba(16,185,129,0.3)',background:'rgba(16,185,129,0.08)'} : {border:'1px solid rgba(255,255,255,0.07)',background:'rgba(255,255,255,0.03)'}}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all" style={provDone.includes(item.key) ? {background:'#10b981'} : {background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                      {provDone.includes(item.key) ? <Check size={13} className="text-white"/> : <div className="w-2 h-2 rounded-full" style={{background:'rgba(255,255,255,0.2)'}}/>}
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-                      <p className="text-xs text-gray-500">{item.sub}</p>
+                      <p className="text-sm font-semibold text-white">{item.label}</p>
+                      <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>{item.sub}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              {error && <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</p>}
+              {error && <p className="text-xs px-3 py-2 rounded-lg" style={{color:'#f87171',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)'}}>{error}</p>}
               <div className="flex justify-between pt-2">
-                <button onClick={() => setStep(2)} disabled={provisioning} className="px-5 py-2.5 text-sm border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-50">← Back</button>
-                <button onClick={provision} disabled={provisioning} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-70">
+                <button onClick={() => setStep(2)} disabled={provisioning} className="px-5 py-2.5 text-sm rounded-xl disabled:opacity-50" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>← Back</button>
+                <button onClick={provision} disabled={provisioning} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-70" style={{background:'#4f46e5'}}>
                   {provisioning ? <><RefreshCw size={13} className="animate-spin"/>Provisioning…</> : 'Provision Tenant'}
                 </button>
               </div>
@@ -483,13 +484,13 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {/* ── Step 4: Done ── */}
           {step === 4 && (
             <div className="text-center py-8">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle size={28} className="text-green-600"/>
+              <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{background:'rgba(16,185,129,0.15)'}}>
+                <CheckCircle size={28} style={{color:'#10b981'}}/>
               </div>
-              <h3 className="text-base font-bold text-gray-900 mb-1">Tenant Provisioned!</h3>
-              <p className="text-sm text-gray-500 mb-1"><strong>{form.shopName}</strong> is live.</p>
-              <p className="text-xs font-mono text-gray-400">{form.subdomain}</p>
-              <button onClick={onClose} className="mt-6 px-6 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800">Done</button>
+              <h3 className="text-base font-bold text-white mb-1">Tenant Provisioned!</h3>
+              <p className="text-sm mb-1" style={{color:'rgba(255,255,255,0.5)'}}><strong className="text-white">{form.shopName}</strong> is live.</p>
+              <p className="text-xs font-mono" style={{color:'rgba(255,255,255,0.3)'}}>{form.subdomain}</p>
+              <button onClick={onClose} className="mt-6 px-6 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Done</button>
             </div>
           )}
 
