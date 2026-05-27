@@ -393,7 +393,26 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               <h3 className="text-base font-bold text-white">Shop Details</h3>
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop Name</label>
-                <input className={inp} placeholder="e.g. FashionHub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
+                <input className={inp} placeholder="e.g. Fashion Hub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop URL (Subdomain)</label>
+                <div className="flex items-center rounded-xl overflow-hidden" style={{border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)'}}>
+                  <input
+                    className="flex-1 px-4 py-2.5 text-sm bg-transparent outline-none text-white placeholder:text-white/30"
+                    placeholder="fashion-hub"
+                    value={form.subdomain}
+                    onChange={e => setForm(f => ({...f, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'').replace(/^-|-$/g,'')}))}
+                  />
+                  <span className="px-3 py-2.5 text-sm shrink-0 select-none" style={{color:'rgba(255,255,255,0.35)',borderLeft:'1px solid rgba(255,255,255,0.08)'}}>
+                    .hexalytc.com
+                  </span>
+                </div>
+                {form.subdomain && (
+                  <p className="mt-1.5 text-xs" style={{color:'rgba(99,102,241,0.9)'}}>
+                    🔗 https://{form.subdomain}.hexalytc.com
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Owner Name</label>
