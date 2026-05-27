@@ -52,6 +52,28 @@ export class TenantsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
+  private async createCloudflareDns(subdomain: string): Promise<void> {
+    const token  = process.env.CLOUDFLARE_API_TOKEN;
+    const zoneId = process.env.CLOUDFLARE_ZONE_ID;
+    const ip     = process.env.SERVER_IP;
+    if (!token || !zoneId || !ip) return;
+    try {
+      const res = await fetch(
+        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'A', name: `${subdomain}.shop`, content: ip, ttl: 1, proxied: true }),
+        },
+      );
+      const data = await res.json() as { success: boolean; errors?: unknown[] };
+      if (!data.success) console.error('[CF-DNS] Failed:', data.errors);
+      else console.log(`[CF-DNS] Created ${subdomain}.shop.hexalyte.com → ${ip}`);
+    } catch (err) {
+      console.error('[CF-DNS] Error:', err);
+    }
+  }
+
   async register(dto: RegisterTenantDto) {
     const existing = await this.prisma.tenant.findFirst({
       where: { subdomain: dto.subdomain },
@@ -116,6 +138,7 @@ export class TenantsService {
         subdomain: dto.subdomain,
         adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
       });
+      this.createCloudflareDns(dto.subdomain);
       return result;
     });
   }

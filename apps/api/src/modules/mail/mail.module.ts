@@ -87,7 +87,7 @@ export class MailService {
         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:20px 0">
           <table style="width:100%;border-collapse:collapse">
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Workspace</td><td style="font-weight:600;font-size:14px;color:#111">${name}</td></tr>
-            <tr><td style="color:#888;font-size:13px;padding:5px 0">Subdomain</td><td style="font-weight:600;font-size:14px;color:#4f46e5">${subdomain}.hexalyte.com</td></tr>
+            <tr><td style="color:#888;font-size:13px;padding:5px 0">Shop URL</td><td style="font-weight:600;font-size:14px;color:#4f46e5">${subdomain}.shop.hexalyte.com</td></tr>
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Login Email</td><td style="font-weight:600;font-size:14px;color:#111">${email}</td></tr>
           </table>
         </div>

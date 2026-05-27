@@ -405,12 +405,12 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                     onChange={e => setForm(f => ({...f, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'').replace(/^-|-$/g,'')}))}
                   />
                   <span className="px-3 py-2.5 text-sm shrink-0 select-none" style={{color:'rgba(255,255,255,0.35)',borderLeft:'1px solid rgba(255,255,255,0.08)'}}>
-                    .hexalytc.com
+                    .shop.hexalyte.com
                   </span>
                 </div>
                 {form.subdomain && (
                   <p className="mt-1.5 text-xs" style={{color:'rgba(99,102,241,0.9)'}}>
-                    🔗 https://{form.subdomain}.hexalytc.com
+                    🔗 https://{form.subdomain}.shop.hexalyte.com
                   </p>
                 )}
               </div>
