@@ -181,7 +181,20 @@ export async function registerTenant(data: {
   plan: string; currency?: string; country?: string; timezone?: string
   ownerName?: string; password?: string
 }) {
-  return req<{ tenant: TenantRow }>('/tenants/register', { method: 'POST', body: JSON.stringify(data) })
+  const [firstName, ...rest] = (data.ownerName ?? '').trim().split(' ')
+  const payload = {
+    companyName:    data.name,
+    subdomain:      data.subdomain,
+    adminEmail:     data.email,
+    adminPassword:  data.password || Math.random().toString(36).slice(-10) + 'A1!',
+    adminFirstName: firstName || data.name,
+    adminLastName:  rest.join(' ') || '-',
+    phone:          data.phone,
+    currency:       data.currency,
+    country:        data.country,
+    timezone:       data.timezone,
+  }
+  return req<{ tenant: TenantRow }>('/tenants/register', { method: 'POST', body: JSON.stringify(payload) })
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────
