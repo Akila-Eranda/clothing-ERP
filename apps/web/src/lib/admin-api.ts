@@ -140,11 +140,7 @@ export const DEFAULT_PLANS: PlanDef[] = [
 ]
 
 export async function fetchPlans(): Promise<PlanDef[]> {
-  try {
-    return await req<PlanDef[]>('/admin/plans')
-  } catch {
-    return DEFAULT_PLANS
-  }
+  return DEFAULT_PLANS
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
