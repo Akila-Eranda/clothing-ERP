@@ -11,6 +11,8 @@ import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
+import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
+import { AuthModule } from '@/modules/auth/auth.module';
 
 export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
@@ -50,6 +52,7 @@ export class TenantsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly kcAdmin: KeycloakAdminService,
   ) {}
 
   private async createCloudflareDns(subdomain: string): Promise<void> {
@@ -71,6 +74,28 @@ export class TenantsService {
       else console.log(`[CF-DNS] Created ${subdomain}.shop.hexalyte.com → ${ip}`);
     } catch (err) {
       console.error('[CF-DNS] Error:', err);
+    }
+  }
+
+  private async provisionKeycloak(
+    result: { tenant: { id: string; subdomain: string; name: string }; adminUser: { id: string; firstName: string | null; lastName: string | null; email: string } },
+    dto: RegisterTenantDto,
+  ): Promise<void> {
+    try {
+      const groupId = await this.kcAdmin.createOrGetGroup(result.tenant.subdomain, result.tenant.name);
+      await this.kcAdmin.createKcUser({
+        dbUserId:    result.adminUser.id,
+        tenantId:    result.tenant.id,
+        tenantSlug:  result.tenant.subdomain,
+        email:       dto.adminEmail,
+        firstName:   dto.adminFirstName,
+        lastName:    dto.adminLastName,
+        role:        'TENANT_ADMIN',
+        password:    dto.adminPassword,
+        groupId,
+      });
+    } catch (err) {
+      console.error('[KC] Tenant provisioning failed:', err);
     }
   }
 
@@ -139,6 +164,7 @@ export class TenantsService {
         adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
       });
       this.createCloudflareDns(dto.subdomain);
+      this.provisionKeycloak(result, dto);
       return result;
     });
   }
@@ -269,6 +295,7 @@ export class TenantsController {
 }
 
 @Module({
+  imports: [AuthModule],
   controllers: [TenantsController],
   providers: [TenantsService],
   exports: [TenantsService],
