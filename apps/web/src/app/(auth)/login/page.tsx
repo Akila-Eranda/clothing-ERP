@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck,
+  Eye, EyeOff, Lock, Mail, ArrowRight,
   TrendingUp, Package, Users, Zap, BarChart3, ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
@@ -44,7 +44,7 @@ function LoginContent() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "admin@demo.fashionerp.com", password: "Admin@123456" },
+    defaultValues: { email: "", password: "" },
   });
 
   const onSubmit = async (data: LoginForm) => {
@@ -232,19 +232,6 @@ function LoginContent() {
             </button>
           </form>
 
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 rounded-xl" style={{ background: "rgba(79,110,247,0.08)", border: "1px solid rgba(79,110,247,0.2)" }}>
-            <div className="flex items-center gap-2 mb-2">
-              <ShieldCheck className="h-3.5 w-3.5" style={{ color: "#4f6ef7" }} />
-              <span className="text-xs font-bold" style={{ color: "#4f6ef7" }}>Demo Access</span>
-            </div>
-            <p className="text-xs" style={{ color: "#6a8ab8" }}>
-              Email: <span className="font-mono" style={{ color: "#a0b4d4" }}>admin@demo.fashionerp.com</span>
-            </p>
-            <p className="text-xs mt-1" style={{ color: "#6a8ab8" }}>
-              Password: <span className="font-mono" style={{ color: "#a0b4d4" }}>Admin@123456</span>
-            </p>
-          </div>
 
           {/* Register */}
           <p className="text-center text-sm mt-6" style={{ color: "#4a6a8a" }}>
