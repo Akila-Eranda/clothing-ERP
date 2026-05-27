@@ -161,7 +161,18 @@ export async function adminLogin(email: string, password: string, tenantSlug: st
 // ── Tenants ───────────────────────────────────────────────────────────────────
 export async function fetchTenants(params?: Record<string, string>) {
   const qs = params ? '?' + new URLSearchParams(params) : ''
-  return req<{ data: TenantRow[]; total: number; page: number; limit: number }>(`/tenants${qs}`)
+  const token = adminAuth.getToken()
+  const tenantId = adminAuth.getTenantId()
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+  if (tenantId) headers['x-tenant-id'] = tenantId
+  const res = await fetch(`${API_BASE}/tenants${qs}`, { headers })
+  if (res.status === 401) { adminAuth.clear(); if (typeof window !== 'undefined') window.location.href = '/admin/login'; throw new Error('Session expired') }
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.message || 'Request failed')
+  // Backend may return a plain array or a paginated { data, total } object
+  const arr: TenantRow[] = Array.isArray(json) ? json : (Array.isArray(json.data) ? json.data : [])
+  return { data: arr, total: json.total ?? arr.length, page: json.page ?? 1, limit: json.limit ?? arr.length }
 }
 
 export async function fetchTenant(id: string) {
