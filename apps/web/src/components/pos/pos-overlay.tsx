@@ -211,6 +211,18 @@ export function POSOverlay() {
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
   },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes]);
 
+  const handleThermalPrint = React.useCallback(() => {
+    if (!items.length) { toast.error("Cart is empty"); return; }
+    const w = window.open("", "_blank", "width=380,height=600");
+    if (!w) { toast.error("Popup blocked — allow popups to print"); return; }
+    const s = receiptSettings;
+    const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
+    const rows = items.map(i => `<div class="iname">${i.productName} · ${i.variantName}</div><div class="row"><span>${i.quantity} x LKR ${i.unitPrice.toFixed(2)}</span><span>LKR ${(i.quantity*i.unitPrice).toFixed(2)}</span></div>`).join("");
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||"FashionERP"}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`);
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 500); }, 200);
+  }, [items, totalAmt, receiptSettings, user]);
+
   React.useEffect(() => {
     if (!posOpen) return;
     const onKey = (e: KeyboardEvent) => {
