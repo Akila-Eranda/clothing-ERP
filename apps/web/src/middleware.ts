@@ -6,6 +6,9 @@ const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Admin panel has its own client-side auth guard — skip tenant middleware entirely
+  if (pathname.startsWith('/admin')) return NextResponse.next();
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   // The token is stored in localStorage (client-side only).
