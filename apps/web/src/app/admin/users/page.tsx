@@ -31,7 +31,7 @@ export default function UsersPage() {
     const s = params.search ?? search
     if (s) p.search = s
     fetchUsers(p)
-      .then(d => { setUsers(d.data); setTotal(d.total) })
+      .then(d => { setUsers(d.data ?? []); setTotal(d.total ?? 0) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [search, page])
@@ -137,15 +137,15 @@ export default function UsersPage() {
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">{u.email}</td>
                   <td className="px-4 py-3">
-                    {u.roles?.map(r => (
-                      <span key={r.role.name} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 mr-1">
-                        {r.role.name}
+                    {u.roles?.length ? u.roles.map((r, ri) => (
+                      <span key={r.role?.name ?? ri} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600 mr-1">
+                        {r.role?.name ?? '—'}
                       </span>
-                    )) ?? '—'}
+                    )) : '—'}
                   </td>
                   <td className="px-4 py-3"><span className={STATUS_BADGE[u.status] ?? STATUS_BADGE.INACTIVE}>{u.status}</span></td>
                   <td className="px-4 py-3 text-xs text-gray-500">{u.tenant?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(u.createdAt)}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{u.createdAt ? fmtDate(u.createdAt) : '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
                       <button
