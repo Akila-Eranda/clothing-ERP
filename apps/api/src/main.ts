@@ -32,7 +32,14 @@ async function bootstrap(): Promise<void> {
   // ── CORS ──────────────────────────────────────────────────
   const allowedOrigins = config.get<string[]>('app.allowedOrigins', ['http://localhost:3000']);
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true); // allow server-to-server / Swagger
+      const isStatic = allowedOrigins.includes(origin);
+      const isTenantShop = /^https?:\/\/[a-z0-9-]+\.shop\.hexalyte\.com$/.test(origin);
+      const isLocalDev   = /^https?:\/\/localhost(:\d+)?$/.test(origin);
+      if (isStatic || isTenantShop || isLocalDev) return callback(null, true);
+      return callback(new Error(`CORS: origin ${origin} not allowed`), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-branch-id', 'x-request-id'],
