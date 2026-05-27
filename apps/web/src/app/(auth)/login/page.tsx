@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Suspense } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,6 +11,7 @@ import {
   TrendingUp, Package, Users, Zap, BarChart3, ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -32,10 +34,13 @@ const STATS = [
   { value: "256-bit", label: "Encryption" },
 ];
 
-export default function LoginPage() {
+function LoginContent() {
   const { loginWithApi } = useAuthStore();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [emailFocused, setEmailFocused] = React.useState(false);
+  const [passFocused, setPassFocused] = React.useState(false);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -47,7 +52,8 @@ export default function LoginPage() {
     try {
       await loginWithApi(data.email, data.password);
       toast.success("Welcome back!");
-      window.location.href = "/dashboard";
+      const from = searchParams.get("from");
+      window.location.href = from && from.startsWith("/") ? from : "/dashboard";
     } catch (err: unknown) {
       toast.error((err as Error)?.message ?? "Invalid email or password");
     } finally {
@@ -174,10 +180,11 @@ export default function LoginPage() {
                 <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
                 <input id="email" type="email" placeholder="you@company.com" autoComplete="email"
                   className="w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white outline-none transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(79,110,247,0.2)", color: "#fff" }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "rgba(79,110,247,0.6)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(79,110,247,0.2)"; e.currentTarget.style.boxShadow = "none"; }}
-                  {...register("email")} />
+                  style={{ background: "rgba(255,255,255,0.05)", color: "#fff",
+                    border: `1px solid ${emailFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
+                    boxShadow: emailFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
+                  onFocus={() => setEmailFocused(true)}
+                  {...register("email", { onBlur: () => setEmailFocused(false) })} />
               </div>
               {errors.email && <p className="text-xs mt-1.5" style={{ color: "#f87171" }}>{errors.email.message}</p>}
             </div>
@@ -194,10 +201,11 @@ export default function LoginPage() {
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
                 <input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" autoComplete="current-password"
                   className="w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white outline-none transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(79,110,247,0.2)" }}
-                  onFocus={e => { e.currentTarget.style.borderColor = "rgba(79,110,247,0.6)"; e.currentTarget.style.boxShadow = "0 0 0 3px rgba(79,110,247,0.1)"; }}
-                  onBlur={e => { e.currentTarget.style.borderColor = "rgba(79,110,247,0.2)"; e.currentTarget.style.boxShadow = "none"; }}
-                  {...register("password")} />
+                  style={{ background: "rgba(255,255,255,0.05)",
+                    border: `1px solid ${passFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
+                    boxShadow: passFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
+                  onFocus={() => setPassFocused(true)}
+                  {...register("password", { onBlur: () => setPassFocused(false) })} />
                 <button type="button" onClick={() => setShowPassword(p => !p)}
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
                   style={{ color: "#4a6a8a" }}>
@@ -258,5 +266,13 @@ export default function LoginPage() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ background: "#070d1a", minHeight: "100vh" }} />}>
+      <LoginContent />
+    </Suspense>
   );
 }
