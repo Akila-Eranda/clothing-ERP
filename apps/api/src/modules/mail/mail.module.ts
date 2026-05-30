@@ -72,7 +72,7 @@ export class MailService {
 
   @OnEvent('tenant.registered')
   async onTenantRegistered({ email, name, subdomain, adminName }: TenantRegisteredPayload) {
-    const loginUrl = 'https://shop.hexalyte.com/login';
+    const loginUrl = `https://shop.hexalyte.com/login?tenant=${subdomain}`;
     await this.send(email, `Welcome to FashionERP — ${name} is ready!`, `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
         <div style="text-align:center;margin-bottom:24px">

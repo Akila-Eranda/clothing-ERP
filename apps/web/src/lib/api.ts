@@ -103,7 +103,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const tenantId = tokenStorage.getTenant() || getTenantFromToken() || getTenantFromSubdomain();
+  const tenantId = (init.headers as Record<string, string> | undefined)?.['x-tenant-id']
+    || tokenStorage.getTenant()
+    || getTenantFromToken()
+    || getTenantFromSubdomain();
   if (tenantId) {
     headers['x-tenant-id'] = tenantId;
     if (!tokenStorage.getTenant()) tokenStorage.setTenant(tenantId);
@@ -186,8 +189,8 @@ export interface LoginResponse {
 }
 
 export const authApi = {
-  login: (email: string, password: string) =>
-    api.post<LoginResponse>('/auth/login', { email, password }),
+  login: (email: string, password: string, tenantSlug?: string) =>
+    api.post<LoginResponse>('/auth/login', { email, password }, tenantSlug ? { headers: { 'x-tenant-id': tenantSlug } } : undefined),
 
   logout: () =>
     api.delete<null>('/auth/logout'),

@@ -14,7 +14,7 @@ interface AuthStore {
 
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
-  loginWithApi: (email: string, password: string) => Promise<void>;
+  loginWithApi: (email: string, password: string, tenantSlug?: string) => Promise<void>;
   logoutApi: () => Promise<void>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
@@ -41,10 +41,10 @@ export const useAuthStore = create<AuthStore>()(
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
 
-      loginWithApi: async (email, password) => {
+      loginWithApi: async (email, password, tenantSlug) => {
         set({ isLoading: true });
         try {
-          const res = await authApi.login(email, password);
+          const res = await authApi.login(email, password, tenantSlug);
           const { accessToken, refreshToken, user: apiUser } = res.data;
           tokenStorage.setAccess(accessToken);
           tokenStorage.setRefresh(refreshToken);

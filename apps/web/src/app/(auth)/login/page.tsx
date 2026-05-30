@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight,
+  Eye, EyeOff, Lock, Mail, ArrowRight, Building2,
   TrendingUp, Package, Users, Zap, BarChart3, ShoppingBag,
 } from "lucide-react";
 import Link from "next/link";
@@ -41,6 +41,18 @@ function LoginContent() {
   const [isLoading, setIsLoading] = React.useState(false);
   const [emailFocused, setEmailFocused] = React.useState(false);
   const [passFocused, setPassFocused] = React.useState(false);
+  const [subdomainFocused, setSubdomainFocused] = React.useState(false);
+
+  // Detect if we're on the main shop domain (not a tenant subdomain)
+  const isMainShopDomain = React.useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const parts = window.location.hostname.split('.');
+    return parts.length === 3 && parts[0] === 'shop'; // shop.hexalyte.com
+  }, []);
+
+  // Pre-fill subdomain from URL ?tenant=akila
+  const urlTenant = searchParams.get("tenant");
+  const [subdomain, setSubdomain] = React.useState(urlTenant || "");
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -50,7 +62,7 @@ function LoginContent() {
   const onSubmit = async (data: LoginForm) => {
     setIsLoading(true);
     try {
-      await loginWithApi(data.email, data.password);
+      await loginWithApi(data.email, data.password, subdomain || undefined);
       toast.success("Welcome back!");
       const from = searchParams.get("from");
       window.location.href = from && from.startsWith("/") ? from : "/dashboard";
@@ -170,6 +182,28 @@ function LoginContent() {
 
           {/* Form */}
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+
+            {/* Subdomain — only on main shop.hexalyte.com */}
+            {isMainShopDomain && (
+              <div>
+                <label htmlFor="subdomain" className="block text-xs font-semibold mb-2" style={{ color: "#a0b4d4" }}>
+                  Shop / Subdomain
+                </label>
+                <div className="relative">
+                  <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
+                  <input id="subdomain" type="text" placeholder="your-shop"
+                    value={subdomain}
+                    onChange={e => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    className="w-full h-12 pl-10 pr-24 rounded-xl text-sm text-white outline-none transition-all"
+                    style={{ background: "rgba(255,255,255,0.05)",
+                      border: `1px solid ${subdomainFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
+                      boxShadow: subdomainFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
+                    onFocus={() => setSubdomainFocused(true)}
+                    onBlur={() => setSubdomainFocused(false)} />
+                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium" style={{ color: "#4a6a8a" }}>.shop.hexalyte.com</span>
+                </div>
+              </div>
+            )}
 
             {/* Email */}
             <div>
