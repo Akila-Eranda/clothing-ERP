@@ -4,7 +4,7 @@
 set -e
 
 echo "==> Pulling latest code..."
-cd /var/www/fashionerp
+cd /opt/fashionerp
 git pull origin main
 
 echo "==> SSL Certificates (certbot)..."
