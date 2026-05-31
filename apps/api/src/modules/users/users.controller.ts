@@ -24,6 +24,13 @@ export class UsersController {
     return this.usersService.create(user.tenantId, dto);
   }
 
+  @Get('platform')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List all users across tenants (Super Admin)' })
+  findAllPlatform(@Query() query: PaginationDto) {
+    return this.usersService.findAllPlatform(query);
+  }
+
   @Get()
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'List all users with pagination' })
@@ -53,6 +60,9 @@ export class UsersController {
     @Param('id') id: string,
     @Body('status') status: UserStatus,
   ) {
+    if (user.roles.includes(RoleType.SUPER_ADMIN)) {
+      return this.usersService.updateStatusPlatform(id, status);
+    }
     return this.usersService.updateStatus(id, user.tenantId, status);
   }
 
@@ -79,6 +89,9 @@ export class UsersController {
   @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
   @ApiOperation({ summary: 'Delete user' })
   remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    if (user.roles.includes(RoleType.SUPER_ADMIN)) {
+      return this.usersService.removePlatform(id);
+    }
     return this.usersService.remove(id, user.tenantId);
   }
 }

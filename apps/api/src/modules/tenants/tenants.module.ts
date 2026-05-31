@@ -1,9 +1,15 @@
 import { Module } from '@nestjs/common';
-import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsEmail, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray } from 'class-validator';
+import {
+  DEFAULT_SUBSCRIPTION_PLANS,
+  PLATFORM_CONFIG_SUBDOMAIN,
+  resolvePlanLimits,
+  SubscriptionPlanDef,
+} from './subscription-plans';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -45,6 +51,25 @@ export class RegisterTenantDto {
   @ApiPropertyOptional() @IsOptional() @IsString() country?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() currency?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() timezone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEnum(SubscriptionPlan) plan?: SubscriptionPlan;
+}
+
+export class UpdateTenantAdminDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEnum(TenantStatus) status?: TenantStatus;
+  @ApiPropertyOptional() @IsOptional() @IsEnum(SubscriptionPlan) plan?: SubscriptionPlan;
+}
+
+export class UpdatePlanCatalogDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() price?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() currency?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() interval?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) features?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxUsers?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxBranches?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxProducts?: number;
 }
 
 @Injectable()
@@ -119,6 +144,14 @@ export class TenantsService {
     const bcrypt = await import('bcryptjs');
     const passwordHash = await bcrypt.hash(adminPassword, 12);
 
+    if (dto.subdomain === PLATFORM_CONFIG_SUBDOMAIN) {
+      throw new BadRequestException('This subdomain is reserved');
+    }
+
+    const plan = dto.plan ?? SubscriptionPlan.STARTER;
+    const catalog = await this.getMergedSubscriptionPlans();
+    const limits = resolvePlanLimits(plan, catalog);
+
     return this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: {
@@ -129,8 +162,11 @@ export class TenantsService {
           country: dto.country ?? 'IN',
           currency: dto.currency ?? 'INR',
           timezone: dto.timezone ?? 'Asia/Kolkata',
-          plan: SubscriptionPlan.STARTER,
+          plan,
           status: TenantStatus.ACTIVE,
+          maxUsers: limits.maxUsers,
+          maxBranches: limits.maxBranches,
+          maxProducts: limits.maxProducts,
         },
       });
 
@@ -191,10 +227,114 @@ export class TenantsService {
     });
   }
 
-  async findAll() {
+  private async getPlanCatalogOverrides(): Promise<Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>> {
+    const row = await this.prisma.tenant.findUnique({
+      where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
+      select: { settings: true },
+    });
+    if (!row?.settings || typeof row.settings !== 'object') return {};
+    const catalog = (row.settings as { planCatalog?: Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>> })
+      .planCatalog;
+    return catalog ?? {};
+  }
+
+  private async savePlanCatalogOverrides(
+    overrides: Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>,
+  ): Promise<void> {
+    await this.prisma.tenant.upsert({
+      where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
+      create: {
+        subdomain: PLATFORM_CONFIG_SUBDOMAIN,
+        name: 'Platform Configuration',
+        email: 'platform@internal.local',
+        status: TenantStatus.ACTIVE,
+        plan: SubscriptionPlan.CUSTOM,
+        maxUsers: 1,
+        maxBranches: 0,
+        maxProducts: 0,
+        settings: { planCatalog: overrides },
+      },
+      update: {
+        settings: { planCatalog: overrides },
+      },
+    });
+  }
+
+  async getMergedSubscriptionPlans(): Promise<SubscriptionPlanDef[]> {
+    const overrides = await this.getPlanCatalogOverrides();
+    return DEFAULT_SUBSCRIPTION_PLANS.map((plan) => ({
+      ...plan,
+      ...(overrides[plan.key] ?? {}),
+      key: plan.key,
+      id: plan.id,
+    }));
+  }
+
+  async getSubscriptionPlansWithStats() {
+    const plans = await this.getMergedSubscriptionPlans();
+    const counts = await this.prisma.tenant.groupBy({
+      by: ['plan'],
+      where: { subdomain: { not: PLATFORM_CONFIG_SUBDOMAIN } },
+      _count: { _all: true },
+    });
+    const countMap = Object.fromEntries(counts.map((c) => [c.plan, c._count._all]));
+    return plans.map((plan) => ({
+      ...plan,
+      tenantCount: countMap[plan.key] ?? 0,
+    }));
+  }
+
+  async updateSubscriptionPlanCatalog(planKey: SubscriptionPlan, dto: UpdatePlanCatalogDto) {
+    const base = DEFAULT_SUBSCRIPTION_PLANS.find((p) => p.key === planKey);
+    if (!base) throw new NotFoundException('Plan not found');
+    const overrides = await this.getPlanCatalogOverrides();
+    overrides[planKey] = { ...(overrides[planKey] ?? {}), ...dto, key: planKey, id: base.id };
+    await this.savePlanCatalogOverrides(overrides);
+    const merged = await this.getMergedSubscriptionPlans();
+    return merged.find((p) => p.key === planKey)!;
+  }
+
+  async findAll(filters?: { search?: string; status?: string; plan?: string }) {
+    const where = {
+      subdomain: { not: PLATFORM_CONFIG_SUBDOMAIN },
+      ...(filters?.status && filters.status !== 'ALL' && {
+        status: filters.status as TenantStatus,
+      }),
+      ...(filters?.plan && filters.plan !== 'ALL' && {
+        plan: filters.plan as SubscriptionPlan,
+      }),
+      ...(filters?.search?.trim() && {
+        OR: [
+          { name: { contains: filters.search.trim(), mode: 'insensitive' as const } },
+          { subdomain: { contains: filters.search.trim(), mode: 'insensitive' as const } },
+          { email: { contains: filters.search.trim(), mode: 'insensitive' as const } },
+        ],
+      }),
+    };
     return this.prisma.tenant.findMany({
+      where,
       include: { _count: { select: { users: true, branches: true } } },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async updateById(id: string, dto: UpdateTenantAdminDto) {
+    const existing = await this.prisma.tenant.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException('Tenant not found');
+    if (existing.subdomain === PLATFORM_CONFIG_SUBDOMAIN) {
+      throw new ForbiddenException('Cannot modify platform configuration tenant');
+    }
+    const catalog = await this.getMergedSubscriptionPlans();
+    const plan = dto.plan ?? existing.plan;
+    const limits = dto.plan !== undefined ? resolvePlanLimits(plan, catalog) : {};
+    return this.prisma.tenant.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.plan !== undefined && { plan: dto.plan, ...limits }),
+      },
+      include: { _count: { select: { users: true, branches: true } } },
     });
   }
 
@@ -311,8 +451,47 @@ export class TenantsController {
   @ApiBearerAuth('access-token')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all tenants (Super Admin only)' })
-  findAll() {
-    return this.tenantsService.findAll();
+  findAll(
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('plan') plan?: string,
+  ) {
+    return this.tenantsService.findAll({ search, status, plan });
+  }
+
+  @Get('subscription-plans')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List subscription plan catalog with tenant counts' })
+  getSubscriptionPlans() {
+    return this.tenantsService.getSubscriptionPlansWithStats();
+  }
+
+  @Put('subscription-plans/:planKey')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update subscription plan catalog entry' })
+  updateSubscriptionPlan(
+    @Param('planKey') planKey: SubscriptionPlan,
+    @Body() dto: UpdatePlanCatalogDto,
+  ) {
+    return this.tenantsService.updateSubscriptionPlanCatalog(planKey, dto);
+  }
+
+  @Get(':id')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get tenant by ID (Super Admin only)' })
+  findOne(@Param('id') id: string) {
+    return this.tenantsService.findOne(id);
+  }
+
+  @Put(':id')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update tenant by ID (Super Admin only)' })
+  updateById(@Param('id') id: string, @Body() dto: UpdateTenantAdminDto) {
+    return this.tenantsService.updateById(id, dto);
   }
 }
 

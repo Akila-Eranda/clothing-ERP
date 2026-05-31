@@ -35,14 +35,14 @@ export default function AdminLoginPage() {
             <ShoppingBag size={22} className="text-white" />
           </div>
           <h1 className="text-xl font-bold text-gray-900">FashionERP Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Platform Administration Console</p>
+          <p className="text-sm text-gray-500 mt-1">Super Admin only — platform console</p>
         </div>
 
         {/* Card */}
         <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">Tenant Slug</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Your admin tenant slug</label>
               <input
                 className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-900/10 focus:border-gray-400 bg-gray-50"
                 placeholder="demo"
@@ -96,8 +96,9 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-[11px] text-gray-400 mt-4">
-            Default: admin@demo.fashionerp.com / Admin@123456
+          <p className="text-center text-[11px] text-gray-400 mt-4 leading-relaxed">
+            Use a <strong className="text-gray-600">Super Admin</strong> account.<br />
+            Demo: slug <code className="text-gray-600">demo</code> · admin@demo.fashionerp.com · Admin@123456
           </p>
         </div>
       </div>

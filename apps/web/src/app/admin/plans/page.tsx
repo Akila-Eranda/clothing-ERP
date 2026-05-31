@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { Edit2, X, Check, Users, GitBranch, Plus, RefreshCw, Tag, TrendingUp } from 'lucide-react'
-import { fetchPlans, DEFAULT_PLANS, type PlanDef } from '@/lib/admin-api'
+import { fetchPlans, updatePlanCatalog, DEFAULT_PLANS, type PlanDef } from '@/lib/admin-api'
 
 const PLAN_COLOR: Record<string, { badge: string; ring: string; bar: string }> = {
   STARTER:      { badge: 'bg-gray-100 text-gray-700',    ring: 'border-gray-300',   bar: 'bg-gray-400'   },
   PROFESSIONAL: { badge: 'bg-blue-50 text-blue-700',     ring: 'border-blue-400',   bar: 'bg-blue-500'   },
   ENTERPRISE:   { badge: 'bg-purple-50 text-purple-700', ring: 'border-purple-400', bar: 'bg-purple-500' },
+  CUSTOM:       { badge: 'bg-amber-50 text-amber-800',   ring: 'border-amber-400',  bar: 'bg-amber-500'  },
 }
 
 export default function PlansPage() {
@@ -47,7 +48,7 @@ export default function PlansPage() {
       </div>
 
       {/* Plan Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {plans.map(plan => {
           const c = PLAN_COLOR[plan.key] ?? PLAN_COLOR.STARTER
           return (
@@ -81,15 +82,20 @@ export default function PlansPage() {
                 ))}
               </div>
 
-              <div className="pt-4 border-t border-gray-100 flex items-center gap-4">
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <Users size={12} />
-                  {plan.maxUsers === -1 ? 'Unlimited users' : `${plan.maxUsers} users`}
+              <div className="pt-4 border-t border-gray-100 space-y-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <Users size={12} />
+                    {plan.maxUsers === -1 ? 'Unlimited users' : `${plan.maxUsers} users`}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                    <GitBranch size={12} />
+                    {plan.maxBranches === -1 ? 'Unlimited branches' : `${plan.maxBranches} branches`}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <GitBranch size={12} />
-                  {plan.maxBranches === -1 ? 'Unlimited branches' : `${plan.maxBranches} branches`}
-                </div>
+                {typeof plan.tenantCount === 'number' && (
+                  <p className="text-[11px] text-gray-400">{plan.tenantCount} tenant{plan.tenantCount === 1 ? '' : 's'} on this plan</p>
+                )}
               </div>
             </div>
           )
@@ -139,6 +145,7 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
   const [form, setForm]         = useState<PlanDef>({ ...plan, features: [...plan.features] })
   const [featInput, setFeatInput] = useState('')
   const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState('')
 
   function addFeature() {
     if (!featInput.trim()) return
@@ -152,14 +159,15 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
 
   async function save() {
     setSaving(true)
+    setError('')
     try {
-      await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'}/admin/plans/${plan.key}`,
-        { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }
-      )
-    } catch {}
-    onSaved(form)
-    setSaving(false)
+      const updated = await updatePlanCatalog(plan.key, form)
+      onSaved(updated)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save plan')
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -247,6 +255,8 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
             </div>
           </div>
         </div>
+
+        {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-2 mt-6">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>

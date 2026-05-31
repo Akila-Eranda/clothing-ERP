@@ -5,6 +5,8 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { Roles } from '@/common/decorators/roles.decorator';
+import { RoleType } from '@prisma/client';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import * as dayjs from 'dayjs';
 
@@ -60,6 +62,37 @@ export class AuditLogService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 50);
   }
 
+  async findAllPlatform(query: {
+    page?: number; limit?: number; search?: string; action?: string;
+  }) {
+    const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const where = {
+      ...(query.action && query.action !== 'ALL' && {
+        action: { contains: query.action, mode: 'insensitive' as const },
+      }),
+      ...(query.search?.trim() && {
+        OR: [
+          { action: { contains: query.search.trim(), mode: 'insensitive' as const } },
+          { resource: { contains: query.search.trim(), mode: 'insensitive' as const } },
+        ],
+      }),
+    };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.auditLog.findMany({
+        where,
+        skip,
+        take,
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true } },
+          tenant: { select: { id: true, name: true, subdomain: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+    return paginate(data, total, query.page ?? 1, query.limit ?? 50);
+  }
+
   async getActivityLogs(userId: string, query: { page?: number; limit?: number }) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const [data, total] = await this.prisma.$transaction([
@@ -107,6 +140,23 @@ export class AuditLogService {
 @Controller({ path: 'audit-logs', version: '1' })
 export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
+
+  @Get('platform')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Platform-wide audit logs (Super Admin)' })
+  findAllPlatform(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+    @Query('action') action?: string,
+  ) {
+    return this.auditLogService.findAllPlatform({
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 50,
+      search,
+      action,
+    });
+  }
 
   @Get()
   @RequirePermissions('users:read')

@@ -6,7 +6,11 @@ import {
   ChevronLeft, ChevronRight, Building2, Users, CheckCircle,
   AlertCircle, Ban, Edit2, X, Check,
 } from 'lucide-react'
-import { fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans, DEFAULT_PLANS, type TenantRow, type PlatformStats, type PlanDef } from '@/lib/admin-api'
+import {
+  fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans,
+  plansForOnboarding, formatPlanLimit, DEFAULT_PLANS,
+  type TenantRow, type PlatformStats, type PlanDef,
+} from '@/lib/admin-api'
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
@@ -49,7 +53,7 @@ export default function TenantsPage() {
     if (pl !== 'ALL') p.plan   = pl
     fetchTenants(p)
       .then(d => { setTenants(d.data); setTotal(d.total) })
-      .catch(() => {})
+      .catch((e: unknown) => { console.error(e) })
       .finally(() => setLoading(false))
   }, [search, statusFilter, planFilter, page])
 
@@ -260,8 +264,22 @@ export default function TenantsPage() {
 
 function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onClose: () => void; onSaved: () => void }) {
   const [form, setForm] = useState({ status: tenant.status, plan: tenant.plan, name: tenant.name })
+  const [plans, setPlans] = useState<PlanDef[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    fetchPlans()
+      .then(list => {
+        const opts = list.length > 0 ? list : DEFAULT_PLANS
+        if (!opts.some(p => p.key === tenant.plan)) {
+          setPlans([...opts, { id: tenant.plan.toLowerCase(), key: tenant.plan, name: tenant.plan, price: 0, currency: '', interval: 'mo', description: '', features: [], maxUsers: tenant.maxUsers ?? -1, maxBranches: tenant.maxBranches ?? -1 }])
+        } else setPlans(opts)
+      })
+      .catch(() => setPlans(DEFAULT_PLANS))
+  }, [tenant.plan, tenant.maxUsers, tenant.maxBranches])
+
+  const selectedPlan = plans.find(p => p.key === form.plan)
 
   async function save() {
     setLoading(true); setError('')
@@ -287,18 +305,24 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onCl
             <label className="block text-xs font-medium text-gray-700 mb-1">Plan</label>
             <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
               value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })}>
-              <option value="STARTER">Starter</option>
-              <option value="PROFESSIONAL">Professional</option>
-              <option value="ENTERPRISE">Enterprise</option>
+              {plans.map(p => (
+                <option key={p.key} value={p.key}>{p.name}</option>
+              ))}
             </select>
+            {selectedPlan && form.plan !== tenant.plan && (
+              <p className="text-[10px] text-gray-500 mt-1">
+                New limits: {formatPlanLimit(selectedPlan.maxUsers)} users, {formatPlanLimit(selectedPlan.maxBranches)} branches
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
             <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
               value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
+              <option value="TRIAL">Trial</option>
               <option value="ACTIVE">Active</option>
               <option value="SUSPENDED">Suspended</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="CANCELLED">Cancelled</option>
             </select>
           </div>
         </div>
@@ -326,8 +350,15 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     subdomain: '', plan: 'STARTER', currency: 'LKR', country: 'LK',
   })
   const [provisionedPassword, setProvisionedPassword] = useState('')
+  const [createdPlan, setCreatedPlan] = useState('')
 
-  useEffect(() => { fetchPlans().then(setPlans).catch(() => {}) }, [])
+  useEffect(() => {
+    fetchPlans()
+      .then(list => setPlans(plansForOnboarding(list)))
+      .catch(() => setPlans(plansForOnboarding(DEFAULT_PLANS)))
+  }, [])
+
+  const selectedPlan = plans.find(p => p.key === form.plan) ?? plans[0]
 
   function onShopName(v: string) {
     const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -367,6 +398,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
         country: form.country, ownerName: form.ownerName,
         password: pwd,
       })
+      setCreatedPlan(result.tenant?.plan ?? form.plan)
       setProvisionedPassword(result.initialPassword)
       setForm(f => ({ ...f, password: result.initialPassword }))
       for (const item of provItems) {
@@ -467,14 +499,17 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               <div className="space-y-2.5">
                 {plans.map(p => (
                   <label key={p.key} className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all" style={form.plan === p.key ? {border:'2px solid #4f46e5',background:'rgba(79,70,229,0.1)'} : {border:'2px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)'}}>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{borderColor: form.plan === p.key ? '#4f46e5' : 'rgba(255,255,255,0.2)'}}>
                         {form.plan === p.key && <div className="w-2 h-2 rounded-full" style={{background:'#4f46e5'}}/>}
                       </div>
                       <input type="radio" name="plan" value={p.key} checked={form.plan === p.key} onChange={() => setForm(f => ({...f, plan: p.key}))} className="sr-only"/>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-bold text-white">{p.name}</p>
                         <p className="text-xs mt-0.5" style={{color:'rgba(255,255,255,0.4)'}}>{p.description}</p>
+                        <p className="text-[10px] mt-1" style={{color:'rgba(99,102,241,0.85)'}}>
+                          {formatPlanLimit(p.maxUsers)} users · {formatPlanLimit(p.maxBranches)} branches
+                        </p>
                       </div>
                     </div>
                     <span className="text-sm font-bold shrink-0 ml-4 text-white">{p.currency}{p.price.toLocaleString()}/{p.interval}</span>
@@ -495,6 +530,13 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 <h3 className="text-base font-bold text-white">Auto-Provisioning</h3>
                 <p className="text-sm mt-0.5" style={{color:'rgba(255,255,255,0.4)'}}>The following will be created automatically:</p>
               </div>
+              {selectedPlan && (
+                <div className="px-3 py-2.5 rounded-xl text-xs" style={{background:'rgba(79,70,229,0.12)',border:'1px solid rgba(79,70,229,0.25)',color:'rgba(255,255,255,0.75)'}}>
+                  Plan: <strong className="text-white">{selectedPlan.name}</strong>
+                  {' · '}{formatPlanLimit(selectedPlan.maxUsers)} users
+                  {' · '}{formatPlanLimit(selectedPlan.maxBranches)} branches
+                </div>
+              )}
               <div className="space-y-2">
                 {provItems.map(item => (
                   <div key={item.key} className="flex items-center gap-3 p-3.5 rounded-xl transition-all duration-300" style={provDone.includes(item.key) ? {border:'1px solid rgba(16,185,129,0.3)',background:'rgba(16,185,129,0.08)'} : {border:'1px solid rgba(255,255,255,0.07)',background:'rgba(255,255,255,0.03)'}}>
@@ -539,6 +581,12 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 <div>
                   <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Password</p>
                   <p className="text-sm font-mono text-white break-all">{provisionedPassword || form.password}</p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Plan</p>
+                  <p className="text-sm font-semibold text-white">
+                    {plans.find(p => p.key === (createdPlan || form.plan))?.name ?? createdPlan || form.plan}
+                  </p>
                 </div>
               </div>
               <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>Use the shop URL above when signing in (not test.shop). Tenant header must match subdomain.</p>

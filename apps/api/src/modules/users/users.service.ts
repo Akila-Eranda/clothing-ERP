@@ -79,6 +79,36 @@ export class UsersService {
     return user;
   }
 
+  async findAllPlatform(query: PaginationDto) {
+    const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const where = {
+      ...(query.search && {
+        OR: [
+          { firstName: { contains: query.search, mode: 'insensitive' as const } },
+          { lastName: { contains: query.search, mode: 'insensitive' as const } },
+          { email: { contains: query.search, mode: 'insensitive' as const } },
+        ],
+      }),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.user.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          roles: { include: { role: true } },
+          branch: true,
+          tenant: { select: { id: true, name: true, plan: true, subdomain: true } },
+        },
+      }),
+      this.prisma.user.count({ where }),
+    ]);
+
+    return paginate(data, total, query.page ?? 1, query.limit ?? 20);
+  }
+
   async findAll(tenantId: string, query: PaginationDto) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
@@ -133,6 +163,18 @@ export class UsersService {
     const user = await this.prisma.user.update({ where: { id }, data: { status } });
     this.kcAdmin.updateKcUser(id, { isActive: status === UserStatus.ACTIVE });
     return user;
+  }
+
+  async updateStatusPlatform(id: string, status: UserStatus) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    return this.updateStatus(id, user.tenantId, status);
+  }
+
+  async removePlatform(id: string) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException('User not found');
+    return this.remove(id, user.tenantId);
   }
 
   async assignRoles(id: string, tenantId: string, roleIds: string[]) {

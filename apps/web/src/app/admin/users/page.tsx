@@ -32,7 +32,7 @@ export default function UsersPage() {
     if (s) p.search = s
     fetchUsers(p)
       .then(d => { setUsers(d.data ?? []); setTotal(d.total ?? 0) })
-      .catch(() => {})
+      .catch((e: unknown) => { setUsers([]); setTotal(0) })
       .finally(() => setLoading(false))
   }, [search, page])
 
