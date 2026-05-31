@@ -28,7 +28,7 @@ export const useUIStore = create<UIStore>()(
     (set) => ({
       sidebarCollapsed: false,
       sidebarMobileOpen: false,
-      theme: "dark",
+      theme: "light",
       commandOpen: false,
       activeModal: null,
       posOpen: false,
@@ -56,7 +56,7 @@ export const useUIStore = create<UIStore>()(
       closePos: () => set({ posOpen: false }),
     }),
     {
-      name: "fashion-erp-ui",
+      name: "fashion-erp-ui-v2",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         sidebarCollapsed: state.sidebarCollapsed,

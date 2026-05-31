@@ -59,7 +59,7 @@ export function Header() {
   const breadcrumbs = pathname.split("/").filter(Boolean);
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background/80 backdrop-blur-xl px-6 shrink-0">
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-white dark:bg-background/80 backdrop-blur-xl px-6 shrink-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"
