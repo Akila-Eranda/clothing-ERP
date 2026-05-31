@@ -183,25 +183,42 @@ export async function updateTenant(id: string, data: Partial<TenantRow>) {
   return req<TenantRow>(`/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) })
 }
 
+export interface RegisterTenantResult {
+  tenant: TenantRow
+  branch: { id: string; name: string }
+  adminUser: { id: string; email: string; firstName: string; lastName: string }
+  /** Same password that was hashed and saved. */
+  initialPassword: string
+}
+
 export async function registerTenant(data: {
   name: string; subdomain: string; email: string; phone?: string
   plan: string; currency?: string; country?: string; timezone?: string
-  ownerName?: string; password?: string
+  ownerName?: string
+  password: string
 }) {
+  const pwd = data.password.trim()
+  if (!pwd || pwd.length < 8) {
+    throw new Error('Password is required and must be at least 8 characters')
+  }
   const [firstName, ...rest] = (data.ownerName ?? '').trim().split(' ')
-  const payload = {
+  const payload: Record<string, string> = {
     companyName:    data.name,
     subdomain:      data.subdomain,
-    adminEmail:     data.email,
-    adminPassword:  data.password || Math.random().toString(36).slice(-10) + 'A1!',
+    adminEmail:     data.email.trim().toLowerCase(),
+    adminPassword:  pwd,
     adminFirstName: firstName || data.name,
     adminLastName:  rest.join(' ') || '-',
-    phone:          data.phone,
-    currency:       data.currency,
-    country:        data.country,
-    timezone:       data.timezone,
   }
-  return req<{ tenant: TenantRow }>('/tenants/register', { method: 'POST', body: JSON.stringify(payload) })
+  if (data.phone) payload.phone = data.phone
+  if (data.currency) payload.currency = data.currency
+  if (data.country) payload.country = data.country
+  if (data.timezone) payload.timezone = data.timezone
+
+  return req<RegisterTenantResult>('/tenants/register', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  })
 }
 
 // ── Users ─────────────────────────────────────────────────────────────────────

@@ -57,6 +57,20 @@ describe('FashionERP API (e2e)', () => {
 
       expect(res.body.data.tenant).toBeDefined();
       expect(res.body.data.tenant.subdomain).toBe(registerDto.subdomain);
+      expect(res.body.data.initialPassword).toBe(registerDto.adminPassword);
+    });
+
+    it('should return 400 when adminPassword is missing', () => {
+      return request(app.getHttpServer())
+        .post('/api/v1/tenants/register')
+        .send({
+          companyName: 'No Pass Store',
+          subdomain: `nopass-${Date.now()}`,
+          adminEmail: `nopass-${Date.now()}@test.com`,
+          adminFirstName: 'No',
+          adminLastName: 'Pass',
+        })
+        .expect(400);
     });
   });
 

@@ -5,7 +5,13 @@ import * as nodemailer from 'nodemailer';
 
 // ── Payloads ──────────────────────────────────────────────────────────────
 interface PasswordResetPayload  { email: string; token: string; name: string; }
-interface TenantRegisteredPayload { email: string; name: string; subdomain: string; adminName: string; }
+interface TenantRegisteredPayload {
+  email: string;
+  name: string;
+  subdomain: string;
+  adminName: string;
+  initialPassword: string;
+}
 
 @Injectable()
 export class MailService {
@@ -71,8 +77,8 @@ export class MailService {
   }
 
   @OnEvent('tenant.registered')
-  async onTenantRegistered({ email, name, subdomain, adminName }: TenantRegisteredPayload) {
-    const loginUrl = `https://shop.hexalyte.com/login?tenant=${subdomain}`;
+  async onTenantRegistered({ email, name, subdomain, adminName, initialPassword }: TenantRegisteredPayload) {
+    const loginUrl = `https://${subdomain}.shop.hexalyte.com/login`;
     await this.send(email, `Welcome to FashionERP — ${name} is ready!`, `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
         <div style="text-align:center;margin-bottom:24px">
@@ -89,6 +95,7 @@ export class MailService {
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Workspace</td><td style="font-weight:600;font-size:14px;color:#111">${name}</td></tr>
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Shop URL</td><td style="font-weight:600;font-size:14px;color:#4f46e5">${subdomain}.shop.hexalyte.com</td></tr>
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Login Email</td><td style="font-weight:600;font-size:14px;color:#111">${email}</td></tr>
+            <tr><td style="color:#888;font-size:13px;padding:5px 0">Password</td><td style="font-weight:600;font-size:14px;font-family:monospace;color:#111">${initialPassword}</td></tr>
           </table>
         </div>
         <div style="text-align:center;margin:28px 0">

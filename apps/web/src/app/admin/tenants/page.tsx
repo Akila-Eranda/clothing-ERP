@@ -325,6 +325,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     shopName: '', ownerName: '', email: '', phone: '', password: '',
     subdomain: '', plan: 'STARTER', currency: 'LKR', country: 'LK',
   })
+  const [provisionedPassword, setProvisionedPassword] = useState('')
 
   useEffect(() => { fetchPlans().then(setPlans).catch(() => {}) }, [])
 
@@ -333,7 +334,13 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     setForm(f => ({ ...f, shopName: v, subdomain: slug }))
   }
 
-  const canNext = !!(form.shopName.trim() && form.ownerName.trim() && form.email.trim() && form.phone.trim())
+  const canNext = !!(
+    form.shopName.trim() &&
+    form.ownerName.trim() &&
+    form.email.trim() &&
+    form.phone.trim() &&
+    form.password.trim().length >= 8
+  )
 
   const provItems = [
     { key: 'schema', label: 'PostgreSQL schema',          sub: `schema: ${form.subdomain || '—'}` },
@@ -343,14 +350,25 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
   ]
 
   async function provision() {
+    const pwd = form.password.trim()
+    if (!pwd) {
+      setError('Password is required.')
+      return
+    }
+    if (pwd.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
     setProvisioning(true); setError(''); setProvDone([])
     try {
-      await registerTenant({
+      const result = await registerTenant({
         name: form.shopName, subdomain: form.subdomain, email: form.email,
         phone: form.phone || undefined, plan: form.plan, currency: form.currency,
         country: form.country, ownerName: form.ownerName,
-        password: form.password || undefined,
+        password: pwd,
       })
+      setProvisionedPassword(result.initialPassword)
+      setForm(f => ({ ...f, password: result.initialPassword }))
       for (const item of provItems) {
         await new Promise<void>(r => setTimeout(r, 380))
         setProvDone(prev => [...prev, item.key])
@@ -428,7 +446,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>
-                  Password <span className="font-normal" style={{color:'rgba(255,255,255,0.3)'}}>( leave blank to auto-generate)</span>
+                  Password <span className="font-normal" style={{color:'rgba(255,255,255,0.3)'}}>(required, min 8 characters)</span>
                 </label>
                 <div className="relative">
                   <input type={showPass ? 'text' : 'password'} className={inp + ' pr-14'} placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
@@ -502,14 +520,29 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
 
           {/* ── Step 4: Done ── */}
           {step === 4 && (
-            <div className="text-center py-8">
+            <div className="text-center py-6">
               <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{background:'rgba(16,185,129,0.15)'}}>
                 <CheckCircle size={28} style={{color:'#10b981'}}/>
               </div>
               <h3 className="text-base font-bold text-white mb-1">Tenant Provisioned!</h3>
-              <p className="text-sm mb-1" style={{color:'rgba(255,255,255,0.5)'}}><strong className="text-white">{form.shopName}</strong> is live.</p>
-              <p className="text-xs font-mono" style={{color:'rgba(255,255,255,0.3)'}}>{form.subdomain}</p>
-              <button onClick={onClose} className="mt-6 px-6 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Done</button>
+              <p className="text-sm mb-4" style={{color:'rgba(255,255,255,0.5)'}}><strong className="text-white">{form.shopName}</strong> is live.</p>
+              <div className="text-left rounded-xl p-4 space-y-2.5 mb-4" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)'}}>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={{color:'rgba(255,255,255,0.45)'}}>Login credentials — save these now</p>
+                <div>
+                  <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Shop URL</p>
+                  <p className="text-sm font-mono text-indigo-300">https://{form.subdomain}.shop.hexalyte.com</p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Email</p>
+                  <p className="text-sm font-mono text-white">{form.email.trim().toLowerCase()}</p>
+                </div>
+                <div>
+                  <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Password</p>
+                  <p className="text-sm font-mono text-white break-all">{provisionedPassword || form.password}</p>
+                </div>
+              </div>
+              <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>Use the shop URL above when signing in (not test.shop). Tenant header must match subdomain.</p>
+              <button onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Done</button>
             </div>
           )}
 

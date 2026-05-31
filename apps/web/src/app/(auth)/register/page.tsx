@@ -98,7 +98,7 @@ export default function RegisterPage() {
       const res = await fetch(`${API_BASE}/tenants/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ ...data, adminEmail: data.adminEmail.trim().toLowerCase() }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Registration failed");

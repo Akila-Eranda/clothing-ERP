@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Body, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsEmail } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -38,7 +38,7 @@ export class RegisterTenantDto {
   @ApiProperty() @IsString() companyName: string;
   @ApiProperty() @IsString() subdomain: string;
   @ApiProperty() @IsEmail() adminEmail: string;
-  @ApiProperty() @IsString() adminPassword: string;
+  @ApiProperty() @IsString() @MinLength(8, { message: 'adminPassword must be at least 8 characters' }) adminPassword: string;
   @ApiProperty() @IsString() adminFirstName: string;
   @ApiProperty() @IsString() adminLastName: string;
   @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
@@ -78,7 +78,12 @@ export class TenantsService {
   }
 
   private async provisionKeycloak(
-    result: { tenant: { id: string; subdomain: string; name: string }; adminUser: { id: string; firstName: string | null; lastName: string | null; email: string } },
+    result: {
+      tenant: { id: string; subdomain: string; name: string };
+      adminUser: { id: string; email: string; firstName: string | null; lastName: string | null };
+    },
+    adminEmail: string,
+    adminPassword: string,
     dto: RegisterTenantDto,
   ): Promise<void> {
     try {
@@ -87,11 +92,11 @@ export class TenantsService {
         dbUserId:    result.adminUser.id,
         tenantId:    result.tenant.id,
         tenantSlug:  result.tenant.subdomain,
-        email:       dto.adminEmail,
+        email:       adminEmail,
         firstName:   dto.adminFirstName,
         lastName:    dto.adminLastName,
         role:        'TENANT_ADMIN',
-        password:    dto.adminPassword,
+        password:    adminPassword,
         groupId,
       });
     } catch (err) {
@@ -105,15 +110,21 @@ export class TenantsService {
     });
     if (existing) throw new ConflictException('Subdomain already in use');
 
+    const adminEmail = dto.adminEmail.trim().toLowerCase();
+    const adminPassword = dto.adminPassword?.trim();
+    if (!adminPassword || adminPassword.length < 8) {
+      throw new BadRequestException('Password is required and must be at least 8 characters');
+    }
+
     const bcrypt = await import('bcryptjs');
-    const passwordHash = await bcrypt.hash(dto.adminPassword, 12);
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
 
     return this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: {
           name: dto.companyName,
           subdomain: dto.subdomain,
-          email: dto.adminEmail,
+          email: adminEmail,
           phone: dto.phone,
           country: dto.country ?? 'IN',
           currency: dto.currency ?? 'INR',
@@ -145,7 +156,7 @@ export class TenantsService {
         data: {
           tenantId: tenant.id,
           branchId: branch.id,
-          email: dto.adminEmail,
+          email: adminEmail,
           firstName: dto.adminFirstName,
           lastName: dto.adminLastName,
           passwordHash,
@@ -155,16 +166,27 @@ export class TenantsService {
         },
       });
 
-      return { tenant, branch, adminUser };
+      return {
+        tenant,
+        branch,
+        adminUser: {
+          id: adminUser.id,
+          email: adminUser.email,
+          firstName: adminUser.firstName,
+          lastName: adminUser.lastName,
+        },
+        initialPassword: adminPassword,
+      };
     }).then((result) => {
       this.eventEmitter.emit('tenant.registered', {
-        email: dto.adminEmail,
+        email: adminEmail,
         name: dto.companyName,
         subdomain: dto.subdomain,
         adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
+        initialPassword: adminPassword,
       });
       this.createCloudflareDns(dto.subdomain);
-      this.provisionKeycloak(result, dto);
+      this.provisionKeycloak(result, adminEmail, adminPassword, dto);
       return result;
     });
   }
