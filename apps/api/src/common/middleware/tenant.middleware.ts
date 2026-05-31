@@ -12,6 +12,7 @@ export class TenantMiddleware implements NestMiddleware {
     const skip =
       req.path.endsWith('/health') ||
       req.path.includes('/auth/login') ||
+      req.path.includes('/auth/platform-login') ||
       req.path.includes('/auth/refresh') ||
       req.path.includes('/auth/kc-') ||
       req.path.includes('/tenants/register');

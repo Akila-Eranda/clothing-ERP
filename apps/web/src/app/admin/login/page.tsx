@@ -35,7 +35,7 @@ export default function AdminLoginPage() {
             <ShoppingBag size={22} className="text-white" />
           </div>
           <h1 className="text-xl font-bold text-gray-900">FashionERP Admin</h1>
-          <p className="text-sm text-gray-500 mt-1">Super Admin only — platform console</p>
+          <p className="text-sm text-gray-500 mt-1">Super Admin only — not for shop staff</p>
         </div>
 
         {/* Card */}
@@ -97,8 +97,9 @@ export default function AdminLoginPage() {
           </form>
 
           <p className="text-center text-[11px] text-gray-400 mt-4 leading-relaxed">
-            Use a <strong className="text-gray-600">Super Admin</strong> account.<br />
-            Demo: slug <code className="text-gray-600">demo</code> · admin@demo.fashionerp.com · Admin@123456
+            Tenant owners, managers, and cashiers must sign in at<br />
+            <strong className="text-gray-600">https://your-shop.shop.hexalyte.com/login</strong><br />
+            <span className="mt-2 block">Platform console: <strong className="text-gray-600">Super Admin</strong> only.</span>
           </p>
         </div>
       </div>

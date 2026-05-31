@@ -27,7 +27,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (path === '/admin/login') { setReady(true); return }
     const token = adminAuth.getToken()
-    if (!token) {
+    if (!token || !adminAuth.isSuperAdmin()) {
+      adminAuth.clear()
       router.replace('/admin/login')
     } else {
       setReady(true)

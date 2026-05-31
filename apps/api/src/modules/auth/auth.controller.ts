@@ -11,7 +11,9 @@ import {
   Delete,
   Redirect,
   Query,
+  ForbiddenException,
 } from '@nestjs/common';
+import { RoleType } from '@prisma/client';
 import {
   ApiTags,
   ApiOperation,
@@ -77,6 +79,30 @@ export class AuthController {
     @Headers('x-tenant-id') tenantSlug?: string,
   ) {
     return this.authService.login(dto, req.ip, userAgent, tenantSlug);
+  }
+
+  @Public()
+  @Post('platform-login')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Platform console login (Super Admin only)' })
+  @ApiResponse({ status: 200, description: 'Login successful' })
+  @ApiResponse({ status: 403, description: 'Not a Super Admin account' })
+  async platformLogin(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Headers('user-agent') userAgent: string,
+    @Headers('x-tenant-id') tenantSlug?: string,
+  ) {
+    const result = await this.authService.login(dto, req.ip, userAgent, tenantSlug);
+    if ('requiresTwoFactor' in result) return result;
+    const roles = result.user.roles ?? [];
+    if (!roles.includes(RoleType.SUPER_ADMIN)) {
+      throw new ForbiddenException(
+        'This account cannot access the platform admin console. Use your shop login URL instead.',
+      );
+    }
+    return result;
   }
 
   @Public()

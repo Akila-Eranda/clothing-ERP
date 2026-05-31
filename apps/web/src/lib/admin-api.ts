@@ -3,18 +3,46 @@ const API_ROOT = API_BASE.replace(/\/api\/v1\/?$/, '/api')
 
 const TOKEN_KEY = 'fashionerp_admin_token'
 const TENANT_KEY = 'fashionerp_admin_tenant'
+const ROLES_KEY = 'fashionerp_admin_roles'
+
+function parseRolesFromToken(token: string): string[] {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]))
+    const roles = payload.roles
+    return Array.isArray(roles) ? roles.map(String) : []
+  } catch {
+    return []
+  }
+}
 
 export const adminAuth = {
   getToken: () => (typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY) : null),
   getTenantId: () => (typeof window !== 'undefined' ? localStorage.getItem(TENANT_KEY) : null),
-  setSession: (token: string, tenantSlug: string) => {
+  getRoles: (): string[] => {
+    if (typeof window === 'undefined') return []
+    const stored = localStorage.getItem(ROLES_KEY)
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as unknown
+        if (Array.isArray(parsed)) return parsed.map(String)
+      } catch {
+        /* fall through */
+      }
+    }
+    const token = localStorage.getItem(TOKEN_KEY)
+    return token ? parseRolesFromToken(token) : []
+  },
+  isSuperAdmin: (): boolean => adminAuth.getRoles().includes('SUPER_ADMIN'),
+  setSession: (token: string, tenantSlug: string, roles: string[]) => {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(TENANT_KEY, tenantSlug)
+    localStorage.setItem(ROLES_KEY, JSON.stringify(roles))
     document.cookie = `admin_token=${token}; path=/; max-age=${60 * 60 * 8}; SameSite=Strict`
   },
   clear: () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(TENANT_KEY)
+    localStorage.removeItem(ROLES_KEY)
     document.cookie = 'admin_token=; path=/; max-age=0'
   },
 }
@@ -216,20 +244,23 @@ export async function updatePlanCatalog(key: string, data: Partial<PlanDef>): Pr
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export async function adminLogin(email: string, password: string, tenantSlug: string) {
-  const res = await fetch(`${API_BASE}/auth/login`, {
+  const res = await fetch(`${API_BASE}/auth/platform-login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantSlug },
     body: JSON.stringify({ email, password }),
   })
   const json = await res.json()
-  if (!res.ok) throw new Error(json.message || 'Login failed')
+  if (!res.ok) {
+    const msg = (json as { message?: string })?.message || 'Login failed'
+    throw new Error(msg)
+  }
   const data = unwrap<{ accessToken: string; user: { roles: string[] } }>(json)
   if (!data.accessToken) throw new Error('No token received')
-  const roles: string[] = data.user?.roles ?? []
+  const roles: string[] = data.user?.roles ?? parseRolesFromToken(data.accessToken)
   if (!roles.includes('SUPER_ADMIN')) {
     throw new Error('This account does not have Super Admin access to the platform console.')
   }
-  adminAuth.setSession(data.accessToken, tenantSlug)
+  adminAuth.setSession(data.accessToken, tenantSlug, roles)
   return data
 }
 

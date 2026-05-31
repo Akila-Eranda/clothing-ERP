@@ -128,7 +128,9 @@ async function main() {
       lastName: 'User',
       passwordHash,
       emailVerified: true,
-      roles: { create: [{ roleId: tenantAdminRole.id }] },
+      roles: {
+        create: [{ roleId: superAdminRole.id }, { roleId: tenantAdminRole.id }],
+      },
     },
   });
   console.log(`✅ Admin user: ${adminUser.email} (password: Admin@123456)`);
