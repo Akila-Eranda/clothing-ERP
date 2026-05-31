@@ -1,6 +1,8 @@
-import { SubscriptionPlan } from '@prisma/client';
+import { SubscriptionPlan, TenantStatus } from '@prisma/client';
 
 export const PLATFORM_CONFIG_SUBDOMAIN = '__platform_config__';
+/** STARTER plan includes a free trial (days). */
+export const STARTER_TRIAL_DAYS = 14;
 
 export interface SubscriptionPlanDef {
   id: string;
@@ -24,8 +26,8 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
     price: 1199,
     currency: 'Rs.',
     interval: 'mo',
-    description: '3 users, 1 branch, basic POS',
-    features: ['3 Users', '1 Branch', 'Basic POS', 'Inventory'],
+    description: `14-day free trial · then Rs.1,199/mo · 3 users, 1 branch`,
+    features: ['14-day free trial', '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
     maxUsers: 3,
     maxBranches: 1,
     maxProducts: 500,
@@ -73,6 +75,39 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
 
 export function toDbLimit(value: number): number {
   return value < 0 ? 999_999 : value;
+}
+
+export function addTrialDays(from: Date = new Date(), days = STARTER_TRIAL_DAYS): Date {
+  const end = new Date(from);
+  end.setDate(end.getDate() + days);
+  return end;
+}
+
+/** New tenant: STARTER → TRIAL + 14 days; paid plans → ACTIVE immediately. */
+export function subscriptionFieldsForNewTenant(plan: SubscriptionPlan): {
+  status: TenantStatus;
+  trialEndsAt: Date | null;
+} {
+  if (plan === SubscriptionPlan.STARTER) {
+    return { status: TenantStatus.TRIAL, trialEndsAt: addTrialDays() };
+  }
+  return { status: TenantStatus.ACTIVE, trialEndsAt: null };
+}
+
+/** Plan change from admin: upgrade clears trial; downgrade to STARTER starts a new trial window. */
+export function subscriptionFieldsForPlanChange(plan: SubscriptionPlan): {
+  status: TenantStatus;
+  trialEndsAt: Date | null;
+} {
+  if (plan === SubscriptionPlan.STARTER) {
+    return { status: TenantStatus.TRIAL, trialEndsAt: addTrialDays() };
+  }
+  return { status: TenantStatus.ACTIVE, trialEndsAt: null };
+}
+
+export function isStarterTrialExpired(trialEndsAt: Date | null | undefined): boolean {
+  if (!trialEndsAt) return false;
+  return trialEndsAt.getTime() < Date.now();
 }
 
 export function resolvePlanLimits(

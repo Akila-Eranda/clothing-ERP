@@ -8,8 +8,11 @@ import {
   DEFAULT_SUBSCRIPTION_PLANS,
   PLATFORM_CONFIG_SUBDOMAIN,
   resolvePlanLimits,
+  subscriptionFieldsForNewTenant,
+  subscriptionFieldsForPlanChange,
   SubscriptionPlanDef,
 } from './subscription-plans';
+import { TenantTrialCron } from './tenant-trial.cron';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -151,6 +154,7 @@ export class TenantsService {
     const plan = dto.plan ?? SubscriptionPlan.STARTER;
     const catalog = await this.getMergedSubscriptionPlans();
     const limits = resolvePlanLimits(plan, catalog);
+    const subscription = subscriptionFieldsForNewTenant(plan);
 
     return this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
@@ -163,7 +167,8 @@ export class TenantsService {
           currency: dto.currency ?? 'INR',
           timezone: dto.timezone ?? 'Asia/Kolkata',
           plan,
-          status: TenantStatus.ACTIVE,
+          status: subscription.status,
+          trialEndsAt: subscription.trialEndsAt,
           maxUsers: limits.maxUsers,
           maxBranches: limits.maxBranches,
           maxProducts: limits.maxProducts,
@@ -327,12 +332,20 @@ export class TenantsService {
     const catalog = await this.getMergedSubscriptionPlans();
     const plan = dto.plan ?? existing.plan;
     const limits = dto.plan !== undefined ? resolvePlanLimits(plan, catalog) : {};
+    const subscription =
+      dto.plan !== undefined && dto.plan !== existing.plan
+        ? subscriptionFieldsForPlanChange(dto.plan)
+        : {};
     return this.prisma.tenant.update({
       where: { id },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.status !== undefined && { status: dto.status }),
-        ...(dto.plan !== undefined && { plan: dto.plan, ...limits }),
+        ...(dto.plan !== undefined && {
+          plan: dto.plan,
+          ...limits,
+          ...subscription,
+        }),
       },
       include: { _count: { select: { users: true, branches: true } } },
     });
@@ -498,7 +511,7 @@ export class TenantsController {
 @Module({
   imports: [AuthModule],
   controllers: [TenantsController],
-  providers: [TenantsService],
+  providers: [TenantsService, TenantTrialCron],
   exports: [TenantsService],
 })
 export class TenantsModule {}

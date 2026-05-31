@@ -158,6 +158,8 @@ export interface PlanDef {
   tenantCount?: number
 }
 
+export const STARTER_TRIAL_DAYS = 14
+
 export const DEFAULT_PLANS: PlanDef[] = [
   {
     id: 'starter',
@@ -166,8 +168,8 @@ export const DEFAULT_PLANS: PlanDef[] = [
     price: 1199,
     currency: 'Rs.',
     interval: 'mo',
-    description: '3 users, 1 branch, basic POS',
-    features: ['3 Users', '1 Branch', 'Basic POS', 'Inventory'],
+    description: '14-day free trial, then Rs.1,199/mo',
+    features: ['14-day free trial', '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
     maxUsers: 3,
     maxBranches: 1,
   },

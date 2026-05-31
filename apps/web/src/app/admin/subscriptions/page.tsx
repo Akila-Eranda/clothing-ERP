@@ -150,7 +150,7 @@ export default function SubscriptionsPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Tenant', 'Subdomain', 'Plan', 'Status', 'Users', 'Branches', 'Currency', 'Joined', ''].map(h => (
+                {['Tenant', 'Subdomain', 'Plan', 'Status', 'Trial ends', 'Users', 'Branches', 'Joined', ''].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -173,13 +173,17 @@ export default function SubscriptionsPage() {
                   <td className="px-4 py-3 text-xs font-mono text-gray-500">{t.subdomain}</td>
                   <td className="px-4 py-3"><span className={PLAN_BADGE[t.plan] ?? PLAN_BADGE.STARTER}>{t.plan}</span></td>
                   <td className="px-4 py-3"><span className={STATUS_BADGE[t.status] ?? STATUS_BADGE.CANCELLED}>{t.status}</span></td>
+                  <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
+                    {t.plan === 'STARTER' && t.trialEndsAt
+                      ? new Date(t.trialEndsAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
+                      : '—'}
+                  </td>
                   <td className="px-4 py-3 text-xs text-gray-600">
                     {t._count?.users ?? 0} / {formatLimit(t.maxUsers)}
                   </td>
                   <td className="px-4 py-3 text-xs text-gray-600">
                     {t._count?.branches ?? 0} / {formatLimit(t.maxBranches)}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">{t.currency}</td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                     {new Date(t.createdAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })}
                   </td>

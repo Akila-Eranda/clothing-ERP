@@ -16,6 +16,7 @@ import * as qrcode from 'qrcode';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserStatus } from '@prisma/client';
+import { enforceTenantSubscriptionActive } from '@/shared/tenant-subscription.helper';
 import {
   LoginDto,
   ForgotPasswordDto,
@@ -85,6 +86,8 @@ export class AuthService {
 
     // ── Password verify ───────────────────────────────────────
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const roles = user.roles.map((ur) => (ur.role as { type: string }).type);
+
     if (!isPasswordValid) {
       const attempts = user.loginAttempts + 1;
       const lockedUntil = attempts >= MAX_LOGIN_ATTEMPTS
@@ -98,6 +101,8 @@ export class AuthService {
 
       throw new UnauthorizedException('Invalid credentials');
     }
+
+    await enforceTenantSubscriptionActive(this.prisma, user.tenantId, roles);
 
     // ── 2FA check ─────────────────────────────────────────────
     if (user.twoFactorEnabled) {
@@ -126,7 +131,6 @@ export class AuthService {
       },
     });
 
-    const roles = user.roles.map((ur) => (ur.role as { type: string }).type);
     const permissions = user.roles.flatMap((ur) =>
       (ur.role as { permissions: { permission: { resource: string; action: string } }[] }).permissions.map(
         (rp) => `${rp.permission.resource}:${rp.permission.action}`,

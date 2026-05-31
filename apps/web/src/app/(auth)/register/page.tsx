@@ -57,7 +57,8 @@ const TIMEZONES  = [
 ];
 
 const PLAN_FEATURES = [
-  "Up to 5 users",
+  "14-day free trial (Starter)",
+  "Up to 3 users",
   "500 products",
   "1 branch",
   "POS terminal",
@@ -98,7 +99,11 @@ export default function RegisterPage() {
       const res = await fetch(`${API_BASE}/tenants/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, adminEmail: data.adminEmail.trim().toLowerCase() }),
+        body: JSON.stringify({
+          ...data,
+          adminEmail: data.adminEmail.trim().toLowerCase(),
+          plan: 'STARTER',
+        }),
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Registration failed");

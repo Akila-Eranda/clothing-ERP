@@ -7,6 +7,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { IJwtPayload } from '@/common/interfaces/jwt-payload.interface';
 import { IAuthUser } from '@/common/decorators/current-user.decorator';
 import { UserStatus } from '@prisma/client';
+import { enforceTenantSubscriptionActive } from '@/shared/tenant-subscription.helper';
 
 // ── JWKS cache (30 min TTL) ────────────────────────────────────────────────
 interface JwkKey { kid: string; kty: string; n: string; e: string; use: string; alg: string }
@@ -102,6 +103,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!user) throw new UnauthorizedException('User not found or inactive');
 
     const roles = user.roles.map((ur) => ur.role.type);
+    await enforceTenantSubscriptionActive(this.prisma, user.tenantId, roles);
+
     const permissions = user.roles.flatMap((ur) =>
       ur.role.permissions.map((rp) => `${rp.permission.resource}:${rp.permission.action}`),
     );
@@ -131,6 +134,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!user) throw new UnauthorizedException('User not found or inactive');
 
     const roles = user.roles.map((ur) => ur.role.type);
+    await enforceTenantSubscriptionActive(this.prisma, user.tenantId, roles);
+
     const permissions = user.roles.flatMap((ur) =>
       ur.role.permissions.map((rp) => `${rp.permission.resource}:${rp.permission.action}`),
     );

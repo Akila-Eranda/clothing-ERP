@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import {
   fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans,
-  plansForOnboarding, formatPlanLimit, DEFAULT_PLANS,
+  plansForOnboarding, formatPlanLimit, DEFAULT_PLANS, STARTER_TRIAL_DAYS,
   type TenantRow, type PlatformStats, type PlanDef,
 } from '@/lib/admin-api'
 
@@ -351,6 +351,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
   })
   const [provisionedPassword, setProvisionedPassword] = useState('')
   const [createdPlan, setCreatedPlan] = useState('')
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPlans()
@@ -399,6 +400,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
         password: pwd,
       })
       setCreatedPlan(result.tenant?.plan ?? form.plan)
+      setTrialEndsAt(result.tenant?.trialEndsAt ?? null)
       setProvisionedPassword(result.initialPassword)
       setForm(f => ({ ...f, password: result.initialPassword }))
       for (const item of provItems) {
@@ -496,6 +498,9 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {step === 2 && (
             <div className="space-y-4">
               <h3 className="text-base font-bold text-white">Select Plan</h3>
+              <p className="text-xs" style={{color:'rgba(255,255,255,0.45)'}}>
+                Starter includes a <strong className="text-white">{STARTER_TRIAL_DAYS}-day free trial</strong>. Paid plans activate immediately.
+              </p>
               <div className="space-y-2.5">
                 {plans.map(p => (
                   <label key={p.key} className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all" style={form.plan === p.key ? {border:'2px solid #4f46e5',background:'rgba(79,70,229,0.1)'} : {border:'2px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)'}}>
@@ -587,6 +592,11 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                   <p className="text-sm font-semibold text-white">
                     {plans.find(p => p.key === (createdPlan || form.plan))?.name ?? createdPlan || form.plan}
                   </p>
+                  {(createdPlan || form.plan) === 'STARTER' && trialEndsAt && (
+                    <p className="text-[11px] mt-1" style={{color:'rgba(251,191,36,0.95)'}}>
+                      Trial ends {new Date(trialEndsAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
                 </div>
               </div>
               <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>Use the shop URL above when signing in (not test.shop). Tenant header must match subdomain.</p>
