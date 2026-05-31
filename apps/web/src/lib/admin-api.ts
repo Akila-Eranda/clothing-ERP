@@ -1,5 +1,4 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
-const API_ROOT = API_BASE.replace(/\/api\/v1\/?$/, '/api')
 
 const TOKEN_KEY = 'fashionerp_admin_token'
 const TENANT_KEY = 'fashionerp_admin_tenant'
@@ -127,7 +126,9 @@ export interface AuditLogRow {
 export interface HealthData {
   status: string
   uptime?: number
-  services?: { database?: string; api?: string }
+  timestamp?: string
+  environment?: string
+  services?: { database?: string; redis?: string; api?: string }
   info?: {
     database?: { status: string }
     redis?: { status: string }
@@ -408,23 +409,34 @@ export async function fetchPlatformAuditLogs(params?: Record<string, string>) {
   }
 }
 
-// ── Health (public, no version prefix) ──────────────────────────────────────────
+// ── Health (public) ─────────────────────────────────────────────────────────────
 export async function fetchHealth(): Promise<HealthData> {
-  const res = await fetch(`${API_ROOT}/health`)
+  const res = await fetch(`${API_BASE}/health`, { cache: 'no-store' })
   const json = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error((json as { message?: string })?.message || `Health check failed (${res.status})`)
+  }
+
   const data = unwrap<{
     status: string
     uptime?: number
-    services?: { database?: string; api?: string }
+    timestamp?: string
+    environment?: string
+    services?: { database?: string; redis?: string; api?: string }
   }>(json)
-  const dbOk = data.services?.database === 'healthy'
+
+  const dbHealthy = data.services?.database === 'healthy'
+  const redisHealthy = data.services?.redis === 'healthy'
+
   return {
     status: data.status,
     uptime: data.uptime,
+    timestamp: data.timestamp,
+    environment: data.environment,
     services: data.services,
     info: {
-      database: { status: dbOk ? 'up' : 'down' },
-      redis: { status: data.status === 'ok' ? 'up' : 'down' },
+      database: { status: dbHealthy ? 'up' : 'down' },
+      redis: { status: redisHealthy ? 'up' : 'down' },
     },
   }
 }

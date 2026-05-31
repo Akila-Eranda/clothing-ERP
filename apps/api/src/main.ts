@@ -45,14 +45,6 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: ['Content-Type', 'Authorization', 'x-tenant-id', 'x-branch-id', 'x-request-id'],
   });
 
-  // ── Raw health endpoint (bypasses all middleware + tenant check) ─────────
-  app.use('/api/v1/health', (_req: any, res: any, next: any) => {
-    if (_req.method === 'GET') {
-      return res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
-    }
-    next();
-  });
-
   // ── Compression ───────────────────────────────────────────
   app.use(compression());
 

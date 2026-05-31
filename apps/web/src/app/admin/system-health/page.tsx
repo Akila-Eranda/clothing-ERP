@@ -37,9 +37,13 @@ export default function SystemHealthPage() {
   }, [load])
 
   const apiOk    = !error && health !== null
-  const dbOk     = health?.info?.database?.status === 'up' || health?.status === 'ok'
-  const redisOk  = health?.info?.redis?.status === 'up' || health?.status === 'ok'
-  const allOk    = apiOk && dbOk && redisOk
+  const dbOk     =
+    health?.services?.database === 'healthy' ||
+    health?.info?.database?.status === 'up'
+  const redisOk  =
+    health?.services?.redis === 'healthy' ||
+    health?.info?.redis?.status === 'up'
+  const allOk    = apiOk && health?.status === 'ok' && dbOk && redisOk
 
   const services = [
     {
