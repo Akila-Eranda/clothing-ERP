@@ -123,10 +123,10 @@ export function Sidebar() {
   /* ── theme-aware palette ── */
   const bg       = isDark ? "#0f172a" : "#ffffff"
   const border   = isDark ? "#1e293b" : "#e5e7eb"
-  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "rgba(15,23,42,0.55)"
-  const textFull = isDark ? "#ffffff" : "#111827"
+  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "#000000"
+  const textFull = isDark ? "#ffffff" : "#000000"
   const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
-  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "rgba(15,23,42,0.30)"
+  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "#000000"
 
   /* ── single nav item renderer ── */
   const renderItem = (item: NavItem, groupIdx: number) => {
@@ -149,10 +149,18 @@ export function Sidebar() {
         onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
         onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
       >
-        <Icon className={cn("shrink-0 h-5 w-5", isActive && "text-indigo-500")} strokeWidth={isActive ? 2.2 : 1.8} />
+        <Icon
+          className={cn("shrink-0 h-5 w-5", isActive && "text-indigo-500", !isActive && !isDark && "text-black")}
+          strokeWidth={isActive ? 2.2 : 1.8}
+        />
         {!sidebarCollapsed && (
           <>
-            <span className={cn("truncate flex-1 text-[15px] leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}>{item.label}</span>
+            <span
+              className={cn("truncate flex-1 text-[15px] leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}
+              style={!isActive && !isDark ? { color: "#000000" } : undefined}
+            >
+              {item.label}
+            </span>
             {item.badge && <NavBadge text={item.badge} />}
           </>
         )}
@@ -169,10 +177,15 @@ export function Sidebar() {
         onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
         onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
       >
-        <Icon className="shrink-0 h-5 w-5" strokeWidth={1.8} />
+        <Icon className={cn("shrink-0 h-5 w-5", !isDark && "text-black")} strokeWidth={1.8} />
         {!sidebarCollapsed && (
           <>
-            <span className="truncate flex-1 text-[15px] leading-none font-medium">{item.label}</span>
+            <span
+              className="truncate flex-1 text-[15px] leading-none font-medium"
+              style={!isDark ? { color: "#000000" } : undefined}
+            >
+              {item.label}
+            </span>
             {item.badge && <NavBadge text={item.badge} />}
           </>
         )}
