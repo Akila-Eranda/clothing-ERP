@@ -11,6 +11,9 @@ import {
   plansForOnboarding, formatPlanLimit, DEFAULT_PLANS, STARTER_TRIAL_DAYS,
   type TenantRow, type PlatformStats, type PlanDef,
 } from '@/lib/admin-api'
+import { SHOP_TYPE_LIST, ShopType, getShopProfile } from '@/lib/shop-profiles'
+import { getVerticalFeatures } from '@/lib/shop-features'
+import { ShopFeatureList } from '@/components/shop/shop-feature-list'
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
@@ -154,19 +157,19 @@ export default function TenantsPage() {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
-                {['Tenant','Subdomain','Plan','Status','Users','Branches','Joined','Actions'].map(h => (
+                {['Tenant','Type','Subdomain','Plan','Status','Users','Branches','Joined','Actions'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading && (
-                <tr><td colSpan={8} className="px-4 py-12 text-center">
+                <tr><td colSpan={9} className="px-4 py-12 text-center">
                   <RefreshCw size={18} className="animate-spin mx-auto text-gray-300" />
                 </td></tr>
               )}
               {!loading && tenants.length === 0 && (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm text-gray-400">No tenants match filters.</td></tr>
+                <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-400">No tenants match filters.</td></tr>
               )}
               {!loading && tenants.map(t => (
                 <tr key={t.id} className={`hover:bg-gray-50 transition-colors ${actionLoading === t.id ? 'opacity-50' : ''}`}>
@@ -180,6 +183,12 @@ export default function TenantsPage() {
                         <p className="text-[10px] text-gray-400">{t.email}</p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+                      <span>{getShopProfile(t.shopType).emoji}</span>
+                      <span className="whitespace-nowrap">{getShopProfile(t.shopType).label.replace(' Shop', '')}</span>
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-xs font-mono text-gray-500">{t.subdomain}</td>
                   <td className="px-4 py-3"><span className={PLAN_BADGE[t.plan] ?? PLAN_BADGE.STARTER}>{t.plan}</span></td>
@@ -348,6 +357,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
   const [form, setForm]                 = useState({
     shopName: '', ownerName: '', email: '', phone: '', password: '',
     subdomain: '', plan: 'STARTER', currency: 'LKR', country: 'LK',
+    shopType: ShopType.CLOTHING as ShopType,
   })
   const [provisionedPassword, setProvisionedPassword] = useState('')
   const [createdPlan, setCreatedPlan] = useState('')
@@ -360,6 +370,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
   }, [])
 
   const selectedPlan = plans.find(p => p.key === form.plan) ?? plans[0]
+  const selectedProfile = getShopProfile(form.shopType)
 
   function onShopName(v: string) {
     const slug = v.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
@@ -378,6 +389,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     { key: 'schema', label: 'PostgreSQL schema',          sub: `schema: ${form.subdomain || '—'}` },
     { key: 'realm',  label: 'Keycloak realm',             sub: `realm: ${form.subdomain || '—'}` },
     { key: 'roles',  label: 'Default roles & permissions', sub: 'Owner, Manager, Cashier, Technician' },
+    { key: 'catalog', label: `${selectedProfile.label} setup`, sub: `${selectedProfile.defaultCategories.length} categories · variants: ${selectedProfile.variantAttributes.map(a => a.name).join(', ')}` },
     { key: 'email',  label: 'Welcome email',              sub: `to ${form.email || '—'}` },
   ]
 
@@ -395,8 +407,8 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     try {
       const result = await registerTenant({
         name: form.shopName, subdomain: form.subdomain, email: form.email,
-        phone: form.phone || undefined, plan: form.plan, currency: form.currency,
-        country: form.country, ownerName: form.ownerName,
+        phone: form.phone || undefined, plan: form.plan, shopType: form.shopType,
+        currency: form.currency, country: form.country, ownerName: form.ownerName,
         password: pwd,
       })
       setCreatedPlan(result.tenant?.plan ?? form.plan)
@@ -421,7 +433,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="rounded-2xl w-full max-w-[520px] shadow-2xl overflow-hidden" style={{background:'#0f172a',border:'1px solid rgba(255,255,255,0.08)'}}>
+      <div className="rounded-2xl w-full max-w-[560px] shadow-2xl overflow-hidden" style={{background:'#0f172a',border:'1px solid rgba(255,255,255,0.08)'}}>
 
         {/* Step progress */}
         <div className="px-7 pt-7 pb-5" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
@@ -443,6 +455,32 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="text-base font-bold text-white">Shop Details</h3>
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{color:'rgba(255,255,255,0.6)'}}>Business Type *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {SHOP_TYPE_LIST.map((p) => (
+                    <button
+                      key={p.type}
+                      type="button"
+                      onClick={() => setForm(f => ({ ...f, shopType: p.type }))}
+                      className="rounded-xl p-3 text-left transition-all"
+                      style={form.shopType === p.type
+                        ? { border: '2px solid #4f46e5', background: 'rgba(79,70,229,0.12)' }
+                        : { border: '2px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
+                    >
+                      <span className="text-lg">{p.emoji}</span>
+                      <p className="text-sm font-semibold text-white mt-1">{p.label}</p>
+                      <p className="text-[10px] mt-0.5 leading-tight" style={{color:'rgba(255,255,255,0.4)'}}>{p.labelSi}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="rounded-xl p-3 max-h-36 overflow-y-auto" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                    {selectedProfile.label} features
+                  </p>
+                  <ShopFeatureList features={getVerticalFeatures(form.shopType)} compact variant="on-dark" showComingSoon={false} />
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop Name</label>
                 <input className={inp} placeholder="e.g. Fashion Hub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
@@ -537,7 +575,8 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               </div>
               {selectedPlan && (
                 <div className="px-3 py-2.5 rounded-xl text-xs" style={{background:'rgba(79,70,229,0.12)',border:'1px solid rgba(79,70,229,0.25)',color:'rgba(255,255,255,0.75)'}}>
-                  Plan: <strong className="text-white">{selectedPlan.name}</strong>
+                  {selectedProfile.emoji} <strong className="text-white">{selectedProfile.label}</strong>
+                  {' · '}Plan: <strong className="text-white">{selectedPlan.name}</strong>
                   {' · '}{formatPlanLimit(selectedPlan.maxUsers)} users
                   {' · '}{formatPlanLimit(selectedPlan.maxBranches)} branches
                 </div>
@@ -575,6 +614,10 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               <p className="text-sm mb-4" style={{color:'rgba(255,255,255,0.5)'}}><strong className="text-white">{form.shopName}</strong> is live.</p>
               <div className="text-left rounded-xl p-4 space-y-2.5 mb-4" style={{background:'rgba(255,255,255,0.04)',border:'1px solid rgba(255,255,255,0.1)'}}>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={{color:'rgba(255,255,255,0.45)'}}>Login credentials — save these now</p>
+                <div>
+                  <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Business Type</p>
+                  <p className="text-sm font-semibold text-white">{selectedProfile.emoji} {selectedProfile.label}</p>
+                </div>
                 <div>
                   <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Shop URL</p>
                   <p className="text-sm font-mono text-indigo-300">https://{form.subdomain}.shop.hexalyte.com</p>

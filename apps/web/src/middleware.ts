@@ -3,20 +3,36 @@ import type { NextRequest } from 'next/server';
 
 const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
 
+/** Hostnames allowed to serve /admin (company console). */
+const ADMIN_HOSTS = new Set(
+  (process.env.NEXT_PUBLIC_ADMIN_HOSTS || 'admin3.hexalyte.com,localhost')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+function isAdminHost(request: NextRequest): boolean {
+  const host = request.headers.get('host')?.split(':')[0]?.toLowerCase() ?? '';
+  return ADMIN_HOSTS.has(host);
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Admin panel has its own client-side auth guard — skip tenant middleware entirely
-  if (pathname.startsWith('/admin')) return NextResponse.next();
+  // Company admin panel — only on admin3 (not shop / tenant domains)
+  if (pathname.startsWith('/admin')) {
+    if (!isAdminHost(request)) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/login';
+      loginUrl.search = '';
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
 
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-
-  // The token is stored in localStorage (client-side only).
-  // We fall back to a cookie-based check for SSR protection.
-  // The client-side layout guard handles the final redirect.
   const token = request.cookies.get('fe_access_token')?.value;
 
-  // If accessing a protected route without a token cookie, redirect to /login
   if (!isPublic && !token && !pathname.startsWith('/_next') && !pathname.startsWith('/api')) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
@@ -24,7 +40,6 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If already logged in and hitting auth pages, redirect to /dashboard
   if (isPublic && token) {
     const dashboardUrl = request.nextUrl.clone();
     dashboardUrl.pathname = '/dashboard';

@@ -181,6 +181,13 @@ enum SubscriptionPlan {
   CUSTOM
 }
 
+enum ShopType {
+  CLOTHING
+  GROCERY
+  HARDWARE
+  AGRICULTURE
+}
+
 enum TenantStatus {
   TRIAL
   ACTIVE
@@ -218,6 +225,7 @@ model Tenant {
   country          String           @default("IN")
   timezone         String           @default("Asia/Kolkata")
   plan             SubscriptionPlan @default(STARTER)
+  shopType         ShopType         @default(CLOTHING)
   status           TenantStatus     @default(TRIAL)
   trialEndsAt      DateTime?
   subscriptionId   String?

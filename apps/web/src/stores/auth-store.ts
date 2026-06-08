@@ -3,7 +3,8 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/types";
-import { authApi, tokenStorage } from "@/lib/api";
+import { authApi, api, tokenStorage } from "@/lib/api";
+import { setStoredShopType, ShopType } from "@/lib/shop-profiles";
 
 interface AuthStore {
   user: User | null;
@@ -61,6 +62,10 @@ export const useAuthStore = create<AuthStore>()(
             createdAt: new Date(),
           };
           set({ user, accessToken, refreshToken, isAuthenticated: true, isLoading: false });
+          try {
+            const tenantRes = await api.get<{ shopType?: ShopType }>('/tenants/me');
+            if (tenantRes.data?.shopType) setStoredShopType(tenantRes.data.shopType);
+          } catch { /* tenant profile optional on first paint */ }
         } catch (e) {
           set({ isLoading: false });
           throw e;

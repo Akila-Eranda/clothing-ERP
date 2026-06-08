@@ -16,6 +16,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { SHOP_TYPE_LIST, ShopType, getShopProfile } from "@/lib/shop-profiles";
+import { getVerticalFeatures } from "@/lib/shop-features";
+import { ShopFeatureList } from "@/components/shop/shop-feature-list";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -56,22 +59,16 @@ const TIMEZONES  = [
   "Europe/London","Europe/Paris","Asia/Dubai","Asia/Singapore","Australia/Sydney",
 ];
 
-const PLAN_FEATURES = [
-  "14-day free trial (Starter)",
-  "Up to 3 users",
-  "500 products",
-  "1 branch",
-  "POS terminal",
-  "Inventory management",
-  "Sales & reports",
-];
-
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep]             = React.useState(1);
+  const [shopType, setShopType]     = React.useState<ShopType>(ShopType.CLOTHING);
   const [showPass, setShowPass]     = React.useState(false);
   const [isLoading, setIsLoading]   = React.useState(false);
   const [subPreview, setSubPreview] = React.useState("");
+
+  const selectedProfile = getShopProfile(shopType);
+  const verticalFeatures = getVerticalFeatures(shopType);
 
   const { register, handleSubmit, watch, trigger, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -84,6 +81,10 @@ export default function RegisterPage() {
   }, [subdomain]);
 
   const nextStep = async () => {
+    if (step === 1 && !shopType) {
+      toast.error("Please select your shop type");
+      return;
+    }
     const fields: (keyof FormData)[][] = [
       ["companyName","subdomain","phone"],
       ["adminFirstName","adminLastName","adminEmail","adminPassword"],
@@ -103,6 +104,7 @@ export default function RegisterPage() {
           ...data,
           adminEmail: data.adminEmail.trim().toLowerCase(),
           plan: 'STARTER',
+          shopType,
         }),
       });
       const json = await res.json();
@@ -156,25 +158,20 @@ export default function RegisterPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-black tracking-wide uppercase">FashionERP</span>
+            <span className="text-xl font-black tracking-wide uppercase">ShopERP</span>
           </div>
-          <h2 className="text-3xl font-bold leading-tight mb-4">Start your free 14-day trial</h2>
-          <p className="text-white/70 text-sm leading-relaxed mb-8">
-            No credit card required. Full access to all Starter features from day one.
+          <h2 className="text-3xl font-bold leading-tight mb-2">Start your free 14-day trial</h2>
+          <p className="text-white/70 text-sm leading-relaxed mb-6">
+            {selectedProfile.emoji} <strong className="text-white">{selectedProfile.label}</strong> — {selectedProfile.description}
           </p>
-          <div className="space-y-3">
-            {PLAN_FEATURES.map((f) => (
-              <div key={f} className="flex items-center gap-3">
-                <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 shrink-0">
-                  <Check className="h-3 w-3 text-white" />
-                </div>
-                <span className="text-sm text-white/90">{f}</span>
-              </div>
-            ))}
-          </div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-3">Included features</p>
+          <ShopFeatureList features={verticalFeatures} compact variant="on-dark" />
+          <Link href="/features" className="inline-block mt-6 text-xs text-white/60 hover:text-white underline underline-offset-2">
+            View all business types & common features →
+          </Link>
         </div>
         <p className="relative text-xs text-white/50">
-          © 2025 FashionERP · Enterprise Retail Platform
+          © 2025 ShopERP · Multi-Shop Retail Platform
         </p>
       </div>
 
@@ -186,7 +183,7 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow mb-3">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold">FashionERP</h1>
+            <h1 className="text-xl font-bold">ShopERP</h1>
           </div>
 
           {/* Step indicator */}
@@ -222,7 +219,29 @@ export default function RegisterPage() {
                   <motion.div key="step1" initial={{ opacity:0,x:20 }} animate={{ opacity:1,x:0 }} exit={{ opacity:0,x:-20 }} className="space-y-5">
                     <div>
                       <h2 className="text-xl font-bold mb-1">Business details</h2>
-                      <p className="text-sm text-muted-foreground">Tell us about your business</p>
+                      <p className="text-sm text-muted-foreground">Select shop type and enter your business info</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Shop type *</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {SHOP_TYPE_LIST.map((p) => (
+                          <button
+                            key={p.type}
+                            type="button"
+                            onClick={() => setShopType(p.type)}
+                            className={cn(
+                              "rounded-xl border p-3 text-left transition-all",
+                              shopType === p.type
+                                ? "border-primary bg-primary/5 ring-2 ring-primary/20"
+                                : "border-border hover:border-primary/40",
+                            )}
+                          >
+                            <span className="text-xl">{p.emoji}</span>
+                            <p className="text-sm font-semibold mt-1">{p.label}</p>
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{p.labelSi}</p>
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <Label>Company / Shop name *</Label>
@@ -248,7 +267,7 @@ export default function RegisterPage() {
                       </div>
                       {subPreview && (
                         <p className="text-xs text-muted-foreground">
-                          Your URL: <span className="text-primary font-mono">{subPreview}.hexalyte.com</span>
+                          Your URL: <span className="text-primary font-mono">{subPreview}.shop.hexalyte.com</span>
                         </p>
                       )}
                       {errors.subdomain && <p className="text-xs text-destructive">{errors.subdomain.message}</p>}

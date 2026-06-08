@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { getWorkspace } from "@/lib/shop-workspace";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -30,6 +32,24 @@ interface NavGroup { title: string; items: NavItem[] }
 /* ── Navigation structure ────────────────────────────────── */
 function useNavGroups(): NavGroup[] {
   const { openPos } = useUIStore();
+  const profile = useShopProfile();
+  const ws = getWorkspace(profile.type);
+  const productItems: NavItem[] = [
+    { label: ws.productLabel, href: "/products", icon: Package },
+    { label: "Categories",     href: "/categories", icon: Layers },
+    ...(profile.modules.brands ? [{ label: "Brands", href: "/brands", icon: Bookmark }] : []),
+    { label: "Inventory",      href: "/inventory",  icon: Warehouse },
+  ];
+  const salesItems: NavItem[] = [
+    { label: "Point of Sale",  icon: ShoppingCart,  badge: "POS", action: openPos },
+    { label: "Sales History",  href: "/sales",      icon: History },
+    ...(profile.modules.returns ? [{ label: "Returns", href: "/returns", icon: RotateCcw }] : []),
+    { label: ws.customerLabel, href: "/customers",  icon: Users },
+  ];
+  const reportItems: NavItem[] = [
+    { label: "Reports",        href: "/reports",    icon: FileBarChart },
+    ...(profile.modules.promotions ? [{ label: "Promotions", href: "/promotions", icon: Zap }] : []),
+  ];
   return [
     {
       title: "OVERVIEW",
@@ -39,21 +59,11 @@ function useNavGroups(): NavGroup[] {
     },
     {
       title: "SALES",
-      items: [
-        { label: "Point of Sale",  icon: ShoppingCart,  badge: "POS", action: openPos },
-        { label: "Sales History",  href: "/sales",      icon: History },
-        { label: "Returns",        href: "/returns",    icon: RotateCcw },
-        { label: "Customers",      href: "/customers",  icon: Users },
-      ],
+      items: salesItems,
     },
     {
       title: "PRODUCTS",
-      items: [
-        { label: "Products",       href: "/products",   icon: Package },
-        { label: "Categories",     href: "/categories", icon: Layers },
-        { label: "Brands",         href: "/brands",     icon: Bookmark },
-        { label: "Inventory",      href: "/inventory",  icon: Warehouse },
-      ],
+      items: productItems,
     },
     {
       title: "PROCUREMENT",
@@ -72,10 +82,7 @@ function useNavGroups(): NavGroup[] {
     },
     {
       title: "REPORTS",
-      items: [
-        { label: "Reports",        href: "/reports",    icon: FileBarChart },
-        { label: "Promotions",     href: "/promotions", icon: Zap },
-      ],
+      items: reportItems,
     },
     {
       title: "HR & STAFF",
@@ -113,9 +120,9 @@ export function Sidebar() {
   const { theme, setTheme } = useTheme();
   const isDark    = theme === "dark";
   const navGroups = useNavGroups();
+  const shopProfile = useShopProfile();
 
-  const shopName  = user?.branch?.name ?? "FashionERP";
-  const initials  = shopName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  const shopName  = user?.branch?.name ?? "ShopERP";
   const planLabel = user?.role === "super_admin" ? "Enterprise" : user?.role === "admin" ? "Pro" : "Starter";
 
   const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
@@ -232,16 +239,17 @@ export function Sidebar() {
         <div className={cn("flex items-center shrink-0 gap-3 px-3 py-4", sidebarCollapsed && "justify-center")}>
           {/* Avatar */}
           <div
-            className="h-11 w-11 rounded-xl shrink-0 flex items-center justify-center text-white font-bold text-sm select-none"
+            className="h-11 w-11 rounded-xl shrink-0 flex items-center justify-center text-xl select-none"
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
           >
-            {initials}
+            {shopProfile.emoji}
           </div>
 
           {!sidebarCollapsed && (
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold leading-tight truncate" style={{ color: textFull }}>{shopName}</p>
+                <p className="text-[11px] font-medium truncate mt-0.5" style={{ color: textMut }}>{shopProfile.label}</p>
                 <p className="text-xs font-semibold mt-0.5" style={{ color: "#6366f1" }}>{planLabel}</p>
               </div>
               {/* Collapse button */}

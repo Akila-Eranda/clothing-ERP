@@ -61,6 +61,7 @@ services:
       KC_REALM: ${KC_REALM:-fashion-erp}
       KC_CLIENT_ID: ${KC_CLIENT_ID:-fashion-erp-api}
       KC_CLIENT_SECRET: ${KC_CLIENT_SECRET:-}
+      PLATFORM_TENANT_SUBDOMAIN: ${PLATFORM_TENANT_SUBDOMAIN:-platform}
     ports:
       - '3001:3001'
     volumes:
@@ -77,12 +78,16 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: https://shop.clothing.api.hexalyte.com/api/v1
+        NEXT_PUBLIC_ADMIN_HOSTS: admin3.hexalyte.com
+        NEXT_PUBLIC_PLATFORM_TENANT: platform
     container_name: fashionerp_web
     restart: unless-stopped
     depends_on:
       - api
     environment:
       NEXT_PUBLIC_API_URL: https://shop.clothing.api.hexalyte.com/api/v1
+      NEXT_PUBLIC_ADMIN_HOSTS: admin3.hexalyte.com
+      NEXT_PUBLIC_PLATFORM_TENANT: platform
       NODE_ENV: production
     ports:
       - '3000:3000'

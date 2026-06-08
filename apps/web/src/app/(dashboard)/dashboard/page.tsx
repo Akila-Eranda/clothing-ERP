@@ -20,6 +20,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { getWorkspace } from "@/lib/shop-workspace";
+import { ShopQuickStart } from "@/components/dashboard/shop-quick-start";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface DailySummary {
@@ -85,6 +88,8 @@ const IV = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardPage() {
+  const shopProfile = useShopProfile();
+  const workspace = getWorkspace(shopProfile.type);
   const [period, setPeriod] = React.useState<"7d" | "30d">("30d");
   const [loading, setLoading] = React.useState(true);
   const [summary, setSummary]     = React.useState<DailySummary | null>(null);
@@ -140,10 +145,10 @@ export default function DashboardPage() {
       insights.push({ insight: `Discount rate today is ${pct}% — review promo effectiveness`, type: "action", confidence: 80 });
     }
     if (insights.length === 0) {
-      insights.push({ insight: "No sales recorded today yet — open the POS terminal to start selling", type: "action", confidence: 100 });
+      insights.push({ insight: workspace.tips[0] ?? "Open POS to start selling", type: "action", confidence: 100 });
     }
     return insights;
-  }, [summary, lowStock, topProducts]);
+  }, [summary, lowStock, topProducts, workspace.tips]);
 
   const statCards = [
     {
@@ -159,7 +164,7 @@ export default function DashboardPage() {
       icon: ShoppingCart, color: "text-blue-500", bg: "bg-blue-500/10",
     },
     {
-      title: "Total Customers",
+      title: `Total ${workspace.customerLabel}`,
       value: loading ? "—" : formatNumber(custTotal),
       sub: "registered in system",
       icon: Users, color: "text-violet-500", bg: "bg-violet-500/10",
@@ -178,8 +183,12 @@ export default function DashboardPage() {
       {/* Header */}
       <motion.div variants={IV} className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">AI Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Real-time insights for your fashion retail business</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-2xl">{shopProfile.emoji}</span>
+            <h1 className="text-2xl font-bold">{workspace.dashboardTitle}</h1>
+          </div>
+          <p className="text-sm text-muted-foreground">{workspace.dashboardSubtitle}</p>
+          <p className="text-xs text-muted-foreground/80 mt-0.5">{workspace.dashboardSubtitleSi}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-500">
@@ -191,6 +200,15 @@ export default function DashboardPage() {
             Refresh
           </Button>
         </div>
+      </motion.div>
+
+      <motion.div variants={IV}>
+        <ShopQuickStart
+          actions={workspace.quickActions}
+          tips={workspace.tips}
+          shopEmoji={shopProfile.emoji}
+          shopLabel={shopProfile.label}
+        />
       </motion.div>
 
       {/* KPI Stats */}
@@ -233,7 +251,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <CardTitle className="text-base">AI Insights</CardTitle>
-                <CardDescription>Powered by FashionAI™</CardDescription>
+                <CardDescription>Powered by {workspace.aiBrand}</CardDescription>
               </div>
             </div>
           </CardHeader>
@@ -265,7 +283,7 @@ export default function DashboardPage() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Top Products</CardTitle>
+                <CardTitle className="text-base">{workspace.topSellingLabel}</CardTitle>
                 <CardDescription>By quantity sold — last 30 days</CardDescription>
               </div>
             </div>

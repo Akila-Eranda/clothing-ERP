@@ -14,7 +14,7 @@ import {
 } from './subscription-plans';
 import { TenantTrialCron } from './tenant-trial.cron';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlan, TenantStatus, UserStatus } from '@prisma/client';
+import { SubscriptionPlan, TenantStatus, UserStatus, ShopType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -22,6 +22,7 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
 import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
 import { AuthModule } from '@/modules/auth/auth.module';
+import { getShopProfile, SHOP_TYPE_LIST, slugifyCategory } from '@/shared/shop-profiles';
 
 export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
@@ -55,6 +56,10 @@ export class RegisterTenantDto {
   @ApiPropertyOptional() @IsOptional() @IsString() currency?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() timezone?: string;
   @ApiPropertyOptional() @IsOptional() @IsEnum(SubscriptionPlan) plan?: SubscriptionPlan;
+  @ApiPropertyOptional({ enum: ShopType, default: ShopType.CLOTHING })
+  @IsOptional()
+  @IsEnum(ShopType)
+  shopType?: ShopType;
 }
 
 export class UpdateTenantAdminDto {
@@ -82,6 +87,42 @@ export class TenantsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly kcAdmin: KeycloakAdminService,
   ) {}
+
+  private async seedTenantDefaults(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    shopType: ShopType,
+  ): Promise<void> {
+    const profile = getShopProfile(shopType);
+    for (const name of profile.defaultCategories) {
+      await tx.category.upsert({
+        where: { tenantId_slug: { tenantId, slug: slugifyCategory(name) } },
+        update: {},
+        create: { tenantId, name, slug: slugifyCategory(name) },
+      });
+    }
+    const existingSettings = await tx.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+    const settings = (existingSettings?.settings as Record<string, unknown>) ?? {};
+    await tx.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...settings,
+          shopProfile: {
+            type: profile.type,
+            defaultUnit: profile.defaultUnit,
+            units: profile.units,
+            modules: profile.modules,
+            labelTemplates: profile.labelTemplates,
+            variantAttributes: profile.variantAttributes,
+          },
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
 
   private async createCloudflareDns(subdomain: string): Promise<void> {
     const token  = process.env.CLOUDFLARE_API_TOKEN;
@@ -152,6 +193,7 @@ export class TenantsService {
     }
 
     const plan = dto.plan ?? SubscriptionPlan.STARTER;
+    const shopType = dto.shopType ?? ShopType.CLOTHING;
     const catalog = await this.getMergedSubscriptionPlans();
     const limits = resolvePlanLimits(plan, catalog);
     const subscription = subscriptionFieldsForNewTenant(plan);
@@ -167,6 +209,7 @@ export class TenantsService {
           currency: dto.currency ?? 'INR',
           timezone: dto.timezone ?? 'Asia/Kolkata',
           plan,
+          shopType,
           status: subscription.status,
           trialEndsAt: subscription.trialEndsAt,
           maxUsers: limits.maxUsers,
@@ -206,6 +249,8 @@ export class TenantsService {
           roles: { create: [{ roleId: adminRole.id }] },
         },
       });
+
+      await this.seedTenantDefaults(tx, tenant.id, shopType);
 
       return {
         tenant,
@@ -422,6 +467,19 @@ export class TenantsService {
 @Controller({ path: 'tenants', version: '1' })
 export class TenantsController {
   constructor(private readonly tenantsService: TenantsService) {}
+
+  @Public()
+  @Get('shop-types')
+  @ApiOperation({ summary: 'List available shop verticals (clothing, grocery, etc.)' })
+  listShopTypes() {
+    return SHOP_TYPE_LIST.map(({ type, label, labelSi, emoji, description }) => ({
+      type,
+      label,
+      labelSi,
+      emoji,
+      description,
+    }));
+  }
 
   @Public()
   @Post('register')

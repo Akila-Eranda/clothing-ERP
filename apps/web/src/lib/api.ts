@@ -166,11 +166,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
 }
 
 export const api = {
-  get:    <T>(path: string)                   => request<T>(path, { method: 'GET' }),
-  post:   <T>(path: string, body?: unknown)   => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }),
-  put:    <T>(path: string, body?: unknown)   => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }),
-  patch:  <T>(path: string, body?: unknown)   => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  delete: <T>(path: string)                   => request<T>(path, { method: 'DELETE' }),
+  get:    <T>(path: string, init?: RequestInit)                   => request<T>(path, { method: 'GET', ...init }),
+  post:   <T>(path: string, body?: unknown, init?: RequestInit)   => request<T>(path, { method: 'POST',  body: JSON.stringify(body), ...init }),
+  put:    <T>(path: string, body?: unknown, init?: RequestInit)   => request<T>(path, { method: 'PUT',   body: JSON.stringify(body), ...init }),
+  patch:  <T>(path: string, body?: unknown, init?: RequestInit)   => request<T>(path, { method: 'PATCH', body: JSON.stringify(body), ...init }),
+  delete: <T>(path: string, init?: RequestInit)                   => request<T>(path, { method: 'DELETE', ...init }),
 };
 
 // ── Auth API ─────────────────────────────────────────────────────────────
@@ -190,7 +190,11 @@ export interface LoginResponse {
 
 export const authApi = {
   login: (email: string, password: string, tenantSlug?: string) =>
-    api.post<LoginResponse>('/auth/login', { email, password }, tenantSlug ? { headers: { 'x-tenant-id': tenantSlug } } : undefined),
+    api.post<LoginResponse>(
+      '/auth/login',
+      { email, password },
+      tenantSlug ? { headers: { 'x-tenant-id': tenantSlug } } : undefined,
+    ),
 
   logout: () =>
     api.delete<null>('/auth/logout'),

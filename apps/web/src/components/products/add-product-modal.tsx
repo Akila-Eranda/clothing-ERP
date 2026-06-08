@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -43,18 +45,28 @@ interface Form {
   tags: string[]; tagInput: string;
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
+  unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
   seoTitle: string; seoDescription: string;
 }
 
-const INITIAL: Form = {
-  name: "", barcode: "", description: "", shortDesc: "",
-  categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
-  tags: [], tagInput: "",
-  sellingPrice: "", costPrice: "", mrp: "", taxRate: "18",
-  hasVariants: false, attributes: [{ name: "Size", values: [], input: "" }],
-  trackInventory: true, seoTitle: "", seoDescription: "",
+const buildInitialForm = (): Form => {
+  const profile = getShopProfile(getStoredShopType());
+  return {
+    name: "", barcode: "", description: "", shortDesc: "",
+    categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
+    tags: [], tagInput: "",
+    sellingPrice: "", costPrice: "", mrp: "", taxRate: "18",
+    hasVariants: defaultHasVariants(profile),
+    attributes: variantAttrsFromProfile(profile.type),
+    unit: profile.defaultUnit,
+    expiryDate: "",
+    batchNumber: "",
+    trackInventory: true, seoTitle: "", seoDescription: "",
+  };
 };
+
+const INITIAL: Form = buildInitialForm();
 
 const TABS = [
   { id: "basic",      label: "Basic Information", icon: Info },
@@ -83,6 +95,10 @@ function genSku(name: string, combo: string[]): string {
 interface Props { open: boolean; onClose: () => void; onCreated?: () => void; editProduct?: Product; }
 
 export function AddProductModal({ open, onClose, onCreated, editProduct }: Props) {
+  const shopProfile = useShopProfile();
+  const showUnit = hasMultiUnit(shopProfile);
+  const showExpiry = hasExpiryTracking(shopProfile);
+  const showBatch = hasBatchTracking(shopProfile);
   const [tab, setTab]               = useState<TabId>("basic");
   const [form, setForm]             = useState<Form>(INITIAL);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -105,18 +121,22 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         categoryId: editProduct.categoryId ?? "", brandId: editProduct.brandId ?? "",
         hsn: editProduct.hsn ?? "",
         status: editProduct.status === "ACTIVE" ? "ACTIVE" : "DRAFT",
-        tags: editProduct.tags ?? [], tagInput: "",
+        tags: (editProduct.tags ?? []).filter((t) => !t.startsWith("unit:") && !t.startsWith("exp:") && !t.startsWith("batch:")),
+        tagInput: "",
         sellingPrice: editProduct.sellingPrice.toString(),
         costPrice: editProduct.costPrice.toString(),
         mrp: editProduct.mrp.toString(),
         taxRate: editProduct.taxRate.toString(),
         hasVariants: editProduct.hasVariants,
-        attributes: [{ name: "Size", values: [], input: "" }],
+        attributes: variantAttrsFromProfile(shopProfile.type),
+        unit: (editProduct.tags ?? []).find((t) => t.startsWith("unit:"))?.slice(5) ?? shopProfile.defaultUnit,
+        expiryDate: (editProduct.tags ?? []).find((t) => t.startsWith("exp:"))?.slice(4) ?? "",
+        batchNumber: (editProduct.tags ?? []).find((t) => t.startsWith("batch:"))?.slice(6) ?? "",
         trackInventory: editProduct.trackInventory,
         seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
       });
     } else {
-      setForm(INITIAL);
+      setForm(buildInitialForm());
     }
     setTab("basic"); setDone(new Set());
   }, [editProduct, open]);
@@ -125,7 +145,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
 
   const handleClose = () => {
-    setForm(INITIAL); setTab("basic"); setDone(new Set()); onClose();
+    setForm(buildInitialForm()); setTab("basic"); setDone(new Set()); onClose();
   };
 
   const submit = async (status: "ACTIVE" | "DRAFT") => {
@@ -146,11 +166,18 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         taxRate: parseFloat(form.taxRate) || 18,
       };
       validAttrs.forEach((attr, idx) => {
-        const k = attr.name.toLowerCase();
-        if (["size","color","material","style"].includes(k)) v[k] = combo[idx];
+        const def = shopProfile.variantAttributes.find((d) => d.name === attr.name);
+        const key = def?.mapsTo ?? attr.name.toLowerCase();
+        if (["size", "color", "material", "style"].includes(key)) v[key] = combo[idx];
       });
       return v;
     });
+    const extraTags = [
+      ...form.tags,
+      ...(showUnit && form.unit ? [`unit:${form.unit}`] : []),
+      ...(showExpiry && form.expiryDate ? [`exp:${form.expiryDate}`] : []),
+      ...(showBatch && form.batchNumber ? [`batch:${form.batchNumber}`] : []),
+    ];
     const payload = {
       name: form.name.trim(),
       description: form.description || undefined,
@@ -164,7 +191,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       mrp: form.mrp ? parseFloat(form.mrp) : undefined,
       taxRate: parseFloat(form.taxRate) || 18,
       status,
-      tags: form.tags,
+      tags: extraTags,
       hasVariants: form.hasVariants,
       trackInventory: form.trackInventory,
       seoTitle: form.seoTitle || undefined,
@@ -254,6 +281,49 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           <Input placeholder="Enter HSN/SAC code" value={form.hsn} onChange={(e) => set("hsn", e.target.value)} />
         </div>
       </div>
+      {showUnit && (
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Unit of Measure</Label>
+            <Select value={form.unit} onValueChange={(v) => set("unit", v)}>
+              <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+              <SelectContent>
+                {shopProfile.units.map((u) => (
+                  <SelectItem key={u} value={u}>{u}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {showExpiry && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Expiry Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
+            </div>
+          )}
+          {showBatch && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Batch Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Input placeholder="e.g. BATCH-2026-001" value={form.batchNumber} onChange={(e) => set("batchNumber", e.target.value)} />
+            </div>
+          )}
+        </div>
+      )}
+      {!showUnit && (showExpiry || showBatch) && (
+        <div className="grid grid-cols-2 gap-4">
+          {showExpiry && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Expiry Date</Label>
+              <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
+            </div>
+          )}
+          {showBatch && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Batch Number</Label>
+              <Input placeholder="e.g. BATCH-2026-001" value={form.batchNumber} onChange={(e) => set("batchNumber", e.target.value)} />
+            </div>
+          )}
+        </div>
+      )}
       {/* Status */}
       <div className="flex items-center gap-3">
         <Label className="text-xs font-semibold">Status</Label>

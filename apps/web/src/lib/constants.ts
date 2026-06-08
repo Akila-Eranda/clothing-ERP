@@ -1,6 +1,6 @@
-export const APP_NAME = "FashionERP";
+export const APP_NAME = "ShopERP";
 export const APP_VERSION = "2.0.0";
-export const APP_DESCRIPTION = "Enterprise AI-Powered Fashion Retail Management";
+export const APP_DESCRIPTION = "Multi-Shop ERP — Clothing, Grocery, Hardware & Agriculture";
 
 export const CURRENCY = "LKR";
 export const CURRENCY_SYMBOL = "LKR";

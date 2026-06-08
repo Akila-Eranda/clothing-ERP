@@ -120,7 +120,7 @@ export class AuthService {
       }
     }
 
-    // ── Reset failed attempts ─────────────────────────────────
+    // ── Reset failed attempts + activate verified users on login ──
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
@@ -128,6 +128,9 @@ export class AuthService {
         lockedUntil: null,
         lastLoginAt: new Date(),
         lastLoginIp: ip,
+        ...(user.emailVerified && user.status === UserStatus.PENDING_VERIFICATION
+          ? { status: UserStatus.ACTIVE }
+          : {}),
       },
     });
 
@@ -166,6 +169,36 @@ export class AuthService {
     };
   }
 
+  /** Company platform console — only users in the platform tenant with SUPER_ADMIN */
+  async platformLogin(dto: LoginDto, ip?: string, userAgent?: string) {
+    const platformSlug =
+      this.configService.get<string>('app.platformTenantSubdomain') ?? 'platform';
+
+    const platformTenant = await this.prisma.tenant.findUnique({
+      where: { subdomain: platformSlug },
+      select: { id: true },
+    });
+
+    if (!platformTenant) {
+      throw new ForbiddenException(
+        'Platform admin is not configured. Contact your system administrator.',
+      );
+    }
+
+    const result = await this.login(dto, ip, userAgent, platformSlug);
+
+    if ('requiresTwoFactor' in result) return result;
+
+    const roles = result.user.roles ?? [];
+    if (!roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenException(
+        'This account cannot access the company admin console.',
+      );
+    }
+
+    return result;
+  }
+
   // ── Refresh ───────────────────────────────────────────────
   async refreshToken(token: string) {
     let payload: IRefreshTokenPayload;
@@ -199,15 +232,8 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token expired');
     }
 
-    // Mark current as used
-    await this.prisma.refreshToken.update({
-      where: { id: storedToken.id },
-      data: { isUsed: true },
-    });
-
-    const user = storedToken.user;
     const userWithRoles = await this.prisma.user.findUnique({
-      where: { id: user.id },
+      where: { id: storedToken.userId },
       include: {
         roles: {
           include: {
@@ -219,9 +245,19 @@ export class AuthService {
       },
     });
 
-    if (!userWithRoles || userWithRoles.status !== UserStatus.ACTIVE) {
+    if (
+      !userWithRoles ||
+      userWithRoles.status === UserStatus.INACTIVE ||
+      userWithRoles.status === UserStatus.SUSPENDED
+    ) {
       throw new UnauthorizedException('User inactive');
     }
+
+    // Mark current as used only after validation passes
+    await this.prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { isUsed: true },
+    });
 
     const roles = userWithRoles.roles.map((ur) => (ur.role as { type: string }).type);
     const permissions = userWithRoles.roles.flatMap((ur) =>
@@ -230,7 +266,14 @@ export class AuthService {
       ),
     );
 
-    return this.generateTokens(user.id, user.tenantId, user.email, roles, permissions, payload.family);
+    return this.generateTokens(
+      userWithRoles.id,
+      userWithRoles.tenantId,
+      userWithRoles.email,
+      roles,
+      permissions,
+      payload.family,
+    );
   }
 
   // ── Logout ────────────────────────────────────────────────

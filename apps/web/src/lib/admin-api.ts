@@ -1,4 +1,5 @@
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
+const PLATFORM_TENANT = process.env.NEXT_PUBLIC_PLATFORM_TENANT || 'platform'
 
 const TOKEN_KEY = 'fashionerp_admin_token'
 const TENANT_KEY = 'fashionerp_admin_tenant'
@@ -89,6 +90,7 @@ export interface TenantRow {
   phone?: string
   plan: string
   status: string
+  shopType?: string
   currency: string
   country: string
   timezone: string
@@ -246,10 +248,10 @@ export async function updatePlanCatalog(key: string, data: Partial<PlanDef>): Pr
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-export async function adminLogin(email: string, password: string, tenantSlug: string) {
+export async function adminLogin(email: string, password: string) {
   const res = await fetch(`${API_BASE}/auth/platform-login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantSlug },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password }),
   })
   const json = await res.json()
@@ -261,9 +263,9 @@ export async function adminLogin(email: string, password: string, tenantSlug: st
   if (!data.accessToken) throw new Error('No token received')
   const roles: string[] = data.user?.roles ?? parseRolesFromToken(data.accessToken)
   if (!roles.includes('SUPER_ADMIN')) {
-    throw new Error('This account does not have Super Admin access to the platform console.')
+    throw new Error('This account does not have company admin access.')
   }
-  adminAuth.setSession(data.accessToken, tenantSlug, roles)
+  adminAuth.setSession(data.accessToken, PLATFORM_TENANT, roles)
   return data
 }
 
@@ -324,6 +326,7 @@ export async function registerTenant(data: {
   email: string
   phone?: string
   plan: string
+  shopType?: string
   currency?: string
   country?: string
   timezone?: string
@@ -344,6 +347,7 @@ export async function registerTenant(data: {
     adminLastName:  rest.join(' ') || '-',
     plan:           data.plan,
   }
+  if (data.shopType) payload.shopType = data.shopType
   if (data.phone) payload.phone = data.phone
   if (data.currency) payload.currency = data.currency
   if (data.country) payload.country = data.country

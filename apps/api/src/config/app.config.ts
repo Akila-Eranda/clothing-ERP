@@ -8,4 +8,6 @@ export default registerAs('app', () => ({
   allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(','),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000',
   uploadMaxSize: parseInt(process.env.UPLOAD_MAX_SIZE || '10485760', 10), // 10MB
+  /** Internal company tenant — only users here may use platform-login / admin3 */
+  platformTenantSubdomain: process.env.PLATFORM_TENANT_SUBDOMAIN || 'platform',
 }));

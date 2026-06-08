@@ -15,6 +15,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+ARG NEXT_PUBLIC_ADMIN_HOSTS=admin3.hexalyte.com
+ENV NEXT_PUBLIC_ADMIN_HOSTS=$NEXT_PUBLIC_ADMIN_HOSTS
+
+ARG NEXT_PUBLIC_PLATFORM_TENANT=platform
+ENV NEXT_PUBLIC_PLATFORM_TENANT=$NEXT_PUBLIC_PLATFORM_TENANT
+
 RUN pnpm build
 
 # ── Stage 2: Runner ───────────────────────────────────────────

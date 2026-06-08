@@ -6,6 +6,7 @@ import { Printer, ArrowLeft, Minus, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, variantColumnLabelsFromProfile } from "@/lib/use-shop-profile";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface POItem {
@@ -22,6 +23,8 @@ interface POItem {
     sellingPrice: number;
     color?: string | null;
     size?: string | null;
+    style?: string | null;
+    material?: string | null;
     product?: { name: string };
   };
 }
@@ -52,14 +55,31 @@ function BarcodeEl({ value, id }: { value: string; id: string }) {
   return <svg ref={ref} className="max-w-full" />;
 }
 
-type LabelFormat = "sticker" | "hangtag";
+type LabelFormat = "sticker" | "hangtag" | "shelf";
+
+const FORMAT_LABELS: Record<LabelFormat, string> = {
+  sticker: "🏷️ Sticker",
+  hangtag: "🎫 Hang Tag",
+  shelf: "📋 Shelf Label",
+};
+
+function variantFieldValue(variant: POItem["variant"], mapsTo?: string): string {
+  if (!variant || !mapsTo) return "—";
+  const val = variant[mapsTo as keyof NonNullable<POItem["variant"]>];
+  return typeof val === "string" && val ? val : "—";
+}
+
+function variantDisplayLine(variant?: POItem["variant"], fallback?: string): string {
+  const parts = [variant?.size, variant?.material, variant?.color, variant?.style].filter(Boolean);
+  return parts.length ? parts.join(" / ") : (fallback ?? "");
+}
 
 // ── Sticker Label (thermal 60×40mm) ──────────────────────────────────────
 function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
   const baseCode   = item.variant?.barcode || item.sku;
   const barcodeVal = `${baseCode}${serial.toString().padStart(3, "0")}`;
   const price      = item.variant?.sellingPrice ?? item.unitCost;
-  const variantLine = [item.variant?.color, item.variant?.size].filter(Boolean).join(" / ") || item.variantName;
+  const variantLine = variantDisplayLine(item.variant, item.variantName);
   return (
     <div className="label-card bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
       style={{ width: "7.5cm", minHeight: "4.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
@@ -107,15 +127,59 @@ function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; s
   );
 }
 
+// ── Shelf Label (grocery shelf edge, landscape) ─────────────────────────
+function ShelfLabel({ item, shopName, serial, unit }: { item: POItem; shopName: string; serial: number; unit?: string }) {
+  const baseCode   = item.variant?.barcode || item.sku;
+  const barcodeVal = `${baseCode}${serial.toString().padStart(3, "0")}`;
+  const price      = item.variant?.sellingPrice ?? item.unitCost;
+  const variantLine = variantDisplayLine(item.variant, item.variantName);
+  return (
+    <div className="label-card bg-white border-2 border-emerald-700 rounded flex flex-col justify-between overflow-hidden"
+      style={{ width: "10cm", minHeight: "3.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}>
+      <div className="bg-emerald-700 px-2 py-1 flex items-center justify-between">
+        <p className="text-[9px] font-bold tracking-wider uppercase text-white truncate">{shopName}</p>
+        {unit && <span className="text-[8px] font-semibold text-emerald-100 shrink-0 ml-2">/{unit}</span>}
+      </div>
+      <div className="px-2 py-1 flex items-end justify-between gap-2 flex-1">
+        <div className="min-w-0">
+          <p className="text-[12px] font-bold leading-tight truncate">{item.productName}</p>
+          {variantLine && <p className="text-[9px] text-gray-500 truncate">{variantLine}</p>}
+        </div>
+        <p className="text-[16px] font-extrabold text-emerald-800 shrink-0">
+          {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+      <div className="border-t px-1 pb-0.5 flex items-center justify-center">
+        <BarcodeEl value={barcodeVal} id={`shelf-${item.id}-${serial}`} />
+      </div>
+    </div>
+  );
+}
+
+function LabelPreview({ format, item, shopName, serial, unit }: {
+  format: LabelFormat; item: POItem; shopName: string; serial: number; unit?: string;
+}) {
+  if (format === "hangtag") return <HangTag item={item} shopName={shopName} serial={serial} />;
+  if (format === "shelf") return <ShelfLabel item={item} shopName={shopName} serial={serial} unit={unit} />;
+  return <StickerLabel item={item} shopName={shopName} serial={serial} />;
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function PrintTagsPage() {
+  const shopProfile = useShopProfile();
+  const templates = shopProfile.labelTemplates;
+  const defaultFormat = (templates[0] ?? "sticker") as LabelFormat;
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
   const [po,      setPo]      = useState<PO | null>(null);
   const [loading, setLoading] = useState(true);
   const [qtys,    setQtys]    = useState<Record<string, number>>({});
-  const [format,  setFormat]  = useState<LabelFormat>("sticker");
+  const [format,  setFormat]  = useState<LabelFormat>(defaultFormat);
+
+  useEffect(() => {
+    if (!templates.includes(format)) setFormat(defaultFormat);
+  }, [templates, format, defaultFormat]);
 
   const load = useCallback(async () => {
     try {
@@ -142,7 +206,10 @@ export default function PrintTagsPage() {
   if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
   if (!po)     return <div className="flex items-center justify-center min-h-screen text-muted-foreground">PO not found</div>;
 
-  const shopName = "FashionERP";
+  const shopName = "ShopERP";
+  const [colA, colB] = variantColumnLabelsFromProfile(shopProfile);
+  const attrA = shopProfile.variantAttributes[0]?.mapsTo;
+  const attrB = shopProfile.variantAttributes[1]?.mapsTo;
 
   // Expand items by qty for print — each copy gets its own serial number
   const expandedLabels: { item: POItem; key: string; serial: number }[] = [];
@@ -194,14 +261,12 @@ export default function PrintTagsPage() {
               Total: <strong className="text-foreground">{totalLabels}</strong> labels
             </span>
             <div className="flex rounded-lg border overflow-hidden">
-              <button onClick={() => setFormat("sticker")}
-                className={`px-3 py-1.5 text-xs font-medium transition-colors ${ format === "sticker" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted" }`}>
-                🏷️ Sticker
-              </button>
-              <button onClick={() => setFormat("hangtag")}
-                className={`px-3 py-1.5 text-xs font-medium border-l transition-colors ${ format === "hangtag" ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted" }`}>
-                🎫 Hang Tag
-              </button>
+              {templates.map((tpl, i) => (
+                <button key={tpl} onClick={() => setFormat(tpl)}
+                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${ format === tpl ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted" }`}>
+                  {FORMAT_LABELS[tpl]}
+                </button>
+              ))}
             </div>
             <Button onClick={handlePrint} className="gap-2 px-5">
               <Printer className="h-4 w-4" /> Print
@@ -222,8 +287,8 @@ export default function PrintTagsPage() {
                 <tr>
                   <th className="px-5 py-2.5 text-left">Item</th>
                   <th className="px-5 py-2.5 text-left w-28">SKU</th>
-                  <th className="px-5 py-2.5 text-left w-20">Size</th>
-                  <th className="px-5 py-2.5 text-left w-20">Color</th>
+                  <th className="px-5 py-2.5 text-left w-20">{colA}</th>
+                  <th className="px-5 py-2.5 text-left w-20">{colB}</th>
                   <th className="px-5 py-2.5 text-right w-24">Ordered</th>
                   <th className="px-5 py-2.5 text-right w-24">Received</th>
                   <th className="px-5 py-2.5 text-center w-36">Print Qty</th>
@@ -234,8 +299,8 @@ export default function PrintTagsPage() {
                   <tr key={item.id} className="hover:bg-muted/10">
                     <td className="px-5 py-3 font-medium">{item.productName}</td>
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{item.sku}</td>
-                    <td className="px-5 py-3 text-xs">{item.variant?.size ?? "—"}</td>
-                    <td className="px-5 py-3 text-xs">{item.variant?.color ?? "—"}</td>
+                    <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrA)}</td>
+                    <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrB)}</td>
                     <td className="px-5 py-3 text-right text-muted-foreground">{item.orderedQty}</td>
                     <td className="px-5 py-3 text-right text-green-600 font-medium">{item.receivedQty}</td>
                     <td className="px-5 py-3">
@@ -267,9 +332,7 @@ export default function PrintTagsPage() {
             ) : (
               <div className="flex flex-wrap gap-3">
                 {expandedLabels.map(({ item, key, serial }) =>
-                  format === "hangtag"
-                    ? <HangTag key={key} item={item} shopName={shopName} serial={serial} />
-                    : <StickerLabel key={key} item={item} shopName={shopName} serial={serial} />
+                  <LabelPreview key={key} format={format} item={item} shopName={shopName} serial={serial} unit={shopProfile.defaultUnit} />
                 )}
               </div>
             )}
@@ -281,9 +344,7 @@ export default function PrintTagsPage() {
       {/* ── Print-only labels ── */}
       <div className="print-grid hidden print:flex">
         {expandedLabels.map(({ item, key, serial }) =>
-          format === "hangtag"
-            ? <HangTag key={key} item={item} shopName={shopName} serial={serial} />
-            : <StickerLabel key={key} item={item} shopName={shopName} serial={serial} />
+          <LabelPreview key={key} format={format} item={item} shopName={shopName} serial={serial} unit={shopProfile.defaultUnit} />
         )}
       </div>
     </>
