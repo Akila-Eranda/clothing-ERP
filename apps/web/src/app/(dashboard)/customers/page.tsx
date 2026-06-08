@@ -15,6 +15,8 @@ import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
+import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
 import { api } from "@/lib/api";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { AddCustomerModal, type Customer } from "@/components/customers/add-customer-modal";
@@ -45,11 +47,12 @@ function buildColumns(
   onView:   (c: Customer) => void,
   onEdit:   (c: Customer) => void,
   onDelete: (c: Customer) => void,
+  opts: { showLoyalty: boolean; customerLabel: string },
 ): ColumnDef<Customer>[] {
-  return [
+  const cols: ColumnDef<Customer>[] = [
     {
       id: "customer",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={opts.customerLabel.replace(/s$/, '')} />,
       cell: ({ row }) => {
         const c = row.original;
         const name = `${c.firstName} ${c.lastName ?? ""}`.trim();
@@ -94,13 +97,17 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Orders" />,
       cell: ({ row }) => <span className="text-sm">{row.original.totalOrders}</span>,
     },
-    {
+  ];
+  if (opts.showLoyalty) {
+    cols.push({
       accessorKey: "loyaltyPoints",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Points" />,
       cell: ({ row }) => (
         <span className="text-sm font-semibold text-amber-500">{formatNumber(row.original.loyaltyPoints)}</span>
       ),
-    },
+    });
+  }
+  cols.push(
     {
       accessorKey: "walletBalance",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Wallet" />,
@@ -120,11 +127,17 @@ function buildColumns(
         />
       ),
     },
-  ];
+  );
+  return cols;
 }
 
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function CustomersPage() {
+  const { profile, workspace } = useShopWorkspace();
+  const showLoyalty = hasShopModule(profile, 'loyalty');
+  const customerTitle = profile.type === ShopType.AGRICULTURE
+    ? `${workspace.customerLabel} & Accounts`
+    : `${workspace.customerLabel} & CRM`;
   const [customers, setCustomers]       = useState<Customer[]>([]);
   const [loading, setLoading]           = useState(true);
   const [addOpen, setAddOpen]           = useState(false);
@@ -157,16 +170,19 @@ export default function CustomersPage() {
   const premium     = customers.filter((c) => ["GOLD","PLATINUM","DIAMOND"].includes(c.tier)).length;
 
   const STATS = [
-    { label: "Total Customers", value: customers.length,                    icon: Users,   color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Gold+ Members",   value: premium,                             icon: Crown,   color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "Loyalty Points",  value: formatNumber(totalPoints),           icon: Gift,    color: "text-violet-500",  bg: "bg-violet-500/10" },
-    { label: "Wallet Balance",  value: `LKR ${formatNumber(totalWallet)}`,    icon: Wallet,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: `Total ${workspace.customerLabel}`, value: customers.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    ...(showLoyalty ? [
+      { label: "Gold+ Members", value: premium, icon: Crown, color: "text-amber-500", bg: "bg-amber-500/10" },
+      { label: "Loyalty Points", value: formatNumber(totalPoints), icon: Gift, color: "text-violet-500", bg: "bg-violet-500/10" },
+    ] : []),
+    { label: "Wallet Balance", value: `LKR ${formatNumber(totalWallet)}`, icon: Wallet, color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
   const columns = buildColumns(
     (c) => setViewId(c.id),
     (c) => { setEditCustomer(c); setAddOpen(true); },
     handleDelete,
+    { showLoyalty, customerLabel: workspace.customerLabel },
   );
 
   return (
@@ -174,8 +190,10 @@ export default function CustomersPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Customers & CRM</h1>
-          <p className="text-sm text-muted-foreground">Manage customer relationships and loyalty</p>
+          <h1 className="text-2xl font-bold">{customerTitle}</h1>
+          <p className="text-sm text-muted-foreground">
+            Manage {workspace.customerLabel.toLowerCase()}{showLoyalty ? ' relationships and loyalty' : ' accounts and credit'}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={fetchCustomers} className="gap-1.5">
@@ -185,7 +203,7 @@ export default function CustomersPage() {
             <Download className="h-3.5 w-3.5" /> Export
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => { setEditCustomer(undefined); setAddOpen(true); }}>
-            <Plus className="h-3.5 w-3.5" /> Add Customer
+            <Plus className="h-3.5 w-3.5" /> Add {workspace.customerLabel.replace(/s$/, '')}
           </Button>
         </div>
       </div>

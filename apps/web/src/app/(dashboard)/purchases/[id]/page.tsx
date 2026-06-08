@@ -12,6 +12,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { ReceiveItemsModal } from "@/components/purchases/receive-items-modal";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getRouteLabels } from "@/lib/shop-vertical";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface POItem {
@@ -95,6 +97,10 @@ function StatusTimeline({ status, orderDate }: { status: string; orderDate: stri
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function PODetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { profile, workspace } = useShopWorkspace();
+  const routeLabels = getRouteLabels(workspace, profile);
+  const printLabel = routeLabels.printTags ?? 'Print Labels';
+  const showPrintLabels = profile.labelTemplates.length > 0;
   const router = useRouter();
 
   const [po,       setPo]       = useState<PO | null>(null);
@@ -165,10 +171,12 @@ export default function PODetailPage() {
                   onClick={() => router.push(`/purchases/${po.id}/grn`)}>
                   <Package className="h-3.5 w-3.5" /> GRN
                 </Button>
+                {showPrintLabels && (
                 <Button variant="outline" size="sm" className="gap-1.5"
                   onClick={() => router.push(`/purchases/${po.id}/print-tags`)}>
-                  <Tag className="h-3.5 w-3.5" /> Print Tags
+                  <Tag className="h-3.5 w-3.5" /> {printLabel}
                 </Button>
+                )}
                 <Button variant="outline" size="sm" className="gap-1.5">
                   <Printer className="h-3.5 w-3.5" /> Print
                 </Button>

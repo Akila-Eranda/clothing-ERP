@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
 import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
+import { nextVariantAttributeName, variantVariantHint } from "@/lib/shop-vertical";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -57,7 +58,7 @@ const buildInitialForm = (): Form => {
     categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
     tags: [], tagInput: "",
     sellingPrice: "", costPrice: "", mrp: "", taxRate: "18",
-    hasVariants: defaultHasVariants(profile),
+    hasVariants: defaultHasVariants(profile.type),
     attributes: variantAttrsFromProfile(profile.type),
     unit: profile.defaultUnit,
     expiryDate: "",
@@ -96,6 +97,7 @@ interface Props { open: boolean; onClose: () => void; onCreated?: () => void; ed
 
 export function AddProductModal({ open, onClose, onCreated, editProduct }: Props) {
   const shopProfile = useShopProfile();
+  const variantHint = variantVariantHint(shopProfile);
   const showUnit = hasMultiUnit(shopProfile);
   const showExpiry = hasExpiryTracking(shopProfile);
   const showBatch = hasBatchTracking(shopProfile);
@@ -377,7 +379,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">Variants</h3>
-            <p className="text-sm text-muted-foreground">Add product variants like Size, Color etc. and generate SKUs</p>
+            <p className="text-sm text-muted-foreground">Add product variants like {variantHint} and generate SKUs</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Manage Variants</span>
@@ -438,10 +440,14 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() =>
-                      set("attributes", [...form.attributes, { name: "Color", values: [], input: "" }])}>
+                    {form.attributes.length < shopProfile.variantAttributes.length && (
+                    <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => {
+                      const next = nextVariantAttributeName(shopProfile, form.attributes);
+                      if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
+                    }}>
                       <Plus className="h-3.5 w-3.5" /> Add Attribute
                     </Button>
+                    )}
                     <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
                       <Zap className="h-3.5 w-3.5" /> Auto Generate
                     </Button>
@@ -558,7 +564,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Layers className="h-12 w-12 mb-3 opacity-20" />
             <p className="font-medium">Variants disabled</p>
-            <p className="text-sm mt-1">Toggle "Manage Variants" above to add Size, Color etc.</p>
+            <p className="text-sm mt-1">Toggle &quot;Manage Variants&quot; above to add {variantHint}</p>
           </div>
         )}
       </div>
@@ -693,7 +699,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         <div className="flex items-center justify-between">
           <div>
             <p className="font-semibold text-sm">Has Variants</p>
-            <p className="text-xs text-muted-foreground">Product has multiple variants (Size, Color, etc.)</p>
+            <p className="text-xs text-muted-foreground">Product has multiple variants ({variantHint})</p>
           </div>
           <Switch checked={form.hasVariants} onCheckedChange={(v) => set("hasVariants", v)} />
         </div>

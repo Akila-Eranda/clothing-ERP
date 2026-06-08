@@ -429,14 +429,14 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     `w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${step >= n ? 'bg-indigo-600 text-white' : 'bg-white/10 text-white/30'}`
   const line = (n: number) =>
     `flex-1 h-0.5 mx-1 transition-colors ${step > n ? 'bg-indigo-600' : 'bg-white/10'}`
-  const inp = 'w-full px-4 py-2.5 text-sm rounded-xl outline-none text-white placeholder:text-white/30 bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30'
+  const inp = 'w-full px-4 py-2 text-sm rounded-xl outline-none text-white placeholder:text-white/30 bg-white/5 border border-white/10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/30'
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="rounded-2xl w-full max-w-[560px] shadow-2xl overflow-hidden" style={{background:'#0f172a',border:'1px solid rgba(255,255,255,0.08)'}}>
+      <div className="rounded-2xl w-full max-w-[820px] max-h-[92vh] flex flex-col shadow-2xl overflow-hidden" style={{background:'#0f172a',border:'1px solid rgba(255,255,255,0.08)'}}>
 
         {/* Step progress */}
-        <div className="px-7 pt-7 pb-5" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
+        <div className="px-6 pt-5 pb-4 shrink-0" style={{borderBottom:'1px solid rgba(255,255,255,0.07)'}}>
           <div className="flex items-center">
             <div className={circ(1)}>{step > 1 ? <Check size={13}/> : 1}</div>
             <div className={line(1)}/>
@@ -449,83 +449,91 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
           </div>
         </div>
 
-        <div className="px-7 py-6">
+        <div className="px-6 py-5 overflow-y-auto min-h-0">
 
           {/* ── Step 1: Shop Details ── */}
           {step === 1 && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <h3 className="text-base font-bold text-white">Shop Details</h3>
               <div>
-                <label className="block text-sm font-medium mb-2" style={{color:'rgba(255,255,255,0.6)'}}>Business Type *</label>
-                <div className="grid grid-cols-2 gap-2">
+                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Business Type *</label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {SHOP_TYPE_LIST.map((p) => (
                     <button
                       key={p.type}
                       type="button"
                       onClick={() => setForm(f => ({ ...f, shopType: p.type }))}
-                      className="rounded-xl p-3 text-left transition-all"
+                      className="rounded-xl p-2.5 text-left transition-all"
                       style={form.shopType === p.type
                         ? { border: '2px solid #4f46e5', background: 'rgba(79,70,229,0.12)' }
                         : { border: '2px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
                     >
-                      <span className="text-lg">{p.emoji}</span>
-                      <p className="text-sm font-semibold text-white mt-1">{p.label}</p>
-                      <p className="text-[10px] mt-0.5 leading-tight" style={{color:'rgba(255,255,255,0.4)'}}>{p.labelSi}</p>
+                      <span className="text-base">{p.emoji}</span>
+                      <p className="text-xs font-semibold text-white mt-0.5 leading-tight">{p.label}</p>
+                      <p className="text-[9px] mt-0.5 leading-tight line-clamp-1" style={{color:'rgba(255,255,255,0.4)'}}>{p.labelSi}</p>
                     </button>
                   ))}
                 </div>
-                <div className="rounded-xl p-3 max-h-36 overflow-y-auto" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'rgba(255,255,255,0.45)' }}>
+                <div className="rounded-xl px-3 py-2 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'rgba(255,255,255,0.45)' }}>
                     {selectedProfile.label} features
                   </p>
-                  <ShopFeatureList features={getVerticalFeatures(form.shopType)} compact variant="on-dark" showComingSoon={false} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop Name</label>
-                <input className={inp} placeholder="e.g. Fashion Hub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Shop URL (Subdomain)</label>
-                <div className="flex items-center rounded-xl overflow-hidden" style={{border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)'}}>
-                  <input
-                    className="flex-1 px-4 py-2.5 text-sm bg-transparent outline-none text-white placeholder:text-white/30"
-                    placeholder="fashion-hub"
-                    value={form.subdomain}
-                    onChange={e => setForm(f => ({...f, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'').replace(/^-|-$/g,'')}))}
+                  <ShopFeatureList
+                    features={getVerticalFeatures(form.shopType)}
+                    compact
+                    variant="on-dark"
+                    showComingSoon={false}
+                    className="grid grid-cols-2 gap-x-4 gap-y-1 space-y-0"
                   />
-                  <span className="px-3 py-2.5 text-sm shrink-0 select-none" style={{color:'rgba(255,255,255,0.35)',borderLeft:'1px solid rgba(255,255,255,0.08)'}}>
-                    .shop.hexalyte.com
-                  </span>
-                </div>
-                {form.subdomain && (
-                  <p className="mt-1.5 text-xs" style={{color:'rgba(99,102,241,0.9)'}}>
-                    🔗 https://{form.subdomain}.shop.hexalyte.com
-                  </p>
-                )}
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Owner Name</label>
-                <input className={inp} placeholder="e.g. Kamal Perera" value={form.ownerName} onChange={e => setForm(f => ({...f, ownerName: e.target.value}))}/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Email</label>
-                <input type="email" className={inp} placeholder="owner@shop.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Phone</label>
-                <input className={inp} placeholder="+94771234567" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}/>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>
-                  Password <span className="font-normal" style={{color:'rgba(255,255,255,0.3)'}}>(required, min 8 characters)</span>
-                </label>
-                <div className="relative">
-                  <input type={showPass ? 'text' : 'password'} className={inp + ' pr-14'} placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
-                  <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium" style={{color:'rgba(255,255,255,0.4)'}}>{showPass ? 'Hide' : 'Show'}</button>
                 </div>
               </div>
-              <div className="flex justify-between pt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>Shop Name</label>
+                  <input className={inp} placeholder="e.g. Fashion Hub" value={form.shopName} onChange={e => onShopName(e.target.value)}/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>Owner Name</label>
+                  <input className={inp} placeholder="e.g. Kamal Perera" value={form.ownerName} onChange={e => setForm(f => ({...f, ownerName: e.target.value}))}/>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>Shop URL (Subdomain)</label>
+                  <div className="flex items-center rounded-xl overflow-hidden" style={{border:'1px solid rgba(255,255,255,0.1)',background:'rgba(255,255,255,0.05)'}}>
+                    <input
+                      className="flex-1 px-4 py-2 text-sm bg-transparent outline-none text-white placeholder:text-white/30"
+                      placeholder="fashion-hub"
+                      value={form.subdomain}
+                      onChange={e => setForm(f => ({...f, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g,'').replace(/^-|-$/g,'')}))}
+                    />
+                    <span className="px-3 py-2 text-sm shrink-0 select-none" style={{color:'rgba(255,255,255,0.35)',borderLeft:'1px solid rgba(255,255,255,0.08)'}}>
+                      .shop.hexalyte.com
+                    </span>
+                  </div>
+                  {form.subdomain && (
+                    <p className="mt-1 text-xs" style={{color:'rgba(99,102,241,0.9)'}}>
+                      🔗 https://{form.subdomain}.shop.hexalyte.com
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>Email</label>
+                  <input type="email" className={inp} placeholder="owner@shop.com" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))}/>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>Phone</label>
+                  <input className={inp} placeholder="+94771234567" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}/>
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-medium mb-1" style={{color:'rgba(255,255,255,0.6)'}}>
+                    Password <span className="font-normal" style={{color:'rgba(255,255,255,0.3)'}}>(required, min 8 characters)</span>
+                  </label>
+                  <div className="relative max-w-md">
+                    <input type={showPass ? 'text' : 'password'} className={inp + ' pr-14 py-2'} placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
+                    <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium" style={{color:'rgba(255,255,255,0.4)'}}>{showPass ? 'Hide' : 'Show'}</button>
+                  </div>
+                </div>
+              </div>
+              <div className="flex justify-between pt-1">
                 <button onClick={onClose} className="px-5 py-2.5 text-sm rounded-xl transition-colors" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>Cancel</button>
                 <button onClick={() => setStep(2)} disabled={!canNext} className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-40" style={{background:'#4f46e5'}}>Next →</button>
               </div>
@@ -539,9 +547,9 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               <p className="text-xs" style={{color:'rgba(255,255,255,0.45)'}}>
                 Starter includes a <strong className="text-white">{STARTER_TRIAL_DAYS}-day free trial</strong>. Paid plans activate immediately.
               </p>
-              <div className="space-y-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {plans.map(p => (
-                  <label key={p.key} className="flex items-center justify-between p-4 rounded-xl cursor-pointer transition-all" style={form.plan === p.key ? {border:'2px solid #4f46e5',background:'rgba(79,70,229,0.1)'} : {border:'2px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)'}}>
+                  <label key={p.key} className="flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all" style={form.plan === p.key ? {border:'2px solid #4f46e5',background:'rgba(79,70,229,0.1)'} : {border:'2px solid rgba(255,255,255,0.08)',background:'rgba(255,255,255,0.03)'}}>
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0" style={{borderColor: form.plan === p.key ? '#4f46e5' : 'rgba(255,255,255,0.2)'}}>
                         {form.plan === p.key && <div className="w-2 h-2 rounded-full" style={{background:'#4f46e5'}}/>}
@@ -581,9 +589,9 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                   {' · '}{formatPlanLimit(selectedPlan.maxBranches)} branches
                 </div>
               )}
-              <div className="space-y-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {provItems.map(item => (
-                  <div key={item.key} className="flex items-center gap-3 p-3.5 rounded-xl transition-all duration-300" style={provDone.includes(item.key) ? {border:'1px solid rgba(16,185,129,0.3)',background:'rgba(16,185,129,0.08)'} : {border:'1px solid rgba(255,255,255,0.07)',background:'rgba(255,255,255,0.03)'}}>
+                  <div key={item.key} className="flex items-center gap-3 p-3 rounded-xl transition-all duration-300" style={provDone.includes(item.key) ? {border:'1px solid rgba(16,185,129,0.3)',background:'rgba(16,185,129,0.08)'} : {border:'1px solid rgba(255,255,255,0.07)',background:'rgba(255,255,255,0.03)'}}>
                     <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-all" style={provDone.includes(item.key) ? {background:'#10b981'} : {background:'rgba(255,255,255,0.05)',border:'1px solid rgba(255,255,255,0.1)'}}>
                       {provDone.includes(item.key) ? <Check size={13} className="text-white"/> : <div className="w-2 h-2 rounded-full" style={{background:'rgba(255,255,255,0.2)'}}/>}
                     </div>

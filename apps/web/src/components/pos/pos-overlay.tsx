@@ -12,6 +12,9 @@ import { formatNumber } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
+import { getReturnReasons, variantTableColumns } from "@/lib/shop-vertical";
+import { APP_NAME } from "@/lib/constants";
 
 interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; }
@@ -23,8 +26,8 @@ interface SaleDetail { id: string; invoiceNumber: string; total: number; invoice
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }];
-const NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw }, { id:"discounts", label:"Discounts", icon: Tag }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
-const SIZE_ORDER = ["XS","S","M","L","XL","XXL","XXXL","28","30","32","34","36","38","40","42","44"];
+
+const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
@@ -34,6 +37,19 @@ const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", 
 export function POSOverlay() {
   const { posOpen, closePos } = useUIStore();
   const { user } = useAuthStore();
+  const { profile, workspace } = useShopWorkspace();
+  const showLoyalty = hasShopModule(profile, 'loyalty');
+  const variantCols = variantTableColumns(profile);
+  const attr1 = variantCols[0];
+  const attr2 = variantCols[1];
+  const sizePresets = attr1?.presets ?? [];
+  const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
+    if (!item.module) return true;
+    return hasShopModule(profile, item.module);
+  }).map((item) => item.id === 'customers'
+    ? { ...item, label: workspace.customerLabel }
+    : item), [profile, workspace.customerLabel]);
+  const returnReasons = React.useMemo(() => getReturnReasons(profile.type), [profile.type]);
   const [products, setProducts] = React.useState<ProductItem[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [categories, setCategories] = React.useState<string[]>(["All"]);
@@ -141,7 +157,7 @@ export function POSOverlay() {
   const productGroups = React.useMemo(() => { const m = new Map<string,ProductItem[]>(); for (const p of products) m.set(p.productName,[...(m.get(p.productName)||[]),p]); return m; }, [products]);
   const getVariants = React.useCallback((n:string)=>productGroups.get(n)||[], [productGroups]);
   const getColors = React.useCallback((n:string)=>[...new Set(getVariants(n).map(v=>v.color).filter(Boolean))] as string[], [getVariants]);
-  const getSizes = React.useCallback((n:string)=>{ const s=[...new Set(getVariants(n).map(v=>v.size).filter(Boolean))] as string[]; return s.sort((a,b)=>{const ai=SIZE_ORDER.indexOf(a.toUpperCase()),bi=SIZE_ORDER.indexOf(b.toUpperCase());return(ai===-1?99:ai)-(bi===-1?99:bi);});}, [getVariants]);
+  const getSizes = React.useCallback((n:string)=>{ const s=[...new Set(getVariants(n).map(v=>v.size).filter(Boolean))] as string[]; return s.sort((a,b)=>{const ai=sizePresets.indexOf(a.toUpperCase()),bi=sizePresets.indexOf(b.toUpperCase());return(ai===-1?99:ai)-(bi===-1?99:bi);});}, [getVariants, sizePresets]);
   const findVariant = React.useCallback((n:string,c?:string,s?:string)=>getVariants(n).find(v=>(!c||v.color===c)&&(!s||v.size===s))??getVariants(n)[0], [getVariants]);
   const activeVariant = React.useMemo(()=>selectedProductName?findVariant(selectedProductName,selColor??undefined,selSize??undefined):null, [selectedProductName,selColor,selSize,findVariant]);
   const totalAmt = total(); const changeAmt = numpad ? Math.max(0,parseFloat(numpad)-totalAmt) : 0;
@@ -192,7 +208,7 @@ export function POSOverlay() {
     const discountHtml=(s.showDiscount&&r.discount>0)?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:"";
     const taxHtml=(s.showTax&&r.tax>0)?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:"";
     const barcodeHtml=s.showBarcode?`<div style="text-align:center;font-family:monospace;letter-spacing:2px;font-size:9px;margin:4px 0">${r.invoiceNumber}</div>`:"";
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:${fs};padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px}.d{border:none;border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em;line-height:1.6}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body>${logoHtml}<h1>${s.shopName||"FashionERP"}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div><hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:${fs};padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px}.d{border:none;border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em;line-height:1.6}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div><hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
   },[user, receiptSettings]);
 
   const handleCheckout = React.useCallback(async()=>{
@@ -218,7 +234,7 @@ export function POSOverlay() {
     const s = receiptSettings;
     const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
     const rows = items.map(i => `<div class="iname">${i.productName} · ${i.variantName}</div><div class="row"><span>${i.quantity} x LKR ${i.unitPrice.toFixed(2)}</span><span>LKR ${(i.quantity*i.unitPrice).toFixed(2)}</span></div>`).join("");
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||"FashionERP"}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`);
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`);
     w.document.close();
     setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 500); }, 200);
   }, [items, totalAmt, receiptSettings, user]);
@@ -326,8 +342,8 @@ export function POSOverlay() {
                 <div className="w-24 shrink-0 p-2 flex items-center justify-center border-r" style={{borderColor:"#1e3356"}}><div className="w-full aspect-square rounded-xl flex items-center justify-center" style={{background:getCardBg(activeVariant.color)}}><Package className="h-8 w-8 text-white/30"/></div></div>
                 <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
                   <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold leading-tight">{activeVariant.productName}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{activeVariant.variantName}</p></div><button onClick={()=>setSelectedProductName(null)} className="p-0.5 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
-                  {getColors(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>Color</p><div className="flex gap-1 flex-wrap">{getColors(selectedProductName).map(c=><button key={c} onClick={()=>setSelColor(c)} title={c} className="h-5 w-5 rounded-full border-2 transition-all" style={{background:getColorHex(c),borderColor:selColor===c?"#4f6ef7":"transparent"}}/>)}</div></div>)}
-                  {getSizes(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>Size</p><div className="flex gap-1 flex-wrap">{getSizes(selectedProductName).map(s=><button key={s} onClick={()=>setSelSize(s)} className="px-2 py-0.5 rounded text-[10px] font-bold border transition-all" style={{background:selSize===s?"#4f6ef7":"#1a2b4a",color:selSize===s?"#fff":"#6a8ab8",borderColor:selSize===s?"#4f6ef7":"#1e3356"}}>{s}</button>)}</div></div>)}
+                  {getColors(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{attr2?.isColor ? attr2.label : 'Color'}</p><div className="flex gap-1 flex-wrap">{getColors(selectedProductName).map(c=><button key={c} onClick={()=>setSelColor(c)} title={c} className="h-5 w-5 rounded-full border-2 transition-all" style={{background:getColorHex(c),borderColor:selColor===c?"#4f6ef7":"transparent"}}/>)}</div></div>)}
+                  {getSizes(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{attr1?.label ?? 'Size'}</p><div className="flex gap-1 flex-wrap">{getSizes(selectedProductName).map(s=><button key={s} onClick={()=>setSelSize(s)} className="px-2 py-0.5 rounded text-[10px] font-bold border transition-all" style={{background:selSize===s?"#4f6ef7":"#1a2b4a",color:selSize===s?"#fff":"#6a8ab8",borderColor:selSize===s?"#4f6ef7":"#1e3356"}}>{s}</button>)}</div></div>)}
                   <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} pcs</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
                 </div>
               </div>
@@ -397,7 +413,7 @@ export function POSOverlay() {
           </div>
         )}
         {/* Active bill customer */}
-        {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone} · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
+        {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
         {/* Search results */}
         <div className="flex-1 overflow-y-auto">
           {inlineCustomers.length===0&&!inlineCustomerSearch&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Search existing or register a new customer</p></div>}
@@ -412,7 +428,7 @@ export function POSOverlay() {
             {inlineCustomers.map(c=>(
               <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
-                <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span><span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span></div></div>
+                <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
                 <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?"? Active":"Set"}</button>
               </div>
             ))}
@@ -468,7 +484,7 @@ export function POSOverlay() {
 
     // RETURNS FLOW
     if (activeNav === "returns") {
-      const REASONS = [{v:"DEFECTIVE",l:"Defective"},{v:"WRONG_ITEM",l:"Wrong Item"},{v:"SIZE_ISSUE",l:"Size Issue"},{v:"CUSTOMER_CHANGED_MIND",l:"Changed Mind"},{v:"DAMAGED",l:"Damaged"},{v:"OTHER",l:"Other"}];
+      const REASONS = returnReasons;
       const selectedItems = Array.from(returnItems.entries()).filter(([,s])=>s.qty>0);
       const refundTotal = selectedItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
       const selectedExchangeItems = Array.from(exchangeItems.entries()).filter(([,s])=>s.qty>0);
@@ -880,7 +896,7 @@ export function POSOverlay() {
             <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
             <div className="flex items-center gap-2">
               <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><ShoppingBag className="h-4 w-4 text-white"/></div>
-              <div><p className="text-white font-bold text-sm leading-none">FashionERP</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p></div>
+              <div><p className="text-white font-bold text-sm leading-none">{APP_NAME}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p></div>
             </div>
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
@@ -910,7 +926,7 @@ export function POSOverlay() {
           {/* SIDEBAR */}
           <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
             <nav className="flex-1 py-2 overflow-y-auto">
-              {NAV_ITEMS.map(item=>{
+              {navItems.map(item=>{
                 const active=activeNav===item.id;
                 return (
                   <button key={item.id} onClick={()=>setActiveNav(item.id)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>

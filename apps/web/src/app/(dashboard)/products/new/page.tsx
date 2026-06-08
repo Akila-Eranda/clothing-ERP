@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
@@ -35,14 +37,18 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   trackInventory: boolean;
 }
-const INITIAL: Form = {
-  name: "", description: "", shortDesc: "",
-  categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
-  tags: [], tagInput: "",
-  sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
-  hasVariants: false, attributes: [{ name: "Size", values: [], input: "" }],
-  trackInventory: true,
-};
+function buildInitial(type?: string): Form {
+  const d = buildProductFormDefaults(type);
+  return {
+    name: "", description: "", shortDesc: "",
+    categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
+    tags: [], tagInput: "",
+    sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
+    hasVariants: d.hasVariants, attributes: d.attributes,
+    trackInventory: true,
+  };
+}
+const INITIAL: Form = buildInitial();
 
 function cartesian(attrs: VariantAttr[]): string[][] {
   const valid = attrs.filter((a) => a.values.length > 0);
@@ -68,7 +74,10 @@ const COLOR_HEX: Record<string, string> = {
 // â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AddProductPage() {
   const router = useRouter();
-  const [form, setForm]             = useState<Form>(INITIAL);
+  const shopProfile = useShopProfile();
+  const variantCols = variantTableColumns(shopProfile);
+  const variantHint = variantVariantHint(shopProfile);
+  const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
   const [loading, setLoading]       = useState(false);
@@ -329,7 +338,7 @@ export default function AddProductPage() {
             </div>
 
             {!form.hasVariants ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Enable variants to add Size, Color, Material etc.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">Enable variants to add {variantHint}</p>
             ) : listView ? (
               /* â”€â”€ List view â”€â”€ */
               <div className="space-y-3">
@@ -353,8 +362,11 @@ export default function AddProductPage() {
                           <th className="px-3 py-2.5 text-left w-8">#</th>
                           <th className="px-3 py-2.5 text-left">SKU</th>
                           <th className="px-3 py-2.5 text-left">Variant</th>
-                          {variantRows[0]?.size  !== undefined && <th className="px-3 py-2.5 text-left">Size</th>}
-                          {variantRows[0]?.color !== undefined && <th className="px-3 py-2.5 text-left">Color</th>}
+                          {variantCols.map((col) => (
+                            variantRows[0]?.[col.field] !== undefined && (
+                              <th key={col.field} className="px-3 py-2.5 text-left">{col.label}</th>
+                            )
+                          ))}
                           <th className="px-3 py-2.5 text-right">Selling</th>
                           <th className="px-3 py-2.5 text-right">Cost</th>
                           <th className="px-3 py-2.5 text-right">MRP</th>
@@ -373,13 +385,22 @@ export default function AddProductPage() {
                                   className="h-7 text-xs font-mono w-28" />
                               </td>
                               <td className="px-3 py-2 font-medium">{row.name}</td>
-                              {row.size  !== undefined && <td className="px-3 py-2"><Badge variant="secondary" className="text-[10px]">{row.size}</Badge></td>}
-                              {row.color !== undefined && <td className="px-3 py-2">
-                                <div className="flex items-center gap-1.5">
-                                  {hex && <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: hex }} />}
-                                  {row.color}
-                                </div>
-                              </td>}
+                              {variantCols.map((col) => (
+                                row[col.field] !== undefined && (
+                                  <td key={col.field} className="px-3 py-2">
+                                    {col.isColor ? (
+                                      <div className="flex items-center gap-1.5">
+                                        {getColorHex(String(row[col.field])) && (
+                                          <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: getColorHex(String(row[col.field]))! }} />
+                                        )}
+                                        {row[col.field]}
+                                      </div>
+                                    ) : (
+                                      <Badge variant="secondary" className="text-[10px]">{row[col.field]}</Badge>
+                                    )}
+                                  </td>
+                                )
+                              ))}
                               <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
                               <td className="px-3 py-2"><Input type="number" value={row.costPrice} onChange={(e) => updateRow(row.key, "costPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
                               <td className="px-3 py-2"><Input type="number" value={row.mrp} onChange={(e) => updateRow(row.key, "mrp", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
@@ -444,13 +465,19 @@ export default function AddProductPage() {
                 ))}
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
-                      set("attributes", [...form.attributes, { name: "Color", values: [], input: "" }])}>
+                    {form.attributes.length < shopProfile.variantAttributes.length && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => {
+                      const next = nextVariantAttributeName(shopProfile, form.attributes);
+                      if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
+                    }}>
                       <Plus className="h-3 w-3" /> Add Attribute
                     </Button>
+                    )}
+                    {shopProfile.variantAttributes[0]?.presets?.includes('S') && (
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3 w-3" /> Auto S/M/L/XL
+                      <Zap className="h-3 w-3" /> Auto {shopProfile.variantAttributes[0]?.presets.slice(0, 4).join('/')}
                     </Button>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground font-medium">
                     {allVariants.length} variants

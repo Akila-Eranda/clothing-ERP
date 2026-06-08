@@ -20,8 +20,11 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { getInitials } from "@/lib/utils";
 import { DUMMY_RECENT_SALES } from "@/lib/constants";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getRouteLabels } from "@/lib/shop-vertical";
+import { APP_NAME } from "@/lib/constants";
 
-const ROUTE_LABELS: Record<string, string> = {
+const BASE_ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Dashboard",
   "/analytics": "Analytics",
   "/pos": "POS Terminal",
@@ -52,10 +55,15 @@ export function Header() {
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const { profile, workspace } = useShopWorkspace();
+  const routeLabels = React.useMemo(
+    () => ({ ...BASE_ROUTE_LABELS, ...getRouteLabels(workspace, profile) }),
+    [workspace, profile],
+  );
 
   const handleLogout = async () => { await logoutApi(); router.replace('/login'); };
 
-  const pageTitle = ROUTE_LABELS[pathname] || "FashionERP";
+  const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
 
   return (
@@ -72,7 +80,7 @@ export function Header() {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm min-w-0 flex-1">
-        <span className="text-muted-foreground hidden sm:block">FashionERP</span>
+        <span className="text-muted-foreground hidden sm:block">{APP_NAME}</span>
         {breadcrumbs.map((crumb, i) => (
           <React.Fragment key={crumb}>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 hidden sm:block shrink-0" />
@@ -83,7 +91,7 @@ export function Header() {
                   : "text-muted-foreground hidden sm:block"
               }
             >
-              {ROUTE_LABELS["/" + crumb] || crumb}
+              {routeLabels["/" + crumb] || crumb}
             </span>
           </React.Fragment>
         ))}

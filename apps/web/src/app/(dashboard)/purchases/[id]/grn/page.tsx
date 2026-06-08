@@ -6,6 +6,8 @@ import { ArrowLeft, Printer, CheckCircle2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { APP_NAME } from "@/lib/constants";
 
 interface POItem {
   id: string; productName: string; variantName: string; sku: string;
@@ -28,6 +30,8 @@ const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2,
 
 export default function GRNPage() {
   const { id } = useParams<{ id: string }>();
+  const { settings: receiptSettings } = useReceiptSettings();
+  const shopTitle = receiptSettings.shopName || APP_NAME;
   const router = useRouter();
   const [po, setPo] = useState<PO | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +84,7 @@ export default function GRNPage() {
         {/* Header */}
         <div className="flex items-start justify-between">
           <div>
-            <p className="text-2xl font-extrabold tracking-tight">FashionERP</p>
+            <p className="text-2xl font-extrabold tracking-tight">{shopTitle}</p>
             <p className="text-sm text-muted-foreground mt-0.5">Goods Received Note</p>
           </div>
           <div className="text-right">

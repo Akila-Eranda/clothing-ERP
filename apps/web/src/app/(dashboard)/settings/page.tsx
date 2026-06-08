@@ -20,6 +20,7 @@ import { APP_NAME, APP_VERSION } from "@/lib/constants";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
+import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 
 type Tenant = {
   id: string; name: string; email: string; phone?: string;
@@ -158,6 +159,8 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
+  const { profile } = useShopWorkspace();
+  const showLoyalty = hasShopModule(profile, 'loyalty');
 
   const [tenant, setTenant] = React.useState<Tenant | null>(null);
   const [bizForm, setBizForm] = React.useState({ name: "", phone: "", country: "", currency: "", timezone: "" });
@@ -287,7 +290,7 @@ export default function SettingsPage() {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Configure your FashionERP workspace</p>
+        <p className="text-sm text-muted-foreground">Configure your {APP_NAME} workspace · {profile.emoji} {profile.label}</p>
       </div>
 
       <Tabs defaultValue="general">
@@ -313,7 +316,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5"><Store className="h-3.5 w-3.5" />Business Name</Label>
-                  <Input value={bizForm.name} onChange={e => setBizForm(f => ({ ...f, name: e.target.value }))} placeholder="My Fashion Store" />
+                  <Input value={bizForm.name} onChange={e => setBizForm(f => ({ ...f, name: e.target.value }))} placeholder="My Shop Name" />
                 </div>
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone</Label>
@@ -360,7 +363,7 @@ export default function SettingsPage() {
                 { key: "autoPrint", label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout", default: false },
                 { key: "roundOff", label: "Round off totals", desc: "Round total amount to nearest unit", default: true },
                 { key: "negativeStock", label: "Allow negative stock", desc: "Enable sales even when stock is 0", default: false },
-                { key: "loyalty", label: "Loyalty points on every sale", desc: "Auto-apply loyalty program", default: true },
+                ...(showLoyalty ? [{ key: "loyalty", label: "Loyalty points on every sale", desc: "Auto-apply loyalty program", default: true }] : []),
               ].map((s) => (
                 <div key={s.key} className="flex items-center justify-between py-0.5">
                   <div>
@@ -387,7 +390,7 @@ export default function SettingsPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5 col-span-2">
                       <Label>Shop Name</Label>
-                      <Input value={receiptForm.shopName} onChange={e => setReceiptForm(f => ({ ...f, shopName: e.target.value }))} placeholder="My Fashion Store" />
+                      <Input value={receiptForm.shopName} onChange={e => setReceiptForm(f => ({ ...f, shopName: e.target.value }))} placeholder="My Shop Name" />
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label>Tagline</Label>

@@ -13,6 +13,10 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { type Product } from "@/components/products/add-product-modal";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { getRouteLabels } from "@/lib/shop-vertical";
+import { APP_NAME } from "@/lib/constants";
 
 // ── Status helpers ────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
@@ -25,7 +29,7 @@ const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning
 // ── CSV helpers ───────────────────────────────────────────────────────────
 const CSV_HEADERS = ["name", "sellingPrice", "costPrice", "mrp", "taxRate", "description", "tags", "status"];
 
-function printLabels(products: Product[]) {
+function printLabels(products: Product[], brandName: string) {
   const w = window.open("", "_blank", "width=900,height=700,scrollbars=yes");
   if (!w) { alert("Allow popups to print labels"); return; }
   const labels = products.slice(0, 200).map(p => ({
@@ -37,7 +41,7 @@ function printLabels(products: Product[]) {
   }));
   const html = labels.map(l => `
     <div class="label">
-      <div class="brand">FashionERP</div>
+      <div class="brand">${brandName}</div>
       <div class="pname">${l.name}</div>
       ${l.variant ? `<div class="vname">${l.variant}</div>` : ""}
       <div class="barcode-text">${l.barcode}</div>
@@ -166,6 +170,11 @@ function buildColumns(
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
   const router = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const { settings: receiptSettings } = useReceiptSettings();
+  const routeLabels = getRouteLabels(workspace, profile);
+  const printLabel = routeLabels.printTags ?? 'Print Labels';
+  const brandName = receiptSettings.shopName || APP_NAME;
   const [products, setProducts]     = useState<Product[]>([]);
   const [loading, setLoading]       = useState(true);
   const [importing, setImporting]   = useState(false);
@@ -213,7 +222,7 @@ export default function ProductsPage() {
   const inactive = products.filter((p) => p.status === "INACTIVE" || p.status === "OUT_OF_STOCK").length;
 
   const STATS = [
-    { label: "Total Products",   value: total,    icon: Package,   color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: `Total ${workspace.productLabel}`, value: total,    icon: Package,   color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Active",           value: active,   icon: TrendingUp,color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Drafts",           value: drafts,   icon: FileText,  color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Inactive / OOS",   value: inactive, icon: Archive,   color: "text-rose-500",    bg: "bg-rose-500/10" },
@@ -230,8 +239,8 @@ export default function ProductsPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Products</h1>
-          <p className="text-sm text-muted-foreground">Manage your product catalog and variants</p>
+          <h1 className="text-2xl font-bold">{workspace.productLabel}</h1>
+          <p className="text-sm text-muted-foreground">Manage your {workspace.productLabel.toLowerCase()} catalog and variants</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => fetch()} className="gap-1.5">
@@ -240,15 +249,15 @@ export default function ProductsPage() {
           <Button variant="outline" size="sm" onClick={() => exportToCsv(products)} className="gap-1.5" disabled={!products.length}>
             <Download className="h-3.5 w-3.5" /> Export CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printLabels(products)} className="gap-1.5" disabled={!products.length}>
-            <Tag className="h-3.5 w-3.5" /> Print Labels
+          <Button variant="outline" size="sm" onClick={() => printLabels(products, brandName)} className="gap-1.5" disabled={!products.length}>
+            <Tag className="h-3.5 w-3.5" /> {printLabel}
           </Button>
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
             <Upload className="h-3.5 w-3.5" /> Import CSV
           </Button>
           <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
           <Button size="sm" className="gap-1.5" onClick={() => router.push("/products/new")}>
-            <Plus className="h-3.5 w-3.5" /> Add Product
+            <Plus className="h-3.5 w-3.5" /> Add {workspace.productLabel.replace(/s$/, '')}
           </Button>
         </div>
       </div>

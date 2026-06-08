@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { getShopProfile, getStoredShopType, ShopType, type ShopProfile, variantColumnLabels } from '@/lib/shop-profiles';
+import { getWorkspace, type WorkspaceConfig } from '@/lib/shop-workspace';
+import { hasShopModule } from '@/lib/shop-vertical';
 
 export function useShopProfile(): ShopProfile {
   const [profile, setProfile] = useState<ShopProfile>(() => getShopProfile(getStoredShopType()));
@@ -43,3 +45,11 @@ export function hasBatchTracking(profile?: ShopProfile): boolean {
 export function variantColumnLabelsFromProfile(profile?: ShopProfile): [string, string] {
   return variantColumnLabels(profile?.type ?? getStoredShopType());
 }
+
+export function useShopWorkspace(): { profile: ShopProfile; workspace: WorkspaceConfig } {
+  const profile = useShopProfile();
+  const workspace = getWorkspace(profile.type);
+  return { profile, workspace };
+}
+
+export { hasShopModule };

@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { variantTableColumns } from "@/lib/shop-vertical";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface InventoryRecord {
@@ -70,6 +72,8 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router  = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const variantCols = variantTableColumns(profile);
 
   const [product, setProduct] = useState<ProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,7 +99,7 @@ export default function ProductDetailPage() {
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
       <Package className="h-12 w-12 text-muted-foreground/40" />
       <p className="text-muted-foreground">Product not found</p>
-      <Button variant="outline" onClick={() => router.push("/products")}>Back to Products</Button>
+      <Button variant="outline" onClick={() => router.push("/products")}>Back to {workspace.productLabel}</Button>
     </div>
   );
 
@@ -127,10 +131,10 @@ export default function ProductDetailPage() {
       <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push("/products")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-          <ArrowLeft className="h-4 w-4" /> Back to Products
+          <ArrowLeft className="h-4 w-4" /> Back to {workspace.productLabel}
         </button>
         <div className="flex items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => router.push("/products")}>Products</span>
+          <span className="text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => router.push("/products")}>{workspace.productLabel}</span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-semibold text-foreground truncate max-w-[220px]">{product.name}</span>
         </div>
@@ -262,7 +266,7 @@ export default function ProductDetailPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/30 border-b">
                     <tr>
-                      {["Variant", "SKU", "Barcode", "Size", "Color", "Cost (LKR)", "Selling (LKR)", "MRP (LKR)", "Margin", "Stock", "Status"].map((h) => (
+                      {["Variant", "SKU", "Barcode", ...variantCols.map((c) => c.label), "Cost (LKR)", "Selling (LKR)", "MRP (LKR)", "Margin", "Stock", "Status"].map((h) => (
                         <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
@@ -277,14 +281,18 @@ export default function ProductDetailPage() {
                           <td className="px-3 py-3 font-medium whitespace-nowrap">{v.name}</td>
                           <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{v.sku}</td>
                           <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{v.barcode ?? "—"}</td>
-                          <td className="px-3 py-3">
-                            {v.size ? <span className="bg-muted px-2 py-0.5 rounded text-xs font-semibold">{v.size}</span> : "—"}
-                          </td>
-                          <td className="px-3 py-3">
-                            {v.color
-                              ? <div className="flex items-center gap-1.5"><ColorDot color={v.color} /><span className="text-xs">{v.color}</span></div>
-                              : "—"}
-                          </td>
+                          {variantCols.map((col) => {
+                            const val = v[col.field as keyof Variant] as string | null | undefined;
+                            return (
+                              <td key={col.field} className="px-3 py-3">
+                                {val ? (
+                                  col.isColor
+                                    ? <div className="flex items-center gap-1.5"><ColorDot color={val} /><span className="text-xs">{val}</span></div>
+                                    : <span className="bg-muted px-2 py-0.5 rounded text-xs font-semibold">{val}</span>
+                                ) : "—"}
+                              </td>
+                            );
+                          })}
                           <td className="px-3 py-3 text-xs">{fmt(v.costPrice)}</td>
                           <td className="px-3 py-3 text-xs font-semibold text-blue-600">{fmt(v.sellingPrice)}</td>
                           <td className="px-3 py-3 text-xs text-muted-foreground">{fmt(v.mrp)}</td>
@@ -409,7 +417,7 @@ export default function ProductDetailPage() {
               <Edit2 className="h-4 w-4" /> Edit Product
             </Button>
             <Button variant="outline" className="w-full" onClick={() => router.push("/products")}>
-              Back to Products
+              Back to {workspace.productLabel}
             </Button>
           </div>
 

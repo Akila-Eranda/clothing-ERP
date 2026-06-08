@@ -15,6 +15,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
+import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -77,13 +80,16 @@ const COLOR_HEX: Record<string, string> = {
 export default function EditProductPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
+  const shopProfile = useShopProfile();
+  const variantCols = variantTableColumns(shopProfile);
+  const variantHint = variantVariantHint(shopProfile);
 
   const [form, setForm]             = useState<Form>({
     name: "", description: "", shortDesc: "",
     categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
     tags: [], tagInput: "",
     sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
-    hasVariants: false, attributes: [{ name: "Size", values: [], input: "" }],
+    hasVariants: false, attributes: variantAttrsFromProfile(shopProfile.type),
     trackInventory: true,
   });
   const [categories, setCategories] = useState<Category[]>([]);
@@ -124,7 +130,7 @@ export default function EditProductPage() {
         mrp:           String(p.mrp),
         taxRate:       String(p.taxRate),
         hasVariants:   p.hasVariants,
-        attributes:    [{ name: "Size", values: [], input: "" }],
+        attributes:    variantAttrsFromProfile(shopProfile.type),
         trackInventory: p.trackInventory,
       });
       if (p.variants.length > 0) {
@@ -402,7 +408,7 @@ export default function EditProductPage() {
             </div>
 
             {!form.hasVariants ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Enable variants to manage Size, Color etc.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">Enable variants to manage {variantHint}</p>
             ) : listView ? (
               /* ── List view (existing + new variants) ── */
               <div className="space-y-3">
@@ -428,8 +434,11 @@ export default function EditProductPage() {
                           <th className="px-3 py-2.5 text-left w-8">#</th>
                           <th className="px-3 py-2.5 text-left">SKU</th>
                           <th className="px-3 py-2.5 text-left">Variant</th>
-                          {variantRows.some((r) => r.size  !== undefined) && <th className="px-3 py-2.5 text-left">Size</th>}
-                          {variantRows.some((r) => r.color !== undefined) && <th className="px-3 py-2.5 text-left">Color</th>}
+                          {variantCols.map((col) => (
+                            variantRows.some((r) => r[col.field] !== undefined) && (
+                              <th key={col.field} className="px-3 py-2.5 text-left">{col.label}</th>
+                            )
+                          ))}
                           <th className="px-3 py-2.5 text-right">Selling</th>
                           <th className="px-3 py-2.5 text-right">Cost</th>
                           <th className="px-3 py-2.5 text-right">MRP</th>
@@ -451,21 +460,24 @@ export default function EditProductPage() {
                                 {row.name}
                                 {row.id && <span className="ml-1 text-[9px] text-muted-foreground/60">existing</span>}
                               </td>
-                              {variantRows.some((r) => r.size !== undefined) && (
-                                <td className="px-3 py-2">
-                                  {row.size ? <Badge variant="secondary" className="text-[10px]">{row.size}</Badge> : "—"}
-                                </td>
-                              )}
-                              {variantRows.some((r) => r.color !== undefined) && (
-                                <td className="px-3 py-2">
-                                  {row.color ? (
-                                    <div className="flex items-center gap-1.5">
-                                      {hex && <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: hex }} />}
-                                      {row.color}
-                                    </div>
-                                  ) : "—"}
-                                </td>
-                              )}
+                              {variantCols.map((col) => (
+                                variantRows.some((r) => r[col.field] !== undefined) && (
+                                  <td key={col.field} className="px-3 py-2">
+                                    {row[col.field] ? (
+                                      col.isColor ? (
+                                        <div className="flex items-center gap-1.5">
+                                          {getColorHex(String(row[col.field])) && (
+                                            <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: getColorHex(String(row[col.field]))! }} />
+                                          )}
+                                          {row[col.field]}
+                                        </div>
+                                      ) : (
+                                        <Badge variant="secondary" className="text-[10px]">{row[col.field]}</Badge>
+                                      )
+                                    ) : "—"}
+                                  </td>
+                                )
+                              ))}
                               <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
                               <td className="px-3 py-2"><Input type="number" value={row.costPrice}    onChange={(e) => updateRow(row.key, "costPrice",    e.target.value)} className="h-7 text-xs text-right w-20" /></td>
                               <td className="px-3 py-2"><Input type="number" value={row.mrp}          onChange={(e) => updateRow(row.key, "mrp",          e.target.value)} className="h-7 text-xs text-right w-20" /></td>
@@ -538,13 +550,19 @@ export default function EditProductPage() {
                 ))}
                 <div className="flex items-center justify-between">
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
-                      set("attributes", [...form.attributes, { name: "Color", values: [], input: "" }])}>
+                    {form.attributes.length < shopProfile.variantAttributes.length && (
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => {
+                      const next = nextVariantAttributeName(shopProfile, form.attributes);
+                      if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
+                    }}>
                       <Plus className="h-3 w-3" /> Add Attribute
                     </Button>
+                    )}
+                    {shopProfile.variantAttributes[0]?.presets?.includes('S') && (
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3 w-3" /> Auto S/M/L/XL
+                      <Zap className="h-3 w-3" /> Auto {shopProfile.variantAttributes[0]?.presets.slice(0, 4).join('/')}
                     </Button>
+                    )}
                   </div>
                   <span className="text-xs text-muted-foreground font-medium">{allVariants.length} variants</span>
                 </div>
