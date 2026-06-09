@@ -18,6 +18,7 @@ export interface Customer {
   gender?: string | null; dateOfBirth?: string | null; anniversary?: string | null;
   address?: string | null; city?: string | null;
   tier: string; loyaltyPoints: number; walletBalance: number;
+  creditLimit: number; creditBalance: number;
   totalSpent: number; totalOrders: number;
   isActive: boolean; referralCode?: string | null;
   notes?: string | null; tags: string[];
@@ -29,13 +30,13 @@ interface Form {
   firstName: string; lastName: string; phone: string; email: string;
   gender: string; dateOfBirth: string; anniversary: string;
   address: string; city: string; notes: string;
-  tags: string[]; tagInput: string;
+  tags: string[]; tagInput: string; creditLimit: string;
 }
 
 const INIT: Form = {
   firstName: "", lastName: "", phone: "", email: "",
   gender: "", dateOfBirth: "", anniversary: "",
-  address: "", city: "", notes: "", tags: [], tagInput: "",
+  address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "",
 };
 
 interface Props { open: boolean; onClose: () => void; onSaved: () => void; editCustomer?: Customer; }
@@ -63,6 +64,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         anniversary: editCustomer.anniversary?.split("T")[0] ?? "",
         address: editCustomer.address ?? "", city: editCustomer.city ?? "",
         notes: editCustomer.notes ?? "", tags: editCustomer.tags ?? [], tagInput: "",
+        creditLimit: editCustomer.creditLimit > 0 ? String(editCustomer.creditLimit) : "",
       });
     } else { setForm(INIT); }
   }, [open, editCustomer]);
@@ -82,6 +84,12 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
     if (!form.phone.trim())     { toast.error("Phone number is required"); return; }
     setLoading(true);
     try {
+      const creditLimit = form.creditLimit.trim() ? parseFloat(form.creditLimit) : undefined;
+      if (creditLimit !== undefined && (isNaN(creditLimit) || creditLimit < 0)) {
+        toast.error("Credit limit must be a valid non-negative number");
+        setLoading(false);
+        return;
+      }
       const payload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName || undefined,
@@ -94,6 +102,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         city: form.city || undefined,
         notes: form.notes || undefined,
         tags: form.tags,
+        ...(creditLimit !== undefined ? { creditLimit } : {}),
       };
       if (editCustomer) {
         await api.put(`/customers/${editCustomer.id}`, payload);
@@ -174,6 +183,9 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
           </div>
           <Field label="Notes">
             <Textarea rows={2} placeholder="Internal notes…" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+          </Field>
+          <Field label="Credit Limit (LKR)">
+            <Input type="number" min="0" step="0.01" placeholder="0 = no credit sales" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
           </Field>
           <Field label="Tags">
             <div className="flex gap-1.5">

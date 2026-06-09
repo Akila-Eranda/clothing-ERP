@@ -8,13 +8,15 @@ import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNe
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } from './pos-sale.helpers';
+import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { nanoid } from 'nanoid';
 import * as dayjs from 'dayjs';
 
@@ -62,6 +64,8 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() couponCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() heldBillId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPartialPayment?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() applyTierDiscount?: boolean;
 }
 
 export class HoldBillDto {
@@ -106,12 +110,33 @@ export class PosService {
       return sum + (taxable * (item.taxRate ?? 0)) / 100;
     }, 0);
 
-    const totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
-    const discountAmount = dto.discountAmount ?? 0;
-    const total = subtotal + taxAmount - discountAmount;
+    let couponDiscount = 0;
+    let promotionId: string | null = null;
+    if (dto.couponCode?.trim()) {
+      const promoResult = await this.resolveCouponDiscount(tenantId, dto.couponCode.trim(), subtotal);
+      if (!promoResult.valid) throw new BadRequestException(promoResult.reason ?? 'Invalid coupon');
+      couponDiscount = promoResult.discountAmount ?? 0;
+      promotionId = promoResult.promotionId ?? null;
+    }
+
+    let tierDiscount = 0;
+    let customerRecord: { id: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; tier: import('@prisma/client').CustomerTier } | null = null;
+    if (dto.customerId) {
+      customerRecord = await this.prisma.customer.findFirst({
+        where: { id: dto.customerId, tenantId },
+        select: { id: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, tier: true },
+      });
+      if (!customerRecord) throw new BadRequestException('Customer not found');
+      if (dto.applyTierDiscount !== false) {
+        tierDiscount = tierDiscountAmount(subtotal, customerRecord.tier);
+      }
+    }
+
+    const manualDiscount = dto.discountAmount ?? 0;
+    const totalDiscount = manualDiscount + couponDiscount + tierDiscount;
+    const total = subtotal + taxAmount - totalDiscount;
     const roundOff = Math.round(total) - total;
     const finalTotal = total + roundOff;
-    const changeDue = Math.max(0, totalPaid - finalTotal);
 
     let loyaltyDiscount = 0;
     let pointsRedeemed = 0;
@@ -119,12 +144,45 @@ export class PosService {
 
     if (dto.customerId && dto.loyaltyPointsToRedeem) {
       await assertShopModule(this.prisma, tenantId, 'loyalty');
-      const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
-      if (customer && customer.loyaltyPoints >= dto.loyaltyPointsToRedeem) {
+      if (customerRecord && customerRecord.loyaltyPoints >= dto.loyaltyPointsToRedeem) {
         loyaltyDiscount = dto.loyaltyPointsToRedeem * 0.1;
         pointsRedeemed = dto.loyaltyPointsToRedeem;
       }
     }
+
+    const amountDue = Math.max(0, finalTotal - loyaltyDiscount);
+    const totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
+    const walletPayments = dto.payments.filter((p) => p.method === PaymentMethod.WALLET);
+    const walletTotal = walletPayments.reduce((s, p) => s + p.amount, 0);
+    const creditPayments = dto.payments.filter((p) => p.method === PaymentMethod.CUSTOMER_CREDIT);
+    const creditPayTotal = creditPayments.reduce((s, p) => s + p.amount, 0);
+
+    if (walletTotal > 0) {
+      if (!dto.customerId) throw new BadRequestException('Customer required for wallet payment');
+      if (!customerRecord || customerRecord.walletBalance < walletTotal) {
+        throw new BadRequestException('Insufficient wallet balance');
+      }
+    }
+
+    if (creditPayTotal > 0 && !dto.customerId) {
+      throw new BadRequestException('Customer required for credit payment');
+    }
+
+    const isPartial = totalPaid + 0.01 < amountDue;
+    const partialCredit = isPartial ? amountDue - totalPaid : 0;
+    const totalCreditCharge = creditPayTotal + partialCredit;
+
+    if (totalCreditCharge > 0 && customerRecord) {
+      assertCreditAvailable(customerRecord.creditLimit, customerRecord.creditBalance, totalCreditCharge);
+    }
+
+    if (isPartial && !dto.allowPartialPayment) {
+      throw new BadRequestException(`Payment short by LKR ${(amountDue - totalPaid).toFixed(2)}. Enable partial payment or add more.`);
+    }
+
+    const changeDue = Math.max(0, totalPaid - amountDue);
+    const paymentStatus = isPartial ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
+    const paymentMethods = dto.payments.map((p) => p.method);
 
     const sale = await this.prisma.$transaction(async (tx) => {
       const created = await tx.sale.create({
@@ -136,17 +194,24 @@ export class PosService {
           invoiceNumber,
           status: SaleStatus.COMPLETED,
           subtotal,
-          discountAmount,
+          discountAmount: totalDiscount,
           taxAmount,
           roundOff,
           loyaltyDiscount,
-          total: finalTotal - loyaltyDiscount,
+          total: amountDue,
           amountPaid: totalPaid,
           changeDue,
           paymentMethod: dto.payments[0]?.method ?? PaymentMethod.CASH,
+          paymentStatus,
           pointsRedeemed,
           notes: dto.notes,
-          couponCode: dto.couponCode,
+          couponCode: dto.couponCode?.trim().toUpperCase() || null,
+          couponDiscount,
+          metadata: {
+            tierDiscount,
+            paymentSummary: buildPaymentsSummary(paymentMethods),
+            partialBalance: isPartial ? amountDue - totalPaid : 0,
+          },
           items: {
             create: dto.items.map((item) => {
               const lineTotal = item.unitPrice * item.quantity;
@@ -175,6 +240,7 @@ export class PosService {
               method: p.method,
               amount: p.amount,
               reference: p.reference,
+              status: paymentStatus,
             })),
           },
         },
@@ -185,11 +251,17 @@ export class PosService {
         },
       });
 
+      if (promotionId) {
+        await tx.promotion.update({
+          where: { id: promotionId },
+          data: { usageCount: { increment: 1 } },
+        });
+      }
+
       if (dto.heldBillId) {
         await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', dto.heldBillId, true);
       }
 
-      // Update inventory
       for (const item of dto.items) {
         await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
           variantId: item.variantId,
@@ -199,18 +271,46 @@ export class PosService {
         });
       }
 
-      // Update customer stats + loyalty
-      if (dto.customerId) {
-        pointsEarned = Math.floor(finalTotal / 100);
+      if (dto.customerId && customerRecord) {
+        pointsEarned = Math.floor(amountDue / 100);
+        const creditIncrement = creditPayTotal + partialCredit;
         await tx.customer.update({
           where: { id: dto.customerId },
           data: {
-            totalSpent: { increment: finalTotal },
+            totalSpent: { increment: totalPaid },
             totalOrders: { increment: 1 },
             loyaltyPoints: { increment: pointsEarned - pointsRedeemed },
             lastPurchaseAt: new Date(),
+            ...(walletTotal > 0 ? { walletBalance: { decrement: walletTotal } } : {}),
+            ...(creditIncrement > 0 ? { creditBalance: { increment: creditIncrement } } : {}),
           },
         });
+
+        if (creditIncrement > 0) {
+          await tx.customerCreditTransaction.create({
+            data: {
+              customerId: dto.customerId,
+              tenantId,
+              amount: creditIncrement,
+              type: 'CHARGE',
+              description: `POS sale ${invoiceNumber}`,
+              referenceId: created.id,
+            },
+          });
+        }
+
+        if (walletTotal > 0) {
+          await tx.walletTransaction.create({
+            data: {
+              customerId: dto.customerId,
+              tenantId,
+              amount: -walletTotal,
+              type: 'SALE_DEBIT',
+              description: `POS sale ${invoiceNumber}`,
+              referenceId: created.id,
+            },
+          });
+        }
 
         if (pointsEarned > 0) {
           await tx.loyaltyTransaction.create({
@@ -219,6 +319,18 @@ export class PosService {
               tenantId,
               points: pointsEarned,
               type: 'EARNED',
+              description: `Sale ${invoiceNumber}`,
+              referenceId: created.id,
+            },
+          });
+        }
+        if (pointsRedeemed > 0) {
+          await tx.loyaltyTransaction.create({
+            data: {
+              customerId: dto.customerId,
+              tenantId,
+              points: -pointsRedeemed,
+              type: 'REDEEMED',
               description: `Sale ${invoiceNumber}`,
               referenceId: created.id,
             },
@@ -233,8 +345,78 @@ export class PosService {
       await this.prisma.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
     }
 
-    this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: finalTotal });
+    this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
     return sale;
+  }
+
+  private async resolveCouponDiscount(tenantId: string, couponCode: string, orderAmount: number) {
+    try {
+      await assertShopModule(this.prisma, tenantId, 'promotions');
+    } catch {
+      return { valid: false as const, reason: 'Promotions module not enabled' };
+    }
+    const now = new Date();
+    const promo = await this.prisma.promotion.findFirst({
+      where: {
+        tenantId,
+        couponCode: couponCode.toUpperCase(),
+        isActive: true,
+        startsAt: { lte: now },
+        OR: [{ endsAt: null }, { endsAt: { gte: now } }],
+      },
+    });
+    if (!promo) return { valid: false as const, reason: 'Coupon or gift voucher not found or expired' };
+    if (promo.minOrderAmount > 0 && orderAmount < promo.minOrderAmount) {
+      return { valid: false as const, reason: `Minimum order LKR ${promo.minOrderAmount} required` };
+    }
+    if (promo.usageLimit && promo.usageCount >= promo.usageLimit) {
+      return { valid: false as const, reason: 'Voucher usage limit reached' };
+    }
+    const discountAmount = computePromotionDiscount(
+      promo.discountType,
+      promo.discountValue,
+      orderAmount,
+      promo.maxDiscount,
+    );
+    return { valid: true as const, discountAmount, promotionId: promo.id, name: promo.name };
+  }
+
+  async validateCoupon(tenantId: string, code: string, amount: number) {
+    return this.resolveCouponDiscount(tenantId, code, amount);
+  }
+
+  async searchCustomers(tenantId: string, search?: string, limit = 20) {
+    const take = Math.min(50, Math.max(1, limit));
+    const q = search?.trim();
+    return this.prisma.customer.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(q && {
+          OR: [
+            { firstName: { contains: q, mode: 'insensitive' as const } },
+            { lastName: { contains: q, mode: 'insensitive' as const } },
+            { phone: { contains: q } },
+            { email: { contains: q, mode: 'insensitive' as const } },
+            { code: { contains: q, mode: 'insensitive' as const } },
+          ],
+        }),
+      },
+      take,
+      orderBy: [{ lastPurchaseAt: 'desc' }, { updatedAt: 'desc' }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+        tier: true,
+        loyaltyPoints: true,
+        walletBalance: true,
+        creditLimit: true,
+        creditBalance: true,
+      },
+    });
   }
 
   async getSales(tenantId: string, branchId: string, query: { page?: number; limit?: number; search?: string; date?: string }) {
@@ -549,6 +731,27 @@ export class PosController {
   @ApiOperation({ summary: 'Process a return/exchange' })
   processReturn(@CurrentUser() user: IAuthUser, @Body() dto: ReturnSaleDto) {
     return this.posService.processReturn(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('coupons/validate/:code')
+  @ApiOperation({ summary: 'Validate coupon or gift voucher for POS checkout' })
+  validateCoupon(
+    @CurrentUser() user: IAuthUser,
+    @Param('code') code: string,
+    @Query('amount') amount?: string,
+  ) {
+    return this.posService.validateCoupon(user.tenantId, code, parseFloat(amount ?? '0') || 0);
+  }
+
+  @Get('customers')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Search customers for POS (name, phone, email)' })
+  searchCustomers(
+    @CurrentUser() user: IAuthUser,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.posService.searchCustomers(user.tenantId, search, parseInt(limit ?? '20', 10) || 20);
   }
 }
 

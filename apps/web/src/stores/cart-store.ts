@@ -169,7 +169,7 @@ export const useCartStore = create<CartStore>()(
 
       loyaltyDiscount: () => {
         const { loyaltyPointsToRedeem } = get();
-        return loyaltyPointsToRedeem * 0.5;
+        return loyaltyPointsToRedeem * 0.1;
       },
 
       taxAmount: () => {

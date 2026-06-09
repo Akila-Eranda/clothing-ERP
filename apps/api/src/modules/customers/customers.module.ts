@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray } from 'class-validator';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CustomerTier, Gender } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -24,6 +24,7 @@ export class CreateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() city?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() tags?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) creditLimit?: number;
 }
 
 @Injectable()
@@ -47,6 +48,7 @@ export class CustomersService {
         anniversary: dto.anniversary ? new Date(dto.anniversary) : undefined,
         address: dto.address, city: dto.city,
         notes: dto.notes, tags: dto.tags ?? [],
+        creditLimit: dto.creditLimit ?? 0,
       },
     });
   }
@@ -80,6 +82,7 @@ export class CustomersService {
       include: {
         loyaltyTxns: { orderBy: { createdAt: 'desc' }, take: 10 },
         walletTxns: { orderBy: { createdAt: 'desc' }, take: 10 },
+        creditTxns: { orderBy: { createdAt: 'desc' }, take: 20 },
         sales: { orderBy: { invoiceDate: 'desc' }, take: 10, include: { _count: { select: { items: true } } } },
       },
     });
@@ -93,7 +96,36 @@ export class CustomersService {
 
   async update(id: string, tenantId: string, dto: Partial<CreateCustomerDto>) {
     await this.findOne(id, tenantId);
-    return this.prisma.customer.update({ where: { id }, data: dto as object });
+    const data: Record<string, unknown> = { ...dto };
+    if (dto.creditLimit !== undefined && dto.creditLimit < 0) {
+      throw new BadRequestException('Credit limit cannot be negative');
+    }
+    return this.prisma.customer.update({ where: { id }, data: data as object });
+  }
+
+  async receiveCreditPayment(id: string, tenantId: string, amount: number, description: string) {
+    if (amount <= 0) throw new BadRequestException('Amount must be positive');
+    const customer = await this.prisma.customer.findFirst({ where: { id, tenantId } });
+    if (!customer) throw new NotFoundException('Customer not found');
+    if (amount > customer.creditBalance + 0.01) {
+      throw new BadRequestException(`Payment exceeds outstanding balance (LKR ${customer.creditBalance.toFixed(2)})`);
+    }
+    await this.prisma.$transaction([
+      this.prisma.customer.update({ where: { id }, data: { creditBalance: { decrement: amount } } }),
+      this.prisma.customerCreditTransaction.create({
+        data: { customerId: id, tenantId, amount, type: 'PAYMENT', description },
+      }),
+    ]);
+    return { creditBalance: customer.creditBalance - amount, creditLimit: customer.creditLimit };
+  }
+
+  async setCreditLimit(id: string, tenantId: string, creditLimit: number) {
+    if (creditLimit < 0) throw new BadRequestException('Credit limit cannot be negative');
+    const customer = await this.findOne(id, tenantId);
+    if (creditLimit < customer.creditBalance) {
+      throw new BadRequestException('Credit limit cannot be less than outstanding balance');
+    }
+    return this.prisma.customer.update({ where: { id }, data: { creditLimit } });
   }
 
   async topUpWallet(id: string, tenantId: string, amount: number, description: string) {
@@ -198,6 +230,24 @@ export class CustomersController {
   @RequirePermissions('customers:update')
   addLoyaltyPoints(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { points: number; description?: string }) {
     return this.customersService.addLoyaltyPoints(id, user.tenantId, body.points, body.description ?? 'Manual adjustment');
+  }
+
+  @Post(':id/credit/payment')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Receive payment against customer credit balance' })
+  receiveCreditPayment(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() body: { amount: number; description?: string },
+  ) {
+    return this.customersService.receiveCreditPayment(id, user.tenantId, body.amount, body.description ?? 'Credit payment received');
+  }
+
+  @Put(':id/credit/limit')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Set customer credit limit' })
+  setCreditLimit(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { creditLimit: number }) {
+    return this.customersService.setCreditLimit(id, user.tenantId, body.creditLimit);
   }
 
   @Delete(':id')

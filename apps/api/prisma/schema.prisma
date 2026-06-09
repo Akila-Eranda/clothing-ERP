@@ -848,6 +848,7 @@ model Customer {
   sales           Sale[]
   loyaltyTxns     LoyaltyTransaction[]
   walletTxns      WalletTransaction[]
+  creditTxns      CustomerCreditTransaction[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -886,6 +887,22 @@ model WalletTransaction {
 
   @@index([customerId])
   @@map("wallet_transactions")
+}
+
+model CustomerCreditTransaction {
+  id          String   @id @default(cuid())
+  customerId  String
+  tenantId    String
+  amount      Float
+  type        String
+  description String?
+  referenceId String?
+  createdAt   DateTime @default(now())
+
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@map("customer_credit_transactions")
 }
 
 // ============================================================

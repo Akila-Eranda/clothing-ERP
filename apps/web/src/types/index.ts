@@ -293,6 +293,7 @@ export interface Customer {
   dateOfBirth?: Date;
   anniversary?: Date;
   loyaltyPoints: number;
+  walletBalance?: number;
   totalPurchases: number;
   totalSpent: number;
   membershipTier: "bronze" | "silver" | "gold" | "platinum";

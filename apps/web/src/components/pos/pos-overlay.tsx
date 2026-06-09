@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,9 +15,38 @@ import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-sett
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
+import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 
 interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
-interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; }
+interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
+
+interface ApiCustomerRow {
+  id: string; firstName: string; lastName?: string | null; phone: string; email?: string | null;
+  tier?: string; loyaltyPoints?: number; walletBalance?: number; creditLimit?: number; creditBalance?: number;
+}
+
+function extractCustomerRows<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)) {
+    return (payload as { data: T[] }).data;
+  }
+  return [];
+}
+
+function mapApiCustomer(c: ApiCustomerRow): CustomerItem {
+  const name = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.phone || "Customer";
+  return {
+    id: c.id,
+    name,
+    phone: c.phone,
+    email: c.email ?? undefined,
+    tier: c.tier?.toLowerCase(),
+    loyaltyPoints: c.loyaltyPoints ?? 0,
+    walletBalance: c.walletBalance ?? 0,
+    creditLimit: c.creditLimit ?? 0,
+    creditBalance: c.creditBalance ?? 0,
+  };
+}
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string } | null; _count?: { items: number }; payments?: { method: string }[]; }
@@ -26,7 +55,7 @@ interface SaleDetail { id: string; invoiceNumber: string; total: number; invoice
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
 
-const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }];
+const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }];
 
 const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
@@ -108,10 +137,35 @@ export function POSOverlay() {
   const [dayEndSummary, setDayEndSummary] = React.useState<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}|null>(null);
   const [serverHeldBills, setServerHeldBills] = React.useState<ServerHeldBill[]>([]);
   const [holdsLoading, setHoldsLoading] = React.useState(false);
+  const [payState, setPayState] = React.useState<PosPaymentState>({
+    splitMode: false,
+    paymentLines: [{ method: "CASH", amount: "" }],
+    allowPartial: false,
+    couponCode: "",
+    couponDiscount: 0,
+    tierDiscountPct: 0,
+    currency: "LKR",
+  });
   const { settings: receiptSettings } = useReceiptSettings();
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+  const { items, customer, discount, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+
+  React.useEffect(() => {
+    if (!posOpen) return;
+    api.get<{ currency?: string }>("/tenants/me")
+      .then((r) => setPayState((s) => ({ ...s, currency: r.data?.currency ?? "LKR" })))
+      .catch(() => {});
+  }, [posOpen]);
+
+  const patchPayState = React.useCallback((patch: Partial<PosPaymentState>) => {
+    setPayState((s) => ({ ...s, ...patch }));
+  }, []);
+
+  const onCouponChange = React.useCallback((code: string | null, discountAmt: number) => {
+    setCoupon(code);
+    patchPayState({ couponDiscount: discountAmt, couponCode: code ?? "" });
+  }, [setCoupon, patchPayState]);
 
   const loadHeldBills = React.useCallback(async () => {
     setHoldsLoading(true);
@@ -196,17 +250,42 @@ export function POSOverlay() {
 
   React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); setReturnType("RETURN"); setExchangeItems(new Map()); setExchangeSearch(""); } }, [activeNav]);
 
-  React.useEffect(() => {
-    if (!customerSearch.trim()) { setCustomers([]); return; }
-    const t = setTimeout(async () => { setCustomerLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(customerSearch)}&limit=8`); setCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch { toast.error("Customer search failed"); } finally { setCustomerLoading(false); } }, 300);
-    return () => clearTimeout(t);
-  }, [customerSearch]);
+  const fetchPosCustomers = React.useCallback(async (search: string, limit: number) => {
+    const q = search.trim();
+    const url = `/pos/customers?limit=${limit}${q ? `&search=${encodeURIComponent(q)}` : ""}`;
+    const r = await api.get<ApiCustomerRow[] | { data: ApiCustomerRow[] }>(url);
+    return extractCustomerRows<ApiCustomerRow>(r.data).map(mapApiCustomer);
+  }, []);
 
   React.useEffect(() => {
-    if (!inlineCustomerSearch.trim()) { setInlineCustomers([]); return; }
-    const t = setTimeout(async () => { setInlineCustLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(inlineCustomerSearch)}&limit=12`); setInlineCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch { toast.error("Customer search failed"); } finally { setInlineCustLoading(false); } }, 300);
+    if (!posOpen || !showCustomerSearch) return;
+    const t = setTimeout(async () => {
+      setCustomerLoading(true);
+      try {
+        setCustomers(await fetchPosCustomers(customerSearch, 12));
+      } catch (e: unknown) {
+        toast.error((e as Error).message ?? "Customer search failed");
+      } finally {
+        setCustomerLoading(false);
+      }
+    }, customerSearch.trim() ? 300 : 0);
     return () => clearTimeout(t);
-  }, [inlineCustomerSearch]);
+  }, [customerSearch, showCustomerSearch, posOpen, fetchPosCustomers]);
+
+  React.useEffect(() => {
+    if (!posOpen || activeNav !== "customers") return;
+    const t = setTimeout(async () => {
+      setInlineCustLoading(true);
+      try {
+        setInlineCustomers(await fetchPosCustomers(inlineCustomerSearch, 20));
+      } catch (e: unknown) {
+        toast.error((e as Error).message ?? "Customer search failed");
+      } finally {
+        setInlineCustLoading(false);
+      }
+    }, inlineCustomerSearch.trim() ? 300 : 0);
+    return () => clearTimeout(t);
+  }, [inlineCustomerSearch, activeNav, posOpen, fetchPosCustomers]);
 
   const productGroups = React.useMemo(() => { const m = new Map<string,ProductItem[]>(); for (const p of products) m.set(p.productName,[...(m.get(p.productName)||[]),p]); return m; }, [products]);
   const getVariants = React.useCallback((n:string)=>productGroups.get(n)||[], [productGroups]);
@@ -288,21 +367,62 @@ export function POSOverlay() {
 
   const handleCheckout = React.useCallback(async()=>{
     if(!items.length||checkoutLoading)return;
-    if(activePayment==="CASH"&&numpad&&parseFloat(numpad)<totalAmt){toast.error("Cash tendered less than total");return;}
+    const payments = buildCheckoutPayments(payState, activePayment, numpad, totalAmt);
+    if (activePayment === "WALLET" && !payState.splitMode) {
+      if (!customer) { toast.error("Select a customer for wallet payment"); return; }
+      payments.length = 0;
+      payments.push({ method: "WALLET", amount: totalAmt });
+    }
+    if (activePayment === "CUSTOMER_CREDIT" && !payState.splitMode) {
+      if (!customer) { toast.error("Select a customer for credit payment"); return; }
+      const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
+      if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
+      if (totalAmt > available + 0.01) { toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`); return; }
+      payments.length = 0;
+      payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
+    }
+    if (!payState.splitMode && !payState.allowPartial) {
+      if (activePayment === "CASH" && numpad && parseFloat(numpad) < totalAmt) {
+        toast.error("Cash tendered less than total");
+        return;
+      }
+      const paid = payments.reduce((s, p) => s + p.amount, 0);
+      if (paid + 0.01 < totalAmt && activePayment !== "CASH") {
+        toast.error("Payment amount is less than total");
+        return;
+      }
+    }
+    if (payments.length === 0 || payments.every((p) => p.amount <= 0)) {
+      toast.error("Enter payment amount");
+      return;
+    }
     setCheckoutLoading(true);
     try {
       const pm=new Map(products.map(p=>[p.variantId,p]));
-      const payload={customerId:customer?.id,items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),payments:[{method:activePayment,amount:activePayment==="CASH"&&numpad?parseFloat(numpad):totalAmt}],discountAmount:discountAmount(),notes:cartNotes,...(activeHeldBillId?{heldBillId:activeHeldBillId}:{})};
-      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number}>("/pos/sale",payload);
+      const payload={
+        customerId:customer?.id,
+        items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),
+        payments,
+        discountAmount:discountAmount(),
+        couponCode:couponCode??undefined,
+        loyaltyPointsToRedeem:loyaltyPointsToRedeem>0?loyaltyPointsToRedeem:undefined,
+        allowPartialPayment:payState.allowPartial,
+        applyTierDiscount:true,
+        notes:cartNotes,
+        ...(activeHeldBillId?{heldBillId:activeHeldBillId}:{}),
+      };
+      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;paymentStatus?:string}>("/pos/sale",payload);
       const s=res.data;
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");
+      setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
       await loadHeldBills();
       await loadProducts();
-      toast.success(`Sale complete · ${s.invoiceNumber} — LKR ${s.total.toLocaleString()}`,{duration:3500});
+      const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
+      toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts]);
 
   const handleThermalPrint = React.useCallback(() => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -342,7 +462,7 @@ export function POSOverlay() {
       if(e.key==="F9"){e.preventDefault();handleCheckout();return;}
       if(e.key==="F12"){e.preventDefault();const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();return;}
       if(e.key==="Tab"){e.preventDefault();const i=PAY_METHODS.findIndex(m=>m.value===activePayment);setActivePayment(PAY_METHODS[(i+1)%PAY_METHODS.length].value);return;}
-      if(e.key==="Enter"){e.preventDefault();handleCheckout();return;}
+      if(e.key==="Enter"){if(activeNav!=="cart"||items.length===0)return;e.preventDefault();handleCheckout();return;}
       if(activePayment==="CASH"){if(/^\d$/.test(e.key)){handleNumpad(e.key);return;}if(e.key==="."){handleNumpad(".");return;}if(e.key==="Backspace"){handleNumpad("DEL");return;}}
       if(e.key==="ArrowDown"){e.preventDefault();setSelectedCartIdx(i=>Math.min(items.length-1,i+1));return;}
       if(e.key==="ArrowUp"){e.preventDefault();setSelectedCartIdx(i=>Math.max(0,i-1));return;}
@@ -354,26 +474,58 @@ export function POSOverlay() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts]);
 
+  const applyCustomer = React.useCallback((c: CustomerItem) => {
+    if (!c?.id) { toast.error("Invalid customer — try again"); return; }
+    setCustomer({
+      id: c.id, name: c.name, phone: c.phone, email: c.email,
+      membershipTier: (c.tier?.toLowerCase() ?? "bronze") as "bronze" | "silver" | "gold" | "platinum",
+      loyaltyPoints: c.loyaltyPoints, walletBalance: c.walletBalance,
+      totalPurchases: 0, totalSpent: 0,
+      creditLimit: c.creditLimit, outstandingBalance: c.creditBalance,
+      isActive: true, createdAt: new Date(),
+    });
+    toast.success(`${c.name} added to bill`);
+    setActiveNav("cart");
+  }, [setCustomer]);
+
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
     setNewCustSaving(true);
     try {
       const res = await api.post<any>("/customers", { firstName: newCustFirst.trim(), lastName: newCustLast.trim()||undefined, phone: newCustPhone.trim(), email: newCustEmail.trim()||undefined });
       const c = res.data;
-      const item: CustomerItem = { id:c.id, name:`${c.firstName} ${c.lastName??""}`.trim(), phone:c.phone, email:c.email, tier:c.tier?.toLowerCase(), loyaltyPoints:c.loyaltyPoints??0, walletBalance:c.walletBalance??0 };
+      const item: CustomerItem = mapApiCustomer(c);
       applyCustomer(item);
       setShowNewCust(false); setNewCustFirst(""); setNewCustLast(""); setNewCustPhone(""); setNewCustEmail("");
       setInlineCustomerSearch(""); setInlineCustomers([]);
     } catch(e:unknown){ toast.error((e as Error).message??"Failed to register customer"); }
     finally { setNewCustSaving(false); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newCustFirst, newCustLast, newCustPhone, newCustEmail]);
+  }, [newCustFirst, newCustLast, newCustPhone, newCustEmail, applyCustomer]);
 
-  //  Helper: set customer from CustomerItem 
-  const applyCustomer = (c: CustomerItem) => {
-    setCustomer({ id:c.id, name:c.name, phone:c.phone, email:c.email, membershipTier:(c.tier?.toLowerCase() as "bronze")??"bronze", loyaltyPoints:c.loyaltyPoints, totalPurchases:0, totalSpent:0, creditLimit:0, outstandingBalance:0, isActive:true, createdAt:new Date() });
-    toast.success(`${c.name} added to bill`);
-  };
+  const handleSplitBill = React.useCallback(async () => {
+    if (selectedCartIdx < 0 || !items[selectedCartIdx]) {
+      toast.error("Select a cart line (↑↓) then split");
+      return;
+    }
+    const splitItem = items[selectedCartIdx];
+    if (items.length <= 1) {
+      toast.error("Add more items or use Hold Bill for the full cart");
+      return;
+    }
+    try {
+      const payload = getHoldPayload();
+      await api.post("/pos/hold", {
+        label: `Split · ${splitItem.productName}`,
+        data: { ...payload, items: [splitItem], notes: `Split from active bill` },
+      });
+      removeItem(splitItem.variantId);
+      setSelectedCartIdx(-1);
+      await loadHeldBills();
+      toast.success(`${splitItem.productName} moved to held bills — checkout the rest`);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Split bill failed");
+    }
+  }, [selectedCartIdx, items, getHoldPayload, removeItem, loadHeldBills]);
 
   //  Center content per nav 
   const renderCenter = () => {
@@ -507,7 +659,7 @@ export function POSOverlay() {
         {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
         {/* Search results */}
         <div className="flex-1 overflow-y-auto">
-          {inlineCustomers.length===0&&!inlineCustomerSearch&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Search existing or register a new customer</p></div>}
+          {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
           {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
             <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"#4a6a8a"}}>
               <AlertCircle className="h-8 w-8 opacity-30"/>
@@ -517,10 +669,14 @@ export function POSOverlay() {
           )}
           <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))"}}>
             {inlineCustomers.map(c=>(
-              <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40" style={{background:"#162338",borderColor:"#1e3356"}}>
+              <div key={c.id} role="button" tabIndex={0}
+                onClick={() => applyCustomer(c)}
+                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
+                className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
+                style={{background:"#162338",borderColor:customer?.id===c.id?"#10b981":"#1e3356"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                 <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Active</>:"Set"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Active</>:"Set"}</button>
               </div>
             ))}
           </div>
@@ -1087,6 +1243,17 @@ export function POSOverlay() {
                 <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
                 <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
               </div>
+              <PosPaymentPanel
+                totalAmt={totalAmt}
+                subtotal={subtotal()}
+                customerWallet={customer?.walletBalance}
+                customerCreditLimit={customer?.creditLimit}
+                customerCreditBalance={customer?.outstandingBalance}
+                customerTier={customer?.membershipTier}
+                state={payState}
+                onStateChange={patchPayState}
+                onCouponChange={onCouponChange}
+              />
               <div className="flex gap-1.5 px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
                 {PAY_METHODS.map(({value,label,icon:Icon})=>(
                   <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
@@ -1114,8 +1281,11 @@ export function POSOverlay() {
                   <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
                 </div>
               )}
-              <div className="p-3 flex gap-2">
-                <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+              <div className="p-3 flex gap-2 flex-wrap">
+                <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+                  Split Bill
+                </button>
+                <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
                   {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                   Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                 </button>
@@ -1192,6 +1362,7 @@ export function POSOverlay() {
               </div>
               <div className="max-h-64 overflow-y-auto p-1.5">
                 {customerLoading&&<div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" style={{color:"#4f6ef7"}}/></div>}
+                {!customerLoading&&customers.length===0&&!customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>Type to search or pick from recent customers below</p>}
                 {!customerLoading&&customers.length===0&&customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>No customers found</p>}
                 {customers.map(c=>(<button key={c.id} onClick={()=>{applyCustomer(c);setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);}} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left">
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>

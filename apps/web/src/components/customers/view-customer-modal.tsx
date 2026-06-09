@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Phone, Mail, MapPin, Star, Crown, Diamond, Gift, Wallet, ShoppingBag, Calendar, Tag, Loader2, Plus } from "lucide-react";
+import { X, Phone, Mail, MapPin, Star, Crown, Diamond, Gift, Wallet, ShoppingBag, Calendar, Tag, Loader2, Plus, UserCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -16,11 +16,13 @@ import type { Customer } from "./add-customer-modal";
 interface SaleItem { id: string; invoiceNumber: string; invoiceDate: string; total: number; status: string; _count: { items: number } }
 interface LoyaltyTxn { id: string; points: number; type: string; description?: string | null; createdAt: string }
 interface WalletTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
+interface CreditTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
 
 interface FullCustomer extends Customer {
   sales: SaleItem[];
   loyaltyTxns: LoyaltyTxn[];
   walletTxns: WalletTxn[];
+  creditTxns: CreditTxn[];
 }
 
 interface Props { customerId: string | null; onClose: () => void; onEdit: (c: Customer) => void; }
@@ -33,7 +35,7 @@ const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon
   DIAMOND:  { label: "Diamond",  color: "text-cyan-400",    bg: "bg-cyan-400/10",    icon: Diamond },
 };
 
-type Tab = "overview" | "purchases" | "loyalty" | "wallet";
+type Tab = "overview" | "purchases" | "loyalty" | "wallet" | "credit";
 
 export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const profile = useShopProfile();
@@ -43,13 +45,18 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const [loading, setLoading]     = useState(false);
   const [pointsInput, setPointsInput] = useState("");
   const [walletInput, setWalletInput] = useState("");
+  const [creditPayInput, setCreditPayInput] = useState("");
+  const [creditLimitInput, setCreditLimitInput] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (!customerId) { setCustomer(null); return; }
     setLoading(true); setTab("overview");
     api.get<FullCustomer>(`/customers/${customerId}`)
-      .then((r) => setCustomer(r.data))
+      .then((r) => {
+        setCustomer(r.data);
+        setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
+      })
       .catch(() => toast.error("Failed to load customer"))
       .finally(() => setLoading(false));
   }, [customerId]);
@@ -80,6 +87,39 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     finally { setActionLoading(false); }
   };
 
+  const reloadCustomer = async () => {
+    if (!customerId) return;
+    const r = await api.get<FullCustomer>(`/customers/${customerId}`);
+    setCustomer(r.data);
+    setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
+  };
+
+  const receiveCreditPayment = async () => {
+    const amt = parseFloat(creditPayInput);
+    if (!customer || isNaN(amt) || amt <= 0) return;
+    if (amt > customer.creditBalance) { toast.error("Amount exceeds outstanding credit"); return; }
+    setActionLoading(true);
+    try {
+      await api.post(`/customers/${customer.id}/credit/payment`, { amount: amt, description: "Credit payment received" });
+      toast.success(`LKR ${amt} credit payment received`);
+      setCreditPayInput("");
+      await reloadCustomer();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to record payment"); }
+    finally { setActionLoading(false); }
+  };
+
+  const saveCreditLimit = async () => {
+    const limit = parseFloat(creditLimitInput);
+    if (!customer || isNaN(limit) || limit < 0) { toast.error("Enter a valid credit limit"); return; }
+    setActionLoading(true);
+    try {
+      await api.put(`/customers/${customer.id}/credit/limit`, { creditLimit: limit });
+      toast.success("Credit limit updated");
+      await reloadCustomer();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to update credit limit"); }
+    finally { setActionLoading(false); }
+  };
+
   if (!customerId) return null;
 
   const tierConf = customer ? (TIER_CONF[customer.tier] ?? TIER_CONF.BRONZE) : TIER_CONF.BRONZE;
@@ -90,6 +130,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     { id: "purchases", label: `Purchases${customer ? ` (${customer.sales.length})` : ""}` },
     ...(showLoyalty ? [{ id: "loyalty" as Tab, label: "Loyalty" }] : []),
     { id: "wallet",    label: "Wallet" },
+    { id: "credit",    label: "Credit" },
   ];
 
   return (
@@ -176,9 +217,17 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <p className="text-[10px] text-muted-foreground mt-0.5">Wallet Balance</p>
                 </div>
                 <div className="rounded-xl border bg-card p-3 text-center">
-                  <p className="text-xl font-black">{customer.lastPurchaseAt ? new Date(customer.lastPurchaseAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Last Purchase</p>
+                  <p className={`text-xl font-black ${customer.creditBalance > 0 ? "text-amber-500" : "text-muted-foreground"}`}>
+                    LKR {formatNumber(customer.creditBalance)}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Credit Due {customer.creditLimit > 0 ? `(limit ${formatNumber(customer.creditLimit)})` : ""}
+                  </p>
                 </div>
+              </div>
+              <div className="rounded-xl border bg-card p-3 text-center">
+                <p className="text-xl font-black">{customer.lastPurchaseAt ? new Date(customer.lastPurchaseAt).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" }) : "—"}</p>
+                <p className="text-[10px] text-muted-foreground mt-0.5">Last Purchase</p>
               </div>
               {customer.notes && (
                 <div className="rounded-xl border bg-muted/20 p-3">
@@ -272,7 +321,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 </Button>
               </div>
               <div className="space-y-2">
-                {customer.walletTxns.map((txn) => (
+                {(customer.walletTxns ?? []).map((txn) => (
                   <div key={txn.id} className="flex items-center justify-between p-2.5 rounded-lg border text-sm">
                     <div>
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
@@ -280,6 +329,55 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                     </div>
                     <span className={`font-bold text-sm ${txn.amount > 0 ? "text-emerald-500" : "text-red-500"}`}>
                       {txn.amount > 0 ? "+" : ""}LKR {formatNumber(txn.amount)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {customer && tab === "credit" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border bg-amber-500/5 p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">Outstanding Credit</p>
+                  <p className="text-3xl font-black text-amber-500">LKR {formatNumber(customer.creditBalance)}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Limit: LKR {formatNumber(customer.creditLimit)} · Available: LKR {formatNumber(Math.max(0, customer.creditLimit - customer.creditBalance))}
+                  </p>
+                </div>
+                <UserCheck className="h-10 w-10 text-amber-500/30" />
+              </div>
+              <div className="rounded-xl border p-3 space-y-2">
+                <p className="text-xs font-semibold">Credit Limit</p>
+                <div className="flex gap-2">
+                  <Input type="number" min={0} step={0.01} placeholder="Credit limit (LKR)…" value={creditLimitInput}
+                    onChange={(e) => setCreditLimitInput(e.target.value)} />
+                  <Button onClick={saveCreditLimit} disabled={actionLoading} variant="outline" className="shrink-0">Save</Button>
+                </div>
+              </div>
+              {customer.creditBalance > 0 && (
+                <div className="flex gap-2">
+                  <Input type="number" min={0.01} max={customer.creditBalance} step={0.01} placeholder="Payment amount (LKR)…" value={creditPayInput}
+                    onChange={(e) => setCreditPayInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && receiveCreditPayment()} />
+                  <Button onClick={receiveCreditPayment} disabled={actionLoading || !creditPayInput} className="gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-700">
+                    {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Receive
+                  </Button>
+                </div>
+              )}
+              <div className="space-y-2">
+                {(customer.creditTxns ?? []).length === 0 && (
+                  <p className="text-center text-muted-foreground py-6 text-sm">No credit transactions yet</p>
+                )}
+                {(customer.creditTxns ?? []).map((txn) => (
+                  <div key={txn.id} className="flex items-center justify-between p-2.5 rounded-lg border text-sm">
+                    <div>
+                      <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-LK")}</p>
+                    </div>
+                    <span className={`font-bold text-sm ${txn.type === "PAYMENT" ? "text-emerald-500" : "text-amber-500"}`}>
+                      {txn.type === "PAYMENT" ? "-" : "+"}LKR {formatNumber(txn.amount)}
                     </span>
                   </div>
                 ))}
