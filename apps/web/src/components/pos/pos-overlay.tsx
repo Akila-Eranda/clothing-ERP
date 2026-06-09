@@ -47,11 +47,20 @@ function mapApiCustomer(c: ApiCustomerRow): CustomerItem {
     creditBalance: c.creditBalance ?? 0,
   };
 }
+
+type SaleCustomer = { name?: string; firstName?: string; lastName?: string | null; phone?: string };
+
+function formatSaleCustomerName(customer?: SaleCustomer | null): string {
+  if (!customer) return "Walk-in";
+  if (customer.name?.trim()) return customer.name.trim();
+  const full = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
+  return full || customer.phone || "Walk-in";
+}
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
-interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string } | null; _count?: { items: number }; payments?: { method: string }[]; }
+interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; paymentMethod?: string; customer?: SaleCustomer | null; _count?: { items: number }; payments?: { method: string }[]; }
 interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
-interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string; phone: string } | null; items: SaleItemDetail[]; }
+interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: SaleCustomer | null; items: SaleItemDetail[]; }
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
 
@@ -704,10 +713,10 @@ export function POSOverlay() {
               <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
               <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid #1a2b3a",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
                 <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
-                <td className="px-3 py-2 text-xs text-white">{o.customer?.name??"Walk-in"}</td>
+                <td className="px-3 py-2 text-xs text-white">{formatSaleCustomerName(o.customer)}</td>
                 <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o._count?.items??0}</td>
                 <td className="px-3 py-2 text-xs font-bold font-mono text-white">LKR {formatNumber(o.total)}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.payments?.[0]?.method??"-"}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.payments?.[0]?.method ?? o.paymentMethod ?? "-"}</td>
                 <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{new Date(o.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
                 <td className="px-3 py-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{o.status}</span></td>
               </tr>);})}</tbody>
@@ -795,7 +804,7 @@ export function POSOverlay() {
                       {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>}
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
-                        <p className="text-xs" style={{color:"#6a8ab8"}}>{row.customer?.name??"Walk-in"} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
+                        <p className="text-xs" style={{color:"#6a8ab8"}}>{formatSaleCustomerName(row.customer)} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-white font-bold text-sm">LKR {formatNumber(row.total)}</p>
@@ -817,7 +826,7 @@ export function POSOverlay() {
             <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
               <div className="flex-1 flex flex-col gap-2 overflow-hidden">
                 <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
-                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{returnSale.customer?.name??"Walk-in"} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
+                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{formatSaleCustomerName(returnSale.customer)} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
                   <div className="ml-auto text-right"><p className="text-white font-bold">LKR {formatNumber(returnSale.total)}</p><span className="text-[10px]" style={{color:STATUS_STYLE[returnSale.status]?.color??"#9ca3af"}}>{returnSale.status}</span></div>
                 </div>
                 <p className="text-xs font-semibold shrink-0" style={{color:"#6a8ab8"}}>SELECT ITEMS TO RETURN</p>
@@ -915,7 +924,7 @@ export function POSOverlay() {
               <div className="rounded-xl border p-4" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <p className="text-xs font-semibold mb-3" style={{color:"#6a8ab8"}}>RETURN SUMMARY</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
-                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:returnSale.customer?.name??"Walk-in"},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},...(returnType==="EXCHANGE"?[{l:exchangeDue>0?"Customer Pays":"Refund",v:`LKR ${formatNumber(exchangeDue>0?exchangeDue:netRefund)}`}]:[])].map(f=>(
+                  {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:formatSaleCustomerName(returnSale.customer)},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},...(returnType==="EXCHANGE"?[{l:exchangeDue>0?"Customer Pays":"Refund",v:`LKR ${formatNumber(exchangeDue>0?exchangeDue:netRefund)}`}]:[])].map(f=>(
                     <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"#f59e0b"}:f.l==="Refund"?{color:"#10b981"}:{}}>{f.v}</p></div>
                   ))}
                 </div>

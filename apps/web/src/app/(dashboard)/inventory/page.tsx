@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag,
-  BookOpen, Layers, Clock, Skull, CheckCircle2, XCircle, Loader2,
+  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +16,13 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
+import { StockTransferModal } from "@/components/inventory/stock-transfer-modal";
 import { CreatePOModal } from "@/components/purchases/create-po-modal";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { variantTableColumns } from "@/lib/shop-vertical";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface LedgerLog {
   id: string;
@@ -55,6 +57,31 @@ interface AbcRow {
   grade: string;
   cumulativePct: number;
 }
+
+interface StockTransferRow {
+  id: string;
+  fromBranchId: string;
+  toBranchId: string;
+  status: "PENDING" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
+  notes?: string | null;
+  createdAt: string;
+  items: {
+    id: string;
+    requestedQty: number;
+    sentQty: number;
+    receivedQty: number;
+    variant?: { sku: string; name: string; product: { name: string } };
+  }[];
+  fromBranch?: { id: string; name: string; code?: string | null };
+  toBranch?: { id: string; name: string; code?: string | null } | null;
+}
+
+const TRANSFER_STATUS: Record<StockTransferRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "danger" }> = {
+  PENDING: { label: "Pending", variant: "warning" },
+  IN_TRANSIT: { label: "In Transit", variant: "secondary" },
+  RECEIVED: { label: "Received", variant: "success" },
+  CANCELLED: { label: "Cancelled", variant: "danger" },
+};
 
 function getStockStatus(qty: number) {
   if (qty === 0) return "out_of_stock";
@@ -173,6 +200,7 @@ function buildStockColumns(
 
 export default function InventoryPage() {
   const router = useRouter();
+  const userBranchId = useAuthStore((s) => s.user?.branchId);
   const { profile, workspace } = useShopWorkspace();
   const showBatch = hasBatchTracking(profile);
   const showExpiry = hasExpiryTracking(profile);
@@ -189,17 +217,21 @@ export default function InventoryPage() {
   const [poOpen, setPoOpen] = useState(false);
   const [prefillVariant, setPrefillVariant] = useState<string | undefined>();
   const [cycleLoading, setCycleLoading] = useState(false);
+  const [transfers, setTransfers] = useState<StockTransferRow[]>([]);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferActionId, setTransferActionId] = useState<string | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockRes, logsRes, summaryRes, abcRes, deadRes, agingRes] = await Promise.all([
+      const [stockRes, logsRes, summaryRes, abcRes, deadRes, agingRes, transfersRes] = await Promise.all([
         api.get<{ data: InventoryItem[] }>("/inventory?limit=500"),
         api.get<{ data: LedgerLog[] }>("/inventory/logs?limit=100"),
         api.get<LedgerSummary>("/inventory/ledger/summary"),
         api.get<AbcRow[]>("/inventory/analytics/abc"),
         api.get<{ name: string; sku: string; quantity: number; value: number }[]>("/inventory/analytics/dead-stock"),
         api.get<{ buckets: Record<string, number>; details: { name: string; ageDays: number; qty: number }[] }>("/inventory/analytics/aging"),
+        api.get<StockTransferRow[]>("/inventory/transfers").catch(() => ({ data: [] as StockTransferRow[] })),
       ]);
       setStock(stockRes.data?.data ?? (stockRes.data as unknown as InventoryItem[]) ?? []);
       setLogs(logsRes.data?.data ?? (logsRes.data as unknown as LedgerLog[]) ?? []);
@@ -207,12 +239,26 @@ export default function InventoryPage() {
       setAbc(Array.isArray(abcRes.data) ? abcRes.data : []);
       setDeadStock(Array.isArray(deadRes.data) ? deadRes.data : []);
       setAging(agingRes.data ?? null);
+      setTransfers(Array.isArray(transfersRes.data) ? transfersRes.data : []);
     } catch {
       toast.error("Failed to load inventory data");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const updateTransferStatus = async (id: string, status: StockTransferRow["status"]) => {
+    setTransferActionId(id);
+    try {
+      await api.put(`/inventory/transfers/${id}/status`, { status });
+      toast.success(status === "IN_TRANSIT" ? "Transfer dispatched" : status === "RECEIVED" ? "Transfer received" : "Transfer cancelled");
+      fetchAll();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to update transfer");
+    } finally {
+      setTransferActionId(null);
+    }
+  };
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -254,6 +300,9 @@ export default function InventoryPage() {
           <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
             <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
           </Button>
+          <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
+            <ArrowLeftRight className="h-3.5 w-3.5" /> Stock Transfer
+          </Button>
           <Button size="sm" onClick={startCycleCount} disabled={cycleLoading} className="gap-1.5">
             {cycleLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
             Start Cycle Count
@@ -290,6 +339,7 @@ export default function InventoryPage() {
           <TabsTrigger value="abc">ABC Analysis</TabsTrigger>
           <TabsTrigger value="dead">Dead Stock</TabsTrigger>
           <TabsTrigger value="aging">Stock Aging</TabsTrigger>
+          <TabsTrigger value="transfers">Stock Transfers</TabsTrigger>
         </TabsList>
 
         <TabsContent value="stock" className="mt-4">
@@ -422,9 +472,92 @@ export default function InventoryPage() {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="transfers" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <p className="text-sm text-muted-foreground">
+              Move stock between branches — dispatch from source, receive at destination.
+            </p>
+            <Button size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
+              <ArrowLeftRight className="h-3.5 w-3.5" /> New Transfer
+            </Button>
+          </div>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 border-b">
+                    <tr>
+                      {["Date", "From", "To", "Items", "Status", "Actions"].map((h) => (
+                        <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {transfers.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                          No stock transfers yet. Create one to move inventory between branches.
+                        </td>
+                      </tr>
+                    ) : transfers.map((t) => {
+                      const st = TRANSFER_STATUS[t.status];
+                      const itemSummary = t.items
+                        .map((i) => `${i.variant?.product?.name ?? "Item"} ×${i.requestedQty}`)
+                        .slice(0, 2)
+                        .join(", ");
+                      const canDispatch = t.status === "PENDING" && (!userBranchId || t.fromBranchId === userBranchId);
+                      const canReceive = t.status === "IN_TRANSIT" && (!userBranchId || t.toBranchId === userBranchId);
+                      const canCancel = t.status === "PENDING" && (!userBranchId || t.fromBranchId === userBranchId);
+                      const acting = transferActionId === t.id;
+                      return (
+                        <tr key={t.id} className="hover:bg-muted/20">
+                          <td className="px-3 py-2.5 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
+                          <td className="px-3 py-2.5 text-xs font-medium">{t.fromBranch?.name ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-xs font-medium">{t.toBranch?.name ?? "—"}</td>
+                          <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[200px]">
+                            {itemSummary}{t.items.length > 2 ? ` +${t.items.length - 2} more` : ""}
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <Badge variant={st.variant} className="text-[9px]">{st.label}</Badge>
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <div className="flex gap-1.5 flex-wrap">
+                              {canDispatch && (
+                                <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" disabled={acting}
+                                  onClick={() => updateTransferStatus(t.id, "IN_TRANSIT")}>
+                                  {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Truck className="h-3 w-3" />}
+                                  Dispatch
+                                </Button>
+                              )}
+                              {canReceive && (
+                                <Button size="sm" className="h-7 text-[10px] gap-1" disabled={acting}
+                                  onClick={() => updateTransferStatus(t.id, "RECEIVED")}>
+                                  {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
+                                  Receive
+                                </Button>
+                              )}
+                              {canCancel && (
+                                <Button size="sm" variant="ghost" className="h-7 text-[10px] gap-1 text-red-500" disabled={acting}
+                                  onClick={() => updateTransferStatus(t.id, "CANCELLED")}>
+                                  <Ban className="h-3 w-3" /> Cancel
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       <StockAdjustModal open={adjustOpen} onClose={() => setAdjustOpen(false)} onAdjusted={fetchAll} item={adjustItem} />
+      <StockTransferModal open={transferOpen} onClose={() => setTransferOpen(false)} onCreated={fetchAll} stock={stock} currentBranchId={userBranchId} />
       <CreatePOModal open={poOpen} onClose={() => { setPoOpen(false); setPrefillVariant(undefined); }} onCreated={() => { setPoOpen(false); fetchAll(); }} prefillVariantId={prefillVariant} />
     </div>
   );
