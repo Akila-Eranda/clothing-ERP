@@ -130,6 +130,29 @@ export function getInitials(name: string): string {
     .substring(0, 2);
 }
 
+/** Normalize API role strings (e.g. SUPER_ADMIN → super_admin). */
+export function normalizeRole(role?: string | null): string {
+  if (!role) return "cashier";
+  return role.toLowerCase().replace(/-/g, "_");
+}
+
+/** Human-readable role label for UI. */
+export function formatUserRole(role?: string | null): string {
+  if (!role) return "Staff";
+  return normalizeRole(role)
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Sidebar plan badge derived from user role. */
+export function planTierFromRole(role?: string | null): string {
+  const r = normalizeRole(role);
+  if (r.includes("super") || r === "tenant_admin") return "Enterprise";
+  if (r.includes("admin") || r.includes("manager")) return "Pro";
+  return "Starter";
+}
+
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return `${str.substring(0, length)}...`;

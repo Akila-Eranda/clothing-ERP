@@ -10,6 +10,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
+import { assertShopModule } from '@/shared/shop-module.helper';
 
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export class PromotionsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(tenantId: string, dto: CreatePromotionDto) {
+    await assertShopModule(this.prisma, tenantId, 'promotions');
     if (dto.couponCode) {
       const existing = await this.prisma.promotion.findFirst({
         where: { tenantId, couponCode: dto.couponCode.toUpperCase() },
@@ -76,6 +78,7 @@ export class PromotionsService {
   }
 
   async findAll(tenantId: string) {
+    await assertShopModule(this.prisma, tenantId, 'promotions');
     return this.prisma.promotion.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -114,6 +117,7 @@ export class PromotionsService {
   }
 
   async validate(couponCode: string, tenantId: string, orderAmount: number) {
+    await assertShopModule(this.prisma, tenantId, 'promotions');
     const now = new Date();
     const promo = await this.prisma.promotion.findFirst({
       where: {

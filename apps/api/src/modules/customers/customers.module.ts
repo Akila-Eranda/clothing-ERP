@@ -10,6 +10,7 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { assertShopModule } from '@/shared/shop-module.helper';
 
 export class CreateCustomerDto {
   @ApiProperty() @IsString() firstName: string;
@@ -107,6 +108,7 @@ export class CustomersService {
   }
 
   async addLoyaltyPoints(id: string, tenantId: string, points: number, description: string) {
+    await assertShopModule(this.prisma, tenantId, 'loyalty');
     return this.prisma.$transaction([
       this.prisma.customer.update({ where: { id }, data: { loyaltyPoints: { increment: points } } }),
       this.prisma.loyaltyTransaction.create({

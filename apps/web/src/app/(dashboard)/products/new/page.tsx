@@ -15,8 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile } from "@/lib/use-shop-profile";
-import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
+import { getShopProfile } from "@/lib/shop-profiles";
+import { getWorkspace } from "@/lib/shop-workspace";
+import {
+  buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint,
+  applyVariantCombo, autoFillVariantAttributes, findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
+} from "@/lib/shop-vertical";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
@@ -29,22 +34,26 @@ interface VariantRow {
   active: boolean;
 }
 interface Form {
-  name: string; description: string; shortDesc: string;
+  name: string; barcode: string; description: string; shortDesc: string;
   categoryId: string; brandId: string; hsn: string;
   status: "ACTIVE" | "DRAFT";
   tags: string[]; tagInput: string;
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
+  unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
 }
 function buildInitial(type?: string): Form {
   const d = buildProductFormDefaults(type);
+  const profile = getShopProfile(type);
+  const copy = getProductFormCopy(profile, getWorkspace(profile.type));
   return {
-    name: "", description: "", shortDesc: "",
+    name: "", barcode: "", description: "", shortDesc: "",
     categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
     tags: [], tagInput: "",
-    sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
+    sellingPrice: "", costPrice: "", mrp: "", taxRate: copy.defaultTaxRate,
     hasVariants: d.hasVariants, attributes: d.attributes,
+    unit: d.unit, expiryDate: "", batchNumber: "",
     trackInventory: true,
   };
 }
@@ -75,8 +84,13 @@ const COLOR_HEX: Record<string, string> = {
 export default function AddProductPage() {
   const router = useRouter();
   const shopProfile = useShopProfile();
+  const { workspace } = useShopWorkspace();
+  const formCopy = getProductFormCopy(shopProfile, workspace);
   const variantCols = variantTableColumns(shopProfile);
   const variantHint = variantVariantHint(shopProfile);
+  const showUnit = hasMultiUnit(shopProfile);
+  const showExpiry = hasExpiryTracking(shopProfile);
+  const showBatch = hasBatchTracking(shopProfile);
   const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -85,9 +99,17 @@ export default function AddProductPage() {
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
   useEffect(() => {
-    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => {});
-    api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => {});
-  }, []);
+    setForm(buildInitial(shopProfile.type));
+    setListView(false);
+    setVariantRows([]);
+  }, [shopProfile.type]);
+
+  useEffect(() => {
+    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => toast.error("Failed to load categories"));
+    if (formCopy.showBrand) {
+      api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
+    }
+  }, [formCopy.showBrand]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
@@ -104,20 +126,11 @@ export default function AddProductPage() {
 
   const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
     const validAttrs = attrs.filter((a) => a.values.length > 0);
-    return combos.map((combo) => {
-      const row: VariantRow = {
-        key: combo.join("|"), sku: genSku(form.name, combo), name: combo.join(" / "),
-        sellingPrice: form.sellingPrice, costPrice: form.costPrice, mrp: form.mrp, active: true,
-      };
-      validAttrs.forEach((attr, idx) => {
-        const k = attr.name.toLowerCase();
-        if (k === "size") row.size = combo[idx];
-        else if (k === "color") row.color = combo[idx];
-        else if (k === "material") row.material = combo[idx];
-        else if (k === "style") row.style = combo[idx];
-      });
-      return row;
-    });
+    return combos.map((combo) => ({
+      key: combo.join("|"), sku: genSku(form.name, combo), name: combo.join(" / "),
+      ...applyVariantCombo(shopProfile, validAttrs, combo),
+      sellingPrice: form.sellingPrice, costPrice: form.costPrice, mrp: form.mrp, active: true,
+    }));
   };
 
   const openListView = () => {
@@ -130,12 +143,13 @@ export default function AddProductPage() {
   const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
     setVariantRows((rows) => rows.map((r) => r.key === key ? { ...r, [field]: value } : r));
 
-  const autoGenerate = () => {
-    set("attributes", form.attributes.map((a) => {
-      const n = a.name.toLowerCase();
-      if (n === "size")  return { ...a, values: ["S", "M", "L", "XL"] };
-      if (n === "color") return { ...a, values: ["Black", "White", "Navy", "Olive"] };
-      return a;
+  const autoGenerate = () => set("attributes", autoFillVariantAttributes(shopProfile, form.attributes));
+
+  const togglePreset = (attrIdx: number, preset: string) => {
+    set("attributes", form.attributes.map((x, j) => {
+      if (j !== attrIdx) return x;
+      const has = x.values.includes(preset);
+      return { ...x, values: has ? x.values.filter((v) => v !== preset) : [...x.values, preset] };
     }));
   };
 
@@ -157,34 +171,35 @@ export default function AddProductPage() {
         }));
       } else {
         const validAttrs = form.attributes.filter((a) => a.values.length > 0);
-        variants = (validAttrs.length > 0 ? cartesian(form.attributes) : []).map((combo) => {
-          const v: Record<string, unknown> = {
-            sku: genSku(form.name, combo), name: combo.join(" / "),
-            sellingPrice: parseFloat(form.sellingPrice) || 0,
-            costPrice:    parseFloat(form.costPrice)    || 0,
-            mrp:          parseFloat(form.mrp)          || 0,
-          };
-          validAttrs.forEach((attr, idx) => {
-            const k = attr.name.toLowerCase();
-            if (["size","color","material","style"].includes(k)) v[k] = combo[idx];
-          });
-          return v;
-        });
+        variants = (validAttrs.length > 0 ? cartesian(form.attributes) : []).map((combo) => ({
+          sku: genSku(form.name, combo), name: combo.join(" / "),
+          ...applyVariantCombo(shopProfile, validAttrs, combo),
+          sellingPrice: parseFloat(form.sellingPrice) || 0,
+          costPrice:    parseFloat(form.costPrice)    || 0,
+          mrp:          parseFloat(form.mrp)          || 0,
+        }));
       }
     }
+    const extraTags = [
+      ...form.tags,
+      ...(showUnit && form.unit ? [`unit:${form.unit}`] : []),
+      ...(showExpiry && form.expiryDate ? [`exp:${form.expiryDate}`] : []),
+      ...(showBatch && form.batchNumber ? [`batch:${form.batchNumber}`] : []),
+    ];
     try {
       await api.post("/products", {
         name: form.name.trim(),
         description: form.description || undefined,
         shortDesc: form.shortDesc || undefined,
         categoryId: form.categoryId || undefined,
-        brandId: form.brandId || undefined,
+        brandId: formCopy.showBrand && form.brandId ? form.brandId : undefined,
         hsn: form.hsn || undefined,
+        barcode: form.barcode || undefined,
         sellingPrice: parseFloat(form.sellingPrice),
         costPrice: parseFloat(form.costPrice),
         mrp: parseFloat(form.mrp),
         taxRate: parseFloat(form.taxRate) || 0,
-        status, tags: form.tags,
+        status, tags: extraTags,
         hasVariants: form.hasVariants,
         trackInventory: form.trackInventory,
         variants: variants.length > 0 ? variants : undefined,
@@ -213,7 +228,7 @@ export default function AddProductPage() {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
           <ArrowLeft className="h-4 w-4" /> Back to Products
         </button>
-        <h1 className="text-base font-semibold">Add New Product</h1>
+        <h1 className="text-base font-semibold">{formCopy.pageTitle}</h1>
         <div className="w-36" /> {/* spacer */}
       </div>
 
@@ -224,14 +239,23 @@ export default function AddProductPage() {
         {/* â•â• LEFT COLUMN â•â• */}
         <div className="space-y-5">
 
+          <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{shopProfile.emoji} {shopProfile.label}:</span>{" "}
+            {formCopy.productTip}
+          </div>
+
           {/* Basic Info */}
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1.5">
-                <Label className="text-xs font-semibold">Product Name <span className="text-destructive">*</span></Label>
-                <Input placeholder="e.g. Premium Cotton T-Shirt" value={form.name} maxLength={120}
+                <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive">*</span></Label>
+                <Input placeholder={formCopy.namePlaceholder} value={form.name} maxLength={120}
                   onChange={(e) => set("name", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Barcode</Label>
+                <Input placeholder="Scan or enter barcode" value={form.barcode} onChange={(e) => set("barcode", e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Category</Label>
@@ -244,6 +268,7 @@ export default function AddProductPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {formCopy.showBrand && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Brand</Label>
                 <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
@@ -255,10 +280,34 @@ export default function AddProductPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">HSN / SAC Code</Label>
                 <Input placeholder="e.g. 6109" value={form.hsn} onChange={(e) => set("hsn", e.target.value)} />
               </div>
+              {showUnit && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Unit of Measure</Label>
+                  <Select value={form.unit} onValueChange={(v) => set("unit", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select unit" /></SelectTrigger>
+                    <SelectContent>
+                      {shopProfile.units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {showExpiry && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Expiry Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
+                </div>
+              )}
+              {showBatch && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Batch Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                  <Input placeholder="e.g. BATCH-2026-001" value={form.batchNumber} onChange={(e) => set("batchNumber", e.target.value)} />
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Tags</Label>
                 <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[38px] bg-background cursor-text"
@@ -270,7 +319,7 @@ export default function AddProductPage() {
                     </Badge>
                   ))}
                   <input className="flex-1 min-w-[80px] outline-none text-xs bg-transparent placeholder:text-muted-foreground"
-                    placeholder="Add tag, press Enterâ€¦" value={form.tagInput}
+                    placeholder="Add tag, press Enter…" value={form.tagInput}
                     onChange={(e) => set("tagInput", e.target.value)}
                     onKeyDown={(e) => {
                       if ((e.key === "Enter" || e.key === ",") && form.tagInput.trim()) {
@@ -284,7 +333,7 @@ export default function AddProductPage() {
               </div>
               <div className="col-span-2 space-y-1.5">
                 <Label className="text-xs font-semibold">Description</Label>
-                <Textarea placeholder="Product descriptionâ€¦" rows={3} value={form.description}
+                <Textarea placeholder={formCopy.descriptionPlaceholder} rows={3} value={form.description}
                   onChange={(e) => set("description", e.target.value)} />
               </div>
             </div>
@@ -330,7 +379,10 @@ export default function AddProductPage() {
           {/* Variants */}
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between border-b pb-2">
-              <h2 className="font-semibold text-base">Variants</h2>
+              <div>
+                <h2 className="font-semibold text-base">Variants</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">{formCopy.variantSectionHint}</p>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Enable variants</span>
                 <Switch checked={form.hasVariants} onCheckedChange={(v) => { set("hasVariants", v); setListView(false); }} />
@@ -443,7 +495,7 @@ export default function AddProductPage() {
                     <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[40px] bg-background cursor-text"
                       onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
                       {attr.values.map((v, vi) => {
-                        const hex = attr.name.toLowerCase() === "color" ? getColorHex(v) : null;
+                        const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
                         return (
                           <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
                             {hex && <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: hex }} />}
@@ -456,11 +508,23 @@ export default function AddProductPage() {
                         );
                       })}
                       <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
-                        placeholder={`Add ${attr.name}â€¦`} value={attr.input}
+                        placeholder={`Add ${attr.name}…`} value={attr.input}
                         onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }} />
                       <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
+                    {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
+                          <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                            }`}>
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
                 <div className="flex items-center justify-between">
@@ -473,9 +537,9 @@ export default function AddProductPage() {
                       <Plus className="h-3 w-3" /> Add Attribute
                     </Button>
                     )}
-                    {shopProfile.variantAttributes[0]?.presets?.includes('S') && (
+                    {shopProfile.variantAttributes.some((a) => a.presets.length > 0) && (
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3 w-3" /> Auto {shopProfile.variantAttributes[0]?.presets.slice(0, 4).join('/')}
+                      <Zap className="h-3 w-3" /> Fill {variantHint} presets
                     </Button>
                     )}
                   </div>
@@ -493,7 +557,7 @@ export default function AddProductPage() {
                     </div>
                     <div className="flex flex-wrap gap-1.5 max-h-28 overflow-auto">
                       {allVariants.slice(0, 30).map((combo, idx) => {
-                        const colorAttr = validAttrs.find((a) => a.name.toLowerCase() === "color");
+                        const colorAttr = validAttrs.find((a) => isColorVariantAttr(shopProfile, a.name));
                         const colorVal  = colorAttr ? combo[validAttrs.indexOf(colorAttr)] : null;
                         const hex = colorVal ? getColorHex(colorVal) : null;
                         return (
@@ -545,7 +609,8 @@ export default function AddProductPage() {
               ["Category", categories.find((c) => c.id === form.categoryId)?.name || <span className="text-muted-foreground italic">None</span>],
               ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">â€”</span>],
               ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}`    : <span className="text-muted-foreground italic">â€”</span>],
-              ["Variants", form.hasVariants  ? `${allVariants.length} variants` : "No variants"],
+              ["Variants", form.hasVariants  ? `${allVariants.length} (${variantHint})` : "Single SKU"],
+              ...(showUnit ? [["Unit", form.unit || shopProfile.defaultUnit] as const] : []),
               ["Status",   form.status],
             ].map(([label, val]) => (
               <div key={String(label)} className="flex justify-between gap-2">

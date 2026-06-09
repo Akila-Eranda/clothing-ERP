@@ -46,6 +46,7 @@ import { CollectionsModule } from './modules/collections/collections.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
+import { WorkflowModule } from './modules/workflow/workflow.module';
 
 @Module({
   imports: [
@@ -102,6 +103,7 @@ import { HealthModule } from './health/health.module';
     PromotionsModule,
     AuditLogModule,
     CollectionsModule,
+    WorkflowModule,
 
     // ── Infrastructure ────────────────────────────────────────
     MailModule,

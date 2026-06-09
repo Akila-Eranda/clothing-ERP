@@ -5,6 +5,17 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartItem, Customer } from "@/types";
 import { calculateDiscount, calculateTax } from "@/lib/utils";
 
+export interface HeldBillData {
+  items: CartItem[];
+  customer: Customer | null;
+  discount: number;
+  discountType: "percentage" | "fixed";
+  taxRate: number;
+  notes: string;
+  couponCode: string | null;
+  loyaltyPointsToRedeem: number;
+}
+
 interface CartStore {
   items: CartItem[];
   customer: Customer | null;
@@ -14,7 +25,7 @@ interface CartStore {
   loyaltyPointsToRedeem: number;
   notes: string;
   taxRate: number;
-  heldBills: { id: string; items: CartItem[]; customer: Customer | null; timestamp: Date }[];
+  activeHeldBillId: string | null;
 
   addItem: (item: CartItem) => void;
   removeItem: (variantId: string) => void;
@@ -26,12 +37,11 @@ interface CartStore {
   setLoyaltyPoints: (points: number) => void;
   setNotes: (notes: string) => void;
   setTaxRate: (rate: number) => void;
+  setActiveHeldBillId: (id: string | null) => void;
   clearCart: () => void;
-  holdBill: () => void;
-  restoreHeldBill: (id: string) => void;
-  deleteHeldBill: (id: string) => void;
+  loadFromHeldBill: (data: HeldBillData, heldBillId: string) => void;
+  getHoldPayload: () => HeldBillData;
 
-  // Computed values
   subtotal: () => number;
   discountAmount: () => number;
   taxAmount: () => number;
@@ -51,7 +61,7 @@ export const useCartStore = create<CartStore>()(
       loyaltyPointsToRedeem: 0,
       notes: "",
       taxRate: 0,
-      heldBills: [],
+      activeHeldBillId: null,
 
       addItem: (newItem) =>
         set((state) => {
@@ -93,16 +103,12 @@ export const useCartStore = create<CartStore>()(
         })),
 
       setCustomer: (customer) => set({ customer }),
-
       setDiscount: (discount, discountType) => set({ discount, discountType }),
-
       setCoupon: (couponCode) => set({ couponCode }),
-
       setLoyaltyPoints: (loyaltyPointsToRedeem) => set({ loyaltyPointsToRedeem }),
-
       setNotes: (notes) => set({ notes }),
-
       setTaxRate: (taxRate) => set({ taxRate }),
+      setActiveHeldBillId: (activeHeldBillId) => set({ activeHeldBillId }),
 
       clearCart: () =>
         set({
@@ -113,41 +119,35 @@ export const useCartStore = create<CartStore>()(
           couponCode: null,
           loyaltyPointsToRedeem: 0,
           notes: "",
+          activeHeldBillId: null,
         }),
 
-      holdBill: () =>
-        set((state) => ({
-          heldBills: [
-            ...state.heldBills,
-            {
-              id: `HOLD-${Date.now()}`,
-              items: state.items,
-              customer: state.customer,
-              timestamp: new Date(),
-            },
-          ],
-          items: [],
-          customer: null,
-          discount: 0,
-          couponCode: null,
-          loyaltyPointsToRedeem: 0,
-        })),
-
-      restoreHeldBill: (id) =>
-        set((state) => {
-          const bill = state.heldBills.find((b) => b.id === id);
-          if (!bill) return state;
-          return {
-            items: bill.items,
-            customer: bill.customer,
-            heldBills: state.heldBills.filter((b) => b.id !== id),
-          };
+      loadFromHeldBill: (data, heldBillId) =>
+        set({
+          items: data.items,
+          customer: data.customer,
+          discount: data.discount,
+          discountType: data.discountType,
+          taxRate: data.taxRate,
+          notes: data.notes,
+          couponCode: data.couponCode,
+          loyaltyPointsToRedeem: data.loyaltyPointsToRedeem,
+          activeHeldBillId: heldBillId,
         }),
 
-      deleteHeldBill: (id) =>
-        set((state) => ({
-          heldBills: state.heldBills.filter((b) => b.id !== id),
-        })),
+      getHoldPayload: () => {
+        const s = get();
+        return {
+          items: s.items,
+          customer: s.customer,
+          discount: s.discount,
+          discountType: s.discountType,
+          taxRate: s.taxRate,
+          notes: s.notes,
+          couponCode: s.couponCode,
+          loyaltyPointsToRedeem: s.loyaltyPointsToRedeem,
+        };
+      },
 
       subtotal: () => {
         const { items } = get();
@@ -169,7 +169,7 @@ export const useCartStore = create<CartStore>()(
 
       loyaltyDiscount: () => {
         const { loyaltyPointsToRedeem } = get();
-        return loyaltyPointsToRedeem * 0.5; // 0.5 per point
+        return loyaltyPointsToRedeem * 0.5;
       },
 
       taxAmount: () => {
@@ -193,7 +193,7 @@ export const useCartStore = create<CartStore>()(
         customer: state.customer,
         discount: state.discount,
         discountType: state.discountType,
-        heldBills: state.heldBills,
+        activeHeldBillId: state.activeHeldBillId,
       }),
     }
   )

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2,
   Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight, Printer,
@@ -19,6 +19,19 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { getReturnReasons } from "@/lib/shop-vertical";
+import { ModuleGate } from "@/components/shop/module-gate";
+
+type ReasonOption = { value: string; label: string };
+
+function buildReasons(type: string | null | undefined): ReasonOption[] {
+  return getReturnReasons(type).map((r) => ({ value: r.v, label: r.l }));
+}
+
+function reasonLabel(value: string, reasons: ReasonOption[]) {
+  return reasons.find((r) => r.value === value)?.label ?? value;
+}
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ExchangeItem { variantId: string; quantity: number; unitPrice: number; productName?: string; variantName?: string; sku?: string; }
@@ -43,14 +56,6 @@ interface VariantLookup {
   size?: string | null; color?: string | null;
 }
 
-const REASONS: { value: string; label: string }[] = [
-  { value: "DEFECTIVE",             label: "Defective Product" },
-  { value: "WRONG_ITEM",            label: "Wrong Item" },
-  { value: "SIZE_ISSUE",            label: "Size Issue" },
-  { value: "CUSTOMER_CHANGED_MIND", label: "Customer Changed Mind" },
-  { value: "DAMAGED",               label: "Damaged" },
-  { value: "OTHER",                 label: "Other" },
-];
 
 const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.ElementType }> = {
   INITIATED:        { label: "Initiated",        variant: "warning", icon: Clock },
@@ -61,13 +66,13 @@ const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.E
 };
 
 // ── Thermal bill printer (80mm) ──────────────────────────────────────────────
-function printBill(record: ReturnRecord) {
+function printBill(record: ReturnRecord, reasons: ReasonOption[]) {
   const isExchange = record.returnType === "EXCHANGE";
   const fmt  = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const date = new Date(record.createdAt);
   const dateStr = date.toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
   const timeStr = date.toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" });
-  const reason  = REASONS.find((r) => r.value === record.reason)?.label ?? record.reason;
+  const reason  = reasonLabel(record.reason, reasons);
 
   // Pad text to fill thermal width (32 chars usable at 10px Courier on 80mm)
   const pad = (left: string, right: string, width = 32) => {
@@ -209,7 +214,7 @@ ${exchangeItemRows || '<div style="font-size:10px;font-style:italic;">No exchang
 }
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
-function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () => void }) {
+function DetailModal({ record, onClose, reasons }: { record: ReturnRecord; onClose: () => void; reasons: ReasonOption[] }) {
   const cfg = STATUS_CFG[record.status] ?? STATUS_CFG.INITIATED;
   const Icon = cfg.icon;
   const isExchange = record.returnType === "EXCHANGE";
@@ -231,7 +236,7 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
             <Badge variant={cfg.variant as "success"|"warning"|"danger"|"default"} className="text-[10px] gap-1">
               <Icon className="h-3 w-3" />{cfg.label}
             </Badge>
-            <button onClick={() => printBill(record)}
+            <button onClick={() => printBill(record, reasons)}
               className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-muted ${
                 isExchange ? "text-violet-600 border-violet-200" : "text-primary border-primary/20"
               }`}>
@@ -319,7 +324,7 @@ function DetailModal({ record, onClose }: { record: ReturnRecord; onClose: () =>
 // ── New Return / Exchange Modal — 4-step wizard ─────────────────────────────
 const STEPS = ["Type", "Invoice", "Items", "Confirm"];
 
-function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => void; onSaved: () => void; initialInvoice?: string }) {
+function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose: () => void; onSaved: () => void; initialInvoice?: string; reasons: ReasonOption[] }) {
   const [step, setStep]                   = useState(initialInvoice ? 1 : 0);
   const [mode, setMode]                   = useState<"RETURN" | "EXCHANGE">("RETURN");
   const [invoiceSearch, setInvoiceSearch] = useState(initialInvoice ?? "");
@@ -662,7 +667,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
                 <Label className="text-xs font-semibold">Reason for Return *</Label>
                 <Select value={reason} onValueChange={setReason}>
                   <SelectTrigger><SelectValue placeholder="Select a reason…" /></SelectTrigger>
-                  <SelectContent>{REASONS.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>{reasons.map((r) => <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
 
@@ -711,6 +716,8 @@ function NewReturnModal({ onClose, onSaved, initialInvoice }: { onClose: () => v
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function ReturnsPage() {
+  const profile = useShopProfile();
+  const reasons = useMemo(() => buildReasons(profile.type), [profile.type]);
   const [returns, setReturns]             = useState<ReturnRecord[]>([]);
   const [loading, setLoading]             = useState(true);
   const [addOpen, setAddOpen]             = useState(false);
@@ -799,7 +806,7 @@ export default function ReturnsPage() {
       accessorKey: "reason",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Reason" />,
       cell: ({ row }) => {
-        const r = REASONS.find((r) => r.value === row.original.reason);
+        const r = reasons.find((r) => r.value === row.original.reason);
         return <span className="text-xs text-muted-foreground">{r?.label ?? row.original.reason}</span>;
       },
     },
@@ -852,7 +859,7 @@ export default function ReturnsPage() {
         const isExchange = row.original.returnType === "EXCHANGE";
         const moreActions = [
           { text: "View Details", function: () => setDetailRecord(row.original) },
-          { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printBill(row.original) },
+          { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printBill(row.original, reasons) },
         ];
         if (s === "INITIATED") {
           moreActions.push({ text: "Approve",        function: () => updateStatus(row.original.id, "APPROVED", "Approved") });
@@ -871,6 +878,7 @@ export default function ReturnsPage() {
   ];
 
   return (
+    <ModuleGate module="returns">
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -932,9 +940,11 @@ export default function ReturnsPage() {
           onClose={() => { setAddOpen(false); setInitialInvoice(undefined); }}
           onSaved={() => fetchReturns()}
           initialInvoice={initialInvoice}
+          reasons={reasons}
         />
       )}
-      {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} />}
+      {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} reasons={reasons} />}
     </div>
+    </ModuleGate>
   );
 }

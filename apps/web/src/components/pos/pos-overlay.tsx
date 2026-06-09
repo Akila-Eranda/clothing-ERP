@@ -5,18 +5,18 @@ import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useCartStore } from "@/stores/cart-store";
+import { useCartStore, type HeldBillData } from "@/stores/cart-store";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
-import { getReturnReasons, variantTableColumns } from "@/lib/shop-vertical";
+import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 
-interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; }
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
@@ -24,6 +24,7 @@ interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDat
 interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
 interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: { name: string; phone: string } | null; items: SaleItemDetail[]; }
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
+interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }];
 
@@ -40,9 +41,6 @@ export function POSOverlay() {
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
   const variantCols = variantTableColumns(profile);
-  const attr1 = variantCols[0];
-  const attr2 = variantCols[1];
-  const sizePresets = attr1?.presets ?? [];
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
     if (!item.module) return true;
     return hasShopModule(profile, item.module);
@@ -68,8 +66,7 @@ export function POSOverlay() {
   const [scanFlash, setScanFlash] = React.useState(false);
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
-  const [selColor, setSelColor] = React.useState<string | null>(null);
-  const [selSize, setSelSize] = React.useState<string | null>(null);
+  const [selAttrs, setSelAttrs] = React.useState<Record<string, string | null>>({});
   const [now, setNow] = React.useState(new Date());
   const [todayStats, setTodayStats] = React.useState({ sales: 0, orders: 0, items: 0 });
   const [liked, setLiked] = React.useState<Set<string>>(new Set());
@@ -109,10 +106,24 @@ export function POSOverlay() {
   const [dayEndLoading, setDayEndLoading] = React.useState(false);
   const [showDayEnd, setShowDayEnd] = React.useState(false);
   const [dayEndSummary, setDayEndSummary] = React.useState<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}|null>(null);
+  const [serverHeldBills, setServerHeldBills] = React.useState<ServerHeldBill[]>([]);
+  const [holdsLoading, setHoldsLoading] = React.useState(false);
   const { settings: receiptSettings } = useReceiptSettings();
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setTaxRate, clearCart, holdBill, heldBills, restoreHeldBill, deleteHeldBill, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+  const { items, customer, discount, taxRate, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+
+  const loadHeldBills = React.useCallback(async () => {
+    setHoldsLoading(true);
+    try {
+      const r = await api.get<ServerHeldBill[]>("/pos/hold");
+      setServerHeldBills(Array.isArray(r.data) ? r.data : []);
+    } catch {
+      toast.error("Failed to load held bills");
+    } finally {
+      setHoldsLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
 
@@ -122,6 +133,49 @@ export function POSOverlay() {
     catch { toast.error("Failed to load products"); } finally { setLoading(false); }
   }, []);
 
+  const handleHoldBill = React.useCallback(async () => {
+    if (!items.length) { toast.info("Cart is empty"); return; }
+    try {
+      const payload = getHoldPayload();
+      await api.post("/pos/hold", {
+        label: `Hold ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+        data: payload,
+      });
+      clearCart();
+      setCartNotes("");
+      setDiscountInput("");
+      await loadHeldBills();
+      await loadProducts();
+      toast.success("Bill held — stock reserved");
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to hold bill");
+    }
+  }, [items.length, getHoldPayload, clearCart, loadHeldBills, loadProducts]);
+
+  const handleRestoreHeldBill = React.useCallback(async (bill: ServerHeldBill) => {
+    if (items.length > 0 && activeHeldBillId !== bill.id) {
+      toast.error("Clear or checkout the current cart before restoring another hold");
+      return;
+    }
+    loadFromHeldBill(bill.data, bill.id);
+    setCartNotes(bill.data.notes ?? "");
+    setDiscountInput(bill.data.discount > 0 ? String(bill.data.discount) : "");
+    setActiveNav("products");
+    toast.success("Bill restored");
+  }, [items.length, activeHeldBillId, loadFromHeldBill]);
+
+  const handleDeleteHeldBill = React.useCallback(async (id: string) => {
+    try {
+      await api.delete(`/pos/hold/${id}`);
+      if (activeHeldBillId === id) clearCart();
+      await loadHeldBills();
+      await loadProducts();
+      toast.info("Held bill removed — stock released");
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to delete held bill");
+    }
+  }, [activeHeldBillId, clearCart, loadHeldBills, loadProducts]);
+
   const loadOrders = React.useCallback(async () => {
     setOrdersLoading(true);
     try {
@@ -130,7 +184,7 @@ export function POSOverlay() {
     } catch { toast.error("Failed to load sales"); } finally { setOrdersLoading(false); }
   }, []);
 
-  React.useEffect(() => { if (posOpen) loadProducts(); }, [posOpen, loadProducts]);
+  React.useEffect(() => { if (posOpen) { loadProducts(); loadHeldBills(); } }, [posOpen, loadProducts, loadHeldBills]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
   React.useEffect(() => {
     if (posOpen) {
@@ -144,28 +198,49 @@ export function POSOverlay() {
 
   React.useEffect(() => {
     if (!customerSearch.trim()) { setCustomers([]); return; }
-    const t = setTimeout(async () => { setCustomerLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(customerSearch)}&limit=8`); setCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch{} finally { setCustomerLoading(false); } }, 300);
+    const t = setTimeout(async () => { setCustomerLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(customerSearch)}&limit=8`); setCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch { toast.error("Customer search failed"); } finally { setCustomerLoading(false); } }, 300);
     return () => clearTimeout(t);
   }, [customerSearch]);
 
   React.useEffect(() => {
     if (!inlineCustomerSearch.trim()) { setInlineCustomers([]); return; }
-    const t = setTimeout(async () => { setInlineCustLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(inlineCustomerSearch)}&limit=12`); setInlineCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch{} finally { setInlineCustLoading(false); } }, 300);
+    const t = setTimeout(async () => { setInlineCustLoading(true); try { const r = await api.get<{data:CustomerItem[]}>(`/customers?search=${encodeURIComponent(inlineCustomerSearch)}&limit=12`); setInlineCustomers((r.data?.data??r.data??[]) as CustomerItem[]); } catch { toast.error("Customer search failed"); } finally { setInlineCustLoading(false); } }, 300);
     return () => clearTimeout(t);
   }, [inlineCustomerSearch]);
 
   const productGroups = React.useMemo(() => { const m = new Map<string,ProductItem[]>(); for (const p of products) m.set(p.productName,[...(m.get(p.productName)||[]),p]); return m; }, [products]);
   const getVariants = React.useCallback((n:string)=>productGroups.get(n)||[], [productGroups]);
-  const getColors = React.useCallback((n:string)=>[...new Set(getVariants(n).map(v=>v.color).filter(Boolean))] as string[], [getVariants]);
-  const getSizes = React.useCallback((n:string)=>{ const s=[...new Set(getVariants(n).map(v=>v.size).filter(Boolean))] as string[]; return s.sort((a,b)=>{const ai=sizePresets.indexOf(a.toUpperCase()),bi=sizePresets.indexOf(b.toUpperCase());return(ai===-1?99:ai)-(bi===-1?99:bi);});}, [getVariants, sizePresets]);
-  const findVariant = React.useCallback((n:string,c?:string,s?:string)=>getVariants(n).find(v=>(!c||v.color===c)&&(!s||v.size===s))??getVariants(n)[0], [getVariants]);
-  const activeVariant = React.useMemo(()=>selectedProductName?findVariant(selectedProductName,selColor??undefined,selSize??undefined):null, [selectedProductName,selColor,selSize,findVariant]);
+  const getAttrValues = React.useCallback((n: string, field: 'size' | 'color' | 'material' | 'style') => {
+    const presets = variantCols.find((c) => c.field === field)?.presets ?? [];
+    const values = [...new Set(getVariants(n).map((v) => variantFieldValue(v, field)).filter(Boolean))] as string[];
+    return values.sort((a, b) => {
+      const ai = presets.indexOf(a);
+      const bi = presets.indexOf(b);
+      if (ai === -1 && bi === -1) return a.localeCompare(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  }, [getVariants, variantCols]);
+  const needsVariantPicker = React.useCallback((n: string) =>
+    variantCols.some((col) => getAttrValues(n, col.field).length > 1),
+  [variantCols, getAttrValues]);
+  const findVariant = React.useCallback((n: string, attrs: Record<string, string | null | undefined>) =>
+    getVariants(n).find((v) =>
+      variantCols.every((col) => {
+        const sel = attrs[col.field];
+        if (!sel) return true;
+        return variantFieldValue(v, col.field) === sel;
+      }),
+    ) ?? getVariants(n)[0],
+  [getVariants, variantCols]);
+  const activeVariant = React.useMemo(() =>
+    selectedProductName ? findVariant(selectedProductName, selAttrs) : null,
+  [selectedProductName, selAttrs, findVariant]);
   const totalAmt = total(); const changeAmt = numpad ? Math.max(0,parseFloat(numpad)-totalAmt) : 0;
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
-  const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
+  const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
 
-  const handleAddProduct = React.useCallback((p:ProductItem)=>{ if(p.stock<=0){toast.error(`${p.productName} (${p.variantName}) — Out of stock`);return;} addItem({variantId:p.variantId,productName:p.productName,variantName:p.variantName,sku:p.sku,unitPrice:p.unitPrice,quantity:1,stock:p.stock,discountAmount:0,discountType:"percentage",taxRate:0}); setRecentScans(prev=>[{id:Date.now().toString(),variantId:p.variantId,name:p.productName,variant:p.variantName,price:p.unitPrice,time:new Date()},...prev].slice(0,8)); toast.success(`${p.productName} · ${p.variantName} added  (Stock: ${p.stock})`,{duration:900}); }, [addItem]);
-  const handleCardClick = React.useCallback((p:ProductItem)=>{ const c=getColors(p.productName),s=getSizes(p.productName); if(c.length<=1&&s.length<=1){handleAddProduct(p);return;} setSelectedProductName(p.productName);setSelColor(p.color??null);setSelSize(p.size??null); },[getColors,getSizes,handleAddProduct]);
+  const handleAddProduct = React.useCallback((p:ProductItem)=>{ if(p.stock<=0){toast.error(`${p.productName} (${p.variantName}) — Out of stock`);return;} addItem({variantId:p.variantId,productName:p.productName,variantName:p.variantName,sku:p.sku,unitPrice:p.unitPrice,quantity:1,stock:p.stock,discountAmount:0,discountType:"percentage",taxRate:0}); setRecentScans(prev=>[{id:Date.now().toString(),variantId:p.variantId,name:p.productName,variant:variantDisplayLabel(p, profile),price:p.unitPrice,time:new Date()},...prev].slice(0,8)); toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} added  (Stock: ${p.stock})`,{duration:900}); }, [addItem, profile]);
+  const handleCardClick = React.useCallback((p:ProductItem)=>{ if(!needsVariantPicker(p.productName)){handleAddProduct(p);return;} setSelectedProductName(p.productName); const initial: Record<string, string | null> = {}; for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null; setSelAttrs(initial); },[needsVariantPicker, handleAddProduct, variantCols]);
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
   const handlePinEntry = React.useCallback((digit: string) => {
@@ -217,15 +292,17 @@ export function POSOverlay() {
     setCheckoutLoading(true);
     try {
       const pm=new Map(products.map(p=>[p.variantId,p]));
-      const payload={customerId:customer?.id,items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),payments:[{method:activePayment,amount:activePayment==="CASH"&&numpad?parseFloat(numpad):totalAmt}],discountAmount:discountAmount(),notes:cartNotes};
+      const payload={customerId:customer?.id,items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),payments:[{method:activePayment,amount:activePayment==="CASH"&&numpad?parseFloat(numpad):totalAmt}],discountAmount:discountAmount(),notes:cartNotes,...(activeHeldBillId?{heldBillId:activeHeldBillId}:{})};
       const res=await api.post<{invoiceNumber:string;total:number;changeDue:number}>("/pos/sale",payload);
       const s=res.data;
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
-      toast.success(`? ${s.invoiceNumber} — LKR ${s.total.toLocaleString()}`,{duration:3500});
+      await loadHeldBills();
+      await loadProducts();
+      toast.success(`Sale complete · ${s.invoiceNumber} — LKR ${s.total.toLocaleString()}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,changeAmt,subtotal,taxAmount,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts]);
 
   const handleThermalPrint = React.useCallback(() => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -258,10 +335,10 @@ export function POSOverlay() {
       if(e.key==="u"||e.key==="U"){e.preventDefault();setActiveNav("customers");return;}
       if(e.key==="/"||((e.ctrlKey||e.metaKey)&&e.key==="f")){e.preventDefault();searchRef.current?.focus();return;}
       if(e.key==="F2"){e.preventDefault();searchRef.current?.focus();setActiveNav("products");return;}
-      if(e.key==="F3"){e.preventDefault();if(items.length>0){holdBill();toast.success("Bill held");}return;}
+      if(e.key==="F3"){e.preventDefault();if(items.length>0){handleHoldBill();}return;}
       if(e.key==="F4"){e.preventDefault();setShowCustomerSearch(true);return;}
       if(e.key==="F5"){e.preventDefault();loadProducts();return;}
-      if(e.key==="F8"){e.preventDefault();if(heldBills.length>0){restoreHeldBill(heldBills[heldBills.length-1].id);toast.success("Bill restored");}return;}
+      if(e.key==="F8"){e.preventDefault();if(serverHeldBills.length>0){handleRestoreHeldBill(serverHeldBills[0]);}return;}
       if(e.key==="F9"){e.preventDefault();handleCheckout();return;}
       if(e.key==="F12"){e.preventDefault();const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();return;}
       if(e.key==="Tab"){e.preventDefault();const i=PAY_METHODS.findIndex(m=>m.value===activePayment);setActivePayment(PAY_METHODS[(i+1)%PAY_METHODS.length].value);return;}
@@ -275,7 +352,7 @@ export function POSOverlay() {
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,heldBills,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,pinLocked,handlePinEntry,filteredProducts]);
+  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts]);
 
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
@@ -324,7 +401,7 @@ export function POSOverlay() {
                       <button onClick={e=>{e.stopPropagation();setLiked(s=>{const n=new Set(s);n.has(p.variantId)?n.delete(p.variantId):n.add(p.variantId);return n;});}} className="absolute top-1.5 right-1.5 p-1 rounded-full" style={{background:"rgba(0,0,0,0.3)"}}><Heart className="h-3 w-3" style={{color:liked.has(p.variantId)?"#ef4444":"#fff",fill:liked.has(p.variantId)?"#ef4444":"none"}}/></button>
                       <button onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
-                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{p.color??p.variantName}</p><p className="text-[10px] font-mono mt-0.5 line-clamp-1" style={{color:"#4a6a8a"}}>{p.sku}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p></div>
+                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p><p className="text-[10px] font-mono mt-0.5 line-clamp-1" style={{color:"#4a6a8a"}}>{p.sku}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p></div>
                   </motion.div>
                 );
               })}
@@ -334,17 +411,31 @@ export function POSOverlay() {
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
           <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color)}}><Package className="h-5 w-5 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{p.color}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color??p.material)}}><Package className="h-5 w-5 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col border-r" style={{borderColor:"#1e3356"}}>
             {selectedProductName&&activeVariant?(
               <div className="flex h-full">
                 <div className="w-24 shrink-0 p-2 flex items-center justify-center border-r" style={{borderColor:"#1e3356"}}><div className="w-full aspect-square rounded-xl flex items-center justify-center" style={{background:getCardBg(activeVariant.color)}}><Package className="h-8 w-8 text-white/30"/></div></div>
                 <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
-                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold leading-tight">{activeVariant.productName}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{activeVariant.variantName}</p></div><button onClick={()=>setSelectedProductName(null)} className="p-0.5 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
-                  {getColors(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{attr2?.isColor ? attr2.label : 'Color'}</p><div className="flex gap-1 flex-wrap">{getColors(selectedProductName).map(c=><button key={c} onClick={()=>setSelColor(c)} title={c} className="h-5 w-5 rounded-full border-2 transition-all" style={{background:getColorHex(c),borderColor:selColor===c?"#4f6ef7":"transparent"}}/>)}</div></div>)}
-                  {getSizes(selectedProductName).length>0&&(<div><p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{attr1?.label ?? 'Size'}</p><div className="flex gap-1 flex-wrap">{getSizes(selectedProductName).map(s=><button key={s} onClick={()=>setSelSize(s)} className="px-2 py-0.5 rounded text-[10px] font-bold border transition-all" style={{background:selSize===s?"#4f6ef7":"#1a2b4a",color:selSize===s?"#fff":"#6a8ab8",borderColor:selSize===s?"#4f6ef7":"#1e3356"}}>{s}</button>)}</div></div>)}
-                  <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} pcs</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
+                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold leading-tight">{activeVariant.productName}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{variantDisplayLabel(activeVariant, profile)}</p></div><button onClick={()=>setSelectedProductName(null)} className="p-0.5 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
+                  {variantCols.map((col) => {
+                    const values = selectedProductName ? getAttrValues(selectedProductName, col.field) : [];
+                    if (values.length === 0) return null;
+                    return (
+                      <div key={col.field}>
+                        <p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{col.label}</p>
+                        <div className="flex gap-1 flex-wrap">
+                          {values.map((val) => col.isColor ? (
+                            <button key={val} onClick={() => setSelAttrs((a) => ({ ...a, [col.field]: val }))} title={val} className="h-5 w-5 rounded-full border-2 transition-all" style={{background:getColorHex(val),borderColor:selAttrs[col.field]===val?"#4f6ef7":"transparent"}}/>
+                          ) : (
+                            <button key={val} onClick={() => setSelAttrs((a) => ({ ...a, [col.field]: val }))} className="px-2 py-0.5 rounded text-[10px] font-bold border transition-all" style={{background:selAttrs[col.field]===val?"#4f6ef7":"#1a2b4a",color:selAttrs[col.field]===val?"#fff":"#6a8ab8",borderColor:selAttrs[col.field]===val?"#4f6ef7":"#1e3356"}}>{val}</button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} {profile.defaultUnit}</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
                 </div>
               </div>
             ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-12 w-12 mb-2 opacity-30"/><p className="text-base font-semibold">Click a product to select variant</p></div>)}
@@ -429,7 +520,7 @@ export function POSOverlay() {
               <div key={c.id} className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40" style={{background:"#162338",borderColor:"#1e3356"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                 <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?"? Active":"Set"}</button>
+                <button onClick={()=>applyCustomer(c)} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Active</>:"Set"}</button>
               </div>
             ))}
           </div>
@@ -440,17 +531,18 @@ export function POSOverlay() {
     // HOLD BILLS
     if (activeNav === "hold-bills") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
-        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"#6a8ab8"}}>({heldBills.length})</span></h2><button onClick={()=>{if(items.length>0){holdBill();toast.success("Current bill held");}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"#4f6ef7"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div>
-        {heldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 or the button above</p></div>):(
+        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"#6a8ab8"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#6a8ab8"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"#4f6ef7"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
+        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
           <div className="flex-1 overflow-y-auto grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",alignContent:"start"}}>
-            {[...heldBills].reverse().map((bill,idx)=>{
-              const billTotal=bill.items.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
+            {serverHeldBills.map((bill,idx)=>{
+              const billItems = bill.data?.items ?? [];
+              const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
               return (
                 <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"#162338",borderColor:"#1e3356"}}>
-                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">Bill #{heldBills.length-idx}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.timestamp).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {bill.items.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>On Hold</span></div>
-                  {bill.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.customer.name}</span></div>}
-                  <div className="space-y-0.5">{bill.items.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{bill.items.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{bill.items.length-3} more items</p>}</div>
-                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"#1e3356"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>{deleteHeldBill(bill.id);toast.info("Bill removed");}} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>{restoreHeldBill(bill.id);toast.success("Bill restored");setActiveNav("products");}} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"#10b981"}}>Restore</button></div></div>
+                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span></div>
+                  {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
+                  <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{billItems.length-3} more items</p>}</div>
+                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"#1e3356"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"#10b981"}}>Restore</button></div></div>
                 </div>
               );
             })}
@@ -882,7 +974,7 @@ export function POSOverlay() {
               {[1,2,3,4,5,6,7,8,9].map(n=>(
                 <button key={n} onClick={()=>handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>{n}</button>
               ))}
-              <button onClick={()=>handlePinEntry("DEL")} className="h-20 rounded-2xl text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>?</button>
+              <button onClick={()=>handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center" style={{background:"#162338",border:"1px solid #1e3356",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
               <button onClick={()=>handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>0</button>
               <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>Exit</button>
             </div>
@@ -905,7 +997,7 @@ export function POSOverlay() {
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){holdBill();toast.success("Bill held");}}},{label:"Recent Bills",key:"",icon:Receipt,onClick:()=>setActiveNav("orders")},{label:"Customers",key:"F4",icon:Users,onClick:()=>{setActiveNav("customers");setShowCustomerSearch(false);}}].map((btn,i)=>(
+            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}}},{label:"Recent Bills",key:"",icon:Receipt,onClick:()=>setActiveNav("orders")},{label:"Customers",key:"F4",icon:Users,onClick:()=>{setActiveNav("customers");setShowCustomerSearch(false);}}].map((btn,i)=>(
               <button key={i} onClick={btn.onClick} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"#1a2b4a",color:"#a0b4d4"}}>
                 <btn.icon className="h-3.5 w-3.5"/>{btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5">{btn.key}</span>}
               </button>
@@ -913,10 +1005,10 @@ export function POSOverlay() {
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}><span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"/>Online</div>
-            {heldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{heldBills.length} Held</button>}
+            {serverHeldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{user?.name?.[0]??"A"}</div>
-              <div><p className="text-white text-xs font-semibold leading-tight">{user?.name??"Admin"}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>Super Admin</p></div>
+              <div><p className="text-white text-xs font-semibold leading-tight">{user?.name??"Admin"}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>{formatUserRole(user?.role)}</p></div>
             </div>
           </div>
         </div>
@@ -1117,7 +1209,7 @@ export function POSOverlay() {
             <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-sm p-4" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
               <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {[["F2 / P","Focus search (Products)"],["C","Cart tab"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["F3","Hold bill"],["F8","Restore last held bill"],["F9 / Enter","Confirm payment"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["? ?","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["F1 / ?","This help"]].map(([k,d])=>(
+                {[["F2 / P","Focus search (Products)"],["C","Cart tab"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["F3","Hold bill"],["F8","Restore last held bill"],["F9 / Enter","Confirm payment"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["↑ ↓","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["F1 / ?","This help"]].map(([k,d])=>(
                   <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5">
                     <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
                     <span className="text-xs ml-3" style={{color:"#6a8ab8"}}>{d}</span>

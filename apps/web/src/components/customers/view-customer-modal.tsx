@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getInitials, formatNumber } from "@/lib/utils";
+import { useShopProfile } from "@/lib/use-shop-profile";
+import { hasShopModule } from "@/lib/shop-vertical";
 import type { Customer } from "./add-customer-modal";
 
 interface SaleItem { id: string; invoiceNumber: string; invoiceDate: string; total: number; status: string; _count: { items: number } }
@@ -34,6 +36,8 @@ const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon
 type Tab = "overview" | "purchases" | "loyalty" | "wallet";
 
 export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
+  const profile = useShopProfile();
+  const showLoyalty = hasShopModule(profile, "loyalty");
   const [customer, setCustomer]   = useState<FullCustomer | null>(null);
   const [tab, setTab]             = useState<Tab>("overview");
   const [loading, setLoading]     = useState(false);
@@ -59,7 +63,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       toast.success(`${pts > 0 ? "+" : ""}${pts} points added`);
       setPointsInput("");
       setCustomer((c) => c ? { ...c, loyaltyPoints: c.loyaltyPoints + pts } : c);
-    } catch { toast.error("Failed"); }
+    } catch { toast.error("Failed to add loyalty points"); }
     finally { setActionLoading(false); }
   };
 
@@ -72,7 +76,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       toast.success(`LKR ${amt} added to wallet`);
       setWalletInput("");
       setCustomer((c) => c ? { ...c, walletBalance: c.walletBalance + amt } : c);
-    } catch { toast.error("Failed"); }
+    } catch { toast.error("Failed to top up wallet"); }
     finally { setActionLoading(false); }
   };
 
@@ -84,7 +88,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const TABS: { id: Tab; label: string }[] = [
     { id: "overview",  label: "Overview" },
     { id: "purchases", label: `Purchases${customer ? ` (${customer.sales.length})` : ""}` },
-    { id: "loyalty",   label: "Loyalty" },
+    ...(showLoyalty ? [{ id: "loyalty" as Tab, label: "Loyalty" }] : []),
     { id: "wallet",    label: "Wallet" },
   ];
 
@@ -158,7 +162,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 {[
                   { label: "Total Spent", value: `LKR ${formatNumber(customer.totalSpent)}`, icon: ShoppingBag, color: "text-primary" },
                   { label: "Orders",      value: customer.totalOrders, icon: ShoppingBag, color: "text-blue-500" },
-                  { label: "Loyalty Pts", value: formatNumber(customer.loyaltyPoints), icon: Gift, color: "text-amber-500" },
+                  ...(showLoyalty ? [{ label: "Loyalty Pts", value: formatNumber(customer.loyaltyPoints), icon: Gift, color: "text-amber-500" }] : []),
                 ].map((k) => (
                   <div key={k.label} className="rounded-xl border bg-card p-3 text-center">
                     <p className={`text-xl font-black ${k.color}`}>{k.value}</p>
@@ -217,7 +221,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
             </div>
           )}
 
-          {customer && tab === "loyalty" && (
+          {customer && showLoyalty && tab === "loyalty" && (
             <div className="space-y-4">
               <div className="rounded-xl border bg-amber-500/5 p-4 flex items-center justify-between">
                 <div>

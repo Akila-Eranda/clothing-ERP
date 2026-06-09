@@ -584,7 +584,7 @@ export default function HRPage() {
   const handleDeactivate = async (emp: Employee) => {
     if (!window.confirm(`Deactivate ${emp.firstName}?`)) return;
     try { await api.delete(`/hr/employees/${emp.id}`); toast.success("Employee deactivated"); fetchEmployees(); }
-    catch { toast.error("Failed"); }
+    catch { toast.error("Failed to deactivate employee"); }
   };
 
   // ── Fetch attendance ──────────────────────────────────────────────────
@@ -656,7 +656,7 @@ export default function HRPage() {
       toast.success("Payroll generated");
       setGenEmpId(""); setGenAllowances("0"); setGenBonus("0"); setGenDeduct("0");
       fetchPayrolls();
-    } catch { toast.error("Failed"); }
+    } catch { toast.error("Failed to generate payroll"); }
     finally { setGenLoading(false); }
   };
 
@@ -670,7 +670,7 @@ export default function HRPage() {
 
   const markPaid = async (id: string) => {
     try { await api.put(`/hr/employees/payroll/${id}/paid`, {}); toast.success("Marked as paid"); fetchPayrolls(); }
-    catch { toast.error("Failed"); }
+    catch { toast.error("Failed to mark payroll as paid"); }
   };
 
   // Stats

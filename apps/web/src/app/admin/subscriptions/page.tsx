@@ -202,7 +202,7 @@ export default function SubscriptionsPage() {
       {editTenant && (
         <EditPlanModal
           tenant={editTenant}
-          plans={plans.length > 0 ? plans : catalogPlans.map(p => ({ key: p.key, name: p.label, id: p.key } as PlanDef))}
+          plans={plans.length > 0 ? plans : catalogPlans.map(p => ({ key: p.key, name: p.name, id: p.key } as PlanDef))}
           onClose={() => setEditTenant(null)}
           onSaved={() => { load(planFilter === 'ALL' ? undefined : planFilter); setEditTenant(null) }}
         />

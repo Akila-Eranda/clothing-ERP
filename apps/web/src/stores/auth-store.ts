@@ -5,6 +5,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/types";
 import { authApi, api, tokenStorage } from "@/lib/api";
 import { setStoredShopType, ShopType } from "@/lib/shop-profiles";
+import { normalizeRole } from "@/lib/utils";
 
 interface AuthStore {
   user: User | null;
@@ -54,7 +55,7 @@ export const useAuthStore = create<AuthStore>()(
             id: apiUser.id,
             name: `${apiUser.firstName} ${apiUser.lastName}`,
             email: apiUser.email,
-            role: (apiUser.roles?.[0] ?? 'cashier') as any,
+            role: normalizeRole(apiUser.roles?.[0]) as User["role"],
             permissions: [],
             isActive: true,
             twoFactorEnabled: false,

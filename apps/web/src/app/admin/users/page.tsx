@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Search, RefreshCw, UserX, UserCheck, Trash2, Users } from 'lucide-react'
 import { fetchUsers, updateUserStatus, deleteUser, type UserRow } from '@/lib/admin-api'
+import { toast } from 'sonner'
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
@@ -32,7 +33,7 @@ export default function UsersPage() {
     if (s) p.search = s
     fetchUsers(p)
       .then(d => { setUsers(d.data ?? []); setTotal(d.total ?? 0) })
-      .catch((e: unknown) => { setUsers([]); setTotal(0) })
+      .catch((e: unknown) => { setUsers([]); setTotal(0); toast.error('Failed to load users') })
       .finally(() => setLoading(false))
   }, [search, page])
 
@@ -47,14 +48,14 @@ export default function UsersPage() {
   async function toggleStatus(u: UserRow) {
     setActionLoading(u.id)
     const next = u.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE'
-    try { await updateUserStatus(u.id, next); load() } catch {}
+    try { await updateUserStatus(u.id, next); load() } catch { toast.error('Failed to update user status') }
     setActionLoading(null)
   }
 
   async function handleDelete() {
     if (!confirmDelete) return
     setActionLoading(confirmDelete.id)
-    try { await deleteUser(confirmDelete.id); setConfirmDelete(null); load() } catch {}
+    try { await deleteUser(confirmDelete.id); setConfirmDelete(null); load() } catch { toast.error('Failed to delete user') }
     setActionLoading(null)
   }
 

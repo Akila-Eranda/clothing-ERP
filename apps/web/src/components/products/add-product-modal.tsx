@@ -16,8 +16,12 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
-import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
-import { nextVariantAttributeName, variantVariantHint } from "@/lib/shop-vertical";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
+import {
+  nextVariantAttributeName, variantVariantHint, applyVariantCombo, autoFillVariantAttributes,
+  findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
+} from "@/lib/shop-vertical";
+import { getWorkspace } from "@/lib/shop-workspace";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -53,11 +57,12 @@ interface Form {
 
 const buildInitialForm = (): Form => {
   const profile = getShopProfile(getStoredShopType());
+  const copy = getProductFormCopy(profile, getWorkspace(profile.type));
   return {
     name: "", barcode: "", description: "", shortDesc: "",
     categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
     tags: [], tagInput: "",
-    sellingPrice: "", costPrice: "", mrp: "", taxRate: "18",
+    sellingPrice: "", costPrice: "", mrp: "", taxRate: copy.defaultTaxRate,
     hasVariants: defaultHasVariants(profile.type),
     attributes: variantAttrsFromProfile(profile.type),
     unit: profile.defaultUnit,
@@ -97,6 +102,8 @@ interface Props { open: boolean; onClose: () => void; onCreated?: () => void; ed
 
 export function AddProductModal({ open, onClose, onCreated, editProduct }: Props) {
   const shopProfile = useShopProfile();
+  const { workspace } = useShopWorkspace();
+  const formCopy = getProductFormCopy(shopProfile, workspace);
   const variantHint = variantVariantHint(shopProfile);
   const showUnit = hasMultiUnit(shopProfile);
   const showExpiry = hasExpiryTracking(shopProfile);
@@ -111,9 +118,11 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
   useEffect(() => {
     if (!open) return;
-    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => {});
-    api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => {});
-  }, [open]);
+    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => toast.error("Failed to load categories"));
+    if (formCopy.showBrand) {
+      api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
+    }
+  }, [open, formCopy.showBrand]);
 
   useEffect(() => {
     if (editProduct) {
@@ -158,22 +167,15 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     setLoading(true);
     const validAttrs = form.attributes.filter((a) => a.values.length > 0);
     const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
-    const variants = variantCombos.map((combo) => {
-      const sku = genSku(form.name, combo);
-      const v: Record<string, unknown> = {
-        sku, name: combo.join(" / "),
-        sellingPrice: parseFloat(form.sellingPrice) || 0,
-        costPrice: parseFloat(form.costPrice) || 0,
-        mrp: parseFloat(form.mrp) || 0,
-        taxRate: parseFloat(form.taxRate) || 18,
-      };
-      validAttrs.forEach((attr, idx) => {
-        const def = shopProfile.variantAttributes.find((d) => d.name === attr.name);
-        const key = def?.mapsTo ?? attr.name.toLowerCase();
-        if (["size", "color", "material", "style"].includes(key)) v[key] = combo[idx];
-      });
-      return v;
-    });
+    const variants = variantCombos.map((combo) => ({
+      sku: genSku(form.name, combo),
+      name: combo.join(" / "),
+      ...applyVariantCombo(shopProfile, validAttrs, combo),
+      sellingPrice: parseFloat(form.sellingPrice) || 0,
+      costPrice: parseFloat(form.costPrice) || 0,
+      mrp: parseFloat(form.mrp) || 0,
+      taxRate: parseFloat(form.taxRate) || 18,
+    }));
     const extraTags = [
       ...form.tags,
       ...(showUnit && form.unit ? [`unit:${form.unit}`] : []),
@@ -185,7 +187,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       description: form.description || undefined,
       shortDesc: form.shortDesc || undefined,
       categoryId: form.categoryId || undefined,
-      brandId: form.brandId || undefined,
+      brandId: formCopy.showBrand && form.brandId ? form.brandId : undefined,
       hsn: form.hsn || undefined,
       barcode: form.barcode || undefined,
       sellingPrice: form.sellingPrice ? parseFloat(form.sellingPrice) : undefined,
@@ -239,8 +241,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       {/* Row 1 */}
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-1.5 col-span-1">
-          <Label className="text-xs font-semibold">Product Name <span className="text-destructive">*</span></Label>
-          <Input placeholder="Enter product name" value={form.name} maxLength={120}
+          <Label className="text-xs font-semibold">{formCopy.nameLabel} <span className="text-destructive">*</span></Label>
+          <Input placeholder={formCopy.namePlaceholder} value={form.name} maxLength={120}
             onChange={(e) => set("name", e.target.value)}
             onBlur={() => form.name && mark("basic")} />
           <p className="text-[10px] text-muted-foreground text-right">{form.name.length}/120</p>
@@ -267,6 +269,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             </SelectContent>
           </Select>
         </div>
+        {formCopy.showBrand && (
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold">Brand</Label>
           <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
@@ -278,6 +281,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             </SelectContent>
           </Select>
         </div>
+        )}
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold">HSN / SAC Code</Label>
           <Input placeholder="Enter HSN/SAC code" value={form.hsn} onChange={(e) => set("hsn", e.target.value)} />
@@ -359,14 +363,14 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   };
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
 
-  const autoGenerate = () => {
-    const updated = form.attributes.map((a) => {
-      const n = a.name.toLowerCase();
-      if (n === "size")  return { ...a, values: ["S", "M", "L", "XL"] };
-      if (n === "color") return { ...a, values: ["Black", "White", "Navy", "Olive"] };
-      return a;
-    });
-    set("attributes", updated);
+  const autoGenerate = () => set("attributes", autoFillVariantAttributes(shopProfile, form.attributes));
+
+  const togglePreset = (attrIdx: number, preset: string) => {
+    set("attributes", form.attributes.map((x, j) => {
+      if (j !== attrIdx) return x;
+      const has = x.values.includes(preset);
+      return { ...x, values: has ? x.values.filter((v) => v !== preset) : [...x.values, preset] };
+    }));
   };
 
   const renderVariants = () => {
@@ -414,7 +418,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                     <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[42px] bg-background cursor-text"
                       onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
                       {attr.values.map((v, vi) => {
-                        const hex = attr.name.toLowerCase() === "color" ? getColorHex(v) : null;
+                        const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
                         return (
                           <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
                             {hex && <span className="h-3.5 w-3.5 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
@@ -435,6 +439,18 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                       />
                       <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
                     </div>
+                    {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
+                          <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                            }`}>
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))}
 
@@ -449,7 +465,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                     </Button>
                     )}
                     <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3.5 w-3.5" /> Auto Generate
+                      <Zap className="h-3.5 w-3.5" /> Fill {variantHint} presets
                     </Button>
                   </div>
                   <span className="text-xs text-muted-foreground font-medium">
@@ -475,7 +491,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                               {a0.name}&nbsp;\&nbsp;{a1.name}
                             </th>
                             {a1.values.map((v) => {
-                              const hex = a1.name.toLowerCase() === "color" ? getColorHex(v) : null;
+                              const hex = isColorVariantAttr(shopProfile, a1.name) ? getColorHex(v) : null;
                               return (
                                 <th key={v} className="border-b border-r last:border-r-0 px-3 py-2 text-center font-medium">
                                   <div className="flex flex-col items-center gap-1">
@@ -721,8 +737,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             <Package className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h2 className="text-lg font-bold">{editProduct ? "Edit Product" : "Add New Product"}</h2>
-            <p className="text-xs text-muted-foreground">{editProduct ? `Editing: ${editProduct.name}` : "Add a new product to your inventory"}</p>
+            <h2 className="text-lg font-bold">{editProduct ? `Edit ${formCopy.nameLabel.replace(/ Name$/, "")}` : formCopy.pageTitle}</h2>
+            <p className="text-xs text-muted-foreground">{editProduct ? `Editing: ${editProduct.name}` : formCopy.productTip}</p>
           </div>
           <button onClick={handleClose} className="ml-auto p-2 rounded-lg hover:bg-muted transition-colors"><X className="h-4 w-4" /></button>
         </div>

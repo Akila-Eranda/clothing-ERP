@@ -8,12 +8,14 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { APP_NAME } from "@/lib/constants";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { variantTableColumns, formatVariantCell } from "@/lib/shop-vertical";
 
 interface POItem {
   id: string; productName: string; variantName: string; sku: string;
   orderedQty: number; receivedQty: number; rejectedQty: number;
   unitCost: number; discount: number; taxRate: number; taxAmount: number; total: number;
-  variant?: { color?: string | null; size?: string | null; barcode?: string | null };
+  variant?: { color?: string | null; size?: string | null; material?: string | null; style?: string | null; barcode?: string | null };
 }
 interface PO {
   id: string; poNumber: string; status: string; orderDate: string;
@@ -30,6 +32,9 @@ const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2,
 
 export default function GRNPage() {
   const { id } = useParams<{ id: string }>();
+  const { profile } = useShopWorkspace();
+  const variantCols = variantTableColumns(profile);
+  const variantHeader = variantCols.map((c) => c.label).join(" / ") || "Variant";
   const { settings: receiptSettings } = useReceiptSettings();
   const shopTitle = receiptSettings.shopName || APP_NAME;
   const router = useRouter();
@@ -143,7 +148,7 @@ export default function GRNPage() {
                 <th className="px-4 py-2.5 text-left">#</th>
                 <th className="px-4 py-2.5 text-left">Product</th>
                 <th className="px-4 py-2.5 text-left">SKU / Barcode</th>
-                <th className="px-4 py-2.5 text-left">Variant</th>
+                <th className="px-4 py-2.5 text-left">{variantHeader}</th>
                 <th className="px-4 py-2.5 text-right">Ordered</th>
                 <th className="px-4 py-2.5 text-right">Received</th>
                 <th className="px-4 py-2.5 text-right">Rejected</th>
@@ -161,7 +166,7 @@ export default function GRNPage() {
                     {item.variant?.barcode && <p className="text-[10px] text-muted-foreground">{item.variant.barcode}</p>}
                   </td>
                   <td className="px-4 py-2.5 text-xs text-muted-foreground">
-                    {[item.variant?.color, item.variant?.size].filter(Boolean).join(" / ") || item.variantName}
+                    {formatVariantCell(item.variant, profile, item.variantName)}
                   </td>
                   <td className="px-4 py-2.5 text-right">{item.orderedQty}</td>
                   <td className="px-4 py-2.5 text-right">

@@ -14,6 +14,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
+import { assertShopModule } from '@/shared/shop-module.helper';
 import { nanoid } from 'nanoid';
 import * as dayjs from 'dayjs';
 
@@ -60,6 +61,7 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) loyaltyPointsToRedeem?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() couponCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() heldBillId?: string;
 }
 
 export class HoldBillDto {
@@ -116,6 +118,7 @@ export class PosService {
     let pointsEarned = 0;
 
     if (dto.customerId && dto.loyaltyPointsToRedeem) {
+      await assertShopModule(this.prisma, tenantId, 'loyalty');
       const customer = await this.prisma.customer.findUnique({ where: { id: dto.customerId } });
       if (customer && customer.loyaltyPoints >= dto.loyaltyPointsToRedeem) {
         loyaltyDiscount = dto.loyaltyPointsToRedeem * 0.1;
@@ -182,6 +185,10 @@ export class PosService {
         },
       });
 
+      if (dto.heldBillId) {
+        await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', dto.heldBillId, true);
+      }
+
       // Update inventory
       for (const item of dto.items) {
         await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
@@ -221,6 +228,10 @@ export class PosService {
 
       return created;
     });
+
+    if (dto.heldBillId) {
+      await this.prisma.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
+    }
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: finalTotal });
     return sale;
@@ -278,9 +289,22 @@ export class PosService {
 
   async holdBill(tenantId: string, branchId: string, cashierId: string, dto: HoldBillDto) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    return this.prisma.heldBill.create({
+    const data = dto.data as { items?: { variantId: string; quantity: number }[] };
+    const bill = await this.prisma.heldBill.create({
       data: { tenantId, branchId: resolvedBranchId, cashierId, label: dto.label, data: dto.data as object },
     });
+    for (const item of data.items ?? []) {
+      await this.inventoryService.reserveStock(
+        tenantId,
+        resolvedBranchId,
+        item.variantId,
+        item.quantity,
+        'HELD_BILL',
+        bill.id,
+        cashierId,
+      );
+    }
+    return bill;
   }
 
   async getHeldBills(tenantId: string, branchId: string) {
@@ -291,7 +315,10 @@ export class PosService {
     });
   }
 
-  async deleteHeldBill(id: string) {
+  async deleteHeldBill(id: string, tenantId: string) {
+    const bill = await this.prisma.heldBill.findFirst({ where: { id, tenantId } });
+    if (!bill) throw new NotFoundException('Held bill not found');
+    await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', id);
     return this.prisma.heldBill.delete({ where: { id } });
   }
 
@@ -356,6 +383,7 @@ export class PosService {
   }
 
   async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
+    await assertShopModule(this.prisma, tenantId, 'returns');
     const refundNumber = `RET-${dayjs().format('YYYYMMDD')}-${nanoid(4).toUpperCase()}`;
     const total = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
@@ -398,6 +426,8 @@ export class PosService {
       category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
       color:       v.color ?? undefined,
       size:        v.size  ?? undefined,
+      material:    v.material ?? undefined,
+      style:       v.style ?? undefined,
       stock:       v.inventory[0]?.quantity ?? 0,
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
       barcode:     v.barcode ?? undefined,
@@ -484,8 +514,8 @@ export class PosController {
   @Delete('hold/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete held bill' })
-  deleteHeldBill(@Param('id') id: string) {
-    return this.posService.deleteHeldBill(id);
+  deleteHeldBill(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.posService.deleteHeldBill(id, user.tenantId);
   }
 
   @Get('summary')

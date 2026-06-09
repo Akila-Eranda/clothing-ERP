@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Edit2, X, Check, Users, GitBranch, Plus, RefreshCw, Tag, TrendingUp } from 'lucide-react'
 import { fetchPlans, updatePlanCatalog, DEFAULT_PLANS, type PlanDef } from '@/lib/admin-api'
+import { toast } from 'sonner'
 
 const PLAN_COLOR: Record<string, { badge: string; ring: string; bar: string }> = {
   STARTER:      { badge: 'bg-gray-100 text-gray-700',    ring: 'border-gray-300',   bar: 'bg-gray-400'   },
@@ -18,7 +19,7 @@ export default function PlansPage() {
 
   async function load() {
     setLoading(true)
-    try { setPlans(await fetchPlans()) } catch {}
+    try { setPlans(await fetchPlans()) } catch { toast.error('Failed to load plans') }
     finally { setLoading(false) }
   }
 

@@ -7,6 +7,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { fetchTenants, type TenantRow } from '@/lib/admin-api'
+import { toast } from 'sonner'
 
 function Skeleton({ h = 'h-8', w = 'w-full' }: { h?: string; w?: string }) {
   return <div className={`${h} ${w} bg-gray-100 rounded-lg animate-pulse`} />
@@ -48,7 +49,7 @@ export default function AnalyticsPage() {
     try {
       const res = await fetchTenants({ limit: '500' })
       setTenants(res.data)
-    } catch {}
+    } catch { toast.error('Failed to load analytics data') }
     finally { setLoading(false) }
   }, [])
 

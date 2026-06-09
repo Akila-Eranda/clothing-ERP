@@ -188,17 +188,17 @@ export default function SettingsPage() {
       const t = r.data;
       setTenant(t);
       setBizForm({ name: t.name ?? "", phone: t.phone ?? "", country: t.country ?? "", currency: t.currency ?? "", timezone: t.timezone ?? "" });
-    }).catch(() => {});
+    }).catch(() => toast.error("Failed to load business settings"));
 
     api.get<Me>("/auth/me").then(r => {
       const u = r.data;
       setMe(u);
       setProfileForm({ firstName: u.firstName ?? "", lastName: u.lastName ?? "", phone: u.phone ?? "" });
-    }).catch(() => {});
+    }).catch(() => toast.error("Failed to load profile"));
 
     api.get<ReceiptSettings>("/tenants/receipt-settings").then(r => {
       setReceiptForm({ ...RECEIPT_DEFAULTS, ...r.data });
-    }).catch(() => {});
+    }).catch(() => toast.error("Failed to load receipt settings"));
 
     loadBranches();
   }, []);
@@ -307,6 +307,17 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="general" className="mt-6 space-y-6">
+          <Card className="border-primary/20 bg-primary/5">
+            <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="font-semibold text-sm">Business Type QA Audit</p>
+                <p className="text-xs text-muted-foreground">Scan all pages for {profile.label} before production go-live</p>
+              </div>
+              <Button variant="outline" size="sm" asChild>
+                <a href="/settings/vertical-audit">Open audit checklist →</a>
+              </Button>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Business Information</CardTitle>

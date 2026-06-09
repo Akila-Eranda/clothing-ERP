@@ -82,7 +82,7 @@ export default function NotificationsPage() {
       await api.patch("/notifications/read-all", {});
       setItems((prev) => prev.map((x) => ({ ...x, isRead: true })));
       toast.success("All marked as read");
-    } catch { toast.error("Failed"); }
+    } catch { toast.error("Failed to mark all as read"); }
     finally { setMarkingAll(false); }
   };
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle2, XCircle,
-  Clock, Printer, Download, Ban, Tag,
+  Clock, Printer, Download, Ban, Tag, Send,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,7 @@ interface PO {
 // ── Helpers ────────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; color: string; variant: "success" | "secondary" | "info" | "danger" | "warning" }> = {
   DRAFT:              { label: "Draft",     color: "text-amber-600 bg-amber-50 border-amber-200",     variant: "secondary" },
+  PENDING_APPROVAL:   { label: "Pending Approval", color: "text-purple-600 bg-purple-50 border-purple-200", variant: "warning" },
   CONFIRMED:          { label: "Ordered",   color: "text-blue-600 bg-blue-50 border-blue-200",         variant: "info" },
   SENT:               { label: "Ordered",   color: "text-blue-600 bg-blue-50 border-blue-200",         variant: "info" },
   PARTIALLY_RECEIVED: { label: "Partial",   color: "text-orange-600 bg-orange-50 border-orange-200",   variant: "warning" },
@@ -107,11 +108,18 @@ export default function PODetailPage() {
   const [loading,  setLoading]  = useState(true);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [acting,   setActing]   = useState(false);
+  const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await api.get<PO>(`/purchases/${id}`);
       setPo(res.data);
+      try {
+        const wf = await api.get<{ status: string }>(`/workflows/instances/PurchaseOrder/${id}`);
+        setWorkflowStatus(wf.data?.status ?? null);
+      } catch {
+        setWorkflowStatus(null);
+      }
     } catch { toast.error("Failed to load purchase order"); }
     finally { setLoading(false); }
   }, [id]);
@@ -126,6 +134,17 @@ export default function PODetailPage() {
       toast.success(`Status updated to ${STATUS_MAP[status]?.label ?? status}`);
       load();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to update status"); }
+    finally { setActing(false); }
+  };
+
+  const submitForApproval = async () => {
+    if (!po) return;
+    setActing(true);
+    try {
+      await api.post(`/purchases/${po.id}/submit-approval`);
+      toast.success("Submitted for approval");
+      load();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to submit"); }
     finally { setActing(false); }
   };
 
@@ -145,7 +164,7 @@ export default function PODetailPage() {
 
   const statusConf = STATUS_MAP[po.status] ?? STATUS_MAP.DRAFT;
   const canReceive = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"].includes(po.status);
-  const canCancel  = !["RECEIVED", "CANCELLED"].includes(po.status);
+  const canCancel  = !["RECEIVED", "CANCELLED", "PENDING_APPROVAL"].includes(po.status);
   const amountDue  = po.total - po.paidAmount;
 
   return (
@@ -203,6 +222,11 @@ export default function PODetailPage() {
               <div>
                 <p className="text-xs text-muted-foreground">Notes</p>
                 <p className="text-xs mt-0.5">{po.notes}</p>
+              </div>
+            )}
+            {po.status === "PENDING_APPROVAL" && (
+              <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-800">
+                Awaiting manager approval{workflowStatus ? ` (${workflowStatus.replace(/_/g, " ")})` : ""}. GRN and receiving are blocked until approved.
               </div>
             )}
           </div>
@@ -343,9 +367,14 @@ export default function PODetailPage() {
         {/* ── Footer actions ── */}
         <div className="flex justify-end gap-3 pt-2 border-t">
           {po.status === "DRAFT" && (
-            <Button variant="outline" size="sm" disabled={acting} onClick={() => updateStatus("CONFIRMED")}>
-              <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Ordered
-            </Button>
+            <>
+              <Button variant="outline" size="sm" disabled={acting} onClick={submitForApproval}>
+                <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Approval
+              </Button>
+              <Button variant="outline" size="sm" disabled={acting} onClick={() => updateStatus("CONFIRMED")}>
+                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Ordered
+              </Button>
+            </>
           )}
           {canCancel && (
             <Button variant="destructive" size="sm" disabled={acting} onClick={() => updateStatus("CANCELLED")}>

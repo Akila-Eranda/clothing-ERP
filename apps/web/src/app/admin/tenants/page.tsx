@@ -14,6 +14,7 @@ import {
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from '@/lib/shop-profiles'
 import { getVerticalFeatures } from '@/lib/shop-features'
 import { ShopFeatureList } from '@/components/shop/shop-feature-list'
+import { toast } from 'sonner'
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
@@ -74,7 +75,7 @@ export default function TenantsPage() {
   async function handleStatusToggle(t: TenantRow) {
     setActionLoading(t.id); setMenuOpen(null)
     const newStatus = t.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
-    try { await updateTenant(t.id, { status: newStatus }); load() } catch {}
+    try { await updateTenant(t.id, { status: newStatus }); load() } catch { toast.error('Failed to update tenant status') }
     setActionLoading(null)
   }
 
@@ -641,7 +642,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 <div>
                   <p className="text-xs" style={{color:'rgba(255,255,255,0.4)'}}>Plan</p>
                   <p className="text-sm font-semibold text-white">
-                    {plans.find(p => p.key === (createdPlan || form.plan))?.name ?? createdPlan || form.plan}
+                    {plans.find(p => p.key === (createdPlan || form.plan))?.name ?? (createdPlan || form.plan)}
                   </p>
                   {(createdPlan || form.plan) === 'STARTER' && trialEndsAt && (
                     <p className="text-[11px] mt-1" style={{color:'rgba(251,191,36,0.95)'}}>

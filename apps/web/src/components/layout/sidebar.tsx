@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, Shield, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useShopProfile } from "@/lib/use-shop-profile";
@@ -39,6 +39,7 @@ function useNavGroups(): NavGroup[] {
     { label: "Categories",     href: "/categories", icon: Layers },
     ...(profile.modules.brands ? [{ label: "Brands", href: "/brands", icon: Bookmark }] : []),
     { label: "Inventory",      href: "/inventory",  icon: Warehouse },
+    { label: "Workflows",      href: "/workflows",  icon: Shield },
   ];
   const salesItems: NavItem[] = [
     { label: "Point of Sale",  icon: ShoppingCart,  badge: "POS", action: openPos },
@@ -78,6 +79,7 @@ function useNavGroups(): NavGroup[] {
         { label: "Accounting",     href: "/accounting", icon: Wallet },
         { label: "Expenses",       href: "/expenses",   icon: TrendingDown, badge: "NEW" },
         { label: "Analytics",      href: "/analytics",  icon: BarChart3 },
+        { label: "ERP Roadmap",    href: "/advanced",   icon: Zap },
       ],
     },
     {
@@ -123,7 +125,7 @@ export function Sidebar() {
   const shopProfile = useShopProfile();
 
   const shopName  = user?.branch?.name ?? "ShopERP";
-  const planLabel = user?.role === "super_admin" ? "Enterprise" : user?.role === "admin" ? "Pro" : "Starter";
+  const planLabel = planTierFromRole(user?.role);
 
   const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
 

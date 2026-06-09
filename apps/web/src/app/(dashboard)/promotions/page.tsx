@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { ModuleGate } from "@/components/shop/module-gate";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Promotion {
@@ -147,6 +148,7 @@ export default function PromotionsPage() {
   const totalUsed = promos.reduce((s, p) => s + p.usageCount, 0);
 
   return (
+    <ModuleGate module="promotions">
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -344,5 +346,6 @@ export default function PromotionsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </ModuleGate>
   );
 }

@@ -12,6 +12,7 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
+import { assertShopModule } from '@/shared/shop-module.helper';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
@@ -46,6 +47,7 @@ export class ReturnsService {
   ) {}
 
   async create(tenantId: string, branchId: string, userId: string, dto: CreateReturnDto) {
+    await assertShopModule(this.prisma, tenantId, 'returns');
     const sale = await this.prisma.sale.findFirst({ where: { id: dto.originalSaleId, tenantId } });
     if (!sale) throw new NotFoundException('Original sale not found');
 
@@ -75,6 +77,7 @@ export class ReturnsService {
   }
 
   async findAll(tenantId: string, query: PaginationDto) {
+    await assertShopModule(this.prisma, tenantId, 'returns');
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const [data, total] = await this.prisma.$transaction([
       this.prisma.return.findMany({
@@ -91,6 +94,7 @@ export class ReturnsService {
   }
 
   async findOne(id: string, tenantId: string) {
+    await assertShopModule(this.prisma, tenantId, 'returns');
     const ret = await this.prisma.return.findFirst({
       where: { id, tenantId },
       include: {
@@ -103,6 +107,7 @@ export class ReturnsService {
   }
 
   async updateStatus(id: string, tenantId: string, status: ReturnStatus, userId: string) {
+    await assertShopModule(this.prisma, tenantId, 'returns');
     const ret = await this.findOne(id, tenantId);
     const r = ret as any;
 

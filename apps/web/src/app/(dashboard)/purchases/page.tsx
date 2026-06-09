@@ -13,11 +13,14 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/receive-items-modal";
 import { useRouter } from "next/navigation";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getRouteLabels } from "@/lib/shop-vertical";
 
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
   DRAFT:              { label: "Draft",    variant: "secondary", icon: FileText },
+  PENDING_APPROVAL:   { label: "Pending Approval", variant: "warning", icon: Clock },
   CONFIRMED:          { label: "Ordered",  variant: "info",      icon: Clock },
   SENT:               { label: "Ordered",  variant: "info",      icon: Clock },
   PARTIALLY_RECEIVED: { label: "Ordered",  variant: "info",      icon: Clock },
@@ -116,6 +119,8 @@ function buildColumns(
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function PurchasesPage() {
   const router = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const routeLabels = getRouteLabels(workspace, profile);
   const [pos, setPos]             = useState<PurchaseOrder[]>([]);
   const [loading, setLoading]     = useState(true);
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
@@ -148,14 +153,14 @@ export default function PurchasesPage() {
 
   // Stats
   const total    = pos.length;
-  const pending  = pos.filter((p) => p.status === "DRAFT").length;
+  const pending  = pos.filter((p) => p.status === "DRAFT" || p.status === "PENDING_APPROVAL").length;
   const ordered  = pos.filter((p) => ["CONFIRMED","SENT","PARTIALLY_RECEIVED"].includes(p.status)).length;
   const received = pos.filter((p) => p.status === "RECEIVED").length;
   const totalValue = pos.filter((p) => p.status !== "CANCELLED").reduce((s, p) => s + p.total, 0);
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Draft",       value: pending,                                 icon: FileText,      color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Pending",     value: pending,                                 icon: FileText,      color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Ordered",     value: ordered,                                 icon: Truck,         color: "text-violet-500",  bg: "bg-violet-500/10" },
     { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
@@ -167,8 +172,10 @@ export default function PurchasesPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Purchase Orders</h1>
-          <p className="text-sm text-muted-foreground">Manage supplier POs and restock inventory</p>
+          <h1 className="text-2xl font-bold">{routeLabels["/purchases"]}</h1>
+          <p className="text-sm text-muted-foreground">
+            {profile.emoji} {profile.label} — supplier orders, GRN & {routeLabels.printTags?.toLowerCase() ?? "labels"}
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={fetchPOs} className="gap-1.5">
@@ -201,7 +208,7 @@ export default function PurchasesPage() {
         <div className="text-right">
           <p className="text-xs text-muted-foreground">PO Workflow</p>
           <div className="flex items-center gap-1.5 mt-1 text-xs font-medium text-muted-foreground">
-            {["Draft","→ Ordered","→ Received"].map((s) => (
+            {["Draft / Pending", "→ Approval", "→ Ordered", "→ GRN"].map((s) => (
               <span key={s} className="bg-muted/50 px-2 py-0.5 rounded-full">{s}</span>
             ))}
           </div>

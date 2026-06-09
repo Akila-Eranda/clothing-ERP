@@ -13,8 +13,6 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { variantTableColumns } from "@/lib/shop-vertical";
-
-// ── Types ──────────────────────────────────────────────────────────────────
 interface InventoryRecord {
   id: string; quantity: number; reservedQty: number;
   branch: { id: string; name: string };
@@ -204,7 +202,7 @@ export default function ProductDetailPage() {
                       <BarChart2 className="h-3 w-3" /> {product.brand.name}
                     </span>
                   )}
-                  {product.collections.map((c) => (
+                  {profile.modules.collections && product.collections.map((c) => (
                     <span key={c.collection.id} className="flex items-center gap-1.5 text-xs bg-orange-50 border border-orange-100 text-orange-700 rounded-lg px-2.5 py-1">
                       <Layers className="h-3 w-3" /> {c.collection.name}
                     </span>

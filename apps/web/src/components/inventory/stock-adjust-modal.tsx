@@ -9,11 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopProfile, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 
 export interface InventoryItem {
   id: string;
   variantId: string;
   quantity: number;
+  reservedQty?: number;
+  damagedQty?: number;
+  returnedQty?: number;
   reorderPoint?: number | null;
   variant: {
     id: string;
@@ -40,8 +44,13 @@ const MOVEMENT_TYPES = [
 ];
 
 export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
+  const profile = useShopProfile();
+  const showBatch = hasBatchTracking(profile);
+  const showExpiry = hasExpiryTracking(profile);
   const [movementType, setMovementType] = useState("ADJUSTMENT");
   const [quantity, setQuantity]         = useState("");
+  const [batchNumber, setBatchNumber]   = useState("");
+  const [expiryDate, setExpiryDate]     = useState("");
   const [notes, setNotes]               = useState("");
   const [loading, setLoading]           = useState(false);
 
@@ -49,6 +58,8 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
     if (open) {
       setMovementType("ADJUSTMENT");
       setQuantity(item ? String(item.quantity) : "");
+      setBatchNumber("");
+      setExpiryDate("");
       setNotes("");
     }
   }, [open, item]);
@@ -66,6 +77,8 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
         quantity: qty,
         movementType,
         notes: notes || undefined,
+        ...(showBatch && batchNumber ? { batchNumber } : {}),
+        ...(showExpiry && expiryDate ? { expiryDate } : {}),
       });
       toast.success("Stock adjusted successfully");
       onAdjusted();
@@ -150,6 +163,23 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
               </p>
             )}
           </div>
+
+          {(showBatch || showExpiry) && (movementType === "PURCHASE" || movementType === "RETURN" || movementType === "ADJUSTMENT") && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {showBatch && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Batch Number</Label>
+                  <Input value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g. BATCH-2026-001" />
+                </div>
+              )}
+              {showExpiry && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Expiry Date</Label>
+                  <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div className="space-y-1.5">

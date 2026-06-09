@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -12,6 +12,7 @@ import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
+import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -72,6 +73,7 @@ export class SuppliersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
+    private readonly workflowService: WorkflowService,
   ) {}
 
   async createSupplier(tenantId: string, dto: CreateSupplierDto) {
@@ -172,7 +174,28 @@ export class SuppliersService {
   async updatePOStatus(id: string, tenantId: string, status: PurchaseOrderStatus) {
     const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
     if (!po) throw new NotFoundException('Purchase order not found');
+    if (po.status === PurchaseOrderStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('Cannot change status while approval is pending');
+    }
     return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
+  }
+
+  async submitPOForApproval(id: string, tenantId: string, userId: string) {
+    const po = await this.findOnePO(id, tenantId);
+    if (po.status !== PurchaseOrderStatus.DRAFT) {
+      throw new BadRequestException('Only draft purchase orders can be submitted for approval');
+    }
+    await this.prisma.purchaseOrder.update({
+      where: { id },
+      data: { status: PurchaseOrderStatus.PENDING_APPROVAL },
+    });
+    await this.workflowService.start(tenantId, userId, {
+      key: 'purchase_order',
+      entityType: 'PurchaseOrder',
+      entityId: id,
+      metadata: { poNumber: po.poNumber, total: po.total },
+    });
+    return this.findOnePO(id, tenantId);
   }
 
   async recordPayment(supplierId: string, tenantId: string, dto: RecordPaymentDto) {
@@ -219,6 +242,9 @@ export class SuppliersService {
       include: { items: true },
     });
     if (!po) throw new NotFoundException('Purchase order not found');
+    if (po.status === PurchaseOrderStatus.PENDING_APPROVAL || po.status === PurchaseOrderStatus.DRAFT) {
+      throw new BadRequestException('Purchase order must be approved before receiving items');
+    }
 
     await this.prisma.$transaction(async (tx) => {
       for (const item of items) {
@@ -354,10 +380,17 @@ export class PurchasesController {
     return this.suppliersService.receiveItems(id, user.tenantId, user.branchId ?? '', user.id, items);
   }
 
+  @Post(':id/submit-approval')
+  @RequirePermissions('purchases:update')
+  @ApiOperation({ summary: 'Submit purchase order for approval workflow' })
+  submitForApproval(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.submitPOForApproval(id, user.tenantId, user.id);
+  }
+
 }
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, WorkflowModule],
   controllers: [SuppliersController, PurchasesController],
   providers: [SuppliersService],
   exports: [SuppliersService],
