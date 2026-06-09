@@ -151,6 +151,117 @@ export class ReportsService {
     })).sort((a, b) => b.totalRevenue - a.totalRevenue);
   }
 
+  async branchReport(tenantId: string, startDate: string, endDate: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const grouped = await this.prisma.sale.groupBy({
+      by: ['branchId'],
+      where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
+      _sum: { total: true, taxAmount: true, discountAmount: true },
+      _count: { id: true },
+    });
+    const branchIds = grouped.map((g) => g.branchId).filter(Boolean) as string[];
+    const branches = branchIds.length
+      ? await this.prisma.branch.findMany({ where: { id: { in: branchIds } }, select: { id: true, name: true, code: true } })
+      : [];
+    const branchMap = Object.fromEntries(branches.map((b) => [b.id, b]));
+    return grouped
+      .map((g) => ({
+        branchId: g.branchId,
+        branchName: g.branchId ? branchMap[g.branchId]?.name ?? 'Unknown' : 'No branch',
+        branchCode: g.branchId ? branchMap[g.branchId]?.code ?? '' : '',
+        salesCount: g._count.id,
+        totalRevenue: g._sum.total ?? 0,
+        totalTax: g._sum.taxAmount ?? 0,
+        totalDiscount: g._sum.discountAmount ?? 0,
+      }))
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
+  }
+
+  async supplierPerformanceReport(tenantId: string) {
+    const pos = await this.prisma.purchaseOrder.findMany({
+      where: { tenantId, status: { notIn: ['DRAFT', 'CANCELLED'] } },
+      select: {
+        id: true, supplierId: true, total: true, orderDate: true, expectedDate: true, receivedDate: true,
+        supplier: { select: { name: true } },
+      },
+    });
+    const map = new Map<string, {
+      supplierId: string; supplierName: string; orderCount: number; totalSpend: number;
+      onTimeDeliveries: number; lateDeliveries: number; leadDaysTotal: number; receivedCount: number;
+    }>();
+    for (const po of pos) {
+      const key = po.supplierId;
+      if (!map.has(key)) {
+        map.set(key, {
+          supplierId: po.supplierId,
+          supplierName: po.supplier.name,
+          orderCount: 0,
+          totalSpend: 0,
+          onTimeDeliveries: 0,
+          lateDeliveries: 0,
+          leadDaysTotal: 0,
+          receivedCount: 0,
+        });
+      }
+      const row = map.get(key)!;
+      row.orderCount += 1;
+      row.totalSpend += po.total;
+      if (po.receivedDate) {
+        row.receivedCount += 1;
+        row.leadDaysTotal += Math.max(0, dayjs(po.receivedDate).diff(dayjs(po.orderDate), 'day'));
+        if (po.expectedDate) {
+          if (dayjs(po.receivedDate).isAfter(dayjs(po.expectedDate).endOf('day'))) row.lateDeliveries += 1;
+          else row.onTimeDeliveries += 1;
+        }
+      }
+    }
+    return Array.from(map.values())
+      .map((r) => ({
+        ...r,
+        avgLeadDays: r.receivedCount > 0 ? Math.round((r.leadDaysTotal / r.receivedCount) * 10) / 10 : null,
+        onTimeRate: r.receivedCount > 0 ? Math.round((r.onTimeDeliveries / r.receivedCount) * 100) : null,
+      }))
+      .sort((a, b) => b.totalSpend - a.totalSpend);
+  }
+
+  async supplierPriceHistory(tenantId: string, variantId?: string, supplierId?: string, limit = 50) {
+    const items = await this.prisma.purchaseOrderItem.findMany({
+      where: {
+        purchase: {
+          tenantId,
+          status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED'] },
+          ...(supplierId ? { supplierId } : {}),
+        },
+        ...(variantId ? { variantId } : {}),
+      },
+      include: {
+        purchase: {
+          select: {
+            poNumber: true, orderDate: true, supplierId: true,
+            supplier: { select: { name: true } },
+          },
+        },
+      },
+      orderBy: { purchase: { orderDate: 'desc' } },
+      take: Math.min(100, limit),
+    });
+    return items.map((i) => ({
+      variantId: i.variantId,
+      sku: i.sku,
+      productName: i.productName,
+      variantName: i.variantName,
+      unitCost: i.unitCost,
+      orderedQty: i.orderedQty,
+      poNumber: i.purchase.poNumber,
+      orderDate: i.purchase.orderDate,
+      supplierId: i.purchase.supplierId,
+      supplierName: i.purchase.supplier.name,
+    }));
+  }
+
   async taxReport(tenantId: string, startDate: string, endDate: string) {
     const dateRange = {
       gte: dayjs(startDate).startOf('day').toDate(),
@@ -238,6 +349,32 @@ export class ReportsController {
   @ApiOperation({ summary: 'Sales performance by cashier' })
   cashierReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
     return this.reportsService.cashierReport(user.tenantId, start, end, branchId);
+  }
+
+  @Get('branches')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Sales performance by branch' })
+  branchReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
+    return this.reportsService.branchReport(user.tenantId, start, end);
+  }
+
+  @Get('supplier-performance')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Supplier delivery and spend analytics' })
+  supplierPerformance(@CurrentUser() user: IAuthUser) {
+    return this.reportsService.supplierPerformanceReport(user.tenantId);
+  }
+
+  @Get('supplier-price-history')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Historical supplier unit costs from POs' })
+  supplierPriceHistory(
+    @CurrentUser() user: IAuthUser,
+    @Query('variantId') variantId?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.reportsService.supplierPriceHistory(user.tenantId, variantId, supplierId, limit ? parseInt(limit, 10) : 50);
   }
 }
 

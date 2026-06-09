@@ -44,6 +44,7 @@ interface ProfitRow  { productName:string; variantName:string; sku:string; qty:n
 interface ProfitRpt  { rows:ProfitRow[]; totals:{revenue:number;cost:number;profit:number}; margin:string }
 interface MonthlyPL  { month:string; revenue:number; expenses:number; profit:number }
 interface RevPoint   { invoiceDate:string; total:number }
+interface BranchRow  { branchId:string|null; branchName:string; branchCode:string; salesCount:number; totalRevenue:number; totalTax:number; totalDiscount:number }
 
 // ── helper components ─────────────────────────────────────────────────────────
 function KpiCard({ label, value, sub, icon: Icon, color, bg, loading }:
@@ -84,22 +85,25 @@ export default function AnalyticsPage() {
   const [profit, setProfit]         = React.useState<ProfitRpt|null>(null);
   const [monthly, setMonthly]       = React.useState<MonthlyPL[]>([]);
   const [revPoints, setRevPoints]   = React.useState<RevPoint[]>([]);
+  const [branches, setBranches]     = React.useState<BranchRow[]>([]);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     const { start, end } = range;
-    const [bs, ca, pr, mo, rv] = await Promise.allSettled([
+    const [bs, ca, pr, mo, rv, br] = await Promise.allSettled([
       api.get<BestItem[]>(`/reports/best-selling?startDate=${start}&endDate=${end}&limit=15`),
       api.get<CashierRow[]>(`/reports/cashier?startDate=${start}&endDate=${end}`),
       api.get<ProfitRpt>(`/reports/profit?startDate=${start}&endDate=${end}`),
       api.get<MonthlyPL[]>(`/accounting/monthly-pl?months=12`),
       api.get<RevPoint[]>(`/sales/revenue?period=day`),
+      api.get<BranchRow[]>(`/reports/branches?startDate=${start}&endDate=${end}`),
     ]);
     if (bs.status==="fulfilled") setBest(Array.isArray(bs.value.data) ? bs.value.data : []);
     if (ca.status==="fulfilled") setCashier(Array.isArray(ca.value.data) ? ca.value.data : []);
     if (pr.status==="fulfilled") setProfit(pr.value.data ?? null);
     if (mo.status==="fulfilled") setMonthly(Array.isArray(mo.value.data) ? mo.value.data : []);
     if (rv.status==="fulfilled") setRevPoints(Array.isArray(rv.value.data) ? rv.value.data : []);
+    if (br.status==="fulfilled") setBranches(Array.isArray(br.value.data) ? br.value.data : []);
     else toast.error("Some analytics data failed to load");
     setLoading(false);
   }, [range.start, range.end]); // eslint-disable-line
@@ -225,6 +229,7 @@ export default function AnalyticsPage() {
             <TabsTrigger value="bestselling" className="text-[13px]">Best Selling</TabsTrigger>
             <TabsTrigger value="profit"   className="text-[13px]">Profit by Product</TabsTrigger>
             <TabsTrigger value="cashier"  className="text-[13px]">Cashier Performance</TabsTrigger>
+            <TabsTrigger value="branches" className="text-[13px]">Top Branches</TabsTrigger>
           </TabsList>
 
           {/* ── Monthly P&L ── */}
@@ -497,6 +502,60 @@ export default function AnalyticsPage() {
                            <p className="text-sm font-bold shrink-0">LKR {formatNumber(c.totalRevenue)}</p>
                          </div>
                          <Progress value={(c.totalRevenue/maxCRev)*100} className="h-1.5"/>
+                       </div>
+                     );
+                   })}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* ── Top Branches ── */}
+          <TabsContent value="branches" className="mt-4">
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Revenue by Branch</CardTitle>
+                  <CardDescription>{range.label.toLowerCase()}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? <Skeleton className="h-[280px] w-full rounded-xl"/> : branches.length===0 ? <Empty/> : (
+                    <ResponsiveContainer width="100%" height={280}>
+                      <BarChart data={branches} barSize={22}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false}/>
+                        <XAxis dataKey="branchName" tick={{fontSize:10}} axisLine={false} tickLine={false}/>
+                        <YAxis tick={{fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/>
+                        <Tooltip contentStyle={TT} formatter={(v:number)=>[`LKR ${formatNumber(v)}`,"Revenue"]}/>
+                        <Bar dataKey="totalRevenue" fill={C[0]} radius={[4,4,0,0]} name="Revenue"/>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Branch Leaderboard</CardTitle>
+                  <CardDescription>Ranked by sales count and revenue</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 max-h-80 overflow-y-auto">
+                  {loading ? Array.from({length:4}).map((_,i)=><Skeleton key={i} className="h-14 w-full rounded-lg"/>) :
+                   branches.length===0 ? <Empty/> :
+                   branches.map((b,i)=>{
+                     const maxBRev = Math.max(...branches.map(x=>x.totalRevenue), 1);
+                     return (
+                       <div key={b.branchId??i} className="p-3 rounded-xl border bg-card hover:bg-muted/30 transition-colors">
+                         <div className="flex items-center gap-3 mb-2">
+                           <div className="h-9 w-9 rounded-full flex items-center justify-center text-white text-sm font-bold shrink-0" style={{background:C[i%C.length]}}>
+                             #{i+1}
+                           </div>
+                           <div className="flex-1 min-w-0">
+                             <p className="text-sm font-semibold truncate">{b.branchName}</p>
+                             <p className="text-xs text-muted-foreground">{b.branchCode} · {b.salesCount} sales</p>
+                           </div>
+                           <p className="text-sm font-bold shrink-0">LKR {formatNumber(b.totalRevenue)}</p>
+                         </div>
+                         <Progress value={(b.totalRevenue/maxBRev)*100} className="h-1.5"/>
                        </div>
                      );
                    })}

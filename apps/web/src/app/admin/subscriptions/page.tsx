@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, CreditCard, TrendingUp, Edit2, X, CheckCircle, AlertCircle } from 'lucide-react'
-import { fetchTenants, fetchPlans, updateTenant, type TenantRow, type PlanDef } from '@/lib/admin-api'
+import { fetchTenants, fetchPlans, fetchBillingSummary, updateTenant, type TenantRow, type PlanDef } from '@/lib/admin-api'
 
 const PLAN_BADGE: Record<string, string> = {
   STARTER:      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600',
@@ -37,6 +37,10 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState('')
   const [planFilter, setPlanFilter] = useState('ALL')
   const [editTenant, setEditTenant] = useState<TenantRow | null>(null)
+  const [billing, setBilling] = useState<{
+    mrr: number; arr: number; totalTenants: number; activeTenants: number; trialTenants: number; trialExpiringSoon: number;
+    recentInvoices: { tenantName: string; plan: string; amount: number; status: string; dueDate: string | null }[];
+  } | null>(null)
 
   const load = useCallback(async (plan?: string) => {
     setLoading(true)
@@ -44,9 +48,14 @@ export default function SubscriptionsPage() {
     const p: Record<string, string> = { limit: '500' }
     if (plan && plan !== 'ALL') p.plan = plan
     try {
-      const [tenantRes, planList] = await Promise.all([fetchTenants(p), fetchPlans()])
+      const [tenantRes, planList, billingRes] = await Promise.all([
+        fetchTenants(p),
+        fetchPlans(),
+        fetchBillingSummary().catch(() => null),
+      ])
       setTenants(tenantRes.data)
       setPlans(planList.filter(pl => pl.key !== 'CUSTOM' || tenantRes.data.some(t => t.plan === 'CUSTOM')))
+      if (billingRes) setBilling(billingRes)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load subscriptions')
     } finally {
@@ -107,6 +116,24 @@ export default function SubscriptionsPage() {
       {error && (
         <div className="flex items-center gap-2 px-4 py-3 text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl">
           <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {billing && (
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {[
+            { label: 'MRR', value: `LKR ${billing.mrr.toLocaleString()}`, sub: 'Monthly recurring' },
+            { label: 'ARR', value: `LKR ${billing.arr.toLocaleString()}`, sub: 'Annual run rate' },
+            { label: 'Active Tenants', value: String(billing.activeTenants), sub: `${billing.totalTenants} total` },
+            { label: 'Trials', value: String(billing.trialTenants), sub: `${billing.trialExpiringSoon} expiring soon` },
+            { label: 'Due Invoices', value: String(billing.recentInvoices.filter(i => i.status === 'DUE').length), sub: 'This cycle' },
+          ].map((k) => (
+            <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-4">
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">{k.label}</p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">{k.value}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{k.sub}</p>
+            </div>
+          ))}
         </div>
       )}
 

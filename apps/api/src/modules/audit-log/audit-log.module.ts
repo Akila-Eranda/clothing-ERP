@@ -112,6 +112,56 @@ export class AuditLogService {
     }
   }
 
+  async getLoginHistory(tenantId: string, query: { page?: number; limit?: number }) {
+    const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const users = await this.prisma.user.findMany({ where: { tenantId }, select: { id: true } });
+    const userIds = users.map((u) => u.id);
+    if (userIds.length === 0) return paginate([], 0, query.page ?? 1, query.limit ?? 30);
+
+    const where = { userId: { in: userIds } };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.session.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          user: { select: { id: true, firstName: true, lastName: true, email: true, lastLoginAt: true, lastLoginIp: true } },
+        },
+      }),
+      this.prisma.session.count({ where }),
+    ]);
+    return paginate(
+      data.map((s) => ({
+        id: s.id,
+        userId: s.userId,
+        userName: `${s.user.firstName} ${s.user.lastName ?? ''}`.trim(),
+        email: s.user.email,
+        ipAddress: s.ipAddress ?? s.user.lastLoginIp,
+        userAgent: s.userAgent,
+        deviceName: s.deviceName,
+        createdAt: s.createdAt,
+        lastUsedAt: s.lastUsedAt,
+        isActive: s.isActive,
+      })),
+      total,
+      query.page ?? 1,
+      query.limit ?? 30,
+    );
+  }
+
+  @OnEvent('auth.login')
+  async onAuthLogin(payload: { userId: string; tenantId: string; ip?: string }) {
+    await this.logActivity(payload.userId, 'LOGIN', 'User signed in', {}, payload.ip);
+    await this.log({
+      tenantId: payload.tenantId,
+      userId: payload.userId,
+      action: 'LOGIN',
+      resource: 'Auth',
+      ipAddress: payload.ip,
+    });
+  }
+
   @OnEvent('pos.sale.completed')
   async onSaleCompleted(payload: { saleId: string; tenantId: string; branchId: string; total: number }) {
     await this.log({
@@ -175,6 +225,20 @@ export class AuditLogController {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 50,
       userId, resource, action, startDate, endDate,
+    });
+  }
+
+  @Get('login-history')
+  @RequirePermissions('users:read')
+  @ApiOperation({ summary: 'User login session history for tenant' })
+  loginHistory(
+    @CurrentUser() user: IAuthUser,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.auditLogService.getLoginHistory(user.tenantId, {
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? parseInt(limit, 10) : 30,
     });
   }
 

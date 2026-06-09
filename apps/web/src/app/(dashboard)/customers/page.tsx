@@ -143,12 +143,17 @@ export default function CustomersPage() {
   const [addOpen, setAddOpen]           = useState(false);
   const [editCustomer, setEditCustomer] = useState<Customer | undefined>();
   const [viewId, setViewId]             = useState<string | null>(null);
+  const [segments, setSegments]         = useState<{ key: string; label: string; count: number }[]>([]);
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ data: Customer[] }>("/customers?limit=500");
+      const [res, segRes] = await Promise.all([
+        api.get<{ data: Customer[] }>("/customers?limit=500"),
+        api.get<{ segments: { key: string; label: string; count: number }[] }>("/customers/segments"),
+      ]);
       setCustomers(res.data?.data ?? (res.data as unknown as Customer[]) ?? []);
+      setSegments(segRes.data?.segments ?? []);
     } catch { toast.error("Failed to load customers"); }
     finally { setLoading(false); }
   }, []);
@@ -219,6 +224,19 @@ export default function CustomersPage() {
           </Card>
         ))}
       </div>
+
+      {segments.length > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+          {segments.map((s) => (
+            <Card key={s.key}>
+              <CardContent className="p-3 text-center">
+                <p className="text-lg font-bold">{s.count}</p>
+                <p className="text-[10px] text-muted-foreground leading-tight">{s.label}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Table */}
       <ClientSideTable

@@ -124,12 +124,23 @@ export default function PurchasesPage() {
   const [pos, setPos]             = useState<PurchaseOrder[]>([]);
   const [loading, setLoading]     = useState(true);
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
+  const [reorder, setReorder]     = useState<{ variantId: string; productName: string; sku: string; branchName: string; currentQty: number; reorderPoint: number; suggestedOrderQty: number }[]>([]);
+  const [supplierPerf, setSupplierPerf] = useState<{ supplierName: string; orderCount: number; totalSpend: number; onTimeRate: number | null; avgLeadDays: number | null }[]>([]);
+  const [priceHistory, setPriceHistory] = useState<{ productName: string; supplierName: string; unitCost: number; poNumber: string; orderDate: string }[]>([]);
 
   const fetchPOs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ data: PurchaseOrder[] }>("/purchases?limit=200");
+      const [res, reorderRes, perfRes, histRes] = await Promise.all([
+        api.get<{ data: PurchaseOrder[] }>("/purchases?limit=200"),
+        api.get<typeof reorder>("/purchases/reorder-suggestions"),
+        api.get<typeof supplierPerf>("/reports/supplier-performance"),
+        api.get<typeof priceHistory>("/reports/supplier-price-history?limit=8"),
+      ]);
       setPos(res.data?.data ?? (res.data as unknown as PurchaseOrder[]) ?? []);
+      setReorder(Array.isArray(reorderRes.data) ? reorderRes.data : []);
+      setSupplierPerf(Array.isArray(perfRes.data) ? perfRes.data.slice(0, 5) : []);
+      setPriceHistory(Array.isArray(histRes.data) ? histRes.data : []);
     } catch { toast.error("Failed to load purchase orders"); }
     finally { setLoading(false); }
   }, []);
@@ -214,6 +225,52 @@ export default function PurchasesPage() {
           </div>
         </div>
       </div>
+
+      {(reorder.length > 0 || supplierPerf.length > 0 || priceHistory.length > 0) && (
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold mb-2">Auto Reorder Suggestions</p>
+              {reorder.length === 0 ? <p className="text-xs text-muted-foreground">All stock levels OK</p> : (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {reorder.slice(0, 6).map((r) => (
+                    <div key={`${r.variantId}-${r.branchName}`} className="flex justify-between text-xs border-b pb-1">
+                      <span className="truncate flex-1">{r.productName}</span>
+                      <span className="text-amber-600 font-semibold shrink-0 ml-2">Order {r.suggestedOrderQty}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold mb-2">Supplier Performance</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {supplierPerf.map((s) => (
+                  <div key={s.supplierName} className="flex justify-between text-xs border-b pb-1">
+                    <span className="truncate flex-1">{s.supplierName}</span>
+                    <span className="text-muted-foreground shrink-0 ml-2">{s.onTimeRate ?? 0}% on-time</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <p className="text-sm font-semibold mb-2">Supplier Price History</p>
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {priceHistory.map((h, i) => (
+                  <div key={`${h.poNumber}-${i}`} className="flex justify-between text-xs border-b pb-1">
+                    <span className="truncate flex-1">{h.productName}</span>
+                    <span className="font-mono shrink-0 ml-2">LKR {h.unitCost.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Table */}
       <ClientSideTable

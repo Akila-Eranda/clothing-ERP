@@ -302,6 +302,49 @@ export class AccountingService {
       include: { lines: true },
     });
   }
+
+  async getAccountsReceivable(tenantId: string) {
+    const customers = await this.prisma.customer.findMany({
+      where: { tenantId, creditBalance: { gt: 0 } },
+      select: {
+        id: true, code: true, firstName: true, lastName: true, phone: true,
+        creditBalance: true, creditLimit: true, lastPurchaseAt: true,
+      },
+      orderBy: { creditBalance: 'desc' },
+    });
+    const total = customers.reduce((s, c) => s + c.creditBalance, 0);
+    return { total, count: customers.length, customers };
+  }
+
+  async getAccountsPayable(tenantId: string) {
+    const [suppliers, purchaseOrders] = await Promise.all([
+      this.prisma.supplier.findMany({
+        where: { tenantId, balance: { gt: 0 } },
+        select: { id: true, code: true, name: true, phone: true, balance: true, creditDays: true },
+        orderBy: { balance: 'desc' },
+      }),
+      this.prisma.purchaseOrder.findMany({
+        where: { tenantId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'CONFIRMED', 'SENT'] } },
+        select: {
+          id: true, poNumber: true, total: true, paidAmount: true, orderDate: true,
+          supplier: { select: { id: true, name: true } },
+        },
+        orderBy: { orderDate: 'desc' },
+      }),
+    ]);
+    const unpaidPos = purchaseOrders
+      .map((po) => ({ ...po, balanceDue: Math.max(0, po.total - po.paidAmount) }))
+      .filter((po) => po.balanceDue > 0.01);
+    const supplierTotal = suppliers.reduce((s, sup) => s + sup.balance, 0);
+    const poTotal = unpaidPos.reduce((s, po) => s + po.balanceDue, 0);
+    return {
+      total: supplierTotal + poTotal,
+      supplierBalanceTotal: supplierTotal,
+      purchaseOrderDueTotal: poTotal,
+      suppliers,
+      unpaidPurchaseOrders: unpaidPos,
+    };
+  }
 }
 
 @ApiTags('Accounting')
@@ -399,6 +442,20 @@ export class AccountingController {
   @ApiOperation({ summary: 'Create journal entry' })
   createJournalEntry(@CurrentUser() user: IAuthUser, @Body() dto: CreateJournalEntryDto) {
     return this.accountingService.createJournalEntry(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('accounts-receivable')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'Customer credit outstanding (AR)' })
+  getAccountsReceivable(@CurrentUser() user: IAuthUser) {
+    return this.accountingService.getAccountsReceivable(user.tenantId);
+  }
+
+  @Get('accounts-payable')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'Supplier balances and unpaid POs (AP)' })
+  getAccountsPayable(@CurrentUser() user: IAuthUser) {
+    return this.accountingService.getAccountsPayable(user.tenantId);
   }
 
   @Get('trial-balance')

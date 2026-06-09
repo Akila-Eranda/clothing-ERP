@@ -334,6 +334,69 @@ export class TenantsService {
     }));
   }
 
+  async getBillingSummary() {
+    const plans = await this.getMergedSubscriptionPlans();
+    const priceMap = Object.fromEntries(plans.map((p) => [p.key, p.price]));
+    const tenants = await this.prisma.tenant.findMany({
+      where: { subdomain: { not: PLATFORM_CONFIG_SUBDOMAIN } },
+      select: { id: true, name: true, plan: true, status: true, trialEndsAt: true, billingEmail: true, createdAt: true },
+    });
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    let mrr = 0;
+    const byPlan: Record<string, { count: number; active: number; mrr: number }> = {};
+    const invoices: { tenantId: string; tenantName: string; plan: string; amount: number; status: string; dueDate: string | null }[] = [];
+
+    for (const t of tenants) {
+      const price = priceMap[t.plan] ?? 0;
+      const isPaying = t.status === 'ACTIVE' && price > 0;
+      if (isPaying) mrr += price;
+      if (!byPlan[t.plan]) byPlan[t.plan] = { count: 0, active: 0, mrr: 0 };
+      byPlan[t.plan].count += 1;
+      if (t.status === 'ACTIVE' || t.status === 'TRIAL') byPlan[t.plan].active += 1;
+      if (isPaying) byPlan[t.plan].mrr += price;
+
+      if (t.status === 'TRIAL' && t.trialEndsAt) {
+        invoices.push({
+          tenantId: t.id,
+          tenantName: t.name,
+          plan: t.plan,
+          amount: price,
+          status: t.trialEndsAt <= now ? 'TRIAL_EXPIRED' : 'TRIAL',
+          dueDate: t.trialEndsAt.toISOString(),
+        });
+      } else if (isPaying) {
+        const due = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        invoices.push({
+          tenantId: t.id,
+          tenantName: t.name,
+          plan: t.plan,
+          amount: price,
+          status: 'DUE',
+          dueDate: due.toISOString(),
+        });
+      }
+    }
+
+    const trialExpiringSoon = tenants.filter(
+      (t) => t.status === 'TRIAL' && t.trialEndsAt && t.trialEndsAt <= in7Days && t.trialEndsAt >= now,
+    ).length;
+
+    return {
+      mrr,
+      arr: mrr * 12,
+      totalTenants: tenants.length,
+      activeTenants: tenants.filter((t) => t.status === 'ACTIVE').length,
+      trialTenants: tenants.filter((t) => t.status === 'TRIAL').length,
+      trialExpiringSoon,
+      byPlan,
+      recentInvoices: invoices
+        .sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
+        .slice(0, 50),
+    };
+  }
+
   async updateSubscriptionPlanCatalog(planKey: SubscriptionPlan, dto: UpdatePlanCatalogDto) {
     const base = DEFAULT_SUBSCRIPTION_PLANS.find((p) => p.key === planKey);
     if (!base) throw new NotFoundException('Plan not found');
@@ -536,6 +599,14 @@ export class TenantsController {
   @ApiOperation({ summary: 'List subscription plan catalog with tenant counts' })
   getSubscriptionPlans() {
     return this.tenantsService.getSubscriptionPlansWithStats();
+  }
+
+  @Get('billing-summary')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Platform MRR, trials, and billing invoices' })
+  getBillingSummary() {
+    return this.tenantsService.getBillingSummary();
   }
 
   @Put('subscription-plans/:planKey')

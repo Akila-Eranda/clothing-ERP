@@ -8,6 +8,7 @@ import { CustomerTier, Gender } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
+import * as dayjs from 'dayjs';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
@@ -164,12 +165,44 @@ export class CustomersService {
   }
 
   async getSegments(tenantId: string) {
-    return this.prisma.customer.groupBy({
-      by: ['tier'],
-      where: { tenantId },
-      _count: { id: true },
-      _sum: { totalSpent: true, loyaltyPoints: true },
-    });
+    const thirtyDaysAgo = dayjs().subtract(30, 'day').toDate();
+    const ninetyDaysAgo = dayjs().subtract(90, 'day').toDate();
+
+    const [tiers, highValue, dormant, newCustomers, creditOwing, totalCustomers] = await Promise.all([
+      this.prisma.customer.groupBy({
+        by: ['tier'],
+        where: { tenantId },
+        _count: { id: true },
+        _sum: { totalSpent: true, loyaltyPoints: true },
+      }),
+      this.prisma.customer.count({ where: { tenantId, totalSpent: { gte: 100000 } } }),
+      this.prisma.customer.count({
+        where: {
+          tenantId,
+          OR: [
+            { lastPurchaseAt: { lt: ninetyDaysAgo } },
+            { lastPurchaseAt: null, createdAt: { lt: ninetyDaysAgo } },
+          ],
+        },
+      }),
+      this.prisma.customer.count({ where: { tenantId, createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.customer.count({ where: { tenantId, creditBalance: { gt: 0 } } }),
+      this.prisma.customer.count({ where: { tenantId } }),
+    ]);
+
+    const activeRecent = totalCustomers - dormant;
+
+    return {
+      tiers,
+      segments: [
+        { key: 'HIGH_VALUE', label: 'High Value (100k+)', count: highValue },
+        { key: 'ACTIVE', label: 'Active (90d)', count: activeRecent },
+        { key: 'DORMANT', label: 'Dormant (90d+)', count: dormant },
+        { key: 'NEW', label: 'New (30d)', count: newCustomers },
+        { key: 'CREDIT', label: 'Credit Outstanding', count: creditOwing },
+      ],
+      totalCustomers,
+    };
   }
 
   async remove(id: string, tenantId: string) {

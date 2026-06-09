@@ -38,6 +38,74 @@ const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 interface AuditEntry { id:string; action:string; resource:string; resourceId?:string; userId?:string; user?:{firstName:string;lastName:string;email:string}|null; ipAddress?:string; createdAt:string; oldData?:object; newData?:object; }
+interface LoginEntry { id:string; userName:string; email:string; ipAddress?:string; deviceName?:string; userAgent?:string; createdAt:string; lastUsedAt?:string; isActive:boolean; }
+
+function LoginHistoryCard() {
+  const [logs, setLogs] = React.useState<LoginEntry[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api.get<{ data: LoginEntry[] }>("/audit-logs/login-history?limit=20");
+      setLogs(r.data?.data ?? []);
+    } catch { toast.error("Failed to load login history"); }
+    finally { setLoading(false); }
+  }, []);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2"><Shield className="h-4 w-4 text-primary"/>Login History</CardTitle>
+            <CardDescription>Recent sign-in sessions for your team</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`}/>
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}
+        {!loading && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="text-left py-2 pr-3">User</th>
+                  <th className="text-left py-2 pr-3">IP</th>
+                  <th className="text-left py-2 pr-3">Device</th>
+                  <th className="text-left py-2 pr-3">Signed in</th>
+                  <th className="text-left py-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((l) => (
+                  <tr key={l.id} className="border-b hover:bg-muted/30">
+                    <td className="py-2 pr-3">
+                      <p className="font-medium text-xs">{l.userName}</p>
+                      <p className="text-[10px] text-muted-foreground">{l.email}</p>
+                    </td>
+                    <td className="py-2 pr-3 text-xs font-mono text-muted-foreground">{l.ipAddress ?? "—"}</td>
+                    <td className="py-2 pr-3 text-xs text-muted-foreground truncate max-w-[120px]">{l.deviceName ?? l.userAgent?.slice(0, 30) ?? "—"}</td>
+                    <td className="py-2 pr-3 text-xs text-muted-foreground whitespace-nowrap">{new Date(l.createdAt).toLocaleString()}</td>
+                    <td className="py-2">
+                      <Badge variant={l.isActive ? "success" : "secondary"} className="text-[10px]">{l.isActive ? "Active" : "Ended"}</Badge>
+                    </td>
+                  </tr>
+                ))}
+                {!logs.length && <tr><td colSpan={5} className="py-8 text-center text-muted-foreground text-sm">No login sessions recorded yet</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function AuditLogTab() {
   const [logs, setLogs] = React.useState<AuditEntry[]>([]);
@@ -585,6 +653,7 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+          <LoginHistoryCard />
         </TabsContent>
 
         <TabsContent value="branches" className="mt-6 space-y-4">

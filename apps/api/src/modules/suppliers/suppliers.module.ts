@@ -278,6 +278,33 @@ export class SuppliersService {
 
     return this.prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { items: true } });
   }
+
+  async getReorderSuggestions(tenantId: string, branchId?: string) {
+    const rows = await this.prisma.inventory.findMany({
+      where: { tenantId, ...(branchId ? { branchId } : {}) },
+      include: {
+        variant: { select: { sku: true, product: { select: { name: true } } } },
+        branch: { select: { name: true } },
+      },
+    });
+    return rows
+      .filter((inv) => inv.quantity <= inv.reorderPoint)
+      .map((inv) => ({
+        variantId: inv.variantId,
+        sku: inv.variant.sku,
+        productName: inv.variant.product.name,
+        branchName: inv.branch.name,
+        currentQty: inv.quantity,
+        reorderPoint: inv.reorderPoint,
+        minStockLevel: inv.minStockLevel,
+        suggestedOrderQty: Math.max(
+          inv.reorderPoint * 2 - inv.quantity,
+          inv.maxStockLevel > 0 ? inv.maxStockLevel - inv.quantity : inv.reorderPoint,
+          1,
+        ),
+      }))
+      .sort((a, b) => a.currentQty - b.currentQty);
+  }
 }
 
 @ApiTags('Suppliers')
@@ -349,6 +376,13 @@ export class PurchasesController {
   @RequirePermissions('purchases:read')
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { status?: PurchaseOrderStatus }) {
     return this.suppliersService.findAllPOs(user.tenantId, query);
+  }
+
+  @Get('reorder-suggestions')
+  @RequirePermissions('purchases:read')
+  @ApiOperation({ summary: 'Products at or below reorder point' })
+  reorderSuggestions(@CurrentUser() user: IAuthUser) {
+    return this.suppliersService.getReorderSuggestions(user.tenantId, user.branchId ?? undefined);
   }
 
   @Get(':id')

@@ -230,6 +230,14 @@ export async function fetchPlans(): Promise<PlanDef[]> {
   return DEFAULT_PLANS
 }
 
+export async function fetchBillingSummary(): Promise<{
+  mrr: number; arr: number; totalTenants: number; activeTenants: number; trialTenants: number; trialExpiringSoon: number;
+  byPlan: Record<string, { count: number; active: number; mrr: number }>;
+  recentInvoices: { tenantId: string; tenantName: string; plan: string; amount: number; status: string; dueDate: string | null }[];
+}> {
+  return req('/tenants/billing-summary')
+}
+
 export async function updatePlanCatalog(key: string, data: Partial<PlanDef>): Promise<PlanDef> {
   return req<PlanDef>(`/tenants/subscription-plans/${key}`, {
     method: 'PUT',

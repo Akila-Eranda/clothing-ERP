@@ -34,6 +34,8 @@ interface PLReport { period: { startDate: string; endDate: string }; revenue: { 
 interface CashFlowDay { date: string; inflow: number; outflow: number; }
 interface JournalEntry { id: string; entryNumber: string; description: string; date: string; isPosted: boolean; lines: { id: string; type: string; amount: number; debitAccount?: { name: string; code: string } | null; creditAccount?: { name: string; code: string } | null; }[]; }
 interface BalanceSheet { assets: { accounts: Account[]; operatingCash: number; totalExpenses: number; total: number }; liabilities: { accounts: Account[]; total: number }; equity: { accounts: Account[]; retainedEarnings: number; total: number }; revenue: { accounts: Account[]; total: number }; expenseAcct: { accounts: Account[]; total: number }; }
+interface ARData { total: number; count: number; customers: { id: string; code: string; firstName: string; lastName: string; phone: string; creditBalance: number; creditLimit: number }[]; }
+interface APData { total: number; supplierBalanceTotal: number; purchaseOrderDueTotal: number; suppliers: { id: string; name: string; balance: number }[]; unpaidPurchaseOrders: { poNumber: string; balanceDue: number; supplier: { name: string } }[]; }
 
 const PAY_METHODS = ["CASH","CARD","BANK_TRANSFER","ONLINE","CREDIT","CHEQUE"];
 const CATEGORIES  = ["Payroll","Rent","Utilities","Marketing","Operations","Logistics","Assets","Other"];
@@ -291,6 +293,8 @@ export default function AccountingPage() {
   const [journalEntries, setJournal]  = useState<JournalEntry[]>([]);
   const [balanceSheet, setBS]         = useState<BalanceSheet | null>(null);
   const [thisMonthPL, setThisMonthPL] = useState<PLReport | null>(null);
+  const [arData, setArData]           = useState<ARData | null>(null);
+  const [apData, setApData]           = useState<APData | null>(null);
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState("dashboard");
 
@@ -305,7 +309,7 @@ export default function AccountingPage() {
     try {
       const tmStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
       const tmEnd   = new Date().toISOString().split("T")[0];
-      const [expRes, accRes, plRes, cfRes, jeRes, bsRes, monthRes, tmRes] = await Promise.all([
+      const [expRes, accRes, plRes, cfRes, jeRes, bsRes, monthRes, tmRes, arRes, apRes] = await Promise.all([
         api.get<{ data: Expense[] }>("/accounting/expenses?limit=200"),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
@@ -314,6 +318,8 @@ export default function AccountingPage() {
         api.get<BalanceSheet>("/accounting/balance-sheet"),
         api.get<PLData[]>("/accounting/monthly-pl?months=6"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${tmStart}&endDate=${tmEnd}`),
+        api.get<ARData>("/accounting/accounts-receivable"),
+        api.get<APData>("/accounting/accounts-payable"),
       ]);
       setExpenses((expRes.data?.data ?? expRes.data ?? []) as Expense[]);
       setAccounts((Array.isArray(accRes.data) ? accRes.data : []) as Account[]);
@@ -323,6 +329,8 @@ export default function AccountingPage() {
       setBS(bsRes.data as BalanceSheet);
       setMonthlyPL((Array.isArray(monthRes.data) ? monthRes.data : []) as PLData[]);
       setThisMonthPL(tmRes.data as PLReport);
+      setArData(arRes.data as ARData);
+      setApData(apRes.data as APData);
     } catch { toast.error("Failed to load accounting data"); }
     finally { setLoading(false); }
   }, [plRange, cfRange]);
@@ -865,6 +873,51 @@ export default function AccountingPage() {
                 </div>
               )}
             </div>
+
+            {/* Accounts Receivable / Payable */}
+            {(arData || apData) && (
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <Card className="bg-card border shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Accounts Receivable</CardTitle>
+                    <p className="text-xs text-muted-foreground">Customer credit outstanding — LKR {formatNumber(arData?.total ?? 0)} ({arData?.count ?? 0} customers)</p>
+                  </CardHeader>
+                  <CardContent className="space-y-2 max-h-48 overflow-y-auto">
+                    {(arData?.customers ?? []).length === 0 ? (
+                      <p className="text-xs text-muted-foreground py-4 text-center">No outstanding receivables</p>
+                    ) : arData!.customers.slice(0, 8).map((c) => (
+                      <div key={c.id} className="flex justify-between text-xs border-b pb-1.5">
+                        <span className="truncate flex-1">{c.firstName} {c.lastName}</span>
+                        <span className="font-semibold shrink-0 ml-2">LKR {formatNumber(c.creditBalance)}</span>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+                <Card className="bg-card border shadow-sm">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-semibold">Accounts Payable</CardTitle>
+                    <p className="text-xs text-muted-foreground">Supplier &amp; PO dues — LKR {formatNumber(apData?.total ?? 0)}</p>
+                  </CardHeader>
+                  <CardContent className="space-y-2 max-h-48 overflow-y-auto">
+                    {(apData?.suppliers ?? []).slice(0, 4).map((s) => (
+                      <div key={s.id} className="flex justify-between text-xs border-b pb-1.5">
+                        <span className="truncate flex-1">{s.name}</span>
+                        <span className="font-semibold text-red-600 shrink-0 ml-2">LKR {formatNumber(s.balance)}</span>
+                      </div>
+                    ))}
+                    {(apData?.unpaidPurchaseOrders ?? []).slice(0, 4).map((po) => (
+                      <div key={po.poNumber} className="flex justify-between text-xs border-b pb-1.5">
+                        <span className="truncate flex-1">{po.poNumber} · {po.supplier.name}</span>
+                        <span className="font-semibold text-red-600 shrink-0 ml-2">LKR {formatNumber(po.balanceDue)}</span>
+                      </div>
+                    ))}
+                    {!apData?.suppliers.length && !apData?.unpaidPurchaseOrders.length && (
+                      <p className="text-xs text-muted-foreground py-4 text-center">No outstanding payables</p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
 
             {/* Cash Flow Chart */}
             {cashFlow && cashFlow.data.length > 0 && (
