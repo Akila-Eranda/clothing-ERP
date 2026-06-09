@@ -57,7 +57,7 @@ interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }];
 
-const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"cart", label:"Cart", icon: ShoppingCart, badge:true }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
+const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
@@ -86,6 +86,7 @@ export function POSOverlay() {
   const [activePayment, setActivePayment] = React.useState("CASH");
   const [numpad, setNumpad] = React.useState("");
   const [checkoutLoading, setCheckoutLoading] = React.useState(false);
+  const [checkoutOpen, setCheckoutOpen] = React.useState(false);
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [showCustomerSearch, setShowCustomerSearch] = React.useState(false);
   const [customerSearch, setCustomerSearch] = React.useState("");
@@ -180,6 +181,7 @@ export function POSOverlay() {
   }, []);
 
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
+  React.useEffect(() => { if (items.length === 0) setCheckoutOpen(false); }, [items.length]);
 
   const loadProducts = React.useCallback(async () => {
     setLoading(true);
@@ -414,7 +416,7 @@ export function POSOverlay() {
       const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;paymentStatus?:string}>("/pos/sale",payload);
       const s=res.data;
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
-      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");
+      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setCheckoutOpen(false);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
       await loadHeldBills();
@@ -445,11 +447,11 @@ export function POSOverlay() {
       if(e.key.length===1&&delta<60&&!e.ctrlKey&&!e.altKey){barcodeBuffer.current+=e.key;clearTimeout(barcodeTimer.current);barcodeTimer.current=setTimeout(()=>{barcodeBuffer.current="";},120);}else if(e.key!=="Enter"&&delta>60){clearTimeout(barcodeTimer.current);barcodeBuffer.current="";}
       if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const code=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(code){const base=code.replace(/\d{3}$/,"");let found=products.find(p=>(p.barcode&&p.barcode===code)||p.sku.toLowerCase()===code.toLowerCase());if(!found&&base&&base!==code)found=products.find(p=>(p.barcode&&p.barcode===base)||p.sku.toLowerCase()===base.toLowerCase());if(found){handleAddProduct(found);setSearch("");setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`Barcode/SKU not found: ${code}`);e.preventDefault();return;}}
       if(e.key==="F1"||(e.key==="?"&&!inInput)){e.preventDefault();setShowShortcuts(s=>!s);return;}
-      if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
+      if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(checkoutOpen){setCheckoutOpen(false);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
       if(inInput&&e.key==="Enter"&&document.activeElement===searchRef.current){const first=filteredProducts[0];if(first){e.preventDefault();handleAddProduct(first);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}return;}
       if(inInput)return;
       if(e.key==="p"||e.key==="P"){e.preventDefault();setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),50);return;}
-      if(e.key==="c"||e.key==="C"){e.preventDefault();setActiveNav("cart");return;}
+      if(e.key==="c"||e.key==="C"){e.preventDefault();if(items.length>0)setCheckoutOpen(true);else toast.info("Cart is empty");return;}
       if(e.key==="r"||e.key==="R"){e.preventDefault();setActiveNav("returns");return;}
       if(e.key==="h"||e.key==="H"){e.preventDefault();setActiveNav("hold-bills");return;}
       if(e.key==="u"||e.key==="U"){e.preventDefault();setActiveNav("customers");return;}
@@ -459,10 +461,10 @@ export function POSOverlay() {
       if(e.key==="F4"){e.preventDefault();setShowCustomerSearch(true);return;}
       if(e.key==="F5"){e.preventDefault();loadProducts();return;}
       if(e.key==="F8"){e.preventDefault();if(serverHeldBills.length>0){handleRestoreHeldBill(serverHeldBills[0]);}return;}
-      if(e.key==="F9"){e.preventDefault();handleCheckout();return;}
+      if(e.key==="F9"){e.preventDefault();if(items.length===0)return;if(!checkoutOpen){setCheckoutOpen(true);return;}handleCheckout();return;}
       if(e.key==="F12"){e.preventDefault();const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();return;}
       if(e.key==="Tab"){e.preventDefault();const i=PAY_METHODS.findIndex(m=>m.value===activePayment);setActivePayment(PAY_METHODS[(i+1)%PAY_METHODS.length].value);return;}
-      if(e.key==="Enter"){if(activeNav!=="cart"||items.length===0)return;e.preventDefault();handleCheckout();return;}
+      if(e.key==="Enter"){if(items.length===0)return;if(!checkoutOpen){e.preventDefault();setCheckoutOpen(true);return;}e.preventDefault();handleCheckout();return;}
       if(activePayment==="CASH"){if(/^\d$/.test(e.key)){handleNumpad(e.key);return;}if(e.key==="."){handleNumpad(".");return;}if(e.key==="Backspace"){handleNumpad("DEL");return;}}
       if(e.key==="ArrowDown"){e.preventDefault();setSelectedCartIdx(i=>Math.min(items.length-1,i+1));return;}
       if(e.key==="ArrowUp"){e.preventDefault();setSelectedCartIdx(i=>Math.max(0,i-1));return;}
@@ -472,7 +474,7 @@ export function POSOverlay() {
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts]);
+  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,checkoutOpen,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts]);
 
   const applyCustomer = React.useCallback((c: CustomerItem) => {
     if (!c?.id) { toast.error("Invalid customer — try again"); return; }
@@ -485,7 +487,6 @@ export function POSOverlay() {
       isActive: true, createdAt: new Date(),
     });
     toast.success(`${c.name} added to bill`);
-    setActiveNav("cart");
   }, [setCustomer]);
 
   const saveNewCustomer = React.useCallback(async () => {
@@ -600,32 +601,6 @@ export function POSOverlay() {
       </div>
     );
 
-    // CART DETAIL
-    if (activeNav === "cart") return (
-      <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
-        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Current Order</h2>{customer&&<div className="flex items-center gap-2 px-3 py-1.5 rounded-xl" style={{background:"rgba(79,110,247,0.15)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-6 w-6 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><span className="text-white text-xs font-semibold">{customer.name}</span><button onClick={()=>setCustomer(null)} className="ml-1"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>}</div>
-        <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
-          {items.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty  add products from Products tab</p></div>):(
-            <table className="w-full text-sm">
-              <thead><tr style={{borderBottom:"1px solid #1e3356"}}>{["Product","Variant","Qty","Unit Price","Total",""].map(h=><th key={h} className="text-left px-3 py-2 text-[11px] font-semibold" style={{color:"#6a8ab8"}}>{h}</th>)}</tr></thead>
-              <tbody>{items.map((item,idx)=>(<tr key={item.variantId} onClick={()=>setSelectedCartIdx(idx)} className="transition-colors cursor-pointer" style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.1)":"transparent",borderBottom:"1px solid #1a2b3a"}}>
-                <td className="px-3 py-2"><p className="text-white text-xs font-semibold">{item.productName}</p></td>
-                <td className="px-3 py-2"><p className="text-xs" style={{color:"#6a8ab8"}}>{item.variantName}</p></td>
-                <td className="px-3 py-2"><div className="flex items-center gap-1"><button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button><span className="text-white text-xs font-bold w-6 text-center">{item.quantity}</span><button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button></div></td>
-                <td className="px-3 py-2 text-xs font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(item.unitPrice)}</td>
-                <td className="px-3 py-2 text-xs font-bold font-mono text-white">LKR {formatNumber(item.unitPrice*item.quantity)}</td>
-                <td className="px-3 py-2"><button onClick={e=>{e.stopPropagation();removeItem(item.variantId);}} className="p-1 rounded hover:bg-red-500/20 transition-colors"><Trash2 className="h-3.5 w-3.5" style={{color:"#ef4444"}}/></button></td>
-              </tr>))}</tbody>
-            </table>
-          )}
-        </div>
-        <div className="shrink-0 rounded-xl border p-3" style={{borderColor:"#1e3356",background:"#162338"}}>
-          <p className="text-xs font-semibold mb-1.5" style={{color:"#6a8ab8"}}>Order Notes</p>
-          <textarea value={cartNotes} onChange={e=>setCartNotes(e.target.value)} rows={2} placeholder="Add notes for this order..." className="w-full rounded-lg px-3 py-2 text-xs text-white outline-none resize-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
-        </div>
-      </div>
-    );
-
     // CUSTOMERS
     if (activeNav === "customers") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
@@ -656,7 +631,19 @@ export function POSOverlay() {
           </div>
         )}
         {/* Active bill customer */}
-        {customer&&<div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}><div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div><span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active Bill Customer</span><button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>}
+        {customer ? (
+          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}>
+            <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div>
+            <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Selected</span>
+            <button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+          </div>
+        ) : (
+          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border border-dashed" style={{borderColor:"#1e3356",background:"#162338"}}>
+            <User className="h-5 w-5 shrink-0" style={{color:"#6a8ab8"}}/>
+            <p className="text-sm flex-1" style={{color:"#6a8ab8"}}>No {workspace.customerLabel.toLowerCase()} on bill — tap <span className="font-bold text-white">Select</span> below</p>
+          </div>
+        )}
         {/* Search results */}
         <div className="flex-1 overflow-y-auto">
           {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
@@ -676,7 +663,7 @@ export function POSOverlay() {
                 style={{background:"#162338",borderColor:customer?.id===c.id?"#10b981":"#1e3356"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                 <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Active</>:"Set"}</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
               </div>
             ))}
           </div>
@@ -1153,9 +1140,9 @@ export function POSOverlay() {
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}}},{label:"Recent Bills",key:"",icon:Receipt,onClick:()=>setActiveNav("orders")},{label:"Customers",key:"F4",icon:Users,onClick:()=>{setActiveNav("customers");setShowCustomerSearch(false);}}].map((btn,i)=>(
-              <button key={i} onClick={btn.onClick} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"#1a2b4a",color:"#a0b4d4"}}>
-                <btn.icon className="h-3.5 w-3.5"/>{btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5">{btn.key}</span>}
+            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}}},{label:"Recent Bills",key:"",icon:Receipt,onClick:()=>setActiveNav("orders")},{label: customer ? customer.name : "Select Customer", key:"F4",icon:Users,onClick:()=>{setActiveNav("customers");setShowCustomerSearch(false);}}].map((btn,i)=>(
+              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[160px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"#1a2b4a",color:i===2&&customer?"#fff":"#a0b4d4",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Select customer"):undefined}>
+                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2&&customer ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
           </div>
@@ -1181,7 +1168,7 @@ export function POSOverlay() {
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"#6a8ab8"}}/>
                     {item.label}
-                    {item.badge&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
+                    {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
                   </button>
                 );
               })}
@@ -1203,95 +1190,166 @@ export function POSOverlay() {
           {/* CART PANEL */}
           <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-              <span className="text-white font-bold text-lg">Cart ({itemCount()} Items)</span>
-              <button onClick={()=>{clearCart();setSelectedCartIdx(-1);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear Cart</button>
-            </div>
-            <div className="flex-1 overflow-y-auto">
-              {items.length===0?(
-                <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p></div>
-              ):(
-                <div className="p-3 space-y-2">
-                  <AnimatePresence>{items.map((item,idx)=>(
-                    <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
-                      onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
-                      style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                      <div className="h-12 w-12 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(item.variantName)}}><Package className="h-6 w-6 text-white/20"/></div>
-                      <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{item.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
-                        <span className="text-white text-sm font-bold w-7 text-center">{item.quantity}</span>
-                        <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
-                      </div>
-                      <div className="text-right shrink-0 w-24 group">
-                        <p className="text-white text-sm font-bold">LKR {formatNumber(item.unitPrice*item.quantity)}</p>
-                        <button onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
-                      </div>
-                    </motion.div>
-                  ))}</AnimatePresence>
-                </div>
-              )}
-            </div>
-            <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
-              <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
-                <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");if(v>0)toast.success(`${v}% discount applied`);}}} placeholder={discount>0?`${discount}% active`:"0"} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:`1px solid ${discount>0?"#10b981":"#1e3356"}`}}/>
-                <button onClick={()=>{const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");setDiscountInput("");if(v>0)toast.success(`${v}% discount applied`);else toast.info("Discount cleared");}} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Apply</button>
-              </div>
-              <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
-                <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
-                {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
-                <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
-                <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
-              </div>
-              <PosPaymentPanel
-                totalAmt={totalAmt}
-                subtotal={subtotal()}
-                customerWallet={customer?.walletBalance}
-                customerCreditLimit={customer?.creditLimit}
-                customerCreditBalance={customer?.outstandingBalance}
-                customerTier={customer?.membershipTier}
-                state={payState}
-                onStateChange={patchPayState}
-                onCouponChange={onCouponChange}
-              />
-              <div className="flex gap-1.5 px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
-                {PAY_METHODS.map(({value,label,icon:Icon})=>(
-                  <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
-                    <Icon className="h-4 w-4"/>{label}
+              <span className="text-white font-bold text-lg">{checkoutOpen ? "Checkout" : `Cart (${itemCount()} Items)`}</span>
+              <div className="flex items-center gap-2">
+                {checkoutOpen && (
+                  <button onClick={() => setCheckoutOpen(false)} className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-white/10" style={{color:"#6a8ab8"}}>
+                    ← Back to Cart
                   </button>
-                ))}
+                )}
+                {!checkoutOpen && (
+                  <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
+                )}
               </div>
-              {activePayment==="CASH"&&(
-                <div className="px-3 py-2 border-b" style={{borderColor:"#1e3356"}}>
-                  <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
-                  <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
-                  <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
-                    {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
-                      const isQuick=ki===3;const isDel=k==="DEL";
-                      return(<button key={`${ri}-${ki}`} onClick={()=>isQuick?setNumpad(k):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"#1e3356":isDel?"rgba(239,68,68,0.15)":"#1a2b4a",color:isQuick?"#6a8ab8":isDel?"#ef4444":"#fff"}}>
-                        {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
-                      </button>);
-                    }))}
+            </div>
+            {/* Customer on bill — always visible */}
+            <div className="px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+              <button
+                type="button"
+                onClick={() => setActiveNav("customers")}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-white/5 text-left"
+                style={{
+                  background: customer ? "rgba(79,110,247,0.1)" : "#162338",
+                  border: `1px solid ${customer ? "rgba(79,110,247,0.35)" : "#1e3356"}`,
+                }}
+              >
+                <div
+                  className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
+                  style={{ background: customer ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : "#1a2b4a" }}
+                >
+                  {customer
+                    ? <span className="text-white text-xs font-bold">{customer.name?.[0] ?? "?"}</span>
+                    : <User className="h-4 w-4" style={{ color: "#6a8ab8" }} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5" style={{ color: "#6a8ab8" }}>{workspace.customerLabel}</p>
+                  <p className="text-sm font-bold truncate leading-tight" style={{ color: customer ? "#fff" : "#6a8ab8" }}>
+                    {customer ? customer.name : "Select"}
+                  </p>
+                  {customer?.phone && (
+                    <p className="text-[10px] truncate mt-0.5" style={{ color: "#6a8ab8" }}>{customer.phone}</p>
+                  )}
+                </div>
+                {customer ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setCustomer(null); toast.info("Customer removed from bill"); }}
+                    className="p-1.5 rounded-lg hover:bg-white/10 shrink-0"
+                    title="Remove customer"
+                  >
+                    <X className="h-3.5 w-3.5" style={{ color: "#6a8ab8" }} />
+                  </button>
+                ) : (
+                  <ChevronRight className="h-4 w-4 shrink-0" style={{ color: "#4f6ef7" }} />
+                )}
+              </button>
+            </div>
+            {!checkoutOpen && (
+              <>
+                <div className="flex-1 overflow-y-auto">
+                  {items.length===0?(
+                    <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Add products to begin</p></div>
+                  ):(
+                    <div className="p-3 space-y-2">
+                      <AnimatePresence>{items.map((item,idx)=>(
+                        <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
+                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                          style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
+                          <div className="h-12 w-12 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(item.variantName)}}><Package className="h-6 w-6 text-white/20"/></div>
+                          <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{item.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
+                            <span className="text-white text-sm font-bold w-7 text-center">{item.quantity}</span>
+                            <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                          </div>
+                          <div className="text-right shrink-0 w-24 group">
+                            <p className="text-white text-sm font-bold">LKR {formatNumber(item.unitPrice*item.quantity)}</p>
+                            <button onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
+                          </div>
+                        </motion.div>
+                      ))}</AnimatePresence>
+                    </div>
+                  )}
+                </div>
+                <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
+                  <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
+                    <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
+                    <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");if(v>0)toast.success(`${v}% discount applied`);}}} placeholder={discount>0?`${discount}% active`:"0"} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:`1px solid ${discount>0?"#10b981":"#1e3356"}`}}/>
+                    <button onClick={()=>{const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");setDiscountInput("");if(v>0)toast.success(`${v}% discount applied`);else toast.info("Discount cleared");}} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Apply</button>
+                  </div>
+                  <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
+                    <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
+                    {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
+                    <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
+                    <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  </div>
+                  <div className="p-3">
+                    <button onClick={() => setCheckoutOpen(true)} disabled={items.length === 0} className="w-full h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>
+                      <ChevronRight className="h-5 w-5"/>
+                      Checkout
+                      <span className="text-xs opacity-70 font-mono">(Enter / F9)</span>
+                    </button>
                   </div>
                 </div>
-              )}
-              {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                <div className="flex justify-between items-center px-4 py-2 border-b" style={{borderColor:"#1e3356"}}>
-                  <span className="text-sm font-semibold text-green-400">Change</span>
-                  <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
+              </>
+            )}
+            {checkoutOpen && (
+              <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
+                <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"#1e3356"}}>
+                  <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
+                  {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
+                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"#1e3356"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                 </div>
-              )}
-              <div className="p-3 flex gap-2 flex-wrap">
-                <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
-                  Split Bill
-                </button>
-                <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
-                  {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
-                  Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
-                </button>
-                <button onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}}><Printer className="h-5 w-5" style={{color:"#6a8ab8"}}/></button>
+                <PosPaymentPanel
+                  totalAmt={totalAmt}
+                  subtotal={subtotal()}
+                  customerWallet={customer?.walletBalance}
+                  customerCreditLimit={customer?.creditLimit}
+                  customerCreditBalance={customer?.outstandingBalance}
+                  customerTier={customer?.membershipTier}
+                  state={payState}
+                  onStateChange={patchPayState}
+                  onCouponChange={onCouponChange}
+                />
+                <div className="flex gap-1.5 px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                  {PAY_METHODS.map(({value,label,icon:Icon})=>(
+                    <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
+                      <Icon className="h-4 w-4"/>{label}
+                    </button>
+                  ))}
+                </div>
+                {activePayment==="CASH"&&(
+                  <div className="px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+                    <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
+                    <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
+                      {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
+                        const isQuick=ki===3;const isDel=k==="DEL";
+                        return(<button key={`${ri}-${ki}`} onClick={()=>isQuick?setNumpad(k):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"#1e3356":isDel?"rgba(239,68,68,0.15)":"#1a2b4a",color:isQuick?"#6a8ab8":isDel?"#ef4444":"#fff"}}>
+                          {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
+                        </button>);
+                      }))}
+                    </div>
+                  </div>
+                )}
+                {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
+                  <div className="flex justify-between items-center px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                    <span className="text-sm font-semibold text-green-400">Change</span>
+                    <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
+                  </div>
+                )}
+                <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0">
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+                    Split Bill
+                  </button>
+                  <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                    {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
+                    Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
+                  </button>
+                  <button onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}}><Printer className="h-5 w-5" style={{color:"#6a8ab8"}}/></button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1380,7 +1438,7 @@ export function POSOverlay() {
             <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-sm p-4" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
               <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
               <div className="space-y-1 max-h-72 overflow-y-auto">
-                {[["F2 / P","Focus search (Products)"],["C","Cart tab"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["F3","Hold bill"],["F8","Restore last held bill"],["F9 / Enter","Confirm payment"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["↑ ↓","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["F1 / ?","This help"]].map(([k,d])=>(
+                {[["F2 / P","Focus search (Products)"],["C","Open checkout"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["Enter / F9","Checkout → Confirm payment"],["F3","Hold bill"],["F8","Restore last held bill"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["↑ ↓","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["Esc","Back to cart / Close"],["F1 / ?","This help"]].map(([k,d])=>(
                   <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5">
                     <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
                     <span className="text-xs ml-3" style={{color:"#6a8ab8"}}>{d}</span>
