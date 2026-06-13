@@ -309,7 +309,7 @@ export default function AccountingPage() {
     try {
       const tmStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
       const tmEnd   = new Date().toISOString().split("T")[0];
-      const [expRes, accRes, plRes, cfRes, jeRes, bsRes, monthRes, tmRes, arRes, apRes] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get<{ data: Expense[] }>("/accounting/expenses?limit=200"),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
@@ -321,16 +321,26 @@ export default function AccountingPage() {
         api.get<ARData>("/accounting/accounts-receivable"),
         api.get<APData>("/accounting/accounts-payable"),
       ]);
-      setExpenses((expRes.data?.data ?? expRes.data ?? []) as Expense[]);
-      setAccounts((Array.isArray(accRes.data) ? accRes.data : []) as Account[]);
-      setPlReport(plRes.data as PLReport);
-      setCashFlow(cfRes.data as any);
-      setJournal((jeRes.data?.data ?? []) as JournalEntry[]);
-      setBS(bsRes.data as BalanceSheet);
-      setMonthlyPL((Array.isArray(monthRes.data) ? monthRes.data : []) as PLData[]);
-      setThisMonthPL(tmRes.data as PLReport);
-      setArData(arRes.data as ARData);
-      setApData(apRes.data as APData);
+
+      const ok = <T,>(i: number): T | null =>
+        results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<{ data: T }>).value.data : null;
+
+      const expRes = ok<{ data: Expense[] }>(0);
+      const accRes = ok<Account[]>(1);
+      if (expRes) setExpenses((expRes?.data ?? expRes ?? []) as Expense[]);
+      if (accRes) setAccounts(Array.isArray(accRes) ? accRes : []);
+      const pl = ok<PLReport>(2); if (pl) setPlReport(pl);
+      const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number }>(3); if (cf) setCashFlow(cf as any);
+      const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal((je?.data ?? []) as JournalEntry[]);
+      const bs = ok<BalanceSheet>(5); if (bs) setBS(bs);
+      const month = ok<PLData[]>(6); if (month) setMonthlyPL(Array.isArray(month) ? month : []);
+      const tm = ok<PLReport>(7); if (tm) setThisMonthPL(tm);
+      const ar = ok<ARData>(8); if (ar) setArData(ar);
+      const ap = ok<APData>(9); if (ap) setApData(ap);
+
+      const failed = results.filter((r) => r.status === "rejected").length;
+      if (failed === results.length) toast.error("Failed to load accounting data");
+      else if (failed > 0) toast.warning(`${failed} accounting report(s) could not load — retry Refresh`);
     } catch { toast.error("Failed to load accounting data"); }
     finally { setLoading(false); }
   }, [plRange, cfRange]);

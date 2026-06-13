@@ -94,7 +94,7 @@ async function tryRefresh(): Promise<string | null> {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
+async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<ApiResponse<T>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(init.headers as Record<string, string>),
@@ -117,6 +117,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   if (branchId) headers['x-branch-id'] = branchId;
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+
+  // Transient gateway errors (deploy restart, upstream boot) — retry briefly
+  if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < 2) {
+    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+    return request<T>(path, init, attempt + 1);
+  }
 
   // 401 → try token refresh once
   if (res.status === 401) {

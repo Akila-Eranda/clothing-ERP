@@ -43,7 +43,14 @@ interface Quotation {
 }
 
 interface Customer { id: string; firstName: string; lastName?: string | null; phone: string }
-interface VariantOpt { variantId: string; productName: string; variantName: string; sku: string; sellingPrice: number }
+interface VariantOpt {
+  variantId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  unitPrice: number;
+  stock?: number;
+}
 interface LineItem { variantId: string; label: string; quantity: number; unitPrice: number }
 
 type StatusFilter = "ALL" | "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "CONVERTED" | "EXPIRED";
@@ -309,8 +316,18 @@ export default function QuotationsPage() {
     api.get<{ data: Customer[] }>("/customers?limit=200")
       .then((r) => setCustomers(r.data?.data ?? (r.data as unknown as Customer[]) ?? []))
       .catch(() => {});
-    api.get<VariantOpt[]>("/pos/products")
-      .then((r) => setVariants(Array.isArray(r.data) ? r.data : []))
+    api.get<Array<VariantOpt & { sellingPrice?: number }>>("/pos/products")
+      .then((r) => {
+        const raw = Array.isArray(r.data) ? r.data : [];
+        setVariants(raw.map((v) => ({
+          variantId: v.variantId,
+          productName: v.productName,
+          variantName: v.variantName,
+          sku: v.sku,
+          unitPrice: Number(v.unitPrice ?? v.sellingPrice ?? 0),
+          stock: v.stock,
+        })));
+      })
       .catch(() => {});
   }, []);
 
@@ -342,7 +359,7 @@ export default function QuotationsPage() {
       variantId: v.variantId,
       label: `${v.productName} — ${v.sku}`,
       quantity: 1,
-      unitPrice: v.sellingPrice,
+      unitPrice: v.unitPrice,
     }]);
     setPickVariant("");
     setPartSearch("");
@@ -384,6 +401,11 @@ export default function QuotationsPage() {
   const sentCount = quotes.filter((q) => q.status === "SENT").length;
   const totalValue = quotes.reduce((s, q) => s + q.total, 0);
   const totalPreview = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+
+  const selectedVariant = useMemo(
+    () => variants.find((v) => v.variantId === pickVariant),
+    [variants, pickVariant],
+  );
 
   const STATS = [
     { label: "Total Quotes",  value: quotes.length,  icon: FileText,     color: "text-blue-500",    bg: "bg-blue-500/10" },
@@ -547,11 +569,13 @@ export default function QuotationsPage() {
               />
               <div className="flex gap-2">
                 <Select value={pickVariant} onValueChange={setPickVariant}>
-                  <SelectTrigger className="flex-1"><SelectValue placeholder="Select part to add…" /></SelectTrigger>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select part to add…" />
+                  </SelectTrigger>
                   <SelectContent className="max-h-60">
                     {filteredVariants.map((v) => (
                       <SelectItem key={v.variantId} value={v.variantId}>
-                        {v.productName} — {v.sku} · LKR {formatNumber(v.sellingPrice)}
+                        {v.productName} — {v.sku} · LKR {formatNumber(v.unitPrice)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -560,6 +584,19 @@ export default function QuotationsPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
+              {selectedVariant && (
+                <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="text-muted-foreground">
+                    {selectedVariant.variantName !== selectedVariant.productName
+                      ? `${selectedVariant.variantName} · `
+                      : ""}
+                    Stock: {selectedVariant.stock ?? 0}
+                  </span>
+                  <span className="font-semibold text-primary">
+                    Unit price: LKR {formatNumber(selectedVariant.unitPrice)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {items.length > 0 && (
