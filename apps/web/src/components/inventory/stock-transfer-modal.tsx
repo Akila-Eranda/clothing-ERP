@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { X, ArrowLeftRight, Plus, Trash2, Loader2, Search } from "lucide-react";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { X, ArrowLeftRight, Plus, Trash2, Loader2, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,8 +39,10 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
   const [toBranchId, setToBranchId] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
-  const [search, setSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -54,25 +56,47 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
       setToBranchId("");
       setNotes("");
       setItems([]);
-      setSearch("");
+      setPickerOpen(false);
+      setPickerSearch("");
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const closeOnOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false);
+        setPickerSearch("");
+      }
+    };
+    document.addEventListener("mousedown", closeOnOutside);
+    return () => document.removeEventListener("mousedown", closeOnOutside);
+  }, [pickerOpen]);
 
   const destinationBranches = useMemo(
     () => branches.filter((b) => b.id !== currentBranchId),
     [branches, currentBranchId],
   );
 
-  const filteredStock = useMemo(() => {
-    const q = search.toLowerCase();
-    return stock.filter(
+  const pickableStock = useMemo(
+    () =>
+      stock.filter((s) => {
+        const available = Math.max(0, s.quantity - (s.reservedQty ?? 0));
+        return available > 0 && !items.some((i) => i.variantId === s.variantId);
+      }),
+    [stock, items],
+  );
+
+  const filteredPickerStock = useMemo(() => {
+    const q = pickerSearch.toLowerCase().trim();
+    if (!q) return pickableStock;
+    return pickableStock.filter(
       (s) =>
-        s.quantity > 0 &&
-        (s.variant.product.name.toLowerCase().includes(q) ||
-          s.variant.name.toLowerCase().includes(q) ||
-          s.variant.sku.toLowerCase().includes(q)),
+        s.variant.product.name.toLowerCase().includes(q) ||
+        s.variant.name.toLowerCase().includes(q) ||
+        s.variant.sku.toLowerCase().includes(q),
     );
-  }, [stock, search]);
+  }, [pickableStock, pickerSearch]);
 
   const addItem = (row: InventoryItem) => {
     if (items.some((i) => i.variantId === row.variantId)) return;
@@ -92,6 +116,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
         requestedQty: 1,
       },
     ]);
+    setPickerSearch("");
   };
 
   const updateQty = (idx: number, qty: number) =>
@@ -170,38 +195,60 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
 
           <div className="space-y-2">
             <Label className="text-xs font-semibold">Add Items</Label>
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                className="pl-8"
-                placeholder="Search products or SKU..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <div className="max-h-36 overflow-y-auto rounded-lg border divide-y">
-              {filteredStock.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">No stock items found</p>
-              ) : (
-                filteredStock.slice(0, 30).map((row) => {
-                  const avail = Math.max(0, row.quantity - (row.reservedQty ?? 0));
-                  const added = items.some((i) => i.variantId === row.variantId);
-                  return (
-                    <button
-                      key={row.id}
-                      type="button"
-                      disabled={added}
-                      onClick={() => addItem(row)}
-                      className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-muted/40 disabled:opacity-50 text-sm"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-medium truncate">{row.variant.product.name}</p>
-                        <p className="text-[10px] text-muted-foreground">{row.variant.sku} · avail {avail}</p>
-                      </div>
-                      {!added && <Plus className="h-3.5 w-3.5 shrink-0 text-emerald-600" />}
-                    </button>
-                  );
-                })
+            <div className="relative" ref={pickerRef}>
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <span className="text-muted-foreground">Select product to add...</span>
+                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {pickerOpen && (
+                <div className="absolute z-20 mt-1 w-full rounded-lg border bg-background shadow-lg overflow-hidden">
+                  <div className="p-2 border-b bg-muted/20">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                      <Input
+                        autoFocus
+                        className="pl-8 h-9 text-sm"
+                        placeholder="Search product name or SKU..."
+                        value={pickerSearch}
+                        onChange={(e) => setPickerSearch(e.target.value)}
+                        onKeyDown={(e) => e.key === "Escape" && setPickerOpen(false)}
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-y-auto p-1">
+                    {filteredPickerStock.length === 0 ? (
+                      <p className="text-xs text-muted-foreground text-center py-6">
+                        {pickableStock.length === 0 ? "All available items added" : "No matching products"}
+                      </p>
+                    ) : (
+                      filteredPickerStock.slice(0, 50).map((row) => {
+                        const avail = Math.max(0, row.quantity - (row.reservedQty ?? 0));
+                        return (
+                          <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => addItem(row)}
+                            className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-muted/50 text-sm"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-medium truncate">{row.variant.product.name}</p>
+                              <p className="text-[10px] text-muted-foreground truncate">
+                                {row.variant.name !== row.variant.product.name ? `${row.variant.name} · ` : ""}
+                                {row.variant.sku} · avail {avail}
+                              </p>
+                            </div>
+                            <Plus className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>

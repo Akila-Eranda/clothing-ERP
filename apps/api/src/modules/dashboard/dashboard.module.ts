@@ -24,6 +24,7 @@ export class DashboardService {
       todaySales, thisMonthSales, lastMonthSales,
       totalCustomers, newCustomersToday, newCustomersMonth,
       lowStockCount, pendingPOs, pendingReturns,
+      totalProducts, customerReceivables, supplierPayables,
     ] = await this.prisma.$transaction([
       this.prisma.sale.aggregate({ where: { ...saleWhere, invoiceDate: { gte: today, lte: todayEnd } }, _sum: { total: true }, _count: { id: true } }),
       this.prisma.sale.aggregate({ where: { ...saleWhere, invoiceDate: { gte: thisMonthStart } }, _sum: { total: true }, _count: { id: true } }),
@@ -34,6 +35,9 @@ export class DashboardService {
       this.prisma.inventory.count({ where: { tenantId, ...(branchId && { branchId }), quantity: { lte: 5 } } }),
       this.prisma.purchaseOrder.count({ where: { tenantId, status: { in: ['DRAFT', 'SENT'] as any[] } } }),
       this.prisma.return.count({ where: { tenantId, status: 'INITIATED' as any } }),
+      this.prisma.product.count({ where: { tenantId, status: { not: 'ARCHIVED' as any } } }),
+      this.prisma.customer.aggregate({ where: { tenantId, creditBalance: { gt: 0 } }, _sum: { creditBalance: true }, _count: { id: true } }),
+      this.prisma.supplier.aggregate({ where: { tenantId, balance: { gt: 0 } }, _sum: { balance: true }, _count: { id: true } }),
     ]);
 
     const monthlyRevenue = thisMonthSales._sum.total ?? 0;
@@ -52,6 +56,13 @@ export class DashboardService {
       growth: { revenue: revenueGrowth },
       alerts: { lowStock: lowStockCount, pendingPOs, pendingReturns },
       totalCustomers,
+      totalProducts,
+      outstanding: {
+        customerReceivables: customerReceivables._sum.creditBalance ?? 0,
+        customerReceivableCount: customerReceivables._count.id,
+        supplierPayables: supplierPayables._sum.balance ?? 0,
+        supplierPayableCount: supplierPayables._count.id,
+      },
     };
   }
 

@@ -41,6 +41,9 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() hasVariants?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() trackInventory?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() oemNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() modelNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) warrantyMonths?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() seoTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() seoDescription?: string;
   @ApiPropertyOptional({ type: [CreateVariantDto] })
@@ -111,6 +114,9 @@ export class ProductsService {
         hasVariants: dto.hasVariants ?? true,
         trackInventory: dto.trackInventory ?? true,
         barcode: dto.barcode,
+        oemNumber: dto.oemNumber,
+        modelNumber: dto.modelNumber,
+        warrantyMonths: dto.warrantyMonths,
         seoTitle: dto.seoTitle,
         seoDescription: dto.seoDescription,
       },

@@ -25,6 +25,9 @@ export function getReturnReasons(type: ShopType | string | null | undefined) {
   if (t === ShopType.AGRICULTURE) {
     return [{ v: 'BATCH_ISSUE', l: 'Batch Issue' }, { v: 'QUALITY_ISSUE', l: 'Grade / Quality Issue' }, ...common];
   }
+  if (t === ShopType.SPARE_PARTS) {
+    return [{ v: 'WARRANTY', l: 'Warranty Claim' }, { v: 'WRONG_PART', l: 'Wrong Part' }, ...common];
+  }
   return common;
 }
 
@@ -59,6 +62,9 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/settings': 'Settings',
     '/users': 'Users & Roles',
     '/features': 'Features',
+    '/vehicles': 'Vehicle Compatibility',
+    '/warranty': 'Warranty Claims',
+    '/quotations': 'Quotations',
     printTags: printLabel,
   };
 }
@@ -175,12 +181,14 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.GROCERY]: 'Set unit (kg, L, pack) and expiry date for perishable items.',
     [ShopType.HARDWARE]: 'Track by unit (pcs, meter, box) and use Material variants for fittings.',
     [ShopType.AGRICULTURE]: 'Record batch number and grade for seeds, fertilizer and feed.',
+    [ShopType.SPARE_PARTS]: 'Set OEM number, part type and warranty months. Map to compatible vehicles.',
   };
   const placeholders: Record<ShopType, string> = {
     [ShopType.CLOTHING]: 'e.g. Premium Cotton T-Shirt',
     [ShopType.GROCERY]: 'e.g. Fresh Milk 1L',
     [ShopType.HARDWARE]: 'e.g. PVC Pipe 20mm',
     [ShopType.AGRICULTURE]: 'e.g. Hybrid Tomato Seeds 1kg',
+    [ShopType.SPARE_PARTS]: 'e.g. Oil Filter — Toyota Axio',
   };
   const lowTax = profile.type === ShopType.GROCERY || profile.type === ShopType.AGRICULTURE;
   return {

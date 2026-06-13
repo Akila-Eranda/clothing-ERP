@@ -103,6 +103,26 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
       'Monitor farmer credit limits on customer profiles',
     ],
   },
+  [ShopType.SPARE_PARTS]: {
+    dashboardTitle: 'Spare Parts Dashboard',
+    dashboardSubtitle: 'Vehicle compatibility, warranty, stock & sales',
+    dashboardSubtitleSi: 'Vehicle parts, warranty, stock — spare parts shop easy',
+    customerLabel: 'Customers',
+    productLabel: 'Parts',
+    topSellingLabel: 'Top Selling Parts',
+    aiBrand: 'ShopAI™',
+    quickActions: [
+      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
+      { label: 'Add Part', labelSi: 'Part add', href: '/products', icon: 'product' },
+      { label: 'Vehicle Lookup', labelSi: 'Vehicle search', href: '/vehicles', icon: 'barcode' },
+      { label: 'New Quotation', labelSi: 'Quotation', href: '/quotations', icon: 'report' },
+    ],
+    tips: [
+      'Map parts to vehicle make, model & year for fast lookup',
+      'Set OEM number and warranty months on each part',
+      'Use quotations for workshop and fleet customers',
+    ],
+  },
 };
 
 export function getWorkspace(type: ShopType | string | null | undefined): WorkspaceConfig {

@@ -112,6 +112,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     if (!tokenStorage.getTenant()) tokenStorage.setTenant(tenantId);
   }
 
+  const branchId = (init.headers as Record<string, string> | undefined)?.['x-branch-id']
+    || (typeof window !== 'undefined' ? localStorage.getItem('fe_active_branch') : null);
+  if (branchId) headers['x-branch-id'] = branchId;
+
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   // 401 → try token refresh once

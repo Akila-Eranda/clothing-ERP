@@ -12,6 +12,7 @@ const VERTICAL_ICONS: Record<ShopType, string> = {
   [ShopType.GROCERY]: '🛒',
   [ShopType.HARDWARE]: '🔨',
   [ShopType.AGRICULTURE]: '🌾',
+  [ShopType.SPARE_PARTS]: '🚗',
 };
 
 export default function FeaturesPage() {
@@ -33,10 +34,10 @@ export default function FeaturesPage() {
       <main className="max-w-6xl mx-auto px-4 py-12 space-y-14">
         <section className="text-center max-w-2xl mx-auto space-y-4">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
-            One platform. Four business types.
+            One platform. Five business types.
           </h1>
           <p className="text-muted-foreground text-lg">
-            Clothing, grocery, hardware, or agriculture — each shop gets the tools built for that industry, plus shared ERP features every business needs.
+            Clothing, grocery, hardware, agriculture, or spare parts — each shop gets the tools built for that industry, plus shared ERP features every business needs.
           </p>
         </section>
 

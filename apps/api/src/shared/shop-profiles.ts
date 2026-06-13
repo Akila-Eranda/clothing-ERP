@@ -1,10 +1,11 @@
-/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE */
+/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE, SPARE_PARTS */
 
 export enum ShopType {
   CLOTHING = 'CLOTHING',
   GROCERY = 'GROCERY',
   HARDWARE = 'HARDWARE',
   AGRICULTURE = 'AGRICULTURE',
+  SPARE_PARTS = 'SPARE_PARTS',
 }
 
 export interface VariantAttributeDef {
@@ -33,6 +34,9 @@ export interface ShopProfile {
     loyalty: boolean;
     expiry: boolean;
     batch: boolean;
+    vehicles: boolean;
+    warranty: boolean;
+    quotations: boolean;
   };
   labelTemplates: Array<'sticker' | 'hangtag' | 'shelf'>;
 }
@@ -51,7 +55,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs'],
-    modules: { brands: true, collections: true, hangTags: true, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false },
+    modules: { brands: true, collections: true, hangTags: true, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: false },
     labelTemplates: ['sticker', 'hangtag'],
   },
   [ShopType.GROCERY]: {
@@ -67,7 +71,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['pcs', 'kg', 'g', 'L', 'ml', 'pack'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: true, loyalty: false, expiry: true, batch: true },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: true, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.HARDWARE]: {
@@ -83,7 +87,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'piece', 'kg', 'feet', 'meter', 'box', 'set', 'roll'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: false, batch: false },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.AGRICULTURE]: {
@@ -99,7 +103,23 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['kg', 'bag', 'pcs', 'liter', 'acre'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: true, batch: true },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false },
+    labelTemplates: ['sticker', 'shelf'],
+  },
+  [ShopType.SPARE_PARTS]: {
+    type: ShopType.SPARE_PARTS,
+    label: 'Spare Parts Shop',
+    labelSi: 'Spare Parts කඩය',
+    emoji: '🚗',
+    description: 'Auto spare parts — vehicle compatibility, warranty, quotations',
+    defaultCategories: ['Engine Parts', 'Brakes & Suspension', 'Filters', 'Electrical', 'Body Parts', 'Lubricants', 'Accessories'],
+    variantAttributes: [
+      { name: 'OEM No', presets: [], mapsTo: 'size' },
+      { name: 'Part Type', presets: ['OEM', 'Aftermarket', 'Genuine'], mapsTo: 'style' },
+    ],
+    defaultUnit: 'pcs',
+    units: ['pcs', 'set', 'pair', 'box', 'liter'],
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true },
     labelTemplates: ['sticker', 'shelf'],
   },
 };

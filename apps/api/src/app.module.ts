@@ -3,7 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 
 import appConfig from './config/app.config';
 import jwtConfig from './config/jwt.config';
@@ -46,7 +46,9 @@ import { CollectionsModule } from './modules/collections/collections.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
+import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { BranchContextInterceptor } from './common/interceptors/branch-context.interceptor';
 
 @Module({
   imports: [
@@ -104,6 +106,7 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     AuditLogModule,
     CollectionsModule,
     WorkflowModule,
+    SparePartsModule,
 
     // ── Infrastructure ────────────────────────────────────────
     MailModule,
@@ -116,6 +119,7 @@ import { WorkflowModule } from './modules/workflow/workflow.module';
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
+    { provide: APP_INTERCEPTOR, useClass: BranchContextInterceptor },
   ],
 })
 export class AppModule implements NestModule {

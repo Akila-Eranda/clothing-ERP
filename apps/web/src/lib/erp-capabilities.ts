@@ -16,7 +16,7 @@ export const ERP_PRIORITY = [
   { rank: 3, label: 'Customer Wallet + Loyalty', status: 'live' as const },
   { rank: 4, label: 'Advanced Analytics', status: 'live' as const },
   { rank: 5, label: 'Subscription Billing Engine', status: 'partial' as const },
-  { rank: 6, label: 'Vehicle Parts Module', status: 'planned' as const },
+  { rank: 6, label: 'Vehicle Parts Module', status: 'live' as const },
   { rank: 7, label: 'Mobile App', status: 'planned' as const },
   { rank: 8, label: 'WhatsApp Integration', status: 'planned' as const },
   { rank: 9, label: 'BI Dashboard', status: 'planned' as const },
@@ -205,6 +205,16 @@ export const INDUSTRY_MODULES = [
       { label: 'Farmer Accounts', status: 'live' as const },
       { label: 'Fertilizer Batch Tracking', status: 'live' as const },
       { label: 'Seasonal Purchase Analysis', status: 'partial' as const },
+    ],
+  },
+  {
+    type: 'SPARE_PARTS',
+    emoji: '🚗',
+    items: [
+      { label: 'Vehicle Compatibility', status: 'live' as const },
+      { label: 'Warranty Claims', status: 'live' as const },
+      { label: 'Quotations', status: 'live' as const },
+      { label: 'VIN / Chassis Lookup', status: 'live' as const },
     ],
   },
 ];

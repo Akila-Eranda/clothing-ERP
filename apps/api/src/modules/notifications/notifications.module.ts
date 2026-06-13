@@ -79,6 +79,20 @@ export class NotificationsService {
     });
   }
 
+  async queueSms(tenantId: string, userId: string, body: { phone: string; message: string; type?: string }) {
+    return this.prisma.notification.create({
+      data: {
+        tenantId,
+        title: body.type ? `SMS: ${body.type}` : 'SMS Notification',
+        message: `[${body.phone}] ${body.message}`,
+        type: NotificationType.INFO,
+        channel: NotificationChannel.SMS,
+        recipients: [userId],
+        data: { phone: body.phone, smsType: body.type ?? 'general', status: 'queued' },
+      },
+    });
+  }
+
   @OnEvent('inventory.low-stock')
   async handleLowStock(payload: { tenantId: string; variantId: string; branchId: string; quantity: number }) {
     const admins = await this.prisma.user.findMany({
@@ -188,6 +202,15 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Send notification to users' })
   send(@CurrentUser() user: IAuthUser, @Body() dto: CreateNotificationDto) {
     return this.notificationsService.send(user.tenantId, dto);
+  }
+
+  @Post('sms')
+  @ApiOperation({ summary: 'Queue SMS notification (invoice, reminder, promo)' })
+  sendSms(
+    @CurrentUser() user: IAuthUser,
+    @Body() body: { phone: string; message: string; type?: string },
+  ) {
+    return this.notificationsService.queueSms(user.tenantId, user.id, body);
   }
 }
 

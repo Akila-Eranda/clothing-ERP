@@ -10,6 +10,7 @@ import {
   Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, Shield, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
+  Car, FileText, Wrench,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -39,11 +40,14 @@ function useNavGroups(): NavGroup[] {
     { label: "Categories",     href: "/categories", icon: Layers },
     ...(profile.modules.brands ? [{ label: "Brands", href: "/brands", icon: Bookmark }] : []),
     { label: "Inventory",      href: "/inventory",  icon: Warehouse },
+    ...(profile.modules.vehicles ? [{ label: "Vehicle Compatibility", href: "/vehicles", icon: Car }] : []),
+    ...(profile.modules.warranty ? [{ label: "Warranty Claims", href: "/warranty", icon: Wrench }] : []),
     { label: "Workflows",      href: "/workflows",  icon: Shield },
   ];
   const salesItems: NavItem[] = [
     { label: "Point of Sale",  icon: ShoppingCart,  badge: "POS", action: openPos },
     { label: "Sales History",  href: "/sales",      icon: History },
+    ...(profile.modules.quotations ? [{ label: "Quotations", href: "/quotations", icon: FileText }] : []),
     ...(profile.modules.returns ? [{ label: "Returns", href: "/returns", icon: RotateCcw }] : []),
     { label: ws.customerLabel, href: "/customers",  icon: Users },
   ];
