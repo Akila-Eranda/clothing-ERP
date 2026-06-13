@@ -17,6 +17,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -33,6 +34,8 @@ interface NavGroup { title: string; items: NavItem[] }
 /* ── Navigation structure ────────────────────────────────── */
 function useNavGroups(): NavGroup[] {
   const { openPos } = useUIStore();
+  const { user } = useAuthStore();
+  const skipWorkflows = bypassesWorkflowApproval(user?.role);
   const { profile, workspace: ws } = useShopWorkspace();
   const L = getSidebarLabels(ws, profile);
   const S = getSidebarSectionTitles(profile);
@@ -44,7 +47,7 @@ function useNavGroups(): NavGroup[] {
     { label: L["/inventory"], href: "/inventory", icon: Warehouse },
     ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
     ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
-    { label: L["/workflows"], href: "/workflows", icon: GitBranch },
+    ...(!skipWorkflows ? [{ label: L["/workflows"], href: "/workflows", icon: GitBranch }] : []),
   ];
 
   const salesItems: NavItem[] = [

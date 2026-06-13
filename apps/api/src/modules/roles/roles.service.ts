@@ -37,7 +37,7 @@ export class RolesService {
 
   async findAll(tenantId: string) {
     return this.prisma.role.findMany({
-      where: { OR: [{ tenantId }, { isSystem: true }] },
+      where: { tenantId },
       include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },
       orderBy: { name: 'asc' },
     });

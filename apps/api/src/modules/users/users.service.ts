@@ -26,6 +26,10 @@ export class UsersService {
     });
     if (existing) throw new ConflictException('Email already in use');
 
+    if (dto.roleIds?.length) {
+      await this.assertRolesBelongToTenant(tenantId, dto.roleIds);
+    }
+
     const passwordHash = await this.authService.hashPassword(dto.password);
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -179,10 +183,21 @@ export class UsersService {
 
   async assignRoles(id: string, tenantId: string, roleIds: string[]) {
     await this.findOne(id, tenantId);
+    await this.assertRolesBelongToTenant(tenantId, roleIds);
     await this.prisma.userRole.deleteMany({ where: { userId: id } });
     return this.prisma.userRole.createMany({
       data: roleIds.map((roleId) => ({ userId: id, roleId })),
     });
+  }
+
+  private async assertRolesBelongToTenant(tenantId: string, roleIds: string[]) {
+    if (!roleIds.length) return;
+    const count = await this.prisma.role.count({
+      where: { id: { in: roleIds }, tenantId },
+    });
+    if (count !== roleIds.length) {
+      throw new ForbiddenException('One or more roles do not belong to this tenant');
+    }
   }
 
   async remove(id: string, tenantId: string) {

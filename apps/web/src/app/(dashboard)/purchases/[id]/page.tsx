@@ -14,6 +14,8 @@ import { api } from "@/lib/api";
 import { ReceiveItemsModal } from "@/components/purchases/receive-items-modal";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface POItem {
@@ -103,6 +105,8 @@ export default function PODetailPage() {
   const printLabel = routeLabels.printTags ?? 'Print Labels';
   const showPrintLabels = profile.labelTemplates.length > 0;
   const router = useRouter();
+  const { user } = useAuthStore();
+  const adminBypass = bypassesWorkflowApproval(user?.role);
 
   const [po,       setPo]       = useState<PO | null>(null);
   const [loading,  setLoading]  = useState(true);
@@ -142,7 +146,7 @@ export default function PODetailPage() {
     setActing(true);
     try {
       await api.post(`/purchases/${po.id}/submit-approval`);
-      toast.success("Submitted for approval");
+      toast.success(adminBypass ? "Purchase order confirmed" : "Submitted for approval");
       load();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to submit"); }
     finally { setActing(false); }
@@ -224,7 +228,7 @@ export default function PODetailPage() {
                 <p className="text-xs mt-0.5">{po.notes}</p>
               </div>
             )}
-            {po.status === "PENDING_APPROVAL" && (
+            {po.status === "PENDING_APPROVAL" && !adminBypass && (
               <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-800">
                 Awaiting manager approval{workflowStatus ? ` (${workflowStatus.replace(/_/g, " ")})` : ""}. GRN and receiving are blocked until approved.
               </div>
@@ -368,12 +372,20 @@ export default function PODetailPage() {
         <div className="flex justify-end gap-3 pt-2 border-t">
           {po.status === "DRAFT" && (
             <>
-              <Button variant="outline" size="sm" disabled={acting} onClick={submitForApproval}>
-                <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Approval
-              </Button>
-              <Button variant="outline" size="sm" disabled={acting} onClick={() => updateStatus("CONFIRMED")}>
-                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Ordered
-              </Button>
+              {adminBypass ? (
+                <Button variant="gradient" size="sm" disabled={acting} onClick={submitForApproval}>
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Confirm Order
+                </Button>
+              ) : (
+                <>
+                  <Button variant="outline" size="sm" disabled={acting} onClick={submitForApproval}>
+                    <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Approval
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={acting} onClick={() => updateStatus("CONFIRMED")}>
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Ordered
+                  </Button>
+                </>
+              )}
             </>
           )}
           {canCancel && (

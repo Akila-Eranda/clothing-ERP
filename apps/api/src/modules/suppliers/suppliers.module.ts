@@ -13,6 +13,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -180,11 +181,20 @@ export class SuppliersService {
     return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
   }
 
-  async submitPOForApproval(id: string, tenantId: string, userId: string) {
+  async submitPOForApproval(id: string, tenantId: string, userId: string, userRoles: string[]) {
     const po = await this.findOnePO(id, tenantId);
     if (po.status !== PurchaseOrderStatus.DRAFT) {
       throw new BadRequestException('Only draft purchase orders can be submitted for approval');
     }
+
+    if (bypassesWorkflowApproval(userRoles)) {
+      await this.prisma.purchaseOrder.update({
+        where: { id },
+        data: { status: PurchaseOrderStatus.CONFIRMED },
+      });
+      return this.findOnePO(id, tenantId);
+    }
+
     await this.prisma.purchaseOrder.update({
       where: { id },
       data: { status: PurchaseOrderStatus.PENDING_APPROVAL },
@@ -418,7 +428,7 @@ export class PurchasesController {
   @RequirePermissions('purchases:update')
   @ApiOperation({ summary: 'Submit purchase order for approval workflow' })
   submitForApproval(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.suppliersService.submitPOForApproval(id, user.tenantId, user.id);
+    return this.suppliersService.submitPOForApproval(id, user.tenantId, user.id, user.roles);
   }
 
 }

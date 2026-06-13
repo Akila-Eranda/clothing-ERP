@@ -4,12 +4,15 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus } from '@prisma/client';
+import {
+  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
-import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { randomUUID } from 'crypto';
 
 export class StartWorkflowDto {
   @ApiProperty() @IsString() key: string;
@@ -20,6 +23,12 @@ export class StartWorkflowDto {
 
 export class ActOnTaskDto {
   @ApiPropertyOptional() @IsOptional() @IsString() comment?: string;
+}
+
+export class DiscountRequestDto {
+  @ApiProperty() @IsNumber() amount: number;
+  @ApiProperty() @IsString() reason: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() cartTotal?: number;
 }
 
 @Injectable()
@@ -121,6 +130,87 @@ export class WorkflowService {
     });
   }
 
+  private readonly catalogKeys = [
+    'purchase_order',
+    'stock_adjustment',
+    'discount_request',
+    'stock_transfer',
+  ] as const;
+
+  async getCatalog(tenantId: string) {
+    const items = await Promise.all(
+      this.catalogKeys.map(async (key) => {
+        const def = await this.ensureDefinition(tenantId, key);
+        return {
+          key,
+          name: def.name,
+          stepCount: def.steps.length,
+          steps: def.steps.map((s) => s.name),
+          status: 'active' as const,
+          triggerFrom: {
+            purchase_order: 'Purchases → Submit for approval',
+            stock_adjustment: 'Inventory → Adjust stock (manual)',
+            discount_request: 'POS → Manager discount override',
+            stock_transfer: 'Inventory → Stock transfer',
+          }[key],
+        };
+      }),
+    );
+    return { operational: true, workflows: items };
+  }
+
+  private async applyApprovedStockAdjustment(
+    tenantId: string,
+    userId: string,
+    metadata: Record<string, unknown>,
+  ) {
+    const variantId = metadata.variantId as string | undefined;
+    const branchId = metadata.branchId as string | undefined;
+    const quantity = metadata.quantity as number | undefined;
+    const movementType = (metadata.movementType as StockMovementType) ?? StockMovementType.ADJUSTMENT;
+    const notes = metadata.notes as string | undefined;
+    if (!variantId || !branchId || quantity === undefined) return;
+
+    const inventory = await this.prisma.inventory.findFirst({
+      where: { tenantId, branchId, variantId },
+    });
+    const currentQty = inventory?.quantity ?? 0;
+    let newQty = currentQty;
+    if (movementType === StockMovementType.ADJUSTMENT) {
+      newQty = quantity;
+    } else if (movementType === StockMovementType.DAMAGE) {
+      newQty = Math.max(0, currentQty - quantity);
+    } else {
+      newQty = Math.max(0, currentQty + quantity);
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      if (inventory) {
+        await tx.inventory.update({
+          where: { id: inventory.id },
+          data: { quantity: Math.max(0, newQty) },
+        });
+      } else {
+        await tx.inventory.create({
+          data: { tenantId, branchId, variantId, quantity: Math.max(0, newQty) },
+        });
+      }
+      await tx.inventoryLog.create({
+        data: {
+          tenantId,
+          branchId,
+          variantId,
+          movementType,
+          quantityChange: Math.max(0, newQty) - currentQty,
+          quantityBefore: currentQty,
+          quantityAfter: Math.max(0, newQty),
+          notes: notes ?? 'Approved via workflow',
+          performedBy: userId,
+        },
+      });
+    });
+  }
+
   async getPendingTasks(tenantId: string, userId: string) {
     return this.prisma.workflowTask.findMany({
       where: {
@@ -205,11 +295,19 @@ export class WorkflowService {
       });
     });
 
-    if (isLast && entityType === 'PurchaseOrder') {
-      await this.prisma.purchaseOrder.updateMany({
-        where: { id: entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
-        data: { status: PurchaseOrderStatus.CONFIRMED },
-      });
+    if (isLast) {
+      if (entityType === 'PurchaseOrder') {
+        await this.prisma.purchaseOrder.updateMany({
+          where: { id: entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
+          data: { status: PurchaseOrderStatus.CONFIRMED },
+        });
+      } else if (entityType === 'StockAdjustment') {
+        await this.applyApprovedStockAdjustment(
+          tenantId,
+          userId,
+          (instance.metadata ?? {}) as Record<string, unknown>,
+        );
+      }
     }
 
     return result;
@@ -246,10 +344,16 @@ export class WorkflowService {
         include: { tasks: true, events: true, definition: true },
       });
     }).then(async (result) => {
-      if (task.instance.entityType === 'PurchaseOrder') {
+      const { entityType, entityId } = task.instance;
+      if (entityType === 'PurchaseOrder') {
         await this.prisma.purchaseOrder.updateMany({
-          where: { id: task.instance.entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
+          where: { id: entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
           data: { status: PurchaseOrderStatus.DRAFT },
+        });
+      } else if (entityType === 'StockTransfer') {
+        await this.prisma.stockTransfer.updateMany({
+          where: { id: entityId, tenantId, status: TransferStatus.PENDING },
+          data: { status: TransferStatus.CANCELLED },
         });
       }
       return result;
@@ -268,6 +372,40 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Start approval workflow for an entity' })
   start(@CurrentUser() user: IAuthUser, @Body() dto: StartWorkflowDto) {
     return this.workflowService.start(user.tenantId, user.id, dto);
+  }
+
+  @Post('discount-request')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Submit POS discount for manager approval' })
+  discountRequest(@CurrentUser() user: IAuthUser, @Body() dto: DiscountRequestDto) {
+    if (bypassesWorkflowApproval(user.roles)) {
+      return {
+        bypassed: true,
+        message: 'Discount approved automatically for admin',
+        amount: dto.amount,
+        reason: dto.reason,
+      };
+    }
+    const id = randomUUID();
+    return this.workflowService.start(user.tenantId, user.id, {
+      key: 'discount_request',
+      entityType: 'DiscountRequest',
+      entityId: id,
+      metadata: {
+        reference: `DISC-${id.slice(0, 8).toUpperCase()}`,
+        amount: dto.amount,
+        total: dto.amount,
+        reason: dto.reason,
+        cartTotal: dto.cartTotal,
+      },
+    });
+  }
+
+  @Get('catalog')
+  @RequirePermissions('inventory:read')
+  @ApiOperation({ summary: 'List active workflow definitions and triggers' })
+  catalog(@CurrentUser() user: IAuthUser) {
+    return this.workflowService.getCatalog(user.tenantId);
   }
 
   @Get('tasks/pending')

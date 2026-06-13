@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 
 export interface InventoryItem {
   id: string;
@@ -45,6 +47,8 @@ const MOVEMENT_TYPES = [
 
 export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
   const profile = useShopProfile();
+  const { user } = useAuthStore();
+  const adminBypass = bypassesWorkflowApproval(user?.role);
   const showBatch = hasBatchTracking(profile);
   const showExpiry = hasExpiryTracking(profile);
   const [movementType, setMovementType] = useState("ADJUSTMENT");
@@ -72,7 +76,9 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
     if (isNaN(qty) || qty < 0) { toast.error("Enter a valid quantity"); return; }
     setLoading(true);
     try {
-      await api.post("/inventory/adjust", {
+      const needsApproval = !adminBypass && (movementType === "ADJUSTMENT" || movementType === "DAMAGE");
+      const endpoint = needsApproval ? "/inventory/adjust/request" : "/inventory/adjust";
+      await api.post(endpoint, {
         variantId: item.variantId,
         quantity: qty,
         movementType,
@@ -80,7 +86,11 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
         ...(showBatch && batchNumber ? { batchNumber } : {}),
         ...(showExpiry && expiryDate ? { expiryDate } : {}),
       });
-      toast.success("Stock adjusted successfully");
+      toast.success(
+        needsApproval
+          ? "Adjustment submitted for approval — check Workflows"
+          : "Stock adjusted successfully",
+      );
       onAdjusted();
       handleClose();
     } catch (e: unknown) {

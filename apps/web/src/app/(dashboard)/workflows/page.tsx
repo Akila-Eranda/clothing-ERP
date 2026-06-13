@@ -15,6 +15,9 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { useRouter } from "next/navigation";
 
 interface WorkflowTask {
   id: string;
@@ -41,18 +44,36 @@ const WORKFLOW_CFG: Record<string, { label: string; icon: React.ElementType; col
 };
 
 const GUIDE = [
-  { key: "purchase_order", title: "Purchase Order", steps: "Draft → Manager → Finance → GRN" },
-  { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval" },
-  { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval" },
-  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Branch manager approval" },
+  { key: "purchase_order", title: "Purchase Order", steps: "Draft → Manager → Finance → GRN", href: "/purchases" },
+  { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval", href: "/pos" },
+  { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval", href: "/inventory" },
+  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Branch manager approval", href: "/inventory" },
 ];
+
+interface WorkflowCatalogItem {
+  key: string;
+  name: string;
+  stepCount: number;
+  steps: string[];
+  status: "active";
+  triggerFrom: string;
+}
+
+interface WorkflowCatalog {
+  operational: boolean;
+  workflows: WorkflowCatalogItem[];
+}
 
 function workflowCfg(key: string) {
   return WORKFLOW_CFG[key] ?? { label: key.replace(/_/g, " "), icon: GitBranch, color: "text-muted-foreground", bg: "bg-muted/50" };
 }
 
 function entityLink(task: WorkflowTask): string | null {
+  const key = task.instance.definition.key;
   if (task.instance.entityType === "PurchaseOrder") return `/purchases/${task.instance.entityId}`;
+  if (key === "stock_transfer") return "/inventory";
+  if (key === "stock_adjustment") return "/inventory";
+  if (key === "discount_request") return "/pos";
   return null;
 }
 
@@ -172,7 +193,12 @@ function buildColumns(
 }
 
 export default function WorkflowsPage() {
+  const router = useRouter();
+  const { user } = useAuthStore();
+  const adminBypass = bypassesWorkflowApproval(user?.role);
+
   const [tasks, setTasks] = useState<WorkflowTask[]>([]);
+  const [catalog, setCatalog] = useState<WorkflowCatalog | null>(null);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
@@ -180,8 +206,12 @@ export default function WorkflowsPage() {
   const fetchTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<WorkflowTask[]>("/workflows/tasks/pending");
-      setTasks(Array.isArray(res.data) ? res.data : []);
+      const [tasksRes, catalogRes] = await Promise.all([
+        api.get<WorkflowTask[]>("/workflows/tasks/pending"),
+        api.get<WorkflowCatalog>("/workflows/catalog"),
+      ]);
+      setTasks(Array.isArray(tasksRes.data) ? tasksRes.data : []);
+      setCatalog(catalogRes.data ?? null);
     } catch {
       toast.error("Failed to load approval tasks");
     } finally {
@@ -189,7 +219,13 @@ export default function WorkflowsPage() {
     }
   }, []);
 
-  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => {
+    if (adminBypass) {
+      router.replace("/dashboard");
+      return;
+    }
+    fetchTasks();
+  }, [fetchTasks, adminBypass, router]);
 
   const act = async (taskId: string, action: "approve" | "reject") => {
     setActing(taskId);
@@ -219,10 +255,18 @@ export default function WorkflowsPage() {
     { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-amber-500",   bg: "bg-amber-500/10" },
     { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-500",  bg: "bg-violet-500/10" },
-    { label: "Workflow Types",    value: GUIDE.length, icon: GitBranch,      color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-emerald-500", bg: "bg-emerald-500/10" },
   ];
 
   const columns = useMemo(() => buildColumns(acting, act), [acting]);
+
+  if (adminBypass) {
+    return (
+      <div className="flex items-center justify-center min-h-[40vh] text-sm text-muted-foreground">
+        Redirecting…
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 w-full">
@@ -243,6 +287,30 @@ export default function WorkflowsPage() {
           </Button>
         </div>
       </div>
+
+      {/* System status */}
+      {catalog?.operational && (
+        <Card className="border-emerald-500/30 bg-emerald-500/5">
+          <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="p-2.5 rounded-xl bg-emerald-500/15">
+                <CheckCircle2 className="h-6 w-6 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                  All approval workflows are active and working
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {catalog.workflows.length} workflow types configured — Purchase Orders, Discounts, Stock Adjustments & Transfers
+                </p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-500 hover:bg-emerald-500 text-white shrink-0 w-fit">
+              System Operational
+            </Badge>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -314,22 +382,38 @@ export default function WorkflowsPage() {
       <div className="space-y-3">
         <div>
           <h2 className="text-sm font-semibold">Supported Workflows</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Multi-step approval paths configured for your shop</p>
+          <p className="text-xs text-muted-foreground mt-0.5">All paths are live — submit from the linked module to start approval</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
           {GUIDE.map((g) => {
             const cfg = workflowCfg(g.key);
             const Icon = cfg.icon;
+            const live = catalog?.workflows.find((w) => w.key === g.key);
             return (
-              <Card key={g.key} className="hover:shadow-md transition-shadow">
+              <Card key={g.key} className="hover:shadow-md transition-shadow border-emerald-500/10">
                 <CardContent className="p-4 space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`p-2 rounded-lg ${cfg.bg}`}>
-                      <Icon className={`h-4 w-4 ${cfg.color}`} />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`p-2 rounded-lg shrink-0 ${cfg.bg}`}>
+                        <Icon className={`h-4 w-4 ${cfg.color}`} />
+                      </div>
+                      <p className="text-sm font-semibold leading-tight">{g.title}</p>
                     </div>
-                    <p className="text-sm font-semibold">{g.title}</p>
+                    <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 shrink-0">
+                      Active
+                    </Badge>
                   </div>
                   <p className="text-[11px] text-muted-foreground leading-relaxed">{g.steps}</p>
+                  {live && (
+                    <p className="text-[10px] text-emerald-600/90 font-medium">
+                      {live.stepCount} step{live.stepCount !== 1 ? "s" : ""} · {live.triggerFrom}
+                    </p>
+                  )}
+                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 -ml-2" asChild>
+                    <Link href={g.href}>
+                      Open module <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             );

@@ -13,10 +13,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, tokenStorage } from "@/lib/api";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface Role { id: string; name: string; type: string; isSystem: boolean; description?: string; permissions: { permission: { id: string; resource: string; action: string } }[]; _count: { users: number } }
+interface Role {
+  id: string;
+  tenantId?: string | null;
+  name: string;
+  type: string;
+  isSystem: boolean;
+  description?: string;
+  permissions: { permission: { id: string; resource: string; action: string } }[];
+  _count: { users: number };
+}
 interface UserRole { role: Role }
 interface Branch { id: string; name: string }
 interface AppUser { id: string; firstName: string; lastName: string; email: string; status: string; phone?: string; branch?: Branch | null; roles: UserRole[]; createdAt: string; lastLoginAt?: string | null }
@@ -32,7 +41,24 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const EMPTY_USER = { firstName: "", lastName: "", email: "", password: "", phone: "", branchId: "", roleId: "" };
-const EMPTY_ROLE = { name: "", description: "" };
+
+function parseList<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object" && "data" in payload) {
+    const inner = (payload as { data: unknown }).data;
+    if (Array.isArray(inner)) return inner as T[];
+  }
+  return [];
+}
+
+/** Assignable staff roles for this tenant (excludes platform super-admin type). */
+function assignableRoles(roles: Role[], tenantId?: string | null): Role[] {
+  return roles.filter((r) => {
+    if (tenantId && r.tenantId && r.tenantId !== tenantId) return false;
+    if (tenantId && !r.tenantId) return false;
+    return r.type !== "SUPER_ADMIN";
+  });
+}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function UsersPage() {
@@ -43,13 +69,18 @@ export default function UsersPage() {
   const [search, setSearch]           = useState("");
 
   const [userModal, setUserModal]     = useState(false);
-  const [roleModal, setRoleModal]     = useState(false);
   const [roleAssignModal, setRoleAssignModal] = useState<AppUser | null>(null);
   const [selectedRoleId, setSelectedRoleId]  = useState("");
 
   const [userForm, setUserForm]       = useState({ ...EMPTY_USER });
-  const [roleForm, setRoleForm]       = useState({ ...EMPTY_ROLE });
   const [saving, setSaving]           = useState(false);
+
+  const tenantId = tokenStorage.getTenant();
+  const staffRoles = useMemo(() => assignableRoles(roles, tenantId), [roles, tenantId]);
+  const tenantRoleCards = useMemo(
+    () => roles.filter((r) => !tenantId || r.tenantId === tenantId),
+    [roles, tenantId],
+  );
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -59,9 +90,9 @@ export default function UsersPage() {
         api.get<Role[]>("/roles"),
         api.get<Branch[]>("/branches"),
       ]);
-      setUsers(Array.isArray(uRes.data?.data) ? uRes.data.data : []);
-      setRoles(Array.isArray(rRes.data) ? rRes.data : []);
-      setBranches(Array.isArray(bRes.data) ? bRes.data : []);
+      setUsers(parseList<AppUser>(uRes.data?.data ?? uRes.data));
+      setRoles(parseList<Role>(rRes.data));
+      setBranches(parseList<Branch>(bRes.data?.data ?? bRes.data));
     } catch { toast.error("Failed to load data"); }
     finally { setLoading(false); }
   }, []);
@@ -72,6 +103,9 @@ export default function UsersPage() {
   const handleCreateUser = async () => {
     if (!userForm.firstName || !userForm.email || !userForm.password) {
       toast.error("First name, email and password required"); return;
+    }
+    if (!userForm.roleId) {
+      toast.error("Select a role for this user"); return;
     }
     setSaving(true);
     try {
@@ -122,31 +156,6 @@ export default function UsersPage() {
     finally { setSaving(false); }
   };
 
-  // ── Role actions ──────────────────────────────────────────────────────────
-  const handleCreateRole = async () => {
-    if (!roleForm.name) { toast.error("Role name required"); return; }
-    setSaving(true);
-    try {
-      await api.post("/roles", { name: roleForm.name, description: roleForm.description });
-      toast.success("Role created");
-      setRoleModal(false);
-      setRoleForm({ ...EMPTY_ROLE });
-      loadAll();
-    } catch (e: unknown) {
-      const msg = (e as { data?: { message?: string } })?.data?.message;
-      toast.error(msg ?? "Failed to create role");
-    } finally { setSaving(false); }
-  };
-
-  const handleDeleteRole = async (id: string) => {
-    if (!confirm("Delete this role?")) return;
-    try {
-      await api.delete(`/roles/${id}`);
-      setRoles((prev) => prev.filter((r) => r.id !== id));
-      toast.success("Role deleted");
-    } catch { toast.error("Cannot delete — role may be in use"); }
-  };
-
   // ── Filtered users ────────────────────────────────────────────────────────
   const filtered = useMemo(() => users.filter((u) => {
     const q = search.toLowerCase();
@@ -167,7 +176,13 @@ export default function UsersPage() {
           <Button variant="outline" size="sm" onClick={loadAll} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="gradient" className="gap-2" onClick={() => { setUserForm({ ...EMPTY_USER }); setUserModal(true); }}>
+          <Button variant="gradient" className="gap-2" onClick={() => {
+            setUserForm({
+              ...EMPTY_USER,
+              roleId: staffRoles[0]?.id ?? "",
+            });
+            setUserModal(true);
+          }}>
             <Plus className="h-4 w-4" /> Invite User
           </Button>
         </div>
@@ -179,7 +194,7 @@ export default function UsersPage() {
           { label: "Total Users",   value: users.length,                   color: "text-foreground" },
           { label: "Active",        value: activeCount,                    color: "text-emerald-500" },
           { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground" },
-          { label: "Total Roles",   value: roles.length,                   color: "text-primary" },
+          { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary" },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border bg-card p-4">
             <p className="text-xs text-muted-foreground">{s.label}</p>
@@ -191,7 +206,7 @@ export default function UsersPage() {
       <Tabs defaultValue="users">
         <TabsList>
           <TabsTrigger value="users">Users ({users.length})</TabsTrigger>
-          <TabsTrigger value="roles">Roles ({roles.length})</TabsTrigger>
+          <TabsTrigger value="roles">Roles ({tenantRoleCards.length})</TabsTrigger>
         </TabsList>
 
         {/* ── Users Tab ──────────────────────────────────────────────────── */}
@@ -272,51 +287,43 @@ export default function UsersPage() {
           </div>
         </TabsContent>
 
-        {/* ── Roles Tab ──────────────────────────────────────────────────── */}
-        <TabsContent value="roles" className="mt-4">
+        {/* ── Roles Tab (read-only) ──────────────────────────────────────── */}
+        <TabsContent value="roles" className="mt-4 space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Roles configured for your shop only — other tenants&apos; roles are not shown.
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {roles.map((role) => (
-              <div key={role.id} className="rounded-xl border bg-card p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                      <Shield className="h-4 w-4 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{role.name}</p>
-                      {role.isSystem
-                        ? <span className="text-[10px] text-muted-foreground">System role</span>
-                        : <span className="text-[10px] text-primary">Custom role</span>}
-                    </div>
+            {tenantRoleCards.map((role) => (
+              <div key={role.id} className="rounded-xl border bg-card p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <Shield className="h-4 w-4 text-primary" />
                   </div>
-                  {!role.isSystem && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteRole(role.id)}>
-                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete Role
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-sm">{role.name}</p>
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${ROLE_COLORS[role.type] ?? ROLE_COLORS.CUSTOM}`}>
+                        {role.isSystem ? "System" : "Custom"}
+                      </span>
+                    </div>
+                    {role.description && (
+                      <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+                    )}
+                  </div>
                 </div>
-                {role.description && <p className="text-xs text-muted-foreground mb-2">{role.description}</p>}
                 <div className="flex items-center justify-between text-sm pt-3 border-t">
                   <span className="text-muted-foreground flex items-center gap-1 text-xs">
                     <User className="h-3.5 w-3.5" /> {role._count?.users ?? 0} users
                   </span>
-                  <span className="text-xs font-medium">{role.permissions?.length ?? 0} perms</span>
+                  <span className="text-xs font-medium">{role.permissions?.length ?? 0} permissions</span>
                 </div>
               </div>
             ))}
-            <button
-              onClick={() => { setRoleForm({ ...EMPTY_ROLE }); setRoleModal(true); }}
-              className="rounded-xl border-2 border-dashed border-border bg-card/50 p-4 flex flex-col items-center justify-center gap-2 hover:border-primary/50 hover:bg-primary/5 transition-colors min-h-[120px]">
-              <Plus className="h-6 w-6 text-muted-foreground" />
-              <p className="text-sm font-medium text-muted-foreground">Create Custom Role</p>
-            </button>
+            {tenantRoleCards.length === 0 && !loading && (
+              <div className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                No assignable roles found. Contact your administrator.
+              </div>
+            )}
           </div>
         </TabsContent>
       </Tabs>
@@ -339,11 +346,29 @@ export default function UsersPage() {
             <div><Label className="text-xs mb-1.5 block">Phone</Label>
               <Input value={userForm.phone} onChange={(e) => setUserForm((f) => ({ ...f, phone: e.target.value }))} placeholder="Optional" /></div>
             <div className="grid grid-cols-2 gap-3">
-              <div><Label className="text-xs mb-1.5 block">Role</Label>
-                <Select value={userForm.roleId} onValueChange={(v) => setUserForm((f) => ({ ...f, roleId: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                  <SelectContent>{roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
-                </Select></div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Role *</Label>
+                <Select
+                  value={userForm.roleId}
+                  onValueChange={(v) => setUserForm((f) => ({ ...f, roleId: v }))}
+                  disabled={staffRoles.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={staffRoles.length ? "Select role" : "No roles available"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {staffRoles.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name}
+                        {r.description ? ` — ${r.description}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Your shop&apos;s roles only — select one to assign
+                </p>
+              </div>
               <div><Label className="text-xs mb-1.5 block">Branch</Label>
                 <Select value={userForm.branchId} onValueChange={(v) => setUserForm((f) => ({ ...f, branchId: v }))}>
                   <SelectTrigger><SelectValue placeholder="Select branch" /></SelectTrigger>
@@ -352,24 +377,13 @@ export default function UsersPage() {
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={() => setUserModal(false)} disabled={saving}>Cancel</Button>
-              <Button variant="gradient" onClick={handleCreateUser} disabled={saving}>{saving ? "Creating…" : "Create User"}</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── Create Role Modal ─────────────────────────────────────────────── */}
-      <Dialog open={roleModal} onOpenChange={setRoleModal}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Create Custom Role</DialogTitle></DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><Label className="text-xs mb-1.5 block">Role Name *</Label>
-              <Input value={roleForm.name} onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Store Supervisor" /></div>
-            <div><Label className="text-xs mb-1.5 block">Description</Label>
-              <Input value={roleForm.description} onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))} placeholder="Optional description" /></div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
-              <Button variant="outline" onClick={() => setRoleModal(false)} disabled={saving}>Cancel</Button>
-              <Button variant="gradient" onClick={handleCreateRole} disabled={saving}>{saving ? "Creating…" : "Create Role"}</Button>
+              <Button
+                variant="gradient"
+                onClick={handleCreateUser}
+                disabled={saving || !userForm.roleId || staffRoles.length === 0}
+              >
+                {saving ? "Creating…" : "Create User"}
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -382,11 +396,17 @@ export default function UsersPage() {
             <DialogTitle>Change Role — {roleAssignModal?.firstName} {roleAssignModal?.lastName}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div><Label className="text-xs mb-1.5 block">Select New Role</Label>
+            <div><Label className="text-xs mb-1.5 block">Select Role</Label>
               <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
-                <SelectContent>{roles.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
-              </Select></div>
+                <SelectContent>
+                  {staffRoles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[10px] text-muted-foreground mt-1">Existing roles only</p>
+            </div>
             <div className="flex justify-end gap-2 pt-2 border-t">
               <Button variant="outline" onClick={() => setRoleAssignModal(null)} disabled={saving}>Cancel</Button>
               <Button variant="gradient" onClick={handleAssignRole} disabled={saving || !selectedRoleId}>{saving ? "Saving…" : "Assign Role"}</Button>

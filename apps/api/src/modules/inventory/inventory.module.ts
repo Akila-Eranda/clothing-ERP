@@ -9,12 +9,15 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus } from '@prisma/client';
+import { StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { randomUUID } from 'crypto';
 
 export class AdjustStockDto {
   @ApiProperty() @IsString() variantId: string;
@@ -43,6 +46,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly workflowService: WorkflowService,
   ) {}
 
   async getStock(tenantId: string, branchId: string, query: PaginationDto & { lowStock?: boolean }) {
@@ -116,6 +120,54 @@ export class InventoryService {
       orderBy: { quantity: 'asc' },
       take: 100,
     });
+  }
+
+  async requestAdjustmentApproval(
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: AdjustStockDto,
+    userRoles: string[] = [],
+  ) {
+    if (bypassesWorkflowApproval(userRoles)) {
+      await this.adjustStock(tenantId, branchId, userId, dto);
+      return {
+        id: randomUUID(),
+        status: 'applied',
+        message: 'Stock adjusted (admin — no approval required)',
+      };
+    }
+
+    const effectiveBranch = await this.resolveBranchId(tenantId, branchId);
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: dto.variantId, product: { tenantId } },
+      include: { product: { select: { name: true } } },
+    });
+    if (!variant) throw new NotFoundException('Product variant not found');
+
+    const requestId = randomUUID();
+    const reference = `ADJ-${requestId.slice(0, 8).toUpperCase()}`;
+
+    await this.workflowService.start(tenantId, userId, {
+      key: 'stock_adjustment',
+      entityType: 'StockAdjustment',
+      entityId: requestId,
+      metadata: {
+        ...dto,
+        branchId: effectiveBranch,
+        reference,
+        productName: variant.product.name,
+        variantName: variant.name,
+        sku: variant.sku,
+      },
+    });
+
+    return {
+      id: requestId,
+      reference,
+      status: 'pending_approval',
+      message: 'Stock adjustment submitted for manager approval',
+    };
   }
 
   async adjustStock(tenantId: string, branchId: string, userId: string, dto: AdjustStockDto) {
@@ -488,7 +540,7 @@ export class InventoryService {
     return transfers.map((t) => ({ ...t, toBranch: toMap.get(t.toBranchId) ?? null }));
   }
 
-  async createTransfer(tenantId: string, fromBranchId: string, userId: string, dto: CreateTransferDto) {
+  async createTransfer(tenantId: string, fromBranchId: string, userId: string, dto: CreateTransferDto, userRoles: string[] = []) {
     if (!dto.items?.length) throw new BadRequestException('At least one item is required');
 
     const effectiveFrom = await this.resolveBranchId(tenantId, fromBranchId);
@@ -519,6 +571,22 @@ export class InventoryService {
     });
 
     const [enriched] = await this.enrichTransfers([transfer]);
+
+    if (!bypassesWorkflowApproval(userRoles)) {
+      await this.workflowService.start(tenantId, userId, {
+        key: 'stock_transfer',
+        entityType: 'StockTransfer',
+        entityId: transfer.id,
+        metadata: {
+          reference: `TRF-${transfer.id.slice(0, 8).toUpperCase()}`,
+          fromBranchId: effectiveFrom,
+          toBranchId: dto.toBranchId,
+          toBranchName: toBranch.name,
+          itemCount: dto.items.length,
+        },
+      });
+    }
+
     return enriched;
   }
 
@@ -539,7 +607,7 @@ export class InventoryService {
     return this.enrichTransfers(transfers);
   }
 
-  async updateTransferStatus(id: string, status: TransferStatus, userId: string) {
+  async updateTransferStatus(id: string, status: TransferStatus, userId: string, userRoles: string[] = []) {
     const transfer = await this.prisma.stockTransfer.findUnique({
       where: { id },
       include: { items: { include: { variant: true } } },
@@ -566,6 +634,19 @@ export class InventoryService {
     if (status === TransferStatus.IN_TRANSIT) {
       if (transfer.status !== TransferStatus.PENDING) {
         throw new BadRequestException('Only pending transfers can be dispatched');
+      }
+
+      const wf = await this.prisma.workflowInstance.findUnique({
+        where: {
+          tenantId_entityType_entityId: {
+            tenantId: transfer.tenantId,
+            entityType: 'StockTransfer',
+            entityId: transfer.id,
+          },
+        },
+      });
+      if (wf && wf.status !== WorkflowStatus.APPROVED && !bypassesWorkflowApproval(userRoles)) {
+        throw new BadRequestException('Transfer must be approved in Workflows before dispatch');
       }
 
       for (const item of transfer.items) {
@@ -671,6 +752,19 @@ export class InventoryController {
     return this.inventoryService.adjustStock(user.tenantId, user.branchId ?? '', user.id, dto);
   }
 
+  @Post('adjust/request')
+  @RequirePermissions('inventory:update')
+  @ApiOperation({ summary: 'Submit stock adjustment for approval workflow' })
+  requestAdjustment(@CurrentUser() user: IAuthUser, @Body() dto: AdjustStockDto) {
+    return this.inventoryService.requestAdjustmentApproval(
+      user.tenantId,
+      user.branchId ?? '',
+      user.id,
+      dto,
+      user.roles,
+    );
+  }
+
   @Get('logs')
   @RequirePermissions('inventory:read')
   @ApiOperation({ summary: 'Get inventory movement logs (ledger)' })
@@ -731,7 +825,7 @@ export class InventoryController {
   @RequirePermissions('inventory:create')
   @ApiOperation({ summary: 'Create stock transfer between branches' })
   createTransfer(@CurrentUser() user: IAuthUser, @Body() dto: CreateTransferDto) {
-    return this.inventoryService.createTransfer(user.tenantId, user.branchId ?? '', user.id, dto);
+    return this.inventoryService.createTransfer(user.tenantId, user.branchId ?? '', user.id, dto, user.roles);
   }
 
   @Get('transfers')
@@ -749,11 +843,12 @@ export class InventoryController {
     @Param('id') id: string,
     @Body('status') status: TransferStatus,
   ) {
-    return this.inventoryService.updateTransferStatus(id, status, user.id);
+    return this.inventoryService.updateTransferStatus(id, status, user.id, user.roles);
   }
 }
 
 @Module({
+  imports: [WorkflowModule],
   controllers: [InventoryController],
   providers: [InventoryService],
   exports: [InventoryService],
