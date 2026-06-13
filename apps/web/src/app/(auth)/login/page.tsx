@@ -7,13 +7,27 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, Building2,
-  TrendingUp, Package, Users, Zap, BarChart3, ShoppingBag,
+  Eye, EyeOff, Lock, Mail, ArrowRight, Building2, Sparkles, Tag, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
+import { APP_NAME } from "@/lib/constants";
+import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
+import {
+  getHostnameTenantSlug,
+  isMainShopLoginDomain,
+  SHOP_DOMAIN_SUFFIX,
+  tenantLoginUrl,
+} from "@/lib/auth-host";
+import { ShopType } from "@/lib/shop-profiles";
 import { useAuthStore } from "@/stores/auth-store";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
@@ -21,48 +35,68 @@ const loginSchema = z.object({
 });
 type LoginForm = z.infer<typeof loginSchema>;
 
-const FEATURES = [
-  { icon: BarChart3,  label: "AI Analytics",    desc: "Real-time sales insights" },
-  { icon: ShoppingBag, label: "Smart POS",       desc: "Offline-ready terminal" },
-  { icon: Package,    label: "Inventory",        desc: "Live stock management" },
-  { icon: Users,      label: "Multi-Branch",     desc: "Centralised control" },
-];
-
-const STATS = [
-  { value: "99.9%", label: "Uptime SLA" },
-  { value: "< 1s",  label: "API latency" },
-  { value: "256-bit", label: "Encryption" },
-];
+interface TenantPreview {
+  name: string;
+  subdomain: string;
+  shopType: ShopType;
+}
 
 function LoginContent() {
   const { loginWithApi } = useAuthStore();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
-  const [emailFocused, setEmailFocused] = React.useState(false);
-  const [passFocused, setPassFocused] = React.useState(false);
-  const [subdomainFocused, setSubdomainFocused] = React.useState(false);
+  const [isMainDomain, setIsMainDomain] = React.useState(false);
+  const [hostnameSlug, setHostnameSlug] = React.useState<string | null>(null);
+  const [tenantPreview, setTenantPreview] = React.useState<TenantPreview | null>(null);
 
-  // Detect if we're on the main shop domain (not a tenant subdomain)
-  const isMainShopDomain = React.useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const parts = window.location.hostname.split('.');
-    return parts.length === 3 && parts[0] === 'shop'; // shop.hexalyte.com
-  }, []);
-
-  // Pre-fill subdomain from URL ?tenant=akila
   const urlTenant = searchParams.get("tenant");
   const [subdomain, setSubdomain] = React.useState(urlTenant || "");
+
+  React.useEffect(() => {
+    setIsMainDomain(isMainShopLoginDomain());
+    const slug = getHostnameTenantSlug();
+    setHostnameSlug(slug);
+    if (slug && !urlTenant) setSubdomain(slug);
+  }, [urlTenant]);
+
+  React.useEffect(() => {
+    const slug = hostnameSlug ?? (subdomain.trim() || null);
+    if (!slug || isMainDomain) {
+      setTenantPreview(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${API_BASE}/tenants/resolve/${encodeURIComponent(slug)}`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const json = await res.json();
+        return (json.data ?? json) as TenantPreview;
+      })
+      .then((data) => {
+        if (!cancelled && data?.subdomain) setTenantPreview(data);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [hostnameSlug, subdomain, isMainDomain]);
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
+  const effectiveSlug = hostnameSlug ?? (subdomain.trim() || undefined);
+  const shopType = tenantPreview?.shopType ?? ShopType.CLOTHING;
+  const showSubdomainField = isMainDomain;
+
   const onSubmit = async (data: LoginForm) => {
+    if (isMainDomain && !subdomain.trim()) {
+      toast.error("Enter your shop subdomain to continue");
+      return;
+    }
     setIsLoading(true);
     try {
-      await loginWithApi(data.email, data.password, subdomain || undefined);
+      await loginWithApi(data.email, data.password, effectiveSlug);
       toast.success("Welcome back!");
       const from = searchParams.get("from");
       window.location.href = from && from.startsWith("/") ? from : "/dashboard";
@@ -73,226 +107,205 @@ function LoginContent() {
     }
   };
 
+  const openWorkspace = () => {
+    const slug = subdomain.trim().toLowerCase();
+    if (!slug) {
+      toast.error("Enter your shop subdomain first");
+      return;
+    }
+    window.location.href = tenantLoginUrl(slug);
+  };
+
   return (
-    <div className="min-h-screen flex" style={{ background: "#070d1a" }}>
+    <div className="min-h-screen flex bg-background">
+      <AuthBrandPanel
+        shopType={shopType}
+        tenantName={tenantPreview?.name}
+        tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
+      />
 
-      {/* ── LEFT BRAND PANEL ─────────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative flex-col overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #0a1628 0%, #0d1f3c 50%, #0a1628 100%)" }}>
-
-        {/* Animated grid */}
-        <div className="absolute inset-0 opacity-[0.06]"
-          style={{ backgroundImage: "linear-gradient(rgba(79,110,247,1) 1px, transparent 1px), linear-gradient(90deg, rgba(79,110,247,1) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
-
-        {/* Glow orbs */}
-        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full opacity-20"
-          style={{ background: "radial-gradient(circle, #4f6ef7 0%, transparent 70%)" }} />
-        <div className="absolute -bottom-40 right-0 w-[400px] h-[400px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, #7c3aed 0%, transparent 70%)" }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(ellipse, #4f6ef7 0%, transparent 60%)" }} />
-
-        <div className="relative z-10 flex flex-col h-full p-12 xl:p-16">
-          {/* Logo */}
-          <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}
-            className="flex items-center gap-3 mb-auto">
-            <div className="h-10 w-10 rounded-xl flex items-center justify-center"
-              style={{ background: "linear-gradient(135deg, #4f6ef7, #7c3aed)" }}>
-              <Zap className="h-5 w-5 text-white" />
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-10 sm:px-8">
+        <div className="w-full max-w-md">
+          {/* Mobile header */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow mb-3">
+              <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <div>
-              <span className="text-white font-bold text-lg tracking-tight">FashionERP</span>
-              <span className="ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded-full text-white"
-                style={{ background: "rgba(79,110,247,0.3)", border: "1px solid rgba(79,110,247,0.5)" }}>
-                PRO
-              </span>
-            </div>
-          </motion.div>
-
-          {/* Hero text */}
-          <motion.div className="my-12" initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.15 }}>
-            <h1 className="text-4xl xl:text-5xl font-black text-white leading-[1.1] mb-4">
-              The future of<br />
-              <span style={{ background: "linear-gradient(135deg, #4f6ef7, #a78bfa)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                fashion retail
-              </span>
-            </h1>
-            <p className="text-base xl:text-lg leading-relaxed" style={{ color: "#6a8ab8" }}>
-              AI-powered ERP built for modern clothing businesses. Manage inventory, sales, and customers from one unified platform.
-            </p>
-          </motion.div>
-
-          {/* Feature list */}
-          <motion.div className="grid grid-cols-2 gap-3 mb-10"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, delay: 0.3 }}>
-            {FEATURES.map((f, i) => (
-              <motion.div key={f.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.35 + i * 0.08 }}
-                className="flex items-start gap-3 p-4 rounded-2xl"
-                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(79,110,247,0.15)" }}>
-                <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: "rgba(79,110,247,0.15)" }}>
-                  <f.icon className="h-4 w-4" style={{ color: "#4f6ef7" }} />
-                </div>
-                <div>
-                  <p className="text-white text-sm font-semibold">{f.label}</p>
-                  <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>{f.desc}</p>
-                </div>
-              </motion.div>
-            ))}
-          </motion.div>
-
-          {/* Stats */}
-          <motion.div className="flex items-center gap-8 pt-8"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.65 }}
-            style={{ borderTop: "1px solid rgba(79,110,247,0.15)" }}>
-            {STATS.map((s) => (
-              <div key={s.label}>
-                <p className="text-white font-black text-xl">{s.value}</p>
-                <p className="text-xs mt-0.5" style={{ color: "#4a6a8a" }}>{s.label}</p>
-              </div>
-            ))}
-          </motion.div>
-        </div>
-      </div>
-
-      {/* ── RIGHT FORM PANEL ─────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col items-center justify-center p-6 sm:p-10 relative"
-        style={{ background: "#070d1a" }}>
-
-        {/* Mobile logo */}
-        <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="lg:hidden flex items-center gap-2.5 mb-10">
-          <div className="h-9 w-9 rounded-xl flex items-center justify-center"
-            style={{ background: "linear-gradient(135deg, #4f6ef7, #7c3aed)" }}>
-            <Zap className="h-4.5 w-4.5 text-white" />
-          </div>
-          <span className="text-white font-bold text-lg">FashionERP</span>
-        </motion.div>
-
-        <motion.div className="w-full max-w-[400px]"
-          initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: "easeOut" }}>
-
-          {/* Heading */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-white">Welcome back</h2>
-            <p className="text-sm mt-1.5" style={{ color: "#4a6a8a" }}>Sign in to your workspace to continue</p>
+            <h1 className="text-xl font-bold">{APP_NAME}</h1>
+            {(tenantPreview || hostnameSlug) && (
+              <p className="text-sm text-muted-foreground mt-1">
+                {tenantPreview?.name ?? hostnameSlug}
+              </p>
+            )}
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
+            className="glass-card rounded-2xl p-8 shadow-glass"
+          >
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold">Welcome back</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                {tenantPreview
+                  ? `Sign in to ${tenantPreview.name}`
+                  : isMainDomain
+                    ? "Enter your workspace and account details"
+                    : "Sign in to your workspace to continue"}
+              </p>
+            </div>
 
-            {/* Subdomain — only on main shop.hexalyte.com */}
-            {isMainShopDomain && (
-              <div>
-                <label htmlFor="subdomain" className="block text-xs font-semibold mb-2" style={{ color: "#a0b4d4" }}>
-                  Shop / Subdomain
-                </label>
-                <div className="relative">
-                  <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
-                  <input id="subdomain" type="text" placeholder="your-shop"
-                    value={subdomain}
-                    onChange={e => setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
-                    className="w-full h-12 pl-10 pr-24 rounded-xl text-sm text-white outline-none transition-all"
-                    style={{ background: "rgba(255,255,255,0.05)",
-                      border: `1px solid ${subdomainFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
-                      boxShadow: subdomainFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
-                    onFocus={() => setSubdomainFocused(true)}
-                    onBlur={() => setSubdomainFocused(false)} />
-                  <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium" style={{ color: "#4a6a8a" }}>.shop.hexalyte.com</span>
+            {tenantPreview && !isMainDomain && (
+              <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                  <Building2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">{tenantPreview.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">
+                    {tenantPreview.subdomain}{SHOP_DOMAIN_SUFFIX}
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* Email */}
-            <div>
-              <label htmlFor="email" className="block text-xs font-semibold mb-2" style={{ color: "#a0b4d4" }}>
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
-                <input id="email" type="email" placeholder="you@company.com" autoComplete="email"
-                  className="w-full h-12 pl-10 pr-4 rounded-xl text-sm text-white outline-none transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", color: "#fff",
-                    border: `1px solid ${emailFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
-                    boxShadow: emailFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
-                  onFocus={() => setEmailFocused(true)}
-                  {...register("email", { onBlur: () => setEmailFocused(false) })} />
-              </div>
-              {errors.email && <p className="text-xs mt-1.5" style={{ color: "#f87171" }}>{errors.email.message}</p>}
-            </div>
-
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label htmlFor="password" className="text-xs font-semibold" style={{ color: "#a0b4d4" }}>Password</label>
-                <Link href="/forgot-password" className="text-xs font-medium transition-colors hover:opacity-80" style={{ color: "#4f6ef7" }}>
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: "#4a6a8a" }} />
-                <input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" autoComplete="current-password"
-                  className="w-full h-12 pl-10 pr-11 rounded-xl text-sm text-white outline-none transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)",
-                    border: `1px solid ${passFocused ? "rgba(79,110,247,0.6)" : "rgba(79,110,247,0.2)"}`,
-                    boxShadow: passFocused ? "0 0 0 3px rgba(79,110,247,0.1)" : "none" }}
-                  onFocus={() => setPassFocused(true)}
-                  {...register("password", { onBlur: () => setPassFocused(false) })} />
-                <button type="button" onClick={() => setShowPassword(p => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 transition-colors"
-                  style={{ color: "#4a6a8a" }}>
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {errors.password && <p className="text-xs mt-1.5" style={{ color: "#f87171" }}>{errors.password.message}</p>}
-            </div>
-
-            {/* Submit */}
-            <button type="submit" disabled={isLoading}
-              className="w-full h-12 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all mt-2"
-              style={{ background: isLoading ? "rgba(79,110,247,0.5)" : "linear-gradient(135deg, #4f6ef7, #7c3aed)", cursor: isLoading ? "not-allowed" : "pointer" }}
-              onMouseEnter={e => { if (!isLoading) e.currentTarget.style.opacity = "0.92"; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}>
-              {isLoading ? (
-                <>
-                  <div className="h-4 w-4 rounded-full border-2 animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "#fff" }} />
-                  Signing in...
-                </>
-              ) : (
-                <>Sign in <ArrowRight className="h-4 w-4" /></>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              {showSubdomainField && (
+                <div className="space-y-2">
+                  <Label htmlFor="subdomain">Shop / Workspace</Label>
+                  <div className="relative">
+                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="subdomain"
+                      type="text"
+                      placeholder="your-shop"
+                      value={subdomain}
+                      className="pl-9 pr-[7.5rem] lowercase"
+                      onChange={(e) =>
+                        setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
+                      }
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none">
+                      {SHOP_DOMAIN_SUFFIX}
+                    </span>
+                  </div>
+                  {subdomain.trim() && (
+                    <button
+                      type="button"
+                      onClick={openWorkspace}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      Open {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
+                      <ExternalLink className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               )}
-            </button>
-          </form>
 
+              <div className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@company.com"
+                    autoComplete="email"
+                    className="pl-9"
+                    {...register("email")}
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-xs text-destructive">{errors.email.message}</p>
+                )}
+              </div>
 
-          {/* Register */}
-          <p className="text-center text-sm mt-6" style={{ color: "#4a6a8a" }}>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <Link
+                    href="/forgot-password"
+                    className="text-xs text-primary font-medium hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                </div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    className="pl-9 pr-9"
+                    {...register("password")}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-xs text-destructive">{errors.password.message}</p>
+                )}
+              </div>
+
+              <Button
+                type="submit"
+                variant="gradient"
+                className={cn("w-full h-11 font-semibold mt-2")}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                    Signing in...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Sign in <ArrowRight className="h-4 w-4" />
+                  </span>
+                )}
+              </Button>
+            </form>
+          </motion.div>
+
+          <p className="text-center text-sm text-muted-foreground mt-6">
             Don&apos;t have an account?{" "}
-            <a href="/register" className="font-semibold transition-colors hover:opacity-80" style={{ color: "#4f6ef7" }}>
+            <Link href="/register" className="text-primary font-medium hover:underline">
               Start free trial
-            </a>
+            </Link>
           </p>
 
-          {/* Trust badges */}
-          <div className="flex items-center justify-center gap-5 mt-8">
-            {["SSL Secured", "GDPR Ready", "SOC 2"].map((badge) => (
+          <div className="flex items-center justify-center gap-4 mt-6 flex-wrap">
+            {["SSL Secured", "Multi-tenant", "Role-based access"].map((badge) => (
               <div key={badge} className="flex items-center gap-1.5">
-                <div className="h-1.5 w-1.5 rounded-full" style={{ background: "#10b981" }} />
-                <span className="text-[11px] font-medium" style={{ color: "#4a6a8a" }}>{badge}</span>
+                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                <span className="text-[11px] font-medium text-muted-foreground">{badge}</span>
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function LoginFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div style={{ background: "#070d1a", minHeight: "100vh" }} />}>
+    <Suspense fallback={<LoginFallback />}>
       <LoginContent />
     </Suspense>
   );

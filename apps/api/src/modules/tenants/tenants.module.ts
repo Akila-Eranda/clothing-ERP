@@ -475,6 +475,21 @@ export class TenantsService {
     return this.findOne(tenantId);
   }
 
+  async resolvePublicBySubdomain(subdomain: string) {
+    const slug = subdomain.trim().toLowerCase();
+    if (!slug || slug === PLATFORM_CONFIG_SUBDOMAIN) {
+      throw new NotFoundException('Workspace not found');
+    }
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { subdomain: slug },
+      select: { name: true, subdomain: true, shopType: true, status: true },
+    });
+    if (!tenant || tenant.status === 'SUSPENDED' || tenant.status === 'CANCELLED') {
+      throw new NotFoundException('Workspace not found');
+    }
+    return tenant;
+  }
+
   async update(id: string, dto: Partial<RegisterTenantDto>) {
     return this.prisma.tenant.update({
       where: { id },
@@ -549,6 +564,13 @@ export class TenantsController {
   @ApiOperation({ summary: 'Register new tenant (SaaS onboarding)' })
   register(@Body() dto: RegisterTenantDto) {
     return this.tenantsService.register(dto);
+  }
+
+  @Public()
+  @Get('resolve/:subdomain')
+  @ApiOperation({ summary: 'Public workspace lookup for login branding' })
+  resolveBySubdomain(@Param('subdomain') subdomain: string) {
+    return this.tenantsService.resolvePublicBySubdomain(subdomain);
   }
 
   @Get('me')
