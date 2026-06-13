@@ -17,11 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useBranchStore } from "@/stores/branch-store";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface PLReport {
   period: { startDate: string; endDate: string };
   revenue: { gross: number; returns: number; net: number };
+  costOfGoodsSold?: number;
+  grossProfit?: number;
   expenses: { total: number; count: number };
   netProfit: number; profitMargin: string; salesCount: number;
 }
@@ -33,18 +36,20 @@ interface SaleItem    { productName: string; quantity: number; total: number }
 interface Payment     { method: string; amount: number }
 interface Sale        { id: string; invoiceDate: string; total: number; status: string; items?: SaleItem[]; payments?: Payment[] }
 interface Customer    { id: string; firstName: string; lastName: string; phone: string; tier: string; totalSpent: number; totalOrders: number; loyaltyPoints: number; lastPurchaseAt: string | null }
-interface InvVariant  { sku: string; price: number; product: { name: string; category?: { name: string } | null } }
+interface InvVariant  { sku: string; costPrice: number; sellingPrice: number; product: { name: string; category?: { name: string } | null } }
 interface InvItem     { id: string; quantity: number; variant: InvVariant }
 interface TaxRate     { taxRate: number; _sum: { taxAmount: number; total: number; quantity: number } }
 interface TaxReport   { summary: { total: number; taxAmount: number; subtotal: number; discountAmount: number } | null; count: number; byTaxRate: TaxRate[] }
+interface CashierRow  { cashierName: string; salesCount: number; totalRevenue: number; totalDiscount: number; totalTax: number }
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#6366f1"];
 const TIER_CFG: Record<string, { color: string; bg: string }> = {
-  VIP:    { color: "text-yellow-600", bg: "bg-yellow-500/10" },
-  GOLD:   { color: "text-amber-600",  bg: "bg-amber-500/10" },
-  SILVER: { color: "text-slate-600",  bg: "bg-muted/50" },
-  BRONZE: { color: "text-orange-700", bg: "bg-orange-500/10" },
+  DIAMOND:  { color: "text-violet-700", bg: "bg-violet-500/10" },
+  PLATINUM: { color: "text-yellow-700", bg: "bg-yellow-500/10" },
+  GOLD:     { color: "text-amber-600",  bg: "bg-amber-500/10" },
+  SILVER:   { color: "text-slate-600",  bg: "bg-muted/50" },
+  BRONZE:   { color: "text-orange-700", bg: "bg-orange-500/10" },
 };
 const TABS = [
   { value: "overview",  label: "Overview"  },
@@ -74,9 +79,12 @@ const TT_STYLE = { background: "hsl(var(--popover))", border: "1px solid hsl(var
 
 // ── Tooltip formatter helpers ─────────────────────────────────────────────
 function fmtLKR(v: number) { return `LKR ${formatNumber(v)}`; }
+function invUnitCost(v?: InvVariant | null) { return v?.costPrice ?? 0; }
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
+  const activeBranchName = useBranchStore((s) => s.activeBranchName);
   const [activeTab, setActiveTab]   = useState("overview");
   const [range, setRange]           = useState({ label: "This Month", start: monthStart(), end: today() });
   const [loading, setLoading]       = useState(true);
@@ -88,20 +96,24 @@ export default function ReportsPage() {
   const [customers,   setCusts]     = useState<Customer[]>([]);
   const [inventory,   setInv]       = useState<InvItem[]>([]);
   const [taxReport,   setTax]       = useState<TaxReport | null>(null);
+  const [cashiers,    setCashiers]  = useState<CashierRow[]>([]);
+
+  const branchQ = activeBranchId ? `&branchId=${activeBranchId}` : "";
 
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
       const { start, end } = range;
-      const [plR, mplR, cfR, expR, salR, custR, invR, taxR] = await Promise.all([
+      const [plR, mplR, cfR, expR, salR, custR, invR, taxR, cashR] = await Promise.all([
         api.get<PLReport>    (`/accounting/profit-loss?startDate=${start}&endDate=${end}`),
         api.get<MonthlyPL[]> (`/accounting/monthly-pl?months=12`),
         api.get<CashFlow>    (`/accounting/cash-flow?startDate=${start}&endDate=${end}`),
         api.get<ExpSummary>  (`/accounting/expenses/summary?startDate=${start}&endDate=${end}`),
-        api.get<Sale[]>      (`/reports/sales?startDate=${start}&endDate=${end}`),
+        api.get<Sale[]>      (`/reports/sales?startDate=${start}&endDate=${end}${branchQ}`),
         api.get<Customer[]>  (`/reports/customers`),
-        api.get<InvItem[]>   (`/reports/inventory`),
-        api.get<TaxReport>   (`/reports/tax?startDate=${start}&endDate=${end}`),
+        api.get<InvItem[]>   (`/reports/inventory${activeBranchId ? `?branchId=${activeBranchId}` : ""}`),
+        api.get<TaxReport>   (`/reports/tax?startDate=${start}&endDate=${end}${branchQ}`),
+        api.get<CashierRow[]>(`/reports/cashier?startDate=${start}&endDate=${end}${branchQ}`),
       ]);
       setPL(plR.data);
       setMonthlyPL(Array.isArray(mplR.data) ? mplR.data : []);
@@ -111,14 +123,15 @@ export default function ReportsPage() {
       setCusts(Array.isArray(custR.data) ? custR.data : []);
       setInv(Array.isArray(invR.data) ? invR.data : []);
       setTax(taxR.data);
+      setCashiers(Array.isArray(cashR.data) ? cashR.data : []);
     } catch { toast.error("Failed to load report data"); }
     finally { setLoading(false); }
-  }, [range.start, range.end]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [range.start, range.end, branchQ, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
   // ── Derived: Sales ────────────────────────────────────────────────────
-  const doneSales = useMemo(() => salesData.filter(s => s.status !== "CANCELLED"), [salesData]);
+  const doneSales = useMemo(() => salesData, [salesData]);
 
   const dailySales = useMemo(() => {
     const map: Record<string, { date: string; revenue: number; orders: number }> = {};
@@ -154,8 +167,8 @@ export default function ReportsPage() {
   // ── Derived: Inventory ────────────────────────────────────────────────
   const lowStock   = useMemo(() => inventory.filter(i => i.quantity > 0 && i.quantity <= 10).sort((a, b) => a.quantity - b.quantity).slice(0, 20), [inventory]);
   const outOfStock = useMemo(() => inventory.filter(i => i.quantity === 0).length, [inventory]);
-  const stockValue = useMemo(() => inventory.reduce((s, i) => s + i.quantity * (i.variant?.price ?? 0), 0), [inventory]);
-  const topInv     = useMemo(() => [...inventory].sort((a, b) => (b.quantity * (b.variant?.price ?? 0)) - (a.quantity * (a.variant?.price ?? 0))).slice(0, 10), [inventory]);
+  const stockValue = useMemo(() => inventory.reduce((s, i) => s + i.quantity * invUnitCost(i.variant), 0), [inventory]);
+  const topInv     = useMemo(() => [...inventory].sort((a, b) => (b.quantity * invUnitCost(b.variant)) - (a.quantity * invUnitCost(a.variant))).slice(0, 10), [inventory]);
 
   // ── Derived: Customers ────────────────────────────────────────────────
   const tierDist = useMemo(() => {
@@ -184,6 +197,9 @@ export default function ReportsPage() {
           <div className="px-6 flex items-center justify-between h-14">
             <TabsList className="h-14 bg-transparent p-0 gap-0 rounded-none border-none">
               <span className="text-sm font-bold mr-5 text-foreground">Reports & Analytics</span>
+              {activeBranchName && (
+                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mr-3">{activeBranchName}</span>
+              )}
               {TABS.map((t) => (
                 <TabsTrigger key={t.value} value={t.value}
                   className="h-14 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors">
@@ -421,13 +437,15 @@ export default function ReportsPage() {
                     { label: "Gross Revenue",    val: `LKR ${formatNumber(pl?.revenue.gross ?? 0)}`,              color: "text-foreground" },
                     { label: "Less: Returns",    val: `− LKR ${formatNumber(pl?.revenue.returns ?? 0)}`,          color: "text-red-500" },
                     { label: "Net Revenue",      val: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`,                color: "text-emerald-600", bold: true },
+                    { label: "Cost of Goods",    val: `− LKR ${formatNumber(pl?.costOfGoodsSold ?? 0)}`,          color: "text-orange-600", hide: !(pl?.costOfGoodsSold ?? 0) },
+                    { label: "Gross Profit",     val: `LKR ${formatNumber(pl?.grossProfit ?? 0)}`,               color: (pl?.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true, hide: !(pl?.costOfGoodsSold ?? 0) },
                     { label: "Expenses",         val: `− LKR ${formatNumber(pl?.expenses.total ?? 0)}`,           color: "text-red-500" },
                     { label: "Net Profit",       val: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`,        color: (pl?.netProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true },
                     { label: "Profit Margin",    val: `${pl?.profitMargin ?? 0}%`,                                color: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "text-emerald-600" : "text-red-600" },
                     { label: "Avg Order Value",  val: `LKR ${formatNumber(avgOrder)}`,                           color: "text-foreground" },
                     { label: "Total Orders",     val: `${pl?.salesCount ?? 0} orders`,                           color: "text-foreground" },
-                  ].map((r) => (
-                    <div key={r.label} className={`flex justify-between items-center text-xs ${r.label === "Net Revenue" || r.label === "Net Profit" ? "border-t pt-2 mt-1" : ""}`}>
+                  ].filter((r) => !("hide" in r && r.hide)).map((r) => (
+                    <div key={r.label} className={`flex justify-between items-center text-xs ${r.bold ? "border-t pt-2 mt-1" : ""}`}>
                       <span className="text-muted-foreground">{r.label}</span>
                       <span className={`${r.bold ? "font-bold text-sm" : "font-semibold"} ${r.color}`}>{r.val}</span>
                     </div>
@@ -472,6 +490,32 @@ export default function ReportsPage() {
                 </table>
               </CardContent>
             </Card>
+
+            <Card className="bg-card border shadow-sm">
+              <CardHeader className="pb-0"><CardTitle className="text-sm font-semibold">Cashier Performance</CardTitle></CardHeader>
+              <CardContent className="p-0 mt-3">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Cashier","Orders","Revenue","Discounts","Tax"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 1 ? "text-right" : "text-left"}`}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {cashiers.length > 0 ? cashiers.map((c) => (
+                      <tr key={c.cashierName} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
+                        <td className="px-4 py-2.5 text-xs text-right">{c.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right">LKR {formatNumber(c.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-amber-600">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-blue-600">LKR {formatNumber(c.totalTax)}</td>
+                      </tr>
+                    )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier data for this period</td></tr>}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ══════════════════════ CUSTOMERS ══════════════════════ */}
@@ -480,7 +524,7 @@ export default function ReportsPage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: "Total Customers",   val: customers.length,                                                     icon: Users,       bg: "bg-blue-600",    curr: false },
-                { label: "VIP / Gold",         val: customers.filter(c => c.tier==="VIP"||c.tier==="GOLD").length,        icon: TrendingUp,  bg: "bg-amber-500",   curr: false },
+                { label: "Platinum / Diamond", val: customers.filter(c => c.tier === "PLATINUM" || c.tier === "DIAMOND").length, icon: TrendingUp,  bg: "bg-amber-500",   curr: false },
                 { label: "Ordered at Least 1", val: customers.filter(c => c.totalOrders > 0).length,                     icon: ShoppingCart,bg: "bg-emerald-600", curr: false },
                 { label: "Total Lifetime Value",val: customers.reduce((s, c) => s + c.totalSpent, 0),                    icon: DollarSign,  bg: "bg-violet-600",  curr: true  },
               ].map((k) => (
@@ -555,7 +599,7 @@ export default function ReportsPage() {
                 { label: "Total SKUs",    val: inventory.length, icon: Package,       bg: "bg-blue-600",    curr: false },
                 { label: "Out of Stock",  val: outOfStock,       icon: AlertTriangle, bg: "bg-red-500",     curr: false },
                 { label: "Low Stock",     val: lowStock.length,  icon: TrendingDown,  bg: "bg-amber-500",   curr: false },
-                { label: "Total Value",   val: stockValue,       icon: DollarSign,    bg: "bg-emerald-600", curr: true  },
+                { label: "Total Value (Cost)", val: stockValue, icon: DollarSign, bg: "bg-emerald-600", curr: true },
               ].map((k) => (
                 <Card key={k.label} className="bg-card border shadow-sm">
                   <CardContent className="p-4 flex items-center gap-3">
@@ -610,7 +654,7 @@ export default function ReportsPage() {
                   <table className="w-full">
                     <thead>
                       <tr className="border-y bg-muted/30">
-                        {["Product","SKU","Qty","Unit Price","Value"].map((h,i) => (
+                        {["Product","SKU","Qty","Unit Cost","Value"].map((h,i) => (
                           <th key={h} className={`px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase ${i>=2?"text-right":"text-left"}`}>{h}</th>
                         ))}
                       </tr>
@@ -621,8 +665,8 @@ export default function ReportsPage() {
                           <td className="px-4 py-2.5 text-xs font-medium">{item.variant?.product?.name}</td>
                           <td className="px-4 py-2.5 text-[10px] text-muted-foreground font-mono">{item.variant?.sku}</td>
                           <td className="px-4 py-2.5 text-xs text-right">{item.quantity}</td>
-                          <td className="px-4 py-2.5 text-xs text-right">LKR {formatNumber(item.variant?.price ?? 0)}</td>
-                          <td className="px-4 py-2.5 text-xs font-bold text-right">LKR {formatNumber(item.quantity * (item.variant?.price ?? 0))}</td>
+                          <td className="px-4 py-2.5 text-xs text-right">LKR {formatNumber(invUnitCost(item.variant))}</td>
+                          <td className="px-4 py-2.5 text-xs font-bold text-right">LKR {formatNumber(item.quantity * invUnitCost(item.variant))}</td>
                         </tr>
                       )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No inventory data</td></tr>}
                     </tbody>
@@ -656,6 +700,14 @@ export default function ReportsPage() {
                           <div className="h-px bg-emerald-500/20 my-1" />
                           <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-emerald-600">LKR {formatNumber(pl.revenue.net)}</span></div>
                         </div>
+                        {(pl.costOfGoodsSold ?? 0) > 0 && (
+                          <div className="bg-orange-500/5 border border-orange-500/15 rounded-xl p-4 space-y-2">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Cost of Goods Sold</p>
+                            <div className="flex justify-between text-sm"><span className="text-muted-foreground">Product Costs</span><span className="text-orange-600 font-semibold">LKR {formatNumber(pl.costOfGoodsSold ?? 0)}</span></div>
+                            <div className="h-px bg-orange-500/20 my-1" />
+                            <div className="flex justify-between text-sm font-bold"><span>Gross Profit</span><span className={(pl.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}>LKR {formatNumber(pl.grossProfit ?? 0)}</span></div>
+                          </div>
+                        )}
                         <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4 space-y-2">
                           <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">Expenses</p>
                           <div className="flex justify-between text-sm">

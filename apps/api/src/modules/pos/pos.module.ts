@@ -286,7 +286,7 @@ export class PosService {
         await tx.customer.update({
           where: { id: dto.customerId },
           data: {
-            totalSpent: { increment: totalPaid },
+            totalSpent: { increment: amountDue },
             totalOrders: { increment: 1 },
             loyaltyPoints: { increment: pointsEarned - pointsRedeemed },
             lastPurchaseAt: new Date(),

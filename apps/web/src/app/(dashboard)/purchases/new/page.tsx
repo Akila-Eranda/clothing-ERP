@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Search } from "lucide-react";
+import { Plus, Trash2, Search, ScanLine, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ interface Supplier {
 }
 interface VariantOpt {
   variantId: string; productName: string; variantName: string; sku: string;
+  barcode?: string;
   size?: string | null; color?: string | null; costPrice: number; taxRate?: number;
   stock: number;
 }
@@ -38,7 +39,6 @@ const PAYMENT_TERMS = ["Immediate", "15 Days", "30 Days", "45 Days", "60 Days", 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function CreatePOPage() {
   const router = useRouter();
-  const searchRef = useRef<HTMLInputElement>(null);
   const { user } = useAuthStore();
   const adminBypass = bypassesWorkflowApproval(user?.role);
 
@@ -94,16 +94,87 @@ export default function CreatePOPage() {
       variantName: v.variantName, sku: v.sku, size: v.size ?? undefined,
       color: v.color ?? undefined, unitCost: v.costPrice, taxRate: v.taxRate ?? 0,
     } as LineItem : it));
-    setSearchQ((p) => p.map((q, i) => i === idx ? `${v.productName} — ${v.variantName}` : q));
+    setSearchQ((p) => p.map((q, i) => i === idx ? "" : q));
     setSearchOpen(null);
+  };
+
+  const clearVariant = (idx: number) => {
+    setItems((p) => p.map((it, i) => i === idx ? {
+      variantId: "", productName: "", variantName: "", sku: "",
+      orderedQty: it.orderedQty, unitCost: 0, discount: it.discount, taxRate: 0,
+    } as LineItem : it));
+    setSearchQ((p) => p.map((q, i) => i === idx ? "" : q));
+    setSearchOpen(idx);
   };
 
   const filteredVariants = (q: string) => {
     if (!q) return allVariants.slice(0, 30);
     const lq = q.toLowerCase();
     return allVariants.filter((v) =>
-      v.productName.toLowerCase().includes(lq) || v.sku.toLowerCase().includes(lq) || v.variantName.toLowerCase().includes(lq)
+      v.productName.toLowerCase().includes(lq)
+      || v.sku.toLowerCase().includes(lq)
+      || v.variantName.toLowerCase().includes(lq)
+      || (v.barcode?.toLowerCase().includes(lq) ?? false)
     ).slice(0, 20);
+  };
+
+  const resolveVariantByCode = async (code: string): Promise<VariantOpt | null> => {
+    const trimmed = code.trim();
+    if (!trimmed) return null;
+    const local = allVariants.find((v) =>
+      v.sku.toLowerCase() === trimmed.toLowerCase()
+      || v.barcode?.toLowerCase() === trimmed.toLowerCase()
+    );
+    if (local) return local;
+    try {
+      const res = await api.get<{
+        variantId: string; productName: string; variantName: string; sku: string;
+        barcode?: string; costPrice: number; stock: number; size?: string; color?: string;
+      }>(`/pos/barcode/${encodeURIComponent(trimmed)}`);
+      const d = res.data;
+      return {
+        variantId: d.variantId,
+        productName: d.productName,
+        variantName: d.variantName,
+        sku: d.sku,
+        barcode: d.barcode,
+        costPrice: d.costPrice,
+        stock: d.stock,
+        size: d.size,
+        color: d.color,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const handleItemSearchKeyDown = async (idx: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Escape") {
+      setSearchOpen(null);
+      return;
+    }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const q = (searchQ[idx] ?? "").trim();
+    if (!q) return;
+
+    const matches = filteredVariants(q);
+    if (matches.length === 1) {
+      selectVariant(idx, matches[0]);
+      return;
+    }
+    if (matches.length > 1) {
+      selectVariant(idx, matches[0]);
+      return;
+    }
+
+    const resolved = await resolveVariantByCode(q);
+    if (resolved) {
+      selectVariant(idx, resolved);
+      toast.success(`Added ${resolved.productName}`);
+    } else {
+      toast.error(`Product not found: ${q}`);
+    }
   };
 
   // ── Summary ────────────────────────────────────────────────────────────
@@ -285,11 +356,13 @@ export default function CreatePOPage() {
 
         {/* ── Items table ── */}
         <div className="bg-background border rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between px-5 py-4 border-b bg-muted/20">
+            <div className="flex items-center gap-2.5">
               <h3 className="font-semibold text-base">Order Items</h3>
               {items.length > 0 && (
-                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full">{items.length}</span>
+                <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full tabular-nums">
+                  {items.length}
+                </span>
               )}
             </div>
             <Button size="sm" onClick={addRow} className="gap-1.5">
@@ -298,100 +371,153 @@ export default function CreatePOPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 text-left w-8">#</th>
-                  <th className="px-4 py-3 text-left min-w-[220px]">Item</th>
-                  <th className="px-4 py-3 text-left w-32">SKU</th>
-                  <th className="px-4 py-3 text-left w-28">Variant</th>
-                  <th className="px-4 py-3 text-right w-24">Qty</th>
-                  <th className="px-4 py-3 text-right w-32">Unit Cost (LKR)</th>
-                  <th className="px-4 py-3 text-right w-28">Discount</th>
-                  <th className="px-4 py-3 text-right w-24">Tax %</th>
-                  <th className="px-4 py-3 text-right w-32">Amount (LKR)</th>
-                  <th className="px-4 py-3 w-10"></th>
+            <table className="w-full text-sm table-fixed min-w-[920px]">
+              <colgroup>
+                <col className="w-10" />
+                <col />
+                <col className="w-[72px]" />
+                <col className="w-[120px]" />
+                <col className="w-[100px]" />
+                <col className="w-[80px]" />
+                <col className="w-[120px]" />
+                <col className="w-11" />
+              </colgroup>
+              <thead className="bg-muted/40 border-b">
+                <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="px-3 py-2.5 text-left font-semibold">#</th>
+                  <th className="px-3 py-2.5 text-left font-semibold">Product</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Qty</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Unit Cost</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Discount</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Tax %</th>
+                  <th className="px-3 py-2.5 text-right font-semibold">Amount</th>
+                  <th className="px-3 py-2.5" />
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {items.map((item, idx) => {
                   const { total } = calcItem(item);
                   const q = searchQ[idx] ?? "";
+                  const matches = searchOpen === idx ? filteredVariants(q) : [];
                   return (
-                    <tr key={idx} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 text-muted-foreground text-xs">{idx + 1}</td>
+                    <tr key={idx} className="hover:bg-muted/15 transition-colors align-top">
+                      <td className="px-3 py-3 text-muted-foreground text-xs tabular-nums">{idx + 1}</td>
 
-                      {/* Item search */}
-                      <td className="px-4 py-3 relative">
-                        <div className="relative">
-                          <div className="flex items-center gap-2 border rounded-lg px-3 py-2 bg-background cursor-pointer hover:border-primary/50 transition-colors"
-                            onClick={() => setSearchOpen(searchOpen === idx ? null : idx)}>
-                            {item.variantId ? (
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{item.productName}</p>
-                                <p className="text-muted-foreground text-xs">{item.sku}</p>
+                      <td className="px-3 py-2.5">
+                        {item.variantId ? (
+                          <div className="rounded-lg border bg-muted/20 px-3 py-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="font-medium text-sm leading-snug truncate">{item.productName}</p>
+                                <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
+                                  {item.sku}
+                                  {item.variantName ? ` · ${item.variantName}` : ""}
+                                </p>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground text-sm flex-1">Search product / SKU...</span>
-                            )}
-                            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                          </div>
-                          {searchOpen === idx && (
-                            <div className="absolute top-full left-0 z-50 w-80 bg-background border rounded-xl shadow-xl mt-1.5">
-                              <div className="p-3 border-b">
-                                <input autoFocus value={q}
-                                  onChange={(e) => setSearchQ((p) => p.map((x, i) => i === idx ? e.target.value : x))}
-                                  placeholder="Search by name or SKU..."
-                                  className="w-full text-sm px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-ring"
-                                />
-                              </div>
-                              <div className="max-h-52 overflow-y-auto">
-                                {filteredVariants(q).length === 0 ? (
-                                  <p className="px-4 py-6 text-center text-muted-foreground text-sm">No products found</p>
-                                ) : filteredVariants(q).map((v) => (
-                                  <div key={v.variantId} onClick={() => selectVariant(idx, v)}
-                                    className="px-4 py-2.5 hover:bg-muted/50 cursor-pointer flex items-center gap-3 border-b last:border-0">
-                                    <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-sm truncate">{v.productName}</p>
-                                      <p className="text-muted-foreground text-xs">{v.sku} · {v.variantName}</p>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <p className="text-xs font-semibold">LKR {v.costPrice.toLocaleString()}</p>
-                                      <p className="text-xs text-muted-foreground">Stock: {v.stock}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => clearVariant(idx)}
+                                className="text-[11px] font-semibold text-primary hover:underline shrink-0"
+                              >
+                                Change
+                              </button>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="relative">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                            <ScanLine className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 pointer-events-none" />
+                            <input
+                              value={q}
+                              onChange={(e) => setSearchQ((p) => p.map((x, i) => i === idx ? e.target.value : x))}
+                              onFocus={() => setSearchOpen(idx)}
+                              onKeyDown={(e) => handleItemSearchKeyDown(idx, e)}
+                              placeholder="Search name, SKU, or scan barcode…"
+                              className="w-full pl-8 pr-8 py-2 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                            {searchOpen === idx && (
+                              <div className="absolute top-full left-0 right-0 z-50 bg-background border rounded-xl shadow-xl mt-1 overflow-hidden">
+                                <div className="max-h-52 overflow-y-auto">
+                                  {matches.length === 0 ? (
+                                    <p className="px-3 py-5 text-center text-muted-foreground text-xs">
+                                      {q ? "No match — press Enter to scan barcode/SKU" : "Type to search products"}
+                                    </p>
+                                  ) : matches.map((v) => (
+                                    <button
+                                      key={v.variantId}
+                                      type="button"
+                                      onClick={() => selectVariant(idx, v)}
+                                      className="w-full px-3 py-2.5 hover:bg-muted/50 text-left flex items-center gap-3 border-b last:border-0"
+                                    >
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-medium text-sm truncate">{v.productName}</p>
+                                        <p className="text-muted-foreground text-xs truncate">
+                                          {v.sku} · {v.variantName}
+                                        </p>
+                                      </div>
+                                      <div className="text-right shrink-0">
+                                        <p className="text-xs font-semibold tabular-nums">LKR {v.costPrice.toLocaleString()}</p>
+                                        <p className="text-[10px] text-muted-foreground tabular-nums">Stock {v.stock}</p>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.sku || "—"}</td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{item.variantName || "—"}</td>
-                      <td className="px-4 py-3">
-                        <input type="number" min={1} value={item.orderedQty}
-                          onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value) || 1))}
-                          className="w-16 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min={1}
+                          value={item.orderedQty}
+                          onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          className="w-full text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
                       </td>
-                      <td className="px-4 py-3">
-                        <input type="number" min={0} step="0.01" value={item.unitCost}
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.unitCost}
                           onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
-                          className="w-28 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                          className="w-full text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
                       </td>
-                      <td className="px-4 py-3">
-                        <input type="number" min={0} step="0.01" value={item.discount}
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={item.discount}
                           onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
-                          className="w-24 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                          className="w-full text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
                       </td>
-                      <td className="px-4 py-3">
-                        <input type="number" min={0} max={100} step="0.1" value={item.taxRate}
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.1"
+                          value={item.taxRate}
                           onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                          className="w-20 text-right text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+                          className="w-full text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                        />
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-sm">{fmt(total)}</td>
-                      <td className="px-4 py-3">
-                        <button onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-600 transition-colors p-1 rounded hover:bg-red-50">
+                      <td className="px-3 py-3 text-right font-semibold text-sm tabular-nums whitespace-nowrap">
+                        {fmt(total)}
+                      </td>
+                      <td className="px-2 py-2.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeRow(idx)}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded-md hover:bg-destructive/10"
+                          aria-label="Remove row"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </td>
@@ -400,36 +526,52 @@ export default function CreatePOPage() {
                 })}
                 {items.length === 0 && (
                   <tr>
-                    <td colSpan={10} className="py-16 text-center">
-                      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                        <Plus className="h-8 w-8 opacity-30" />
-                        <p className="text-sm">No items added yet.</p>
-                        <button onClick={addRow} className="text-sm text-primary hover:underline font-medium">+ Add your first item</button>
+                    <td colSpan={8} className="py-14 text-center">
+                      <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                        <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
+                          <Package className="h-6 w-6 opacity-40" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground">No items yet</p>
+                          <p className="text-xs mt-1">Search products, scan barcodes, or add a row manually.</p>
+                        </div>
+                        <Button size="sm" variant="outline" onClick={addRow} className="gap-1.5 mt-1">
+                          <Plus className="h-3.5 w-3.5" /> Add first item
+                        </Button>
                       </div>
                     </td>
                   </tr>
                 )}
               </tbody>
               {items.length > 0 && (
-                <tfoot className="bg-muted/30 border-t">
-                  <tr>
-                    <td colSpan={4} className="px-4 py-3 text-sm font-semibold">Total Items: {items.length}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold">{totalQty}</td>
-                    <td />
-                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmt(totalDisc)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold">{fmt(totalTax)}</td>
-                    <td className="px-4 py-3 text-right text-sm font-bold text-primary">{fmt(grandTotal)}</td>
+                <tfoot className="bg-muted/40 border-t">
+                  <tr className="text-sm">
+                    <td colSpan={2} className="px-3 py-3 font-semibold">
+                      Totals <span className="text-muted-foreground font-normal">({items.length} items)</span>
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">{totalQty}</td>
+                    <td className="px-3 py-3 text-right text-xs text-muted-foreground tabular-nums">
+                      {fmt(subtotal)}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums text-green-600">
+                      {fmt(totalDisc)}
+                    </td>
+                    <td className="px-3 py-3 text-right font-semibold tabular-nums">
+                      {fmt(totalTax)}
+                    </td>
+                    <td className="px-3 py-3 text-right font-bold text-primary tabular-nums">
+                      {fmt(grandTotal)}
+                    </td>
                     <td />
                   </tr>
                 </tfoot>
               )}
             </table>
           </div>
+
           {items.length > 0 && (
-            <div className="px-6 py-3 border-t bg-muted/10">
-              <button onClick={addRow} className="text-sm text-primary hover:underline flex items-center gap-1.5 font-medium">
-                <Plus className="h-3.5 w-3.5" /> Add Another Row
-              </button>
+            <div className="px-5 py-2.5 border-t bg-muted/10 text-[11px] text-muted-foreground">
+              Tip: focus the product field and scan a barcode — press Enter to add by SKU/barcode.
             </div>
           )}
         </div>

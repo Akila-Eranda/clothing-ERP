@@ -30,14 +30,16 @@ interface Expense {
 }
 interface Account { id: string; code: string; name: string; type: string; balance: number; description?: string | null; }
 interface PLData { month: string; revenue: number; expenses: number; profit: number; }
-interface PLReport { period: { startDate: string; endDate: string }; revenue: { gross: number; returns: number; net: number }; expenses: { total: number; count: number }; netProfit: number; profitMargin: string; salesCount: number; }
+interface PLReport { period: { startDate: string; endDate: string }; revenue: { gross: number; returns: number; net: number }; costOfGoodsSold?: number; grossProfit?: number; expenses: { total: number; count: number }; netProfit: number; profitMargin: string; salesCount: number; }
+interface ExpenseSummary { total: number; byCategory: { name: string; amount: number }[]; byPaymentMethod: { method: string; amount: number }[]; }
+interface TrialBalanceRow { code: string; name: string; type: string; balance: number; }
 interface CashFlowDay { date: string; inflow: number; outflow: number; }
 interface JournalEntry { id: string; entryNumber: string; description: string; date: string; isPosted: boolean; lines: { id: string; type: string; amount: number; debitAccount?: { name: string; code: string } | null; creditAccount?: { name: string; code: string } | null; }[]; }
 interface BalanceSheet { assets: { accounts: Account[]; operatingCash: number; totalExpenses: number; total: number }; liabilities: { accounts: Account[]; total: number }; equity: { accounts: Account[]; retainedEarnings: number; total: number }; revenue: { accounts: Account[]; total: number }; expenseAcct: { accounts: Account[]; total: number }; }
 interface ARData { total: number; count: number; customers: { id: string; code: string; firstName: string; lastName: string; phone: string; creditBalance: number; creditLimit: number }[]; }
 interface APData { total: number; supplierBalanceTotal: number; purchaseOrderDueTotal: number; suppliers: { id: string; name: string; balance: number }[]; unpaidPurchaseOrders: { poNumber: string; balanceDue: number; supplier: { name: string } }[]; }
 
-const PAY_METHODS = ["CASH","CARD","BANK_TRANSFER","ONLINE","CREDIT","CHEQUE"];
+const PAY_METHODS = ["CASH","CARD","BANK_TRANSFER","ONLINE","CUSTOMER_CREDIT","CHEQUE","WALLET"];
 const CATEGORIES  = ["Payroll","Rent","Utilities","Marketing","Operations","Logistics","Assets","Other"];
 const CAT_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#06b6d4","#84cc16","#ec4899"];
 
@@ -295,6 +297,9 @@ export default function AccountingPage() {
   const [thisMonthPL, setThisMonthPL] = useState<PLReport | null>(null);
   const [arData, setArData]           = useState<ARData | null>(null);
   const [apData, setApData]           = useState<APData | null>(null);
+  const [expenseSummary, setExpenseSummary] = useState<ExpenseSummary | null>(null);
+  const [trialBalance, setTrialBalance] = useState<TrialBalanceRow[]>([]);
+  const [trialOpen, setTrialOpen]     = useState(false);
   const [loading, setLoading]         = useState(true);
   const [activeTab, setActiveTab]     = useState("dashboard");
 
@@ -310,7 +315,7 @@ export default function AccountingPage() {
       const tmStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0];
       const tmEnd   = new Date().toISOString().split("T")[0];
       const results = await Promise.allSettled([
-        api.get<{ data: Expense[] }>("/accounting/expenses?limit=200"),
+        api.get<{ data: Expense[] }>(`/accounting/expenses?limit=200&startDate=${tmStart}&endDate=${tmEnd}`),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
         api.get<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number }>(`/accounting/cash-flow?startDate=${cfRange.start}&endDate=${cfRange.end}`),
@@ -320,6 +325,8 @@ export default function AccountingPage() {
         api.get<PLReport>(`/accounting/profit-loss?startDate=${tmStart}&endDate=${tmEnd}`),
         api.get<ARData>("/accounting/accounts-receivable"),
         api.get<APData>("/accounting/accounts-payable"),
+        api.get<ExpenseSummary>(`/accounting/expenses/summary?startDate=${tmStart}&endDate=${tmEnd}`),
+        api.get<TrialBalanceRow[]>("/accounting/trial-balance"),
       ]);
 
       const ok = <T,>(i: number): T | null =>
@@ -337,6 +344,8 @@ export default function AccountingPage() {
       const tm = ok<PLReport>(7); if (tm) setThisMonthPL(tm);
       const ar = ok<ARData>(8); if (ar) setArData(ar);
       const ap = ok<APData>(9); if (ap) setApData(ap);
+      const expSum = ok<ExpenseSummary>(10); if (expSum) setExpenseSummary(expSum);
+      const tb = ok<TrialBalanceRow[]>(11); if (tb) setTrialBalance(Array.isArray(tb) ? tb : []);
 
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === results.length) toast.error("Failed to load accounting data");
@@ -365,10 +374,26 @@ export default function AccountingPage() {
   const revenue    = pl?.revenue?.net ?? 0;
   const totalExp   = pl?.expenses?.total ?? 0;
   const margin     = revenue > 0 ? ((netProfit / revenue) * 100).toFixed(1) : "0";
-  const expTotal   = expenses.reduce((s, e) => s + e.amount, 0);
+  const expTotal   = expenseSummary?.total ?? expenses.reduce((s, e) => s + e.amount, 0);
   const recentExp  = [...expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
-  const expByCat   = CATEGORIES.map((cat, i) => ({ name: cat, value: expenses.filter((e) => e.categoryId === cat).reduce((s, e) => s + e.amount, 0), color: CAT_COLORS[i % CAT_COLORS.length] })).filter((c) => c.value > 0);
-  const topAccounts = [...accounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 8);
+  const expByCat   = (expenseSummary?.byCategory ?? []).map((cat, i) => ({
+    name: cat.name,
+    value: cat.amount,
+    color: CAT_COLORS[i % CAT_COLORS.length],
+  })).filter((c) => c.value > 0);
+  const flatAccounts = React.useMemo(() => {
+    const out: Account[] = [];
+    const walk = (list: Account[]) => {
+      for (const a of list) {
+        out.push(a);
+        const children = (a as Account & { children?: Account[] }).children;
+        if (children?.length) walk(children);
+      }
+    };
+    walk(accounts);
+    return out;
+  }, [accounts]);
+  const topAccounts = [...flatAccounts].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).slice(0, 8);
 
   // ── This-month KPI values (always current month, independent of range filter)
   const tmRevenue   = thisMonthPL?.revenue?.net ?? 0;
@@ -405,7 +430,7 @@ export default function AccountingPage() {
     { accessorKey: "entryNumber", header: ({ column }) => <DataTableColumnHeader column={column} title="Entry #" />,     cell: ({ row }) => <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded">{row.original.entryNumber}</span> },
     { accessorKey: "description", header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="text-sm">{row.original.description}</span> },
     { accessorKey: "date",        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK",{ day:"2-digit",month:"short",year:"numeric" })}</span> },
-    { id: "lines",                header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.lines?.length ?? 0} lines</span> },
+    { id: "lines",                header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{Math.max(1, Math.floor((row.original.lines?.length ?? 0) / 2))}</span> },
     { accessorKey: "isPosted",    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,      cell: ({ row }) => <Badge variant={row.original.isPosted ? "success" : "warning"} className="text-[10px]">{row.original.isPosted ? "Posted" : "Draft"}</Badge> },
   ];
 
@@ -682,12 +707,12 @@ export default function AccountingPage() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">{accounts.length} accounts total</p>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="gap-1.5"><Scale className="h-3.5 w-3.5" />Trial Balance</Button>
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrialOpen(true)}><Scale className="h-3.5 w-3.5" />Trial Balance</Button>
                 <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />New Account</Button>
               </div>
             </div>
             {Object.entries(ACCT_TYPE_CFG).map(([typeKey, cfg]) => {
-              const accts = accounts.filter((a) => a.type === typeKey);
+              const accts = flatAccounts.filter((a) => a.type === typeKey);
               if (!accts.length) return null;
               const total = accts.reduce((s, a) => s + a.balance, 0);
               return (
@@ -831,7 +856,7 @@ export default function AccountingPage() {
             {/* Cash Position Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { label: "Total Cash Position",  value: accounts.filter(a=>a.type==="ASSET").reduce((s,a)=>s+a.balance,0),  icon: Wallet,    bg: "bg-blue-600",    sub: `${accounts.filter(a=>a.type==="ASSET").length} asset accounts` },
+                { label: "Total Cash Position",  value: flatAccounts.filter(a=>a.type==="ASSET").reduce((s,a)=>s+a.balance,0),  icon: Wallet,    bg: "bg-blue-600",    sub: `${flatAccounts.filter(a=>a.type==="ASSET").length} asset accounts` },
                 { label: "Total Inflow (Period)", value: cashFlow?.totalInflow ?? 0,  icon: ArrowUpRight,   bg: "bg-emerald-600", sub: "From sales revenue" },
                 { label: "Total Outflow (Period)",value: cashFlow?.totalOutflow ?? 0, icon: ArrowDownRight, bg: "bg-red-500",     sub: "Expenses & payments" },
               ].map((item) => (
@@ -854,11 +879,11 @@ export default function AccountingPage() {
                 <h3 className="text-sm font-semibold text-foreground">Cash &amp; Bank Accounts</h3>
                 <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-8" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />Add Account</Button>
               </div>
-              {accounts.filter(a=>a.type==="ASSET").length === 0 ? (
+              {flatAccounts.filter(a=>a.type==="ASSET").length === 0 ? (
                 <div className="h-32 flex items-center justify-center bg-card rounded-xl border text-muted-foreground text-sm">No asset accounts yet</div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {accounts.filter(a=>a.type==="ASSET").map((acct) => (
+                  {flatAccounts.filter(a=>a.type==="ASSET").map((acct) => (
                     <Card key={acct.id} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
                       <CardContent className="p-5">
                         <div className="flex items-center justify-between mb-3">
@@ -975,7 +1000,32 @@ export default function AccountingPage() {
         <ExpenseModal edit={editExpense} onClose={() => { setAddExpenseOpen(false); setEditExpense(null); }} onSaved={loadAll} />
       )}
       {(addAccountOpen || editAccount) && <AccountModal edit={editAccount} onClose={() => { setAddAccountOpen(false); setEditAccount(null); }} onSaved={loadAll} />}
-      {addJournalOpen && <JournalModal accounts={accounts} onClose={() => setAddJournalOpen(false)} onSaved={loadAll} />}
+      {addJournalOpen && <JournalModal accounts={flatAccounts} onClose={() => setAddJournalOpen(false)} onSaved={loadAll} />}
+      {trialOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) setTrialOpen(false); }}>
+          <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b">
+              <h2 className="font-bold">Trial Balance</h2>
+              <button onClick={() => setTrialOpen(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="overflow-auto flex-1 p-4">
+              <table className="w-full text-sm">
+                <thead><tr className="text-xs uppercase text-muted-foreground border-b"><th className="text-left py-2">Code</th><th className="text-left py-2">Account</th><th className="text-left py-2">Type</th><th className="text-right py-2">Balance</th></tr></thead>
+                <tbody>
+                  {trialBalance.map((row) => (
+                    <tr key={row.code} className="border-b last:border-0">
+                      <td className="py-2 font-mono text-xs">{row.code}</td>
+                      <td className="py-2">{row.name}</td>
+                      <td className="py-2 text-xs text-muted-foreground">{row.type}</td>
+                      <td className="py-2 text-right font-semibold tabular-nums">LKR {formatNumber(row.balance)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

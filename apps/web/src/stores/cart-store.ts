@@ -3,7 +3,13 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { CartItem, Customer } from "@/types";
-import { calculateDiscount, calculateTax } from "@/lib/utils";
+import { calculateDiscount } from "@/lib/utils";
+import {
+  calcPosAmountDue,
+  calcPosSubtotal,
+  calcPosTaxAmount,
+  type PosLineInput,
+} from "@/lib/pos-totals";
 
 export interface HeldBillData {
   items: CartItem[];
@@ -149,38 +155,25 @@ export const useCartStore = create<CartStore>()(
         };
       },
 
-      subtotal: () => {
-        const { items } = get();
-        return items.reduce((sum, item) => {
-          const itemDiscount = calculateDiscount(
-            item.unitPrice * item.quantity,
-            item.discountAmount,
-            item.discountType
-          );
-          return sum + item.unitPrice * item.quantity - itemDiscount;
-        }, 0);
-      },
+      subtotal: () => calcPosSubtotal(get().items as PosLineInput[]),
 
       discountAmount: () => {
         const { discount, discountType } = get();
-        const subtotal = get().subtotal();
-        return calculateDiscount(subtotal, discount, discountType);
+        const sub = get().subtotal();
+        return calculateDiscount(sub, discount, discountType);
       },
 
-      loyaltyDiscount: () => {
-        const { loyaltyPointsToRedeem } = get();
-        return loyaltyPointsToRedeem * 0.1;
-      },
+      loyaltyDiscount: () => get().loyaltyPointsToRedeem * 0.1,
 
-      taxAmount: () => {
-        const { taxRate } = get();
-        const base = get().subtotal() - get().discountAmount() - get().loyaltyDiscount();
-        return calculateTax(Math.max(0, base), taxRate);
-      },
+      taxAmount: () => calcPosTaxAmount(get().items as PosLineInput[]),
 
       total: () => {
-        const base = get().subtotal() - get().discountAmount() - get().loyaltyDiscount();
-        return Math.max(0, base) + get().taxAmount();
+        const { items, discount, discountType, loyaltyPointsToRedeem } = get();
+        return calcPosAmountDue(items as PosLineInput[], {
+          manualDiscount: discount,
+          manualDiscountType: discountType,
+          loyaltyPoints: loyaltyPointsToRedeem,
+        });
       },
 
       itemCount: () => get().items.reduce((sum, i) => sum + i.quantity, 0),

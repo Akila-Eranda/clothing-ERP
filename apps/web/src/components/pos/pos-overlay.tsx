@@ -20,6 +20,7 @@ import { APP_NAME } from "@/lib/constants";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
+import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
 
 interface POSOverlayProps {
   /** Cashier mode — no ERP shell; exit returns to POS landing only. */
@@ -172,7 +173,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { settings: receiptSettings } = useReceiptSettings();
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  const { items, customer, discount, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+  const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
 
   React.useEffect(() => {
     if (!posOpen) return;
@@ -417,7 +418,26 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const activeVariant = React.useMemo(() =>
     selectedProductName ? findVariant(selectedProductName, selAttrs) : null,
   [selectedProductName, selAttrs, findVariant]);
-  const totalAmt = total(); const changeAmt = numpad ? Math.max(0,parseFloat(numpad)-totalAmt) : 0;
+  const totalAmt = React.useMemo(
+    () => calcPosAmountDue(
+      items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+        discountAmount: i.discountAmount,
+        discountType: i.discountType,
+        taxRate: i.taxRate,
+      })),
+      {
+        manualDiscount: discount,
+        manualDiscountType: discountType,
+        couponDiscount: payState.couponDiscount,
+        tierDiscount: calcTierDiscount(subtotal(), customer?.tier),
+        loyaltyPoints: loyaltyPointsToRedeem,
+      },
+    ),
+    [items, discount, discountType, payState.couponDiscount, customer?.tier, loyaltyPointsToRedeem, subtotal],
+  );
+  const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
   const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
 

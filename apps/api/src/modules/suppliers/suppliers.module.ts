@@ -224,29 +224,43 @@ export class SuppliersService {
 
   async recordPayment(supplierId: string, tenantId: string, dto: RecordPaymentDto) {
     await this.findOneSupplier(supplierId, tenantId);
+    if (dto.amount <= 0) {
+      throw new BadRequestException('Payment amount must be positive');
+    }
     return this.prisma.$transaction(async (tx) => {
+      if (dto.purchaseId) {
+        const po = await tx.purchaseOrder.findFirst({
+          where: { id: dto.purchaseId, tenantId, supplierId },
+        });
+        if (!po) throw new NotFoundException('Purchase order not found for this supplier');
+        const due = Math.max(0, po.total - po.paidAmount);
+        if (dto.amount > due + 0.01) {
+          throw new BadRequestException(
+            `Payment exceeds PO balance due (LKR ${due.toFixed(2)} remaining)`,
+          );
+        }
+      }
+
       const payment = await tx.supplierPayment.create({
         data: {
           tenantId,
           supplierId,
           purchaseId: dto.purchaseId || undefined,
-          amount:     dto.amount,
-          method:     dto.method,
-          reference:  dto.reference,
-          notes:      dto.notes,
-          paidAt:     dto.paidAt ? new Date(dto.paidAt) : new Date(),
+          amount: dto.amount,
+          method: dto.method,
+          reference: dto.reference,
+          notes: dto.notes,
+          paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
         },
       });
-      await tx.supplier.update({
-        where: { id: supplierId },
-        data: { balance: { decrement: dto.amount } },
-      });
+
       if (dto.purchaseId) {
         await tx.purchaseOrder.update({
           where: { id: dto.purchaseId },
           data: { paidAmount: { increment: dto.amount } },
         });
       }
+
       return payment;
     });
   }

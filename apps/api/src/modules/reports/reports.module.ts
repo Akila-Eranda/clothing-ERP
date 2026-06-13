@@ -18,7 +18,7 @@ export class ReportsService {
       lte: dayjs(endDate).endOf('day').toDate(),
     };
     return this.prisma.sale.findMany({
-      where: { tenantId, ...(branchId && { branchId }), invoiceDate: dateRange },
+      where: { tenantId, status: { not: 'CANCELLED' }, ...(branchId && { branchId }), invoiceDate: dateRange },
       include: {
         customer: { select: { firstName: true, lastName: true, phone: true } },
         cashier: { select: { firstName: true, lastName: true } },
@@ -262,19 +262,25 @@ export class ReportsService {
     }));
   }
 
-  async taxReport(tenantId: string, startDate: string, endDate: string) {
+  async taxReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
     const dateRange = {
       gte: dayjs(startDate).startOf('day').toDate(),
       lte: dayjs(endDate).endOf('day').toDate(),
     };
+    const saleWhere = {
+      tenantId,
+      status: { not: 'CANCELLED' as const },
+      invoiceDate: dateRange,
+      ...(branchId && { branchId }),
+    };
     const aggregated = await this.prisma.sale.aggregate({
-      where: { tenantId, invoiceDate: dateRange },
+      where: saleWhere,
       _sum: { total: true, taxAmount: true, subtotal: true, discountAmount: true },
       _count: { id: true },
     });
     const byTaxRate = await this.prisma.saleItem.groupBy({
       by: ['taxRate'],
-      where: { sale: { tenantId, invoiceDate: dateRange } },
+      where: { sale: saleWhere },
       _sum: { taxAmount: true, total: true, quantity: true },
       orderBy: { taxRate: 'asc' },
     });
@@ -326,8 +332,8 @@ export class ReportsController {
   @Get('tax')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Tax/GST report' })
-  taxReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
-    return this.reportsService.taxReport(user.tenantId, start, end);
+  taxReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.taxReport(user.tenantId, start, end, branchId);
   }
 
   @Get('profit')

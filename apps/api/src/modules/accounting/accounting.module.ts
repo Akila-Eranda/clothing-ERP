@@ -1,7 +1,7 @@
 import { Module, NotFoundException } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsBoolean, ValidateNested, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -58,6 +58,14 @@ export class CreateJournalEntryDto {
 export class AccountingService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private static readonly SETTLED_RETURN_STATUSES = ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] as const;
+
+  private balanceDelta(type: AccountType, amount: number, isDebit: boolean): number {
+    const debitNormal = type === AccountType.ASSET || type === AccountType.EXPENSE;
+    if (isDebit) return debitNormal ? amount : -amount;
+    return debitNormal ? -amount : amount;
+  }
+
   async getAccounts(tenantId: string) {
     return this.prisma.account.findMany({
       where: { tenantId, isActive: true, parentId: null },
@@ -110,10 +118,11 @@ export class AccountingService {
       gte: dayjs(startDate).startOf('day').toDate(),
       lte: dayjs(endDate).endOf('day').toDate(),
     };
+    const saleWhere = { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' as const } };
 
-    const [revenue, expenses, returns] = await this.prisma.$transaction([
+    const [revenue, expenses, returns, saleItems] = await this.prisma.$transaction([
       this.prisma.sale.aggregate({
-        where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
+        where: saleWhere,
         _sum: { total: true, taxAmount: true, discountAmount: true },
         _count: { _all: true },
       }),
@@ -123,20 +132,32 @@ export class AccountingService {
         _count: { _all: true },
       }),
       this.prisma.return.aggregate({
-        where: { tenantId, createdAt: dateRange, status: { in: ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] } },
+        where: {
+          tenantId,
+          createdAt: dateRange,
+          status: { in: [...AccountingService.SETTLED_RETURN_STATUSES] },
+        },
         _sum: { refundAmount: true },
+      }),
+      this.prisma.saleItem.findMany({
+        where: { sale: saleWhere },
+        select: { quantity: true, costPrice: true },
       }),
     ]);
 
     const grossRevenue = revenue._sum?.total ?? 0;
     const totalExpenses = expenses._sum?.amount ?? 0;
     const totalReturns = returns._sum?.refundAmount ?? 0;
+    const costOfGoodsSold = saleItems.reduce((s, i) => s + i.costPrice * i.quantity, 0);
     const netRevenue = grossRevenue - totalReturns;
-    const netProfit = netRevenue - totalExpenses;
+    const grossProfit = netRevenue - costOfGoodsSold;
+    const netProfit = grossProfit - totalExpenses;
 
     return {
       period: { startDate, endDate },
       revenue: { gross: grossRevenue, returns: totalReturns, net: netRevenue },
+      costOfGoodsSold,
+      grossProfit,
       expenses: { total: totalExpenses, count: expenses._count?._all ?? 0 },
       netProfit,
       profitMargin: netRevenue > 0 ? ((netProfit / netRevenue) * 100).toFixed(2) : '0',
@@ -208,7 +229,14 @@ export class AccountingService {
       const [rev, exp, ret] = await this.prisma.$transaction([
         this.prisma.sale.aggregate({ where: { tenantId, invoiceDate: { gte: start, lte: end }, status: { not: 'CANCELLED' } }, _sum: { total: true } }),
         this.prisma.expense.aggregate({ where: { tenantId, date: { gte: start, lte: end } }, _sum: { amount: true } }),
-        this.prisma.return.aggregate({ where: { tenantId, createdAt: { gte: start, lte: end } }, _sum: { refundAmount: true } }),
+        this.prisma.return.aggregate({
+          where: {
+            tenantId,
+            createdAt: { gte: start, lte: end },
+            status: { in: [...AccountingService.SETTLED_RETURN_STATUSES] },
+          },
+          _sum: { refundAmount: true },
+        }),
       ]);
       const revenue  = (rev._sum?.total ?? 0) - (ret._sum?.refundAmount ?? 0);
       const expenses = exp._sum?.amount ?? 0;
@@ -219,52 +247,102 @@ export class AccountingService {
 
   async getCashFlow(tenantId: string, startDate: string, endDate: string) {
     const dateRange = { gte: dayjs(startDate).startOf('day').toDate(), lte: dayjs(endDate).endOf('day').toDate() };
-    const [sales, expenses, refunds] = await Promise.all([
-      this.prisma.sale.findMany({ where: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } }, select: { total: true, invoiceDate: true } }),
-      this.prisma.expense.findMany({ where: { tenantId, date: dateRange }, select: { amount: true, date: true, categoryId: true } }),
-      this.prisma.return.findMany({ where: { tenantId, createdAt: dateRange, status: { in: ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] } }, select: { refundAmount: true, createdAt: true } }),
+    const [payments, creditPayments, expenses, refunds] = await Promise.all([
+      this.prisma.salePayment.findMany({
+        where: {
+          sale: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
+          method: { not: PaymentMethod.CUSTOMER_CREDIT },
+        },
+        select: { amount: true, sale: { select: { invoiceDate: true } } },
+      }),
+      this.prisma.customerCreditTransaction.findMany({
+        where: {
+          tenantId,
+          type: 'PAYMENT',
+          createdAt: dateRange,
+        },
+        select: { amount: true, createdAt: true },
+      }),
+      this.prisma.expense.findMany({ where: { tenantId, date: dateRange }, select: { amount: true, date: true } }),
+      this.prisma.return.findMany({
+        where: {
+          tenantId,
+          createdAt: dateRange,
+          status: { in: [...AccountingService.SETTLED_RETURN_STATUSES] },
+        },
+        select: { refundAmount: true, createdAt: true },
+      }),
     ]);
     const map: Record<string, { date: string; inflow: number; outflow: number }> = {};
-    for (const s of sales) {
-      const key = dayjs(s.invoiceDate).format('YYYY-MM-DD');
+    const bump = (key: string, field: 'inflow' | 'outflow', amt: number) => {
       if (!map[key]) map[key] = { date: key, inflow: 0, outflow: 0 };
-      map[key].inflow += s.total;
+      map[key][field] += amt;
+    };
+    for (const p of payments) {
+      bump(dayjs(p.sale.invoiceDate).format('YYYY-MM-DD'), 'inflow', p.amount);
+    }
+    for (const cp of creditPayments) {
+      bump(dayjs(cp.createdAt).format('YYYY-MM-DD'), 'inflow', cp.amount);
     }
     for (const e of expenses) {
-      const key = dayjs(e.date).format('YYYY-MM-DD');
-      if (!map[key]) map[key] = { date: key, inflow: 0, outflow: 0 };
-      map[key].outflow += e.amount;
+      bump(dayjs(e.date).format('YYYY-MM-DD'), 'outflow', e.amount);
     }
     for (const r of refunds) {
-      const key = dayjs(r.createdAt).format('YYYY-MM-DD');
-      if (!map[key]) map[key] = { date: key, inflow: 0, outflow: 0 };
-      map[key].outflow += r.refundAmount;
+      bump(dayjs(r.createdAt).format('YYYY-MM-DD'), 'outflow', r.refundAmount);
     }
     const data = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
-    return {
-      data,
-      totalInflow:  sales.reduce((s, e) => s + e.total, 0),
-      totalOutflow: expenses.reduce((s, e) => s + e.amount, 0) + refunds.reduce((s, r) => s + r.refundAmount, 0),
-    };
+    const totalInflow = payments.reduce((s, p) => s + p.amount, 0)
+      + creditPayments.reduce((s, c) => s + c.amount, 0);
+    const totalOutflow = expenses.reduce((s, e) => s + e.amount, 0)
+      + refunds.reduce((s, r) => s + r.refundAmount, 0);
+    return { data, totalInflow, totalOutflow };
   }
 
   async getBalanceSheet(tenantId: string) {
-    const [salesAgg, expAgg, refundAgg, accounts] = await this.prisma.$transaction([
+    const [salesAgg, expAgg, refundAgg, accounts, arAgg, purchaseOrders] = await this.prisma.$transaction([
       this.prisma.sale.aggregate({ where: { tenantId, status: { not: 'CANCELLED' } }, _sum: { total: true } }),
       this.prisma.expense.aggregate({ where: { tenantId }, _sum: { amount: true } }),
-      this.prisma.return.aggregate({ where: { tenantId, status: { in: ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] } }, _sum: { refundAmount: true } }),
+      this.prisma.return.aggregate({
+        where: { tenantId, status: { in: [...AccountingService.SETTLED_RETURN_STATUSES] } },
+        _sum: { refundAmount: true },
+      }),
       this.prisma.account.findMany({ where: { tenantId, isActive: true }, select: { id: true, code: true, name: true, type: true, balance: true } }),
+      this.prisma.customer.aggregate({ where: { tenantId, creditBalance: { gt: 0 } }, _sum: { creditBalance: true } }),
+      this.prisma.purchaseOrder.findMany({
+        where: { tenantId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'CONFIRMED', 'SENT'] } },
+        select: { total: true, paidAmount: true },
+      }),
     ]);
-    const revenue  = (salesAgg._sum?.total ?? 0) - (refundAgg._sum?.refundAmount ?? 0);
+    const netSales = (salesAgg._sum?.total ?? 0) - (refundAgg._sum?.refundAmount ?? 0);
     const expenses = expAgg._sum?.amount ?? 0;
-    const retained = revenue - expenses;
+    const retained = netSales - expenses;
+    const accountsReceivable = arAgg._sum?.creditBalance ?? 0;
+    const accountsPayable = purchaseOrders.reduce(
+      (s, po) => s + Math.max(0, po.total - po.paidAmount),
+      0,
+    );
     const byType = (t: AccountType) => accounts.filter((a) => a.type === t);
+    const assetTotal = byType(AccountType.ASSET).reduce((s, a) => s + a.balance, 0);
+    const liabilityTotal = byType(AccountType.LIABILITY).reduce((s, a) => s + a.balance, 0) + accountsPayable;
+    const equityTotal = byType(AccountType.EQUITY).reduce((s, a) => s + a.balance, 0) + retained;
     return {
-      assets:      { accounts: byType('ASSET'),     operatingCash: revenue, totalExpenses: expenses, total: byType('ASSET').reduce((s, a) => s + a.balance, 0) },
-      liabilities: { accounts: byType('LIABILITY'), total: byType('LIABILITY').reduce((s, a) => s + a.balance, 0) },
-      equity:      { accounts: byType('EQUITY'),    retainedEarnings: retained, total: byType('EQUITY').reduce((s, a) => s + a.balance, 0) + retained },
-      revenue:     { accounts: byType('REVENUE'),   total: byType('REVENUE').reduce((s, a) => s + a.balance, 0) },
-      expenseAcct: { accounts: byType('EXPENSE'),   total: byType('EXPENSE').reduce((s, a) => s + a.balance, 0) },
+      assets: {
+        accounts: byType(AccountType.ASSET),
+        accountsReceivable,
+        total: assetTotal + accountsReceivable,
+      },
+      liabilities: {
+        accounts: byType(AccountType.LIABILITY),
+        accountsPayable,
+        total: liabilityTotal,
+      },
+      equity: {
+        accounts: byType(AccountType.EQUITY),
+        retainedEarnings: retained,
+        total: equityTotal,
+      },
+      revenue: { accounts: byType(AccountType.REVENUE), total: byType(AccountType.REVENUE).reduce((s, a) => s + a.balance, 0) },
+      expenseAcct: { accounts: byType(AccountType.EXPENSE), total: byType(AccountType.EXPENSE).reduce((s, a) => s + a.balance, 0) },
     };
   }
 
@@ -283,24 +361,87 @@ export class AccountingService {
 
   async createJournalEntry(tenantId: string, branchId: string, userId: string, dto: CreateJournalEntryDto) {
     const entryNumber = `JE-${Date.now().toString(36).toUpperCase()}`;
-    return this.prisma.journalEntry.create({
-      data: {
-        tenantId, branchId, entryNumber,
-        description: dto.description,
-        date: new Date(dto.date),
-        referenceId: dto.referenceId,
-        referenceType: dto.referenceType,
-        createdBy: userId,
-        isPosted: true,
-        lines: {
-          create: dto.lines.flatMap((line) => [
-            { debitAccountId: line.debitAccountId, type: JournalEntryType.DEBIT,  amount: line.amount, description: line.description },
-            { creditAccountId: line.creditAccountId, type: JournalEntryType.CREDIT, amount: line.amount, description: line.description },
-          ]),
+
+    return this.prisma.$transaction(async (tx) => {
+      for (const line of dto.lines) {
+        const [debitAcct, creditAcct] = await Promise.all([
+          tx.account.findFirst({ where: { id: line.debitAccountId, tenantId, isActive: true } }),
+          tx.account.findFirst({ where: { id: line.creditAccountId, tenantId, isActive: true } }),
+        ]);
+        if (!debitAcct || !creditAcct) {
+          throw new BadRequestException('Invalid debit or credit account');
+        }
+        if (line.amount <= 0) {
+          throw new BadRequestException('Journal line amount must be positive');
+        }
+      }
+
+      const entry = await tx.journalEntry.create({
+        data: {
+          tenantId,
+          branchId,
+          entryNumber,
+          description: dto.description,
+          date: new Date(dto.date),
+          referenceId: dto.referenceId,
+          referenceType: dto.referenceType,
+          createdBy: userId,
+          isPosted: true,
+          lines: {
+            create: dto.lines.flatMap((line) => [
+              { debitAccountId: line.debitAccountId, type: JournalEntryType.DEBIT, amount: line.amount, description: line.description },
+              { creditAccountId: line.creditAccountId, type: JournalEntryType.CREDIT, amount: line.amount, description: line.description },
+            ]),
+          },
         },
-      },
-      include: { lines: true },
+        include: { lines: true },
+      });
+
+      for (const line of dto.lines) {
+        const [debitAcct, creditAcct] = await Promise.all([
+          tx.account.findFirst({ where: { id: line.debitAccountId, tenantId } }),
+          tx.account.findFirst({ where: { id: line.creditAccountId, tenantId } }),
+        ]);
+        if (!debitAcct || !creditAcct) continue;
+        await tx.account.update({
+          where: { id: debitAcct.id },
+          data: { balance: { increment: this.balanceDelta(debitAcct.type, line.amount, true) } },
+        });
+        await tx.account.update({
+          where: { id: creditAcct.id },
+          data: { balance: { increment: this.balanceDelta(creditAcct.type, line.amount, false) } },
+        });
+      }
+
+      return entry;
     });
+  }
+
+  async updateAccount(id: string, tenantId: string, dto: Partial<CreateAccountDto>) {
+    const account = await this.prisma.account.findFirst({ where: { id, tenantId } });
+    if (!account) throw new NotFoundException('Account not found');
+    return this.prisma.account.update({
+      where: { id },
+      data: {
+        ...(dto.code && { code: dto.code }),
+        ...(dto.name && { name: dto.name }),
+        ...(dto.type && { type: dto.type }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.parentId !== undefined && { parentId: dto.parentId }),
+      },
+    });
+  }
+
+  async deleteAccount(id: string, tenantId: string) {
+    const account = await this.prisma.account.findFirst({ where: { id, tenantId } });
+    if (!account) throw new NotFoundException('Account not found');
+    const lineCount = await this.prisma.journalLine.count({
+      where: { OR: [{ debitAccountId: id }, { creditAccountId: id }] },
+    });
+    if (lineCount > 0) {
+      throw new BadRequestException('Cannot delete an account that has journal entries');
+    }
+    return this.prisma.account.update({ where: { id }, data: { isActive: false } });
   }
 
   async getAccountsReceivable(tenantId: string) {
@@ -317,31 +458,29 @@ export class AccountingService {
   }
 
   async getAccountsPayable(tenantId: string) {
-    const [suppliers, purchaseOrders] = await Promise.all([
-      this.prisma.supplier.findMany({
-        where: { tenantId, balance: { gt: 0 } },
-        select: { id: true, code: true, name: true, phone: true, balance: true, creditDays: true },
-        orderBy: { balance: 'desc' },
-      }),
-      this.prisma.purchaseOrder.findMany({
-        where: { tenantId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'CONFIRMED', 'SENT'] } },
-        select: {
-          id: true, poNumber: true, total: true, paidAmount: true, orderDate: true,
-          supplier: { select: { id: true, name: true } },
-        },
-        orderBy: { orderDate: 'desc' },
-      }),
-    ]);
+    const purchaseOrders = await this.prisma.purchaseOrder.findMany({
+      where: { tenantId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'CONFIRMED', 'SENT'] } },
+      select: {
+        id: true, poNumber: true, total: true, paidAmount: true, orderDate: true,
+        supplier: { select: { id: true, name: true } },
+      },
+      orderBy: { orderDate: 'desc' },
+    });
     const unpaidPos = purchaseOrders
       .map((po) => ({ ...po, balanceDue: Math.max(0, po.total - po.paidAmount) }))
       .filter((po) => po.balanceDue > 0.01);
-    const supplierTotal = suppliers.reduce((s, sup) => s + sup.balance, 0);
     const poTotal = unpaidPos.reduce((s, po) => s + po.balanceDue, 0);
+    const supplierMap = new Map<string, { id: string; name: string; balance: number }>();
+    for (const po of unpaidPos) {
+      const cur = supplierMap.get(po.supplier.id) ?? { id: po.supplier.id, name: po.supplier.name, balance: 0 };
+      cur.balance += po.balanceDue;
+      supplierMap.set(po.supplier.id, cur);
+    }
     return {
-      total: supplierTotal + poTotal,
-      supplierBalanceTotal: supplierTotal,
+      total: poTotal,
+      supplierBalanceTotal: 0,
       purchaseOrderDueTotal: poTotal,
-      suppliers,
+      suppliers: [...supplierMap.values()].sort((a, b) => b.balance - a.balance),
       unpaidPurchaseOrders: unpaidPos,
     };
   }
@@ -365,6 +504,20 @@ export class AccountingController {
   @ApiOperation({ summary: 'Create account' })
   createAccount(@CurrentUser() user: IAuthUser, @Body() dto: CreateAccountDto) {
     return this.accountingService.createAccount(user.tenantId, user.id, dto);
+  }
+
+  @Put('accounts/:id')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Update account' })
+  updateAccount(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: CreateAccountDto) {
+    return this.accountingService.updateAccount(id, user.tenantId, dto);
+  }
+
+  @Delete('accounts/:id')
+  @RequirePermissions('accounting:delete')
+  @ApiOperation({ summary: 'Deactivate account' })
+  deleteAccount(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.accountingService.deleteAccount(id, user.tenantId);
   }
 
   @Post('expenses')
