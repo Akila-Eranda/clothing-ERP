@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -16,6 +16,7 @@ import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
+import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 
 interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
@@ -67,7 +68,7 @@ interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }];
 
-const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
+const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"warranty", label:"Warranty", icon: Wrench, module: "warranty" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
@@ -140,6 +141,7 @@ export function POSOverlay() {
   const [returnType, setReturnType] = React.useState<"RETURN"|"EXCHANGE">("RETURN");
   const [exchangeItems, setExchangeItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
   const [exchangeSearch, setExchangeSearch] = React.useState("");
+  const [warrantySaleId, setWarrantySaleId] = React.useState<string | null>(null);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -341,6 +343,7 @@ export function POSOverlay() {
   }, [posOpen]);
 
   React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); setReturnType("RETURN"); setExchangeItems(new Map()); setExchangeSearch(""); } }, [activeNav]);
+  React.useEffect(() => { if (activeNav !== "warranty") setWarrantySaleId(null); }, [activeNav]);
 
   const fetchPosCustomers = React.useCallback(async (search: string, limit: number) => {
     const q = search.trim();
@@ -795,7 +798,7 @@ export function POSOverlay() {
         {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">No recent orders</p></div>):(
           <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
             <table className="w-full text-sm">
-              <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
+              <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status",...(hasShopModule(profile,"warranty")?["Action"]:[])].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
               <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid #1a2b3a",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
                 <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
                 <td className="px-3 py-2 text-xs text-white">{formatSaleCustomerName(o.customer)}</td>
@@ -804,12 +807,23 @@ export function POSOverlay() {
                 <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.payments?.[0]?.method ?? o.paymentMethod ?? "-"}</td>
                 <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{new Date(o.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
                 <td className="px-3 py-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{o.status}</span></td>
+                {hasShopModule(profile,"warranty")&&(<td className="px-3 py-2">{o.status==="COMPLETED"?(<button type="button" onClick={()=>{setWarrantySaleId(o.id);setActiveNav("warranty");}} className="text-[10px] font-bold px-2 py-1 rounded-lg text-white whitespace-nowrap" style={{background:"rgba(79,110,247,0.85)"}}><Wrench className="inline h-3 w-3 mr-0.5 -mt-0.5"/>Claim</button>):(<span style={{color:"#4a6a8a"}}>—</span>)}</td>)}
               </tr>);})}</tbody>
             </table>
           </div>
         )}
       </div>
     );
+
+    // WARRANTY (Spare Parts)
+    if (activeNav === "warranty") {
+      return (
+        <PosWarrantyPanel
+          initialSaleId={warrantySaleId}
+          onInitialSaleConsumed={() => setWarrantySaleId(null)}
+        />
+      );
+    }
 
     // RETURNS FLOW
     if (activeNav === "returns") {

@@ -8,7 +8,7 @@ import {
   IsString, IsOptional, IsInt, IsNumber, IsArray, IsEnum, Min, IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { QuotationStatus, WarrantyClaimStatus } from '@prisma/client';
+import { QuotationStatus, SaleStatus, WarrantyClaimStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -276,16 +276,46 @@ export class SparePartsService {
 
   async createWarrantyClaim(tenantId: string, userId: string, dto: CreateWarrantyClaimDto) {
     await this.assertModule(tenantId, 'warranty');
+
+    let customerId = dto.customerId;
+    let purchaseDate = new Date(dto.purchaseDate);
+
+    if (dto.saleId) {
+      const sale = await this.prisma.sale.findFirst({
+        where: { id: dto.saleId, tenantId },
+        include: { items: true },
+      });
+      if (!sale) throw new BadRequestException('Linked sale invoice not found');
+      if (sale.status !== SaleStatus.COMPLETED) {
+        throw new BadRequestException('Warranty claims can only be linked to completed sales');
+      }
+      const line = sale.items.find((i) => i.variantId === dto.variantId);
+      if (!line) {
+        throw new BadRequestException('Selected part was not on this invoice');
+      }
+      if (sale.customerId) {
+        if (customerId && sale.customerId !== customerId) {
+          throw new BadRequestException('Customer does not match the selected invoice');
+        }
+        customerId = sale.customerId;
+      }
+      purchaseDate = sale.invoiceDate;
+    }
+
+    if (!customerId) {
+      throw new BadRequestException('Customer is required — link a customer to the sale or select one');
+    }
+
     const claimNumber = `WC-${nanoid(8).toUpperCase()}`;
     return this.prisma.warrantyClaim.create({
       data: {
         tenantId,
-        customerId: dto.customerId,
+        customerId,
         variantId: dto.variantId,
         saleId: dto.saleId,
         claimNumber,
         warrantyMonths: dto.warrantyMonths,
-        purchaseDate: new Date(dto.purchaseDate),
+        purchaseDate,
         issueDescription: dto.issueDescription,
       },
       include: {

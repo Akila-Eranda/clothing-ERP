@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 interface Claim {
   id: string; claimNumber: string; status: string; warrantyMonths: number;
   purchaseDate: string; claimDate: string; issueDescription: string; resolution?: string | null;
+  saleId?: string | null;
   customer: { firstName: string; lastName?: string | null; phone: string };
   variant: { sku: string; name: string; product: { name: string; warrantyMonths?: number | null } };
 }
@@ -119,13 +120,13 @@ export default function WarrantyPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b">
-                <tr>{["Claim #", "Customer", "Part", "Status", "Issue", "Actions"].map((h) => (
+                <tr>{["Claim #", "Customer", "Part", "Status", "Issue", "Invoice", "Actions"].map((h) => (
                   <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
                 ))}</tr>
               </thead>
               <tbody className="divide-y">
                 {claims.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No warranty claims yet</td></tr>
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No warranty claims yet</td></tr>
                 ) : claims.map((c) => (
                   <tr key={c.id} className="hover:bg-muted/20">
                     <td className="px-3 py-2 font-mono text-xs">{c.claimNumber}</td>
@@ -133,6 +134,7 @@ export default function WarrantyPage() {
                     <td className="px-3 py-2 text-xs">{c.variant.product.name}<br /><span className="text-muted-foreground">{c.variant.sku}</span></td>
                     <td className="px-3 py-2"><Badge variant={STATUS_VARIANT[c.status] ?? "secondary"} className="text-[9px]">{c.status}</Badge></td>
                     <td className="px-3 py-2 text-xs max-w-[160px] truncate">{c.issueDescription}</td>
+                    <td className="px-3 py-2 text-xs font-mono text-muted-foreground">{c.saleId ? "POS linked" : "—"}</td>
                     <td className="px-3 py-2">
                       {c.status === "PENDING" && (
                         <div className="flex gap-1">
