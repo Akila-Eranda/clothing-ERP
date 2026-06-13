@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -22,6 +22,8 @@ import {
   buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint,
   applyVariantCombo, autoFillVariantAttributes, findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
 } from "@/lib/shop-vertical";
+import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import { useBranchStore } from "@/stores/branch-store";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
@@ -42,6 +44,8 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
+  branchScope: ProductBranchScope;
+  branchId: string;
 }
 function buildInitial(type?: string): Form {
   const d = buildProductFormDefaults(type);
@@ -55,6 +59,8 @@ function buildInitial(type?: string): Form {
     hasVariants: d.hasVariants, attributes: d.attributes,
     unit: d.unit, expiryDate: "", batchNumber: "",
     trackInventory: true,
+    branchScope: "ALL",
+    branchId: "",
   };
 }
 const INITIAL: Form = buildInitial();
@@ -83,6 +89,7 @@ const COLOR_HEX: Record<string, string> = {
 // â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AddProductPage() {
   const router = useRouter();
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const shopProfile = useShopProfile();
   const { workspace } = useShopWorkspace();
   const formCopy = getProductFormCopy(shopProfile, workspace);
@@ -112,6 +119,13 @@ export default function AddProductPage() {
   }, [formCopy.showBrand]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
+  const setBranchScope = (scope: ProductBranchScope) => {
+    setForm((p) => ({
+      ...p,
+      branchScope: scope,
+      branchId: scope === "SINGLE" && !p.branchId ? (activeBranchId ?? "") : p.branchId,
+    }));
+  };
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
 
   const addAttrValue = (i: number) => {
@@ -186,6 +200,10 @@ export default function AddProductPage() {
       ...(showExpiry && form.expiryDate ? [`exp:${form.expiryDate}`] : []),
       ...(showBatch && form.batchNumber ? [`batch:${form.batchNumber}`] : []),
     ];
+    if (form.branchScope === "SINGLE" && !form.branchId) {
+      toast.error("Select a branch or choose All Branches");
+      return;
+    }
     try {
       await api.post("/products", {
         name: form.name.trim(),
@@ -202,6 +220,8 @@ export default function AddProductPage() {
         status, tags: extraTags,
         hasVariants: form.hasVariants,
         trackInventory: form.trackInventory,
+        branchScope: form.trackInventory ? form.branchScope : undefined,
+        branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
         variants: variants.length > 0 ? variants : undefined,
       });
       toast.success(`"${form.name}" ${status === "DRAFT" ? "saved as draft" : "created"}!`);
@@ -599,6 +619,14 @@ export default function AddProductPage() {
               </div>
               <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
             </div>
+            {form.trackInventory && (
+              <ProductBranchScopeSelect
+                branchScope={form.branchScope}
+                branchId={form.branchId}
+                onScopeChange={setBranchScope}
+                onBranchChange={(id) => set("branchId", id)}
+              />
+            )}
           </div>
 
           {/* Summary */}
@@ -610,6 +638,9 @@ export default function AddProductPage() {
               ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">â€”</span>],
               ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}`    : <span className="text-muted-foreground italic">â€”</span>],
               ["Variants", form.hasVariants  ? `${allVariants.length} (${variantHint})` : "Single SKU"],
+              ...(form.trackInventory
+                ? [["Branches", form.branchScope === "ALL" ? "All Branches" : "Single Branch"] as const]
+                : []),
               ...(showUnit ? [["Unit", form.unit || shopProfile.defaultUnit] as const] : []),
               ["Status",   form.status],
             ].map(([label, val]) => (

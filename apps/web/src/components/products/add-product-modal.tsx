@@ -22,6 +22,8 @@ import {
   findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
 } from "@/lib/shop-vertical";
 import { getWorkspace } from "@/lib/shop-workspace";
+import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import { useBranchStore } from "@/stores/branch-store";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -53,6 +55,8 @@ interface Form {
   unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
   seoTitle: string; seoDescription: string;
+  branchScope: ProductBranchScope;
+  branchId: string;
 }
 
 const buildInitialForm = (): Form => {
@@ -69,6 +73,8 @@ const buildInitialForm = (): Form => {
     expiryDate: "",
     batchNumber: "",
     trackInventory: true, seoTitle: "", seoDescription: "",
+    branchScope: "ALL",
+    branchId: "",
   };
 };
 
@@ -102,6 +108,7 @@ interface Props { open: boolean; onClose: () => void; onCreated?: () => void; ed
 
 export function AddProductModal({ open, onClose, onCreated, editProduct }: Props) {
   const shopProfile = useShopProfile();
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const { workspace } = useShopWorkspace();
   const formCopy = getProductFormCopy(shopProfile, workspace);
   const variantHint = variantVariantHint(shopProfile);
@@ -145,6 +152,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         batchNumber: (editProduct.tags ?? []).find((t) => t.startsWith("batch:"))?.slice(6) ?? "",
         trackInventory: editProduct.trackInventory,
         seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
+        branchScope: "ALL",
+        branchId: "",
       });
     } else {
       setForm(buildInitialForm());
@@ -153,6 +162,13 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   }, [editProduct, open]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
+  const setBranchScope = (scope: ProductBranchScope) => {
+    setForm((p) => ({
+      ...p,
+      branchScope: scope,
+      branchId: scope === "SINGLE" && !p.branchId ? (activeBranchId ?? "") : p.branchId,
+    }));
+  };
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
 
   const handleClose = () => {
@@ -163,6 +179,11 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     if (!form.name.trim()) { toast.error("Product name is required"); setTab("basic"); return; }
     if (!editProduct && (!form.sellingPrice || !form.costPrice || !form.mrp)) {
       toast.error("Selling price, cost price, and MRP are required"); setTab("pricing"); return;
+    }
+    if (!editProduct && form.trackInventory && form.branchScope === "SINGLE" && !form.branchId) {
+      toast.error("Select a branch or choose All Branches");
+      setTab("additional");
+      return;
     }
     setLoading(true);
     const validAttrs = form.attributes.filter((a) => a.values.length > 0);
@@ -198,6 +219,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       tags: extraTags,
       hasVariants: form.hasVariants,
       trackInventory: form.trackInventory,
+      branchScope: !editProduct && form.trackInventory ? form.branchScope : undefined,
+      branchId: !editProduct && form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
       seoTitle: form.seoTitle || undefined,
       seoDescription: form.seoDescription || undefined,
       variants: variants.length > 0 ? variants : undefined,
@@ -719,6 +742,21 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           </div>
           <Switch checked={form.hasVariants} onCheckedChange={(v) => set("hasVariants", v)} />
         </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-sm">Track Inventory</p>
+            <p className="text-xs text-muted-foreground">Create stock records when saving</p>
+          </div>
+          <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
+        </div>
+        {!editProduct && form.trackInventory && (
+          <ProductBranchScopeSelect
+            branchScope={form.branchScope}
+            branchId={form.branchId}
+            onScopeChange={setBranchScope}
+            onBranchChange={(id) => set("branchId", id)}
+          />
+        )}
       </div>
     </div>
   );

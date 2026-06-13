@@ -81,6 +81,7 @@ function referenceLabel(task: WorkflowTask): string {
   const meta = task.instance.metadata ?? {};
   if (typeof meta.poNumber === "string") return meta.poNumber;
   if (typeof meta.reference === "string") return meta.reference;
+  if (typeof meta.discountPercent === "number") return `${meta.discountPercent}% discount`;
   return task.instance.entityId.slice(0, 10) + "…";
 }
 
@@ -275,7 +276,7 @@ export default function WorkflowsPage() {
         <div>
           <h1 className="text-2xl font-bold">Approval Workflows</h1>
           <p className="text-sm text-muted-foreground">
-            Review and approve purchase orders, discounts, stock adjustments & transfers
+            Review and approve purchase orders, discounts, stock adjustments & transfers — tasks match your role
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">

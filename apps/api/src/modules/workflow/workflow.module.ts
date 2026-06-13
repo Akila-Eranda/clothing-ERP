@@ -4,15 +4,16 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum, IsNumber } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
-import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { RequireAnyPermissions, RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { assertCanActOnWorkflowTask, canUserActOnWorkflowTask } from '@/shared/workflow-approval.helper';
 import { randomUUID } from 'crypto';
 
 export class StartWorkflowDto {
@@ -30,6 +31,7 @@ export class DiscountRequestDto {
   @ApiProperty() @IsNumber() amount: number;
   @ApiProperty() @IsString() reason: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() cartTotal?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) @Max(100) discountPercent?: number;
 }
 
 @Injectable()
@@ -99,6 +101,49 @@ export class WorkflowService {
     const firstStep = def.steps[0];
     if (!firstStep) throw new BadRequestException('Workflow has no steps');
 
+    const taskCreates = def.steps.map((step) => ({
+      stepOrder: step.stepOrder,
+      assigneeId: step.approverUserId ?? undefined,
+      status: step.stepOrder === 1 ? WorkflowTaskStatus.PENDING : WorkflowTaskStatus.SKIPPED,
+    }));
+
+    if (existing) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.workflowTask.deleteMany({ where: { instanceId: existing.id } });
+        await tx.workflowInstance.update({
+          where: { id: existing.id },
+          data: {
+            definitionId: def.id,
+            initiatedBy: userId,
+            status: WorkflowStatus.IN_PROGRESS,
+            currentStep: 1,
+            completedAt: null,
+            metadata: (dto.metadata ?? {}) as object,
+          },
+        });
+        await tx.workflowTask.createMany({
+          data: taskCreates.map((t) => ({ ...t, instanceId: existing.id })),
+        });
+        await tx.workflowEvent.create({
+          data: {
+            instanceId: existing.id,
+            eventType: 'RESUBMITTED',
+            toStatus: WorkflowStatus.IN_PROGRESS,
+            actorId: userId,
+            payload: { key: dto.key },
+          },
+        });
+        return tx.workflowInstance.findUnique({
+          where: { id: existing.id },
+          include: {
+            definition: true,
+            tasks: { orderBy: { stepOrder: 'asc' } },
+            events: { orderBy: { createdAt: 'asc' } },
+          },
+        });
+      });
+    }
+
     return this.prisma.workflowInstance.create({
       data: {
         tenantId,
@@ -108,11 +153,7 @@ export class WorkflowService {
         initiatedBy: userId,
         metadata: (dto.metadata ?? {}) as object,
         tasks: {
-          create: def.steps.map((step) => ({
-            stepOrder: step.stepOrder,
-            assigneeId: step.approverUserId ?? undefined,
-            status: step.stepOrder === 1 ? WorkflowTaskStatus.PENDING : WorkflowTaskStatus.SKIPPED,
-          })),
+          create: taskCreates,
         },
         events: {
           create: {
@@ -212,17 +253,32 @@ export class WorkflowService {
     });
   }
 
-  async getPendingTasks(tenantId: string, userId: string) {
-    return this.prisma.workflowTask.findMany({
+  async getPendingTasks(tenantId: string, userId: string, userRoles: string[] = []) {
+    const tasks = await this.prisma.workflowTask.findMany({
       where: {
         status: WorkflowTaskStatus.PENDING,
         instance: { tenantId, status: WorkflowStatus.IN_PROGRESS },
       },
       include: {
-        instance: { include: { definition: true, events: { orderBy: { createdAt: 'desc' }, take: 3 } } },
+        instance: {
+          include: {
+            definition: { include: { steps: { orderBy: { stepOrder: 'asc' } } } },
+            events: { orderBy: { createdAt: 'desc' }, take: 3 },
+          },
+        },
       },
       orderBy: { instance: { createdAt: 'desc' } },
     });
+
+    return tasks.filter((task) =>
+      canUserActOnWorkflowTask(
+        userId,
+        userRoles,
+        task,
+        task.instance,
+        task.instance.definition.steps,
+      ),
+    );
   }
 
   async getInstance(tenantId: string, entityType: string, entityId: string) {
@@ -236,7 +292,7 @@ export class WorkflowService {
     });
   }
 
-  async approveTask(taskId: string, tenantId: string, userId: string, comment?: string) {
+  async approveTask(taskId: string, tenantId: string, userId: string, userRoles: string[] = [], comment?: string) {
     const task = await this.prisma.workflowTask.findFirst({
       where: { id: taskId, instance: { tenantId } },
       include: { instance: { include: { definition: { include: { steps: true } } } } },
@@ -244,6 +300,14 @@ export class WorkflowService {
     if (!task || task.status !== WorkflowTaskStatus.PENDING) {
       throw new NotFoundException('Pending task not found');
     }
+
+    assertCanActOnWorkflowTask(
+      userId,
+      userRoles,
+      task,
+      task.instance,
+      task.instance.definition.steps,
+    );
 
     const instance = task.instance;
     const totalSteps = instance.definition.steps.length;
@@ -314,12 +378,20 @@ export class WorkflowService {
     return result;
   }
 
-  async rejectTask(taskId: string, tenantId: string, userId: string, comment?: string) {
+  async rejectTask(taskId: string, tenantId: string, userId: string, userRoles: string[] = [], comment?: string) {
     const task = await this.prisma.workflowTask.findFirst({
       where: { id: taskId, instance: { tenantId }, status: WorkflowTaskStatus.PENDING },
-      include: { instance: true },
+      include: { instance: { include: { definition: { include: { steps: true } } } } },
     });
     if (!task) throw new NotFoundException('Pending task not found');
+
+    assertCanActOnWorkflowTask(
+      userId,
+      userRoles,
+      task,
+      task.instance,
+      task.instance.definition.steps,
+    );
 
     return this.prisma.$transaction(async (tx) => {
       await tx.workflowTask.update({
@@ -369,7 +441,7 @@ export class WorkflowController {
   constructor(private readonly workflowService: WorkflowService) {}
 
   @Post('start')
-  @RequirePermissions('inventory:update')
+  @RequireAnyPermissions('inventory:update', 'purchases:update')
   @ApiOperation({ summary: 'Start approval workflow for an entity' })
   start(@CurrentUser() user: IAuthUser, @Body() dto: StartWorkflowDto) {
     return this.workflowService.start(user.tenantId, user.id, dto);
@@ -396,6 +468,7 @@ export class WorkflowController {
         reference: `DISC-${id.slice(0, 8).toUpperCase()}`,
         amount: dto.amount,
         total: dto.amount,
+        discountPercent: dto.discountPercent,
         reason: dto.reason,
         cartTotal: dto.cartTotal,
       },
@@ -403,21 +476,21 @@ export class WorkflowController {
   }
 
   @Get('catalog')
-  @RequirePermissions('inventory:read')
+  @RequireAnyPermissions('inventory:read', 'purchases:read', 'sales:read')
   @ApiOperation({ summary: 'List active workflow definitions and triggers' })
   catalog(@CurrentUser() user: IAuthUser) {
     return this.workflowService.getCatalog(user.tenantId);
   }
 
   @Get('tasks/pending')
-  @RequirePermissions('inventory:read')
+  @RequireAnyPermissions('inventory:read', 'purchases:read', 'sales:read')
   @ApiOperation({ summary: 'List pending approval tasks' })
   pending(@CurrentUser() user: IAuthUser) {
-    return this.workflowService.getPendingTasks(user.tenantId, user.id);
+    return this.workflowService.getPendingTasks(user.tenantId, user.id, user.roles);
   }
 
   @Get('instances/:entityType/:entityId')
-  @RequirePermissions('inventory:read')
+  @RequireAnyPermissions('inventory:read', 'purchases:read', 'sales:read')
   @ApiOperation({ summary: 'Get workflow instance for entity' })
   getInstance(
     @CurrentUser() user: IAuthUser,
@@ -428,17 +501,17 @@ export class WorkflowController {
   }
 
   @Put('tasks/:id/approve')
-  @RequirePermissions('inventory:update')
+  @RequireAnyPermissions('inventory:update', 'purchases:update', 'sales:create')
   @ApiOperation({ summary: 'Approve workflow task' })
   approve(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: ActOnTaskDto) {
-    return this.workflowService.approveTask(id, user.tenantId, user.id, dto.comment);
+    return this.workflowService.approveTask(id, user.tenantId, user.id, user.roles, dto.comment);
   }
 
   @Put('tasks/:id/reject')
-  @RequirePermissions('inventory:update')
+  @RequireAnyPermissions('inventory:update', 'purchases:update', 'sales:create')
   @ApiOperation({ summary: 'Reject workflow task' })
   reject(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: ActOnTaskDto) {
-    return this.workflowService.rejectTask(id, user.tenantId, user.id, dto.comment);
+    return this.workflowService.rejectTask(id, user.tenantId, user.id, user.roles, dto.comment);
   }
 }
 

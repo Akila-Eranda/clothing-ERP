@@ -16,6 +16,7 @@ import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
+import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 
 interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
@@ -116,6 +117,8 @@ export function POSOverlay() {
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
+  const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{ entityId: string; percent: number } | null>(null);
+  const adminBypass = bypassesWorkflowApproval(user?.role);
   const [showNewCust, setShowNewCust] = React.useState(false);
   const [newCustFirst, setNewCustFirst] = React.useState("");
   const [newCustLast, setNewCustLast] = React.useState("");
@@ -176,6 +179,84 @@ export function POSOverlay() {
     setCoupon(code);
     patchPayState({ couponDiscount: discountAmt, couponCode: code ?? "" });
   }, [setCoupon, patchPayState]);
+
+  const applyCartDiscount = React.useCallback(async () => {
+    const v = parseFloat(discountInput) || 0;
+    if (v <= 0) {
+      setDiscount(0, "percentage");
+      setDiscountInput("");
+      setPendingDiscountApproval(null);
+      toast.info("Discount cleared");
+      return;
+    }
+    if (v > 100) {
+      toast.error("Discount cannot exceed 100%");
+      return;
+    }
+
+    const needsApproval = !adminBypass && v > DISCOUNT_APPROVAL_THRESHOLD_PCT;
+    if (needsApproval) {
+      const reason = window.prompt(
+        `Discount ${v}% requires manager approval (over ${DISCOUNT_APPROVAL_THRESHOLD_PCT}%). Enter reason:`,
+      );
+      if (!reason?.trim()) {
+        toast.error("Reason is required for manager approval");
+        return;
+      }
+      const discAmt = subtotal() * (v / 100);
+      try {
+        const res = await api.post<{ entityId: string; status: string }>("/workflows/discount-request", {
+          amount: discAmt,
+          discountPercent: v,
+          reason: reason.trim(),
+          cartTotal: subtotal(),
+        });
+        const inst = res.data;
+        setPendingDiscountApproval({ entityId: inst.entityId, percent: v });
+        setDiscount(0, "percentage");
+        toast.info("Discount sent for manager approval — waiting…");
+      } catch (e: unknown) {
+        toast.error((e as Error).message ?? "Failed to submit discount for approval");
+      }
+      return;
+    }
+
+    setPendingDiscountApproval(null);
+    setDiscount(v, "percentage");
+    setDiscountInput("");
+    toast.success(`${v}% discount applied`);
+  }, [discountInput, adminBypass, subtotal, setDiscount]);
+
+  React.useEffect(() => {
+    if (!pendingDiscountApproval?.entityId) return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await api.get<{ status: string }>(
+          `/workflows/instances/DiscountRequest/${pendingDiscountApproval.entityId}`,
+        );
+        if (cancelled) return;
+        const status = res.data?.status;
+        if (status === "APPROVED") {
+          setDiscount(pendingDiscountApproval.percent, "percentage");
+          setPendingDiscountApproval(null);
+          setDiscountInput("");
+          toast.success(`${pendingDiscountApproval.percent}% discount approved and applied`);
+        } else if (status === "REJECTED" || status === "CANCELLED") {
+          setPendingDiscountApproval(null);
+          toast.error("Discount request was rejected");
+        }
+      } catch {
+        /* ignore transient poll errors */
+      }
+    };
+    poll();
+    const timer = setInterval(poll, 4000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [pendingDiscountApproval, setDiscount]);
 
   const loadHeldBills = React.useCallback(async () => {
     setHoldsLoading(true);
@@ -378,6 +459,10 @@ export function POSOverlay() {
 
   const handleCheckout = React.useCallback(async()=>{
     if(!items.length||checkoutLoading)return;
+    if (pendingDiscountApproval) {
+      toast.error("Waiting for manager discount approval — cannot checkout yet");
+      return;
+    }
     const payments = buildCheckoutPayments(payState, activePayment, numpad, totalAmt);
     if (activePayment === "WALLET" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for wallet payment"); return; }
@@ -425,7 +510,7 @@ export function POSOverlay() {
       const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;paymentStatus?:string}>("/pos/sale",payload);
       const s=res.data;
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
-      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setCheckoutOpen(false);
+      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
       await loadHeldBills();
@@ -433,7 +518,7 @@ export function POSOverlay() {
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts,pendingDiscountApproval]);
 
   const handleThermalPrint = React.useCallback(() => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -1283,9 +1368,20 @@ export function POSOverlay() {
                 <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
                   <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
                     <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                    <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");if(v>0)toast.success(`${v}% discount applied`);}}} placeholder={discount>0?`${discount}% active`:"0"} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none" style={{background:"#1a2b4a",border:`1px solid ${discount>0?"#10b981":"#1e3356"}`}}/>
-                    <button onClick={()=>{const v=parseFloat(discountInput)||0;setDiscount(v,"percentage");setDiscountInput("");if(v>0)toast.success(`${v}% discount applied`);else toast.info("Discount cleared");}} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Apply</button>
+                    <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"#1a2b4a",border:`1px solid ${pendingDiscountApproval?"#f59e0b":discount>0?"#10b981":"#1e3356"}`}}/>
+                    <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
                   </div>
+                  {pendingDiscountApproval && (
+                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.35)",color:"#fbbf24"}}>
+                      <Clock className="h-3.5 w-3.5 shrink-0"/>
+                      {pendingDiscountApproval.percent}% discount awaiting manager approval (auto-applies when approved)
+                    </div>
+                  )}
+                  {!adminBypass && !pendingDiscountApproval && (
+                    <p className="px-4 pb-2 text-[10px]" style={{color:"#6a8ab8"}}>
+                      Discounts over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% require manager approval via Workflows
+                    </p>
+                  )}
                   <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
                     <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
                     {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}

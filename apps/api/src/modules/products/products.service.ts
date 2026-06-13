@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt,
+  IsString, IsOptional, IsNumber, IsEnum, IsArray, IsBoolean, Min, ValidateNested, IsInt, IsIn,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -49,6 +49,12 @@ export class CreateProductDto {
   @ApiPropertyOptional({ type: [CreateVariantDto] })
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
   variants?: CreateVariantDto[];
+  @ApiPropertyOptional({ enum: ['ALL', 'SINGLE'], default: 'ALL', description: 'ALL = stock in every branch; SINGLE = one branch only' })
+  @IsOptional() @IsIn(['ALL', 'SINGLE'])
+  branchScope?: 'ALL' | 'SINGLE';
+  @ApiPropertyOptional({ description: 'Required when branchScope is SINGLE' })
+  @IsOptional() @IsString()
+  branchId?: string;
 }
 
 export class CreateCategoryDto {
@@ -73,6 +79,53 @@ export class ProductsService {
     const sum = digits.reduce((acc, d, i) => acc + d * (i % 2 === 0 ? 1 : 3), 0);
     const check = (10 - (sum % 10)) % 10;
     return [...digits, check].join('');
+  }
+
+  private async resolveInventoryBranchIds(
+    tenantId: string,
+    branchScope: 'ALL' | 'SINGLE' = 'ALL',
+    branchId?: string,
+  ): Promise<string[]> {
+    if (branchScope === 'SINGLE') {
+      if (!branchId) throw new BadRequestException('branchId is required when branchScope is SINGLE');
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: branchId, tenantId, isActive: true },
+        select: { id: true },
+      });
+      if (!branch) throw new BadRequestException('Branch not found');
+      return [branch.id];
+    }
+
+    const branches = await this.prisma.branch.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true },
+      orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+    });
+    return branches.map((b) => b.id);
+  }
+
+  private async seedVariantInventory(
+    tenantId: string,
+    variantIds: string[],
+    branchScope: 'ALL' | 'SINGLE' = 'ALL',
+    branchId?: string,
+  ) {
+    if (!variantIds.length) return;
+
+    const branchIds = await this.resolveInventoryBranchIds(tenantId, branchScope, branchId);
+    if (!branchIds.length) return;
+
+    await this.prisma.inventory.createMany({
+      data: branchIds.flatMap((bid) =>
+        variantIds.map((variantId) => ({
+          tenantId,
+          branchId: bid,
+          variantId,
+          quantity: 0,
+        })),
+      ),
+      skipDuplicates: true,
+    });
   }
 
   // ── Products ─────────────────────────────────────────────
@@ -159,17 +212,14 @@ export class ProductsService {
       where: { productId: product.id },
       select: { id: true },
     });
-    const branch = await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } });
-    if (branch && createdVariants.length) {
-      await this.prisma.inventory.createMany({
-        data: createdVariants.map((v) => ({
-          tenantId,
-          branchId: branch.id,
-          variantId: v.id,
-          quantity: 0,
-        })),
-        skipDuplicates: true,
-      });
+
+    if (dto.trackInventory !== false && createdVariants.length) {
+      await this.seedVariantInventory(
+        tenantId,
+        createdVariants.map((v) => v.id),
+        dto.branchScope ?? 'ALL',
+        dto.branchId,
+      );
     }
 
     return product;
@@ -312,7 +362,7 @@ export class ProductsService {
     const orphans = products.filter((p) => p._count.variants === 0);
     if (!orphans.length) return { seeded: 0, message: 'All products already have variants' };
 
-    const branch = await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } });
+    const branchIds = await this.resolveInventoryBranchIds(tenantId, 'ALL');
 
     let seeded = 0;
     for (const p of orphans) {
@@ -327,11 +377,15 @@ export class ProductsService {
           barcode: this.generateEAN13(),
         },
       });
-      if (branch) {
-        await this.prisma.inventory.upsert({
-          where: { branchId_variantId: { branchId: branch.id, variantId: variant.id } },
-          update: {},
-          create: { tenantId, branchId: branch.id, variantId: variant.id, quantity: 0 },
+      if (branchIds.length) {
+        await this.prisma.inventory.createMany({
+          data: branchIds.map((branchId) => ({
+            tenantId,
+            branchId,
+            variantId: variant.id,
+            quantity: 0,
+          })),
+          skipDuplicates: true,
         });
       }
       seeded++;

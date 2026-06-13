@@ -16,6 +16,8 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { POApprovalPanel } from "@/components/purchases/po-approval-panel";
+import type { WorkflowInstanceLike } from "@/lib/workflow-access";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface POItem {
@@ -112,17 +114,17 @@ export default function PODetailPage() {
   const [loading,  setLoading]  = useState(true);
   const [receiveOpen, setReceiveOpen] = useState(false);
   const [acting,   setActing]   = useState(false);
-  const [workflowStatus, setWorkflowStatus] = useState<string | null>(null);
+  const [workflowInstance, setWorkflowInstance] = useState<WorkflowInstanceLike | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await api.get<PO>(`/purchases/${id}`);
       setPo(res.data);
       try {
-        const wf = await api.get<{ status: string }>(`/workflows/instances/PurchaseOrder/${id}`);
-        setWorkflowStatus(wf.data?.status ?? null);
+        const wf = await api.get<WorkflowInstanceLike>(`/workflows/instances/PurchaseOrder/${id}`);
+        setWorkflowInstance(wf.data ?? null);
       } catch {
-        setWorkflowStatus(null);
+        setWorkflowInstance(null);
       }
     } catch { toast.error("Failed to load purchase order"); }
     finally { setLoading(false); }
@@ -146,9 +148,23 @@ export default function PODetailPage() {
     setActing(true);
     try {
       await api.post(`/purchases/${po.id}/submit-approval`);
-      toast.success(adminBypass ? "Purchase order confirmed" : "Submitted for approval");
+      toast.success(
+        adminBypass
+          ? "Purchase order confirmed"
+          : "Submitted for approval — Branch Manager then Accountant will review",
+      );
       load();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to submit"); }
+    finally { setActing(false); }
+  };
+
+  const actOnWorkflow = async (taskId: string, action: "approve" | "reject") => {
+    setActing(true);
+    try {
+      await api.put(`/workflows/tasks/${taskId}/${action}`, {});
+      toast.success(action === "approve" ? "Approved — order moves to next step" : "Purchase order rejected");
+      load();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Action failed"); }
     finally { setActing(false); }
   };
 
@@ -228,9 +244,19 @@ export default function PODetailPage() {
                 <p className="text-xs mt-0.5">{po.notes}</p>
               </div>
             )}
-            {po.status === "PENDING_APPROVAL" && !adminBypass && (
-              <div className="rounded-lg border border-purple-200 bg-purple-50 px-3 py-2 text-xs text-purple-800">
-                Awaiting manager approval{workflowStatus ? ` (${workflowStatus.replace(/_/g, " ")})` : ""}. GRN and receiving are blocked until approved.
+            {po.status === "PENDING_APPROVAL" && (
+              <POApprovalPanel
+                instance={workflowInstance}
+                userId={user?.id}
+                userRole={user?.role}
+                acting={acting}
+                onApprove={(taskId) => actOnWorkflow(taskId, "approve")}
+                onReject={(taskId) => actOnWorkflow(taskId, "reject")}
+              />
+            )}
+            {po.status === "DRAFT" && !adminBypass && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                Save complete — click <strong>Submit for Approval</strong> below. Branch Manager and Accountant must approve before you can receive goods.
               </div>
             )}
           </div>
@@ -377,14 +403,9 @@ export default function PODetailPage() {
                   <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Confirm Order
                 </Button>
               ) : (
-                <>
-                  <Button variant="outline" size="sm" disabled={acting} onClick={submitForApproval}>
-                    <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Approval
-                  </Button>
-                  <Button variant="outline" size="sm" disabled={acting} onClick={() => updateStatus("CONFIRMED")}>
-                    <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" /> Mark as Ordered
-                  </Button>
-                </>
+                <Button variant="gradient" size="sm" disabled={acting} onClick={submitForApproval}>
+                  <Send className="h-3.5 w-3.5 mr-1.5" /> Submit for Approval
+                </Button>
               )}
             </>
           )}

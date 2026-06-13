@@ -172,11 +172,25 @@ export class SuppliersService {
     return po;
   }
 
-  async updatePOStatus(id: string, tenantId: string, status: PurchaseOrderStatus) {
+  async updatePOStatus(
+    id: string,
+    tenantId: string,
+    status: PurchaseOrderStatus,
+    userRoles: string[] = [],
+  ) {
     const po = await this.prisma.purchaseOrder.findFirst({ where: { id, tenantId } });
     if (!po) throw new NotFoundException('Purchase order not found');
     if (po.status === PurchaseOrderStatus.PENDING_APPROVAL) {
       throw new BadRequestException('Cannot change status while approval is pending');
+    }
+    if (
+      po.status === PurchaseOrderStatus.DRAFT &&
+      status === PurchaseOrderStatus.CONFIRMED &&
+      !bypassesWorkflowApproval(userRoles)
+    ) {
+      throw new BadRequestException(
+        'Use Submit for Approval to confirm this order. Direct confirmation requires admin access.',
+      );
     }
     return this.prisma.purchaseOrder.update({ where: { id }, data: { status } });
   }
@@ -410,7 +424,7 @@ export class PurchasesController {
     @Param('id') id: string,
     @Body() dto: UpdatePOStatusDto,
   ) {
-    return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status);
+    return this.suppliersService.updatePOStatus(id, user.tenantId, dto.status, user.roles);
   }
 
   @Post(':id/receive')

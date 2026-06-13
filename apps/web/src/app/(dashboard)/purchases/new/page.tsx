@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Supplier {
@@ -37,6 +39,8 @@ const PAYMENT_TERMS = ["Immediate", "15 Days", "30 Days", "45 Days", "60 Days", 
 export default function CreatePOPage() {
   const router = useRouter();
   const searchRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
+  const adminBypass = bypassesWorkflowApproval(user?.role);
 
   const [suppliers,    setSuppliers]    = useState<Supplier[]>([]);
   const [allVariants,  setAllVariants]  = useState<VariantOpt[]>([]);
@@ -110,7 +114,7 @@ export default function CreatePOPage() {
   const totalQty   = items.reduce((s, i) => s + i.orderedQty, 0);
 
   // ── Submit ─────────────────────────────────────────────────────────────
-  const submit = async (sendNow: boolean) => {
+  const submit = async (submitForApproval: boolean) => {
     if (!supplierId) { toast.error("Please select a supplier"); return; }
     if (!items.length) { toast.error("Add at least one item"); return; }
     if (items.some((i) => !i.variantId)) { toast.error("All rows must have a product selected"); return; }
@@ -126,10 +130,16 @@ export default function CreatePOPage() {
         })),
       };
       const res = await api.post<{ id: string }>("/purchases", payload);
-      if (sendNow) {
-        await api.put(`/purchases/${res.data.id}/status`, { status: "CONFIRMED" });
+      if (submitForApproval) {
+        await api.post(`/purchases/${res.data.id}/submit-approval`);
+        toast.success(
+          adminBypass
+            ? "Purchase order created and confirmed"
+            : "Purchase order submitted for approval",
+        );
+      } else {
+        toast.success("Purchase order saved as draft");
       }
-      toast.success("Purchase order created");
       router.push(`/purchases/${res.data.id}`);
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to create PO"); }
     finally { setSaving(false); }
@@ -259,11 +269,16 @@ export default function CreatePOPage() {
 
             <div className="pt-1 space-y-2">
               <Button className="w-full gap-2" disabled={saving} onClick={() => submit(true)}>
-                Save &amp; Send PO
+                {adminBypass ? "Save & Confirm Order" : "Save & Submit for Approval"}
               </Button>
               <Button variant="outline" className="w-full" disabled={saving} onClick={() => submit(false)}>
                 Save as Draft
               </Button>
+              {!adminBypass && (
+                <p className="text-[11px] text-muted-foreground text-center leading-snug px-1">
+                  After submit, Branch Manager then Accountant must approve before receiving stock.
+                </p>
+              )}
             </div>
           </div>
         </div>
