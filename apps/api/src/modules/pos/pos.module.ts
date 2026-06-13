@@ -265,7 +265,7 @@ export class PosService {
       for (const item of dto.items) {
         await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
           variantId: item.variantId,
-          quantity: -item.quantity,
+          quantity: item.quantity,
           movementType: StockMovementType.SALE,
           referenceId: created.id,
         });

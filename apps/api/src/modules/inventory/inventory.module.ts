@@ -187,7 +187,8 @@ export class InventoryService {
     const currentDamaged = inventory?.damagedQty ?? 0;
     const currentReturned = inventory?.returnedQty ?? 0;
     const deductionTypes: StockMovementType[] = [StockMovementType.SALE, StockMovementType.TRANSFER_OUT, StockMovementType.DAMAGE];
-    const delta = deductionTypes.includes(dto.movementType) ? -dto.quantity : dto.quantity;
+    const qty = Math.abs(dto.quantity);
+    const delta = deductionTypes.includes(dto.movementType) ? -qty : qty;
     let newQty = dto.movementType === StockMovementType.ADJUSTMENT
       ? dto.quantity
       : currentQty + delta;
@@ -195,12 +196,12 @@ export class InventoryService {
     let newReturned = currentReturned;
 
     if (dto.movementType === StockMovementType.DAMAGE) {
-      newDamaged = currentDamaged + dto.quantity;
-      newQty = Math.max(0, currentQty - dto.quantity);
+      newDamaged = currentDamaged + qty;
+      newQty = Math.max(0, currentQty - qty);
     }
     if (dto.movementType === StockMovementType.RETURN) {
-      newReturned = currentReturned + dto.quantity;
-      newQty = currentQty + dto.quantity;
+      newReturned = currentReturned + qty;
+      newQty = currentQty + qty;
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
