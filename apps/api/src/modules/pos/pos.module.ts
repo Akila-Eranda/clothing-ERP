@@ -613,6 +613,7 @@ export class PosService {
       stock:       v.inventory[0]?.quantity ?? 0,
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
       barcode:     v.barcode ?? undefined,
+      warrantyMonths: v.product.warrantyMonths ?? null,
     }));
   }
 

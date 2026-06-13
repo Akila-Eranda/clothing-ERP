@@ -696,6 +696,35 @@ async function main() {
       data: { tenantId: spareTenant.id, brandId: hondaBrand.id, name: 'Vezel', yearFrom: 2014, yearTo: 2022, engineCapacity: '1500cc' },
     });
   void toyotaAxio;
+
+  // Demo: warranty on common spare-parts categories (others stay without warranty)
+  const warrantyCategoryNames = ['Engine Parts', 'Brakes & Suspension', 'Electrical', 'Filters'];
+  const warrantyCategories = await prisma.category.findMany({
+    where: { tenantId: spareTenant.id, name: { in: warrantyCategoryNames } },
+    select: { id: true },
+  });
+  if (warrantyCategories.length) {
+    const { count } = await prisma.product.updateMany({
+      where: {
+        tenantId: spareTenant.id,
+        categoryId: { in: warrantyCategories.map((c) => c.id) },
+        OR: [{ warrantyMonths: null }, { warrantyMonths: 0 }],
+      },
+      data: { warrantyMonths: 12 },
+    });
+    if (count > 0) console.log(`✅ Spare parts: ${count} product(s) set to 12-month warranty`);
+  }
+  // Name-based fallback for uncategorized demo products (filter, alternator, etc.)
+  const { count: namedCount } = await prisma.product.updateMany({
+    where: {
+      tenantId: spareTenant.id,
+      OR: [{ warrantyMonths: null }, { warrantyMonths: 0 }],
+      name: { contains: 'filter', mode: 'insensitive' },
+    },
+    data: { warrantyMonths: 12 },
+  });
+  if (namedCount > 0) console.log(`✅ Spare parts: ${namedCount} filter product(s) set to 12-month warranty`);
+
   await prisma.tenant.update({
     where: { id: spareTenant.id },
     data: {

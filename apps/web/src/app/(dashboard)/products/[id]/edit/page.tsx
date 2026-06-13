@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile } from "@/lib/use-shop-profile";
+import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
 import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 
@@ -38,6 +38,7 @@ interface Form {
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
   trackInventory: boolean;
+  warrantyMonths: string;
 }
 interface ExistingVariant {
   id: string; name: string; sku: string;
@@ -49,6 +50,7 @@ interface ProductData {
   id: string; name: string; sku: string; hsn?: string | null;
   status: string; description?: string | null; shortDesc?: string | null;
   costPrice: number; sellingPrice: number; mrp: number; taxRate: number;
+  warrantyMonths?: number | null;
   tags: string[]; hasVariants: boolean; trackInventory: boolean;
   category?: { id: string; name: string } | null;
   brand?: { id: string; name: string } | null;
@@ -81,6 +83,7 @@ export default function EditProductPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
   const shopProfile = useShopProfile();
+  const showWarranty = hasShopModule(shopProfile, "warranty");
   const variantCols = variantTableColumns(shopProfile);
   const variantHint = variantVariantHint(shopProfile);
 
@@ -91,6 +94,7 @@ export default function EditProductPage() {
     sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
     hasVariants: false, attributes: variantAttrsFromProfile(shopProfile.type),
     trackInventory: true,
+    warrantyMonths: "",
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -132,6 +136,7 @@ export default function EditProductPage() {
         hasVariants:   p.hasVariants,
         attributes:    variantAttrsFromProfile(shopProfile.type),
         trackInventory: p.trackInventory,
+        warrantyMonths: p.warrantyMonths != null && p.warrantyMonths > 0 ? String(p.warrantyMonths) : "",
       });
       if (p.variants.length > 0) {
         setVariantRows(p.variants.map((v) => ({
@@ -247,6 +252,9 @@ export default function EditProductPage() {
         tags:           form.tags,
         hasVariants:    form.hasVariants,
         trackInventory: form.trackInventory,
+        ...(showWarranty
+          ? { warrantyMonths: form.warrantyMonths.trim() ? parseInt(form.warrantyMonths, 10) || 0 : 0 }
+          : {}),
         variants,
       });
       toast.success(`"${form.name}" updated successfully!`);
@@ -393,6 +401,21 @@ export default function EditProductPage() {
               <div className="flex gap-6 pt-1 text-sm border-t mt-2">
                 <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
                 <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+              </div>
+            )}
+            {showWarranty && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-xs font-semibold">Warranty (months)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0 = no warranty"
+                  value={form.warrantyMonths}
+                  onChange={(e) => set("warrantyMonths", e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Leave empty or 0 if this part has no warranty. Only products with months set can receive warranty claims.
+                </p>
               </div>
             )}
           </div>

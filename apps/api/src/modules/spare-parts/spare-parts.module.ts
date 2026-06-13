@@ -13,6 +13,10 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import {
+  isWarrantyEligible,
+  isWithinWarrantyPeriod,
+} from '@/shared/warranty.helper';
 import { nanoid } from 'nanoid';
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
@@ -53,7 +57,7 @@ export class CreateWarrantyClaimDto {
   @ApiProperty() @IsString() customerId: string;
   @ApiProperty() @IsString() variantId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() saleId?: string;
-  @ApiProperty() @IsInt() @Min(0) warrantyMonths: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) warrantyMonths?: number;
   @ApiProperty() @IsString() purchaseDate: string;
   @ApiProperty() @IsString() issueDescription: string;
 }
@@ -306,6 +310,26 @@ export class SparePartsService {
       throw new BadRequestException('Customer is required — link a customer to the sale or select one');
     }
 
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: dto.variantId, product: { tenantId } },
+      include: { product: { select: { name: true, warrantyMonths: true } } },
+    });
+    if (!variant) throw new NotFoundException('Product variant not found');
+
+    const productWarranty = variant.product.warrantyMonths;
+    if (!isWarrantyEligible(productWarranty)) {
+      throw new BadRequestException(
+        `"${variant.product.name}" has no warranty coverage. Set warranty months on the product (Products → edit) before filing a claim.`,
+      );
+    }
+
+    const warrantyMonths = productWarranty!;
+    if (!isWithinWarrantyPeriod(purchaseDate, warrantyMonths)) {
+      throw new BadRequestException(
+        `Warranty period expired. Coverage was ${warrantyMonths} month(s) from purchase date ${purchaseDate.toISOString().slice(0, 10)}.`,
+      );
+    }
+
     const claimNumber = `WC-${nanoid(8).toUpperCase()}`;
     return this.prisma.warrantyClaim.create({
       data: {
@@ -314,7 +338,7 @@ export class SparePartsService {
         variantId: dto.variantId,
         saleId: dto.saleId,
         claimNumber,
-        warrantyMonths: dto.warrantyMonths,
+        warrantyMonths,
         purchaseDate,
         issueDescription: dto.issueDescription,
       },

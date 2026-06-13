@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, hasShopModule, useShopWorkspace } from "@/lib/use-shop-profile";
 import { getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
@@ -44,6 +44,7 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
+  warrantyMonths: string;
   branchScope: ProductBranchScope;
   branchId: string;
 }
@@ -59,6 +60,7 @@ function buildInitial(type?: string): Form {
     hasVariants: d.hasVariants, attributes: d.attributes,
     unit: d.unit, expiryDate: "", batchNumber: "",
     trackInventory: true,
+    warrantyMonths: "",
     branchScope: "ALL",
     branchId: "",
   };
@@ -98,6 +100,7 @@ export default function AddProductPage() {
   const showUnit = hasMultiUnit(shopProfile);
   const showExpiry = hasExpiryTracking(shopProfile);
   const showBatch = hasBatchTracking(shopProfile);
+  const showWarranty = hasShopModule(shopProfile, "warranty");
   const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -220,6 +223,9 @@ export default function AddProductPage() {
         status, tags: extraTags,
         hasVariants: form.hasVariants,
         trackInventory: form.trackInventory,
+        ...(showWarranty && form.warrantyMonths.trim()
+          ? { warrantyMonths: parseInt(form.warrantyMonths, 10) || 0 }
+          : showWarranty ? { warrantyMonths: 0 } : {}),
         branchScope: form.trackInventory ? form.branchScope : undefined,
         branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
         variants: variants.length > 0 ? variants : undefined,
@@ -392,6 +398,21 @@ export default function AddProductPage() {
               <div className="flex gap-6 pt-1 text-sm border-t mt-2">
                 <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
                 <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+              </div>
+            )}
+            {showWarranty && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-xs font-semibold">Warranty (months)</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  placeholder="0 = no warranty"
+                  value={form.warrantyMonths}
+                  onChange={(e) => set("warrantyMonths", e.target.value)}
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Leave empty or 0 if this part has no warranty. Only products with months set can receive warranty claims.
+                </p>
               </div>
             )}
           </div>

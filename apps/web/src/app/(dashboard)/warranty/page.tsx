@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { productHasWarranty, warrantyPeriodLabel } from "@/lib/warranty";
 
 interface Claim {
   id: string; claimNumber: string; status: string; warrantyMonths: number;
@@ -20,7 +21,7 @@ interface Claim {
   variant: { sku: string; name: string; product: { name: string; warrantyMonths?: number | null } };
 }
 interface Customer { id: string; firstName: string; lastName?: string | null; phone: string }
-interface VariantOpt { variantId: string; productName: string; sku: string }
+interface VariantOpt { variantId: string; productName: string; sku: string; warrantyMonths?: number | null }
 
 const STATUS_VARIANT: Record<string, "warning" | "success" | "secondary" | "danger"> = {
   PENDING: "warning", APPROVED: "secondary", REPLACED: "success", REJECTED: "danger", CLOSED: "success",
@@ -31,7 +32,7 @@ export default function WarrantyPage() {
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [variants, setVariants] = useState<VariantOpt[]>([]);
-  const [form, setForm] = useState({ customerId: "", variantId: "", warrantyMonths: "12", purchaseDate: "", issueDescription: "" });
+  const [form, setForm] = useState({ customerId: "", variantId: "", purchaseDate: "", issueDescription: "" });
   const [saving, setSaving] = useState(false);
 
   const fetchClaims = useCallback(async () => {
@@ -46,21 +47,29 @@ export default function WarrantyPage() {
   useEffect(() => { fetchClaims(); }, [fetchClaims]);
   useEffect(() => {
     api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(r.data?.data ?? (r.data as unknown as Customer[]) ?? [])).catch(() => {});
-    api.get<VariantOpt[]>("/pos/products").then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    api.get<VariantOpt[]>("/pos/products").then((r) => {
+      const all = Array.isArray(r.data) ? r.data : [];
+      setVariants(all.filter((v) => productHasWarranty(v.warrantyMonths)));
+    }).catch(() => {});
   }, []);
+
+  const selectedVariant = variants.find((v) => v.variantId === form.variantId);
 
   const createClaim = async () => {
     if (!form.customerId || !form.variantId || !form.issueDescription) { toast.error("Fill required fields"); return; }
+    if (!productHasWarranty(selectedVariant?.warrantyMonths)) {
+      toast.error("Selected part has no warranty coverage");
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/spare-parts/warranty-claims", {
         customerId: form.customerId, variantId: form.variantId,
-        warrantyMonths: parseInt(form.warrantyMonths, 10) || 0,
         purchaseDate: form.purchaseDate || new Date().toISOString().slice(0, 10),
         issueDescription: form.issueDescription,
       });
       toast.success("Warranty claim created");
-      setForm({ customerId: "", variantId: "", warrantyMonths: "12", purchaseDate: "", issueDescription: "" });
+      setForm({ customerId: "", variantId: "", purchaseDate: "", issueDescription: "" });
       fetchClaims();
     } catch (e: unknown) { toast.error((e as Error).message); }
     finally { setSaving(false); }
@@ -94,15 +103,20 @@ export default function WarrantyPage() {
               <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName ?? ""} · {c.phone}</SelectItem>)}</SelectContent>
             </Select>
           </div>
+          <p className="text-xs text-muted-foreground">Only products with warranty months configured appear here.</p>
           <div className="space-y-1"><Label className="text-xs">Part</Label>
             <Select value={form.variantId} onValueChange={(v) => setForm((f) => ({ ...f, variantId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select part" /></SelectTrigger>
-              <SelectContent>{variants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{v.productName} — {v.sku}</SelectItem>)}</SelectContent>
+              <SelectTrigger><SelectValue placeholder={variants.length ? "Select part" : "No warranty parts"} /></SelectTrigger>
+              <SelectContent>{variants.map((v) => (
+                <SelectItem key={v.variantId} value={v.variantId}>
+                  {v.productName} — {v.sku} ({warrantyPeriodLabel(v.warrantyMonths)})
+                </SelectItem>
+              ))}</SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1"><Label className="text-xs">Warranty (months)</Label>
-              <Input type="number" value={form.warrantyMonths} onChange={(e) => setForm((f) => ({ ...f, warrantyMonths: e.target.value }))} />
+            <div className="space-y-1"><Label className="text-xs">Warranty</Label>
+              <Input readOnly value={selectedVariant ? warrantyPeriodLabel(selectedVariant.warrantyMonths) : "—"} className="bg-muted/40" />
             </div>
             <div className="space-y-1"><Label className="text-xs">Purchase date</Label>
               <Input type="date" value={form.purchaseDate} onChange={(e) => setForm((f) => ({ ...f, purchaseDate: e.target.value }))} />

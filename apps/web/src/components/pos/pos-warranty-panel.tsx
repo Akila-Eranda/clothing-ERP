@@ -5,6 +5,7 @@ import { Loader2, RefreshCw, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
+import { productHasWarranty, warrantyPeriodLabel } from "@/lib/warranty";
 
 interface SaleRow {
   id: string;
@@ -43,6 +44,21 @@ interface PosWarrantyPanelProps {
   onInitialSaleConsumed?: () => void;
 }
 
+function itemWarrantyMonths(
+  it: SaleItemDetail,
+  resolve: (it: SaleItemDetail) => number | null | undefined,
+): number | null | undefined {
+  return resolve(it);
+}
+
+function pickFirstEligibleVariantId(
+  items: SaleItemDetail[],
+  resolve: (it: SaleItemDetail) => number | null | undefined,
+): string | null {
+  const eligible = items.filter((i) => productHasWarranty(resolve(i)));
+  return eligible[0]?.variantId ?? null;
+}
+
 function customerLabel(c?: SaleRow["customer"] | null): string {
   if (!c) return "Walk-in";
   if (c.name?.trim()) return c.name.trim();
@@ -61,6 +77,26 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
   const [issueDescription, setIssueDescription] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [claimNumber, setClaimNumber] = React.useState<string | null>(null);
+  const [warrantyByVariant, setWarrantyByVariant] = React.useState<Map<string, number | null>>(new Map());
+
+  React.useEffect(() => {
+    api
+      .get<Array<{ variantId: string; warrantyMonths?: number | null }>>("/pos/products")
+      .then((r) => {
+        const list = Array.isArray(r.data) ? r.data : [];
+        setWarrantyByVariant(new Map(list.map((p) => [p.variantId, p.warrantyMonths ?? null])));
+      })
+      .catch(() => {});
+  }, []);
+
+  const resolveWarrantyMonths = React.useCallback(
+    (it: SaleItemDetail): number | null | undefined => {
+      const nested = it.variant?.product?.warrantyMonths;
+      if (nested != null) return nested;
+      return warrantyByVariant.get(it.variantId);
+    },
+    [warrantyByVariant],
+  );
 
   const loadSale = React.useCallback(async (row: SaleRow) => {
     setSaleLoading(true);
@@ -68,14 +104,19 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
       const r = await api.get<SaleDetail>(`/sales/${row.id}`);
       const data = r.data;
       setSale(data);
-      setSelectedVariantId(data.items[0]?.variantId ?? null);
+      setSelectedVariantId(pickFirstEligibleVariantId(data.items, resolveWarrantyMonths));
       setStep("item");
     } catch {
       toast.error("Failed to load invoice");
     } finally {
       setSaleLoading(false);
     }
-  }, []);
+  }, [resolveWarrantyMonths]);
+
+  React.useEffect(() => {
+    if (!sale) return;
+    setSelectedVariantId(pickFirstEligibleVariantId(sale.items, resolveWarrantyMonths));
+  }, [sale, resolveWarrantyMonths]);
 
   React.useEffect(() => {
     if (!initialSaleId) return;
@@ -86,7 +127,6 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
       .then((r) => {
         if (cancelled) return;
         setSale(r.data);
-        setSelectedVariantId(r.data.items[0]?.variantId ?? null);
         setStep("item");
         onInitialSaleConsumed?.();
       })
@@ -97,7 +137,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
     return () => {
       cancelled = true;
     };
-  }, [initialSaleId, onInitialSaleConsumed]);
+  }, [initialSaleId, onInitialSaleConsumed, resolveWarrantyMonths]);
 
   const searchSales = async () => {
     if (!query.trim()) return;
@@ -116,8 +156,12 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
     }
   };
 
-  const selectedItem = sale?.items.find((i) => i.variantId === selectedVariantId);
-  const warrantyMonths = selectedItem?.variant?.product?.warrantyMonths ?? 12;
+  const eligibleItems = React.useMemo(
+    () => sale?.items.filter((i) => productHasWarranty(itemWarrantyMonths(i, resolveWarrantyMonths))) ?? [],
+    [sale, resolveWarrantyMonths],
+  );
+  const selectedItem = eligibleItems.find((i) => i.variantId === selectedVariantId);
+  const warrantyMonths = selectedItem ? itemWarrantyMonths(selectedItem, resolveWarrantyMonths)! : 0;
   const purchaseDate = sale?.invoiceDate
     ? new Date(sale.invoiceDate).toISOString().slice(0, 10)
     : new Date().toISOString().slice(0, 10);
@@ -125,7 +169,11 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
 
   const submitClaim = async () => {
     if (!sale || !selectedVariantId || !issueDescription.trim()) {
-      toast.error("Select a part and describe the issue");
+      toast.error("Select a warranty-covered part and describe the issue");
+      return;
+    }
+    if (!selectedItem || !productHasWarranty(warrantyMonths)) {
+      toast.error("This part has no warranty coverage");
       return;
     }
     if (!customerId) {
@@ -138,7 +186,6 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
         customerId,
         variantId: selectedVariantId,
         saleId: sale.id,
-        warrantyMonths,
         purchaseDate,
         issueDescription: issueDescription.trim(),
       });
@@ -281,11 +328,22 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               <p className="text-amber-400 font-medium">No customer on this sale — claim cannot be submitted.</p>
             )}
           </div>
-          <p className="text-xs font-semibold text-white shrink-0">Select defective part</p>
+          <p className="text-xs font-semibold text-white shrink-0">Select defective part (warranty-covered only)</p>
+          {eligibleItems.length === 0 ? (
+            <div
+              className="flex-1 flex flex-col items-center justify-center rounded-xl border p-6 text-center"
+              style={{ borderColor: "#1e3356", color: "#6a8ab8" }}
+            >
+              <p className="text-sm text-white font-medium">No warranty-covered parts on this invoice</p>
+              <p className="text-xs mt-2 max-w-sm">
+                Set warranty months on the product (Products → edit) for parts that should be eligible.
+              </p>
+            </div>
+          ) : (
           <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-            {sale.items.map((it) => {
+            {eligibleItems.map((it) => {
               const active = selectedVariantId === it.variantId;
-              const wm = it.variant?.product?.warrantyMonths;
+              const wm = itemWarrantyMonths(it, resolveWarrantyMonths)!;
               return (
                 <button
                   key={it.id}
@@ -304,16 +362,16 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                     {it.productName} {it.variantName}
                   </p>
                   <p className="text-[11px] font-mono mt-0.5" style={{ color: "#6a8ab8" }}>
-                    {it.sku} · Qty {it.quantity}
-                    {wm != null ? ` · ${wm} mo warranty` : ""}
+                    {it.sku} · Qty {it.quantity} · {warrantyPeriodLabel(wm)}
                   </p>
                 </button>
               );
             })}
           </div>
+          )}
           <button
             type="button"
-            disabled={!selectedVariantId || !customerId}
+            disabled={!selectedVariantId || !customerId || eligibleItems.length === 0}
             onClick={() => setStep("confirm")}
             className="shrink-0 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-40"
             style={{ background: "#4f6ef7" }}
