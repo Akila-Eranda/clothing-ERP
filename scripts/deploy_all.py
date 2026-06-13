@@ -37,6 +37,24 @@ docker compose exec -u root -T api npx prisma db push --accept-data-loss
 echo "==> Seed demo tenants..."
 docker compose exec -u root -T api node prisma/seed.js
 
+echo "==> Renew SSL for all tenant subdomains..."
+SUBDOMAINS=$(docker compose exec -T postgres psql -U fashionerp -d fashionerp -tAc \\
+  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform') ORDER BY subdomain" | tr -d ' ' | grep -v '^$' || true)
+DOMAIN_ARGS="-d shop.hexalyte.com -d shop.clothing.api.hexalyte.com -d admin3.hexalyte.com"
+for s in $SUBDOMAINS; do
+  DOMAIN_ARGS="$DOMAIN_ARGS -d ${{s}}.shop.hexalyte.com"
+done
+docker compose stop nginx
+certbot certonly --standalone $DOMAIN_ARGS \\
+  --non-interactive --agree-tos -m admin@hexalyte.com --expand --force-renewal
+for dir in shop.hexalyte.com shop.clothing.api.hexalyte.com admin3.hexalyte.com wildcard.shop.hexalyte.com; do
+  mkdir -p "nginx/ssl/$dir"
+  cp /etc/letsencrypt/live/shop.hexalyte.com/fullchain.pem "nginx/ssl/$dir/"
+  cp /etc/letsencrypt/live/shop.hexalyte.com/privkey.pem "nginx/ssl/$dir/"
+done
+docker compose up -d nginx
+echo "SSL updated for: $SUBDOMAINS"
+
 echo "==> Health check..."
 curl -sk https://shop.clothing.api.hexalyte.com/api/v1/health | head -c 200
 echo ""
