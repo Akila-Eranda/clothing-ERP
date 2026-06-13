@@ -662,11 +662,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       removeItem(splitItem.variantId);
       setSelectedCartIdx(-1);
       await loadHeldBills();
+      await loadProducts();
       toast.success(`${splitItem.productName} moved to held bills — checkout the rest`);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Split bill failed");
     }
-  }, [selectedCartIdx, items, getHoldPayload, removeItem, loadHeldBills]);
+  }, [selectedCartIdx, items, getHoldPayload, removeItem, loadHeldBills, loadProducts]);
 
   //  Center content per nav 
   const renderCenter = () => {
@@ -905,6 +906,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           const r = await api.post<{returnNumber:string;refundAmount:number}>("/returns", { originalSaleId:returnSale.id, reason:returnReason, returnType, notes:returnNotes, restockItems:returnRestock, items:selectedItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice})), exchangeItems:returnType==="EXCHANGE"?selectedExchangeItems.map(([variantId,s])=>({variantId,quantity:s.qty,unitPrice:s.unitPrice,productName:s.name,variantName:s.name,sku:products.find(p=>p.variantId===variantId)?.sku})):undefined });
           setReturnResult({returnNumber:r.data.returnNumber,refundAmount:r.data.refundAmount});
           setReturnStep("done"); toast.success(`Return ${r.data.returnNumber} created`);
+          await loadProducts();
         } catch(e:unknown){ toast.error((e as Error).message??"Return failed"); } finally { setReturnSubmitting(false); }
       };
 

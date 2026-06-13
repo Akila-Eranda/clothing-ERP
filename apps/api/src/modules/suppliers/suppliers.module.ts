@@ -270,31 +270,52 @@ export class SuppliersService {
       throw new BadRequestException('Purchase order must be approved before receiving items');
     }
 
+    const receiveBranchId = po.branchId || branchId;
+    if (po.branchId && branchId && po.branchId !== branchId) {
+      throw new BadRequestException('Switch to the purchase order branch before receiving goods');
+    }
+
     await this.prisma.$transaction(async (tx) => {
       for (const item of items) {
+        const poItem = po.items.find((i) => i.id === item.itemId);
+        if (!poItem) throw new BadRequestException(`Invalid line item: ${item.itemId}`);
+        if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
+
+        const nextReceived = poItem.receivedQty + item.receivedQty;
+        if (nextReceived > poItem.orderedQty) {
+          throw new BadRequestException(
+            `Cannot receive ${item.receivedQty} units — only ${poItem.orderedQty - poItem.receivedQty} remaining on this line`,
+          );
+        }
+
         await tx.purchaseOrderItem.update({
           where: { id: item.itemId },
           data: { receivedQty: { increment: item.receivedQty }, rejectedQty: { increment: item.rejectedQty ?? 0 } },
         });
-        const poItem = po.items.find((i) => i.id === item.itemId);
-        if (poItem && item.receivedQty > 0) {
-          await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+
+        if (item.receivedQty > 0) {
+          await this.inventoryService.adjustStock(tenantId, receiveBranchId, userId, {
             variantId: poItem.variantId,
             quantity: item.receivedQty,
             movementType: StockMovementType.PURCHASE,
             referenceId: poId,
-          });
+            referenceType: 'PurchaseOrder',
+          }, tx);
         }
       }
 
       const allReceived = await tx.purchaseOrderItem.findMany({ where: { purchaseId: poId } });
       const fullyReceived = allReceived.every((i) => i.receivedQty >= i.orderedQty);
-      const partiallyReceived = allReceived.some((i) => i.receivedQty > 0);
+      const anyReceived = allReceived.some((i) => i.receivedQty > 0);
 
       await tx.purchaseOrder.update({
         where: { id: poId },
         data: {
-          status: fullyReceived ? PurchaseOrderStatus.RECEIVED : PurchaseOrderStatus.PARTIALLY_RECEIVED,
+          status: fullyReceived
+            ? PurchaseOrderStatus.RECEIVED
+            : anyReceived
+              ? PurchaseOrderStatus.PARTIALLY_RECEIVED
+              : po.status,
           receivedDate: fullyReceived ? new Date() : undefined,
         },
       });

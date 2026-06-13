@@ -10,7 +10,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus } from '@prisma/client';
+import { Prisma, StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -176,63 +176,130 @@ export class InventoryService {
     };
   }
 
-  async adjustStock(tenantId: string, branchId: string, userId: string, dto: AdjustStockDto) {
-    const effectiveBranch = branchId || await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } }).then(b => b?.id ?? 'default');
-    const inventory = await this.prisma.inventory.findFirst({
-      where: { tenantId, branchId: effectiveBranch, variantId: dto.variantId },
-    });
-
-    const currentQty = inventory?.quantity ?? 0;
-    const currentReserved = inventory?.reservedQty ?? 0;
-    const currentDamaged = inventory?.damagedQty ?? 0;
-    const currentReturned = inventory?.returnedQty ?? 0;
-    const deductionTypes: StockMovementType[] = [StockMovementType.SALE, StockMovementType.TRANSFER_OUT, StockMovementType.DAMAGE];
-    const qty = Math.abs(dto.quantity);
-    const delta = deductionTypes.includes(dto.movementType) ? -qty : qty;
-    let newQty = dto.movementType === StockMovementType.ADJUSTMENT
-      ? dto.quantity
-      : currentQty + delta;
-    let newDamaged = currentDamaged;
-    let newReturned = currentReturned;
-
-    if (dto.movementType === StockMovementType.DAMAGE) {
-      newDamaged = currentDamaged + qty;
-      newQty = Math.max(0, currentQty - qty);
-    }
-    if (dto.movementType === StockMovementType.RETURN) {
-      newReturned = currentReturned + qty;
-      newQty = currentQty + qty;
+  async assertSaleStockAvailable(
+    tenantId: string,
+    branchId: string,
+    items: { variantId: string; quantity: number }[],
+    heldBillId?: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = tx ?? this.prisma;
+    const heldByVariant = new Map<string, number>();
+    if (heldBillId) {
+      const reservations = await client.inventoryReservation.findMany({
+        where: {
+          tenantId,
+          sourceType: 'HELD_BILL',
+          sourceId: heldBillId,
+          status: InventoryReservationStatus.ACTIVE,
+        },
+      });
+      for (const r of reservations) {
+        heldByVariant.set(r.variantId, (heldByVariant.get(r.variantId) ?? 0) + r.quantity);
+      }
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    for (const item of items) {
+      const inv = await client.inventory.findFirst({
+        where: { tenantId, branchId, variantId: item.variantId },
+      });
+      const onHand = inv?.quantity ?? 0;
+      const reserved = inv?.reservedQty ?? 0;
+      const heldForBill = heldByVariant.get(item.variantId) ?? 0;
+      const available = onHand - reserved + heldForBill;
+      if (available < item.quantity) {
+        const variant = await client.productVariant.findFirst({
+          where: { id: item.variantId, product: { tenantId } },
+          select: { sku: true, name: true, product: { select: { name: true } } },
+        });
+        const label = variant ? `${variant.product.name} — ${variant.name}` : item.variantId;
+        throw new BadRequestException(
+          `Insufficient stock for ${label}: ${Math.max(0, available)} available, ${item.quantity} requested`,
+        );
+      }
+    }
+  }
+
+  async adjustStock(
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: AdjustStockDto,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const effectiveBranch = branchId || await this.resolveBranchId(tenantId, branchId);
+
+    const execute = async (client: Prisma.TransactionClient) => {
+      const inventory = await client.inventory.findFirst({
+        where: { tenantId, branchId: effectiveBranch, variantId: dto.variantId },
+      });
+
+      const currentQty = inventory?.quantity ?? 0;
+      const currentReserved = inventory?.reservedQty ?? 0;
+      const currentDamaged = inventory?.damagedQty ?? 0;
+      const currentReturned = inventory?.returnedQty ?? 0;
+      const deductionTypes: StockMovementType[] = [
+        StockMovementType.SALE,
+        StockMovementType.TRANSFER_OUT,
+        StockMovementType.DAMAGE,
+      ];
+      const qty = Math.abs(dto.quantity);
+      const delta = deductionTypes.includes(dto.movementType) ? -qty : qty;
+      let newQty = dto.movementType === StockMovementType.ADJUSTMENT
+        ? dto.quantity
+        : currentQty + delta;
+      let newDamaged = currentDamaged;
+      let newReturned = currentReturned;
+
+      if (dto.movementType === StockMovementType.DAMAGE) {
+        newDamaged = currentDamaged + qty;
+        newQty = currentQty - qty;
+      }
+      if (dto.movementType === StockMovementType.RETURN) {
+        newReturned = currentReturned + qty;
+        newQty = currentQty + qty;
+      }
+
+      if (
+        deductionTypes.includes(dto.movementType)
+        && dto.movementType !== StockMovementType.ADJUSTMENT
+        && newQty < 0
+      ) {
+        throw new BadRequestException(
+          `Insufficient stock: ${currentQty} on hand, ${qty} requested for ${dto.movementType}`,
+        );
+      }
+
+      const finalQty = Math.max(0, newQty);
+
       const updated = inventory
-        ? await tx.inventory.update({
+        ? await client.inventory.update({
             where: { id: inventory.id },
             data: {
-              quantity: Math.max(0, newQty),
+              quantity: finalQty,
               damagedQty: newDamaged,
               returnedQty: newReturned,
             },
           })
-        : await tx.inventory.create({
+        : await client.inventory.create({
             data: {
               tenantId,
               branchId: effectiveBranch,
               variantId: dto.variantId,
-              quantity: Math.max(0, dto.quantity),
-              returnedQty: dto.movementType === StockMovementType.RETURN ? dto.quantity : 0,
+              quantity: finalQty,
+              returnedQty: dto.movementType === StockMovementType.RETURN ? qty : 0,
             },
           });
 
-      await tx.inventoryLog.create({
+      await client.inventoryLog.create({
         data: {
           tenantId,
           branchId: effectiveBranch,
           variantId: dto.variantId,
           movementType: dto.movementType,
-          quantityChange: Math.max(0, newQty) - currentQty,
+          quantityChange: finalQty - currentQty,
           quantityBefore: currentQty,
-          quantityAfter: Math.max(0, newQty),
+          quantityAfter: finalQty,
           reservedBefore: currentReserved,
           reservedAfter: currentReserved,
           damagedBefore: currentDamaged,
@@ -248,12 +315,14 @@ export class InventoryService {
       });
 
       return updated;
-    });
+    };
+
+    const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
 
     if (result.quantity <= 5) {
       this.eventEmitter.emit('inventory.low-stock', {
         tenantId,
-        branchId,
+        branchId: effectiveBranch,
         variantId: dto.variantId,
         quantity: result.quantity,
       });
@@ -288,30 +357,32 @@ export class InventoryService {
     sourceType: string,
     sourceId: string,
     userId?: string,
+    tx?: Prisma.TransactionClient,
   ) {
     if (quantity <= 0) return;
-    const effectiveBranch = branchId || await this.prisma.branch.findFirst({ where: { tenantId }, select: { id: true } }).then(b => b?.id ?? '');
-    const inventory = await this.prisma.inventory.findFirst({
-      where: { tenantId, branchId: effectiveBranch, variantId },
-    });
-    const onHand = inventory?.quantity ?? 0;
-    const reserved = inventory?.reservedQty ?? 0;
-    const available = onHand - reserved;
-    if (available < quantity) {
-      throw new BadRequestException(`Insufficient available stock (${available} available, ${quantity} requested)`);
-    }
+    const effectiveBranch = branchId || await this.resolveBranchId(tenantId, branchId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const execute = async (client: Prisma.TransactionClient) => {
+      const inventory = await client.inventory.findFirst({
+        where: { tenantId, branchId: effectiveBranch, variantId },
+      });
+      const onHand = inventory?.quantity ?? 0;
+      const reserved = inventory?.reservedQty ?? 0;
+      const available = onHand - reserved;
+      if (available < quantity) {
+        throw new BadRequestException(`Insufficient available stock (${available} available, ${quantity} requested)`);
+      }
+
       const updated = inventory
-        ? await tx.inventory.update({
+        ? await client.inventory.update({
             where: { id: inventory.id },
             data: { reservedQty: { increment: quantity } },
           })
-        : await tx.inventory.create({
+        : await client.inventory.create({
             data: { tenantId, branchId: effectiveBranch, variantId, quantity: 0, reservedQty: quantity },
           });
 
-      await tx.inventoryReservation.create({
+      await client.inventoryReservation.create({
         data: {
           tenantId,
           branchId: effectiveBranch,
@@ -323,7 +394,7 @@ export class InventoryService {
         },
       });
 
-      await tx.inventoryLog.create({
+      await client.inventoryLog.create({
         data: {
           tenantId,
           branchId: effectiveBranch,
@@ -344,27 +415,36 @@ export class InventoryService {
       });
 
       return updated;
-    });
+    };
+
+    return tx ? execute(tx) : this.prisma.$transaction(execute);
   }
 
-  async releaseReservations(tenantId: string, sourceType: string, sourceId: string, consume = false) {
-    const reservations = await this.prisma.inventoryReservation.findMany({
+  async releaseReservations(
+    tenantId: string,
+    sourceType: string,
+    sourceId: string,
+    consume = false,
+    tx?: Prisma.TransactionClient,
+  ) {
+    const client = tx ?? this.prisma;
+    const reservations = await client.inventoryReservation.findMany({
       where: { tenantId, sourceType, sourceId, status: InventoryReservationStatus.ACTIVE },
     });
     if (!reservations.length) return { released: 0 };
 
-    await this.prisma.$transaction(async (tx) => {
+    const execute = async (c: Prisma.TransactionClient) => {
       for (const r of reservations) {
-        const inv = await tx.inventory.findFirst({
+        const inv = await c.inventory.findFirst({
           where: { tenantId, branchId: r.branchId, variantId: r.variantId },
         });
         if (inv) {
-          await tx.inventory.update({
+          await c.inventory.update({
             where: { id: inv.id },
             data: { reservedQty: { decrement: Math.min(r.quantity, inv.reservedQty) } },
           });
         }
-        await tx.inventoryReservation.update({
+        await c.inventoryReservation.update({
           where: { id: r.id },
           data: {
             status: consume ? InventoryReservationStatus.CONSUMED : InventoryReservationStatus.RELEASED,
@@ -372,7 +452,13 @@ export class InventoryService {
           },
         });
       }
-    });
+    };
+
+    if (tx) {
+      await execute(tx);
+    } else {
+      await this.prisma.$transaction(execute);
+    }
     return { released: reservations.length };
   }
 

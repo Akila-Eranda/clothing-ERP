@@ -5,7 +5,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsEnum, IsArray, IsBoolean, IsOptional, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ReturnReason, ReturnStatus, StockMovementType } from '@prisma/client';
+import { ReturnReason, ReturnStatus, StockMovementType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -88,10 +88,94 @@ export class ReturnsService {
       };
       const created = await tx.return.create({ data: createData, include: { items: true } });
 
-      return created;
+      await this.applyStockEffects(tenantId, created, userId, tx);
+      const updated = await tx.return.update({
+        where: { id: created.id },
+        data: { status: ReturnStatus.APPROVED, approvedBy: userId },
+        include: { items: true },
+      });
+
+      return updated;
     });
 
     return ret;
+  }
+
+  private async applyStockEffects(
+    tenantId: string,
+    ret: {
+      id: string;
+      branchId: string;
+      originalSaleId: string;
+      restockItems: boolean;
+      returnType: string;
+      exchangeData: unknown;
+      items: { variantId: string; quantity: number }[];
+    },
+    userId: string,
+    tx?: Prisma.TransactionClient,
+  ) {
+    if (ret.restockItems) {
+      for (const item of ret.items) {
+        await this.inventoryService.adjustStock(tenantId, ret.branchId, userId, {
+          variantId: item.variantId,
+          quantity: item.quantity,
+          movementType: StockMovementType.RETURN,
+          referenceId: ret.id,
+          referenceType: 'Return',
+        }, tx);
+      }
+    }
+    if (ret.returnType === 'EXCHANGE') {
+      const exchangeData = (ret.exchangeData as { variantId?: string; quantity?: number }[]) ?? [];
+      for (const item of exchangeData) {
+        if (item?.variantId && item.quantity) {
+          await this.inventoryService.adjustStock(tenantId, ret.branchId, userId, {
+            variantId: item.variantId,
+            quantity: item.quantity,
+            movementType: StockMovementType.SALE,
+            referenceId: ret.id,
+            referenceType: 'ReturnExchange',
+          }, tx);
+        }
+      }
+    }
+
+    const client = tx ?? this.prisma;
+    const sale = await client.sale.findFirst({
+      where: { id: ret.originalSaleId, tenantId },
+      include: { items: true },
+    });
+    if (!sale) return;
+
+    const approvedReturns = await client.return.findMany({
+      where: {
+        tenantId,
+        originalSaleId: ret.originalSaleId,
+        status: ReturnStatus.APPROVED,
+        id: { not: ret.id },
+      },
+      include: { items: true },
+    });
+
+    const returnedByVariant = new Map<string, number>();
+    for (const r of approvedReturns) {
+      for (const item of r.items) {
+        returnedByVariant.set(item.variantId, (returnedByVariant.get(item.variantId) ?? 0) + item.quantity);
+      }
+    }
+    for (const item of ret.items) {
+      returnedByVariant.set(item.variantId, (returnedByVariant.get(item.variantId) ?? 0) + item.quantity);
+    }
+
+    const fullyReturned = sale.items.every(
+      (si) => (returnedByVariant.get(si.variantId) ?? 0) >= si.quantity,
+    );
+
+    await client.sale.update({
+      where: { id: ret.originalSaleId },
+      data: { status: fullyReturned ? 'REFUNDED' : 'PARTIALLY_REFUNDED' },
+    });
   }
 
   async findAll(tenantId: string, query: PaginationDto) {
@@ -130,29 +214,15 @@ export class ReturnsService {
     const r = ret as any;
 
     if (status === ReturnStatus.APPROVED && r.status === ReturnStatus.INITIATED) {
-      if (r.restockItems) {
-        for (const item of r.items) {
-          await this.inventoryService.adjustStock(tenantId, r.branchId, userId, {
-            variantId: item.variantId, quantity: item.quantity,
-            movementType: StockMovementType.RETURN, referenceId: r.id,
-          });
-        }
-      }
-      if (r.returnType === 'EXCHANGE') {
-        const exchangeData = (r.exchangeData as any[]) ?? [];
-        for (const item of exchangeData) {
-          if (item?.variantId) {
-            await this.inventoryService.adjustStock(tenantId, r.branchId, userId, {
-              variantId: item.variantId, quantity: item.quantity,
-              movementType: StockMovementType.SALE, referenceId: r.id,
-            });
-          }
-        }
-      }
-      await this.prisma.sale.update({
-        where: { id: r.originalSaleId },
-        data: { status: 'REFUNDED' },
-      });
+      await this.applyStockEffects(tenantId, {
+        id: r.id,
+        branchId: r.branchId,
+        originalSaleId: r.originalSaleId,
+        restockItems: r.restockItems,
+        returnType: r.returnType,
+        exchangeData: r.exchangeData,
+        items: r.items,
+      }, userId);
     }
 
     return this.prisma.return.update({

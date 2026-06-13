@@ -185,6 +185,14 @@ export class PosService {
     const paymentMethods = dto.payments.map((p) => p.method);
 
     const sale = await this.prisma.$transaction(async (tx) => {
+      await this.inventoryService.assertSaleStockAvailable(
+        tenantId,
+        branchId,
+        dto.items,
+        dto.heldBillId,
+        tx,
+      );
+
       const created = await tx.sale.create({
         data: {
           tenantId,
@@ -259,7 +267,7 @@ export class PosService {
       }
 
       if (dto.heldBillId) {
-        await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', dto.heldBillId, true);
+        await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', dto.heldBillId, true, tx);
       }
 
       for (const item of dto.items) {
@@ -268,7 +276,8 @@ export class PosService {
           quantity: item.quantity,
           movementType: StockMovementType.SALE,
           referenceId: created.id,
-        });
+          referenceType: 'Sale',
+        }, tx);
       }
 
       if (dto.customerId && customerRecord) {
@@ -338,12 +347,12 @@ export class PosService {
         }
       }
 
+      if (dto.heldBillId) {
+        await tx.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
+      }
+
       return created;
     });
-
-    if (dto.heldBillId) {
-      await this.prisma.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
-    }
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
     return sale;
@@ -472,21 +481,25 @@ export class PosService {
   async holdBill(tenantId: string, branchId: string, cashierId: string, dto: HoldBillDto) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const data = dto.data as { items?: { variantId: string; quantity: number }[] };
-    const bill = await this.prisma.heldBill.create({
-      data: { tenantId, branchId: resolvedBranchId, cashierId, label: dto.label, data: dto.data as object },
+
+    return this.prisma.$transaction(async (tx) => {
+      const bill = await tx.heldBill.create({
+        data: { tenantId, branchId: resolvedBranchId, cashierId, label: dto.label, data: dto.data as object },
+      });
+      for (const item of data.items ?? []) {
+        await this.inventoryService.reserveStock(
+          tenantId,
+          resolvedBranchId,
+          item.variantId,
+          item.quantity,
+          'HELD_BILL',
+          bill.id,
+          cashierId,
+          tx,
+        );
+      }
+      return bill;
     });
-    for (const item of data.items ?? []) {
-      await this.inventoryService.reserveStock(
-        tenantId,
-        resolvedBranchId,
-        item.variantId,
-        item.quantity,
-        'HELD_BILL',
-        bill.id,
-        cashierId,
-      );
-    }
-    return bill;
   }
 
   async getHeldBills(tenantId: string, branchId: string) {
@@ -552,7 +565,7 @@ export class PosService {
       },
       include: {
         product: { include: { category: true } },
-        inventory: { where: branchId ? { branchId } : {}, select: { quantity: true }, take: 1 },
+        inventory: { where: branchId ? { branchId } : {}, select: { quantity: true, reservedQty: true }, take: 1 },
       },
     });
     if (!variant) throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
@@ -560,7 +573,7 @@ export class PosService {
       variantId: variant.id, productName: variant.product.name, variantName: variant.name,
       sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
       costPrice: variant.costPrice, color: variant.color, size: variant.size,
-      stock: variant.inventory[0]?.quantity ?? 0,
+      stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
     };
   }
 
@@ -591,7 +604,7 @@ export class PosService {
         product: { include: { category: true } },
         inventory: {
           where: branchId ? { branchId } : {},
-          select: { quantity: true },
+          select: { quantity: true, reservedQty: true },
           take: 1,
         },
       },
@@ -610,7 +623,7 @@ export class PosService {
       size:        v.size  ?? undefined,
       material:    v.material ?? undefined,
       style:       v.style ?? undefined,
-      stock:       v.inventory[0]?.quantity ?? 0,
+      stock:       Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0)),
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
       barcode:     v.barcode ?? undefined,
       warrantyMonths: v.product.warrantyMonths ?? null,
