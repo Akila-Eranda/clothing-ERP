@@ -57,6 +57,40 @@ export class ReceiptPrintDispatchDto {
   @ApiPropertyOptional() @IsOptional() @IsString() paperWidth?: string;
 }
 
+interface StoredReceiptSettings {
+  shopName: string;
+  tagline: string;
+  logoUrl: string;
+  address1: string;
+  address2: string;
+  phone: string;
+  email: string;
+  website: string;
+  headerText: string;
+  footerText: string;
+  paperWidth: string;
+  showTax: boolean;
+  showDiscount: boolean;
+  showCashier: boolean;
+  showCustomer: boolean;
+  showBarcode: boolean;
+  fontSize: string;
+  printServerEnabled: boolean;
+  printServerUrl: string;
+  printServerKey: string;
+  printMode: string;
+  autoPrintAfterSale: boolean;
+  printerName: string;
+}
+
+function str(v: unknown, fallback = ''): string {
+  return typeof v === 'string' ? v : fallback;
+}
+
+function bool(v: unknown, fallback = false): boolean {
+  return typeof v === 'boolean' ? v : fallback;
+}
+
 export class RegisterTenantDto {
   @ApiProperty() @IsString() companyName: string;
   @ApiProperty() @IsString() subdomain: string;
@@ -516,35 +550,35 @@ export class TenantsService {
     });
   }
 
-  async getReceiptSettings(tenantId: string) {
+  async getReceiptSettings(tenantId: string): Promise<StoredReceiptSettings> {
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true, name: true, phone: true, email: true } });
     if (!tenant) throw new NotFoundException('Tenant not found');
     const s = (tenant.settings as Record<string, unknown>) ?? {};
     const receipt = (s['receipt'] as Record<string, unknown>) ?? {};
     return {
-      shopName:     receipt['shopName']     ?? tenant.name,
-      tagline:      receipt['tagline']      ?? '',
-      logoUrl:      receipt['logoUrl']      ?? '',
-      address1:     receipt['address1']     ?? '',
-      address2:     receipt['address2']     ?? '',
-      phone:        receipt['phone']        ?? tenant.phone ?? '',
-      email:        receipt['email']        ?? tenant.email ?? '',
-      website:      receipt['website']      ?? '',
-      headerText:   receipt['headerText']   ?? '',
-      footerText:   receipt['footerText']   ?? 'Thank you for shopping with us!',
-      paperWidth:   receipt['paperWidth']   ?? '80mm',
-      showTax:      receipt['showTax']      ?? true,
-      showDiscount: receipt['showDiscount'] ?? true,
-      showCashier:  receipt['showCashier']  ?? true,
-      showCustomer: receipt['showCustomer'] ?? true,
-      showBarcode:  receipt['showBarcode']  ?? false,
-      fontSize:     receipt['fontSize']     ?? 'medium',
-      printServerEnabled: receipt['printServerEnabled'] ?? false,
-      printServerUrl:     receipt['printServerUrl']     ?? '',
-      printServerKey:     receipt['printServerKey']     ?? '',
-      printMode:          receipt['printMode']          ?? 'auto',
-      autoPrintAfterSale: receipt['autoPrintAfterSale'] ?? false,
-      printerName:        receipt['printerName']        ?? '',
+      shopName:     str(receipt['shopName'], tenant.name),
+      tagline:      str(receipt['tagline']),
+      logoUrl:      str(receipt['logoUrl']),
+      address1:     str(receipt['address1']),
+      address2:     str(receipt['address2']),
+      phone:        str(receipt['phone'], tenant.phone ?? ''),
+      email:        str(receipt['email'], tenant.email ?? ''),
+      website:      str(receipt['website']),
+      headerText:   str(receipt['headerText']),
+      footerText:   str(receipt['footerText'], 'Thank you for shopping with us!'),
+      paperWidth:   str(receipt['paperWidth'], '80mm'),
+      showTax:      bool(receipt['showTax'], true),
+      showDiscount: bool(receipt['showDiscount'], true),
+      showCashier:  bool(receipt['showCashier'], true),
+      showCustomer: bool(receipt['showCustomer'], true),
+      showBarcode:  bool(receipt['showBarcode'], false),
+      fontSize:     str(receipt['fontSize'], 'medium'),
+      printServerEnabled: bool(receipt['printServerEnabled']),
+      printServerUrl:     str(receipt['printServerUrl']),
+      printServerKey:     str(receipt['printServerKey']),
+      printMode:          str(receipt['printMode'], 'auto'),
+      autoPrintAfterSale: bool(receipt['autoPrintAfterSale']),
+      printerName:        str(receipt['printerName']),
     };
   }
 
