@@ -418,6 +418,99 @@ async function main() {
     });
     console.log('✅ Agriculture demo: agri.shop.hexalyte.com — admin@agri.demo.fashionerp.com / Admin@123456');
 
+    const spareCategories = ['Engine Parts', 'Brakes & Suspension', 'Filters', 'Electrical', 'Body Parts', 'Lubricants', 'Accessories'];
+    const spareTenant = await prisma.tenant.upsert({
+        where: { subdomain: 'spareparts' },
+        update: { shopType: client_1.ShopType.SPARE_PARTS },
+        create: {
+            name: 'Demo Spare Parts Store',
+            subdomain: 'spareparts',
+            email: 'admin@spareparts.demo.fashionerp.com',
+            shopType: client_1.ShopType.SPARE_PARTS,
+            plan: client_1.SubscriptionPlan.PROFESSIONAL,
+            status: client_1.TenantStatus.ACTIVE,
+            currency: 'LKR',
+            country: 'LK',
+            timezone: 'Asia/Colombo',
+        },
+    });
+    const spareBranch = await prisma.branch.upsert({
+        where: { tenantId_code: { tenantId: spareTenant.id, code: 'HO-001' } },
+        update: {},
+        create: { tenantId: spareTenant.id, name: 'Main Parts Store', code: 'HO-001', isDefault: true, city: 'Colombo' },
+    });
+    await prisma.branch.upsert({
+        where: { tenantId_code: { tenantId: spareTenant.id, code: 'BR-002' } },
+        update: {},
+        create: { tenantId: spareTenant.id, name: 'Branch — Kandy', code: 'BR-002', city: 'Kandy' },
+    });
+    const spareAdminRole = await prisma.role.upsert({
+        where: { tenantId_name: { tenantId: spareTenant.id, name: 'Tenant Admin' } },
+        update: {},
+        create: { tenantId: spareTenant.id, name: 'Tenant Admin', type: client_1.RoleType.TENANT_ADMIN, isSystem: true },
+    });
+    await prisma.user.upsert({
+        where: { tenantId_email: { tenantId: spareTenant.id, email: 'admin@spareparts.demo.fashionerp.com' } },
+        update: { status: client_1.UserStatus.ACTIVE, emailVerified: true },
+        create: {
+            tenantId: spareTenant.id,
+            branchId: spareBranch.id,
+            email: 'admin@spareparts.demo.fashionerp.com',
+            firstName: 'Spare',
+            lastName: 'Admin',
+            passwordHash,
+            emailVerified: true,
+            status: client_1.UserStatus.ACTIVE,
+            roles: { create: [{ roleId: spareAdminRole.id }] },
+        },
+    });
+    for (const name of spareCategories) {
+        await prisma.category.upsert({
+            where: { tenantId_slug: { tenantId: spareTenant.id, slug: slugify(name) } },
+            update: {},
+            create: { tenantId: spareTenant.id, name, slug: slugify(name) },
+        });
+    }
+    const toyotaBrand = await prisma.vehicleBrand.upsert({
+        where: { tenantId_name: { tenantId: spareTenant.id, name: 'Toyota' } },
+        update: {},
+        create: { tenantId: spareTenant.id, name: 'Toyota' },
+    });
+    const hondaBrand = await prisma.vehicleBrand.upsert({
+        where: { tenantId_name: { tenantId: spareTenant.id, name: 'Honda' } },
+        update: {},
+        create: { tenantId: spareTenant.id, name: 'Honda' },
+    });
+    if (!(await prisma.vehicleModel.findFirst({ where: { tenantId: spareTenant.id, brandId: toyotaBrand.id, name: 'Axio' } }))) {
+        await prisma.vehicleModel.create({
+            data: { tenantId: spareTenant.id, brandId: toyotaBrand.id, name: 'Axio', yearFrom: 2012, yearTo: 2020, engineCapacity: '1500cc' },
+        });
+    }
+    if (!(await prisma.vehicleModel.findFirst({ where: { tenantId: spareTenant.id, brandId: hondaBrand.id, name: 'Vezel' } }))) {
+        await prisma.vehicleModel.create({
+            data: { tenantId: spareTenant.id, brandId: hondaBrand.id, name: 'Vezel', yearFrom: 2014, yearTo: 2022, engineCapacity: '1500cc' },
+        });
+    }
+    await prisma.tenant.update({
+        where: { id: spareTenant.id },
+        data: {
+            settings: {
+                shopProfile: {
+                    type: 'SPARE_PARTS',
+                    defaultUnit: 'pcs',
+                    units: ['pcs', 'set', 'pair', 'box', 'liter'],
+                    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true },
+                    labelTemplates: ['sticker', 'shelf'],
+                    variantAttributes: [
+                        { name: 'OEM No', presets: [], mapsTo: 'size' },
+                        { name: 'Part Type', presets: ['OEM', 'Aftermarket', 'Genuine'], mapsTo: 'style' },
+                    ],
+                },
+            },
+        },
+    });
+    console.log('✅ Spare Parts demo: spareparts.shop.hexalyte.com — admin@spareparts.demo.fashionerp.com / Admin@123456');
+
     await prisma.user.updateMany({
         where: { emailVerified: true, status: client_1.UserStatus.PENDING_VERIFICATION },
         data: { status: client_1.UserStatus.ACTIVE },
@@ -430,6 +523,7 @@ async function main() {
     console.log('  Grocery demo:  admin@grocery.demo.fashionerp.com / Admin@123456 (subdomain: grocery)');
     console.log('  Hardware demo: admin@hardware.demo.fashionerp.com / Admin@123456 (subdomain: hardware)');
     console.log('  Agri demo:     admin@agri.demo.fashionerp.com / Admin@123456 (subdomain: agri)');
+    console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)');
     console.log('  Cashier:       cashier@demo.fashionerp.com / Cashier@123456');
 }
 main()
