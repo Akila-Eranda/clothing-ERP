@@ -9,6 +9,9 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { BranchProvider } from "@/components/branch/branch-provider";
 import { useBranchStore } from "@/stores/branch-store";
+import { isPosOnlyRole } from "@/lib/role-access";
+import { PosOnlyLanding } from "@/components/pos/pos-only-landing";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
 
 const POSOverlay = dynamic(
   () => import("@/components/pos/pos-overlay").then((m) => m.POSOverlay),
@@ -16,12 +19,14 @@ const POSOverlay = dynamic(
 );
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
-  const { sidebarMobileOpen, setMobileSidebarOpen } = useUIStore();
+  const { isAuthenticated, user, logoutApi } = useAuthStore();
+  const { sidebarMobileOpen, setMobileSidebarOpen, posOpen, openPos } = useUIStore();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const branchRevision = useBranchStore((s) => s.branchRevision);
+  const { settings: receiptSettings } = useReceiptSettings();
   const router = useRouter();
   const [mounted, setMounted] = React.useState(false);
+  const posOnly = isPosOnlyRole(user?.role);
 
   React.useEffect(() => {
     setMounted(true);
@@ -32,6 +37,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace("/login");
     }
   }, [mounted, isAuthenticated, router]);
+
+  React.useEffect(() => {
+    if (mounted && isAuthenticated && posOnly) {
+      openPos();
+    }
+  }, [mounted, isAuthenticated, posOnly, openPos]);
+
+  const handlePosOnlyLogout = React.useCallback(async () => {
+    await logoutApi();
+    router.replace("/login");
+  }, [logoutApi, router]);
 
   // Show shell immediately when a session token exists (persist rehydrates from localStorage).
   const hasStoredSession =
@@ -52,6 +68,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
       </div>
+    );
+  }
+
+  if (posOnly) {
+    return (
+      <BranchProvider>
+        <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} posOnly />
+        {!posOpen && (
+          <PosOnlyLanding
+            shopLabel={receiptSettings.shopName || undefined}
+            onOpenPos={openPos}
+            onLogout={handlePosOnlyLogout}
+          />
+        )}
+      </BranchProvider>
     );
   }
 

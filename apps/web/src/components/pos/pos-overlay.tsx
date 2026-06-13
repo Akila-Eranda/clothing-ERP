@@ -21,6 +21,11 @@ import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 
+interface POSOverlayProps {
+  /** Cashier mode — no ERP shell; exit returns to POS landing only. */
+  posOnly?: boolean;
+}
+
 interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
@@ -77,18 +82,19 @@ function getCardBg(c="") { const m: Record<string,string> = { black:"linear-grad
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"rgba(245,158,11,0.15)",color:"#f59e0b"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6" };
 
-export function POSOverlay() {
+export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { posOpen, closePos } = useUIStore();
   const { user } = useAuthStore();
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
   const variantCols = variantTableColumns(profile);
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
+    if (posOnly && (item.id === "reports" || item.id === "settings")) return false;
     if (!item.module) return true;
     return hasShopModule(profile, item.module);
   }).map((item) => item.id === 'customers'
     ? { ...item, label: workspace.customerLabel }
-    : item), [profile, workspace.customerLabel]);
+    : item), [profile, workspace.customerLabel, posOnly]);
   const returnReasons = React.useMemo(() => getReturnReasons(profile.type), [profile.type]);
   const [products, setProducts] = React.useState<ProductItem[]>([]);
   const [loading, setLoading] = React.useState(true);

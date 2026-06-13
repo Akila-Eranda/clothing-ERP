@@ -25,6 +25,7 @@ import {
 } from "@/lib/auth-host";
 import { ShopType } from "@/lib/shop-profiles";
 import { useAuthStore } from "@/stores/auth-store";
+import { isPosOnlyRole, POS_HOME_PATH } from "@/lib/role-access";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -98,7 +99,12 @@ function LoginContent() {
       await loginWithApi(data.email, data.password, effectiveSlug);
       toast.success("Welcome back!");
       const from = searchParams.get("from");
-      window.location.href = from && from.startsWith("/") ? from : "/dashboard";
+      const role = useAuthStore.getState().user?.role;
+      const cashier = isPosOnlyRole(role);
+      const defaultPath = cashier ? POS_HOME_PATH : "/dashboard";
+      const target =
+        from && from.startsWith("/") && !cashier ? from : defaultPath;
+      window.location.href = target;
     } catch (err: unknown) {
       toast.error((err as Error)?.message ?? "Invalid email or password");
     } finally {

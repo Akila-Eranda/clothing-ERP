@@ -1,5 +1,15 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isPosOnlyFromApiRoles, POS_HOME_PATH } from '@/lib/role-access';
+
+function rolesFromAccessToken(token: string): string[] {
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1])) as { roles?: string[] };
+    return payload.roles ?? [];
+  } catch {
+    return [];
+  }
+}
 
 const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
 
@@ -50,7 +60,9 @@ export function middleware(request: NextRequest) {
 
   if (isPublic && token) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = '/dashboard';
+    dashboardUrl.pathname = isPosOnlyFromApiRoles(rolesFromAccessToken(token))
+      ? POS_HOME_PATH
+      : '/dashboard';
     return NextResponse.redirect(dashboardUrl);
   }
 
