@@ -19,6 +19,12 @@ export interface ReceiptSettings {
   showCustomer: boolean;
   showBarcode: boolean;
   fontSize: "small" | "medium" | "large";
+  printServerEnabled: boolean;
+  printServerUrl: string;
+  printServerKey: string;
+  printMode: "browser" | "server" | "auto";
+  autoPrintAfterSale: boolean;
+  printerName: string;
 }
 
 export const RECEIPT_DEFAULTS: ReceiptSettings = {
@@ -39,6 +45,12 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
   showCustomer: true,
   showBarcode: false,
   fontSize: "medium",
+  printServerEnabled: false,
+  printServerUrl: "",
+  printServerKey: "",
+  printMode: "auto",
+  autoPrintAfterSale: false,
+  printerName: "",
 };
 
 const LS_KEY = "receipt_settings_cache";

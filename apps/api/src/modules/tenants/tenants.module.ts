@@ -14,7 +14,7 @@ import {
 } from './subscription-plans';
 import { TenantTrialCron } from './tenant-trial.cron';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { SubscriptionPlan, TenantStatus, UserStatus, ShopType, Prisma } from '@prisma/client';
+import { SubscriptionPlan, TenantStatus, UserStatus, ShopType, Prisma, ReceiptPrintStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -42,6 +42,19 @@ export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() showCustomer?: boolean;
   @ApiPropertyOptional() @IsOptional() showBarcode?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() fontSize?: string;
+  @ApiPropertyOptional() @IsOptional() printServerEnabled?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() printServerUrl?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() printServerKey?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() printMode?: string;
+  @ApiPropertyOptional() @IsOptional() autoPrintAfterSale?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() printerName?: string;
+}
+
+export class ReceiptPrintDispatchDto {
+  @ApiProperty() @IsString() html: string;
+  @ApiProperty() @IsString() printType: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() invoiceNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() paperWidth?: string;
 }
 
 export class RegisterTenantDto {
@@ -526,6 +539,158 @@ export class TenantsService {
       showCustomer: receipt['showCustomer'] ?? true,
       showBarcode:  receipt['showBarcode']  ?? false,
       fontSize:     receipt['fontSize']     ?? 'medium',
+      printServerEnabled: receipt['printServerEnabled'] ?? false,
+      printServerUrl:     receipt['printServerUrl']     ?? '',
+      printServerKey:     receipt['printServerKey']     ?? '',
+      printMode:          receipt['printMode']          ?? 'auto',
+      autoPrintAfterSale: receipt['autoPrintAfterSale'] ?? false,
+      printerName:        receipt['printerName']        ?? '',
+    };
+  }
+
+  async listReceiptPrintLogs(tenantId: string, limit = 50, page = 1) {
+    const take = Math.min(Math.max(limit, 1), 100);
+    const skip = Math.max(page - 1, 0) * take;
+    const [data, total] = await Promise.all([
+      this.prisma.receiptPrintLog.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+        include: {
+          user: { select: { firstName: true, lastName: true, email: true } },
+        },
+      }),
+      this.prisma.receiptPrintLog.count({ where: { tenantId } }),
+    ]);
+    return { data, total, page, limit: take };
+  }
+
+  private async forwardToPrintServer(
+    url: string,
+    key: string,
+    payload: { html: string; invoiceNumber?: string; paperWidth?: string; printType: string; printerName?: string },
+  ) {
+    const base = url.replace(/\/+$/, '');
+    const res = await fetch(`${base}/v1/print`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(key ? { 'x-print-key': key } : {}),
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => res.statusText);
+      throw new BadRequestException(text || `Print server returned ${res.status}`);
+    }
+    return res.json().catch(() => ({ ok: true }));
+  }
+
+  async testPrintServer(tenantId: string, userId: string) {
+    const settings = await this.getReceiptSettings(tenantId);
+    if (!settings.printServerUrl) {
+      throw new BadRequestException('Print server URL is not configured');
+    }
+    const html = `<!DOCTYPE html><html><body style="font-family:monospace;padding:8mm"><h2>${settings.shopName}</h2><p>Print server test — ${new Date().toLocaleString()}</p></body></html>`;
+    try {
+      await this.forwardToPrintServer(settings.printServerUrl, settings.printServerKey ?? '', {
+        html,
+        printType: 'TEST',
+        paperWidth: settings.paperWidth,
+        printerName: settings.printerName,
+      });
+      await this.prisma.receiptPrintLog.create({
+        data: {
+          tenantId,
+          userId,
+          printType: 'TEST',
+          status: ReceiptPrintStatus.SUCCESS,
+          printMode: 'server',
+          printServerUrl: settings.printServerUrl,
+          printerName: settings.printerName || null,
+          metadata: { message: 'Test print dispatched' },
+        },
+      });
+      return { ok: true, message: 'Print server connected and test job sent' };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Print server unreachable';
+      await this.prisma.receiptPrintLog.create({
+        data: {
+          tenantId,
+          userId,
+          printType: 'TEST',
+          status: ReceiptPrintStatus.FAILED,
+          printMode: 'server',
+          printServerUrl: settings.printServerUrl,
+          printerName: settings.printerName || null,
+          errorMessage: message,
+        },
+      });
+      throw new BadRequestException(message);
+    }
+  }
+
+  async dispatchReceiptPrint(
+    tenantId: string,
+    userId: string,
+    branchId: string | undefined,
+    dto: ReceiptPrintDispatchDto,
+  ) {
+    const settings = await this.getReceiptSettings(tenantId);
+    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST'].includes(dto.printType)
+      ? dto.printType
+      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST';
+    const mode = settings.printMode ?? 'auto';
+    const useServer = settings.printServerEnabled && settings.printServerUrl;
+
+    let status: ReceiptPrintStatus = ReceiptPrintStatus.BROWSER_FALLBACK;
+    let errorMessage: string | undefined;
+    let serverUsed = false;
+
+    if (useServer && (mode === 'server' || mode === 'auto')) {
+      try {
+        await this.forwardToPrintServer(settings.printServerUrl!, settings.printServerKey ?? '', {
+          html: dto.html,
+          invoiceNumber: dto.invoiceNumber,
+          paperWidth: dto.paperWidth ?? settings.paperWidth,
+          printType,
+          printerName: settings.printerName,
+        });
+        status = ReceiptPrintStatus.SUCCESS;
+        serverUsed = true;
+      } catch (err) {
+        errorMessage = err instanceof Error ? err.message : 'Print server error';
+        status = mode === 'server' ? ReceiptPrintStatus.FAILED : ReceiptPrintStatus.BROWSER_FALLBACK;
+      }
+    } else if (mode === 'server') {
+      status = ReceiptPrintStatus.FAILED;
+      errorMessage = 'Print server is disabled or URL missing';
+    }
+
+    const log = await this.prisma.receiptPrintLog.create({
+      data: {
+        tenantId,
+        branchId: branchId ?? null,
+        userId,
+        printType,
+        invoiceNumber: dto.invoiceNumber ?? null,
+        status,
+        printMode: serverUsed ? 'server' : 'browser',
+        printServerUrl: settings.printServerUrl || null,
+        printerName: settings.printerName || null,
+        errorMessage: errorMessage ?? null,
+        metadata: { paperWidth: dto.paperWidth ?? settings.paperWidth, htmlLength: dto.html.length },
+      },
+    });
+
+    return {
+      logId: log.id,
+      status,
+      serverUsed,
+      browserFallback: !serverUsed && status !== ReceiptPrintStatus.FAILED,
+      errorMessage,
     };
   }
 
@@ -601,6 +766,36 @@ export class TenantsController {
   @ApiOperation({ summary: 'Save receipt/thermal print settings' })
   saveReceiptSettings(@CurrentUser() user: IAuthUser, @Body() dto: ReceiptSettingsDto) {
     return this.tenantsService.saveReceiptSettings(user.tenantId, dto);
+  }
+
+  @Get('receipt-print/logs')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'List receipt print logs for current tenant' })
+  listReceiptPrintLogs(
+    @CurrentUser() user: IAuthUser,
+    @Query('limit') limit?: string,
+    @Query('page') page?: string,
+  ) {
+    return this.tenantsService.listReceiptPrintLogs(
+      user.tenantId,
+      limit ? parseInt(limit, 10) : 50,
+      page ? parseInt(page, 10) : 1,
+    );
+  }
+
+  @Post('receipt-print/dispatch')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Dispatch receipt to store print server and log' })
+  dispatchReceiptPrint(@CurrentUser() user: IAuthUser, @Body() dto: ReceiptPrintDispatchDto) {
+    return this.tenantsService.dispatchReceiptPrint(user.tenantId, user.id, user.branchId, dto);
+  }
+
+  @Post('receipt-print/test-server')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN, RoleType.BRANCH_MANAGER)
+  @ApiOperation({ summary: 'Send test print job to configured store print server' })
+  testPrintServer(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.testPrintServer(user.tenantId, user.id);
   }
 
   @Get()

@@ -12,6 +12,7 @@ import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { executeReceiptPrint } from "@/lib/receipt-print";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
@@ -512,27 +513,62 @@ export function POSOverlay() {
       };
       const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;paymentStatus?:string}>("/pos/sale",payload);
       const s=res.data;
+      const saleSnapshot = {
+        items: [...items],
+        subtotal: items.reduce((a, i) => a + i.quantity * i.unitPrice, 0),
+        discount: discountAmount(),
+        tax: items.reduce((a, i) => a + (i.quantity * i.unitPrice * (i.taxRate ?? 0)) / 100, 0),
+        customerName: customer?.name,
+        paymentMethod: payments.map((p) => p.method).join(" + "),
+        cashTendered: activePayment === "CASH" && numpad ? parseFloat(numpad) : undefined,
+      };
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
       await loadHeldBills();
       await loadProducts();
+      if (receiptSettings.autoPrintAfterSale) {
+        const receipt: SaleReceipt = {
+          invoiceNumber: s.invoiceNumber,
+          total: s.total,
+          changeDue: s.changeDue ?? 0,
+          paymentMethod: saleSnapshot.paymentMethod,
+          customerName: saleSnapshot.customerName,
+          items: saleSnapshot.items.map((i) => ({
+            name: `${i.productName} · ${i.variantName}`,
+            qty: i.quantity,
+            price: i.quantity * i.unitPrice,
+          })),
+          subtotal: saleSnapshot.subtotal,
+          discount: saleSnapshot.discount,
+          tax: saleSnapshot.tax,
+          cashTendered: saleSnapshot.cashTendered,
+        };
+        executeReceiptPrint({
+          html: buildReceiptHtml(receipt),
+          printType: "SALE",
+          invoiceNumber: s.invoiceNumber,
+          settings: receiptSettings,
+          title: `Receipt ${s.invoiceNumber}`,
+        }).catch((e) => toast.error((e as Error).message ?? "Receipt print failed"));
+      }
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts,pendingDiscountApproval]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
 
-  const handleThermalPrint = React.useCallback(() => {
+  const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
-    const w = window.open("", "_blank", "width=380,height=600");
-    if (!w) { toast.error("Popup blocked — allow popups to print"); return; }
     const s = receiptSettings;
     const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
     const rows = items.map(i => `<div class="iname">${i.productName} · ${i.variantName}</div><div class="row"><span>${i.quantity} x LKR ${i.unitPrice.toFixed(2)}</span><span>LKR ${(i.quantity*i.unitPrice).toFixed(2)}</span></div>`).join("");
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); setTimeout(() => w.close(), 500); }, 200);
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
+    try {
+      await executeReceiptPrint({ html, printType: "PRE_BILL", settings: s, title: "Pre-Bill" });
+    } catch (e) {
+      toast.error((e as Error).message ?? "Print failed");
+    }
   }, [items, totalAmt, receiptSettings, user]);
 
   React.useEffect(() => {

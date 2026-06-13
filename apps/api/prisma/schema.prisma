@@ -313,8 +313,46 @@ model Tenant {
   vehicleBrands    VehicleBrand[]
   warrantyClaims   WarrantyClaim[]
   quotations       Quotation[]
+  receiptPrintLogs ReceiptPrintLog[]
 
   @@map("tenants")
+}
+
+enum ReceiptPrintType {
+  SALE
+  PRE_BILL
+  RETURN
+  TEST
+}
+
+enum ReceiptPrintStatus {
+  SUCCESS
+  FAILED
+  BROWSER_FALLBACK
+  QUEUED
+}
+
+model ReceiptPrintLog {
+  id             String              @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  userId         String?
+  printType      ReceiptPrintType
+  invoiceNumber  String?
+  status         ReceiptPrintStatus
+  printMode      String              @default("browser")
+  printServerUrl String?
+  printerName    String?
+  errorMessage   String?
+  metadata       Json                @default("{}")
+  createdAt      DateTime            @default(now())
+
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user           User?               @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([invoiceNumber])
+  @@map("receipt_print_logs")
 }
 
 // ============================================================
@@ -389,6 +427,7 @@ model User {
   sales               Sale[]        @relation("CashierSales")
   notifications       UserNotification[]
   activityLogs        ActivityLog[]
+  receiptPrintLogs    ReceiptPrintLog[]
 
   @@unique([tenantId, email])
   @@index([tenantId])

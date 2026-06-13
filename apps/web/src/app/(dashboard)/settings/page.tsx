@@ -5,7 +5,7 @@ import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
-  Printer, Image,
+  Printer, Image, Server, FileText,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS } from "@/lib/use-receipt-settings";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +39,108 @@ const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 interface AuditEntry { id:string; action:string; resource:string; resourceId?:string; userId?:string; user?:{firstName:string;lastName:string;email:string}|null; ipAddress?:string; createdAt:string; oldData?:object; newData?:object; }
 interface LoginEntry { id:string; userName:string; email:string; ipAddress?:string; deviceName?:string; userAgent?:string; createdAt:string; lastUsedAt?:string; isActive:boolean; }
+
+interface ReceiptPrintLogEntry {
+  id: string;
+  printType: string;
+  invoiceNumber?: string | null;
+  status: string;
+  printMode: string;
+  printServerUrl?: string | null;
+  printerName?: string | null;
+  errorMessage?: string | null;
+  createdAt: string;
+  user?: { firstName: string; lastName: string; email: string } | null;
+}
+
+function ReceiptPrintLogCard() {
+  const [logs, setLogs] = React.useState<ReceiptPrintLogEntry[]>([]);
+  const [loading, setLoading] = React.useState(false);
+
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await api.get<{ data: ReceiptPrintLogEntry[] }>("/tenants/receipt-print/logs?limit=30");
+      setLogs(r.data?.data ?? []);
+    } catch {
+      toast.error("Failed to load print logs");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => { load(); }, [load]);
+
+  const statusColor = (s: string) =>
+    s === "SUCCESS" ? "text-emerald-600" : s === "FAILED" ? "text-destructive" : "text-amber-600";
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" />Print Log
+            </CardTitle>
+            <CardDescription>Recent receipt print jobs from POS and test prints</CardDescription>
+          </div>
+          <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {loading && (
+          <div className="flex justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-primary" />
+          </div>
+        )}
+        {!loading && logs.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-6">No print jobs logged yet</p>
+        )}
+        {!loading && logs.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-xs text-muted-foreground">
+                  <th className="text-left py-2 pr-3">Time</th>
+                  <th className="text-left py-2 pr-3">Type</th>
+                  <th className="text-left py-2 pr-3">Invoice</th>
+                  <th className="text-left py-2 pr-3">Mode</th>
+                  <th className="text-left py-2 pr-3">Status</th>
+                  <th className="text-left py-2">User</th>
+                </tr>
+              </thead>
+              <tbody>
+                {logs.map((log) => (
+                  <tr key={log.id} className="border-b border-border/50 last:border-0">
+                    <td className="py-2 pr-3 text-xs whitespace-nowrap">
+                      {new Date(log.createdAt).toLocaleString()}
+                    </td>
+                    <td className="py-2 pr-3">{log.printType}</td>
+                    <td className="py-2 pr-3 font-mono text-xs">{log.invoiceNumber ?? "—"}</td>
+                    <td className="py-2 pr-3 capitalize">{log.printMode}</td>
+                    <td className={`py-2 pr-3 font-medium ${statusColor(log.status)}`}>
+                      {log.status}
+                      {log.errorMessage && (
+                        <span className="block text-[10px] text-muted-foreground font-normal truncate max-w-[140px]" title={log.errorMessage}>
+                          {log.errorMessage}
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 text-xs">
+                      {log.user ? `${log.user.firstName} ${log.user.lastName}`.trim() : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function LoginHistoryCard() {
   const [logs, setLogs] = React.useState<LoginEntry[]>([]);
@@ -244,6 +346,7 @@ export default function SettingsPage() {
 
   const [receiptForm, setReceiptForm] = React.useState<ReceiptSettings>(RECEIPT_DEFAULTS);
   const [receiptSaving, setReceiptSaving] = React.useState(false);
+  const [printServerTesting, setPrintServerTesting] = React.useState(false);
 
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = React.useState(false);
@@ -279,6 +382,18 @@ export default function SettingsPage() {
       toast.success("Receipt settings saved");
     } catch { toast.error("Failed to save receipt settings"); }
     finally { setReceiptSaving(false); }
+  }
+
+  async function testPrintServer() {
+    setPrintServerTesting(true);
+    try {
+      await api.post("/tenants/receipt-print/test-server");
+      toast.success("Print server connected — test job sent");
+    } catch (e) {
+      toast.error((e as Error).message ?? "Print server test failed");
+    } finally {
+      setPrintServerTesting(false);
+    }
   }
 
   async function loadBranches() {
@@ -563,6 +678,99 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Server className="h-4 w-4 text-primary" />Store Print Server
+                  </CardTitle>
+                  <CardDescription>
+                    Run the print server on your shop PC (same network as the thermal printer). POS sends jobs through the cloud API to this local server.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between py-1">
+                    <div>
+                      <p className="text-sm font-medium">Enable store print server</p>
+                      <p className="text-xs text-muted-foreground">Send receipts to LAN print server instead of browser only</p>
+                    </div>
+                    <Switch
+                      checked={receiptForm.printServerEnabled}
+                      onCheckedChange={(v) => setReceiptForm((f) => ({ ...f, printServerEnabled: v }))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Print server URL</Label>
+                    <Input
+                      value={receiptForm.printServerUrl}
+                      onChange={(e) => setReceiptForm((f) => ({ ...f, printServerUrl: e.target.value.trim() }))}
+                      placeholder="http://192.168.1.50:9123"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Shop PC IP + port — run <code className="text-[11px] bg-muted px-1 rounded">node services/print-server/server.js</code>
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>API key</Label>
+                      <Input
+                        type="password"
+                        value={receiptForm.printServerKey}
+                        onChange={(e) => setReceiptForm((f) => ({ ...f, printServerKey: e.target.value }))}
+                        placeholder="Same as PRINT_API_KEY on shop PC"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Printer name (optional)</Label>
+                      <Input
+                        value={receiptForm.printerName}
+                        onChange={(e) => setReceiptForm((f) => ({ ...f, printerName: e.target.value }))}
+                        placeholder="Counter-1 / Epson TM-T82"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Print mode</Label>
+                      <select
+                        value={receiptForm.printMode}
+                        onChange={(e) => setReceiptForm((f) => ({ ...f, printMode: e.target.value as ReceiptSettings["printMode"] }))}
+                        className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                      >
+                        <option value="auto">Auto — server first, browser fallback</option>
+                        <option value="server">Server only</option>
+                        <option value="browser">Browser popup only</option>
+                      </select>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={testPrintServer}
+                        disabled={printServerTesting || !receiptForm.printServerUrl}
+                      >
+                        {printServerTesting ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                        ) : (
+                          <Printer className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Test print server
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between py-1 border-t border-border pt-3">
+                    <div>
+                      <p className="text-sm font-medium">Auto-print after sale</p>
+                      <p className="text-xs text-muted-foreground">Print receipt automatically when POS checkout completes</p>
+                    </div>
+                    <Switch
+                      checked={receiptForm.autoPrintAfterSale}
+                      onCheckedChange={(v) => setReceiptForm((f) => ({ ...f, autoPrintAfterSale: v }))}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
               <Button variant="gradient" onClick={saveReceipt} disabled={receiptSaving}>
                 {receiptSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
                 Save Receipt Settings
@@ -582,6 +790,7 @@ export default function SettingsPage() {
               </Card>
             </div>
           </div>
+          <ReceiptPrintLogCard />
         </TabsContent>
 
         <TabsContent value="profile" className="mt-6 space-y-6">
