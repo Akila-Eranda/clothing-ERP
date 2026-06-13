@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, Building2, Sparkles, Tag, ExternalLink,
+  Eye, EyeOff, Lock, Mail, ArrowRight, Building2, Sparkles, Tag, ExternalLink, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import { APP_NAME } from "@/lib/constants";
 import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
 import {
@@ -117,76 +116,80 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className="min-h-screen flex">
       <AuthBrandPanel
         shopType={shopType}
         tenantName={tenantPreview?.name}
         tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
       />
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-10 sm:px-8">
-        <div className="w-full max-w-md">
-          {/* Mobile header */}
-          <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow mb-3">
-              <Sparkles className="h-6 w-6 text-white" />
+      {/* Right — clean white form panel */}
+      <div className="flex-1 flex flex-col bg-white relative overflow-hidden">
+        <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" />
+        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
+
+        <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10">
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-2.5 mb-8 self-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
+              <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <h1 className="text-xl font-bold">{APP_NAME}</h1>
-            {(tenantPreview || hostnameSlug) && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {tenantPreview?.name ?? hostnameSlug}
-              </p>
-            )}
+            <span className="font-bold text-lg text-foreground">{APP_NAME}</span>
           </div>
 
           <motion.div
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            className="glass-card rounded-2xl p-8 shadow-glass"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+            className="w-full max-w-[420px]"
           >
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold">Welcome back</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+            <div className="mb-8">
+              <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Sign in</p>
+              <h2 className="text-3xl font-bold text-foreground tracking-tight">Welcome back</h2>
+              <p className="text-sm text-muted-foreground mt-2">
                 {tenantPreview
-                  ? `Sign in to ${tenantPreview.name}`
+                  ? `Access your ${tenantPreview.name} dashboard`
                   : isMainDomain
-                    ? "Enter your workspace and account details"
-                    : "Sign in to your workspace to continue"}
+                    ? "Enter your workspace URL and credentials"
+                    : "Enter your credentials to continue"}
               </p>
             </div>
 
             {tenantPreview && !isMainDomain && (
-              <div className="mb-5 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-4 py-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                  <Building2 className="h-4 w-4 text-primary" />
+              <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-slate-50 px-4 py-3.5 shadow-sm">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                  <Building2 className="h-5 w-5 text-primary" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold truncate">{tenantPreview.name}</p>
                   <p className="text-xs text-muted-foreground font-mono truncate">
                     {tenantPreview.subdomain}{SHOP_DOMAIN_SUFFIX}
                   </p>
                 </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </div>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {showSubdomainField && (
                 <div className="space-y-2">
-                  <Label htmlFor="subdomain">Shop / Workspace</Label>
+                  <Label htmlFor="subdomain" className="text-foreground font-medium">
+                    Workspace subdomain
+                  </Label>
                   <div className="relative">
-                    <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="subdomain"
                       type="text"
                       placeholder="your-shop"
                       value={subdomain}
-                      className="pl-9 pr-[7.5rem] lowercase"
+                      className="pl-10 pr-[8rem] h-12 rounded-xl border-border bg-white lowercase text-base shadow-sm focus-visible:ring-primary/30"
                       onChange={(e) =>
                         setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
                       }
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none">
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none font-medium">
                       {SHOP_DOMAIN_SUFFIX}
                     </span>
                   </div>
@@ -194,9 +197,9 @@ function LoginContent() {
                     <button
                       type="button"
                       onClick={openWorkspace}
-                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
                     >
-                      Open {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
+                      Go to {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
                       <ExternalLink className="h-3 w-3" />
                     </button>
                   )}
@@ -204,60 +207,53 @@ function LoginContent() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
+                <Label htmlFor="email" className="text-foreground font-medium">Email address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="you@company.com"
                     autoComplete="email"
-                    className="pl-9"
+                    className="pl-10 h-12 rounded-xl border-border bg-white text-base shadow-sm focus-visible:ring-primary/30"
                     {...register("email")}
                   />
                 </div>
-                {errors.email && (
-                  <p className="text-xs text-destructive">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-primary font-medium hover:underline"
-                  >
+                  <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
+                  <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    className="pl-9 pr-9"
+                    className="pl-10 pr-11 h-12 rounded-xl border-border bg-white text-base shadow-sm focus-visible:ring-primary/30"
                     {...register("password")}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((p) => !p)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {errors.password && (
-                  <p className="text-xs text-destructive">{errors.password.message}</p>
-                )}
+                {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
 
               <Button
                 type="submit"
                 variant="gradient"
-                className={cn("w-full h-11 font-semibold mt-2")}
+                className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/25 mt-1"
                 disabled={isLoading}
               >
                 {isLoading ? (
@@ -267,29 +263,26 @@ function LoginContent() {
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    Sign in <ArrowRight className="h-4 w-4" />
+                    Sign in to dashboard <ArrowRight className="h-4 w-4" />
                   </span>
                 )}
               </Button>
             </form>
+
+            <div className="mt-8 pt-6 border-t border-border">
+              <p className="text-center text-sm text-muted-foreground">
+                Don&apos;t have an account?{" "}
+                <Link href="/register" className="font-semibold text-primary hover:underline">
+                  Start 14-day free trial
+                </Link>
+              </p>
+            </div>
           </motion.div>
-
-          <p className="text-center text-sm text-muted-foreground mt-6">
-            Don&apos;t have an account?{" "}
-            <Link href="/register" className="text-primary font-medium hover:underline">
-              Start free trial
-            </Link>
-          </p>
-
-          <div className="flex items-center justify-center gap-4 mt-6 flex-wrap">
-            {["SSL Secured", "Multi-tenant", "Role-based access"].map((badge) => (
-              <div key={badge} className="flex items-center gap-1.5">
-                <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="text-[11px] font-medium text-muted-foreground">{badge}</span>
-              </div>
-            ))}
-          </div>
         </div>
+
+        <p className="relative text-center text-[11px] text-muted-foreground pb-6 px-4">
+          © {new Date().getFullYear()} {APP_NAME} · Secure multi-tenant retail platform
+        </p>
       </div>
     </div>
   );
@@ -297,8 +290,11 @@ function LoginContent() {
 
 function LoginFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+    <div className="min-h-screen flex">
+      <div className="hidden lg:block lg:w-[58%] bg-[#070d1a]" />
+      <div className="flex-1 flex items-center justify-center bg-white">
+        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      </div>
     </div>
   );
 }
