@@ -1,14 +1,19 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import { POSOverlay } from "@/components/pos/pos-overlay";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { BranchProvider } from "@/components/branch/branch-provider";
 import { useBranchStore } from "@/stores/branch-store";
+
+const POSOverlay = dynamic(
+  () => import("@/components/pos/pos-overlay").then((m) => m.POSOverlay),
+  { ssr: false },
+);
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -28,7 +33,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [mounted, isAuthenticated, router]);
 
-  if (!mounted || !isAuthenticated) {
+  // Show shell immediately when a session token exists (persist rehydrates from localStorage).
+  const hasStoredSession =
+    mounted &&
+    typeof window !== "undefined" &&
+    !!localStorage.getItem("fe_access_token");
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && !hasStoredSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />

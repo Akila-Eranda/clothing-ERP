@@ -67,8 +67,30 @@ export const useAuthStore = create<AuthStore>()(
           set({ user, accessToken, refreshToken, isAuthenticated: true, isLoading: false });
           try {
             const tenantRes = await api.get<{ shopType?: ShopType }>('/tenants/me');
-            if (tenantRes.data?.shopType) setStoredShopType(tenantRes.data.shopType);
+            if (tenantRes.data?.shopType) {
+              setStoredShopType(tenantRes.data.shopType);
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem(
+                  'fe_tenant_profile',
+                  JSON.stringify({ shopType: tenantRes.data.shopType, fetchedAt: Date.now() }),
+                );
+              }
+            }
           } catch { /* tenant profile optional on first paint */ }
+          // Warm branch list in background so branch switcher is ready without blocking pages.
+          api.get<{ data: { id: string; name: string; code: string; isDefault?: boolean }[] }>('/branches?limit=50')
+            .then((br) => {
+              const raw = br.data?.data ?? (Array.isArray(br.data) ? br.data : []);
+              const list = Array.isArray(raw) ? raw : [];
+              const stored = typeof window !== 'undefined' ? localStorage.getItem('fe_active_branch') : null;
+              const pick =
+                (stored && list.find((b) => b.id === stored)) ??
+                (apiUser.branchId ? list.find((b) => b.id === apiUser.branchId) : undefined) ??
+                list.find((b) => b.isDefault) ??
+                list[0];
+              if (pick) useBranchStore.getState().setBranch(pick.id, pick.name);
+            })
+            .catch(() => {});
         } catch (e) {
           set({ isLoading: false });
           throw e;

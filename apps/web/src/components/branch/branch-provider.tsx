@@ -49,12 +49,19 @@ function pickDefaultBranch(
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
-  const { setBranch } = useBranchStore();
+  const { setBranch, activeBranchId } = useBranchStore();
   const [branches, setBranches] = React.useState<BranchOption[]>([]);
   const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
+
+    // Use cached branch immediately so pages can fetch data without waiting on /branches.
+    const cachedId = getStoredBranchId() ?? activeBranchId ?? user?.branchId ?? null;
+    if (cachedId && !activeBranchId) {
+      setBranch(cachedId, useBranchStore.getState().activeBranchName);
+    }
+    setReady(true);
 
     api
       .get<{ data: BranchOption[] }>("/branches?limit=50")
@@ -66,7 +73,11 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         );
         setBranches(list);
 
-        const currentId = getStoredBranchId() ?? useBranchStore.getState().activeBranchId;
+        const currentId =
+          getStoredBranchId() ??
+          useBranchStore.getState().activeBranchId ??
+          user?.branchId ??
+          null;
         const currentValid = currentId && list.some((b) => b.id === currentId);
 
         if (currentValid) {
@@ -80,23 +91,12 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
         const chosen = pickDefaultBranch(list, user?.branchId);
         if (chosen) setBranch(chosen.id, chosen.name);
       })
-      .catch(() => {})
-      .finally(() => {
-        if (!cancelled) setReady(true);
-      });
+      .catch(() => {});
 
     return () => {
       cancelled = true;
     };
-  }, [user?.branchId, setBranch]);
-
-  if (!ready) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-      </div>
-    );
-  }
+  }, [user?.branchId, setBranch, activeBranchId]);
 
   return (
     <BranchContext.Provider value={{ branches, ready }}>

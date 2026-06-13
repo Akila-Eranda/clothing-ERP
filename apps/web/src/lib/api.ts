@@ -120,9 +120,9 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
 
   // Transient gateway errors (deploy restart, upstream boot) — retry with backoff
   const isGatewayError = res.status === 502 || res.status === 503 || res.status === 504;
-  const maxGatewayRetries = 4;
+  const maxGatewayRetries = 3;
   if (isGatewayError && attempt < maxGatewayRetries) {
-    const delayMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 200);
+    const delayMs = Math.min(3000, 300 * 2 ** attempt) + Math.floor(Math.random() * 100);
     await new Promise((r) => setTimeout(r, delayMs));
     return request<T>(path, init, attempt + 1);
   }
