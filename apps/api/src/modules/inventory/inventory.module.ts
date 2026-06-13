@@ -5,8 +5,9 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
-  IsString, IsOptional, IsNumber, IsEnum, IsInt, Min, IsArray,
+  IsString, IsOptional, IsNumber, IsEnum, IsInt, Min, IsArray, ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus } from '@prisma/client';
@@ -36,9 +37,14 @@ export class TransferItemDto {
 }
 
 export class CreateTransferDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() fromBranchId?: string;
   @ApiProperty() @IsString() toBranchId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiProperty({ type: [TransferItemDto] }) @IsArray() items: TransferItemDto[];
+  @ApiProperty({ type: [TransferItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TransferItemDto)
+  items: TransferItemDto[];
 }
 
 @Injectable()
@@ -543,9 +549,11 @@ export class InventoryService {
   async createTransfer(tenantId: string, fromBranchId: string, userId: string, dto: CreateTransferDto, userRoles: string[] = []) {
     if (!dto.items?.length) throw new BadRequestException('At least one item is required');
 
-    const effectiveFrom = await this.resolveBranchId(tenantId, fromBranchId);
+    const effectiveFrom = await this.resolveBranchId(tenantId, dto.fromBranchId || fromBranchId);
     if (!effectiveFrom) throw new BadRequestException('Source branch is required');
-    if (dto.toBranchId === effectiveFrom) throw new BadRequestException('Cannot transfer to the same branch');
+    if (dto.toBranchId === effectiveFrom) {
+      throw new BadRequestException('Cannot transfer to the same branch. Choose a different destination branch.');
+    }
 
     const toBranch = await this.prisma.branch.findFirst({ where: { id: dto.toBranchId, tenantId } });
     if (!toBranch) throw new NotFoundException('Destination branch not found');

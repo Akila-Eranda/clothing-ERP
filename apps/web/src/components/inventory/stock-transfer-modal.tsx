@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { InventoryItem } from "@/components/inventory/stock-adjust-modal";
+import { useBranchStore } from "@/stores/branch-store";
 
 interface Branch {
   id: string;
@@ -35,6 +36,8 @@ interface Props {
 }
 
 export function StockTransferModal({ open, onClose, onCreated, stock, currentBranchId }: Props) {
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
+  const fromBranchId = activeBranchId ?? currentBranchId;
   const [branches, setBranches] = useState<Branch[]>([]);
   const [toBranchId, setToBranchId] = useState("");
   const [notes, setNotes] = useState("");
@@ -47,7 +50,10 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
   useEffect(() => {
     if (!open) return;
     api.get<{ data: Branch[] } | Branch[]>("/branches?limit=100")
-      .then((r) => setBranches(r.data?.data ?? (r.data as unknown as Branch[]) ?? []))
+      .then((r) => {
+        const raw = r.data?.data ?? r.data;
+        setBranches(Array.isArray(raw) ? raw : []);
+      })
       .catch(() => toast.error("Failed to load branches"));
   }, [open]);
 
@@ -74,8 +80,8 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
   }, [pickerOpen]);
 
   const destinationBranches = useMemo(
-    () => branches.filter((b) => b.id !== currentBranchId),
-    [branches, currentBranchId],
+    () => branches.filter((b) => b.id !== fromBranchId),
+    [branches, fromBranchId],
   );
 
   const pickableStock = useMemo(
@@ -137,12 +143,20 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
       toast.error("Add at least one item");
       return;
     }
+    if (toBranchId === fromBranchId) {
+      toast.error("Cannot transfer to the same branch — select a different destination");
+      return;
+    }
     setLoading(true);
     try {
       await api.post("/inventory/transfers", {
+        ...(fromBranchId ? { fromBranchId } : {}),
         toBranchId,
         notes: notes || undefined,
-        items: items.map((i) => ({ variantId: i.variantId, requestedQty: i.requestedQty })),
+        items: items.map((i) => ({
+          variantId: i.variantId,
+          requestedQty: Number(i.requestedQty),
+        })),
       });
       toast.success("Stock transfer created");
       onCreated();
@@ -178,6 +192,11 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
         <div className="px-6 py-5 space-y-4 overflow-y-auto flex-1">
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Destination Branch</Label>
+            {fromBranchId && (
+              <p className="text-[10px] text-muted-foreground">
+                Transferring from active branch — stock shown is for this location only
+              </p>
+            )}
             <Select value={toBranchId} onValueChange={setToBranchId}>
               <SelectTrigger><SelectValue placeholder="Select branch..." /></SelectTrigger>
               <SelectContent>

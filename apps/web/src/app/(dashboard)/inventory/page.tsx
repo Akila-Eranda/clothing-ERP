@@ -23,6 +23,7 @@ import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { variantTableColumns } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBranchStore } from "@/stores/branch-store";
 
 interface LedgerLog {
   id: string;
@@ -201,6 +202,8 @@ function buildStockColumns(
 export default function InventoryPage() {
   const router = useRouter();
   const userBranchId = useAuthStore((s) => s.user?.branchId);
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
+  const branchScopeId = activeBranchId ?? userBranchId;
   const { profile, workspace } = useShopWorkspace();
   const showBatch = hasBatchTracking(profile);
   const showExpiry = hasExpiryTracking(profile);
@@ -506,9 +509,9 @@ export default function InventoryPage() {
                         .map((i) => `${i.variant?.product?.name ?? "Item"} ×${i.requestedQty}`)
                         .slice(0, 2)
                         .join(", ");
-                      const canDispatch = t.status === "PENDING" && (!userBranchId || t.fromBranchId === userBranchId);
-                      const canReceive = t.status === "IN_TRANSIT" && (!userBranchId || t.toBranchId === userBranchId);
-                      const canCancel = t.status === "PENDING" && (!userBranchId || t.fromBranchId === userBranchId);
+                      const canDispatch = t.status === "PENDING" && (!branchScopeId || t.fromBranchId === branchScopeId);
+                      const canReceive = t.status === "IN_TRANSIT" && (!branchScopeId || t.toBranchId === branchScopeId);
+                      const canCancel = t.status === "PENDING" && (!branchScopeId || t.fromBranchId === branchScopeId);
                       const acting = transferActionId === t.id;
                       return (
                         <tr key={t.id} className="hover:bg-muted/20">
@@ -557,7 +560,7 @@ export default function InventoryPage() {
       </Tabs>
 
       <StockAdjustModal open={adjustOpen} onClose={() => setAdjustOpen(false)} onAdjusted={fetchAll} item={adjustItem} />
-      <StockTransferModal open={transferOpen} onClose={() => setTransferOpen(false)} onCreated={fetchAll} stock={stock} currentBranchId={userBranchId} />
+      <StockTransferModal open={transferOpen} onClose={() => setTransferOpen(false)} onCreated={fetchAll} stock={stock} currentBranchId={branchScopeId} />
       <CreatePOModal open={poOpen} onClose={() => { setPoOpen(false); setPrefillVariant(undefined); }} onCreated={() => { setPoOpen(false); fetchAll(); }} prefillVariantId={prefillVariant} />
     </div>
   );
