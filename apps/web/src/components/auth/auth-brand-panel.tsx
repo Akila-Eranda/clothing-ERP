@@ -28,7 +28,7 @@ export function AuthBrandPanel({
   return (
     <div className="hidden lg:flex lg:w-1/2 relative flex-col min-h-screen overflow-hidden bg-[#070d1a] text-white">
       <div
-        className="absolute inset-0 opacity-[0.06]"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(99,102,241,1) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)",
@@ -144,8 +144,8 @@ export function AuthBrandPanel({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="shrink-0 pt-6 border-t border-white/10 flex items-center gap-5 text-xs text-slate-500">
+        {/* Footer — pinned to bottom */}
+        <div className="shrink-0 mt-auto pt-8 flex items-center gap-5 text-xs text-slate-500">
           <span className="flex items-center gap-1.5">
             <Shield className="h-3.5 w-3.5 text-emerald-400" /> SSL Secured
           </span>

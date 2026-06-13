@@ -129,9 +129,9 @@ function LoginContent() {
         tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
       />
 
-      {/* Right — login form */}
-      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden lg:w-1/2">
-        <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" />
+      {/* Right — login form (always light; see (auth)/layout.tsx) */}
+      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden lg:w-1/2 text-slate-900">
+        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
 
@@ -141,7 +141,7 @@ function LoginContent() {
             <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-lg text-foreground">{APP_NAME}</span>
+            <span className="font-bold text-lg text-slate-900">{APP_NAME}</span>
           </div>
 
           <motion.div
@@ -152,8 +152,8 @@ function LoginContent() {
           >
             <div className="mb-8">
               <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Sign in</p>
-              <h2 className="text-3xl font-bold text-foreground tracking-tight">Welcome back</h2>
-              <p className="text-sm text-muted-foreground mt-2">
+              <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
+              <p className="text-sm text-slate-500 mt-2">
                 {tenantPreview
                   ? `Enter your credentials for ${tenantPreview.name}`
                   : isMainDomain
@@ -165,7 +165,7 @@ function LoginContent() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {showSubdomainField && (
                 <div className="space-y-2">
-                  <Label htmlFor="subdomain" className="text-foreground font-medium">
+                  <Label htmlFor="subdomain" className="text-slate-800 font-medium">
                     Workspace subdomain
                   </Label>
                   <div className="relative">
@@ -175,7 +175,7 @@ function LoginContent() {
                       type="text"
                       placeholder="your-shop"
                       value={subdomain}
-                      className="pl-10 pr-[8rem] h-12 rounded-xl border-border bg-white lowercase text-base shadow-sm focus-visible:ring-primary/30"
+                      className="pl-10 pr-[8rem] h-12 rounded-xl border-slate-200 bg-white lowercase text-base text-slate-900 shadow-sm focus-visible:ring-primary/30"
                       onChange={(e) =>
                         setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
                       }
@@ -198,15 +198,15 @@ function LoginContent() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-foreground font-medium">Email address</Label>
+                <Label htmlFor="email" className="text-slate-800 font-medium">Email address</Label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="email"
                     type="email"
                     placeholder="you@company.com"
                     autoComplete="email"
-                    className="pl-10 h-12 rounded-xl border-border bg-white text-base shadow-sm focus-visible:ring-primary/30"
+                    className="pl-10 h-12 rounded-xl border-slate-200 bg-white text-slate-900 text-base shadow-sm focus-visible:ring-primary/30"
                     {...register("email")}
                   />
                 </div>
@@ -215,19 +215,19 @@ function LoginContent() {
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="password" className="text-foreground font-medium">Password</Label>
+                  <Label htmlFor="password" className="text-slate-800 font-medium">Password</Label>
                   <Link href="/forgot-password" className="text-xs font-semibold text-primary hover:underline">
                     Forgot password?
                   </Link>
                 </div>
                 <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
                     autoComplete="current-password"
-                    className="pl-10 pr-11 h-12 rounded-xl border-border bg-white text-base shadow-sm focus-visible:ring-primary/30"
+                    className="pl-10 pr-11 h-12 rounded-xl border-slate-200 bg-white text-slate-900 text-base shadow-sm focus-visible:ring-primary/30"
                     {...register("password")}
                   />
                   <button
@@ -260,8 +260,8 @@ function LoginContent() {
               </Button>
             </form>
 
-            <div className="mt-8 pt-6 border-t border-border">
-              <p className="text-center text-sm text-muted-foreground">
+            <div className="mt-8 pt-6 border-t border-slate-100">
+              <p className="text-center text-sm text-slate-500">
                 Don&apos;t have an account?{" "}
                 <Link href="/register" className="font-semibold text-primary hover:underline">
                   Start 14-day free trial
@@ -271,7 +271,7 @@ function LoginContent() {
           </motion.div>
         </div>
 
-        <p className="relative text-center text-[11px] text-muted-foreground pb-6 px-4">
+        <p className="relative shrink-0 text-center text-[11px] text-slate-400 pb-6 px-4">
           © {new Date().getFullYear()} {APP_NAME} · Secure multi-tenant retail platform
         </p>
       </div>
