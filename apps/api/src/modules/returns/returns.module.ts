@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IsString, IsEnum, IsArray, IsBoolean, IsOptional, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -50,6 +50,24 @@ export class ReturnsService {
     await assertShopModule(this.prisma, tenantId, 'returns');
     const sale = await this.prisma.sale.findFirst({ where: { id: dto.originalSaleId, tenantId } });
     if (!sale) throw new NotFoundException('Original sale not found');
+    if (sale.status === 'REFUNDED') {
+      throw new BadRequestException('This invoice was already fully refunded');
+    }
+    if (sale.status !== 'COMPLETED' && sale.status !== 'PARTIALLY_REFUNDED') {
+      throw new BadRequestException('Returns are only allowed for completed sales');
+    }
+
+    for (const item of dto.items) {
+      const line = await this.prisma.saleItem.findFirst({
+        where: { saleId: dto.originalSaleId, variantId: item.variantId },
+      });
+      if (!line) {
+        throw new BadRequestException('Returned item was not on the original invoice');
+      }
+      if (item.quantity > line.quantity) {
+        throw new BadRequestException(`Return quantity exceeds sold quantity for ${line.productName}`);
+      }
+    }
 
     const returnType = dto.returnType ?? 'RETURN';
     const returnNumber = `${returnType === 'EXCHANGE' ? 'EXC' : 'RET'}-${Date.now().toString(36).toUpperCase()}`;
