@@ -227,18 +227,21 @@ export default function InventoryPage() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [stockRes, logsRes, summaryRes, abcRes, deadRes, agingRes, transfersRes] = await Promise.all([
+      const [stockRes, logsRes, summaryRes] = await Promise.all([
         api.get<{ data: InventoryItem[] }>("/inventory?limit=500"),
         api.get<{ data: LedgerLog[] }>("/inventory/logs?limit=100"),
         api.get<LedgerSummary>("/inventory/ledger/summary"),
-        api.get<AbcRow[]>("/inventory/analytics/abc"),
-        api.get<{ name: string; sku: string; quantity: number; value: number }[]>("/inventory/analytics/dead-stock"),
-        api.get<{ buckets: Record<string, number>; details: { name: string; ageDays: number; qty: number }[] }>("/inventory/analytics/aging"),
-        api.get<StockTransferRow[]>("/inventory/transfers").catch(() => ({ data: [] as StockTransferRow[] })),
       ]);
       setStock(stockRes.data?.data ?? (stockRes.data as unknown as InventoryItem[]) ?? []);
       setLogs(logsRes.data?.data ?? (logsRes.data as unknown as LedgerLog[]) ?? []);
       setSummary(summaryRes.data ?? null);
+
+      const [abcRes, deadRes, agingRes, transfersRes] = await Promise.all([
+        api.get<AbcRow[]>("/inventory/analytics/abc"),
+        api.get<{ name: string; sku: string; quantity: number; value: number }[]>("/inventory/analytics/dead-stock"),
+        api.get<{ buckets: Record<string, number>; details: { name: string; ageDays: number; qty: number }[] }>("/inventory/analytics/aging"),
+        api.get<StockTransferRow[]>("/inventory/transfers"),
+      ]);
       setAbc(Array.isArray(abcRes.data) ? abcRes.data : []);
       setDeadStock(Array.isArray(deadRes.data) ? deadRes.data : []);
       setAging(agingRes.data ?? null);

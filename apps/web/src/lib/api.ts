@@ -118,9 +118,12 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
 
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
-  // Transient gateway errors (deploy restart, upstream boot) — retry briefly
-  if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < 2) {
-    await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+  // Transient gateway errors (deploy restart, upstream boot) — retry with backoff
+  const isGatewayError = res.status === 502 || res.status === 503 || res.status === 504;
+  const maxGatewayRetries = 4;
+  if (isGatewayError && attempt < maxGatewayRetries) {
+    const delayMs = Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 200);
+    await new Promise((r) => setTimeout(r, delayMs));
     return request<T>(path, init, attempt + 1);
   }
 

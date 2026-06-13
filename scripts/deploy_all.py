@@ -21,7 +21,15 @@ git reset --hard origin/main
 echo "==> Build api + web..."
 docker compose build api web
 docker compose up -d
-sleep 20
+
+echo "==> Waiting for API to become healthy..."
+for i in $(seq 1 45); do
+  if curl -sk -f https://shop.clothing.api.hexalyte.com/api/v1/health >/dev/null 2>&1; then
+    echo "API ready after attempt $i"
+    break
+  fi
+  sleep 2
+done
 
 echo "==> Database schema..."
 docker compose exec -u root -T api npx prisma db push --accept-data-loss
