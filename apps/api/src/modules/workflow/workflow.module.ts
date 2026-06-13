@@ -11,6 +11,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
+import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { randomUUID } from 'crypto';
 
