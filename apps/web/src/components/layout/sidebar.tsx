@@ -19,6 +19,8 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { APP_NAME } from "@/lib/constants";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -125,8 +127,10 @@ export function Sidebar() {
   const isDark    = theme === "dark";
   const navGroups = useNavGroups();
   const { profile } = useShopWorkspace();
+  const { settings: receiptSettings } = useReceiptSettings();
 
-  const shopName  = user?.branch?.name ?? APP_NAME;
+  const logoSrc = resolvePublicAssetUrl(receiptSettings.logoUrl);
+  const shopName = receiptSettings.shopName?.trim() || user?.branch?.name || APP_NAME;
   const planLabel = planTierFromRole(user?.role);
 
   const closeMobile = () => setMobileSidebarOpen(false);
@@ -250,10 +254,23 @@ export function Sidebar() {
         {/* ── Header: shop avatar + name + collapse btn ── */}
         <div className={cn("flex items-center shrink-0 gap-3 px-3 py-4", sidebarCollapsed && "justify-center")}>
           <div
-            className="h-11 w-11 rounded-xl shrink-0 flex items-center justify-center text-xl select-none"
-            style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+            className={cn(
+              "h-11 w-11 rounded-xl shrink-0 flex items-center justify-center select-none overflow-hidden",
+              !logoSrc && "text-xl",
+            )}
+            style={logoSrc
+              ? { background: isDark ? "#1e293b" : "#f8fafc", border: `1px solid ${border}` }
+              : { background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
           >
-            {profile.emoji}
+            {logoSrc ? (
+              <img
+                src={logoSrc}
+                alt={shopName}
+                className="h-full w-full object-contain p-1"
+              />
+            ) : (
+              profile.emoji
+            )}
           </div>
 
           {!sidebarCollapsed && (
