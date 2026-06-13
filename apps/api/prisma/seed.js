@@ -347,7 +347,7 @@ async function main() {
                     type: 'GROCERY',
                     defaultUnit: 'kg',
                     units: ['pcs', 'kg', 'g', 'L', 'ml', 'pack'],
-                    modules: { brands: true, collections: false, hangTags: false, variants: true },
+                    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false },
                     labelTemplates: ['sticker', 'shelf'],
                     variantAttributes: [
                         { name: 'Weight', presets: ['250g', '500g', '1kg', '2kg', '5kg'], mapsTo: 'size' },
@@ -421,7 +421,7 @@ async function main() {
                     type: 'HARDWARE',
                     defaultUnit: 'pcs',
                     units: ['pcs', 'box', 'set', 'meter', 'roll'],
-                    modules: { brands: true, collections: false, hangTags: false, variants: true },
+                    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true },
                     labelTemplates: ['sticker', 'shelf'],
                     variantAttributes: [
                         { name: 'Size', presets: ['Small', 'Medium', 'Large', '10mm', '12mm', '20mm'], mapsTo: 'size' },
@@ -495,7 +495,7 @@ async function main() {
                     type: 'AGRICULTURE',
                     defaultUnit: 'kg',
                     units: ['kg', 'bag', 'pcs', 'liter', 'acre'],
-                    modules: { brands: true, collections: false, hangTags: false, variants: true },
+                    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false },
                     labelTemplates: ['sticker', 'shelf'],
                     variantAttributes: [
                         { name: 'Weight', presets: ['1kg', '5kg', '10kg', '25kg', '50kg'], mapsTo: 'size' },

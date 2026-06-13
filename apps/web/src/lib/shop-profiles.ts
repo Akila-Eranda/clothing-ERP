@@ -73,7 +73,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['pcs', 'kg', 'g', 'L', 'ml', 'pack'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: true, loyalty: false, expiry: true, batch: true, ...OFF },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: false, expiry: true, batch: true, ...OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.HARDWARE]: {
@@ -89,7 +89,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'piece', 'kg', 'feet', 'meter', 'box', 'set', 'roll'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.AGRICULTURE]: {
@@ -105,7 +105,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['kg', 'bag', 'pcs', 'liter', 'acre'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: false, promotions: false, loyalty: false, expiry: true, batch: true, ...OFF },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: true, batch: true, ...OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.SPARE_PARTS]: {
