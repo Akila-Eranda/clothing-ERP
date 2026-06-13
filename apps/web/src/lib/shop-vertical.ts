@@ -71,6 +71,67 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
   };
 }
 
+/** Shorter labels for sidebar nav (248px width) */
+export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Record<string, string> {
+  const routes = getRouteLabels(ws, profile);
+  const brand = getBrandPageCopy(profile, ws);
+  const supplier = getSupplierPageCopy(profile, ws);
+
+  const brandShort: Record<ShopType, string> = {
+    [ShopType.CLOTHING]: 'Brands',
+    [ShopType.GROCERY]: 'Brands',
+    [ShopType.HARDWARE]: 'Manufacturers',
+    [ShopType.AGRICULTURE]: 'Agri Brands',
+    [ShopType.SPARE_PARTS]: 'Manufacturers',
+  };
+
+  const supplierShort: Record<ShopType, string> = {
+    [ShopType.CLOTHING]: 'Suppliers',
+    [ShopType.GROCERY]: 'Suppliers',
+    [ShopType.HARDWARE]: 'Suppliers',
+    [ShopType.AGRICULTURE]: 'Agri Suppliers',
+    [ShopType.SPARE_PARTS]: 'Distributors',
+  };
+
+  return {
+    ...routes,
+    '/returns': 'Returns',
+    '/workflows': 'Workflows',
+    '/customers': ws.customerLabel,
+    '/purchases': 'Purchases',
+    '/reports': 'Reports',
+    '/promotions': 'Promotions',
+    '/brands': brandShort[profile.type] ?? brand.pageTitle,
+    '/suppliers': supplierShort[profile.type] ?? supplier.pageTitle,
+    '/vehicles': profile.type === ShopType.SPARE_PARTS ? 'Vehicles' : 'Vehicle Compat.',
+    '/warranty': 'Warranty',
+    '/quotations': 'Quotations',
+    '/users': 'Users & Roles',
+  };
+}
+
+export function getSidebarSectionTitles(profile: ShopProfile) {
+  const product =
+    profile.type === ShopType.SPARE_PARTS ? 'PARTS & STOCK'
+    : profile.type === ShopType.AGRICULTURE ? 'AGRI PRODUCTS'
+    : profile.type === ShopType.HARDWARE ? 'ITEMS & STOCK'
+    : 'PRODUCTS';
+
+  const sales =
+    profile.type === ShopType.GROCERY ? 'SALES & POS'
+    : 'SALES';
+
+  return {
+    overview: 'OVERVIEW',
+    sales,
+    products: product,
+    procurement: 'PROCUREMENT',
+    finance: 'FINANCE',
+    reports: 'REPORTS',
+    hr: 'HR & STAFF',
+  };
+}
+
 export function variantVariantHint(profile: ShopProfile): string {
   const names = profile.variantAttributes.map((a) => a.name).join(', ');
   return names || 'variants';

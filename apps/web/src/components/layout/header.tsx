@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
   Settings, User, LogOut, LifeBuoy, Keyboard, ShoppingCart,
-  Building2,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -18,9 +17,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth-store";
-import { useBranchStore } from "@/stores/branch-store";
-import { api } from "@/lib/api";
 import { useUIStore } from "@/stores/ui-store";
+import { BranchSwitcher } from "@/components/branch/branch-switcher";
 import { getInitials } from "@/lib/utils";
 import { DUMMY_RECENT_SALES } from "@/lib/constants";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -67,22 +65,6 @@ export function Header() {
     [workspace, profile],
   );
 
-  const { activeBranchId, activeBranchName, setBranch } = useBranchStore();
-  const [branches, setBranches] = React.useState<{ id: string; name: string; code: string }[]>([]);
-
-  React.useEffect(() => {
-    api.get<{ data: { id: string; name: string; code: string }[] }>("/branches?limit=50")
-      .then((r) => {
-        const list = r.data?.data ?? (r.data as unknown as { id: string; name: string; code: string }[]) ?? [];
-        setBranches(Array.isArray(list) ? list : []);
-        if (!activeBranchId && user?.branchId) {
-          const assigned = list.find((b) => b.id === user.branchId);
-          if (assigned) setBranch(assigned.id, assigned.name);
-        }
-      })
-      .catch(() => {});
-  }, [user?.branchId, activeBranchId, setBranch]);
-
   const handleLogout = async () => { await logoutApi(); router.replace('/login'); };
 
   const pageTitle = routeLabels[pathname] || APP_NAME;
@@ -119,27 +101,8 @@ export function Header() {
         ))}
       </div>
 
-      {/* Branch switcher */}
-      {branches.length > 1 && (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs hidden lg:flex max-w-[180px]">
-              <Building2 className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">{activeBranchName ?? "All Branches"}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Switch Branch</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => setBranch(null, null)}>All Branches (Admin view)</DropdownMenuItem>
-            {branches.map((b) => (
-              <DropdownMenuItem key={b.id} onClick={() => { setBranch(b.id, b.name); window.location.reload(); }}>
-                {b.name} ({b.code})
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )}
+      {/* Branch switcher — always visible when branches exist */}
+      <BranchSwitcher />
 
       {/* Search */}
       <div className="hidden md:flex items-center">

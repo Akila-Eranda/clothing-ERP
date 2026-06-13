@@ -9,15 +9,14 @@ import {
   LayoutDashboard, ShoppingCart, History, RotateCcw, Users,
   Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
-  UserCog, Building2, Shield, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
-  Car, FileText, Wrench,
+  UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
+  Car, FileText, Wrench, KeyRound,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
-import { useShopProfile } from "@/lib/use-shop-profile";
-import { getWorkspace } from "@/lib/shop-workspace";
-import { getBrandPageCopy, getSupplierPageCopy } from "@/lib/shop-vertical";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -34,71 +33,63 @@ interface NavGroup { title: string; items: NavItem[] }
 /* ── Navigation structure ────────────────────────────────── */
 function useNavGroups(): NavGroup[] {
   const { openPos } = useUIStore();
-  const profile = useShopProfile();
-  const ws = getWorkspace(profile.type);
-  const brandLabel = getBrandPageCopy(profile, ws).pageTitle;
-  const supplierLabel = getSupplierPageCopy(profile, ws).pageTitle;
+  const { profile, workspace: ws } = useShopWorkspace();
+  const L = getSidebarLabels(ws, profile);
+  const S = getSidebarSectionTitles(profile);
+
   const productItems: NavItem[] = [
-    { label: ws.productLabel, href: "/products", icon: Package },
-    { label: "Categories",     href: "/categories", icon: Layers },
-    ...(profile.modules.brands ? [{ label: brandLabel, href: "/brands", icon: Bookmark }] : []),
-    { label: "Inventory",      href: "/inventory",  icon: Warehouse },
-    ...(profile.modules.vehicles ? [{ label: "Vehicle Compatibility", href: "/vehicles", icon: Car }] : []),
-    ...(profile.modules.warranty ? [{ label: "Warranty Claims", href: "/warranty", icon: Wrench }] : []),
-    { label: "Workflows",      href: "/workflows",  icon: Shield },
+    { label: L["/products"], href: "/products", icon: Package },
+    { label: L["/categories"], href: "/categories", icon: Layers },
+    ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
+    { label: L["/inventory"], href: "/inventory", icon: Warehouse },
+    ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
+    ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
+    { label: L["/workflows"], href: "/workflows", icon: GitBranch },
   ];
+
   const salesItems: NavItem[] = [
-    { label: "Point of Sale",  icon: ShoppingCart,  badge: "POS", action: openPos },
-    { label: "Sales History",  href: "/sales",      icon: History },
-    ...(profile.modules.quotations ? [{ label: "Quotations", href: "/quotations", icon: FileText }] : []),
-    ...(profile.modules.returns ? [{ label: "Returns", href: "/returns", icon: RotateCcw }] : []),
-    { label: ws.customerLabel, href: "/customers",  icon: Users },
+    { label: "Point of Sale", icon: ShoppingCart, badge: "POS", action: openPos },
+    { label: L["/sales"], href: "/sales", icon: History },
+    ...(hasShopModule(profile, "quotations") ? [{ label: L["/quotations"], href: "/quotations", icon: FileText }] : []),
+    ...(hasShopModule(profile, "returns") ? [{ label: L["/returns"], href: "/returns", icon: RotateCcw }] : []),
+    { label: L["/customers"], href: "/customers", icon: Users },
   ];
+
   const reportItems: NavItem[] = [
-    { label: "Reports",        href: "/reports",    icon: FileBarChart },
-    ...(profile.modules.promotions ? [{ label: "Promotions", href: "/promotions", icon: Zap }] : []),
+    { label: L["/reports"], href: "/reports", icon: FileBarChart },
+    ...(hasShopModule(profile, "promotions") ? [{ label: L["/promotions"], href: "/promotions", icon: Zap }] : []),
   ];
+
   return [
     {
-      title: "OVERVIEW",
+      title: S.overview,
+      items: [{ label: L["/dashboard"], href: "/dashboard", icon: LayoutDashboard }],
+    },
+    { title: S.sales, items: salesItems },
+    { title: S.products, items: productItems },
+    {
+      title: S.procurement,
       items: [
-        { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard },
+        { label: L["/suppliers"], href: "/suppliers", icon: Truck },
+        { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
       ],
     },
     {
-      title: "SALES",
-      items: salesItems,
-    },
-    {
-      title: "PRODUCTS",
-      items: productItems,
-    },
-    {
-      title: "PROCUREMENT",
+      title: S.finance,
       items: [
-        { label: supplierLabel,      href: "/suppliers",  icon: Truck },
-        { label: "Purchases",      href: "/purchases",  icon: ShoppingBag },
+        { label: L["/accounting"], href: "/accounting", icon: Wallet },
+        { label: L["/expenses"], href: "/expenses", icon: TrendingDown, badge: "NEW" },
+        { label: L["/analytics"], href: "/analytics", icon: BarChart3 },
+        { label: L["/advanced"], href: "/advanced", icon: Zap },
       ],
     },
+    { title: S.reports, items: reportItems },
     {
-      title: "FINANCE",
+      title: S.hr,
       items: [
-        { label: "Accounting",     href: "/accounting", icon: Wallet },
-        { label: "Expenses",       href: "/expenses",   icon: TrendingDown, badge: "NEW" },
-        { label: "Analytics",      href: "/analytics",  icon: BarChart3 },
-        { label: "ERP Roadmap",    href: "/advanced",   icon: Zap },
-      ],
-    },
-    {
-      title: "REPORTS",
-      items: reportItems,
-    },
-    {
-      title: "HR & STAFF",
-      items: [
-        { label: "HR & Payroll",   href: "/hr",         icon: UserCog },
-        { label: "Branches",       href: "/branches",   icon: Building2 },
-        { label: "Users & Roles",  href: "/users",      icon: Shield },
+        { label: L["/hr"], href: "/hr", icon: UserCog },
+        { label: L["/branches"], href: "/branches", icon: Building2 },
+        { label: L["/users"], href: "/users", icon: KeyRound },
       ],
     },
   ];
@@ -124,25 +115,31 @@ function NavBadge({ text }: { text: string }) {
 export function Sidebar() {
   const pathname  = usePathname();
   const router    = useRouter();
-  const { sidebarCollapsed, toggleSidebar } = useUIStore();
+  const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen } = useUIStore();
   const { logoutApi, user } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const isDark    = theme === "dark";
   const navGroups = useNavGroups();
-  const shopProfile = useShopProfile();
+  const { profile } = useShopWorkspace();
 
   const shopName  = user?.branch?.name ?? "ShopERP";
   const planLabel = planTierFromRole(user?.role);
 
-  const handleLogout = async () => { await logoutApi(); router.replace("/login"); };
+  const closeMobile = () => setMobileSidebarOpen(false);
+
+  const handleLogout = async () => {
+    closeMobile();
+    await logoutApi();
+    router.replace("/login");
+  };
 
   /* ── theme-aware palette ── */
-  const bg       = isDark ? "#0f172a" : "#ffffff"
-  const border   = isDark ? "#1e293b" : "#e5e7eb"
-  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "#000000"
-  const textFull = isDark ? "#ffffff" : "#000000"
-  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)"
-  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "#000000"
+  const bg       = isDark ? "#0f172a" : "#ffffff";
+  const border   = isDark ? "#1e293b" : "#e5e7eb";
+  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "#000000";
+  const textFull = isDark ? "#ffffff" : "#000000";
+  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
+  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "#000000";
 
   /* ── single nav item renderer ── */
   const renderItem = (item: NavItem, groupIdx: number) => {
@@ -152,8 +149,8 @@ export function Sidebar() {
 
     const inner = item.href ? (
       <Link
-        key={key}
         href={item.href}
+        onClick={closeMobile}
         className={cn(
           "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
           sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
@@ -174,6 +171,7 @@ export function Sidebar() {
             <span
               className={cn("truncate flex-1 text-[15px] leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}
               style={!isActive && !isDark ? { color: "#000000" } : undefined}
+              title={item.label}
             >
               {item.label}
             </span>
@@ -183,8 +181,8 @@ export function Sidebar() {
       </Link>
     ) : (
       <button
-        key={key}
-        onClick={item.action}
+        type="button"
+        onClick={() => { item.action?.(); closeMobile(); }}
         className={cn(
           "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none cursor-pointer",
           sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
@@ -199,6 +197,7 @@ export function Sidebar() {
             <span
               className="truncate flex-1 text-[15px] leading-none font-medium"
               style={!isDark ? { color: "#000000" } : undefined}
+              title={item.label}
             >
               {item.label}
             </span>
@@ -216,14 +215,14 @@ export function Sidebar() {
         </Tooltip>
       );
     }
-    return <React.Fragment key={key}>{inner}</React.Fragment>;
+    return <div key={key}>{inner}</div>;
   };
 
   /* ── collapsed icon button helper ── */
   const collapsedBtn = (icon: React.ReactNode, label: string, onClick: () => void, danger = false) => (
     <Tooltip key={label}>
       <TooltipTrigger asChild>
-        <button onClick={onClick}
+        <button type="button" onClick={onClick}
           className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
           style={{ color: textMut }}
           onMouseEnter={e => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.1)" : hoverBg; e.currentTarget.style.color = danger ? "#ef4444" : textFull; }}
@@ -246,23 +245,22 @@ export function Sidebar() {
 
         {/* ── Header: shop avatar + name + collapse btn ── */}
         <div className={cn("flex items-center shrink-0 gap-3 px-3 py-4", sidebarCollapsed && "justify-center")}>
-          {/* Avatar */}
           <div
             className="h-11 w-11 rounded-xl shrink-0 flex items-center justify-center text-xl select-none"
             style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
           >
-            {shopProfile.emoji}
+            {profile.emoji}
           </div>
 
           {!sidebarCollapsed && (
             <>
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold leading-tight truncate" style={{ color: textFull }}>{shopName}</p>
-                <p className="text-[11px] font-medium truncate mt-0.5" style={{ color: textMut }}>{shopProfile.label}</p>
-                <p className="text-xs font-semibold mt-0.5" style={{ color: "#6366f1" }}>{planLabel}</p>
+                <p className="text-[11px] font-medium truncate mt-0.5" style={{ color: textMut }}>{profile.label}</p>
+                <p className="text-xs font-semibold mt-0.5 truncate" style={{ color: "#6366f1" }}>{planLabel}</p>
               </div>
-              {/* Collapse button */}
               <button
+                type="button"
                 onClick={toggleSidebar}
                 className="h-7 w-7 flex items-center justify-center rounded-lg border transition-colors shrink-0"
                 style={{ borderColor: border, color: textMut }}
@@ -276,6 +274,7 @@ export function Sidebar() {
 
           {sidebarCollapsed && (
             <button
+              type="button"
               onClick={toggleSidebar}
               className="absolute right-1 top-4 h-6 w-6 flex items-center justify-center rounded-md border transition-colors"
               style={{ borderColor: border, color: textMut, background: bg }}
@@ -287,17 +286,14 @@ export function Sidebar() {
           )}
         </div>
 
-        {/* ── Divider ── */}
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
-        {/* ── Nav groups ── */}
         <ScrollArea className="flex-1">
           <nav className={cn("py-2", sidebarCollapsed ? "px-1.5" : "px-2.5")}>
             {navGroups.map((group, gi) => (
               <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
-                {/* Section label */}
                 {!sidebarCollapsed && (
-                  <p className="px-3 mb-1 text-[11px] font-semibold tracking-wider uppercase select-none"
+                  <p className="px-3 mb-1 text-[11px] font-semibold tracking-wider uppercase select-none truncate"
                     style={{ color: sectLbl }}>
                     {group.title}
                   </p>
@@ -310,20 +306,18 @@ export function Sidebar() {
           </nav>
         </ScrollArea>
 
-        {/* ── Divider ── */}
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
-        {/* ── Bottom actions ── */}
         <div className={cn("shrink-0 py-2 space-y-0.5", sidebarCollapsed ? "px-1.5 flex flex-col items-center" : "px-2.5")}>
           {sidebarCollapsed ? (
             <>
-              {collapsedBtn(<Settings className="h-[17px] w-[17px]" />, "Settings", () => router.push("/settings"))}
+              {collapsedBtn(<Settings className="h-[17px] w-[17px]" />, "Settings", () => { closeMobile(); router.push("/settings"); })}
               {collapsedBtn(<Moon className="h-[17px] w-[17px]" />, isDark ? "Light Mode" : "Dark Mode", () => setTheme(isDark ? "light" : "dark"))}
               {collapsedBtn(<LogOut className="h-[17px] w-[17px]" />, "Logout", handleLogout, true)}
             </>
           ) : (
             <>
-              <Link href="/settings"
+              <Link href="/settings" onClick={closeMobile}
                 className="flex h-11 items-center gap-3 rounded-xl px-3 font-medium transition-colors"
                 style={{ color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
@@ -333,11 +327,11 @@ export function Sidebar() {
                 <span className="flex-1 text-[15px]">Settings</span>
               </Link>
 
-              {/* Dark mode row */}
               <div className="flex h-11 items-center gap-3 rounded-xl px-3" style={{ color: textMut }}>
                 <Moon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
                 <span className="text-[15px] font-medium flex-1">Dark Mode</span>
                 <button
+                  type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
                   style={{ background: isDark ? "#6366f1" : "hsl(var(--sidebar-border))" }}
@@ -350,7 +344,7 @@ export function Sidebar() {
                 </button>
               </div>
 
-              <button onClick={handleLogout}
+              <button type="button" onClick={handleLogout}
                 className="flex h-11 w-full items-center gap-3 rounded-xl px-3 font-medium transition-colors"
                 style={{ color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.07)"; e.currentTarget.style.color = "#ef4444"; }}
