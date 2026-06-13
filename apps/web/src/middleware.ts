@@ -19,6 +19,14 @@ function isAdminHost(request: NextRequest): boolean {
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Force HTTPS when proxied over HTTP (tenant subdomains must use TLS)
+  const proto = request.headers.get('x-forwarded-proto');
+  if (proto === 'http') {
+    const httpsUrl = request.nextUrl.clone();
+    httpsUrl.protocol = 'https';
+    return NextResponse.redirect(httpsUrl, 301);
+  }
+
   // Company admin panel — only on admin3 (not shop / tenant domains)
   if (pathname.startsWith('/admin')) {
     if (!isAdminHost(request)) {
