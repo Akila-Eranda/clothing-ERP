@@ -182,11 +182,10 @@ export default function DashboardPage() {
       {/* Header */}
       <motion.div variants={IV} className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-2xl">{shopProfile.emoji}</span>
-            <h1 className="text-2xl font-bold">{workspace.dashboardTitle}</h1>
-          </div>
-          <p className="text-sm text-muted-foreground">{workspace.dashboardSubtitle}</p>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Sales, inventory and business overview
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-500">
