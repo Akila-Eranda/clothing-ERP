@@ -5,7 +5,7 @@ import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 
-describe('FashionERP API (e2e)', () => {
+describe('HexaOne API (e2e)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
 

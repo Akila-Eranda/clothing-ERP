@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
+import { APP_NAME } from "@/lib/constants";
 
 const schema = z
   .object({
@@ -81,7 +82,7 @@ function ResetPasswordForm() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl gradient-primary shadow-glow mb-3">
             <Sparkles className="h-7 w-7 text-white" />
           </div>
-          <h1 className="text-xl font-bold text-foreground">ShopERP</h1>
+          <h1 className="text-xl font-bold text-foreground">{APP_NAME}</h1>
         </div>
 
         <div className="glass-card rounded-2xl p-8 shadow-glass">

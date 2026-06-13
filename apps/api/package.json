@@ -1,7 +1,7 @@
 {
   "name": "@fashion-erp/api",
   "version": "1.0.0",
-  "description": "FashionERP Enterprise Backend API",
+  "description": "HexaOne Enterprise Backend API",
   "private": true,
   "scripts": {
     "build": "nest build",

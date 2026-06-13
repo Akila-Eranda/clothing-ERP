@@ -1,5 +1,5 @@
 /**
- * ShopERP Store Print Server
+ * HexaOne Store Print Server
  * Run on the shop PC (same LAN as thermal printer). POS sends jobs via API proxy.
  *
  * Setup:
@@ -58,7 +58,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/v1/health') {
-    return json(res, 200, { ok: true, service: 'ShopERP Print Server', port: PORT });
+    return json(res, 200, { ok: true, service: 'HexaOne Print Server', port: PORT });
   }
 
   if (req.method === 'GET' && req.url === '/v1/logs') {
@@ -112,7 +112,7 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`ShopERP Print Server listening on http://0.0.0.0:${PORT}`);
+  console.log(`HexaOne Print Server listening on http://0.0.0.0:${PORT}`);
   console.log(`API key: ${API_KEY ? '(set)' : '(none)'}`);
   console.log(`Logs: ${LOG_FILE}`);
 });

@@ -6,6 +6,7 @@ import { Printer, ArrowLeft, Minus, Plus, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { APP_NAME } from "@/lib/constants";
 import { useShopProfile, hasMultiUnit, hasExpiryTracking, variantColumnLabelsFromProfile } from "@/lib/use-shop-profile";
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -206,7 +207,7 @@ export default function PrintTagsPage() {
   if (loading) return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
   if (!po)     return <div className="flex items-center justify-center min-h-screen text-muted-foreground">PO not found</div>;
 
-  const shopName = "ShopERP";
+  const shopName = APP_NAME;
   const [colA, colB] = variantColumnLabelsFromProfile(shopProfile);
   const attrA = shopProfile.variantAttributes[0]?.mapsTo;
   const attrB = shopProfile.variantAttributes[1]?.mapsTo;

@@ -3,6 +3,7 @@ import { IsString, IsOptional, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { RoleType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { ensureSystemRoles } from './default-system-roles';
 
 export class CreateRoleDto {
   @ApiProperty() @IsString() name: string;
@@ -36,6 +37,7 @@ export class RolesService {
   }
 
   async findAll(tenantId: string) {
+    await ensureSystemRoles(this.prisma, tenantId);
     return this.prisma.role.findMany({
       where: { tenantId },
       include: { permissions: { include: { permission: true } }, _count: { select: { users: true } } },

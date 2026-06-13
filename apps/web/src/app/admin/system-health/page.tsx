@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Activity, Database, Wifi, Server } from 'lucide-react'
 import { fetchHealth } from '@/lib/admin-api'
+import { APP_NAME } from '@/lib/constants'
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
@@ -109,7 +110,7 @@ export default function SystemHealthPage() {
             {loading ? 'Checking…' : allOk ? 'All Systems Operational' : 'Service Disruption Detected'}
           </p>
           <p className={`text-sm ${allOk ? 'text-green-700' : 'text-red-700'}`}>
-            {loading ? 'Running health checks…' : allOk ? 'FashionERP platform is running normally.' : 'One or more services are experiencing issues.'}
+            {loading ? 'Running health checks…' : allOk ? `${APP_NAME} platform is running normally.` : 'One or more services are experiencing issues.'}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">

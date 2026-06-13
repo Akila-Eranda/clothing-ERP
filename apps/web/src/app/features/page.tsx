@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { APP_NAME } from '@/lib/constants';
 import { Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SHOP_TYPE_LIST, ShopType } from '@/lib/shop-profiles';
@@ -22,7 +23,7 @@ export default function FeaturesPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/login" className="flex items-center gap-2 font-black tracking-wide">
             <Sparkles className="h-5 w-5 text-primary" />
-            ShopERP
+            {APP_NAME}
           </Link>
           <div className="flex gap-2">
             <Button variant="ghost" asChild><Link href="/login">Login</Link></Button>

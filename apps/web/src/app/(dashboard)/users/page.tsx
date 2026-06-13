@@ -51,13 +51,39 @@ function parseList<T>(payload: unknown): T[] {
   return [];
 }
 
+function roleLabel(role: Role): string {
+  if (role.type === "BRANCH_MANAGER") return "Manager";
+  return role.name;
+}
+
+const INVITE_ROLE_ORDER: Record<string, number> = {
+  CASHIER: 0,
+  BRANCH_MANAGER: 1,
+  STAFF: 2,
+  INVENTORY_MANAGER: 3,
+  ACCOUNTANT: 4,
+  HR_MANAGER: 5,
+  VIEWER: 6,
+  CUSTOM: 7,
+  TENANT_ADMIN: 8,
+};
+
 /** Assignable staff roles for this tenant (excludes platform super-admin type). */
 function assignableRoles(roles: Role[], tenantId?: string | null): Role[] {
-  return roles.filter((r) => {
-    if (tenantId && r.tenantId && r.tenantId !== tenantId) return false;
-    if (tenantId && !r.tenantId) return false;
-    return r.type !== "SUPER_ADMIN";
-  });
+  return roles
+    .filter((r) => {
+      if (tenantId && r.tenantId && r.tenantId !== tenantId) return false;
+      if (tenantId && !r.tenantId) return false;
+      return r.type !== "SUPER_ADMIN";
+    })
+    .sort((a, b) => (INVITE_ROLE_ORDER[a.type] ?? 99) - (INVITE_ROLE_ORDER[b.type] ?? 99));
+}
+
+/** Roles shown when inviting day-to-day staff (not another shop admin). */
+function inviteStaffRoles(roles: Role[], tenantId?: string | null): Role[] {
+  return assignableRoles(roles, tenantId).filter(
+    (r) => r.type !== "TENANT_ADMIN" && r.type !== "SUPER_ADMIN",
+  );
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -76,7 +102,8 @@ export default function UsersPage() {
   const [saving, setSaving]           = useState(false);
 
   const tenantId = tokenStorage.getTenant();
-  const staffRoles = useMemo(() => assignableRoles(roles, tenantId), [roles, tenantId]);
+  const staffRoles = useMemo(() => inviteStaffRoles(roles, tenantId), [roles, tenantId]);
+  const allAssignableRoles = useMemo(() => assignableRoles(roles, tenantId), [roles, tenantId]);
   const tenantRoleCards = useMemo(
     () => roles.filter((r) => !tenantId || r.tenantId === tenantId),
     [roles, tenantId],
@@ -359,14 +386,14 @@ export default function UsersPage() {
                   <SelectContent>
                     {staffRoles.map((r) => (
                       <SelectItem key={r.id} value={r.id}>
-                        {r.name}
+                        {roleLabel(r)}
                         {r.description ? ` — ${r.description}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <p className="text-[10px] text-muted-foreground mt-1">
-                  Your shop&apos;s roles only — select one to assign
+                  Cashier, Manager, and other staff roles for your shop
                 </p>
               </div>
               <div><Label className="text-xs mb-1.5 block">Branch</Label>
@@ -400,8 +427,8 @@ export default function UsersPage() {
               <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                 <SelectContent>
-                  {staffRoles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                  {allAssignableRoles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>{roleLabel(r)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

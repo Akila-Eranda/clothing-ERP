@@ -363,7 +363,7 @@ export class AuthService {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
     const secret = speakeasy.generateSecret({
-      name: `FashionERP (${user.email})`,
+      name: `HexaOne (${user.email})`,
       length: 20,
     });
 

@@ -18,6 +18,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { APP_NAME } from "@/lib/constants";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -125,7 +126,7 @@ export function Sidebar() {
   const navGroups = useNavGroups();
   const { profile } = useShopWorkspace();
 
-  const shopName  = user?.branch?.name ?? "ShopERP";
+  const shopName  = user?.branch?.name ?? APP_NAME;
   const planLabel = planTierFromRole(user?.role);
 
   const closeMobile = () => setMobileSidebarOpen(false);

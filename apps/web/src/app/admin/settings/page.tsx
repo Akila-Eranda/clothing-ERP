@@ -19,7 +19,7 @@ export default function SettingsPage() {
   const [showKey, setShowKey] = useState(false)
 
   const [general, setGeneral] = useState({
-    platformName: 'FashionERP',
+    platformName: 'HexaOne',
     supportEmail: 'support@fashionerp.com',
     defaultCurrency: 'LKR',
     defaultTimezone: 'Asia/Colombo',
@@ -88,7 +88,7 @@ export default function SettingsPage() {
               <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">General Settings</h2>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: 'Platform Name',    key: 'platformName',    placeholder: 'FashionERP'              },
+                  { label: 'Platform Name',    key: 'platformName',    placeholder: 'HexaOne'              },
                   { label: 'Support Email',    key: 'supportEmail',    placeholder: 'support@fashionerp.com'  },
                   { label: 'Default Currency', key: 'defaultCurrency', placeholder: 'LKR'                     },
                   { label: 'Default Timezone', key: 'defaultTimezone', placeholder: 'Asia/Colombo'            },

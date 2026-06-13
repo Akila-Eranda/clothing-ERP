@@ -23,6 +23,7 @@ import { RoleType } from '@prisma/client';
 import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { getShopProfile, SHOP_TYPE_LIST, slugifyCategory } from '@/shared/shop-profiles';
+import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
 
 export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
@@ -298,6 +299,7 @@ export class TenantsService {
       });
 
       await this.seedTenantDefaults(tx, tenant.id, shopType);
+      await ensureSystemRoles(tx, tenant.id);
 
       return {
         tenant,

@@ -77,7 +77,7 @@ async function bootstrap(): Promise<void> {
   // ── Swagger Docs ──────────────────────────────────────────
   if (isDev) {
     const swaggerConfig = new DocumentBuilder()
-      .setTitle('FashionERP API')
+      .setTitle('HexaOne API')
       .setDescription('Enterprise AI-Powered Fashion Retail ERP — REST API Documentation')
       .setVersion('1.0')
       .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
@@ -121,7 +121,7 @@ async function bootstrap(): Promise<void> {
 
   await app.listen(port);
 
-  logger.log(`🚀 FashionERP API running on http://localhost:${port}/api/v1`);
+  logger.log(`🚀 HexaOne API running on http://localhost:${port}/api/v1`);
   logger.log(`🌍 Environment: ${config.get('app.env', 'development')}`);
 }
 

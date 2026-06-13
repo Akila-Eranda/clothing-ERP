@@ -1,4 +1,4 @@
-# FashionERP — AI-Powered Clothing Shop ERP System
+# HexaOne — AI-Powered Retail & Business Management Platform
 
 A complete, enterprise-grade ERP + POS + Inventory + CRM + Accounting + Multi-Branch SaaS system for clothing retail.
 

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { ExternalLink, Filter } from "lucide-react";
+import { APP_NAME } from "@/lib/constants";
 
 const STATUS_STYLE: Record<CapabilityStatus, string> = {
   live: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
@@ -65,7 +66,7 @@ export default function AdvancedErpPage() {
     <div className="p-6 space-y-8 max-w-[1200px] mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">ShopERP Advanced Capabilities</h1>
+          <h1 className="text-2xl font-bold">{APP_NAME} Advanced Capabilities</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {profile.emoji} {profile.label} — {livePct}% features live in production
           </p>

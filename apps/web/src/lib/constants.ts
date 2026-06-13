@@ -1,6 +1,6 @@
-export const APP_NAME = "ShopERP";
+export const APP_NAME = "HexaOne";
 export const APP_VERSION = "2.0.0";
-export const APP_DESCRIPTION = "Multi-Shop ERP — Clothing, Grocery, Hardware & Agriculture";
+export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 
 export const CURRENCY = "LKR";
 export const CURRENCY_SYMBOL = "LKR";

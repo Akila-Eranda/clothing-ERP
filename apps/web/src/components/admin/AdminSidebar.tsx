@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Building2, Users, CreditCard, Activity,
   BarChart3, ScrollText, Settings, Shield, X, ShoppingBag, Tag,
 } from 'lucide-react'
+import { APP_NAME } from '@/lib/constants'
 
 const NAV = [
   { href: '/admin/dashboard',      label: 'Dashboard',       icon: LayoutDashboard },
@@ -33,7 +34,7 @@ export default function AdminSidebar({ onClose }: Props) {
             <ShoppingBag size={14} className="text-white" />
           </div>
           <div>
-            <p className="text-[13px] font-bold text-gray-900 leading-tight">FashionERP</p>
+            <p className="text-[13px] font-bold text-gray-900 leading-tight">{APP_NAME}</p>
             <p className="text-[10px] text-gray-400 leading-tight">Platform Admin</p>
           </div>
         </div>

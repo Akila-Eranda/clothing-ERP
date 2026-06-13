@@ -28,7 +28,7 @@ export interface ReceiptSettings {
 }
 
 export const RECEIPT_DEFAULTS: ReceiptSettings = {
-  shopName: "FashionERP",
+  shopName: "HexaOne",
   tagline: "",
   logoUrl: "",
   address1: "",

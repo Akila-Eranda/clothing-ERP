@@ -7,14 +7,14 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "FashionERP — Enterprise Retail Management",
-    template: "%s | FashionERP",
+    default: "HexaOne — Enterprise Retail Management",
+    template: "%s | HexaOne",
   },
   description:
-    "AI-powered enterprise ERP, POS & inventory management for fashion stores, boutiques, and multi-branch retail businesses.",
-  keywords: ["fashion erp", "pos system", "retail management", "inventory", "clothing shop"],
-  authors: [{ name: "FashionERP" }],
-  creator: "FashionERP",
+    "HexaOne — AI-powered ERP, POS & inventory management for retail stores, boutiques, and multi-branch businesses.",
+  keywords: ["hexaone", "pos system", "retail management", "inventory", "erp"],
+  authors: [{ name: "HexaOne" }],
+  creator: "HexaOne",
 };
 
 export const viewport: Viewport = {

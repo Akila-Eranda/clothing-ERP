@@ -2,7 +2,7 @@ import { registerAs } from '@nestjs/config';
 
 export default registerAs('app', () => ({
   env: process.env.NODE_ENV || 'development',
-  name: process.env.APP_NAME || 'FashionERP API',
+  name: process.env.APP_NAME || 'HexaOne API',
   port: parseInt(process.env.PORT || '4000', 10),
   apiPrefix: process.env.API_PREFIX || 'api',
   allowedOrigins: (process.env.ALLOWED_ORIGINS || 'http://localhost:3000').split(','),

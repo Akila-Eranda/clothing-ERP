@@ -1,4 +1,4 @@
-/** ShopERP capability matrix — live vs partial vs planned */
+/** HexaOne capability matrix — live vs partial vs planned */
 
 export type CapabilityStatus = 'live' | 'partial' | 'planned';
 

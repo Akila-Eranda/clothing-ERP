@@ -7,5 +7,5 @@ export default registerAs('mail', () => ({
   user: process.env.SMTP_USER,
   pass: process.env.SMTP_PASS,
   from: process.env.MAIL_FROM || 'noreply@fashion-erp.com',
-  fromName: process.env.MAIL_FROM_NAME || 'FashionERP',
+  fromName: process.env.MAIL_FROM_NAME || 'HexaOne',
 }));

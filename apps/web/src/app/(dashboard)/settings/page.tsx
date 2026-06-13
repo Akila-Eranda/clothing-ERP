@@ -5,9 +5,10 @@ import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
-  Printer, Image, Server, FileText,
+  Printer, Image, Server, FileText, Upload,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS } from "@/lib/use-receipt-settings";
+import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -294,9 +295,10 @@ function AuditLogTab() {
 
 function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string }) {
   const fs = s.fontSize === "small" ? "10px" : s.fontSize === "large" ? "14px" : "12px";
+  const logoSrc = resolvePublicAssetUrl(s.logoUrl);
   return (
     <div style={{ fontFamily: "'Courier New', monospace", fontSize: fs, padding: "12px", background: "#fff", color: "#000", maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: "1px dashed #ccc" }}>
-      {s.logoUrl && <img src={s.logoUrl} alt="logo" style={{ maxWidth: "80px", display: "block", margin: "0 auto 4px" }} />}
+      {logoSrc && <img src={logoSrc} alt="logo" style={{ maxWidth: "80px", display: "block", margin: "0 auto 4px" }} />}
       <div style={{ textAlign: "center", fontWeight: 900, fontSize: "1.3em" }}>{s.shopName || "Shop Name"}</div>
       {s.tagline && <div style={{ textAlign: "center", fontSize: "0.85em", marginBottom: 2 }}>{s.tagline}</div>}
       {s.address1 && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.address1}</div>}
@@ -347,6 +349,8 @@ export default function SettingsPage() {
   const [receiptForm, setReceiptForm] = React.useState<ReceiptSettings>(RECEIPT_DEFAULTS);
   const [receiptSaving, setReceiptSaving] = React.useState(false);
   const [printServerTesting, setPrintServerTesting] = React.useState(false);
+  const [logoUploading, setLogoUploading] = React.useState(false);
+  const logoInputRef = React.useRef<HTMLInputElement>(null);
 
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = React.useState(false);
@@ -393,6 +397,31 @@ export default function SettingsPage() {
       toast.error((e as Error).message ?? "Print server test failed");
     } finally {
       setPrintServerTesting(false);
+    }
+  }
+
+  async function onLogoFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ["image/png", "image/jpeg", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      toast.error("Use PNG, JPG, WEBP or GIF");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Logo must be under 2MB");
+      return;
+    }
+    setLogoUploading(true);
+    try {
+      const uploaded = await uploadFile(file, "receipts");
+      setReceiptForm((f) => ({ ...f, logoUrl: uploaded.url }));
+      toast.success("Logo uploaded — save settings to apply on receipts");
+    } catch (err) {
+      toast.error((err as Error).message ?? "Logo upload failed");
+    } finally {
+      setLogoUploading(false);
+      e.target.value = "";
     }
   }
 
@@ -590,10 +619,70 @@ export default function SettingsPage() {
                       <Label>Tagline</Label>
                       <Input value={receiptForm.tagline} onChange={e => setReceiptForm(f => ({ ...f, tagline: e.target.value }))} placeholder="Quality you can feel" />
                     </div>
-                    <div className="space-y-1.5 col-span-2">
-                      <Label className="flex items-center gap-1.5"><Image className="h-3.5 w-3.5" />Logo URL</Label>
-                      <Input value={receiptForm.logoUrl} onChange={e => setReceiptForm(f => ({ ...f, logoUrl: e.target.value }))} placeholder="https://cdn.example.com/logo.png" />
-                      <p className="text-xs text-muted-foreground">Paste a public image URL (PNG/JPG, max ~80px wide)</p>
+                    <div className="space-y-2 col-span-2">
+                      <Label className="flex items-center gap-1.5">
+                        <Image className="h-3.5 w-3.5" />Shop Logo
+                      </Label>
+                      <div className="flex items-start gap-4 rounded-lg border border-border p-3 bg-muted/20">
+                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg border bg-background overflow-hidden">
+                          {receiptForm.logoUrl ? (
+                            <img
+                              src={resolvePublicAssetUrl(receiptForm.logoUrl)}
+                              alt="Shop logo"
+                              className="max-h-full max-w-full object-contain p-1"
+                            />
+                          ) : (
+                            <Image className="h-8 w-8 text-muted-foreground/50" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <input
+                            ref={logoInputRef}
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="hidden"
+                            onChange={onLogoFileSelected}
+                          />
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={logoUploading}
+                              onClick={() => logoInputRef.current?.click()}
+                            >
+                              {logoUploading ? (
+                                <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                              ) : (
+                                <Upload className="h-4 w-4 mr-1.5" />
+                              )}
+                              {logoUploading ? "Uploading…" : "Upload logo"}
+                            </Button>
+                            {receiptForm.logoUrl && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setReceiptForm((f) => ({ ...f, logoUrl: "" }))}
+                              >
+                                <X className="h-4 w-4 mr-1" /> Remove
+                              </Button>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            PNG, JPG or WEBP — max 2MB. Displays ~80px wide on printed receipts.
+                          </p>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-muted-foreground">Or paste image URL</Label>
+                            <Input
+                              value={receiptForm.logoUrl}
+                              onChange={(e) => setReceiptForm((f) => ({ ...f, logoUrl: e.target.value }))}
+                              placeholder="https://… or /uploads/…"
+                              className="h-8 text-xs"
+                            />
+                          </div>
+                        </div>
+                      </div>
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />Address Line 1</Label>

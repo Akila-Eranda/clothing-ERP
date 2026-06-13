@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { executeReceiptPrint } from "@/lib/receipt-print";
+import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
@@ -449,7 +450,7 @@ export function POSOverlay() {
     const pw = s.paperWidth==="58mm"?"58mm":"80mm";
     const fs = s.fontSize==="small"?"11px":s.fontSize==="large"?"14px":"12px";
     const rows=r.items.map(i=>`<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${i.qty>0?(i.price/i.qty).toFixed(2):"0.00"}</span><span>LKR ${i.price.toFixed(2)}</span></div>`).join("");
-    const logoHtml=s.logoUrl?`<img src="${s.logoUrl}" style="max-width:80px;display:block;margin:0 auto 4px"/>`:"";
+    const logoHtml=s.logoUrl?`<img src="${resolvePublicAssetUrl(s.logoUrl)}" style="max-width:80px;display:block;margin:0 auto 4px"/>`:"";
     const addr=[s.address1,s.address2].filter(Boolean).map(a=>`<sub>${a}</sub>`).join("");
     const contactHtml=[s.phone&&`<sub>${s.phone}</sub>`,s.email&&`<sub>${s.email}</sub>`,s.website&&`<sub>${s.website}</sub>`].filter(Boolean).join("");
     const headerMsg=s.headerText?`<sub style="font-style:italic">${s.headerText}</sub>`:"";

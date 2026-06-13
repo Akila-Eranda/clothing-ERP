@@ -1,5 +1,5 @@
 // ============================================================
-// FashionERP Enterprise Prisma Schema
+// HexaOne Enterprise Prisma Schema
 // ============================================================
 
 generator client {

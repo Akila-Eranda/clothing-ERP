@@ -17,7 +17,7 @@ interface TenantRegisteredPayload {
 export class MailService {
   private readonly logger = new Logger(MailService.name);
   private transporter: nodemailer.Transporter | null = null;
-  private from = '"FashionERP" <noreply@fashion-erp.com>';
+  private from = '"HexaOne" <noreply@fashion-erp.com>';
 
   constructor(private readonly config: ConfigService) {
     const host = config.get<string>('mail.host');
@@ -25,7 +25,7 @@ export class MailService {
     const pass = config.get<string>('mail.pass');
     const port = config.get<number>('mail.port') ?? 587;
     const secure = config.get<boolean>('mail.secure') ?? false;
-    this.from = `"${config.get('mail.fromName') ?? 'FashionERP'}" <${config.get('mail.from') ?? 'noreply@fashion-erp.com'}>`;
+    this.from = `"${config.get('mail.fromName') ?? 'HexaOne'}" <${config.get('mail.from') ?? 'noreply@fashion-erp.com'}>`;
 
     if (user && pass) {
       this.transporter = nodemailer.createTransport({ host, port, secure, auth: { user, pass } });
@@ -53,17 +53,17 @@ export class MailService {
   async onPasswordResetRequested({ email, token, name }: PasswordResetPayload) {
     const frontendUrl = this.config.get<string>('app.frontendUrl') ?? 'https://shop.hexalyte.com';
     const resetUrl = `${frontendUrl}/reset-password?token=${token}`;
-    await this.send(email, 'Reset Your Password — FashionERP', `
+    await this.send(email, 'Reset Your Password — HexaOne', `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
         <div style="text-align:center;margin-bottom:24px">
           <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:#4f46e5;border-radius:14px">
             <span style="font-size:24px">🔐</span>
           </div>
           <h1 style="font-size:22px;font-weight:700;color:#111;margin:12px 0 4px">Reset Your Password</h1>
-          <p style="color:#666;font-size:14px;margin:0">FashionERP — Enterprise Retail Platform</p>
+          <p style="color:#666;font-size:14px;margin:0">HexaOne — Enterprise Retail Platform</p>
         </div>
         <p style="color:#333;line-height:1.6">Hi <strong>${name}</strong>,</p>
-        <p style="color:#333;line-height:1.6">We received a request to reset your FashionERP password. Click the button below to choose a new password:</p>
+        <p style="color:#333;line-height:1.6">We received a request to reset your HexaOne password. Click the button below to choose a new password:</p>
         <div style="text-align:center;margin:28px 0">
           <a href="${resetUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:15px;font-weight:600">
             Reset Password →
@@ -71,7 +71,7 @@ export class MailService {
         </div>
         <p style="color:#888;font-size:13px;line-height:1.6">This link will expire in <strong>1 hour</strong>. If you didn't request this, you can safely ignore this email — your password won't change.</p>
         <hr style="border:none;border-top:1px solid #eee;margin:28px 0"/>
-        <p style="color:#aaa;font-size:12px;text-align:center">© FashionERP · Enterprise AI-Powered Retail Platform</p>
+        <p style="color:#aaa;font-size:12px;text-align:center">© HexaOne · Enterprise AI-Powered Retail Platform</p>
       </div>
     `);
   }
@@ -79,13 +79,13 @@ export class MailService {
   @OnEvent('tenant.registered')
   async onTenantRegistered({ email, name, subdomain, adminName, initialPassword }: TenantRegisteredPayload) {
     const loginUrl = `https://${subdomain}.shop.hexalyte.com/login`;
-    await this.send(email, `Welcome to FashionERP — ${name} is ready!`, `
+    await this.send(email, `Welcome to HexaOne — ${name} is ready!`, `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
         <div style="text-align:center;margin-bottom:24px">
           <div style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;background:#4f46e5;border-radius:14px">
             <span style="font-size:24px">🎉</span>
           </div>
-          <h1 style="font-size:22px;font-weight:700;color:#111;margin:12px 0 4px">Welcome to FashionERP!</h1>
+          <h1 style="font-size:22px;font-weight:700;color:#111;margin:12px 0 4px">Welcome to HexaOne!</h1>
           <p style="color:#666;font-size:14px;margin:0">Your workspace is ready</p>
         </div>
         <p style="color:#333;line-height:1.6">Hi <strong>${adminName}</strong>,</p>
@@ -104,7 +104,7 @@ export class MailService {
           </a>
         </div>
         <hr style="border:none;border-top:1px solid #eee;margin:28px 0"/>
-        <p style="color:#aaa;font-size:12px;text-align:center">© FashionERP · Enterprise AI-Powered Retail Platform</p>
+        <p style="color:#aaa;font-size:12px;text-align:center">© HexaOne · Enterprise AI-Powered Retail Platform</p>
       </div>
     `);
   }

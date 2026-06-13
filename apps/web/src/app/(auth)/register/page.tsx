@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from "@/lib/shop-profiles";
 import { getVerticalFeatures } from "@/lib/shop-features";
 import { ShopFeatureList } from "@/components/shop/shop-feature-list";
+import { APP_NAME } from "@/lib/constants";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -158,7 +159,7 @@ export default function RegisterPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
               <Sparkles className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-black tracking-wide uppercase">ShopERP</span>
+            <span className="text-xl font-black tracking-wide uppercase">{APP_NAME}</span>
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-2">Start your free 14-day trial</h2>
           <p className="text-white/70 text-sm leading-relaxed mb-6">
@@ -171,7 +172,7 @@ export default function RegisterPage() {
           </Link>
         </div>
         <p className="relative text-xs text-white/50">
-          © 2025 ShopERP · Multi-Shop Retail Platform
+          © 2025 {APP_NAME} · Multi-Shop Retail Platform
         </p>
       </div>
 
@@ -183,7 +184,7 @@ export default function RegisterPage() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow mb-3">
               <Sparkles className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold">ShopERP</h1>
+            <h1 className="text-xl font-bold">{APP_NAME}</h1>
           </div>
 
           {/* Step indicator */}
