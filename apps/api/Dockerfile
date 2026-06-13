@@ -35,8 +35,12 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
-USER nestjs
+RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
+
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 3001
 
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/main"]

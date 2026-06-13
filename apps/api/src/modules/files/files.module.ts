@@ -1,20 +1,21 @@
 import { Module } from '@nestjs/common';
 import {
   Controller, Post, Delete, Get, Param, Body,
-  UploadedFile, UseInterceptors, HttpCode, HttpStatus,
+  UploadedFile, UseInterceptors, HttpCode, HttpStatus, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import * as mime from 'mime-types';
+import { memoryStorage } from 'multer';
+
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 @Injectable()
 export class FilesService {
@@ -24,7 +25,7 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.uploadDir = path.resolve('uploads');
+    this.uploadDir = path.resolve(process.env.UPLOAD_DIR ?? 'uploads');
   }
 
   async uploadFile(
@@ -33,15 +34,21 @@ export class FilesService {
     file: Express.Multer.File,
     folder = 'general',
   ) {
-    const ext = mime.extension(file.mimetype) || 'bin';
+    if (!file) throw new BadRequestException('No file uploaded');
+
+    const safeFolder = (folder || 'general').replace(/[^a-zA-Z0-9_-]/g, '') || 'general';
+    const ext = mime.extension(file.mimetype) || path.extname(file.originalname).slice(1) || 'bin';
     const filename = `${uuidv4()}.${ext}`;
-    const dir = path.join(this.uploadDir, tenantId, folder);
+    const dir = path.join(this.uploadDir, tenantId, safeFolder);
     const filepath = path.join(dir, filename);
 
     await fs.mkdir(dir, { recursive: true });
-    await fs.writeFile(filepath, file.buffer);
 
-    const url = `/uploads/${tenantId}/${folder}/${filename}`;
+    const data = file.buffer ?? (file.path ? await fs.readFile(file.path) : null);
+    if (!data) throw new BadRequestException('Upload failed — empty file payload');
+    await fs.writeFile(filepath, data);
+
+    const url = `/uploads/${tenantId}/${safeFolder}/${filename}`;
     const size = file.size;
 
     const record = await this.prisma.fileUpload.create({
@@ -53,7 +60,7 @@ export class FilesService {
         mimeType: file.mimetype,
         size,
         url,
-        folder,
+        folder: safeFolder,
         storageProvider: 'local',
       },
     });
@@ -90,7 +97,10 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   @Post('upload')
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(FileInterceptor('file', {
+    storage: memoryStorage(),
+    limits: { fileSize: MAX_UPLOAD_BYTES },
+  }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a file' })
   upload(

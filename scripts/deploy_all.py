@@ -22,6 +22,9 @@ echo "==> Build api + web..."
 docker compose build api web
 docker compose up -d
 
+echo "==> Fix uploads volume permissions..."
+docker compose exec -u root -T api sh -c 'mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads'
+
 echo "==> Waiting for API to become healthy..."
 for i in $(seq 1 45); do
   if curl -sk -f https://shop.clothing.api.hexalyte.com/api/v1/health >/dev/null 2>&1; then
