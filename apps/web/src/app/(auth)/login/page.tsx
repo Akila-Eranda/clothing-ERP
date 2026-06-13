@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, Building2, Sparkles, Tag, ExternalLink, ChevronRight,
+  Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles, Tag, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -116,15 +116,15 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex flex-col lg:flex-row">
       <AuthBrandPanel
         shopType={shopType}
         tenantName={tenantPreview?.name}
         tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
       />
 
-      {/* Right — clean white form panel */}
-      <div className="flex-1 flex flex-col bg-white relative overflow-hidden">
+      {/* Right — login form */}
+      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden lg:w-1/2">
         <div className="absolute inset-0 mesh-bg opacity-40 pointer-events-none" />
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
@@ -149,27 +149,12 @@ function LoginContent() {
               <h2 className="text-3xl font-bold text-foreground tracking-tight">Welcome back</h2>
               <p className="text-sm text-muted-foreground mt-2">
                 {tenantPreview
-                  ? `Access your ${tenantPreview.name} dashboard`
+                  ? `Enter your credentials for ${tenantPreview.name}`
                   : isMainDomain
                     ? "Enter your workspace URL and credentials"
                     : "Enter your credentials to continue"}
               </p>
             </div>
-
-            {tenantPreview && !isMainDomain && (
-              <div className="mb-6 flex items-center gap-3 rounded-2xl border border-border bg-slate-50 px-4 py-3.5 shadow-sm">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                  <Building2 className="h-5 w-5 text-primary" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate">{tenantPreview.name}</p>
-                  <p className="text-xs text-muted-foreground font-mono truncate">
-                    {tenantPreview.subdomain}{SHOP_DOMAIN_SUFFIX}
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
-              </div>
-            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {showSubdomainField && (
@@ -290,9 +275,9 @@ function LoginContent() {
 
 function LoginFallback() {
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:block lg:w-[58%] bg-[#070d1a]" />
-      <div className="flex-1 flex items-center justify-center bg-white">
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      <div className="hidden lg:block lg:w-1/2 bg-[#070d1a]" />
+      <div className="flex-1 flex items-center justify-center bg-white min-h-screen">
         <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
       </div>
     </div>
