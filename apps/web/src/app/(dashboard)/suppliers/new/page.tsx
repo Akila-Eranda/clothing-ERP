@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getSupplierPageCopy } from "@/lib/shop-vertical";
 
 // ── Types ────────────────────────────────────────────────────────────────
 interface Form {
@@ -39,6 +41,8 @@ function F({ label, req, children }: { label: string; req?: boolean; children: R
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function NewSupplierPage() {
   const router  = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const copy = getSupplierPageCopy(profile, workspace);
   const [form, setForm]     = useState<Form>(INIT);
   const [loading, setLoading] = useState(false);
 
@@ -48,7 +52,7 @@ export default function NewSupplierPage() {
   const cd = parseInt(form.creditDays || "30");
 
   const submit = async () => {
-    if (!form.name.trim()) { toast.error("Supplier name is required"); return; }
+    if (!form.name.trim()) { toast.error(`${copy.nameLabel} is required`); return; }
     if (!form.phone.trim()) { toast.error("Phone is required"); return; }
     setLoading(true);
     try {
@@ -69,7 +73,7 @@ export default function NewSupplierPage() {
       toast.success(`"${form.name}" added!`);
       router.push("/suppliers");
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Failed to create supplier");
+      toast.error((e as Error).message ?? `Failed to create ${copy.singular.toLowerCase()}`);
     } finally { setLoading(false); }
   };
 
@@ -80,9 +84,9 @@ export default function NewSupplierPage() {
       <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push("/suppliers")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-          <ArrowLeft className="h-4 w-4" /> Back to Suppliers
+          <ArrowLeft className="h-4 w-4" /> {copy.backLabel}
         </button>
-        <h1 className="text-base font-semibold">Add New Supplier</h1>
+        <h1 className="text-base font-semibold">{copy.addPageTitle}</h1>
         <div className="w-40" />
       </div>
 
@@ -98,8 +102,8 @@ export default function NewSupplierPage() {
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <F label="Supplier Name" req>
-                  <Input placeholder="e.g. TextileCo Lanka" value={form.name} onChange={(e) => set("name", e.target.value)} />
+                <F label={copy.nameLabel} req>
+                  <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)} />
                 </F>
               </div>
               <div className="space-y-1.5">
@@ -165,8 +169,8 @@ export default function NewSupplierPage() {
             <h3 className="font-semibold text-sm border-b pb-2">Status</h3>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Active Supplier</p>
-                <p className="text-xs text-muted-foreground">{form.isActive ? "Visible and available for POs" : "Disabled"}</p>
+                <p className="text-sm font-medium">{copy.activeLabel}</p>
+                <p className="text-xs text-muted-foreground">{form.isActive ? copy.activeHint : "Disabled"}</p>
               </div>
               <Switch checked={form.isActive} onCheckedChange={(v) => set("isActive", v)} />
             </div>
@@ -191,7 +195,7 @@ export default function NewSupplierPage() {
           {/* Notes */}
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-2">
             <h3 className="font-semibold text-sm border-b pb-2">Notes</h3>
-            <Textarea rows={3} placeholder="Internal notes about this supplier…" value={form.notes}
+            <Textarea rows={3} placeholder={copy.notesPlaceholder} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} />
           </div>
 
@@ -216,7 +220,7 @@ export default function NewSupplierPage() {
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-3">
             <Button className="w-full gap-2" disabled={loading} onClick={submit}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save Supplier
+              {copy.saveButton}
             </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push("/suppliers")}>
               Cancel

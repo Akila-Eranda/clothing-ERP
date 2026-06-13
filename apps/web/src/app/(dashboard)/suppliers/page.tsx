@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Truck, Plus, Phone, Mail, MapPin, Users, ShoppingBag, RefreshCw, CreditCard } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Truck, Plus, Phone, Mail, MapPin, Users, ShoppingBag, RefreshCw, CreditCard, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,9 +14,12 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { type Supplier } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getSupplierPageCopy, type SupplierPageCopy } from "@/lib/shop-vertical";
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
+  copy: SupplierPageCopy,
   onView:   (s: Supplier) => void,
   onEdit:   (s: Supplier) => void,
   onDelete: (s: Supplier) => void,
@@ -24,7 +27,7 @@ function buildColumns(
   return [
     {
       accessorKey: "name",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title={copy.singular} />,
       cell: ({ row }) => {
         const s = row.original;
         return (
@@ -122,24 +125,28 @@ function buildColumns(
 // ── Page ─────────────────────────────────────────────────────────────────
 export default function SuppliersPage() {
   const router = useRouter();
-  const [suppliers, setSuppliers]       = useState<Supplier[]>([]);
-  const [loading, setLoading]           = useState(true);
+  const { profile, workspace } = useShopWorkspace();
+  const copy = useMemo(() => getSupplierPageCopy(profile, workspace), [profile, workspace]);
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading]     = useState(true);
+
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await api.get<{ data: Supplier[] }>("/suppliers?limit=200");
       setSuppliers(res.data?.data ?? (res.data as unknown as Supplier[]) ?? []);
-    } catch { toast.error("Failed to load suppliers"); }
+    } catch { toast.error(`Failed to load ${copy.plural.toLowerCase()}`); }
     finally { setLoading(false); }
-  }, []);
+  }, [copy.plural]);
 
   useEffect(() => { fetchSuppliers(); }, [fetchSuppliers]);
 
   const handleDelete = async (s: Supplier) => {
-    if (!window.confirm(`Delete "${s.name}"? This cannot be undone.`)) return;
+    if (!window.confirm(copy.deleteConfirm(s.name))) return;
     try {
       await api.delete(`/suppliers/${s.id}`);
-      toast.success("Supplier deleted");
+      toast.success(`${copy.singular} deleted`);
       fetchSuppliers();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Delete failed"); }
   };
@@ -149,32 +156,35 @@ export default function SuppliersPage() {
   const outstanding = suppliers.reduce((sum, s) => sum + (s.balance ?? 0), 0);
 
   const STATS = [
-    { label: "Total Suppliers",  value: suppliers.length, icon: Truck,       color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Active",           value: activeCount,      icon: Users,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Credit Limit",     value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-500", bg: "bg-violet-500/10" },
-    { label: "Outstanding",      value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: `Total ${copy.plural}`, value: suppliers.length, icon: Truck,       color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Active",               value: activeCount,      icon: Users,       color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Credit Limit",         value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-500", bg: "bg-violet-500/10" },
+    { label: "Outstanding",          value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-500", bg: "bg-amber-500/10" },
   ];
 
   const columns = buildColumns(
+    copy,
     (s) => router.push(`/suppliers/${s.id}`),
     (s) => router.push(`/suppliers/${s.id}/edit`),
     handleDelete,
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-6 space-y-6 w-full">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Suppliers</h1>
-          <p className="text-sm text-muted-foreground">Manage vendor relationships and purchase orders</p>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <span>{profile.emoji}</span> {copy.pageTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={fetchSuppliers} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => router.push("/suppliers/new")}>
-            <Plus className="h-3.5 w-3.5" /> Add Supplier
+            <Plus className="h-3.5 w-3.5" /> {copy.addButton}
           </Button>
         </div>
       </div>
@@ -196,7 +206,7 @@ export default function SuppliersPage() {
         data={suppliers}
         columns={columns}
         pageCount={Math.ceil(suppliers.length / 10)}
-        searchableColumns={[{ id: "name", title: "Supplier Name" }]}
+        searchableColumns={[{ id: "name", title: copy.nameLabel }]}
         filterableColumns={[
           {
             id: "isActive",
@@ -207,9 +217,22 @@ export default function SuppliersPage() {
             ],
           },
         ]}
-        isShowExportButtons={{ isShow: true, fileName: "suppliers-export" }}
+        isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
       />
 
+      {/* Tips */}
+      <div className="grid md:grid-cols-3 gap-3">
+        {copy.tips.map((tip) => (
+          <Card key={tip} className="border-dashed">
+            <CardContent className="p-4 flex gap-3 items-start">
+              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">{tip}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
     </div>
   );
 }

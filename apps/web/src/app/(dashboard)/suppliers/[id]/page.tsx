@@ -14,6 +14,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getSupplierPageCopy } from "@/lib/shop-vertical";
 
 // ── Types ────────────────────────────────────────────────────────────────
 type POStatus = "DRAFT" | "SENT" | "CONFIRMED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
@@ -73,10 +75,11 @@ const PAY_METHODS = [
 
 // ── Record Payment Modal ──────────────────────────────────────────────────
 function PaymentModal({
-  supplierId, purchases, balance,
+  supplierId, purchases, balance, paymentTitle,
   onClose, onSaved,
 }: {
   supplierId: string;
+  paymentTitle: string;
   purchases: { id: string; poNumber: string; total: number; paidAmount: number; orderDate: string }[];
   balance: number;
   onClose: () => void;
@@ -149,7 +152,7 @@ function PaymentModal({
             <Banknote className="h-4 w-4 text-emerald-600" />
           </div>
           <div>
-            <h2 className="text-base font-bold">Record Supplier Payment</h2>
+            <h2 className="text-base font-bold">{paymentTitle}</h2>
             <p className="text-xs text-muted-foreground">
               Total outstanding: <span className="text-amber-500 font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
             </p>
@@ -276,6 +279,8 @@ function PaymentModal({
 export default function SupplierDetailPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const copy = getSupplierPageCopy(profile, workspace);
   const [supplier, setSupplier]     = useState<SupplierDetail | null>(null);
   const [loading, setLoading]       = useState(true);
   const [payOpen, setPayOpen]       = useState(false);
@@ -285,7 +290,7 @@ export default function SupplierDetailPage() {
       const res = await api.get<SupplierDetail>(`/suppliers/${id}`);
       setSupplier(res.data);
     } catch {
-      toast.error("Failed to load supplier");
+      toast.error(`Failed to load ${copy.singular.toLowerCase()}`);
       router.push("/suppliers");
     } finally { setLoading(false); }
   }, [id, router]);
@@ -312,15 +317,15 @@ export default function SupplierDetailPage() {
       <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push("/suppliers")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-          <ArrowLeft className="h-4 w-4" /> Back to Suppliers
+          <ArrowLeft className="h-4 w-4" /> {copy.backLabel}
         </button>
         <div className="flex items-center gap-1.5 text-sm">
-          <span className="text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => router.push("/suppliers")}>Suppliers</span>
+          <span className="text-muted-foreground cursor-pointer hover:text-foreground" onClick={() => router.push("/suppliers")}>{copy.pageTitle}</span>
           <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="font-semibold truncate max-w-[200px]">{supplier.name}</span>
         </div>
         <Button size="sm" className="gap-1.5" onClick={() => router.push(`/suppliers/${id}/edit`)}>
-          <Pencil className="h-3.5 w-3.5" /> Edit Supplier
+          <Pencil className="h-3.5 w-3.5" /> {copy.editButton}
         </Button>
       </div>
 
@@ -524,7 +529,7 @@ export default function SupplierDetailPage() {
 
           {/* Details */}
           <div className="bg-background border rounded-2xl p-5 shadow-sm">
-            <h3 className="font-semibold text-sm border-b pb-3 mb-1">Supplier Details</h3>
+            <h3 className="font-semibold text-sm border-b pb-3 mb-1">{copy.detailsSectionTitle}</h3>
             {supplier.code     && <InfoRow label="Code"       value={<span className="font-mono text-xs">{supplier.code}</span>} />}
             {supplier.gstNumber && <InfoRow label="GST"        value={<span className="font-mono text-xs">{supplier.gstNumber}</span>} />}
             {supplier.panNumber && <InfoRow label="PAN / BRN"  value={<span className="font-mono text-xs">{supplier.panNumber}</span>} />}
@@ -535,7 +540,7 @@ export default function SupplierDetailPage() {
           {/* Actions */}
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-3">
             <Button className="w-full gap-2" onClick={() => router.push(`/suppliers/${id}/edit`)}>
-              <Pencil className="h-4 w-4" /> Edit Supplier
+              <Pencil className="h-4 w-4" /> {copy.editButton}
             </Button>
             <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700"
               onClick={() => setPayOpen(true)}>
@@ -546,7 +551,7 @@ export default function SupplierDetailPage() {
               <Package className="h-4 w-4" /> New Purchase Order
             </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push("/suppliers")}>
-              Back to Suppliers
+              {copy.backLabel}
             </Button>
           </div>
 
@@ -559,6 +564,7 @@ export default function SupplierDetailPage() {
       {payOpen && supplier && (
         <PaymentModal
           supplierId={id}
+          paymentTitle={copy.paymentModalTitle}
           purchases={supplier.purchases}
           balance={supplier.balance}
           onClose={() => setPayOpen(false)}

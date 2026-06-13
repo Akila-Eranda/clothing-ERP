@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Car, Plus, Search, Loader2, RefreshCw, Link2, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
+import {
+  Car, Plus, Search, Loader2, RefreshCw, Link2, Trash2,
+  Building2, Cog, Package, Hash, ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { formatNumber } from "@/lib/utils";
 
 interface VehicleBrand { id: string; name: string; _count?: { models: number } }
 interface VehicleModel {
@@ -25,10 +32,149 @@ interface CompatiblePart {
 }
 interface VariantOpt { variantId: string; productName: string; variantName: string; sku: string; sellingPrice: number }
 
+type TabKey = "lookup" | "catalog" | "mapping";
+
+const GUIDE = [
+  { title: "Part Lookup", desc: "Search by brand, model, year, VIN or part name to find compatible spare parts instantly." },
+  { title: "Vehicle Catalog", desc: "Register vehicle brands and models with year range and engine capacity." },
+  { title: "Compatibility Map", desc: "Link each part (variant) to the vehicles it fits — e.g. Oil Filter → Toyota Axio 2015." },
+  { title: "VIN / Chassis", desc: "Enter a customer VIN to auto-resolve their vehicle and show matching parts." },
+];
+
+function yearRange(m: VehicleModel) {
+  const from = m.yearFrom ?? "—";
+  const to = m.yearTo ?? "—";
+  return `${from}–${to}`;
+}
+
+function buildBrandColumns(): ColumnDef<VehicleBrand>[] {
+  return [
+    {
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Brand" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+            <Building2 className="h-4 w-4 text-blue-500" />
+          </div>
+          <p className="text-sm font-semibold">{row.original.name}</p>
+        </div>
+      ),
+    },
+    {
+      id: "models",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Models" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-bold">{row.original._count?.models ?? 0}</span>
+      ),
+    },
+  ];
+}
+
+function buildModelColumns(): ColumnDef<VehicleModel>[] {
+  return [
+    {
+      id: "vehicle",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Vehicle" />,
+      cell: ({ row }) => {
+        const m = row.original;
+        return (
+          <div className="flex items-center gap-2.5 min-w-[160px]">
+            <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+              <Car className="h-4 w-4 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">{m.brand.name} {m.name}</p>
+              <p className="text-[10px] text-muted-foreground">{yearRange(m)}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "engine",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Engine" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{row.original.engineCapacity ?? "—"}</span>
+      ),
+    },
+    {
+      id: "parts",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Mapped Parts" />,
+      cell: ({ row }) => (
+        <Badge variant={row.original._count?.compatibilities ? "success" : "secondary"} className="text-[10px]">
+          {row.original._count?.compatibilities ?? 0} parts
+        </Badge>
+      ),
+    },
+  ];
+}
+
+function buildPartColumns(
+  onDelete?: (id: string) => void,
+  deleting?: string | null,
+): ColumnDef<CompatiblePart>[] {
+  return [
+    {
+      id: "product",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Part" />,
+      cell: ({ row }) => (
+        <div className="min-w-[160px]">
+          <p className="text-sm font-semibold">{row.original.product.name}</p>
+          <p className="text-[10px] text-muted-foreground">{row.original.variant.name}</p>
+        </div>
+      ),
+    },
+    {
+      id: "sku",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.variant.sku}</span>,
+    },
+    {
+      id: "vehicle",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Fits Vehicle" />,
+      cell: ({ row }) => <span className="text-xs font-medium">{row.original.vehicle}</span>,
+    },
+    {
+      id: "oem",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="OEM" />,
+      cell: ({ row }) => (
+        <span className="text-xs font-mono text-muted-foreground">{row.original.product.oemNumber ?? "—"}</span>
+      ),
+    },
+    {
+      id: "price",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Price" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-bold">LKR {formatNumber(row.original.variant.sellingPrice)}</span>
+      ),
+    },
+    ...(onDelete ? [{
+      id: "actions",
+      header: () => <span className="text-xs font-semibold">Actions</span>,
+      cell: ({ row }: { row: { original: CompatiblePart } }) => (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 text-red-500 hover:text-red-600 hover:bg-red-50"
+          disabled={deleting === row.original.compatibilityId}
+          onClick={() => onDelete(row.original.compatibilityId)}
+        >
+          {deleting === row.original.compatibilityId
+            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            : <Trash2 className="h-3.5 w-3.5" />}
+        </Button>
+      ),
+    } as ColumnDef<CompatiblePart>] : []),
+  ];
+}
+
 export default function VehiclesPage() {
   const [brands, setBrands] = useState<VehicleBrand[]>([]);
   const [models, setModels] = useState<VehicleModel[]>([]);
+  const [allMappings, setAllMappings] = useState<CompatiblePart[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabKey>("lookup");
   const [searchBrandId, setSearchBrandId] = useState("");
   const [searchModelId, setSearchModelId] = useState("");
   const [searchYear, setSearchYear] = useState("");
@@ -36,22 +182,32 @@ export default function VehiclesPage() {
   const [searchText, setSearchText] = useState("");
   const [parts, setParts] = useState<CompatiblePart[]>([]);
   const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [newBrand, setNewBrand] = useState("");
   const [modelForm, setModelForm] = useState({ brandId: "", name: "", yearFrom: "", yearTo: "", engineCapacity: "" });
   const [mapForm, setMapForm] = useState({ vehicleModelId: "", variantId: "", notes: "" });
   const [variants, setVariants] = useState<VariantOpt[]>([]);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [savingBrand, setSavingBrand] = useState(false);
+  const [savingModel, setSavingModel] = useState(false);
+  const [savingMap, setSavingMap] = useState(false);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [b, m] = await Promise.all([
+      const [b, m, mapRes] = await Promise.all([
         api.get<VehicleBrand[]>("/spare-parts/vehicle-brands"),
         api.get<VehicleModel[]>("/spare-parts/vehicle-models"),
+        api.get<{ parts: CompatiblePart[] }>("/spare-parts/compatible-parts"),
       ]);
       setBrands(Array.isArray(b.data) ? b.data : []);
       setModels(Array.isArray(m.data) ? m.data : []);
-    } catch { toast.error("Failed to load vehicle data"); }
-    finally { setLoading(false); }
+      setAllMappings(mapRes.data?.parts ?? []);
+    } catch {
+      toast.error("Failed to load vehicle data");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -61,6 +217,7 @@ export default function VehiclesPage() {
 
   const runSearch = async () => {
     setSearching(true);
+    setHasSearched(true);
     try {
       const q = new URLSearchParams();
       if (searchBrandId) q.set("brandId", searchBrandId);
@@ -70,23 +227,38 @@ export default function VehiclesPage() {
       if (searchText) q.set("search", searchText);
       const res = await api.get<{ parts: CompatiblePart[] }>(`/spare-parts/compatible-parts?${q}`);
       setParts(res.data?.parts ?? []);
-    } catch (e: unknown) { toast.error((e as Error).message ?? "Search failed"); }
-    finally { setSearching(false); }
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Search failed");
+    } finally {
+      setSearching(false);
+    }
   };
 
   const addBrand = async () => {
     if (!newBrand.trim()) return;
+    setSavingBrand(true);
     try {
       await api.post("/spare-parts/vehicle-brands", { name: newBrand.trim() });
-      toast.success("Brand added"); setNewBrand(""); fetchAll();
-    } catch (e: unknown) { toast.error((e as Error).message); }
+      toast.success("Brand added");
+      setNewBrand("");
+      fetchAll();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingBrand(false);
+    }
   };
 
   const addModel = async () => {
-    if (!modelForm.brandId || !modelForm.name.trim()) { toast.error("Brand and model name required"); return; }
+    if (!modelForm.brandId || !modelForm.name.trim()) {
+      toast.error("Brand and model name required");
+      return;
+    }
+    setSavingModel(true);
     try {
       await api.post("/spare-parts/vehicle-models", {
-        brandId: modelForm.brandId, name: modelForm.name.trim(),
+        brandId: modelForm.brandId,
+        name: modelForm.name.trim(),
         yearFrom: modelForm.yearFrom ? parseInt(modelForm.yearFrom, 10) : undefined,
         yearTo: modelForm.yearTo ? parseInt(modelForm.yearTo, 10) : undefined,
         engineCapacity: modelForm.engineCapacity || undefined,
@@ -94,143 +266,385 @@ export default function VehiclesPage() {
       toast.success("Model added");
       setModelForm({ brandId: "", name: "", yearFrom: "", yearTo: "", engineCapacity: "" });
       fetchAll();
-    } catch (e: unknown) { toast.error((e as Error).message); }
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingModel(false);
+    }
   };
 
   const addMapping = async () => {
-    if (!mapForm.vehicleModelId || !mapForm.variantId) { toast.error("Select vehicle model and part"); return; }
+    if (!mapForm.vehicleModelId || !mapForm.variantId) {
+      toast.error("Select vehicle model and part");
+      return;
+    }
+    setSavingMap(true);
     try {
       await api.post("/spare-parts/compatibilities", mapForm);
-      toast.success("Compatibility mapped"); setMapForm({ vehicleModelId: "", variantId: "", notes: "" }); fetchAll();
-    } catch (e: unknown) { toast.error((e as Error).message); }
+      toast.success("Compatibility mapped");
+      setMapForm({ vehicleModelId: "", variantId: "", notes: "" });
+      fetchAll();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setSavingMap(false);
+    }
+  };
+
+  const removeMapping = async (id: string) => {
+    setDeleting(id);
+    try {
+      await api.delete(`/spare-parts/compatibilities/${id}`);
+      toast.success("Mapping removed");
+      fetchAll();
+      if (hasSearched) runSearch();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setDeleting(null);
+    }
   };
 
   const filteredModels = searchBrandId ? models.filter((m) => m.brand.id === searchBrandId) : models;
+  const totalMappings = allMappings.length;
+  const modelsWithParts = models.filter((m) => (m._count?.compatibilities ?? 0) > 0).length;
+
+  const TABS: { key: TabKey; label: string }[] = [
+    { key: "lookup", label: "Part Lookup" },
+    { key: "catalog", label: "Brands & Models" },
+    { key: "mapping", label: "Compatibility Mapping" },
+  ];
+
+  const STATS = [
+    { label: "Vehicle Brands", value: brands.length, icon: Building2, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Vehicle Models", value: models.length, icon: Car, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Part Mappings", value: totalMappings, icon: Link2, color: "text-violet-500", bg: "bg-violet-500/10" },
+    { label: "Models w/ Parts", value: modelsWithParts, icon: Package, color: "text-amber-500", bg: "bg-amber-500/10" },
+  ];
+
+  const brandColumns = useMemo(() => buildBrandColumns(), []);
+  const modelColumns = useMemo(() => buildModelColumns(), []);
+  const partColumns = useMemo(() => buildPartColumns(), []);
+  const mappingColumns = useMemo(() => buildPartColumns(removeMapping, deleting), [deleting]);
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-6 space-y-6 w-full">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><Car className="h-6 w-6 text-primary" /> Vehicle Compatibility</h1>
-          <p className="text-sm text-muted-foreground">Map spare parts to vehicle make, model, year & engine — search by VIN/chassis</p>
+          <h1 className="text-2xl font-bold">Vehicle Compatibility</h1>
+          <p className="text-sm text-muted-foreground">
+            Map spare parts to vehicles — search by make, model, year, VIN or part name
+          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchAll} className="gap-1.5">
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={fetchAll} className="gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" className="gap-1.5" asChild>
+            <Link href="/products"><ExternalLink className="h-3.5 w-3.5" /> Parts Catalog</Link>
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => setActiveTab("mapping")}>
+            <Plus className="h-3.5 w-3.5" /> New Mapping
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="search">
-        <TabsList>
-          <TabsTrigger value="search">Part Lookup</TabsTrigger>
-          <TabsTrigger value="brands">Brands & Models</TabsTrigger>
-          <TabsTrigger value="mapping">Compatibility Mapping</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="search" className="mt-4 space-y-4">
-          <Card><CardContent className="p-4 grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
-            <div className="space-y-1"><Label className="text-xs">Brand</Label>
-              <Select value={searchBrandId} onValueChange={(v) => { setSearchBrandId(v === "all" ? "" : v); setSearchModelId(""); }}>
-                <SelectTrigger><SelectValue placeholder="All brands" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All brands</SelectItem>
-                  {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Model</Label>
-              <Select value={searchModelId} onValueChange={(v) => setSearchModelId(v === "all" ? "" : v)}>
-                <SelectTrigger><SelectValue placeholder="All models" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All models</SelectItem>
-                  {filteredModels.map((m) => <SelectItem key={m.id} value={m.id}>{m.brand.name} {m.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Year</Label>
-              <Input type="number" placeholder="2015" value={searchYear} onChange={(e) => setSearchYear(e.target.value)} />
-            </div>
-            <div className="space-y-1"><Label className="text-xs">VIN / Chassis</Label>
-              <Input placeholder="VIN or chassis no." value={searchVin} onChange={(e) => setSearchVin(e.target.value)} />
-            </div>
-            <div className="space-y-1 md:col-span-2"><Label className="text-xs">Part search</Label>
-              <Input placeholder="Oil filter, brake pad, OEM no..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
-            </div>
-          </CardContent></Card>
-          <Button onClick={runSearch} disabled={searching} className="gap-1.5">
-            {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Find Compatible Parts
-          </Button>
-          <div className="grid gap-2">
-            {parts.length === 0 ? (
-              <p className="text-center py-8 text-muted-foreground text-sm">Search to find compatible parts for a vehicle</p>
-            ) : parts.map((p) => (
-              <div key={p.compatibilityId} className="flex items-center justify-between p-3 rounded-xl border hover:bg-muted/30">
-                <div>
-                  <p className="font-medium text-sm">{p.product.name}</p>
-                  <p className="text-xs text-muted-foreground">{p.variant.sku} · {p.vehicle}{p.product.oemNumber ? ` · OEM ${p.product.oemNumber}` : ""}</p>
-                </div>
-                <Badge variant="secondary">LKR {p.variant.sellingPrice.toLocaleString()}</Badge>
+      {/* KPI stats */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {STATS.map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
               </div>
-            ))}
+              <div>
+                <p className="text-xl font-bold">{loading ? "—" : s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Tab pills */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">View:</span>
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setActiveTab(t.key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              activeTab === t.key
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "bg-muted/60 text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Part Lookup */}
+      {activeTab === "lookup" && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-lg bg-primary/10">
+                  <Search className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Find Compatible Parts</p>
+                  <p className="text-[11px] text-muted-foreground">Filter by vehicle details or search part name / OEM number</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Brand</Label>
+                  <Select value={searchBrandId || "all"} onValueChange={(v) => { setSearchBrandId(v === "all" ? "" : v); setSearchModelId(""); }}>
+                    <SelectTrigger><SelectValue placeholder="All brands" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All brands</SelectItem>
+                      {brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Model</Label>
+                  <Select value={searchModelId || "all"} onValueChange={(v) => setSearchModelId(v === "all" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="All models" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All models</SelectItem>
+                      {filteredModels.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.brand.name} {m.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Year</Label>
+                  <Input type="number" placeholder="e.g. 2015" value={searchYear} onChange={(e) => setSearchYear(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">VIN / Chassis</Label>
+                  <Input placeholder="VIN or chassis number" value={searchVin} onChange={(e) => setSearchVin(e.target.value)} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs font-semibold">Part name or OEM</Label>
+                  <Input placeholder="Oil filter, brake pad, OEM number..." value={searchText} onChange={(e) => setSearchText(e.target.value)} />
+                </div>
+              </div>
+              <Button onClick={runSearch} disabled={searching} className="gap-1.5">
+                {searching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                Search Compatible Parts
+              </Button>
+            </CardContent>
+          </Card>
+
+          {searching ? (
+            <div className="flex items-center justify-center py-24 rounded-xl border bg-card">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : !hasSearched ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="p-4 rounded-2xl bg-blue-500/10">
+                  <Car className="h-10 w-10 text-blue-500" />
+                </div>
+                <p className="text-base font-semibold">Search for compatible parts</p>
+                <p className="text-sm text-muted-foreground text-center max-w-md">
+                  Select a vehicle brand and model, or enter a VIN, then search to see all mapped spare parts.
+                </p>
+              </CardContent>
+            </Card>
+          ) : parts.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+                <div className="p-4 rounded-2xl bg-amber-500/10">
+                  <Package className="h-10 w-10 text-amber-500" />
+                </div>
+                <p className="text-base font-semibold">No matching parts</p>
+                <p className="text-sm text-muted-foreground text-center max-w-sm">
+                  No compatibility mappings found. Add a mapping in the Compatibility tab.
+                </p>
+                <Button size="sm" variant="outline" className="mt-2 gap-1.5" onClick={() => setActiveTab("mapping")}>
+                  <Link2 className="h-3.5 w-3.5" /> Add Mapping
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <ClientSideTable
+              data={parts}
+              columns={partColumns}
+              pageCount={Math.ceil(parts.length / 10)}
+              searchableColumns={[]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "compatible-parts" }}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Brands & Models */}
+      {activeTab === "catalog" && (
+        <div className="space-y-4">
+          <div className="grid xl:grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-blue-500" />
+                  <p className="text-sm font-semibold">Add Vehicle Brand</p>
+                </div>
+                <div className="flex gap-2">
+                  <Input placeholder="Toyota, Honda, Nissan..." value={newBrand} onChange={(e) => setNewBrand(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addBrand()} />
+                  <Button size="sm" onClick={addBrand} disabled={savingBrand} className="shrink-0 gap-1">
+                    {savingBrand ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                    Add
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Cog className="h-4 w-4 text-emerald-600" />
+                  <p className="text-sm font-semibold">Add Vehicle Model</p>
+                </div>
+                <Select value={modelForm.brandId} onValueChange={(v) => setModelForm((f) => ({ ...f, brandId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                  <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Input placeholder="Model name — Axio, Vezel, Corolla..." value={modelForm.name} onChange={(e) => setModelForm((f) => ({ ...f, name: e.target.value }))} />
+                <div className="grid grid-cols-3 gap-2">
+                  <Input placeholder="Year from" type="number" value={modelForm.yearFrom} onChange={(e) => setModelForm((f) => ({ ...f, yearFrom: e.target.value }))} />
+                  <Input placeholder="Year to" type="number" value={modelForm.yearTo} onChange={(e) => setModelForm((f) => ({ ...f, yearTo: e.target.value }))} />
+                  <Input placeholder="1500cc" value={modelForm.engineCapacity} onChange={(e) => setModelForm((f) => ({ ...f, engineCapacity: e.target.value }))} />
+                </div>
+                <Button size="sm" onClick={addModel} disabled={savingModel} className="gap-1">
+                  {savingModel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  Add Model
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-        </TabsContent>
 
-        <TabsContent value="brands" className="mt-4 grid xl:grid-cols-2 gap-4">
-          <Card><CardContent className="p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Vehicle Brands ({brands.length})</h3>
-            <div className="flex gap-2">
-              <Input placeholder="Toyota, Honda..." value={newBrand} onChange={(e) => setNewBrand(e.target.value)} />
-              <Button size="sm" onClick={addBrand}><Plus className="h-4 w-4" /></Button>
+          {loading ? (
+            <div className="flex items-center justify-center py-16 rounded-xl border bg-card">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {brands.map((b) => (
-                <div key={b.id} className="flex justify-between py-1.5 border-b text-sm">
-                  <span>{b.name}</span><span className="text-muted-foreground text-xs">{b._count?.models ?? 0} models</span>
-                </div>
-              ))}
+          ) : (
+            <div className="grid xl:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Brands ({brands.length})</h2>
+                <ClientSideTable data={brands} columns={brandColumns} pageCount={Math.ceil(brands.length / 10) || 1} searchableColumns={[]} filterableColumns={[]} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-sm font-semibold">Models ({models.length})</h2>
+                <ClientSideTable data={models} columns={modelColumns} pageCount={Math.ceil(models.length / 10) || 1} searchableColumns={[]} filterableColumns={[]} />
+              </div>
             </div>
-          </CardContent></Card>
-          <Card><CardContent className="p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Add Vehicle Model</h3>
-            <Select value={modelForm.brandId} onValueChange={(v) => setModelForm((f) => ({ ...f, brandId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
-              <SelectContent>{brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
-            </Select>
-            <Input placeholder="Model name (Axio, Vezel...)" value={modelForm.name} onChange={(e) => setModelForm((f) => ({ ...f, name: e.target.value }))} />
-            <div className="grid grid-cols-3 gap-2">
-              <Input placeholder="Year from" type="number" value={modelForm.yearFrom} onChange={(e) => setModelForm((f) => ({ ...f, yearFrom: e.target.value }))} />
-              <Input placeholder="Year to" type="number" value={modelForm.yearTo} onChange={(e) => setModelForm((f) => ({ ...f, yearTo: e.target.value }))} />
-              <Input placeholder="Engine (1500cc)" value={modelForm.engineCapacity} onChange={(e) => setModelForm((f) => ({ ...f, engineCapacity: e.target.value }))} />
-            </div>
-            <Button size="sm" onClick={addModel} className="gap-1"><Plus className="h-3.5 w-3.5" /> Add Model</Button>
-            <div className="space-y-1 max-h-48 overflow-y-auto pt-2">
-              {models.map((m) => (
-                <div key={m.id} className="text-xs py-1 border-b">
-                  <span className="font-medium">{m.brand.name} {m.name}</span>
-                  <span className="text-muted-foreground ml-2">
-                    {m.yearFrom ?? "—"}–{m.yearTo ?? "—"}{m.engineCapacity ? ` · ${m.engineCapacity}` : ""} · {m._count?.compatibilities ?? 0} parts
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent></Card>
-        </TabsContent>
+          )}
+        </div>
+      )}
 
-        <TabsContent value="mapping" className="mt-4">
-          <Card><CardContent className="p-4 space-y-3 max-w-xl">
-            <h3 className="font-semibold text-sm flex items-center gap-2"><Link2 className="h-4 w-4" /> Map Part → Vehicle</h3>
-            <Select value={mapForm.vehicleModelId} onValueChange={(v) => setMapForm((f) => ({ ...f, vehicleModelId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Vehicle model" /></SelectTrigger>
-              <SelectContent>{models.map((m) => <SelectItem key={m.id} value={m.id}>{m.brand.name} {m.name}</SelectItem>)}</SelectContent>
-            </Select>
-            <Select value={mapForm.variantId} onValueChange={(v) => setMapForm((f) => ({ ...f, variantId: v }))}>
-              <SelectTrigger><SelectValue placeholder="Spare part / variant" /></SelectTrigger>
-              <SelectContent>{variants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{v.productName} — {v.sku}</SelectItem>)}</SelectContent>
-            </Select>
-            <Input placeholder="Notes (optional)" value={mapForm.notes} onChange={(e) => setMapForm((f) => ({ ...f, notes: e.target.value }))} />
-            <Button onClick={addMapping} className="gap-1"><Link2 className="h-4 w-4" /> Save Mapping</Button>
-          </CardContent></Card>
-        </TabsContent>
-      </Tabs>
+      {/* Compatibility Mapping */}
+      {activeTab === "mapping" && (
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4 space-y-3 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <Link2 className="h-4 w-4 text-violet-500" />
+                <div>
+                  <p className="text-sm font-semibold">Map Part to Vehicle</p>
+                  <p className="text-[11px] text-muted-foreground">Example: Oil Filter → Toyota Axio 2015</p>
+                </div>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Vehicle Model</Label>
+                  <Select value={mapForm.vehicleModelId} onValueChange={(v) => setMapForm((f) => ({ ...f, vehicleModelId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select vehicle" /></SelectTrigger>
+                    <SelectContent>
+                      {models.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>{m.brand.name} {m.name} ({yearRange(m)})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Spare Part</Label>
+                  <Select value={mapForm.variantId} onValueChange={(v) => setMapForm((f) => ({ ...f, variantId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select part variant" /></SelectTrigger>
+                    <SelectContent>
+                      {variants.map((v) => (
+                        <SelectItem key={v.variantId} value={v.variantId}>{v.productName} — {v.sku}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input placeholder="Fitment notes, position, etc." value={mapForm.notes} onChange={(e) => setMapForm((f) => ({ ...f, notes: e.target.value }))} />
+              </div>
+              <Button onClick={addMapping} disabled={savingMap} className="gap-1.5">
+                {savingMap ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                Save Compatibility Mapping
+              </Button>
+            </CardContent>
+          </Card>
+
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold">All Mappings ({allMappings.length})</h2>
+            {loading ? (
+              <div className="flex items-center justify-center py-16 rounded-xl border bg-card">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : allMappings.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-12 gap-2">
+                  <Hash className="h-8 w-8 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground">No part-to-vehicle mappings yet</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <ClientSideTable
+                data={allMappings}
+                columns={mappingColumns}
+                pageCount={Math.ceil(allMappings.length / 10)}
+                searchableColumns={[]}
+                filterableColumns={[]}
+                isShowExportButtons={{ isShow: true, fileName: "vehicle-mappings" }}
+              />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Guide */}
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold">How Vehicle Compatibility Works</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Set up your catalog once — staff can find the right part in seconds</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          {GUIDE.map((g) => (
+            <Card key={g.title} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4 space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 rounded-lg bg-emerald-500/10">
+                    <Car className="h-4 w-4 text-emerald-600" />
+                  </div>
+                  <p className="text-sm font-semibold">{g.title}</p>
+                </div>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">{g.desc}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

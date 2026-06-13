@@ -36,6 +36,8 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     ? `${ws.customerLabel} & Accounts`
     : `${ws.customerLabel} & CRM`;
   const printLabel = profile.labelTemplates.includes('hangtag') ? 'Print Tags' : 'Print Labels';
+  const brandRouteLabel = getBrandPageCopy(profile, ws).pageTitle;
+  const supplierRouteLabel = getSupplierPageCopy(profile, ws).pageTitle;
 
   return {
     '/dashboard': 'Dashboard',
@@ -45,12 +47,12 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/returns': 'Returns & Exchanges',
     '/products': ws.productLabel,
     '/categories': 'Categories',
-    '/brands': 'Brands',
+    '/brands': brandRouteLabel,
     '/inventory': 'Inventory',
     '/workflows': 'Approval Workflows',
     '/advanced': 'ERP Roadmap',
     '/customers': customersTitle,
-    '/suppliers': 'Suppliers',
+    '/suppliers': supplierRouteLabel,
     '/purchases': 'Purchase Orders',
     '/hr': 'HR & Payroll',
     '/accounting': 'Accounting',
@@ -172,6 +174,323 @@ export interface ProductFormCopy {
   defaultTaxRate: string;
   variantSectionHint: string;
   productTip: string;
+}
+
+export interface BrandPageCopy {
+  pageTitle: string;
+  subtitle: string;
+  singular: string;
+  plural: string;
+  addButton: string;
+  addModalTitle: string;
+  editModalTitle: string;
+  addModalSubtitle: string;
+  nameLabel: string;
+  namePlaceholder: string;
+  descriptionPlaceholder: string;
+  activeHint: string;
+  deleteConfirm: (name: string, productLabel: string) => string;
+  tips: string[];
+  csvFileName: string;
+}
+
+export function getBrandPageCopy(profile: ShopProfile, workspace: WorkspaceConfig): BrandPageCopy {
+  const copies: Record<ShopType, Omit<BrandPageCopy, 'deleteConfirm'>> = {
+    [ShopType.CLOTHING]: {
+      pageTitle: 'Brands',
+      subtitle: 'Fashion & apparel brands for your clothing catalog',
+      singular: 'Brand',
+      plural: 'Brands',
+      addButton: 'Add Brand',
+      addModalTitle: 'Add New Brand',
+      editModalTitle: 'Edit Brand',
+      addModalSubtitle: 'Create a fashion or apparel brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: "e.g. Levi's, Nike, H&M",
+      descriptionPlaceholder: 'Brief description of this fashion brand…',
+      activeHint: 'Brand visible in catalog and product forms',
+      tips: [
+        'Assign a brand when adding apparel products',
+        'Use logos for a polished product catalog',
+        'Filter POS and reports by brand for top sellers',
+      ],
+      csvFileName: 'brands-export',
+    },
+    [ShopType.GROCERY]: {
+      pageTitle: 'Brands',
+      subtitle: 'Food, beverage & household product brands',
+      singular: 'Brand',
+      plural: 'Brands',
+      addButton: 'Add Brand',
+      addModalTitle: 'Add New Brand',
+      editModalTitle: 'Edit Brand',
+      addModalSubtitle: 'Create a grocery or FMCG brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: 'e.g. Anchor, Nestlé, Maliban',
+      descriptionPlaceholder: 'Brief description of this brand…',
+      activeHint: 'Brand visible when adding products and at POS',
+      tips: [
+        'Group items by manufacturer for easy shelf planning',
+        'Use brands to compare fast-moving vs slow products',
+        'Set expiry tracking on perishable branded lines',
+      ],
+      csvFileName: 'grocery-brands-export',
+    },
+    [ShopType.HARDWARE]: {
+      pageTitle: 'Manufacturers',
+      subtitle: 'Tool, electrical & plumbing manufacturers',
+      singular: 'Manufacturer',
+      plural: 'Manufacturers',
+      addButton: 'Add Manufacturer',
+      addModalTitle: 'Add Manufacturer',
+      editModalTitle: 'Edit Manufacturer',
+      addModalSubtitle: 'Register a hardware or tool manufacturer',
+      nameLabel: 'Manufacturer Name',
+      namePlaceholder: 'e.g. Bosch, Stanley, PVC King',
+      descriptionPlaceholder: 'Brief description of this manufacturer…',
+      activeHint: 'Manufacturer visible in catalog and purchase orders',
+      tips: [
+        'Track manufacturer for warranty and supplier sourcing',
+        'Use Material variants for pipes, fittings & tools',
+        'Compare sales by manufacturer for reorder decisions',
+      ],
+      csvFileName: 'manufacturers-export',
+    },
+    [ShopType.AGRICULTURE]: {
+      pageTitle: 'Agri Brands',
+      subtitle: 'Seed, fertilizer, pesticide & feed brands',
+      singular: 'Brand',
+      plural: 'Agri Brands',
+      addButton: 'Add Agri Brand',
+      addModalTitle: 'Add Agri Brand',
+      editModalTitle: 'Edit Agri Brand',
+      addModalSubtitle: 'Create a seed, fertilizer or feed brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: 'e.g. CIC Seeds, Hayleys, Luxman',
+      descriptionPlaceholder: 'Brief description of this agri brand…',
+      activeHint: 'Brand visible when adding products and on farmer accounts',
+      tips: [
+        'Farmers often buy by trusted seed & fertilizer brand',
+        'Link batch numbers to branded chemical lines',
+        'Use Grade variants for seeds and animal feed',
+      ],
+      csvFileName: 'agri-brands-export',
+    },
+    [ShopType.SPARE_PARTS]: {
+      pageTitle: 'Part Manufacturers',
+      subtitle: 'OEM, genuine & aftermarket part makers',
+      singular: 'Manufacturer',
+      plural: 'Manufacturers',
+      addButton: 'Add Manufacturer',
+      addModalTitle: 'Add Part Manufacturer',
+      editModalTitle: 'Edit Manufacturer',
+      addModalSubtitle: 'Register an OEM or aftermarket parts maker',
+      nameLabel: 'Manufacturer Name',
+      namePlaceholder: 'e.g. Denso, Bosch, Toyota Genuine',
+      descriptionPlaceholder: 'Brief description — OEM, genuine, aftermarket…',
+      activeHint: 'Manufacturer visible on parts catalog and quotations',
+      tips: [
+        'Set OEM number and warranty months on each part',
+        'Map parts to vehicle make & model for fast lookup',
+        'Use Part Type variant: OEM, Genuine, Aftermarket',
+      ],
+      csvFileName: 'part-manufacturers-export',
+    },
+  };
+  const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
+  return {
+    ...base,
+    deleteConfirm: (name, pl) =>
+      `Delete "${name}"? ${base.plural} linked to ${pl} will lose their ${base.singular.toLowerCase()} association.`,
+  };
+}
+
+export interface SupplierPageCopy {
+  pageTitle: string;
+  subtitle: string;
+  singular: string;
+  plural: string;
+  addButton: string;
+  addPageTitle: string;
+  editPageTitle: string;
+  editButton: string;
+  saveButton: string;
+  updateButton: string;
+  nameLabel: string;
+  namePlaceholder: string;
+  notesPlaceholder: string;
+  activeLabel: string;
+  activeHint: string;
+  backLabel: string;
+  backToDetailLabel: string;
+  addModalTitle: string;
+  editModalTitle: string;
+  addModalSubtitle: string;
+  paymentModalTitle: string;
+  detailsSectionTitle: string;
+  deleteConfirm: (name: string) => string;
+  tips: string[];
+  csvFileName: string;
+}
+
+export function getSupplierPageCopy(profile: ShopProfile, _workspace: WorkspaceConfig): SupplierPageCopy {
+  const copies: Record<ShopType, Omit<SupplierPageCopy, 'deleteConfirm'>> = {
+    [ShopType.CLOTHING]: {
+      pageTitle: 'Suppliers',
+      subtitle: 'Textile vendors, garment wholesalers & fashion distributors',
+      singular: 'Supplier',
+      plural: 'Suppliers',
+      addButton: 'Add Supplier',
+      addPageTitle: 'Add New Supplier',
+      editPageTitle: 'Edit Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. TextileCo Lanka, Fashion Hub',
+      notesPlaceholder: 'Internal notes about this textile vendor…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Visible and available for purchase orders',
+      backLabel: 'Back to Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Supplier',
+      editModalTitle: 'Edit Supplier',
+      addModalSubtitle: 'Create a textile or fashion supplier profile',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Create PO before seasonal fabric and apparel orders',
+        'Track credit limits for bulk import suppliers',
+        'Print hang tags when goods arrive from vendor',
+      ],
+      csvFileName: 'suppliers-export',
+    },
+    [ShopType.GROCERY]: {
+      pageTitle: 'Suppliers',
+      subtitle: 'FMCG distributors, wholesale vendors & importers',
+      singular: 'Supplier',
+      plural: 'Suppliers',
+      addButton: 'Add Supplier',
+      addPageTitle: 'Add New Supplier',
+      editPageTitle: 'Edit Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. Maliban Distributor, Cargills Wholesale',
+      notesPlaceholder: 'Internal notes about this distributor…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Available for stock orders and GRN receiving',
+      backLabel: 'Back to Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Supplier',
+      editModalTitle: 'Edit Supplier',
+      addModalSubtitle: 'Register a grocery or FMCG distributor',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Set expiry dates when receiving dairy & frozen stock',
+        'Use batch numbers for traceability on branded lines',
+        'Monitor credit with fast-moving distributors',
+      ],
+      csvFileName: 'grocery-suppliers-export',
+    },
+    [ShopType.HARDWARE]: {
+      pageTitle: 'Suppliers',
+      subtitle: 'Tool, electrical & building material wholesalers',
+      singular: 'Supplier',
+      plural: 'Suppliers',
+      addButton: 'Add Supplier',
+      addPageTitle: 'Add New Supplier',
+      editPageTitle: 'Edit Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. Abans Hardware Wholesale, Laksala Tools',
+      notesPlaceholder: 'Internal notes about this wholesaler…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Available for purchase orders and GRN',
+      backLabel: 'Back to Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Supplier',
+      editModalTitle: 'Edit Supplier',
+      addModalSubtitle: 'Register a hardware or tools wholesaler',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Create PO before bulk pipe, fitting & tool orders',
+        'Track credit limits on importers and wholesalers',
+        'Receive GRN with material and size variants',
+      ],
+      csvFileName: 'hardware-suppliers-export',
+    },
+    [ShopType.AGRICULTURE]: {
+      pageTitle: 'Agri Suppliers',
+      subtitle: 'Seed, fertilizer, pesticide & feed distributors',
+      singular: 'Supplier',
+      plural: 'Agri Suppliers',
+      addButton: 'Add Agri Supplier',
+      addPageTitle: 'Add Agri Supplier',
+      editPageTitle: 'Edit Agri Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. Hayleys Agri, CIC Fertilizer Depot',
+      notesPlaceholder: 'Internal notes about this agri distributor…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Available for fertilizer, seed & feed orders',
+      backLabel: 'Back to Agri Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Agri Supplier',
+      editModalTitle: 'Edit Agri Supplier',
+      addModalSubtitle: 'Register a seed, fertilizer or feed distributor',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Record batch numbers on fertilizer and chemical arrivals',
+        'Track seasonal credit with seed suppliers',
+        'Monitor outstanding before peak planting season',
+      ],
+      csvFileName: 'agri-suppliers-export',
+    },
+    [ShopType.SPARE_PARTS]: {
+      pageTitle: 'Parts Distributors',
+      subtitle: 'OEM & aftermarket auto parts wholesalers',
+      singular: 'Distributor',
+      plural: 'Distributors',
+      addButton: 'Add Distributor',
+      addPageTitle: 'Add Parts Distributor',
+      editPageTitle: 'Edit Distributor',
+      editButton: 'Edit Distributor',
+      saveButton: 'Save Distributor',
+      updateButton: 'Update Distributor',
+      nameLabel: 'Distributor Name',
+      namePlaceholder: 'e.g. Toyota Lanka Parts, AutoLanka Distributors',
+      notesPlaceholder: 'Internal notes about this parts distributor…',
+      activeLabel: 'Active Distributor',
+      activeHint: 'Available for parts purchase orders and GRN',
+      backLabel: 'Back to Distributors',
+      backToDetailLabel: 'Back to Distributor',
+      addModalTitle: 'Add Parts Distributor',
+      editModalTitle: 'Edit Distributor',
+      addModalSubtitle: 'Register an OEM or aftermarket parts wholesaler',
+      paymentModalTitle: 'Record Distributor Payment',
+      detailsSectionTitle: 'Distributor Details',
+      tips: [
+        'Link PO lines to OEM part numbers on receipt',
+        'Track distributor credit for import orders',
+        'Map received parts to vehicle compatibility',
+      ],
+      csvFileName: 'parts-distributors-export',
+    },
+  };
+  const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
+  return {
+    ...base,
+    deleteConfirm: (name) => `Delete "${name}"? This cannot be undone.`,
+  };
 }
 
 export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceConfig): ProductFormCopy {

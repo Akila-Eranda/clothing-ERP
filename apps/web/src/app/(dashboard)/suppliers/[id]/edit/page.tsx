@@ -10,6 +10,8 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { getSupplierPageCopy } from "@/lib/shop-vertical";
 
 // ── Types ────────────────────────────────────────────────────────────────
 interface Form {
@@ -33,6 +35,8 @@ function F({ label, req, children }: { label: string; req?: boolean; children: R
 export default function EditSupplierPage() {
   const { id }    = useParams<{ id: string }>();
   const router    = useRouter();
+  const { profile, workspace } = useShopWorkspace();
+  const copy = getSupplierPageCopy(profile, workspace);
 
   const [form, setForm]         = useState<Form>({
     name: "", contactPerson: "", phone: "", email: "",
@@ -74,7 +78,7 @@ export default function EditSupplierPage() {
         notes:         s.notes         ?? "",
       });
     } catch {
-      toast.error("Failed to load supplier");
+      toast.error(`Failed to load ${copy.singular.toLowerCase()}`);
       router.push("/suppliers");
     } finally { setFetchLoading(false); }
   }, [id, router]);
@@ -85,7 +89,7 @@ export default function EditSupplierPage() {
   const cd = parseInt(form.creditDays || "30");
 
   const submit = async () => {
-    if (!form.name.trim()) { toast.error("Supplier name is required"); return; }
+    if (!form.name.trim()) { toast.error(`${copy.nameLabel} is required`); return; }
     if (!form.phone.trim()) { toast.error("Phone is required"); return; }
     setLoading(true);
     try {
@@ -107,7 +111,7 @@ export default function EditSupplierPage() {
       toast.success(`"${form.name}" updated!`);
       router.push(`/suppliers/${id}`);
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Failed to update supplier");
+      toast.error((e as Error).message ?? `Failed to update ${copy.singular.toLowerCase()}`);
     } finally { setLoading(false); }
   };
 
@@ -124,10 +128,10 @@ export default function EditSupplierPage() {
       <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push(`/suppliers/${id}`)}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
-          <ArrowLeft className="h-4 w-4" /> Back to Supplier
+          <ArrowLeft className="h-4 w-4" /> {copy.backToDetailLabel}
         </button>
         <div className="flex flex-col items-center">
-          <h1 className="text-base font-semibold">Edit Supplier</h1>
+          <h1 className="text-base font-semibold">{copy.editPageTitle}</h1>
           <p className="text-xs text-muted-foreground truncate max-w-[220px]">{supplierName}</p>
         </div>
         <div className="w-40" />
@@ -144,8 +148,8 @@ export default function EditSupplierPage() {
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
-              <F label="Supplier Name" req>
-                <Input placeholder="e.g. TextileCo Lanka" value={form.name} onChange={(e) => set("name", e.target.value)} />
+              <F label={copy.nameLabel} req>
+                <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)} />
               </F>
               <F label="Contact Person">
                 <Input placeholder="e.g. Kamal Perera" value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
@@ -202,8 +206,8 @@ export default function EditSupplierPage() {
             <h3 className="font-semibold text-sm border-b pb-2">Status</h3>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium">Active Supplier</p>
-                <p className="text-xs text-muted-foreground">{form.isActive ? "Visible and available for POs" : "Disabled"}</p>
+                <p className="text-sm font-medium">{copy.activeLabel}</p>
+                <p className="text-xs text-muted-foreground">{form.isActive ? copy.activeHint : "Disabled"}</p>
               </div>
               <Switch checked={form.isActive} onCheckedChange={(v) => set("isActive", v)} />
             </div>
@@ -228,7 +232,7 @@ export default function EditSupplierPage() {
           {/* Notes */}
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-2">
             <h3 className="font-semibold text-sm border-b pb-2">Notes</h3>
-            <Textarea rows={3} placeholder="Internal notes…" value={form.notes}
+            <Textarea rows={3} placeholder={copy.notesPlaceholder} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} />
           </div>
 
@@ -253,7 +257,7 @@ export default function EditSupplierPage() {
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-3">
             <Button className="w-full gap-2" disabled={loading} onClick={submit}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Update Supplier
+              {copy.updateButton}
             </Button>
             <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push(`/suppliers/${id}`)}>
               Cancel

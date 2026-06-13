@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { FileText, Plus, Loader2, RefreshCw, Trash2 } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
+import {
+  FileText, Plus, Loader2, RefreshCw, Trash2, Users, Send, CheckCircle2,
+  Clock, Banknote, ExternalLink, Package, XCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,31 +13,286 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ModuleGate } from "@/components/shop/module-gate";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 interface Quotation {
-  id: string; quoteNumber: string; status: string; total: number; subtotal: number;
-  validUntil?: string | null; createdAt: string; notes?: string | null;
+  id: string;
+  quoteNumber: string;
+  status: string;
+  total: number;
+  subtotal: number;
+  validUntil?: string | null;
+  createdAt: string;
+  notes?: string | null;
   customer?: { firstName: string; lastName?: string | null; phone: string } | null;
-  items: { quantity: number; unitPrice: number; variant: { sku: string; product: { name: string } } }[];
+  items: {
+    quantity: number;
+    unitPrice: number;
+    total?: number;
+    variant: { sku: string; name?: string; product: { name: string } };
+  }[];
 }
+
 interface Customer { id: string; firstName: string; lastName?: string | null; phone: string }
 interface VariantOpt { variantId: string; productName: string; variantName: string; sku: string; sellingPrice: number }
 interface LineItem { variantId: string; label: string; quantity: number; unitPrice: number }
 
+type StatusFilter = "ALL" | "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "CONVERTED" | "EXPIRED";
+
+const STATUS_CFG: Record<string, { label: string; variant: "success" | "secondary" | "warning" | "danger" | "default" }> = {
+  DRAFT:     { label: "Draft",     variant: "secondary" },
+  SENT:      { label: "Sent",      variant: "default"   },
+  ACCEPTED:  { label: "Accepted",  variant: "success"   },
+  REJECTED:  { label: "Rejected",  variant: "danger"    },
+  CONVERTED: { label: "Converted", variant: "success"   },
+  EXPIRED:   { label: "Expired",   variant: "warning"   },
+};
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "DRAFT", label: "Draft" },
+  { key: "SENT", label: "Sent" },
+  { key: "ACCEPTED", label: "Accepted" },
+  { key: "REJECTED", label: "Rejected" },
+  { key: "CONVERTED", label: "Converted" },
+  { key: "EXPIRED", label: "Expired" },
+];
+
+const GUIDE = [
+  { title: "Create Quote", desc: "Add parts, set prices, optional customer and validity date for workshop or fleet clients." },
+  { title: "Send to Customer", desc: "Mark as Sent when the quote is shared — track pending responses in one place." },
+  { title: "Accept or Reject", desc: "Update status when the customer confirms — accepted quotes can move to POS sale." },
+  { title: "Track Value", desc: "Monitor draft and sent quote totals to forecast parts revenue before conversion." },
+];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function customerName(q: Quotation) {
+  if (!q.customer) return "Walk-in";
+  return `${q.customer.firstName} ${q.customer.lastName ?? ""}`.trim();
+}
+
+function buildColumns(
+  onView: (q: Quotation) => void,
+  onStatus: (id: string, status: string) => void,
+): ColumnDef<Quotation>[] {
+  return [
+    {
+      accessorKey: "quoteNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Quote #" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2.5 min-w-[120px]">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <FileText className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-mono text-xs font-semibold">{row.original.quoteNumber}</span>
+        </div>
+      ),
+    },
+    {
+      id: "customer",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => {
+        const q = row.original;
+        return (
+          <div>
+            <p className="text-sm font-medium">{customerName(q)}</p>
+            {q.customer?.phone && (
+              <p className="text-[10px] text-muted-foreground font-mono">{q.customer.phone}</p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "items",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
+      cell: ({ row }) => (
+        <span className="inline-flex items-center gap-1.5 text-sm">
+          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+          {row.original.items.length}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "total",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-bold">LKR {formatNumber(row.original.total)}</span>
+      ),
+    },
+    {
+      id: "validUntil",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Valid Until" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {row.original.validUntil ? fmtDate(row.original.validUntil) : "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const cfg = STATUS_CFG[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
+        return <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>;
+      },
+    },
+    {
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Created" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>
+      ),
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const q = row.original;
+        const more: { text: string; function: () => void }[] = [];
+        if (q.status === "DRAFT") more.push({ text: "Mark Sent", function: () => onStatus(q.id, "SENT") });
+        if (q.status === "SENT") {
+          more.push({ text: "Accept", function: () => onStatus(q.id, "ACCEPTED") });
+          more.push({ text: "Reject", function: () => onStatus(q.id, "REJECTED") });
+        }
+        if (q.status === "ACCEPTED") {
+          more.push({ text: "Mark Converted", function: () => onStatus(q.id, "CONVERTED") });
+        }
+        return (
+          <TableActionsRow
+            showAction={{ action: () => onView(q) }}
+            dropMoreActions={more}
+          />
+        );
+      },
+    },
+  ];
+}
+
+function QuoteDetailDialog({
+  quote,
+  onClose,
+  onStatus,
+}: {
+  quote: Quotation | null;
+  onClose: () => void;
+  onStatus: (id: string, status: string) => void;
+}) {
+  if (!quote) return null;
+  const cfg = STATUS_CFG[quote.status] ?? { label: quote.status, variant: "secondary" as const };
+
+  return (
+    <Dialog open={!!quote} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono">{quote.quoteNumber}</span>
+            <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+          <div className="rounded-xl border p-3 space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">Customer</p>
+            <p className="font-medium">{customerName(quote)}</p>
+            {quote.customer?.phone && <p className="text-xs text-muted-foreground font-mono">{quote.customer.phone}</p>}
+          </div>
+          <div className="rounded-xl border p-3 space-y-1">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold">Dates</p>
+            <p className="text-xs">Created: <span className="font-medium">{fmtDate(quote.createdAt)}</span></p>
+            <p className="text-xs">Valid until: <span className="font-medium">{quote.validUntil ? fmtDate(quote.validUntil) : "—"}</span></p>
+          </div>
+        </div>
+
+        <div className="border rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 border-b">
+              <tr>
+                {["Part", "SKU", "Qty", "Unit Price", "Line Total"].map((h) => (
+                  <th key={h} className="text-left px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {quote.items.map((item, i) => (
+                <tr key={i}>
+                  <td className="px-3 py-2 text-xs font-medium">{item.variant.product.name}</td>
+                  <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{item.variant.sku}</td>
+                  <td className="px-3 py-2 text-xs">{item.quantity}</td>
+                  <td className="px-3 py-2 text-xs">LKR {formatNumber(item.unitPrice)}</td>
+                  <td className="px-3 py-2 text-xs font-semibold">LKR {formatNumber(item.quantity * item.unitPrice)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {quote.notes && (
+          <div className="rounded-xl border p-3">
+            <p className="text-[10px] uppercase text-muted-foreground font-semibold mb-1">Notes</p>
+            <p className="text-sm text-muted-foreground">{quote.notes}</p>
+          </div>
+        )}
+
+        <div className="flex justify-between items-center pt-2 border-t">
+          <div>
+            <p className="text-xs text-muted-foreground">Subtotal: LKR {formatNumber(quote.subtotal)}</p>
+            <p className="text-lg font-bold">Total: LKR {formatNumber(quote.total)}</p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            {quote.status === "DRAFT" && (
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => { onStatus(quote.id, "SENT"); onClose(); }}>
+                <Send className="h-3.5 w-3.5" /> Mark Sent
+              </Button>
+            )}
+            {quote.status === "SENT" && (
+              <>
+                <Button size="sm" variant="outline" className="gap-1" onClick={() => { onStatus(quote.id, "ACCEPTED"); onClose(); }}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Accept
+                </Button>
+                <Button size="sm" variant="outline" className="gap-1 text-destructive" onClick={() => { onStatus(quote.id, "REJECTED"); onClose(); }}>
+                  <XCircle className="h-3.5 w-3.5" /> Reject
+                </Button>
+              </>
+            )}
+            {quote.status === "ACCEPTED" && (
+              <Button size="sm" className="gap-1" asChild>
+                <Link href="/pos"><ExternalLink className="h-3.5 w-3.5" /> Open POS</Link>
+              </Button>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function QuotationsPage() {
+  const { profile } = useShopWorkspace();
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [variants, setVariants] = useState<VariantOpt[]>([]);
-  const [open, setOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewQuote, setViewQuote] = useState<Quotation | null>(null);
   const [customerId, setCustomerId] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
   const [pickVariant, setPickVariant] = useState("");
+  const [partSearch, setPartSearch] = useState("");
   const [saving, setSaving] = useState(false);
 
   const fetchQuotes = useCallback(async () => {
@@ -47,130 +306,326 @@ export default function QuotationsPage() {
 
   useEffect(() => { fetchQuotes(); }, [fetchQuotes]);
   useEffect(() => {
-    api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(r.data?.data ?? (r.data as unknown as Customer[]) ?? [])).catch(() => {});
-    api.get<VariantOpt[]>("/pos/products").then((r) => setVariants(Array.isArray(r.data) ? r.data : [])).catch(() => {});
+    api.get<{ data: Customer[] }>("/customers?limit=200")
+      .then((r) => setCustomers(r.data?.data ?? (r.data as unknown as Customer[]) ?? []))
+      .catch(() => {});
+    api.get<VariantOpt[]>("/pos/products")
+      .then((r) => setVariants(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
   }, []);
+
+  const updateStatus = useCallback(async (id: string, status: string) => {
+    try {
+      await api.put(`/spare-parts/quotations/${id}/status`, { status });
+      toast.success("Status updated");
+      fetchQuotes();
+      setViewQuote((prev) => (prev?.id === id ? { ...prev, status } : prev));
+    } catch (e: unknown) { toast.error((e as Error).message); }
+  }, [fetchQuotes]);
+
+  const resetForm = () => {
+    setCustomerId("");
+    setValidUntil("");
+    setNotes("");
+    setItems([]);
+    setPickVariant("");
+    setPartSearch("");
+  };
 
   const addLine = () => {
     const v = variants.find((x) => x.variantId === pickVariant);
-    if (!v || items.some((i) => i.variantId === v.variantId)) return;
-    setItems((prev) => [...prev, { variantId: v.variantId, label: `${v.productName} — ${v.sku}`, quantity: 1, unitPrice: v.sellingPrice }]);
+    if (!v || items.some((i) => i.variantId === v.variantId)) {
+      if (v && items.some((i) => i.variantId === v.variantId)) toast.error("Part already added");
+      return;
+    }
+    setItems((prev) => [...prev, {
+      variantId: v.variantId,
+      label: `${v.productName} — ${v.sku}`,
+      quantity: 1,
+      unitPrice: v.sellingPrice,
+    }]);
     setPickVariant("");
+    setPartSearch("");
   };
 
   const createQuote = async () => {
-    if (!items.length) { toast.error("Add at least one item"); return; }
+    if (!items.length) { toast.error("Add at least one part"); return; }
     setSaving(true);
     try {
       await api.post("/spare-parts/quotations", {
-        customerId: customerId || undefined, validUntil: validUntil || undefined, notes: notes || undefined,
+        customerId: customerId || undefined,
+        validUntil: validUntil || undefined,
+        notes: notes || undefined,
         items: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
       });
       toast.success("Quotation created");
-      setOpen(false); setItems([]); setCustomerId(""); setValidUntil(""); setNotes("");
+      setCreateOpen(false);
+      resetForm();
       fetchQuotes();
     } catch (e: unknown) { toast.error((e as Error).message); }
     finally { setSaving(false); }
   };
 
-  const updateStatus = async (id: string, status: string) => {
-    try {
-      await api.put(`/spare-parts/quotations/${id}/status`, { status });
-      toast.success("Status updated"); fetchQuotes();
-    } catch (e: unknown) { toast.error((e as Error).message); }
-  };
+  const filteredVariants = useMemo(() => {
+    const q = partSearch.trim().toLowerCase();
+    if (!q) return variants;
+    return variants.filter((v) =>
+      v.productName.toLowerCase().includes(q) ||
+      v.sku.toLowerCase().includes(q) ||
+      v.variantName.toLowerCase().includes(q),
+    );
+  }, [variants, partSearch]);
 
+  const displayed = useMemo(() =>
+    statusFilter === "ALL" ? quotes : quotes.filter((q) => q.status === statusFilter),
+  [quotes, statusFilter]);
+
+  const draftCount = quotes.filter((q) => q.status === "DRAFT").length;
+  const sentCount = quotes.filter((q) => q.status === "SENT").length;
+  const totalValue = quotes.reduce((s, q) => s + q.total, 0);
   const totalPreview = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
 
+  const STATS = [
+    { label: "Total Quotes",  value: quotes.length,  icon: FileText,     color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Draft",         value: draftCount,     icon: Clock,        color: "text-amber-500",   bg: "bg-amber-500/10" },
+    { label: "Sent",          value: sentCount,      icon: Send,         color: "text-violet-500",  bg: "bg-violet-500/10" },
+    { label: "Pipeline Value", value: `LKR ${formatNumber(totalValue)}`, icon: Banknote, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  ];
+
+  const columns = useMemo(
+    () => buildColumns((q) => setViewQuote(q), updateStatus),
+    [updateStatus],
+  );
+
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2"><FileText className="h-6 w-6 text-primary" /> Quotations</h1>
-          <p className="text-sm text-muted-foreground">Create quotes for workshops, fleet & wholesale customers</p>
+    <ModuleGate module="quotations">
+      <div className="p-6 space-y-6 w-full">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <span>{profile.emoji}</span> Quotations
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Create quotes for workshops, fleet & wholesale customers
+            </p>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={fetchQuotes} className="gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href="/customers"><Users className="h-3.5 w-3.5" /> Customers</Link>
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => { resetForm(); setCreateOpen(true); }}>
+              <Plus className="h-3.5 w-3.5" /> New Quotation
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchQuotes} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button size="sm" onClick={() => setOpen(true)} className="gap-1.5"><Plus className="h-3.5 w-3.5" /> New Quotation</Button>
-        </div>
-      </div>
 
-      {open && (
-        <Card><CardContent className="p-4 space-y-3">
-          <h3 className="font-semibold text-sm">New Quotation</h3>
-          <div className="grid md:grid-cols-2 gap-3">
-            <div className="space-y-1"><Label className="text-xs">Customer (optional)</Label>
-              <Select value={customerId} onValueChange={setCustomerId}>
-                <SelectTrigger><SelectValue placeholder="Walk-in / select customer" /></SelectTrigger>
-                <SelectContent>{customers.map((c) => <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName ?? ""}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Valid until</Label>
-              <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Select value={pickVariant} onValueChange={setPickVariant}>
-              <SelectTrigger className="flex-1"><SelectValue placeholder="Add part..." /></SelectTrigger>
-              <SelectContent>{variants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{v.productName} — {v.sku}</SelectItem>)}</SelectContent>
-            </Select>
-            <Button variant="outline" onClick={addLine}><Plus className="h-4 w-4" /></Button>
-          </div>
-          {items.map((item, idx) => (
-            <div key={item.variantId} className="flex items-center gap-2 text-sm">
-              <span className="flex-1 truncate">{item.label}</span>
-              <Input type="number" min={1} className="w-16 h-8" value={item.quantity}
-                onChange={(e) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, quantity: parseInt(e.target.value, 10) || 1 } : it))} />
-              <Input type="number" min={0} className="w-24 h-8" value={item.unitPrice}
-                onChange={(e) => setItems((prev) => prev.map((it, i) => i === idx ? { ...it, unitPrice: parseFloat(e.target.value) || 0 } : it))} />
-              <button type="button" onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4 text-red-500" /></button>
-            </div>
+        {/* KPI stats */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {STATS.map((s) => (
+            <Card key={s.label}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                  <s.icon className={`h-5 w-5 ${s.color}`} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{loading && typeof s.value === "number" ? "—" : s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              </CardContent>
+            </Card>
           ))}
-          <Textarea rows={2} placeholder="Notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
-          <div className="flex justify-between items-center">
-            <span className="font-bold">Total: LKR {formatNumber(totalPreview)}</span>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-              <Button onClick={createQuote} disabled={saving || !items.length}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Quotation"}
-              </Button>
-            </div>
-          </div>
-        </CardContent></Card>
-      )}
-
-      <Card><CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 border-b">
-              <tr>{["Quote #", "Customer", "Items", "Total", "Status", "Date", "Actions"].map((h) => (
-                <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
-              ))}</tr>
-            </thead>
-            <tbody className="divide-y">
-              {quotes.length === 0 ? (
-                <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No quotations yet</td></tr>
-              ) : quotes.map((q) => (
-                <tr key={q.id} className="hover:bg-muted/20">
-                  <td className="px-3 py-2 font-mono text-xs">{q.quoteNumber}</td>
-                  <td className="px-3 py-2 text-xs">{q.customer ? `${q.customer.firstName} ${q.customer.lastName ?? ""}` : "—"}</td>
-                  <td className="px-3 py-2 text-xs">{q.items.length} item(s)</td>
-                  <td className="px-3 py-2 font-semibold">LKR {formatNumber(q.total)}</td>
-                  <td className="px-3 py-2"><Badge variant="secondary" className="text-[9px]">{q.status}</Badge></td>
-                  <td className="px-3 py-2 text-xs whitespace-nowrap">{new Date(q.createdAt).toLocaleDateString()}</td>
-                  <td className="px-3 py-2">
-                    {q.status === "DRAFT" && (
-                      <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => updateStatus(q.id, "SENT")}>Mark Sent</Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </CardContent></Card>
-    </div>
+
+        {/* Status filter pills */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Status:</span>
+          {STATUS_FILTERS.map((f) => {
+            const count = f.key === "ALL" ? quotes.length : quotes.filter((q) => q.status === f.key).length;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  statusFilter === f.key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/40",
+                )}
+              >
+                {f.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Table */}
+        {displayed.length === 0 && !loading ? (
+          <Card className="border-dashed">
+            <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+              <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <FileText className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="font-semibold">No quotations yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Create a quotation for workshop, fleet or wholesale customers with parts and custom pricing.
+              </p>
+              <Button className="gap-1.5 mt-2" onClick={() => { resetForm(); setCreateOpen(true); }}>
+                <Plus className="h-4 w-4" /> New Quotation
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <ClientSideTable
+            data={displayed}
+            columns={columns}
+            pageCount={Math.ceil(displayed.length / 10)}
+            searchableColumns={[
+              { id: "quoteNumber", title: "Quote #" },
+            ]}
+            filterableColumns={[
+              {
+                id: "status",
+                title: "Status",
+                options: STATUS_FILTERS.filter((f) => f.key !== "ALL").map((f) => ({
+                  label: f.label,
+                  value: f.key,
+                })),
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "quotations-export" }}
+          />
+        )}
+
+        {/* Guide */}
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {GUIDE.map((g) => (
+            <Card key={g.title} className="border-dashed">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-sm font-semibold">{g.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{g.desc}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Create dialog */}
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetForm(); }}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>New Quotation</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Customer (optional)</Label>
+                <Select value={customerId} onValueChange={setCustomerId}>
+                  <SelectTrigger><SelectValue placeholder="Walk-in / select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName ?? ""} · {c.phone}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Valid until</Label>
+                <Input type="date" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Add parts</Label>
+              <Input
+                placeholder="Search parts by name or SKU…"
+                value={partSearch}
+                onChange={(e) => setPartSearch(e.target.value)}
+              />
+              <div className="flex gap-2">
+                <Select value={pickVariant} onValueChange={setPickVariant}>
+                  <SelectTrigger className="flex-1"><SelectValue placeholder="Select part to add…" /></SelectTrigger>
+                  <SelectContent className="max-h-60">
+                    {filteredVariants.map((v) => (
+                      <SelectItem key={v.variantId} value={v.variantId}>
+                        {v.productName} — {v.sku} · LKR {formatNumber(v.sellingPrice)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" onClick={addLine} disabled={!pickVariant}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {items.length > 0 && (
+              <div className="border rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/40 border-b">
+                    <tr>
+                      {["Part", "Qty", "Unit Price", ""].map((h) => (
+                        <th key={h || "rm"} className="text-left px-3 py-2 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {items.map((item, idx) => (
+                      <tr key={item.variantId}>
+                        <td className="px-3 py-2 text-xs truncate max-w-[200px]">{item.label}</td>
+                        <td className="px-3 py-2">
+                          <Input type="number" min={1} className="w-16 h-8"
+                            value={item.quantity}
+                            onChange={(e) => setItems((prev) => prev.map((it, i) =>
+                              i === idx ? { ...it, quantity: parseInt(e.target.value, 10) || 1 } : it,
+                            ))} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <Input type="number" min={0} className="w-24 h-8"
+                            value={item.unitPrice}
+                            onChange={(e) => setItems((prev) => prev.map((it, i) =>
+                              i === idx ? { ...it, unitPrice: parseFloat(e.target.value) || 0 } : it,
+                            ))} />
+                        </td>
+                        <td className="px-3 py-2">
+                          <button type="button" onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Textarea rows={2} placeholder="Terms, delivery notes…" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t">
+              <span className="font-bold">Total: LKR {formatNumber(totalPreview)}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
+                <Button onClick={createQuote} disabled={saving || !items.length} className="gap-1.5">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  Save Quotation
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <QuoteDetailDialog
+          quote={viewQuote}
+          onClose={() => setViewQuote(null)}
+          onStatus={updateStatus}
+        />
+      </div>
+    </ModuleGate>
   );
 }

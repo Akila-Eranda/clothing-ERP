@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import type { BrandPageCopy } from "@/lib/shop-vertical";
 
 export interface BrandItem {
   id: string;
@@ -27,12 +28,13 @@ interface Props {
   onClose: () => void;
   onSaved: () => void;
   editBrand?: BrandItem;
+  copy: BrandPageCopy;
 }
 
 interface Form { name: string; description: string; logo: string; isActive: boolean; }
 const INIT: Form = { name: "", description: "", logo: "", isActive: true };
 
-export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
+export function AddBrandModal({ open, onClose, onSaved, editBrand, copy }: Props) {
   const [form, setForm]   = useState<Form>(INIT);
   const [loading, setLoading] = useState(false);
 
@@ -48,7 +50,7 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
   const handleClose = () => { setForm(INIT); onClose(); };
 
   const submit = async () => {
-    if (!form.name.trim()) { toast.error("Brand name is required"); return; }
+    if (!form.name.trim()) { toast.error(`${copy.nameLabel} is required`); return; }
     setLoading(true);
     try {
       if (editBrand) {
@@ -77,8 +79,10 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
             <Star className="h-4.5 w-4.5 text-primary" />
           </div>
           <div>
-            <h2 className="text-base font-bold">{editBrand ? "Edit Brand" : "Add New Brand"}</h2>
-            <p className="text-xs text-muted-foreground">{editBrand ? `Editing: ${editBrand.name}` : "Create a new product brand"}</p>
+            <h2 className="text-base font-bold">{editBrand ? copy.editModalTitle : copy.addModalTitle}</h2>
+            <p className="text-xs text-muted-foreground">
+              {editBrand ? `Editing: ${editBrand.name}` : copy.addModalSubtitle}
+            </p>
           </div>
           <button onClick={handleClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted transition-colors">
             <X className="h-4 w-4" />
@@ -88,8 +92,8 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
         {/* Body */}
         <div className="px-6 py-5 space-y-4">
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Brand Name <span className="text-destructive">*</span></Label>
-            <Input placeholder="e.g. FabricFusion" value={form.name} onChange={(e) => set("name", e.target.value)}
+            <Label className="text-xs font-semibold">{copy.nameLabel} <span className="text-destructive">*</span></Label>
+            <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && submit()} autoFocus />
           </div>
           <div className="space-y-1.5">
@@ -105,12 +109,12 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
-            <Textarea placeholder="Brief description of this brand..." rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
+            <Textarea placeholder={copy.descriptionPlaceholder} rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
           </div>
           <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-muted/20">
             <div>
               <p className="text-sm font-semibold">Active</p>
-              <p className="text-xs text-muted-foreground">Brand visible in catalog and product forms</p>
+              <p className="text-xs text-muted-foreground">{copy.activeHint}</p>
             </div>
             <Switch checked={form.isActive} onCheckedChange={(v) => set("isActive", v)} />
           </div>
@@ -121,7 +125,7 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand }: Props) {
           <Button variant="outline" onClick={handleClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[120px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Star className="h-3.5 w-3.5" />}
-            {editBrand ? "Save Changes" : "Add Brand"}
+            {editBrand ? "Save Changes" : copy.addButton}
           </Button>
         </div>
       </div>

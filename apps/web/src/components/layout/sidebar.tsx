@@ -17,6 +17,7 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getWorkspace } from "@/lib/shop-workspace";
+import { getBrandPageCopy, getSupplierPageCopy } from "@/lib/shop-vertical";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -35,10 +36,12 @@ function useNavGroups(): NavGroup[] {
   const { openPos } = useUIStore();
   const profile = useShopProfile();
   const ws = getWorkspace(profile.type);
+  const brandLabel = getBrandPageCopy(profile, ws).pageTitle;
+  const supplierLabel = getSupplierPageCopy(profile, ws).pageTitle;
   const productItems: NavItem[] = [
     { label: ws.productLabel, href: "/products", icon: Package },
     { label: "Categories",     href: "/categories", icon: Layers },
-    ...(profile.modules.brands ? [{ label: "Brands", href: "/brands", icon: Bookmark }] : []),
+    ...(profile.modules.brands ? [{ label: brandLabel, href: "/brands", icon: Bookmark }] : []),
     { label: "Inventory",      href: "/inventory",  icon: Warehouse },
     ...(profile.modules.vehicles ? [{ label: "Vehicle Compatibility", href: "/vehicles", icon: Car }] : []),
     ...(profile.modules.warranty ? [{ label: "Warranty Claims", href: "/warranty", icon: Wrench }] : []),
@@ -73,7 +76,7 @@ function useNavGroups(): NavGroup[] {
     {
       title: "PROCUREMENT",
       items: [
-        { label: "Suppliers",      href: "/suppliers",  icon: Truck },
+        { label: supplierLabel,      href: "/suppliers",  icon: Truck },
         { label: "Purchases",      href: "/purchases",  icon: ShoppingBag },
       ],
     },
