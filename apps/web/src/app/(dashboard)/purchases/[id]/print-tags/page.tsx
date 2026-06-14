@@ -26,7 +26,7 @@ interface POItem {
     size?: string | null;
     style?: string | null;
     material?: string | null;
-    product?: { name: string };
+    product?: { name: string; tags?: string[]; oemNumber?: string | null; modelNumber?: string | null };
   };
 }
 interface PO {
@@ -75,6 +75,25 @@ function variantDisplayLine(variant?: POItem["variant"], fallback?: string): str
   return parts.length ? parts.join(" / ") : (fallback ?? "");
 }
 
+const SYSTEM_TAG_PREFIXES = ["unit:", "exp:", "batch:"];
+
+function productTags(item: POItem): string[] {
+  return (item.variant?.product?.tags ?? []).filter(
+    (t) => t.trim() && !SYSTEM_TAG_PREFIXES.some((p) => t.startsWith(p)),
+  );
+}
+
+function tagsLine(item: POItem): string {
+  const tags = productTags(item);
+  return tags.length ? tags.join(" · ") : "";
+}
+
+function TagRow({ item, className = "" }: { item: POItem; className?: string }) {
+  const line = tagsLine(item);
+  if (!line) return null;
+  return <p className={`text-[8px] font-semibold text-gray-600 leading-tight ${className}`}>{line}</p>;
+}
+
 // ── Sticker Label (thermal 60×40mm) ──────────────────────────────────────
 function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
   const baseCode   = item.variant?.barcode || item.sku;
@@ -87,6 +106,7 @@ function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: stri
       <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
       <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
       {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
+      <TagRow item={item} />
       <BarcodeEl value={barcodeVal} id={`${item.id}-${serial}`} />
       <p className="text-[8px] font-mono text-gray-400">{barcodeVal}</p>
       <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
@@ -118,6 +138,7 @@ function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; s
             {color && <span className="text-[9px] border border-gray-300 rounded px-1.5 py-0.5 font-semibold text-gray-600">{color}</span>}
           </div>
         )}
+        <TagRow item={item} className="mt-0.5" />
         <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
         <div className="border-t w-full mt-1 pt-1">
           <BarcodeEl value={barcodeVal} id={`${item.id}-${serial}`} />
@@ -145,6 +166,7 @@ function ShelfLabel({ item, shopName, serial, unit }: { item: POItem; shopName: 
         <div className="min-w-0">
           <p className="text-[12px] font-bold leading-tight truncate">{item.productName}</p>
           {variantLine && <p className="text-[9px] text-gray-500 truncate">{variantLine}</p>}
+          <TagRow item={item} className="truncate" />
         </div>
         <p className="text-[16px] font-extrabold text-emerald-800 shrink-0">
           {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
@@ -288,6 +310,7 @@ export default function PrintTagsPage() {
                 <tr>
                   <th className="px-5 py-2.5 text-left">Item</th>
                   <th className="px-5 py-2.5 text-left w-28">SKU</th>
+                  <th className="px-5 py-2.5 text-left w-32">Tags</th>
                   <th className="px-5 py-2.5 text-left w-20">{colA}</th>
                   <th className="px-5 py-2.5 text-left w-20">{colB}</th>
                   <th className="px-5 py-2.5 text-right w-24">Ordered</th>
@@ -300,6 +323,9 @@ export default function PrintTagsPage() {
                   <tr key={item.id} className="hover:bg-muted/10">
                     <td className="px-5 py-3 font-medium">{item.productName}</td>
                     <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                    <td className="px-5 py-3 text-xs text-muted-foreground max-w-[8rem] truncate" title={tagsLine(item)}>
+                      {tagsLine(item) || "—"}
+                    </td>
                     <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrA)}</td>
                     <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrB)}</td>
                     <td className="px-5 py-3 text-right text-muted-foreground">{item.orderedQty}</td>
