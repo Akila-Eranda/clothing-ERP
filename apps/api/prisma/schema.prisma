@@ -325,6 +325,7 @@ enum ReceiptPrintType {
   PRE_BILL
   RETURN
   TEST
+  PAYSLIP
 }
 
 enum ReceiptPrintStatus {

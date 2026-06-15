@@ -349,31 +349,68 @@ export default function QuotationsPage() {
     setPartSearch("");
   };
 
+  const appendLineFromVariant = useCallback((variantId: string, showDuplicateToast = true): boolean => {
+    const v = variants.find((x) => x.variantId === variantId);
+    if (!v) return false;
+
+    let added = false;
+    setItems((prev) => {
+      if (prev.some((i) => i.variantId === v.variantId)) {
+        if (showDuplicateToast) toast.error("Part already added");
+        return prev;
+      }
+      added = true;
+      return [...prev, {
+        variantId: v.variantId,
+        label: `${v.productName} — ${v.sku}`,
+        quantity: 1,
+        unitPrice: v.unitPrice,
+      }];
+    });
+
+    if (added) {
+      setPickVariant("");
+      setPartSearch("");
+    }
+    return added;
+  }, [variants]);
+
   const addLine = () => {
-    const v = variants.find((x) => x.variantId === pickVariant);
-    if (!v || items.some((i) => i.variantId === v.variantId)) {
-      if (v && items.some((i) => i.variantId === v.variantId)) toast.error("Part already added");
+    if (!pickVariant) {
+      toast.error("Select a part to add");
       return;
     }
-    setItems((prev) => [...prev, {
-      variantId: v.variantId,
-      label: `${v.productName} — ${v.sku}`,
-      quantity: 1,
-      unitPrice: v.unitPrice,
-    }]);
-    setPickVariant("");
-    setPartSearch("");
+    appendLineFromVariant(pickVariant);
+  };
+
+  const handlePickVariant = (variantId: string) => {
+    appendLineFromVariant(variantId);
   };
 
   const createQuote = async () => {
-    if (!items.length) { toast.error("Add at least one part"); return; }
+    let lines = [...items];
+    if (pickVariant && !lines.some((i) => i.variantId === pickVariant)) {
+      const v = variants.find((x) => x.variantId === pickVariant);
+      if (v) {
+        lines.push({
+          variantId: v.variantId,
+          label: `${v.productName} — ${v.sku}`,
+          quantity: 1,
+          unitPrice: v.unitPrice,
+        });
+      }
+    }
+    if (!lines.length) {
+      toast.error("Add at least one part to the quotation");
+      return;
+    }
     setSaving(true);
     try {
       await api.post("/spare-parts/quotations", {
         customerId: customerId || undefined,
         validUntil: validUntil || undefined,
         notes: notes || undefined,
-        items: items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
+        items: lines.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
       });
       toast.success("Quotation created");
       setCreateOpen(false);
@@ -401,6 +438,7 @@ export default function QuotationsPage() {
   const sentCount = quotes.filter((q) => q.status === "SENT").length;
   const totalValue = quotes.reduce((s, q) => s + q.total, 0);
   const totalPreview = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+  const canSave = items.length > 0 || !!pickVariant;
 
   const selectedVariant = useMemo(
     () => variants.find((v) => v.variantId === pickVariant),
@@ -545,7 +583,7 @@ export default function QuotationsPage() {
             <div className="grid sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs">Customer (optional)</Label>
-                <Select value={customerId} onValueChange={setCustomerId}>
+                <Select value={customerId || undefined} onValueChange={setCustomerId}>
                   <SelectTrigger><SelectValue placeholder="Walk-in / select customer" /></SelectTrigger>
                   <SelectContent>
                     {customers.map((c) => (
@@ -568,23 +606,44 @@ export default function QuotationsPage() {
                 onChange={(e) => setPartSearch(e.target.value)}
               />
               <div className="flex gap-2">
-                <Select value={pickVariant} onValueChange={setPickVariant}>
+                <Select value={pickVariant || undefined} onValueChange={handlePickVariant}>
                   <SelectTrigger className="flex-1">
                     <SelectValue placeholder="Select part to add…" />
                   </SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {filteredVariants.map((v) => (
+                    {filteredVariants.length === 0 ? (
+                      <div className="px-3 py-6 text-center text-xs text-muted-foreground">No parts match your search</div>
+                    ) : filteredVariants.map((v) => (
                       <SelectItem key={v.variantId} value={v.variantId}>
                         {v.productName} — {v.sku} · LKR {formatNumber(v.unitPrice)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" onClick={addLine} disabled={!pickVariant}>
+                <Button type="button" variant="outline" onClick={addLine} disabled={!pickVariant} className="gap-1 shrink-0">
                   <Plus className="h-4 w-4" />
+                  Add
                 </Button>
               </div>
-              {selectedVariant && (
+              {items.length === 0 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Select a part from the list — it will be added automatically. You can add multiple parts before saving.
+                </p>
+              )}
+              {selectedVariant && !items.some((i) => i.variantId === selectedVariant.variantId) && (
+                <div className="flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs">
+                  <span className="text-amber-800">
+                    {selectedVariant.variantName !== selectedVariant.productName
+                      ? `${selectedVariant.variantName} · `
+                      : ""}
+                    Stock: {selectedVariant.stock ?? 0} — click Add or pick again to include this part
+                  </span>
+                  <span className="font-semibold text-primary">
+                    LKR {formatNumber(selectedVariant.unitPrice)}
+                  </span>
+                </div>
+              )}
+              {selectedVariant && items.some((i) => i.variantId === selectedVariant.variantId) && (
                 <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2 text-xs">
                   <span className="text-muted-foreground">
                     {selectedVariant.variantName !== selectedVariant.productName
@@ -647,8 +706,8 @@ export default function QuotationsPage() {
             <div className="flex justify-between items-center pt-2 border-t">
               <span className="font-bold">Total: LKR {formatNumber(totalPreview)}</span>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
-                <Button onClick={createQuote} disabled={saving || !items.length} className="gap-1.5">
+                <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
+                <Button type="button" onClick={createQuote} disabled={saving || !canSave} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                   Save Quotation
                 </Button>

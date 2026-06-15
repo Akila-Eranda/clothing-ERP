@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import {
   UserCog, Plus, Users, Clock, DollarSign, RefreshCw,
   Phone, Mail, CheckCircle2, XCircle, AlertCircle, Loader2,
-  CalendarDays, Banknote, ChevronLeft, ChevronRight, Download,
-  X, FileText, BarChart3,
+  CalendarDays, Banknote, ChevronLeft, ChevronRight,
+  X, FileText, BarChart3, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +22,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printThermalPayslip } from "@/lib/payslip-print";
 
 // ── Types ────────────────────────────────────────────────────────────────
 type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE" | "LEAVE" | "HOLIDAY";
@@ -58,89 +60,6 @@ const ATTN_STATUS: Record<string, { label: string; color: string; bg: string; ic
 };
 
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-
-function downloadPayslip(p: Payroll, month: number, year: number) {
-  const monthName = MONTHS[month - 1].toUpperCase();
-  const empName   = `${p.employee.firstName} ${p.employee.lastName}`;
-  const gross     = p.basicSalary + p.allowances + p.bonus;
-  const periodEnd = new Date(year, month, 0).getDate();
-  const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
-<title>Payslip - ${empName} - ${monthName} ${year}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Courier New', Courier, monospace; font-size: 12px; color: #000; background: #fff; padding: 30px; max-width: 700px; margin: auto; }
-  .center { text-align: center; }
-  .bold { font-weight: bold; }
-  .divider { border-top: 1px dashed #000; margin: 6px 0; }
-  .solid { border-top: 2px solid #000; margin: 6px 0; }
-  table { width: 100%; border-collapse: collapse; }
-  td { padding: 2px 0; vertical-align: top; }
-  td.right { text-align: right; }
-  .section-title { font-weight: bold; font-size: 13px; margin: 10px 0 4px; }
-  .net-row td { font-weight: bold; font-size: 14px; padding: 6px 0; }
-  @media print {
-    body { padding: 10px; }
-    button { display: none; }
-  }
-</style></head><body>
-<div class="center bold" style="font-size:22px;letter-spacing:4px;">HEXALYTE</div>
-<div class="center bold" style="font-size:12px;letter-spacing:6px;">INNOVATION</div>
-<div class="center" style="margin-top:4px;">No. 45, Textile Road, Colombo 11, Sri Lanka</div>
-<div class="center">Tel: 077 123 4567 &nbsp;|&nbsp; info@hexalyte.com</div>
-<div class="divider"></div>
-<div class="center bold" style="font-size:16px;letter-spacing:4px;margin:8px 0 2px;">PAYSLIP</div>
-<div class="center">For the Month of ${monthName} ${year}</div>
-<div class="divider"></div>
-<table>
-  <tr><td>Payslip No.</td><td>: PS-${year}-${String(month).padStart(2,"0")}-${p.employee.code.replace("EMP-","")}</td><td>Employee ID</td><td class="right">: ${p.employee.code}</td></tr>
-  <tr><td>Employee Name</td><td>: ${empName}</td><td>Designation</td><td class="right">: ${p.employee.designation ?? "—"}</td></tr>
-  <tr><td>Payroll Period</td><td>: 01 ${MONTHS[month-1].slice(0,3)} ${year} - ${periodEnd} ${MONTHS[month-1].slice(0,3)} ${year}</td><td>Payment Date</td><td class="right">: ${p.paidAt ? new Date(p.paidAt).toLocaleDateString("en-LK",{day:"2-digit",month:"short",year:"numeric"}) : "Pending"}</td></tr>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td class="bold section-title">EARNINGS</td><td class="right bold section-title">AMOUNT (LKR)</td></tr>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td>Basic Salary</td><td class="right">${fmt(p.basicSalary)}</td></tr>
-  ${p.allowances > 0 ? `<tr><td>Allowances</td><td class="right">${fmt(p.allowances)}</td></tr>` : ""}
-  ${p.bonus > 0 ? `<tr><td>Bonus</td><td class="right">${fmt(p.bonus)}</td></tr>` : ""}
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td class="bold">TOTAL EARNINGS</td><td class="right bold">${fmt(gross)}</td></tr>
-</table>
-<br/>
-<table>
-  <tr><td class="bold section-title">DEDUCTIONS</td><td class="right bold section-title">AMOUNT (LKR)</td></tr>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td>Total Deductions</td><td class="right">${fmt(p.deductions)}</td></tr>
-</table>
-<div class="divider"></div>
-<table>
-  <tr><td class="bold">TOTAL DEDUCTIONS</td><td class="right bold">${fmt(p.deductions)}</td></tr>
-</table>
-<div class="solid"></div>
-<table class="net-row">
-  <tr><td>NET PAY</td><td class="right">LKR ${fmt(p.netSalary)}</td></tr>
-</table>
-<div class="solid"></div>
-<div style="margin-top:12px;font-size:10px;" class="center">This is a computer generated payslip. No signature is required.</div>
-<div style="margin-top:6px;" class="center bold">THANK YOU!</div>
-<div style="margin-top:16px;text-align:center;">
-  <button onclick="window.print()" style="font-family:sans-serif;padding:8px 24px;background:#f59e0b;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">🖨 Print / Save as PDF</button>
-</div>
-</body></html>`;
-
-  const win = window.open("", "_blank");
-  if (!win) { alert("Please allow popups to download payslip."); return; }
-  win.document.write(html);
-  win.document.close();
-}
 
 // ── GenerateAllModal ────────────────────────────────────────────────────
 function GenerateAllModal({ month, year, onClose, onDone }: { month: number; year: number; onClose: () => void; onDone: () => void }) {
@@ -383,9 +302,9 @@ function buildAttnColumns(
 
 // ── Payroll columns ────────────────────────────────────────────────────────
 function buildPayrollColumns(
-  payMonth: number,
-  payYear: number,
   onMarkPaid: (id: string) => void,
+  onPrintPayslip: (p: Payroll) => void,
+  printingId: string | null,
 ): ColumnDef<Payroll>[] {
   return [
     {
@@ -436,8 +355,17 @@ function buildPayrollColumns(
               <CheckCircle2 className="h-3 w-3" /> Mark Paid
             </Button>
           )}
-          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => downloadPayslip(row.original, payMonth, payYear)}>
-            <Download className="h-3 w-3" /> Payslip
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            disabled={printingId === row.original.id}
+            onClick={() => onPrintPayslip(row.original)}
+          >
+            {printingId === row.original.id
+              ? <Loader2 className="h-3 w-3 animate-spin" />
+              : <Printer className="h-3 w-3" />}
+            Print
           </Button>
         </div>
       ),
@@ -531,6 +459,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
 export default function HRPage() {
   const today = new Date().toISOString().split("T")[0];
   const now   = new Date();
+  const { settings: receiptSettings } = useReceiptSettings();
 
   // Employees
   const [employees, setEmployees]       = useState<Employee[]>([]);
@@ -562,6 +491,7 @@ export default function HRPage() {
   const [genDeduct, setGenDeduct]     = useState("0");
   const [genLoading, setGenLoading]   = useState(false);
   const [genAllOpen, setGenAllOpen]   = useState(false);
+  const [printingPayslipId, setPrintingPayslipId] = useState<string | null>(null);
 
   // Leaves
   const [leaves, setLeaves]           = useState<LeaveRequest[]>([]);
@@ -669,8 +599,20 @@ export default function HRPage() {
   };
 
   const markPaid = async (id: string) => {
-    try { await api.put(`/hr/employees/payroll/${id}/paid`, {}); toast.success("Marked as paid"); fetchPayrolls(); }
+    try { await api.put(`/hr/employees/payroll/${id}/paid`, {}); toast.success("Marked as paid — expense recorded"); fetchPayrolls(); }
     catch { toast.error("Failed to mark payroll as paid"); }
+  };
+
+  const handlePrintPayslip = async (p: Payroll) => {
+    setPrintingPayslipId(p.id);
+    try {
+      await printThermalPayslip(p, payMonth, payYear, receiptSettings);
+      toast.success("Payslip sent to printer");
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to print payslip");
+    } finally {
+      setPrintingPayslipId(null);
+    }
   };
 
   // Stats
@@ -687,7 +629,7 @@ export default function HRPage() {
   const empColumns         = buildEmpColumns((e) => { setEditEmployee(e); setAddOpen(true); }, handleDeactivate);
   const attnColumns        = buildAttnColumns(attnMap, setAttnMap);
   const attnSummaryColumns = buildAttnSummaryColumns();
-  const payrollColumns     = buildPayrollColumns(payMonth, payYear, markPaid);
+  const payrollColumns     = buildPayrollColumns(markPaid, handlePrintPayslip, printingPayslipId);
   const leaveColumns       = buildLeaveColumns(updateLeaveStatus);
 
   const unpaidEmployees = employees.filter((e) => e.isActive && !payrolls.find((p) => p.employeeId === e.id));

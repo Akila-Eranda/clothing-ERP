@@ -64,7 +64,10 @@ export class WorkflowService {
       },
       stock_transfer: {
         name: 'Stock Transfer Approval',
-        steps: [{ name: 'Branch Manager Approval', approverRole: 'BRANCH_MANAGER' }],
+        steps: [
+          { name: 'Branch Manager Review', approverRole: 'BRANCH_MANAGER' },
+          { name: 'Admin Approval', approverRole: 'TENANT_ADMIN' },
+        ],
       },
       cash_variance: {
         name: 'Cash Variance Approval',
@@ -386,6 +389,11 @@ export class WorkflowService {
             approvedById: userId,
             approvedAt: new Date(),
           },
+        });
+      } else if (entityType === 'StockTransfer') {
+        await this.prisma.stockTransfer.updateMany({
+          where: { id: entityId, tenantId, status: TransferStatus.PENDING },
+          data: { approvedBy: userId },
         });
       }
     }

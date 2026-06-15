@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender, AttendanceStatus } from '@prisma/client';
+import { Gender, AttendanceStatus, PaymentMethod } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { createLinkedExpense } from '@/shared/expense.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -190,10 +191,41 @@ export class HrService {
     });
   }
 
-  async markPayrollPaid(id: string, tenantId: string) {
-    const p = await this.prisma.payroll.findFirst({ where: { id, tenantId } });
+  async markPayrollPaid(id: string, tenantId: string, branchId: string, userId: string) {
+    const p = await this.prisma.payroll.findFirst({
+      where: { id, tenantId },
+      include: { employee: { select: { firstName: true, lastName: true, code: true } } },
+    });
     if (!p) throw new NotFoundException('Payroll not found');
-    return this.prisma.payroll.update({ where: { id }, data: { isPaid: true, paidAt: new Date() } });
+    if (p.isPaid) throw new BadRequestException('Payroll already marked as paid');
+
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    const monthLabel = monthNames[p.month - 1] ?? String(p.month);
+    const empName = `${p.employee.firstName} ${p.employee.lastName}`.trim();
+    const paidAt = new Date();
+
+    return this.prisma.$transaction(async (tx) => {
+      await createLinkedExpense(tx, {
+        tenantId,
+        branchId: branchId || undefined,
+        userId,
+        amount: p.netSalary,
+        description: `Payroll — ${empName} (${p.employee.code ?? 'N/A'}) — ${monthLabel} ${p.year}`,
+        date: paidAt,
+        categoryId: 'Payroll',
+        paymentMethod: PaymentMethod.BANK_TRANSFER,
+        reference: `payroll:${p.id}`,
+      });
+
+      return tx.payroll.update({
+        where: { id },
+        data: { isPaid: true, paidAt, paymentMethod: 'BANK_TRANSFER' },
+        include: { employee: true },
+      });
+    });
   }
 
   async generatePayroll(tenantId: string, dto: CreatePayrollDto) {
@@ -379,7 +411,7 @@ export class HrController {
   @Put('payroll/:id/paid')
   @RequirePermissions('hr:update')
   markPaid(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.hrService.markPayrollPaid(id, user.tenantId);
+    return this.hrService.markPayrollPaid(id, user.tenantId, user.branchId ?? '', user.id);
   }
 
   // ── Dynamic :id routes MUST come last ──────────────────────────────────

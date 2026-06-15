@@ -989,9 +989,9 @@ export class TenantsService {
     dto: ReceiptPrintDispatchDto,
   ) {
     const settings = await this.getReceiptSettings(tenantId);
-    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST'].includes(dto.printType)
+    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP'].includes(dto.printType)
       ? dto.printType
-      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST';
+      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP';
     const mode = settings.printMode ?? 'auto';
     const useServer = settings.printServerEnabled && settings.printServerUrl;
 

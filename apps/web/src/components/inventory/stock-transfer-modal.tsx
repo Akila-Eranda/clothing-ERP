@@ -158,7 +158,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
           requestedQty: Number(i.requestedQty),
         })),
       });
-      toast.success("Stock transfer created");
+      toast.success("Stock transfer submitted — waiting for manager/admin approval");
       onCreated();
       onClose();
     } catch (e: unknown) {

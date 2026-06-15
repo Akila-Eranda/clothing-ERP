@@ -621,7 +621,7 @@ export class InventoryService {
     return branch?.id ?? '';
   }
 
-  private async enrichTransfers<T extends { toBranchId: string }>(transfers: T[]) {
+  private async enrichTransfers<T extends { id: string; toBranchId: string }>(transfers: T[]) {
     const toBranchIds = [...new Set(transfers.map((t) => t.toBranchId))];
     const toBranches = toBranchIds.length
       ? await this.prisma.branch.findMany({
@@ -630,7 +630,24 @@ export class InventoryService {
         })
       : [];
     const toMap = new Map(toBranches.map((b) => [b.id, b]));
-    return transfers.map((t) => ({ ...t, toBranch: toMap.get(t.toBranchId) ?? null }));
+
+    const transferIds = transfers.map((t) => t.id);
+    const workflows = transferIds.length
+      ? await this.prisma.workflowInstance.findMany({
+          where: { entityType: 'StockTransfer', entityId: { in: transferIds } },
+          include: {
+            definition: { include: { steps: { orderBy: { stepOrder: 'asc' } } } },
+            tasks: { orderBy: { stepOrder: 'asc' } },
+          },
+        })
+      : [];
+    const wfMap = new Map(workflows.map((w) => [w.entityId, w]));
+
+    return transfers.map((t) => ({
+      ...t,
+      toBranch: toMap.get(t.toBranchId) ?? null,
+      workflow: wfMap.get(t.id) ?? null,
+    }));
   }
 
   async createTransfer(tenantId: string, fromBranchId: string, userId: string, dto: CreateTransferDto, userRoles: string[] = []) {
@@ -667,20 +684,18 @@ export class InventoryService {
 
     const [enriched] = await this.enrichTransfers([transfer]);
 
-    if (!bypassesWorkflowApproval(userRoles)) {
-      await this.workflowService.start(tenantId, userId, {
-        key: 'stock_transfer',
-        entityType: 'StockTransfer',
-        entityId: transfer.id,
-        metadata: {
-          reference: `TRF-${transfer.id.slice(0, 8).toUpperCase()}`,
-          fromBranchId: effectiveFrom,
-          toBranchId: dto.toBranchId,
-          toBranchName: toBranch.name,
-          itemCount: dto.items.length,
-        },
-      });
-    }
+    await this.workflowService.start(tenantId, userId, {
+      key: 'stock_transfer',
+      entityType: 'StockTransfer',
+      entityId: transfer.id,
+      metadata: {
+        reference: `TRF-${transfer.id.slice(0, 8).toUpperCase()}`,
+        fromBranchId: effectiveFrom,
+        toBranchId: dto.toBranchId,
+        toBranchName: toBranch.name,
+        itemCount: dto.items.length,
+      },
+    });
 
     return enriched;
   }
@@ -740,8 +755,11 @@ export class InventoryService {
           },
         },
       });
-      if (wf && wf.status !== WorkflowStatus.APPROVED && !bypassesWorkflowApproval(userRoles)) {
-        throw new BadRequestException('Transfer must be approved in Workflows before dispatch');
+      if (wf && wf.status !== WorkflowStatus.APPROVED) {
+        if (wf.status === WorkflowStatus.REJECTED) {
+          throw new BadRequestException('Transfer was rejected — create a new transfer request');
+        }
+        throw new BadRequestException('Transfer must be approved before dispatch');
       }
 
       for (const item of transfer.items) {

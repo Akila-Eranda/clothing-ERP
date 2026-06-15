@@ -132,8 +132,8 @@ function PaymentModal({
       }
       toast.success(
         selectedPOs.length === 1
-          ? `Payment of LKR ${selectedDue.toLocaleString("en-LK")} recorded`
-          : `${selectedPOs.length} payments totalling LKR ${selectedDue.toLocaleString("en-LK")} recorded`
+          ? `Payment of LKR ${selectedDue.toLocaleString("en-LK")} recorded — expense added`
+          : `${selectedPOs.length} payments totalling LKR ${selectedDue.toLocaleString("en-LK")} recorded — expenses added`
       );
       onSaved();
     } catch (e: unknown) {

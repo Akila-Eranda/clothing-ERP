@@ -48,7 +48,7 @@ const GUIDE = [
   { key: "purchase_order", title: "Purchase Order", steps: "Draft → Manager → Finance → GRN", href: "/purchases" },
   { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval", href: "/pos" },
   { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval", href: "/inventory" },
-  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Branch manager approval", href: "/inventory" },
+  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Manager review → Admin approval", href: "/inventory" },
   { key: "cash_variance", title: "Cash Variance", steps: "POS close → Manager approves drawer variance", href: "/cash?tab=variance" },
 ];
 

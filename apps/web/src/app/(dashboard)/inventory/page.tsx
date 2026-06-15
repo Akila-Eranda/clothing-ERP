@@ -17,9 +17,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { StockTransferModal } from "@/components/inventory/stock-transfer-modal";
+import { TransferApprovalActions } from "@/components/inventory/transfer-approval-actions";
 import { CreatePOModal } from "@/components/purchases/create-po-modal";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/utils";
+import { isTransferWorkflowApproved, type WorkflowInstanceLike } from "@/lib/workflow-access";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { variantTableColumns } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
@@ -65,6 +67,7 @@ interface StockTransferRow {
   toBranchId: string;
   status: "PENDING" | "IN_TRANSIT" | "RECEIVED" | "CANCELLED";
   notes?: string | null;
+  requestedBy?: string | null;
   createdAt: string;
   items: {
     id: string;
@@ -75,6 +78,7 @@ interface StockTransferRow {
   }[];
   fromBranch?: { id: string; name: string; code?: string | null };
   toBranch?: { id: string; name: string; code?: string | null } | null;
+  workflow?: WorkflowInstanceLike | null;
 }
 
 const TRANSFER_STATUS: Record<StockTransferRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "danger" }> = {
@@ -201,7 +205,8 @@ function buildStockColumns(
 
 export default function InventoryPage() {
   const router = useRouter();
-  const userBranchId = useAuthStore((s) => s.user?.branchId);
+  const user = useAuthStore((s) => s.user);
+  const userBranchId = user?.branchId;
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const branchScopeId = activeBranchId ?? userBranchId;
   const { profile, workspace } = useShopWorkspace();
@@ -266,6 +271,19 @@ export default function InventoryPage() {
       fetchAll();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to update transfer");
+    } finally {
+      setTransferActionId(null);
+    }
+  };
+
+  const actOnTransferWorkflow = async (taskId: string, action: "approve" | "reject") => {
+    setTransferActionId(taskId);
+    try {
+      await api.put(`/workflows/tasks/${taskId}/${action}`, {});
+      toast.success(action === "approve" ? "Transfer approved" : "Transfer rejected");
+      fetchAll();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? `Failed to ${action} transfer`);
     } finally {
       setTransferActionId(null);
     }
@@ -487,7 +505,7 @@ export default function InventoryPage() {
         <TabsContent value="transfers" className="mt-4 space-y-4">
           <div className="flex items-center justify-between flex-wrap gap-3">
             <p className="text-sm text-muted-foreground">
-              Move stock between branches — dispatch from source, receive at destination.
+              Move stock between branches — manager/admin approval required before dispatch.
             </p>
             <Button size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
               <ArrowLeftRight className="h-3.5 w-3.5" /> New Transfer
@@ -499,7 +517,7 @@ export default function InventoryPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40 border-b">
                     <tr>
-                      {["Date", "From", "To", "Items", "Status", "Actions"].map((h) => (
+                      {["Date", "From", "To", "Items", "Status", "Approval", "Actions"].map((h) => (
                         <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
                       ))}
                     </tr>
@@ -507,7 +525,7 @@ export default function InventoryPage() {
                   <tbody className="divide-y">
                     {transfers.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
+                        <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
                           No stock transfers yet. Create one to move inventory between branches.
                         </td>
                       </tr>
@@ -517,10 +535,13 @@ export default function InventoryPage() {
                         .map((i) => `${i.variant?.product?.name ?? "Item"} ×${i.requestedQty}`)
                         .slice(0, 2)
                         .join(", ");
-                      const canDispatch = t.status === "PENDING" && (!branchScopeId || t.fromBranchId === branchScopeId);
+                      const approved = isTransferWorkflowApproved(t.workflow);
+                      const canDispatch = t.status === "PENDING" && approved && (!branchScopeId || t.fromBranchId === branchScopeId);
                       const canReceive = t.status === "IN_TRANSIT" && (!branchScopeId || t.toBranchId === branchScopeId);
                       const canCancel = t.status === "PENDING" && (!branchScopeId || t.fromBranchId === branchScopeId);
                       const acting = transferActionId === t.id;
+                      const wfActing = !!(transferActionId && t.workflow?.tasks?.some((task) => task.id === transferActionId));
+                      const showPendingApproval = t.status === "PENDING" && t.workflow?.status === "IN_PROGRESS";
                       return (
                         <tr key={t.id} className="hover:bg-muted/20">
                           <td className="px-3 py-2.5 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
@@ -531,6 +552,26 @@ export default function InventoryPage() {
                           </td>
                           <td className="px-3 py-2.5">
                             <Badge variant={st.variant} className="text-[9px]">{st.label}</Badge>
+                            {showPendingApproval && (
+                              <p className="text-[9px] text-amber-600 mt-1">Awaiting approval</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-2.5 align-top">
+                            {t.status === "PENDING" && t.workflow ? (
+                              <TransferApprovalActions
+                                instance={t.workflow}
+                                userId={user?.id}
+                                userRole={user?.role}
+                                requestedBy={t.requestedBy}
+                                acting={wfActing}
+                                onApprove={(taskId) => actOnTransferWorkflow(taskId, "approve")}
+                                onReject={(taskId) => actOnTransferWorkflow(taskId, "reject")}
+                              />
+                            ) : t.workflow?.status === "APPROVED" ? (
+                              <span className="text-[10px] text-emerald-600 font-medium">Approved</span>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
                           </td>
                           <td className="px-3 py-2.5">
                             <div className="flex gap-1.5 flex-wrap">

@@ -19,6 +19,8 @@ const APPROVER_ROLE_LABELS: Record<string, string> = {
   branch_manager: 'Branch Manager',
   inventory_manager: 'Inventory Manager',
   accountant: 'Accountant',
+  tenant_admin: 'Tenant Admin',
+  super_admin: 'Super Admin',
 };
 
 export function approverRoleLabel(role?: string | null): string {
@@ -88,4 +90,24 @@ export function poApprovalStatusMessage(
     return `Waiting for ${who} to approve (${step?.name ?? 'review'}). You cannot approve your own request.`;
   }
   return `${step?.name ?? 'Review'} — ${who} approval required`;
+}
+
+/** Human-readable status for stock transfer approval. */
+export function transferApprovalStatusMessage(
+  instance: WorkflowInstanceLike | null,
+  isSubmitter: boolean,
+): string {
+  if (!instance || instance.status !== 'IN_PROGRESS') return '';
+  const pendingTask = instance.tasks?.find((t) => t.status === 'PENDING');
+  if (!pendingTask) return 'Approval in progress…';
+  const step = instance.definition?.steps?.find((s) => s.stepOrder === pendingTask.stepOrder);
+  const who = approverRoleLabel(step?.approverRole);
+  if (isSubmitter) {
+    return `Waiting for ${who} to approve. You cannot approve your own transfer.`;
+  }
+  return `${step?.name ?? 'Review'} — ${who} must approve before dispatch`;
+}
+
+export function isTransferWorkflowApproved(instance: WorkflowInstanceLike | null | undefined): boolean {
+  return !instance || instance.status === 'APPROVED';
 }

@@ -14,6 +14,7 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { createLinkedExpense } from '@/shared/expense.helper';
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -222,17 +223,25 @@ export class SuppliersService {
     return this.findOnePO(id, tenantId);
   }
 
-  async recordPayment(supplierId: string, tenantId: string, dto: RecordPaymentDto) {
-    await this.findOneSupplier(supplierId, tenantId);
+  async recordPayment(
+    supplierId: string,
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: RecordPaymentDto,
+  ) {
+    const supplier = await this.findOneSupplier(supplierId, tenantId);
     if (dto.amount <= 0) {
       throw new BadRequestException('Payment amount must be positive');
     }
     return this.prisma.$transaction(async (tx) => {
+      let poNumber: string | undefined;
       if (dto.purchaseId) {
         const po = await tx.purchaseOrder.findFirst({
           where: { id: dto.purchaseId, tenantId, supplierId },
         });
         if (!po) throw new NotFoundException('Purchase order not found for this supplier');
+        poNumber = po.poNumber;
         const due = Math.max(0, po.total - po.paidAmount);
         if (dto.amount > due + 0.01) {
           throw new BadRequestException(
@@ -260,6 +269,20 @@ export class SuppliersService {
           data: { paidAmount: { increment: dto.amount } },
         });
       }
+
+      await createLinkedExpense(tx, {
+        tenantId,
+        branchId: branchId || undefined,
+        userId,
+        amount: dto.amount,
+        description: poNumber
+          ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
+          : `Supplier payment — ${supplier.name}`,
+        date: payment.paidAt,
+        categoryId: 'Operations',
+        paymentMethod: dto.method,
+        reference: `supplier-payment:${payment.id}`,
+      });
 
       return payment;
     });
@@ -407,7 +430,7 @@ export class SuppliersController {
   @RequirePermissions('suppliers:update')
   @ApiOperation({ summary: 'Record a payment to supplier' })
   recordPayment(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: RecordPaymentDto) {
-    return this.suppliersService.recordPayment(id, user.tenantId, dto);
+    return this.suppliersService.recordPayment(id, user.tenantId, user.branchId ?? '', user.id, dto);
   }
 
   @Get(':id/payments')
