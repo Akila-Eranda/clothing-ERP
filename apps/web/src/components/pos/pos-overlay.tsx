@@ -613,6 +613,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setTimeout(() => setScanFlash(false), 500);
   }, [products, handleAddProduct]);
 
+  const handleCardClick = React.useCallback((p: ProductItem) => {
+    if (!needsVariantPicker(p.productName)) {
+      handleAddProduct(p);
+      return;
+    }
+    setSelectedProductName(p.productName);
+    const initial: Record<string, string | null> = {};
+    for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null;
+    setSelAttrs(initial);
+  }, [needsVariantPicker, handleAddProduct, variantCols]);
+
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
     if (!q) return;
@@ -639,7 +650,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     void scanAndAddProduct(q);
   }, [search, products, filteredProducts, scanAndAddProduct, handleAddProduct, handleCardClick, needsVariantPicker]);
-  const handleCardClick = React.useCallback((p:ProductItem)=>{ if(!needsVariantPicker(p.productName)){handleAddProduct(p);return;} setSelectedProductName(p.productName); const initial: Record<string, string | null> = {}; for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null; setSelAttrs(initial); },[needsVariantPicker, handleAddProduct, variantCols]);
+
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
   const handlePinEntry = React.useCallback((digit: string) => {

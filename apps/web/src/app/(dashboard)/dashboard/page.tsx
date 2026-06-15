@@ -19,6 +19,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 import { toast } from "sonner";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getWorkspace } from "@/lib/shop-workspace";
@@ -60,10 +61,11 @@ interface RevenuePoint {
 }
 
 // ── Chart helpers ────────────────────────────────────────────────────────────
-function groupByDate(raw: RevenuePoint[], days: number) {
+function groupByDate(raw: RevenuePoint[] | unknown, days: number) {
+  const list = parseApiList<RevenuePoint>(raw);
   const map = new Map<string, { date: string; revenue: number; orders: number }>();
   const since = Date.now() - days * 864e5;
-  raw
+  list
     .filter((r) => new Date(r.invoiceDate).getTime() >= since)
     .forEach((r) => {
       const d = new Date(r.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" });
@@ -109,11 +111,11 @@ export default function DashboardPage() {
         api.get<RevenuePoint[]>("/sales/revenue?period=day"),
         api.get<{ total: number }>("/customers?limit=1"),
       ]);
-      if (sumRes.status   === "fulfilled") setSummary(sumRes.value.data);
-      if (salesRes.status === "fulfilled") setRecentSales(salesRes.value.data?.data ?? []);
-      if (topRes.status   === "fulfilled") setTopProducts(topRes.value.data ?? []);
-      if (lowRes.status   === "fulfilled") setLowStock(lowRes.value.data ?? []);
-      if (revRes.status   === "fulfilled") setRevenue(revRes.value.data ?? []);
+      if (sumRes.status   === "fulfilled") setSummary(sumRes.value.data ?? null);
+      if (salesRes.status === "fulfilled") setRecentSales(parseApiList<SaleRow>(salesRes.value.data));
+      if (topRes.status   === "fulfilled") setTopProducts(parseApiList<TopProduct>(topRes.value.data));
+      if (lowRes.status   === "fulfilled") setLowStock(parseApiList<LowStockItem>(lowRes.value.data));
+      if (revRes.status   === "fulfilled") setRevenue(parseApiList<RevenuePoint>(revRes.value.data));
       if (custRes.status  === "fulfilled") {
         const payload = custRes.value.data as unknown as { total?: number; meta?: { total?: number } };
         setCustTotal(payload?.meta?.total ?? payload?.total ?? 0);
