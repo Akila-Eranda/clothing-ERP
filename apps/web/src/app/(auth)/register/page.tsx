@@ -157,7 +157,7 @@ export default function RegisterPage() {
         />
         <div className="relative">
           <div className="mb-12">
-            <AppLogo variant="full" showTagline />
+            <AppLogo variant="full" theme="dark" showTagline />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-2">Start your free 14-day trial</h2>
           <p className="text-white/70 text-sm leading-relaxed mb-6">
@@ -179,7 +179,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <AppLogo variant="compact" className="items-center mx-auto" />
+            <AppLogo variant="compact" theme="light" className="items-center mx-auto" />
           </div>
 
           {/* Step indicator */}

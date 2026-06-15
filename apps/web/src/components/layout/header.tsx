@@ -87,7 +87,7 @@ export function Header() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm min-w-0 flex-1">
         <Link href="/dashboard" className="shrink-0 hidden sm:block">
-          <AppLogo variant="sidebar" />
+          <AppLogo variant="sidebar" theme="auto" />
         </Link>
         {breadcrumbs.map((crumb, i) => (
           <React.Fragment key={crumb}>

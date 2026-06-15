@@ -31,7 +31,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <AppLogo variant="full" className="items-center mb-3" />
+          <AppLogo variant="full" theme="light" className="items-center mb-3" />
           <p className="text-sm text-gray-500 mt-1 text-center">
             Internal use only — not for shop staff or tenants
           </p>

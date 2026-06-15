@@ -43,7 +43,7 @@ export function AuthBrandPanel({
       <div className="relative z-10 flex flex-col flex-1 p-10 xl:p-12 max-w-xl mx-auto w-full">
         {/* Logo */}
         <div className="shrink-0">
-          <AppLogo variant="full" showTagline />
+          <AppLogo variant="full" theme="dark" showTagline />
         </div>
 
         {/* Main content — vertically centred */}

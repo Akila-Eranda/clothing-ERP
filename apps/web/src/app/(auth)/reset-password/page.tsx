@@ -79,7 +79,7 @@ function ResetPasswordForm() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <AppLogo variant="compact" className="items-center mx-auto" />
+          <AppLogo variant="compact" theme="light" className="items-center mx-auto" />
         </div>
 
         <div className="glass-card rounded-2xl p-8 shadow-glass">

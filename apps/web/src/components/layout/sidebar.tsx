@@ -18,7 +18,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
-import { APP_NAME, APP_LOGO_PATH } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -260,7 +261,7 @@ export function Sidebar() {
             )}
             style={logoSrc
               ? { background: isDark ? "#1e293b" : "#f8fafc", border: `1px solid ${border}` }
-              : { background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
+              : { background: isDark ? "#070d1a" : "#f8fafc", border: `1px solid ${border}` }}
           >
             {logoSrc ? (
               <img
@@ -269,11 +270,7 @@ export function Sidebar() {
                 className="h-full w-full object-contain p-1"
               />
             ) : (
-              <img
-                src={APP_LOGO_PATH}
-                alt={APP_NAME}
-                className="h-full w-full object-contain p-0.5"
-              />
+              <AppLogo variant="sidebar" theme="auto" framed={false} className="h-full w-full items-center justify-center" alt={APP_NAME} />
             )}
           </div>
 

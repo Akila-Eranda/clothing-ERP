@@ -16,7 +16,8 @@ import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
-import { APP_NAME, APP_LOGO_PATH } from "@/lib/constants";
+import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
@@ -1385,7 +1386,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="flex items-center gap-2.5 shrink-0">
             <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
             <div className="flex items-center gap-2">
-              <img src={APP_LOGO_PATH} alt={APP_NAME} className="h-7 w-auto object-contain" />
+              <AppLogo variant="sidebar" theme="dark" framed={false} className="h-7 shrink-0" alt={APP_NAME} />
               <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p>
             </div>
           </div>

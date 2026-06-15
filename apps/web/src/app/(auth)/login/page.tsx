@@ -144,7 +144,7 @@ function LoginContent() {
             className="w-full max-w-[420px]"
           >
             <div className="mb-8 flex justify-center">
-              <AppLogo variant="compact" className="items-center" />
+              <AppLogo variant="compact" theme="light" className="items-center" />
             </div>
 
             <div className="mb-8">

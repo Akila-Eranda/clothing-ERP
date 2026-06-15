@@ -17,7 +17,7 @@ export function PosOnlyLanding({ shopLabel, onOpenPos, onLogout }: PosOnlyLandin
       style={{ background: "linear-gradient(160deg,#070d1a 0%,#0f1f3c 50%,#070d1a 100%)" }}
     >
       <div className="max-w-sm w-full text-center space-y-6">
-        <AppLogo variant="compact" className="items-center mx-auto" />
+        <AppLogo variant="compact" theme="dark" className="items-center mx-auto" />
         <div>
           <h1 className="text-2xl font-bold">{shopLabel ?? "Point of Sale"}</h1>
           <p className="text-sm text-slate-400 mt-2">Open the register to start selling.</p>

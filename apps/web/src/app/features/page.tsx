@@ -22,7 +22,7 @@ export default function FeaturesPage() {
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/login">
-            <AppLogo variant="compact" />
+            <AppLogo variant="compact" theme="light" />
           </Link>
           <div className="flex gap-2">
             <Button variant="ghost" asChild><Link href="/login">Login</Link></Button>
