@@ -557,12 +557,28 @@ export class PosService {
       return acc;
     }, {});
 
+    const itemTotals = await this.prisma.saleItem.aggregate({
+      where: {
+        sale: {
+          tenantId,
+          branchId: resolvedBranchId,
+          status: SaleStatus.COMPLETED,
+          invoiceDate: {
+            gte: targetDate.startOf('day').toDate(),
+            lte: targetDate.endOf('day').toDate(),
+          },
+        },
+      },
+      _sum: { quantity: true },
+    });
+
     return {
       date: targetDate.format('YYYY-MM-DD'),
       totalSales: totals._count.id,
       totalRevenue: totals._sum.total ?? 0,
       totalTax: totals._sum.taxAmount ?? 0,
       totalDiscount: totals._sum.discountAmount ?? 0,
+      totalItems: itemTotals._sum.quantity ?? 0,
       byPaymentMethod,
     };
   }

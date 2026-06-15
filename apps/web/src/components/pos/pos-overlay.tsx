@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,6 +12,9 @@ import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
+import { openCustomerDisplayWindow } from "@/lib/pos-customer-display";
+import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
@@ -123,6 +126,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [focusedHeldIdx, setFocusedHeldIdx] = React.useState(0);
   const [focusedCustomerIdx, setFocusedCustomerIdx] = React.useState(0);
   const [scanFlash, setScanFlash] = React.useState(false);
+  const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
+  const [lastAddedVariantId, setLastAddedVariantId] = React.useState<string | undefined>();
+  const [thankYouSale, setThankYouSale] = React.useState<ThankYouSale | null>(null);
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
   const [selAttrs, setSelAttrs] = React.useState<Record<string, string | null>>({});
@@ -200,6 +206,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     currency: "LKR",
   });
   const { settings: receiptSettings } = useReceiptSettings();
+  const { display: printerStatus, refresh: refreshPrinterStatus } = usePosPrinterStatus(posOpen, receiptSettings);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const discountInputRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -301,6 +308,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     };
   }, [pendingDiscountApproval, setDiscount]);
 
+  const loadTodayStats = React.useCallback(async () => {
+    try {
+      const r = await api.get<{ totalSales: number; totalRevenue: number; totalItems?: number }>("/pos/summary");
+      const d = r.data;
+      setTodayStats({
+        sales: d.totalRevenue ?? 0,
+        orders: d.totalSales ?? 0,
+        items: d.totalItems ?? 0,
+      });
+    } catch {
+      /* keep last known stats */
+    }
+  }, []);
+
   const loadHeldBills = React.useCallback(async () => {
     setHoldsLoading(true);
     try {
@@ -396,7 +417,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     } catch { toast.error("Failed to load sales"); } finally { setOrdersLoading(false); }
   }, []);
 
-  React.useEffect(() => { if (posOpen) { loadProducts(); loadHeldBills(); } }, [posOpen, loadProducts, loadHeldBills]);
+  React.useEffect(() => { if (posOpen) { loadProducts(); loadHeldBills(); loadTodayStats(); } }, [posOpen, loadProducts, loadHeldBills, loadTodayStats]);
+  React.useEffect(() => {
+    if (!posOpen) return;
+    const t = setInterval(loadTodayStats, 120_000);
+    return () => clearInterval(t);
+  }, [posOpen, loadTodayStats]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
   React.useEffect(() => {
     if (posOpen) {
@@ -493,6 +519,33 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     ),
     [items, discount, discountType, payState.couponDiscount, customer?.membershipTier, loyaltyPointsToRedeem, subtotal, taxRate],
   );
+  const productImages = React.useMemo(
+    () => new Map(products.map((p) => [p.variantId, p.imageUrl])),
+    [products],
+  );
+
+  usePosCustomerDisplayPublisher({
+    enabled: posOpen && !pinLocked && shiftReady,
+    checkoutOpen,
+    thankYouSale,
+    items,
+    customer,
+    manualDiscount: discount,
+    manualDiscountType: discountType,
+    couponDiscount: payState.couponDiscount,
+    loyaltyPoints: loyaltyPointsToRedeem,
+    taxRate,
+    currency: payState.currency,
+    receiptSettings,
+    productImages,
+    lastAddedVariantId,
+  });
+
+  const handleOpenCustomerDisplay = React.useCallback(() => {
+    const win = openCustomerDisplayWindow();
+    if (!win) toast.error("Popup blocked — allow popups to open customer screen");
+    else toast.success("Customer display opened — drag to second monitor");
+  }, []);
   const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
   const loyaltyDiscountAmt = loyaltyPointsToRedeem * 0.1;
   const amountBeforeLoyalty = React.useMemo(
@@ -525,7 +578,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
       unitPrice: p.unitPrice, quantity: 1, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
+      image: p.imageUrl,
     });
+    setLastAddedVariantId(p.variantId);
     setRecentScans(prev => [{ id: Date.now().toString(), variantId: p.variantId, name: p.productName, variant: variantDisplayLabel(p, profile), price: p.unitPrice, time: new Date() }, ...prev].slice(0, 8));
     toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} added  (Stock: ${p.stock})`, { duration: 900 });
   }, [addItem, profile, taxRate]);
@@ -553,6 +608,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     if (!found) { toast.error(`Barcode/SKU not found: ${trimmed}`); return; }
     handleAddProduct(found);
+    setLastScanAt(new Date());
     setSearch("");
     setScanFlash(true);
     setTimeout(() => setScanFlash(false), 500);
@@ -673,11 +729,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         cashTendered: activePayment === "CASH" && numpad ? parseFloat(numpad) : undefined,
       };
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
+      setThankYouSale({
+        invoiceNumber: s.invoiceNumber,
+        total: s.total,
+        changeDue: s.changeDue ?? 0,
+        paymentMethod: saleSnapshot.paymentMethod,
+        items: saleSnapshot.items,
+        customerName: saleSnapshot.customerName,
+      });
+      setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
       await loadHeldBills();
       await loadProducts();
+      void loadTodayStats();
+      void refreshPrinterStatus();
       if (receiptSettings.autoPrintAfterSale) {
         const receipt: SaleReceipt = {
           invoiceNumber: s.invoiceNumber,
@@ -706,7 +773,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -716,10 +783,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
     try {
       await executeReceiptPrint({ html, printType: "PRE_BILL", settings: s, title: "Pre-Bill" });
+      void refreshPrinterStatus();
     } catch (e) {
       toast.error((e as Error).message ?? "Print failed");
     }
-  }, [items, totalAmt, receiptSettings, user]);
+  }, [items, totalAmt, receiptSettings, user, refreshPrinterStatus]);
 
   const applyCustomer = React.useCallback((c: CustomerItem) => {
     if (!c?.id) { toast.error("Invalid customer — try again"); return; }
@@ -1456,7 +1524,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3">
-            {([{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;onClick?:()=>void}[]).map((item,i)=>(
+            {([{icon:Monitor,title:"Customer Display",onClick:handleOpenCustomerDisplay,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;onClick?:()=>void}[]).map((item,i)=>(
               item.path
                 ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
                 :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
@@ -1558,6 +1626,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               {taxRate > 0 ? `Tax ${taxRate}%` : "No Tax"}
             </button>
             {serverHeldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
+            <button type="button" onClick={handleOpenCustomerDisplay} title="Open customer-facing display on second screen" className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90" style={{background:"rgba(124,58,237,0.15)",color:"#c4b5fd"}}>
+              <Monitor className="h-3.5 w-3.5"/>Customer Screen
+            </button>
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{user?.name?.[0]??"A"}</div>
               <div><p className="text-white text-xs font-semibold leading-tight">{user?.name??"Admin"}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>{formatUserRole(user?.role)}</p></div>
@@ -1608,7 +1679,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </button>
                 )}
                 {!checkoutOpen && (
-                  <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
+                  <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
                 )}
               </div>
             </div>
@@ -1826,12 +1897,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
           ))}
           <div className="flex-1"/>
-          <div className="flex items-center gap-2 shrink-0" style={{color:"#10b981"}}><div className="h-2 w-2 rounded-full bg-green-400 animate-pulse"/><span className="text-xs font-semibold">Barcode Scanner</span><span className="text-xs" style={{color:"#6a8ab8"}}>Connected</span></div>
-          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
-          <div className="flex items-center gap-1.5 shrink-0" style={{color:"#6a8ab8"}}><Printer className="h-3.5 w-3.5"/><span className="text-xs">Printer Ready</span></div>
-          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
-          <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</div>
-          <div className="text-xs shrink-0" style={{color:"#6a8ab8"}}>{now.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})}</div>
+          {(() => {
+            const scannerActive = isScannerActive(lastScanAt, scanFlash, now);
+            const scannerDetail = formatScannerDetail(lastScanAt, now);
+            const scannerColor = scannerActive ? "#10b981" : "#6a8ab8";
+            return (
+              <div className="flex items-center gap-2 shrink-0" style={{ color: scannerColor }}>
+                <div className={cn("h-2 w-2 rounded-full bg-green-400", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "#4a6a8a" }} />
+                <Scan className="h-3.5 w-3.5" />
+                <span className="text-xs font-semibold">Barcode Scanner</span>
+                <span className="text-xs" style={{ color: "#6a8ab8" }}>{scannerDetail}</span>
+              </div>
+            );
+          })()}
+          <div className="h-4 w-px" style={{ background: "#1e3356" }} />
+          <div className="flex items-center gap-1.5 shrink-0" style={{ color: printerStatus.color }}>
+            <Printer className="h-3.5 w-3.5" />
+            <span className="text-xs font-semibold">{printerStatus.label}</span>
+            <span className="text-xs" style={{ color: "#6a8ab8" }}>{printerStatus.detail}</span>
+          </div>
+          <div className="h-4 w-px" style={{ background: "#1e3356" }} />
+          <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })}</div>
+          <div className="text-xs shrink-0" style={{ color: "#6a8ab8" }}>{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
           <div className="h-4 w-px" style={{background:"#1e3356"}}/>
           <button onClick={handleDayEnd} disabled={dayEndLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}}>{dayEndLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<TrendingUp className="h-3.5 w-3.5"/>}Day End</button>
           <button onClick={()=>setShowCashClose(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90" style={{background:"rgba(16,185,129,0.12)",color:"#10b981",border:"1px solid rgba(16,185,129,0.3)"}}><Banknote className="h-3.5 w-3.5"/>Close Shift</button>

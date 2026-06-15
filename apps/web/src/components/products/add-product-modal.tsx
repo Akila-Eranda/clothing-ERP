@@ -24,6 +24,7 @@ import {
 import { getWorkspace } from "@/lib/shop-workspace";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { useBranchStore } from "@/stores/branch-store";
+import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -122,6 +123,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const [loading, setLoading]       = useState(false);
   const [again, setAgain]           = useState(false);
   const [done, setDone]             = useState<Set<TabId>>(new Set());
+  const [editSystemTags, setEditSystemTags] = useState<string[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,13 +135,15 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
   useEffect(() => {
     if (editProduct) {
+      const { userTags, systemTags } = splitProductTags(editProduct.tags ?? []);
+      setEditSystemTags(systemTags);
       setForm({
         name: editProduct.name, barcode: editProduct.barcode ?? "",
         description: editProduct.description ?? "", shortDesc: editProduct.shortDesc ?? "",
         categoryId: editProduct.categoryId ?? "", brandId: editProduct.brandId ?? "",
         hsn: editProduct.hsn ?? "",
         status: editProduct.status === "ACTIVE" ? "ACTIVE" : "DRAFT",
-        tags: (editProduct.tags ?? []).filter((t) => !t.startsWith("unit:") && !t.startsWith("exp:") && !t.startsWith("batch:")),
+        tags: userTags,
         tagInput: "",
         sellingPrice: editProduct.sellingPrice.toString(),
         costPrice: editProduct.costPrice.toString(),
@@ -156,6 +160,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         branchId: "",
       });
     } else {
+      setEditSystemTags([]);
       setForm(buildInitialForm());
     }
     setTab("basic"); setDone(new Set());
@@ -197,12 +202,17 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       mrp: parseFloat(form.mrp) || 0,
       taxRate: parseFloat(form.taxRate) || 18,
     }));
-    const extraTags = [
-      ...form.tags,
-      ...(showUnit && form.unit ? [`unit:${form.unit}`] : []),
-      ...(showExpiry && form.expiryDate ? [`exp:${form.expiryDate}`] : []),
-      ...(showBatch && form.batchNumber ? [`batch:${form.batchNumber}`] : []),
-    ];
+    const extraTags = buildProductTags({
+      tags: form.tags,
+      tagInput: form.tagInput,
+      unit: form.unit,
+      expiryDate: form.expiryDate,
+      batchNumber: form.batchNumber,
+      showUnit,
+      showExpiry,
+      showBatch,
+      preserveSystemTags: editProduct ? editSystemTags : undefined,
+    });
     const payload = {
       name: form.name.trim(),
       description: form.description || undefined,
@@ -705,7 +715,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             {form.tags.map((tag, i) => (
               <Badge key={i} variant="secondary" className="gap-1 pl-2 pr-1 h-6">
                 {tag}
-                <button onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
+                <button type="button" onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
               </Badge>
             ))}
             <input className="flex-1 min-w-[140px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
@@ -722,7 +732,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
               }}
             />
           </div>
-          <p className="text-[10px] text-muted-foreground">Press Enter or comma to add a tag</p>
+          <p className="text-[10px] text-muted-foreground">Press Enter or comma to add — unsaved text in the box is included when you Save</p>
         </div>
       </div>
     </div>

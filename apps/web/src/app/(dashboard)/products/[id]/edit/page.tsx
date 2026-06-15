@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
 import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
+import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -103,6 +104,7 @@ export default function EditProductPage() {
   const [listView, setListView]     = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [productName, setProductName] = useState("");
+  const [systemTags, setSystemTags] = useState<string[]>([]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
@@ -116,7 +118,9 @@ export default function EditProductPage() {
         api.get<Brand[]>("/brands"),
       ]);
       const p = prodRes.data;
+      const { userTags, systemTags: sysTags } = splitProductTags(p.tags ?? []);
       setProductName(p.name);
+      setSystemTags(sysTags);
       setCategories(catRes.data ?? []);
       setBrands(brandRes.data ?? []);
       setForm({
@@ -127,7 +131,7 @@ export default function EditProductPage() {
         brandId:       p.brand?.id     ?? "",
         hsn:           p.hsn           ?? "",
         status:        (p.status as "ACTIVE" | "DRAFT"),
-        tags:          p.tags,
+        tags:          userTags,
         tagInput:      "",
         sellingPrice:  String(p.sellingPrice),
         costPrice:     String(p.costPrice),
@@ -236,6 +240,12 @@ export default function EditProductPage() {
       }));
     }
 
+    const savedTags = buildProductTags({
+      tags: form.tags,
+      tagInput: form.tagInput,
+      preserveSystemTags: systemTags,
+    });
+
     try {
       await api.put(`/products/${id}`, {
         name:           form.name.trim(),
@@ -249,7 +259,7 @@ export default function EditProductPage() {
         mrp:            parseFloat(form.mrp),
         taxRate:        parseFloat(form.taxRate) || 0,
         status,
-        tags:           form.tags,
+        tags:           savedTags,
         hasVariants:    form.hasVariants,
         trackInventory: form.trackInventory,
         ...(showWarranty
@@ -344,7 +354,7 @@ export default function EditProductPage() {
                   {form.tags.map((tag, i) => (
                     <Badge key={i} variant="secondary" className="gap-1 pl-2 pr-1 h-5 text-xs">
                       {tag}
-                      <button onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
                     </Badge>
                   ))}
                   <input className="flex-1 min-w-[80px] outline-none text-xs bg-transparent placeholder:text-muted-foreground"

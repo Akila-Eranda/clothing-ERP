@@ -24,6 +24,7 @@ import {
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { useBranchStore } from "@/stores/branch-store";
+import { buildProductTags } from "@/lib/product-tags";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
@@ -197,12 +198,16 @@ export default function AddProductPage() {
         }));
       }
     }
-    const extraTags = [
-      ...form.tags,
-      ...(showUnit && form.unit ? [`unit:${form.unit}`] : []),
-      ...(showExpiry && form.expiryDate ? [`exp:${form.expiryDate}`] : []),
-      ...(showBatch && form.batchNumber ? [`batch:${form.batchNumber}`] : []),
-    ];
+    const extraTags = buildProductTags({
+      tags: form.tags,
+      tagInput: form.tagInput,
+      unit: form.unit,
+      expiryDate: form.expiryDate,
+      batchNumber: form.batchNumber,
+      showUnit,
+      showExpiry,
+      showBatch,
+    });
     if (form.branchScope === "SINGLE" && !form.branchId) {
       toast.error("Select a branch or choose All Branches");
       return;
@@ -341,7 +346,7 @@ export default function AddProductPage() {
                   {form.tags.map((tag, i) => (
                     <Badge key={i} variant="secondary" className="gap-1 pl-2 pr-1 h-5 text-xs">
                       {tag}
-                      <button onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
+                      <button type="button" onClick={() => set("tags", form.tags.filter((_, j) => j !== i))}><X className="h-3 w-3" /></button>
                     </Badge>
                   ))}
                   <input className="flex-1 min-w-[80px] outline-none text-xs bg-transparent placeholder:text-muted-foreground"

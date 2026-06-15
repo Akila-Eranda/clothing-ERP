@@ -37,7 +37,7 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
   @ApiPropertyOptional({ enum: ProductStatus }) @IsOptional() @IsEnum(ProductStatus) status?: ProductStatus;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() images?: string[];
-  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() tags?: string[];
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsBoolean() hasVariants?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() trackInventory?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
@@ -279,8 +279,17 @@ export class ProductsService {
 
   async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
     await this.findOne(id, tenantId);
-    const { variants, ...productFields } = dto as Record<string, unknown>;
-    const data: Record<string, unknown> = { ...productFields };
+    const { variants, branchScope: _bs, branchId: _bi, ...rest } = dto as Record<string, unknown>;
+    const allowed = [
+      'name', 'description', 'shortDesc', 'categoryId', 'brandId', 'hsn', 'barcode',
+      'sellingPrice', 'costPrice', 'mrp', 'taxRate', 'status', 'images', 'tags',
+      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'warrantyMonths',
+      'seoTitle', 'seoDescription',
+    ] as const;
+    const data: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if (rest[key] !== undefined) data[key] = rest[key];
+    }
     if (dto.name) data.slug = this.generateSlug(dto.name);
     await this.prisma.product.update({ where: { id }, data });
     if (Array.isArray(variants) && variants.length > 0) {

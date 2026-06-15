@@ -982,6 +982,45 @@ export class TenantsService {
     }
   }
 
+  async getReceiptPrintStatus(tenantId: string) {
+    const settings = await this.getReceiptSettings(tenantId);
+    let serverOnline: boolean | null = null;
+    if (settings.printServerEnabled && settings.printServerUrl) {
+      try {
+        const base = settings.printServerUrl.replace(/\/+$/, '');
+        const res = await fetch(`${base}/v1/health`, {
+          method: 'GET',
+          headers: settings.printServerKey ? { 'x-print-key': settings.printServerKey } : {},
+          signal: AbortSignal.timeout(4000),
+        });
+        serverOnline = res.ok;
+      } catch {
+        serverOnline = false;
+      }
+    }
+    const lastLog = await this.prisma.receiptPrintLog.findFirst({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true, createdAt: true, printMode: true, errorMessage: true },
+    });
+    return {
+      printMode: settings.printMode ?? 'auto',
+      printerName: settings.printerName || null,
+      paperWidth: settings.paperWidth,
+      printServerEnabled: settings.printServerEnabled,
+      printServerConfigured: Boolean(settings.printServerUrl?.trim()),
+      serverOnline,
+      lastPrint: lastLog
+        ? {
+            status: lastLog.status,
+            at: lastLog.createdAt.toISOString(),
+            mode: lastLog.printMode,
+            error: lastLog.errorMessage,
+          }
+        : null,
+    };
+  }
+
   async dispatchReceiptPrint(
     tenantId: string,
     userId: string,
@@ -1153,6 +1192,13 @@ export class TenantsController {
   @ApiOperation({ summary: 'Send test print job to configured store print server' })
   testPrintServer(@CurrentUser() user: IAuthUser) {
     return this.tenantsService.testPrintServer(user.tenantId, user.id);
+  }
+
+  @Get('receipt-print/status')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Printer / print-server connectivity status for POS' })
+  getReceiptPrintStatus(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.getReceiptPrintStatus(user.tenantId);
   }
 
   @Get()
