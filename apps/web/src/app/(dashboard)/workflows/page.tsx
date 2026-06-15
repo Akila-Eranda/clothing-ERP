@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   GitBranch, RefreshCw, Loader2, CheckCircle2, XCircle, Clock,
-  ShoppingBag, Package, Tag, ArrowLeftRight, Shield, ExternalLink,
+  ShoppingBag, Package, Tag, ArrowLeftRight, Shield, ExternalLink, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +41,7 @@ const WORKFLOW_CFG: Record<string, { label: string; icon: React.ElementType; col
   stock_adjustment: { label: "Stock Adjustment", icon: Package,        color: "text-amber-500",   bg: "bg-amber-500/10" },
   discount_request: { label: "Discount Request", icon: Tag,            color: "text-violet-500",  bg: "bg-violet-500/10" },
   stock_transfer:   { label: "Stock Transfer",   icon: ArrowLeftRight, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  cash_variance:    { label: "Cash Variance",    icon: Banknote,       color: "text-emerald-600", bg: "bg-emerald-500/10" },
 };
 
 const GUIDE = [
@@ -48,6 +49,7 @@ const GUIDE = [
   { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval", href: "/pos" },
   { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval", href: "/inventory" },
   { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Branch manager approval", href: "/inventory" },
+  { key: "cash_variance", title: "Cash Variance", steps: "POS close → Manager approves drawer variance", href: "/cash?tab=variance" },
 ];
 
 interface WorkflowCatalogItem {
@@ -71,6 +73,7 @@ function workflowCfg(key: string) {
 function entityLink(task: WorkflowTask): string | null {
   const key = task.instance.definition.key;
   if (task.instance.entityType === "PurchaseOrder") return `/purchases/${task.instance.entityId}`;
+  if (key === "cash_variance" || task.instance.entityType === "CashRegister") return "/cash?tab=variance";
   if (key === "stock_transfer") return "/inventory";
   if (key === "stock_adjustment") return "/inventory";
   if (key === "discount_request") return "/pos";
@@ -82,6 +85,8 @@ function referenceLabel(task: WorkflowTask): string {
   if (typeof meta.poNumber === "string") return meta.poNumber;
   if (typeof meta.reference === "string") return meta.reference;
   if (typeof meta.discountPercent === "number") return `${meta.discountPercent}% discount`;
+  if (typeof meta.variance === "number") return `Variance LKR ${formatNumber(Math.abs(meta.variance as number))}`;
+  if (typeof meta.cashierName === "string") return meta.cashierName as string;
   return task.instance.entityId.slice(0, 10) + "…";
 }
 

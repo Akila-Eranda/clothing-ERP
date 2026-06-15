@@ -64,6 +64,9 @@ interface CashRegister {
 }
 
 interface TodaySummary {
+  from?: string;
+  to?: string;
+  isToday?: boolean;
   openShifts: number;
   closedToday: number;
   expected: number;
@@ -83,13 +86,26 @@ const VARIANCE_THRESHOLD = 500;
 const FLOAT_PRESETS = [5000, 10000, 15000, 20000];
 const AUTO_REFRESH_MS = 30_000;
 
-const _n = new Date();
-const HISTORY_PRESETS = [
-  { label: "This Week", start: new Date(_n.getFullYear(), _n.getMonth(), _n.getDate() - _n.getDay()).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
-  { label: "This Month", start: new Date(_n.getFullYear(), _n.getMonth(), 1).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
-  { label: "Last 30 Days", start: new Date(_n.getFullYear(), _n.getMonth(), _n.getDate() - 30).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
-  { label: "Last 3 Months", start: new Date(_n.getFullYear(), _n.getMonth() - 3, 1).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
+function isoDate(d: Date) {
+  return d.toISOString().split("T")[0];
+}
+
+const _now = new Date();
+const TODAY = isoDate(_now);
+
+const DATE_PRESETS = [
+  { label: "Today", from: TODAY, to: TODAY },
+  { label: "Yesterday", from: isoDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - 1)), to: isoDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - 1)) },
+  { label: "This Week", from: isoDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - _now.getDay())), to: TODAY },
+  { label: "This Month", from: isoDate(new Date(_now.getFullYear(), _now.getMonth(), 1)), to: TODAY },
+  { label: "Last 7 Days", from: isoDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - 6)), to: TODAY },
+  { label: "Last 30 Days", from: isoDate(new Date(_now.getFullYear(), _now.getMonth(), _now.getDate() - 29)), to: TODAY },
 ];
+
+function formatRangeLabel(from: string, to: string) {
+  const fmt = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
+  return from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`;
+}
 
 function statusBadge(status: CashRegister["status"]) {
   if (status === "OPEN") return <Badge variant="success" className="text-[10px]">Open</Badge>;
@@ -114,7 +130,7 @@ export default function CashManagementPage() {
   const [closeNotes, setCloseNotes] = React.useState("");
   const [closing, setClosing] = React.useState(false);
   const [history, setHistory] = React.useState<CashRegister[]>([]);
-  const [historyRange, setHistoryRange] = React.useState({ from: HISTORY_PRESETS[1].start, to: HISTORY_PRESETS[1].end });
+  const [dateRange, setDateRange] = React.useState({ from: TODAY, to: TODAY });
   const [varianceDays, setVarianceDays] = React.useState("30");
   const [varianceReport, setVarianceReport] = React.useState<{
     totalShifts: number;
@@ -145,12 +161,14 @@ export default function CashManagementPage() {
 
   const loadToday = React.useCallback(async () => {
     try {
-      const res = await api.get<TodaySummary>("/cash/today");
+      const res = await api.get<TodaySummary>(
+        `/cash/summary?from=${dateRange.from}&to=${dateRange.to}`,
+      );
       setToday(res.data ?? null);
     } catch {
       setToday(null);
     }
-  }, []);
+  }, [dateRange]);
 
   const loadSuggestion = React.useCallback(async () => {
     try {
@@ -164,22 +182,26 @@ export default function CashManagementPage() {
   const loadHistory = React.useCallback(async () => {
     try {
       const res = await api.get<{ data: CashRegister[] }>(
-        `/cash/history?limit=100&from=${historyRange.from}&to=${historyRange.to}`,
+        `/cash/history?limit=100&from=${dateRange.from}&to=${dateRange.to}`,
       );
       setHistory((res.data as { data?: CashRegister[] })?.data ?? []);
     } catch {
       toast.error("Failed to load cash history");
     }
-  }, [historyRange]);
+  }, [dateRange]);
 
   const loadVariance = React.useCallback(async () => {
     try {
-      const res = await api.get<typeof varianceReport>(`/cash/variance-report?days=${varianceDays}`);
+      const useRange = dateRange.from !== TODAY || dateRange.to !== TODAY;
+      const url = useRange
+        ? `/cash/variance-report?from=${dateRange.from}&to=${dateRange.to}`
+        : `/cash/variance-report?days=${varianceDays}`;
+      const res = await api.get<typeof varianceReport>(url);
       setVarianceReport(res.data ?? null);
     } catch {
       toast.error("Failed to load variance report");
     }
-  }, [varianceDays]);
+  }, [dateRange, varianceDays]);
 
   const refresh = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -189,6 +211,18 @@ export default function CashManagementPage() {
   }, [loadActive, loadToday, loadSuggestion, loadHistory, loadVariance]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
+
+  const isViewingToday = dateRange.from === TODAY && dateRange.to === TODAY;
+  const rangeLabel = formatRangeLabel(dateRange.from, dateRange.to);
+
+  const applyPreset = (from: string, to: string) => setDateRange({ from, to });
+
+  // Auto-reload when date filter changes
+  React.useEffect(() => {
+    void loadToday();
+    void loadHistory();
+    void loadVariance();
+  }, [dateRange, loadToday, loadHistory, loadVariance]);
 
   // Auto-route to sensible tab on first load
   React.useEffect(() => {
@@ -212,19 +246,16 @@ export default function CashManagementPage() {
   const shiftOpen = active?.status === "OPEN";
   const shiftPending = active?.status === "PENDING_APPROVAL";
 
-  // Live refresh while shift is open (POS sales auto-update expected cash)
+  // Live refresh while shift is open (today only)
   React.useEffect(() => {
-    if (!shiftOpen) return;
+    if (!shiftOpen || !isViewingToday) return;
     const id = setInterval(() => {
       void loadActive();
       void loadToday();
       setLastRefreshed(new Date());
     }, AUTO_REFRESH_MS);
     return () => clearInterval(id);
-  }, [shiftOpen, loadActive, loadToday]);
-
-  React.useEffect(() => { void loadHistory(); }, [loadHistory]);
-  React.useEffect(() => { void loadVariance(); }, [loadVariance]);
+  }, [shiftOpen, isViewingToday, loadActive, loadToday]);
 
   const handleOpenShift = async () => {
     const amount = parseFloat(openingCash);
@@ -321,7 +352,10 @@ export default function CashManagementPage() {
   const todayLabel = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
   const summary = active?.summary;
   const actualTotal = denominationTotal(denominations);
-  const expected = summary?.expectedCash ?? active?.expectedCash ?? today?.expected ?? 0;
+  const periodExpected = isViewingToday && shiftOpen
+    ? (summary?.expectedCash ?? active?.expectedCash ?? today?.expected ?? 0)
+    : (today?.expected ?? 0);
+  const expected = periodExpected;
   const variancePreview = actualTotal > 0 ? actualTotal - expected : 0;
   const needsApprovalPreview = Math.abs(variancePreview) > VARIANCE_THRESHOLD;
   const movements = active?.movements ?? [];
@@ -345,24 +379,24 @@ export default function CashManagementPage() {
   const KPI = [
     {
       label: "Shift Status",
-      value: shiftOpen ? "Open" : shiftPending ? "Pending" : "Closed",
-      icon: shiftOpen ? CheckCircle2 : Clock,
-      bg: shiftOpen ? "bg-emerald-600" : shiftPending ? "bg-amber-500" : "bg-slate-500",
-      sub: shiftOpen
+      value: isViewingToday && shiftOpen ? "Open" : isViewingToday && shiftPending ? "Pending" : `${today?.closedToday ?? 0} closed`,
+      icon: isViewingToday && shiftOpen ? CheckCircle2 : Clock,
+      bg: isViewingToday && shiftOpen ? "bg-emerald-600" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
+      sub: isViewingToday && shiftOpen
         ? `Opened LKR ${formatNumber(active?.openingCash ?? 0)}`
-        : shiftPending
+        : isViewingToday && shiftPending
           ? "Awaiting manager approval"
-          : `${today?.closedToday ?? 0} closed today`,
+          : `${today?.openShifts ?? 0} open · ${rangeLabel}`,
     },
     {
       label: "Expected Cash",
-      value: `LKR ${formatNumber(expected)}`,
+      value: `LKR ${formatNumber(periodExpected)}`,
       icon: DollarSign,
       bg: "bg-blue-600",
-      sub: shiftOpen ? "Live · updates from POS" : "No active shift",
+      sub: isViewingToday && shiftOpen ? "Live · updates from POS" : rangeLabel,
     },
     {
-      label: "Today's Difference",
+      label: "Cash Difference",
       value: `LKR ${formatNumber(Math.abs(today?.difference ?? 0))}`,
       icon: Activity,
       bg: (today?.difference ?? 0) < 0 ? "bg-red-500" : "bg-teal-600",
@@ -373,7 +407,7 @@ export default function CashManagementPage() {
       value: String(today?.pendingApproval ?? varianceReport?.pendingApproval ?? 0),
       icon: AlertTriangle,
       bg: "bg-orange-500",
-      sub: "Variance over LKR 500",
+      sub: rangeLabel,
     },
   ];
 
@@ -500,6 +534,48 @@ export default function CashManagementPage() {
         </div>
 
         <div className="px-6 py-6 space-y-6">
+
+          {/* Date filter — auto-applies to KPI, history & variance */}
+          <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
+            {DATE_PRESETS.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => applyPreset(p.from, p.to)}
+                className={cn(
+                  "px-3 py-1.5 text-xs rounded-lg border font-medium transition-all",
+                  dateRange.from === p.from && dateRange.to === p.to
+                    ? "bg-emerald-600 text-white border-emerald-600"
+                    : "bg-background text-muted-foreground hover:bg-muted border",
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+            <div className="w-px h-4 bg-border" />
+            <Input
+              type="date"
+              value={dateRange.from}
+              max={dateRange.to}
+              onChange={(e) => {
+                const from = e.target.value;
+                setDateRange((r) => ({ from, to: from > r.to ? from : r.to }));
+              }}
+              className="h-8 text-xs w-36"
+            />
+            <span className="text-muted-foreground text-xs">to</span>
+            <Input
+              type="date"
+              value={dateRange.to}
+              min={dateRange.from}
+              max={TODAY}
+              onChange={(e) => setDateRange((r) => ({ ...r, to: e.target.value }))}
+              className="h-8 text-xs w-36"
+            />
+            <span className="ml-auto text-xs text-muted-foreground">
+              {history.length} shift{history.length !== 1 ? "s" : ""} · {rangeLabel}
+            </span>
+          </div>
 
           {/* Pending approval banner */}
           {pendingItems.length > 0 && (
@@ -810,38 +886,6 @@ export default function CashManagementPage() {
 
           {/* History */}
           <TabsContent value="history" className="m-0 mt-0 space-y-4">
-            <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
-              {HISTORY_PRESETS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => setHistoryRange({ from: p.start, to: p.end })}
-                  className={cn(
-                    "px-3 py-1.5 text-xs rounded-lg border font-medium transition-all",
-                    historyRange.from === p.start && historyRange.to === p.end
-                      ? "bg-emerald-600 text-white border-emerald-600"
-                      : "bg-background text-muted-foreground hover:bg-muted",
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-              <div className="w-px h-4 bg-border" />
-              <Input
-                type="date"
-                value={historyRange.from}
-                onChange={(e) => setHistoryRange((r) => ({ ...r, from: e.target.value }))}
-                className="h-7 text-xs w-32"
-              />
-              <span className="text-muted-foreground text-xs">–</span>
-              <Input
-                type="date"
-                value={historyRange.to}
-                onChange={(e) => setHistoryRange((r) => ({ ...r, to: e.target.value }))}
-                className="h-7 text-xs w-32"
-              />
-              <span className="ml-auto text-xs text-muted-foreground">{history.length} shifts</span>
-            </div>
             <ClientSideTable
               data={history}
               columns={historyColumns}
@@ -862,17 +906,21 @@ export default function CashManagementPage() {
 
           {/* Variance */}
           <TabsContent value="variance" className="m-0 mt-0 space-y-4">
-            <div className="flex items-center gap-3">
-              <Label className="text-xs font-semibold shrink-0">Period</Label>
-              <Select value={varianceDays} onValueChange={setVarianceDays}>
-                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="7">Last 7 days</SelectItem>
-                  <SelectItem value="30">Last 30 days</SelectItem>
-                  <SelectItem value="90">Last 90 days</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {dateRange.from === TODAY && dateRange.to === TODAY ? (
+              <div className="flex items-center gap-3">
+                <Label className="text-xs font-semibold shrink-0">Period</Label>
+                <Select value={varianceDays} onValueChange={setVarianceDays}>
+                  <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="7">Last 7 days</SelectItem>
+                    <SelectItem value="30">Last 30 days</SelectItem>
+                    <SelectItem value="90">Last 90 days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">Showing variances for {rangeLabel}</p>
+            )}
             {loading ? (
               <Skeleton className="h-48 w-full rounded-xl" />
             ) : varianceReport ? (

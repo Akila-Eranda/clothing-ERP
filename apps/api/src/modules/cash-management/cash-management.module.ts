@@ -307,15 +307,25 @@ export class CashManagementService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getVarianceReport(tenantId: string, branchId: string | undefined, days = 30) {
+  async getVarianceReport(
+    tenantId: string,
+    branchId: string | undefined,
+    opts: { days?: number; from?: string; to?: string } = {},
+  ) {
     const resolvedBranchId = branchId ? await this.resolveBranchId(tenantId, branchId) : undefined;
-    const since = dayjs().subtract(days, 'day').startOf('day').toDate();
+    const since = opts.from
+      ? dayjs(opts.from).startOf('day').toDate()
+      : dayjs().subtract(opts.days ?? 30, 'day').startOf('day').toDate();
+    const until = opts.to ? dayjs(opts.to).endOf('day').toDate() : undefined;
 
     const registers = await this.prisma.cashRegister.findMany({
       where: {
         tenantId,
         ...(resolvedBranchId && { branchId: resolvedBranchId }),
-        closingTime: { gte: since },
+        closingTime: {
+          gte: since,
+          ...(until && { lte: until }),
+        },
         variance: { not: null },
       },
       orderBy: { closingTime: 'desc' },
@@ -331,7 +341,9 @@ export class CashManagementService {
     const pendingApproval = registers.filter((r) => r.status === CashRegisterStatus.PENDING_APPROVAL).length;
 
     return {
-      days,
+      days: opts.days ?? 30,
+      from: opts.from ?? dayjs(since).format('YYYY-MM-DD'),
+      to: opts.to ?? dayjs().format('YYYY-MM-DD'),
       totalShifts: registers.length,
       totalVariance: Math.round(totalVariance * 100) / 100,
       overCount,
@@ -369,50 +381,88 @@ export class CashManagementService {
     };
   }
 
-  async getTodayWidget(tenantId: string, branchId: string | undefined) {
+  async getPeriodSummary(
+    tenantId: string,
+    branchId: string | undefined,
+    from?: string,
+    to?: string,
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const todayStart = dayjs().startOf('day').toDate();
-    const todayEnd = dayjs().endOf('day').toDate();
+    const rangeStart = dayjs(from || undefined).startOf('day');
+    const rangeEnd = dayjs(to || from || undefined).endOf('day');
+    const rangeStartDate = rangeStart.toDate();
+    const rangeEndDate = rangeEnd.toDate();
+    const includesToday = !dayjs().startOf('day').isBefore(rangeStart, 'day')
+      && !dayjs().startOf('day').isAfter(rangeEnd, 'day');
 
-    const openRegisters = await this.prisma.cashRegister.findMany({
+    const registers = await this.prisma.cashRegister.findMany({
       where: {
         tenantId,
         branchId: resolvedBranchId,
-        status: { in: [CashRegisterStatus.OPEN, CashRegisterStatus.PENDING_APPROVAL] },
+        OR: [
+          { openingTime: { gte: rangeStartDate, lte: rangeEndDate } },
+          { closingTime: { gte: rangeStartDate, lte: rangeEndDate } },
+          ...(includesToday
+            ? [{ status: { in: [CashRegisterStatus.OPEN, CashRegisterStatus.PENDING_APPROVAL] } }]
+            : []),
+        ],
       },
-      include: { movements: true, cashier: { select: { firstName: true, lastName: true } } },
+      include: { movements: true },
     });
 
-    const closedToday = await this.prisma.cashRegister.findMany({
-      where: {
-        tenantId,
-        branchId: resolvedBranchId,
-        closingTime: { gte: todayStart, lte: todayEnd },
-        status: CashRegisterStatus.CLOSED,
-      },
-    });
-
+    const seen = new Set<string>();
+    let openShifts = 0;
+    let closedCount = 0;
     let expectedTotal = 0;
     let actualTotal = 0;
-    for (const reg of openRegisters) {
-      const expected = computeExpectedCashFromMovements(reg.openingCash, reg.movements);
-      expectedTotal += expected;
-    }
-    for (const reg of closedToday) {
-      expectedTotal += reg.expectedCash ?? 0;
-      actualTotal += reg.actualCash ?? 0;
+    let pendingApproval = 0;
+
+    for (const reg of registers) {
+      if (seen.has(reg.id)) continue;
+      seen.add(reg.id);
+
+      const openedInRange = reg.openingTime >= rangeStartDate && reg.openingTime <= rangeEndDate;
+      const closedInRange =
+        reg.closingTime != null
+        && reg.closingTime >= rangeStartDate
+        && reg.closingTime <= rangeEndDate;
+
+      if (
+        includesToday
+        && (reg.status === CashRegisterStatus.OPEN || reg.status === CashRegisterStatus.PENDING_APPROVAL)
+      ) {
+        openShifts += 1;
+        if (reg.status === CashRegisterStatus.PENDING_APPROVAL) pendingApproval += 1;
+        expectedTotal += computeExpectedCashFromMovements(reg.openingCash, reg.movements);
+      } else if (closedInRange) {
+        closedCount += 1;
+        expectedTotal += reg.expectedCash ?? 0;
+        actualTotal += reg.actualCash ?? 0;
+      } else if (openedInRange && reg.status === CashRegisterStatus.CLOSED) {
+        closedCount += 1;
+        expectedTotal += reg.expectedCash ?? 0;
+        actualTotal += reg.actualCash ?? 0;
+      }
     }
 
-    const varianceTotal = actualTotal > 0 ? actualTotal - expectedTotal : 0;
+    const difference = actualTotal > 0 ? actualTotal - expectedTotal : 0;
 
     return {
-      openShifts: openRegisters.length,
-      closedToday: closedToday.length,
+      from: rangeStart.format('YYYY-MM-DD'),
+      to: rangeEnd.format('YYYY-MM-DD'),
+      isToday: includesToday && rangeStart.isSame(rangeEnd, 'day') && rangeStart.isSame(dayjs(), 'day'),
+      openShifts,
+      closedToday: closedCount,
       expected: Math.round(expectedTotal * 100) / 100,
       actual: Math.round(actualTotal * 100) / 100,
-      difference: Math.round(varianceTotal * 100) / 100,
-      pendingApproval: openRegisters.filter((r) => r.status === CashRegisterStatus.PENDING_APPROVAL).length,
+      difference: Math.round(difference * 100) / 100,
+      pendingApproval,
     };
+  }
+
+  async getTodayWidget(tenantId: string, branchId: string | undefined) {
+    const today = dayjs().format('YYYY-MM-DD');
+    return this.getPeriodSummary(tenantId, branchId, today, today);
   }
 
   async getRegisterById(id: string, tenantId: string) {
@@ -499,6 +549,17 @@ export class CashManagementController {
     return this.cashService.openRegister(user.tenantId, user.branchId, user.id, dto);
   }
 
+  @Get('summary')
+  @RequirePermissions('cash:read')
+  @ApiOperation({ summary: 'Cash summary for a date range' })
+  getSummary(
+    @CurrentUser() user: IAuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.cashService.getPeriodSummary(user.tenantId, user.branchId, from, to);
+  }
+
   @Get('today')
   @RequirePermissions('cash:read')
   @ApiOperation({ summary: 'Today cash widget data' })
@@ -526,8 +587,17 @@ export class CashManagementController {
   @Get('variance-report')
   @RequirePermissions('cash:read')
   @ApiOperation({ summary: 'Cash variance report' })
-  getVarianceReport(@CurrentUser() user: IAuthUser, @Query('days') days?: number) {
-    return this.cashService.getVarianceReport(user.tenantId, user.branchId, days ? Number(days) : 30);
+  getVarianceReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('days') days?: number,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    return this.cashService.getVarianceReport(user.tenantId, user.branchId, {
+      days: days ? Number(days) : undefined,
+      from,
+      to,
+    });
   }
 
   @Get(':id')

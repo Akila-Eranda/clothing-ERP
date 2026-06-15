@@ -7,7 +7,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus,
+  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus, CashRegisterStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -181,6 +181,7 @@ export class WorkflowService {
     'stock_adjustment',
     'discount_request',
     'stock_transfer',
+    'cash_variance',
   ] as const;
 
   async getCatalog(tenantId: string) {
@@ -198,6 +199,7 @@ export class WorkflowService {
             stock_adjustment: 'Inventory → Adjust stock (manual)',
             discount_request: 'POS → Manager discount override',
             stock_transfer: 'Inventory → Stock transfer',
+            cash_variance: 'POS → Cash close with variance over threshold',
           }[key],
         };
       }),
@@ -376,6 +378,15 @@ export class WorkflowService {
           userId,
           (instance.metadata ?? {}) as Record<string, unknown>,
         );
+      } else if (entityType === 'CashRegister') {
+        await this.prisma.cashRegister.updateMany({
+          where: { id: entityId, tenantId, status: CashRegisterStatus.PENDING_APPROVAL },
+          data: {
+            status: CashRegisterStatus.CLOSED,
+            approvedById: userId,
+            approvedAt: new Date(),
+          },
+        });
       }
     }
 

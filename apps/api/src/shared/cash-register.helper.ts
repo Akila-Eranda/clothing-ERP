@@ -133,6 +133,31 @@ export async function recordSaleCashMovement(
   });
 }
 
+export async function recordRefundCashMovement(
+  prisma: PrismaService,
+  tenantId: string,
+  branchId: string,
+  cashierId: string,
+  returnId: string,
+  returnNumber: string,
+  amount: number,
+) {
+  if (amount <= 0) return;
+
+  const register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
+  if (!register || register.status !== CashRegisterStatus.OPEN) return;
+
+  await recordCashMovement(prisma, {
+    tenantId,
+    registerId: register.id,
+    type: CashMovementType.REFUND,
+    amount,
+    reference: returnId,
+    description: `Refund ${returnNumber}`,
+    createdById: cashierId,
+  });
+}
+
 export function denominationTotal(counts: Record<string, number>): number {
   return Object.entries(counts).reduce((sum, [denom, qty]) => {
     const d = parseFloat(denom);

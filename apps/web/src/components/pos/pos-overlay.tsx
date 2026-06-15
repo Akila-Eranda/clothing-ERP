@@ -25,6 +25,7 @@ import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
 import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
 import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
+import { PosCashClose } from "@/components/pos/pos-cash-close";
 import type { Customer } from "@/types";
 
 interface POSOverlayProps {
@@ -160,6 +161,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [exchangeSearch, setExchangeSearch] = React.useState("");
   const [warrantySaleId, setWarrantySaleId] = React.useState<string | null>(null);
   const [shiftReady, setShiftReady] = React.useState(false);
+  const [showCashClose, setShowCashClose] = React.useState(false);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -167,7 +169,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
   const [dayEndLoading, setDayEndLoading] = React.useState(false);
   const [showDayEnd, setShowDayEnd] = React.useState(false);
-  const [dayEndSummary, setDayEndSummary] = React.useState<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}|null>(null);
+  const [dayEndSummary, setDayEndSummary] = React.useState<{
+    date: string;
+    totalSales: number;
+    totalRevenue: number;
+    totalTax: number;
+    totalDiscount: number;
+    byPaymentMethod: Record<string, number>;
+    cash?: {
+      shiftOpen: boolean;
+      openingFloat: number | null;
+      cashSalesNet: number;
+      cashTendered: number;
+      changeGiven: number;
+      cashIn: number;
+      cashOut: number;
+      refunds: number;
+      expectedInDrawer: number | null;
+    };
+  } | null>(null);
   const [serverHeldBills, setServerHeldBills] = React.useState<ServerHeldBill[]>([]);
   const [holdsLoading, setHoldsLoading] = React.useState(false);
   const [payState, setPayState] = React.useState<PosPaymentState>({
@@ -552,11 +572,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
 
 
+  const handleCashClosed = React.useCallback((result: { needsApproval?: boolean; variance?: number }) => {
+    setShowCashClose(false);
+    setShiftReady(false);
+    if (result.needsApproval) {
+      toast.info("Manager must approve variance before you can start a new shift");
+    }
+  }, []);
+
   const handleDayEnd = React.useCallback(async()=>{
     if(dayEndLoading)return;
     setDayEndLoading(true);
     try{
-      const r=await api.post<{date:string;totalSales:number;totalRevenue:number;totalTax:number;totalDiscount:number;byPaymentMethod:Record<string,number>}>("/pos/day-end",{});
+      const r = await api.post<NonNullable<typeof dayEndSummary>>("/pos/day-end", {});
       setDayEndSummary(r.data);
       setShowDayEnd(true);
       toast.success("Day closed successfully");
@@ -1442,8 +1470,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         style={{background:"#0d1b2e"}}>
 
         {/* SHIFT GATE — opening cash required */}
-        {posOpen && !pinLocked && !shiftReady && (
+        {posOpen && !pinLocked && !shiftReady && !showCashClose && (
           <PosShiftGate onShiftReady={() => setShiftReady(true)} onClose={closePos} />
+        )}
+
+        {showCashClose && (
+          <PosCashClose
+            onClosed={handleCashClosed}
+            onCancel={() => setShowCashClose(false)}
+          />
         )}
 
         {/* PIN LOCK SCREEN */}
@@ -1765,6 +1800,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="text-xs shrink-0" style={{color:"#6a8ab8"}}>{now.toLocaleDateString([],{month:"short",day:"numeric",year:"numeric"})}</div>
           <div className="h-4 w-px" style={{background:"#1e3356"}}/>
           <button onClick={handleDayEnd} disabled={dayEndLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}}>{dayEndLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<TrendingUp className="h-3.5 w-3.5"/>}Day End</button>
+          <button onClick={()=>setShowCashClose(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90" style={{background:"rgba(16,185,129,0.12)",color:"#10b981",border:"1px solid rgba(16,185,129,0.3)"}}><Banknote className="h-3.5 w-3.5"/>Close Shift</button>
           <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
         </div>
 
@@ -1772,13 +1808,47 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* DAY END MODAL */}
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.75)"}}>
-            <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-sm" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+            <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-md" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
               <div className="p-5 text-white text-center" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)"}}>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{background:"rgba(255,255,255,0.2)"}}><TrendingUp className="h-6 w-6"/></div>
-                <h2 className="text-base font-bold">Day Closed</h2>
+                <h2 className="text-base font-bold">Day End Summary</h2>
                 <p className="text-white/70 text-xs">{dayEndSummary.date}</p>
               </div>
-              <div className="p-4 space-y-2.5">
+              <div className="p-4 space-y-2.5 max-h-[70vh] overflow-y-auto">
+                {dayEndSummary.cash && (
+                  <div className="rounded-xl p-3 mb-1" style={{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.25)"}}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Banknote className="h-4 w-4" style={{color:"#10b981"}}/>
+                      <p className="text-xs font-bold" style={{color:"#10b981"}}>Cash Drawer</p>
+                      {dayEndSummary.cash.shiftOpen && (
+                        <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{background:"rgba(16,185,129,0.2)",color:"#6ee7b7"}}>Shift open</span>
+                      )}
+                    </div>
+                    {[
+                      dayEndSummary.cash.openingFloat != null && ["Opening float", dayEndSummary.cash.openingFloat],
+                      ["Cash sales (net in drawer)", dayEndSummary.cash.cashSalesNet],
+                      dayEndSummary.cash.cashTendered > 0 && ["Cash received (gross)", dayEndSummary.cash.cashTendered],
+                      dayEndSummary.cash.changeGiven > 0 && ["Change given", dayEndSummary.cash.changeGiven],
+                      dayEndSummary.cash.cashIn > 0 && ["Cash in", dayEndSummary.cash.cashIn],
+                      dayEndSummary.cash.cashOut > 0 && ["Cash out", dayEndSummary.cash.cashOut],
+                      dayEndSummary.cash.refunds > 0 && ["Refunds", dayEndSummary.cash.refunds],
+                    ].filter(Boolean).map((row) => {
+                      const [label, amt] = row as [string, number];
+                      return (
+                        <div key={label} className="flex justify-between text-xs py-0.5">
+                          <span style={{color:"#6a8ab8"}}>{label}</span>
+                          <span className="font-bold text-white tabular-nums">LKR {formatNumber(amt)}</span>
+                        </div>
+                      );
+                    })}
+                    {dayEndSummary.cash.expectedInDrawer != null && (
+                      <div className="flex justify-between text-sm font-bold pt-2 mt-2 border-t" style={{borderColor:"rgba(16,185,129,0.2)"}}>
+                        <span style={{color:"#10b981"}}>Expected in drawer</span>
+                        <span style={{color:"#10b981"}} className="tabular-nums">LKR {formatNumber(dayEndSummary.cash.expectedInDrawer)}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
                 {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"#fff"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"#f59e0b"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
                   <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"#1e3356"}}>
                     <span className="text-xs" style={{color:"#6a8ab8"}}>{r.label}</span>
@@ -1790,15 +1860,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <p className="text-xs font-semibold mb-2" style={{color:"#6a8ab8"}}>By Payment Method</p>
                     {Object.entries(dayEndSummary.byPaymentMethod).map(([method,amt])=>(
                       <div key={method} className="flex justify-between text-xs py-1">
-                        <span className="text-white">{method}</span>
-                        <span className="font-bold" style={{color:"#4f6ef7"}}>LKR {formatNumber(amt)}</span>
+                        <span className="text-white">{method.replace(/_/g, " ")}</span>
+                        <span className="font-bold tabular-nums" style={{color: method === "CASH" ? "#10b981" : "#4f6ef7"}}>LKR {formatNumber(amt)}</span>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
-              <div className="p-3 pt-0">
-                <button onClick={()=>setShowDayEnd(false)} className="w-full h-10 rounded-xl text-sm font-bold text-white" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>Close</button>
+              <div className="p-3 pt-0 space-y-2">
+                {dayEndSummary.cash?.shiftOpen && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowDayEnd(false); setShowCashClose(true); }}
+                    className="w-full h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
+                    style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+                  >
+                    <Banknote className="h-4 w-4" /> Count & Close Shift
+                  </button>
+                )}
+                <button onClick={()=>setShowDayEnd(false)} className="w-full h-10 rounded-xl text-sm font-bold text-white" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>Done</button>
               </div>
             </motion.div>
           </motion.div>

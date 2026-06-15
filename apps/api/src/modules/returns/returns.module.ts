@@ -13,6 +13,8 @@ import { InventoryService, InventoryModule } from '@/modules/inventory/inventory
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { recordRefundCashMovement } from '@/shared/cash-register.helper';
+import { PaymentMethod } from '@prisma/client';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
@@ -48,7 +50,10 @@ export class ReturnsService {
 
   async create(tenantId: string, branchId: string, userId: string, dto: CreateReturnDto) {
     await assertShopModule(this.prisma, tenantId, 'returns');
-    const sale = await this.prisma.sale.findFirst({ where: { id: dto.originalSaleId, tenantId } });
+    const sale = await this.prisma.sale.findFirst({
+      where: { id: dto.originalSaleId, tenantId },
+      include: { payments: true },
+    });
     if (!sale) throw new NotFoundException('Original sale not found');
     if (sale.status === 'REFUNDED') {
       throw new BadRequestException('This invoice was already fully refunded');
@@ -97,6 +102,20 @@ export class ReturnsService {
 
       return updated;
     });
+
+    const paidCash = sale.paymentMethod === PaymentMethod.CASH
+      || sale.payments.some((p) => p.method === PaymentMethod.CASH);
+    if (paidCash && refundAmount > 0) {
+      await recordRefundCashMovement(
+        this.prisma,
+        tenantId,
+        branchId,
+        userId,
+        ret.id,
+        ret.returnNumber,
+        refundAmount,
+      );
+    }
 
     return ret;
   }

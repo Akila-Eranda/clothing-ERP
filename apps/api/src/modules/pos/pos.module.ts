@@ -8,7 +8,7 @@ import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNe
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -18,7 +18,7 @@ import { assertShopModule } from '@/shared/shop-module.helper';
 import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } from './pos-sale.helpers';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { nanoid } from 'nanoid';
-import { recordSaleCashMovement } from '@/shared/cash-register.helper';
+import { recordSaleCashMovement, findOpenRegister, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
@@ -650,16 +650,82 @@ export class PosService {
   async closeDaySession(tenantId: string, branchId: string, cashierId: string, notes?: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const now = dayjs();
+    const todayStart = now.startOf('day').toDate();
+    const todayEnd = now.endOf('day').toDate();
     const where = {
       tenantId,
       branchId: resolvedBranchId,
+      cashierId,
       status: SaleStatus.COMPLETED,
-      invoiceDate: { gte: now.startOf('day').toDate(), lte: now.endOf('day').toDate() },
+      invoiceDate: { gte: todayStart, lte: todayEnd },
     };
-    const [totals, byMethod] = await this.prisma.$transaction([
-      this.prisma.sale.aggregate({ where, _sum: { total: true, taxAmount: true, discountAmount: true }, _count: { id: true } }),
-      this.prisma.salePayment.groupBy({ by: ['method'], where: { sale: { ...where } }, _sum: { amount: true }, orderBy: { method: 'asc' } }),
+
+    const [sales, totals] = await Promise.all([
+      this.prisma.sale.findMany({ where, include: { payments: true } }),
+      this.prisma.sale.aggregate({
+        where,
+        _sum: { total: true, taxAmount: true, discountAmount: true },
+        _count: { id: true },
+      }),
     ]);
+
+    let register = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
+    if (!register) {
+      register = await this.prisma.cashRegister.findFirst({
+        where: {
+          tenantId,
+          branchId: resolvedBranchId,
+          cashierId,
+          openingTime: { gte: todayStart, lte: todayEnd },
+        },
+        orderBy: { openingTime: 'desc' },
+        include: { movements: { orderBy: { createdAt: 'asc' } } },
+      });
+    }
+
+    const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
+      for (const payment of sale.payments) {
+        acc[payment.method] = (acc[payment.method] ?? 0) + payment.amount;
+      }
+      return acc;
+    }, {} as Record<string, number>);
+
+    let cashSalesNet = 0;
+    let cashTendered = 0;
+    let changeGiven = 0;
+    for (const sale of sales) {
+      const net = netCashFromSalePayments(sale.payments, sale.changeDue);
+      cashSalesNet += net;
+      const tendered = sale.payments
+        .filter((p) => p.method === PaymentMethod.CASH)
+        .reduce((s, p) => s + p.amount, 0);
+      if (tendered > 0) {
+        cashTendered += tendered;
+        changeGiven += sale.changeDue ?? 0;
+      }
+    }
+    cashSalesNet = Math.round(cashSalesNet * 100) / 100;
+    cashTendered = Math.round(cashTendered * 100) / 100;
+    changeGiven = Math.round(changeGiven * 100) / 100;
+
+    // Align drawer cash sales with register movements when shift exists
+    const movementSummary = register ? summarizeMovements(register.movements) : null;
+    const registerCashSales = movementSummary?.cashSales ?? cashSalesNet;
+
+    const cash = {
+      shiftOpen: register?.status === CashRegisterStatus.OPEN,
+      openingFloat: register?.openingCash ?? null,
+      cashSalesNet: register ? registerCashSales : cashSalesNet,
+      cashTendered,
+      changeGiven,
+      cashIn: movementSummary?.cashReceived ?? 0,
+      cashOut: movementSummary?.cashExpenses ?? 0,
+      refunds: movementSummary?.cashRefunds ?? 0,
+      expectedInDrawer: register
+        ? computeExpectedCashFromMovements(register.openingCash, register.movements)
+        : null,
+    };
+
     const summary = {
       date: now.format('YYYY-MM-DD'),
       closedAt: now.toISOString(),
@@ -669,7 +735,8 @@ export class PosService {
       totalRevenue: totals._sum.total ?? 0,
       totalTax: totals._sum.taxAmount ?? 0,
       totalDiscount: totals._sum.discountAmount ?? 0,
-      byPaymentMethod: Object.fromEntries(byMethod.map(m => [m.method, m._sum?.amount ?? 0])),
+      byPaymentMethod,
+      cash,
     };
     this.eventEmitter.emit('pos.day.closed', { tenantId, branchId: resolvedBranchId, ...summary });
     return summary;
