@@ -56,6 +56,7 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/purchases': 'Purchase Orders',
     '/hr': 'HR & Payroll',
     '/accounting': 'Accounting',
+    '/cash': 'Cash Management',
     '/expenses': 'Expenses',
     '/branches': 'Branches',
     '/reports': 'Reports & Analytics',
@@ -107,6 +108,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     '/warranty': 'Warranty',
     '/quotations': 'Quotations',
     '/users': 'Users & Roles',
+    '/cash': 'Cash Management',
   };
 }
 

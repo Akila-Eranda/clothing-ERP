@@ -128,6 +128,9 @@ async function main() {
     { resource: 'reports', action: 'read' },
     // Accounting
     { resource: 'accounting', action: 'create' }, { resource: 'accounting', action: 'read' },
+    // Cash management
+    { resource: 'cash', action: 'create' }, { resource: 'cash', action: 'read' },
+    { resource: 'cash', action: 'update' },
     // HR
     { resource: 'hr', action: 'create' }, { resource: 'hr', action: 'read' },
     { resource: 'hr', action: 'update' },

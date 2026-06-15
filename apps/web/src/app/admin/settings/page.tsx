@@ -36,7 +36,7 @@ export default function SettingsPage() {
 
   const [platform, setPlatform] = useState({
     maxTenantsPerPlan: '100',
-    trialDays: '14',
+    trialDays: '7',
     defaultPlan: 'STARTER',
     maintenanceMode: false,
     apiRateLimitPerMin: '100',
@@ -230,7 +230,7 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 {[
                   { label: 'Max Tenants per Plan', key: 'maxTenantsPerPlan', placeholder: '100' },
-                  { label: 'Trial Period (days)',  key: 'trialDays',         placeholder: '14'  },
+                  { label: 'Trial Period (days)',  key: 'trialDays',         placeholder: '7'  },
                   { label: 'API Rate Limit/min',   key: 'apiRateLimitPerMin',placeholder: '100' },
                 ].map(f => (
                   <div key={f.key}>

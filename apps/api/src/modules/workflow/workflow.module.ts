@@ -66,6 +66,10 @@ export class WorkflowService {
         name: 'Stock Transfer Approval',
         steps: [{ name: 'Branch Manager Approval', approverRole: 'BRANCH_MANAGER' }],
       },
+      cash_variance: {
+        name: 'Cash Variance Approval',
+        steps: [{ name: 'Manager Approval', approverRole: 'BRANCH_MANAGER' }],
+      },
     };
 
     const template = defaults[key];

@@ -22,6 +22,8 @@ import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
+import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
+import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import type { Customer } from "@/types";
 
 interface POSOverlayProps {
@@ -115,6 +117,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [customers, setCustomers] = React.useState<CustomerItem[]>([]);
   const [customerLoading, setCustomerLoading] = React.useState(false);
   const [selectedCartIdx, setSelectedCartIdx] = React.useState(-1);
+  const [focusedProductIdx, setFocusedProductIdx] = React.useState(-1);
+  const [focusedHeldIdx, setFocusedHeldIdx] = React.useState(0);
+  const [focusedCustomerIdx, setFocusedCustomerIdx] = React.useState(0);
   const [scanFlash, setScanFlash] = React.useState(false);
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
@@ -153,6 +158,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [exchangeItems, setExchangeItems] = React.useState<Map<string, ReturnItemSel>>(new Map());
   const [exchangeSearch, setExchangeSearch] = React.useState("");
   const [warrantySaleId, setWarrantySaleId] = React.useState<string | null>(null);
+  const [shiftReady, setShiftReady] = React.useState(false);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -174,8 +180,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   });
   const { settings: receiptSettings } = useReceiptSettings();
   const searchRef = React.useRef<HTMLInputElement>(null);
+  const discountInputRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+
+  React.useEffect(() => { if (!posOpen) setShiftReady(false); }, [posOpen]);
 
   React.useEffect(() => {
     if (!posOpen) return;
@@ -681,44 +690,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [items, totalAmt, receiptSettings, user]);
 
-  React.useEffect(() => {
-    if (!posOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      const inInput=["INPUT","TEXTAREA"].includes((document.activeElement as HTMLElement)?.tagName??"");
-      if(pinLocked){if(/^\d$/.test(e.key)){handlePinEntry(e.key);return;}if(e.key==="Backspace"){handlePinEntry("DEL");return;}if(e.key==="Escape"){closePos();return;}return;}
-      const ms=Date.now();const delta=ms-lastKeyTime.current;lastKeyTime.current=ms;
-      if(e.key.length===1&&delta<60&&!e.ctrlKey&&!e.altKey){barcodeBuffer.current+=e.key;clearTimeout(barcodeTimer.current);barcodeTimer.current=setTimeout(()=>{barcodeBuffer.current="";},120);}else if(e.key!=="Enter"&&delta>60){clearTimeout(barcodeTimer.current);barcodeBuffer.current="";}
-      if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const code=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(code){scanAndAddProduct(code);e.preventDefault();return;}}
-      if(e.key==="F1"||(e.key==="?"&&!inInput)){e.preventDefault();setShowShortcuts(s=>!s);return;}
-      if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(checkoutOpen){setCheckoutOpen(false);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
-      if(inInput&&e.key==="Enter"&&document.activeElement===searchRef.current){const first=filteredProducts[0];if(first){e.preventDefault();handleAddProduct(first);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}return;}
-      if(inInput)return;
-      if(e.key==="p"||e.key==="P"){e.preventDefault();setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),50);return;}
-      if(e.key==="c"||e.key==="C"){e.preventDefault();if(items.length>0)setCheckoutOpen(true);else toast.info("Cart is empty");return;}
-      if(e.key==="r"||e.key==="R"){e.preventDefault();setActiveNav("returns");return;}
-      if(e.key==="h"||e.key==="H"){e.preventDefault();setActiveNav("hold-bills");return;}
-      if(e.key==="u"||e.key==="U"){e.preventDefault();setActiveNav("customers");return;}
-      if(e.key==="/"||((e.ctrlKey||e.metaKey)&&e.key==="f")){e.preventDefault();searchRef.current?.focus();return;}
-      if(e.key==="F2"){e.preventDefault();searchRef.current?.focus();setActiveNav("products");return;}
-      if(e.key==="F3"){e.preventDefault();if(items.length>0){handleHoldBill();}return;}
-      if(e.key==="F4"){e.preventDefault();setShowCustomerSearch(true);return;}
-      if(e.key==="F5"){e.preventDefault();loadProducts();return;}
-      if(e.key==="F8"){e.preventDefault();if(serverHeldBills.length>0){handleRestoreHeldBill(serverHeldBills[0]);}return;}
-      if(e.key==="F9"){e.preventDefault();if(items.length===0)return;if(!checkoutOpen){setCheckoutOpen(true);return;}handleCheckout();return;}
-      if(e.key==="F12"){e.preventDefault();const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();return;}
-      if(e.key==="Tab"){e.preventDefault();const i=PAY_METHODS.findIndex(m=>m.value===activePayment);setActivePayment(PAY_METHODS[(i+1)%PAY_METHODS.length].value);return;}
-      if(e.key==="Enter"){if(items.length===0)return;if(!checkoutOpen){e.preventDefault();setCheckoutOpen(true);return;}e.preventDefault();handleCheckout();return;}
-      if(activePayment==="CASH"){if(/^\d$/.test(e.key)){handleNumpad(e.key);return;}if(e.key==="."){handleNumpad(".");return;}if(e.key==="Backspace"){handleNumpad("DEL");return;}}
-      if(e.key==="ArrowDown"){e.preventDefault();setSelectedCartIdx(i=>Math.min(items.length-1,i+1));return;}
-      if(e.key==="ArrowUp"){e.preventDefault();setSelectedCartIdx(i=>Math.max(0,i-1));return;}
-      if((e.key==="+"||e.key==="=")&&selectedCartIdx>=0){const it=items[selectedCartIdx];if(it)updateQuantity(it.variantId,it.quantity+1);return;}
-      if((e.key==="-"||e.key==="_")&&selectedCartIdx>=0){const it=items[selectedCartIdx];if(it)updateQuantity(it.variantId,it.quantity-1);return;}
-      if(e.key==="Delete"&&selectedCartIdx>=0){const it=items[selectedCartIdx];if(it){removeItem(it.variantId);setSelectedCartIdx(i=>Math.max(-1,i-1));}return;}
-    };
-    window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,checkoutOpen,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts,scanAndAddProduct]);
-
   const applyCustomer = React.useCallback((c: CustomerItem) => {
     if (!c?.id) { toast.error("Invalid customer — try again"); return; }
     setCustomer({
@@ -772,6 +743,118 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [selectedCartIdx, items, getHoldPayload, removeItem, loadHeldBills, loadProducts]);
 
+  React.useEffect(() => { setFocusedProductIdx(-1); }, [search, activeCategory, filteredProducts.length]);
+  React.useEffect(() => { setFocusedHeldIdx(0); }, [serverHeldBills.length]);
+  React.useEffect(() => { setFocusedCustomerIdx(0); }, [customers.length, inlineCustomers.length, showCustomerSearch]);
+
+  const adjustSelectedQty = React.useCallback((delta: number) => {
+    if (selectedCartIdx < 0) return;
+    const it = items[selectedCartIdx];
+    if (it) updateQuantity(it.variantId, it.quantity + delta);
+  }, [selectedCartIdx, items, updateQuantity]);
+
+  const removeSelectedCartItem = React.useCallback(() => {
+    if (selectedCartIdx < 0) return;
+    const it = items[selectedCartIdx];
+    if (it) {
+      removeItem(it.variantId);
+      setSelectedCartIdx((i) => Math.max(-1, i - 1));
+    }
+  }, [selectedCartIdx, items, removeItem]);
+
+  const keyboardCtx = React.useMemo(() => ({
+    posOpen,
+    pinLocked,
+    checkoutOpen,
+    showShortcuts,
+    showCustomerSearch,
+    showDayEnd,
+    selectedProductName,
+    activeNav,
+    activePayment,
+    itemsLength: items.length,
+    selectedCartIdx,
+    focusedProductIdx,
+    focusedHeldIdx,
+    focusedCustomerIdx,
+    filteredProductsLength: filteredProducts.length,
+    serverHeldBillsLength: serverHeldBills.length,
+    navItems,
+    categories,
+    activeCategory,
+    customersLength: customers.length,
+    inlineCustomersLength: inlineCustomers.length,
+    customerModalListLength: customers.length,
+    showNewCust,
+    inCheckout: checkoutOpen,
+    searchRef,
+    discountInputRef,
+    barcodeBuffer,
+    lastKeyTime,
+    barcodeTimer,
+    setShowShortcuts,
+    setCheckoutOpen,
+    setSelectedProductName,
+    setShowCustomerSearch,
+    setCustomerSearch,
+    setCustomers,
+    setActiveNav,
+    setActivePayment,
+    setSelectedCartIdx,
+    setFocusedProductIdx,
+    setFocusedHeldIdx,
+    setFocusedCustomerIdx,
+    setActiveCategory,
+    setShowNewCust,
+    setShowDayEnd,
+    setPinLocked,
+    setPinEntry,
+    setPinError,
+    closePos,
+    handlePinEntry,
+    scanAndAddProduct,
+    handleAddProduct,
+    handleCardClick,
+    handleNumpad,
+    handleCheckout,
+    handleHoldBill,
+    handleRestoreHeldBill,
+    handleDeleteHeldBill,
+    handleSplitBill,
+    handleThermalPrint,
+    handleDayEnd,
+    loadProducts,
+    clearCart,
+    setCustomer,
+    updateQuantity,
+    removeItem,
+    adjustSelectedQty,
+    removeSelectedCartItem,
+    applyCustomer,
+    getFilteredProduct: (idx: number) => filteredProducts[idx],
+    getHeldBill: (idx: number) => serverHeldBills[idx],
+    getCustomerModalItem: (idx: number) => customers[idx],
+    getInlineCustomer: (idx: number) => inlineCustomers[idx],
+  }), [
+    posOpen, pinLocked, checkoutOpen, showShortcuts, showCustomerSearch, showDayEnd,
+    selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
+    focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, filteredProducts, serverHeldBills,
+    navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
+    closePos, handlePinEntry, scanAndAddProduct, handleAddProduct, handleCardClick,
+    handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
+    handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
+    updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, applyCustomer,
+  ]);
+
+  usePosKeyboard(keyboardCtx);
+
+  React.useEffect(() => {
+    if (posOpen && !pinLocked) {
+      const t = setTimeout(() => searchRef.current?.focus(), 120);
+      return () => clearTimeout(t);
+    }
+  }, [posOpen, pinLocked]);
+
   //  Center content per nav 
   const renderCenter = () => {
     // PRODUCTS
@@ -787,10 +870,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         <div className="flex-1 overflow-y-auto p-3">
           {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):filteredProducts.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
             <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
-              {filteredProducts.map(p=>{
+              {filteredProducts.map((p, pIdx)=>{
                 const varStock=p.stock;const lowStock=varStock>0&&varStock<=5;
+                const kbFocus = focusedProductIdx === pIdx;
                 return (
-                  <motion.div key={p.variantId} whileTap={{scale:0.96}} onClick={()=>handleCardClick(p)} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:selectedProductName===p.productName?"#4f6ef7":"#1e3356"}}>
+                  <motion.div key={p.variantId} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
                     <div className="relative" style={{aspectRatio:"4/3",background:p.imageUrl?"#162338":getCardBg(p.color)}}>
                       {p.imageUrl?<img src={p.imageUrl} alt={p.productName} className="absolute inset-0 w-full h-full object-cover opacity-90"/>:<Package className="absolute inset-0 m-auto h-10 w-10 text-white/20"/>}
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
@@ -899,12 +983,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
           )}
           <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))"}}>
-            {inlineCustomers.map(c=>(
+            {inlineCustomers.map((c, cIdx)=>(
               <div key={c.id} role="button" tabIndex={0}
-                onClick={() => applyCustomer(c)}
+                onClick={() => { setFocusedCustomerIdx(cIdx); applyCustomer(c); }}
                 onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
                 className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
-                style={{background:"#162338",borderColor:customer?.id===c.id?"#10b981":"#1e3356"}}>
+                style={{background:focusedCustomerIdx===cIdx?"rgba(79,110,247,0.12)":"#162338",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx?"#4f6ef7":"#1e3356",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
                 <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                 <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
                 <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
@@ -924,8 +1008,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             {serverHeldBills.map((bill,idx)=>{
               const billItems = bill.data?.items ?? [];
               const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
+              const kbFocus = focusedHeldIdx === idx;
               return (
-                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"#162338",borderColor:"#1e3356"}}>
+                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"#162338",borderColor:kbFocus?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
                   <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span></div>
                   {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
                   <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{billItems.length-3} more items</p>}</div>
@@ -1355,6 +1440,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         className={cn("fixed inset-0 z-[100] flex flex-col overflow-hidden",scanFlash&&"ring-4 ring-inset ring-green-500/70")}
         style={{background:"#0d1b2e"}}>
 
+        {/* SHIFT GATE — opening cash required */}
+        {posOpen && !pinLocked && !shiftReady && (
+          <PosShiftGate onShiftReady={() => setShiftReady(true)} onClose={closePos} />
+        )}
+
         {/* PIN LOCK SCREEN */}
         {pinLocked&&(
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"#0d1b2e"}}>
@@ -1417,7 +1507,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           {/* SIDEBAR */}
           <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
             <nav className="flex-1 py-2 overflow-y-auto">
-              {navItems.map(item=>{
+              {navItems.map((item, navIdx)=>{
                 const active=activeNav===item.id;
                 return (
                   <button key={item.id} onClick={()=>setActiveNav(item.id)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
@@ -1425,6 +1515,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"#6a8ab8"}}/>
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
+                    {navIdx<9&&!(item.id==="products"&&itemCount()>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{navIdx+1}</span>}
                   </button>
                 );
               })}
@@ -1530,7 +1621,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
                   <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
                     <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                    <input type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"#1a2b4a",border:`1px solid ${pendingDiscountApproval?"#f59e0b":discount>0?"#10b981":"#1e3356"}`}}/>
+                    <input ref={discountInputRef} type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"#1a2b4a",border:`1px solid ${pendingDiscountApproval?"#f59e0b":discount>0?"#10b981":"#1e3356"}`}}/>
                     <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
                   </div>
                   {pendingDiscountApproval && (
@@ -1725,7 +1816,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 {customerLoading&&<div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" style={{color:"#4f6ef7"}}/></div>}
                 {!customerLoading&&customers.length===0&&!customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>Type to search or pick from recent customers below</p>}
                 {!customerLoading&&customers.length===0&&customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>No customers found</p>}
-                {customers.map(c=>(<button key={c.id} onClick={()=>{applyCustomer(c);setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);}} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left">
+                {customers.map((c, cIdx)=>(<button key={c.id} onClick={()=>{applyCustomer(c);setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);}} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left" style={{background:focusedCustomerIdx===cIdx?"rgba(79,110,247,0.12)":"transparent",outline:focusedCustomerIdx===cIdx?"1px solid #4f6ef7":"none"}}>
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                   <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium">{c.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{c.phone}</p></div>
                   <div className="flex items-center gap-1 shrink-0"><Star className="h-3 w-3 text-amber-400"/><span className="text-xs capitalize" style={{color:"#f59e0b"}}>{c.tier}</span></div>
@@ -1738,13 +1829,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* SHORTCUTS */}
         <AnimatePresence>{showShortcuts&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>setShowShortcuts(false)}>
-            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-sm p-4" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-              <div className="flex items-center justify-between mb-3"><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
-              <div className="space-y-1 max-h-72 overflow-y-auto">
-                {[["F2 / P","Focus search (Products)"],["C","Open checkout"],["U","Customers tab"],["H","Hold Bills tab"],["R","Returns tab"],["Enter (in search)","Add first match to cart"],["Enter / F9","Checkout → Confirm payment"],["F3","Hold bill"],["F8","Restore last held bill"],["F4","Customer search popup"],["F5","Refresh products"],["F12","Lock / Close POS"],["Tab","Cycle payment method"],["↑ ↓","Navigate cart"],["+ / -","Qty up/down"],["Del","Remove cart item"],["0-9","Cash numpad"],["Backspace","Delete digit"],["Esc","Back to cart / Close"],["F1 / ?","This help"]].map(([k,d])=>(
-                  <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5">
-                    <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
-                    <span className="text-xs ml-3" style={{color:"#6a8ab8"}}>{d}</span>
+            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-lg p-4 max-h-[85vh] overflow-y-auto" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+              <div className="flex items-center justify-between mb-4 sticky top-0" style={{background:"#0f1f3a"}}><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts — full POS control</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+              <div className="space-y-4">
+                {POS_SHORTCUT_SECTIONS.map((section) => (
+                  <div key={section.title}>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{color:"#6a8ab8"}}>{section.title}</p>
+                    <div className="space-y-1">
+                      {section.items.map(([k, d]) => (
+                        <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 gap-3">
+                          <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5 shrink-0" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
+                          <span className="text-xs text-right flex-1" style={{color:"#94a3b8"}}>{d}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))}
               </div>

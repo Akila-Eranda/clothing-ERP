@@ -52,6 +52,7 @@ export class DashboardService {
         transactions: todaySales._count.id,
         newCustomers: newCustomersToday,
       },
+      cash: await this.getCashWidget(tenantId, branchId),
       thisMonth: { revenue: monthlyRevenue, transactions: thisMonthSales._count.id, newCustomers: newCustomersMonth },
       growth: { revenue: revenueGrowth },
       alerts: { lowStock: lowStockCount, pendingPOs, pendingReturns },
@@ -112,6 +113,61 @@ export class DashboardService {
     }
 
     return Object.values(byCategory).sort((a, b) => b.total - a.total);
+  }
+
+  async getCashWidget(tenantId: string, branchId?: string) {
+    const resolvedBranchId = branchId ?? (await this.prisma.branch.findFirst({
+      where: { tenantId },
+      select: { id: true },
+    }))?.id;
+    if (!resolvedBranchId) {
+      return { expected: 0, actual: 0, difference: 0, openShifts: 0, pendingApproval: 0 };
+    }
+
+    const todayStart = dayjs().startOf('day').toDate();
+    const todayEnd = dayjs().endOf('day').toDate();
+
+    const [openRegs, closedToday] = await this.prisma.$transaction([
+      this.prisma.cashRegister.findMany({
+        where: {
+          tenantId,
+          branchId: resolvedBranchId,
+          status: { in: ['OPEN', 'PENDING_APPROVAL'] },
+        },
+        include: { movements: true },
+      }),
+      this.prisma.cashRegister.findMany({
+        where: {
+          tenantId,
+          branchId: resolvedBranchId,
+          closingTime: { gte: todayStart, lte: todayEnd },
+          status: 'CLOSED',
+        },
+      }),
+    ]);
+
+    let expected = 0;
+    let actual = 0;
+    for (const reg of openRegs) {
+      let exp = reg.openingCash;
+      for (const m of reg.movements) {
+        if (['SALE', 'DEPOSIT', 'PAYMENT'].includes(m.type)) exp += m.amount;
+        if (['EXPENSE', 'REFUND', 'WITHDRAWAL'].includes(m.type)) exp -= m.amount;
+      }
+      expected += exp;
+    }
+    for (const reg of closedToday) {
+      expected += reg.expectedCash ?? 0;
+      actual += reg.actualCash ?? 0;
+    }
+
+    return {
+      expected: Math.round(expected * 100) / 100,
+      actual: Math.round(actual * 100) / 100,
+      difference: Math.round((actual - expected) * 100) / 100,
+      openShifts: openRegs.length,
+      pendingApproval: openRegs.filter((r) => r.status === 'PENDING_APPROVAL').length,
+    };
   }
 }
 

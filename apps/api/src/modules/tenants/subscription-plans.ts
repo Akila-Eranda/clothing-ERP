@@ -2,7 +2,7 @@ import { SubscriptionPlan, TenantStatus } from '@prisma/client';
 
 export const PLATFORM_CONFIG_SUBDOMAIN = '__platform_config__';
 /** STARTER plan includes a free trial (days). */
-export const STARTER_TRIAL_DAYS = 14;
+export const STARTER_TRIAL_DAYS = 7;
 
 export interface SubscriptionPlanDef {
   id: string;
@@ -26,8 +26,8 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
     price: 1199,
     currency: 'Rs.',
     interval: 'mo',
-    description: `14-day free trial · then Rs.1,199/mo · 3 users, 1 branch`,
-    features: ['14-day free trial', '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
+    description: `${STARTER_TRIAL_DAYS}-day free trial · then Rs.1,199/mo · 3 users, 1 branch`,
+    features: [`${STARTER_TRIAL_DAYS}-day free trial`, '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
     maxUsers: 3,
     maxBranches: 1,
     maxProducts: 500,
@@ -83,7 +83,7 @@ export function addTrialDays(from: Date = new Date(), days = STARTER_TRIAL_DAYS)
   return end;
 }
 
-/** New tenant: STARTER → TRIAL + 14 days; paid plans → ACTIVE immediately. */
+/** New tenant: STARTER → TRIAL + free trial days; paid plans → ACTIVE immediately. */
 export function subscriptionFieldsForNewTenant(plan: SubscriptionPlan): {
   status: TenantStatus;
   trialEndsAt: Date | null;

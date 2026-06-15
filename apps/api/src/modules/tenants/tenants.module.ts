@@ -24,6 +24,8 @@ import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { getShopProfile, SHOP_TYPE_LIST, slugifyCategory } from '@/shared/shop-profiles';
 import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
+import { TenantSslProvisioner } from '@/shared/tenant-ssl.provisioner';
+import { TenantSslListener } from './tenant-ssl.listener';
 
 export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
@@ -134,6 +136,7 @@ export class TenantsService {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly kcAdmin: KeycloakAdminService,
+    private readonly sslProvisioner: TenantSslProvisioner,
   ) {}
 
   private async seedTenantDefaults(
@@ -170,28 +173,6 @@ export class TenantsService {
         } as unknown as Prisma.InputJsonValue,
       },
     });
-  }
-
-  private async createCloudflareDns(subdomain: string): Promise<void> {
-    const token  = process.env.CLOUDFLARE_API_TOKEN;
-    const zoneId = process.env.CLOUDFLARE_ZONE_ID;
-    const ip     = process.env.SERVER_IP;
-    if (!token || !zoneId || !ip) return;
-    try {
-      const res = await fetch(
-        `https://api.cloudflare.com/client/v4/zones/${zoneId}/dns_records`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'A', name: `${subdomain}.shop`, content: ip, ttl: 1, proxied: true }),
-        },
-      );
-      const data = await res.json() as { success: boolean; errors?: unknown[] };
-      if (!data.success) console.error('[CF-DNS] Failed:', data.errors);
-      else console.log(`[CF-DNS] Created ${subdomain}.shop.hexalyte.com → ${ip}`);
-    } catch (err) {
-      console.error('[CF-DNS] Error:', err);
-    }
   }
 
   private async provisionKeycloak(
@@ -320,10 +301,24 @@ export class TenantsService {
         adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
         initialPassword: adminPassword,
       });
-      this.createCloudflareDns(dto.subdomain);
       this.provisionKeycloak(result, adminEmail, adminPassword, dto);
       return result;
     });
+  }
+
+  async provisionTenantSsl(subdomain: string) {
+    await this.sslProvisioner.provisionNewTenant(subdomain);
+    return {
+      subdomain,
+      url: this.sslProvisioner.tenantUrl(subdomain),
+      message: 'DNS and SSL renewal queued',
+    };
+  }
+
+  async provisionSslById(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id }, select: { subdomain: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    return this.provisionTenantSsl(tenant.subdomain);
   }
 
   private async getPlanCatalogOverrides(): Promise<Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>> {
@@ -881,6 +876,14 @@ export class TenantsController {
     return this.tenantsService.findOne(id);
   }
 
+  @Post(':id/provision-ssl')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Provision DNS + SSL for tenant subdomain (Super Admin)' })
+  provisionSsl(@Param('id') id: string) {
+    return this.tenantsService.provisionSslById(id);
+  }
+
   @Put(':id')
   @ApiBearerAuth('access-token')
   @Roles(RoleType.SUPER_ADMIN)
@@ -893,7 +896,7 @@ export class TenantsController {
 @Module({
   imports: [AuthModule],
   controllers: [TenantsController],
-  providers: [TenantsService, TenantTrialCron],
-  exports: [TenantsService],
+  providers: [TenantsService, TenantTrialCron, TenantSslProvisioner, TenantSslListener],
+  exports: [TenantsService, TenantSslProvisioner],
 })
 export class TenantsModule {}

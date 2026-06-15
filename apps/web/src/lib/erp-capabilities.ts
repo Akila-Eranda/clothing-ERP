@@ -62,6 +62,21 @@ export const ERP_MODULES: { title: string; icon: string; items: Capability[] }[]
     ],
   },
   {
+    title: 'Cash Management',
+    icon: '💵',
+    items: [
+      { id: 'cash-daily-close', label: 'Daily Cash Close', status: 'live', module: 'cash' },
+      { id: 'cash-shift', label: 'Shift Management (Open/Close)', status: 'live', module: 'cash' },
+      { id: 'cash-in-out', label: 'Cash In / Cash Out', status: 'live', module: 'cash' },
+      { id: 'cash-variance', label: 'Cash Variance Approval', status: 'live', module: 'cash' },
+      { id: 'cash-petty', label: 'Petty Cash (Shift Expenses)', status: 'live', module: 'cash' },
+      { id: 'cash-history', label: 'Cash History & Reports', status: 'live', module: 'cash' },
+      { id: 'cash-bank-deposit', label: 'Bank Deposit Tracking', status: 'planned', module: 'cash' },
+      { id: 'cash-branch-transfer', label: 'Branch Cash Transfer', status: 'planned', module: 'cash' },
+      { id: 'cash-safe', label: 'Safe Deposit Tracking', status: 'planned', module: 'cash' },
+    ],
+  },
+  {
     title: 'Purchases',
     icon: '🛒',
     items: [

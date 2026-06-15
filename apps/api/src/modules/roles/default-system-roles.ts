@@ -37,8 +37,8 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
   const cashierPermIds = permissions
     .filter(
       (p) =>
-        ['sales', 'customers', 'inventory', 'products'].includes(p.resource) &&
-        p.action !== 'delete',
+        (['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) &&
+        p.action !== 'delete'),
     )
     .map((p) => p.id);
 
@@ -48,5 +48,6 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
     'inventory:read', 'inventory:update',
     'purchases:read', 'purchases:create', 'purchases:update',
     'sales:read', 'reports:read', 'products:read',
+    'cash:read', 'cash:update',
   ));
 }

@@ -1,4 +1,6 @@
 export const APP_NAME = "HexaOne";
+/** Free trial length for new Starter tenants (days). */
+export const STARTER_TRIAL_DAYS = 7;
 export const APP_TAGLINE = "ALL IN ONE BUSINESS PLATFORM";
 export const APP_LOGO_PATH = "/hexaone-logo.png";
 export const APP_VERSION = "2.0.0";

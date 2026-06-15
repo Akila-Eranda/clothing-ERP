@@ -18,6 +18,7 @@ import { assertShopModule } from '@/shared/shop-module.helper';
 import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } from './pos-sale.helpers';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { nanoid } from 'nanoid';
+import { recordSaleCashMovement } from '@/shared/cash-register.helper';
 import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
@@ -355,6 +356,16 @@ export class PosService {
     });
 
     this.eventEmitter.emit('pos.sale.completed', { saleId: sale.id, tenantId, branchId, total: amountDue });
+    void recordSaleCashMovement(
+      this.prisma,
+      tenantId,
+      branchId,
+      cashierId,
+      sale.id,
+      invoiceNumber,
+      dto.payments,
+      changeDue,
+    );
     return sale;
   }
 

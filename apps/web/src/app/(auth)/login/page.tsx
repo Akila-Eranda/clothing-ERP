@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, STARTER_TRIAL_DAYS } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
 import {
@@ -261,7 +261,7 @@ function LoginContent() {
               <p className="text-center text-sm text-slate-500">
                 Don&apos;t have an account?{" "}
                 <Link href="/register" className="font-semibold text-primary hover:underline">
-                  Start 14-day free trial
+                  Start {STARTER_TRIAL_DAYS}-day free trial
                 </Link>
               </p>
             </div>

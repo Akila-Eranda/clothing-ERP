@@ -1,5 +1,9 @@
+import { STARTER_TRIAL_DAYS } from '@/lib/constants'
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api/v1'
 const PLATFORM_TENANT = process.env.NEXT_PUBLIC_PLATFORM_TENANT || 'platform'
+
+export { STARTER_TRIAL_DAYS }
 
 const TOKEN_KEY = 'fashionerp_admin_token'
 const TENANT_KEY = 'fashionerp_admin_tenant'
@@ -161,7 +165,6 @@ export interface PlanDef {
   tenantCount?: number
 }
 
-export const STARTER_TRIAL_DAYS = 14
 
 export const DEFAULT_PLANS: PlanDef[] = [
   {
@@ -171,8 +174,8 @@ export const DEFAULT_PLANS: PlanDef[] = [
     price: 1199,
     currency: 'Rs.',
     interval: 'mo',
-    description: '14-day free trial, then Rs.1,199/mo',
-    features: ['14-day free trial', '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
+    description: `${STARTER_TRIAL_DAYS}-day free trial, then Rs.1,199/mo`,
+    features: [`${STARTER_TRIAL_DAYS}-day free trial`, '3 Users', '1 Branch', 'Basic POS', 'Inventory'],
     maxUsers: 3,
     maxBranches: 1,
   },

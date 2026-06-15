@@ -391,6 +391,8 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
     { key: 'realm',  label: 'Keycloak realm',             sub: `realm: ${form.subdomain || '—'}` },
     { key: 'roles',  label: 'Default roles & permissions', sub: 'Owner, Manager, Cashier, Technician' },
     { key: 'catalog', label: `${selectedProfile.label} setup`, sub: `${selectedProfile.defaultCategories.length} categories · variants: ${selectedProfile.variantAttributes.map(a => a.name).join(', ')}` },
+    { key: 'dns',    label: 'DNS record (Cloudflare)',    sub: `${form.subdomain || '—'}.shop.hexalyte.com → server` },
+    { key: 'ssl',    label: 'SSL certificate',            sub: 'HTTPS for tenant shop URL' },
     { key: 'email',  label: 'Welcome email',              sub: `to ${form.email || '—'}` },
   ]
 
@@ -651,7 +653,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                   )}
                 </div>
               </div>
-              <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>Use the shop URL above when signing in (not test.shop). Tenant header must match subdomain.</p>
+              <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>HTTPS is provisioned automatically (DNS + SSL). If the shop URL shows a certificate warning, wait 2–3 minutes and refresh.</p>
               <button onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Done</button>
             </div>
           )}

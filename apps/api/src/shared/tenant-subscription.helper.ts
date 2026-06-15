@@ -1,7 +1,7 @@
 import { ForbiddenException } from '@nestjs/common';
 import { RoleType, SubscriptionPlan, TenantStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { isStarterTrialExpired } from '@/modules/tenants/subscription-plans';
+import { isStarterTrialExpired, STARTER_TRIAL_DAYS } from '@/modules/tenants/subscription-plans';
 
 /**
  * Enforce tenant subscription / trial for shop users.
@@ -33,14 +33,14 @@ export async function enforceTenantSubscriptionActive(
       data: { status: TenantStatus.SUSPENDED },
     });
     throw new ForbiddenException(
-      'Your 14-day Starter trial has ended. Please upgrade to Professional or Enterprise to continue.',
+      `Your ${STARTER_TRIAL_DAYS}-day Starter trial has ended. Please upgrade to Professional or Enterprise to continue.`,
     );
   }
 
   if (tenant.status === TenantStatus.SUSPENDED) {
     if (tenant.plan === SubscriptionPlan.STARTER && tenant.trialEndsAt) {
       throw new ForbiddenException(
-        'Your 14-day Starter trial has ended. Please upgrade your plan to continue.',
+        `Your ${STARTER_TRIAL_DAYS}-day Starter trial has ended. Please upgrade your plan to continue.`,
       );
     }
     throw new ForbiddenException('This shop is suspended. Contact support.');

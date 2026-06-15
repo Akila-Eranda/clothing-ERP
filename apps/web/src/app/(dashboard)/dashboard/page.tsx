@@ -97,17 +97,19 @@ export default function DashboardPage() {
   const [lowStock, setLowStock]   = React.useState<LowStockItem[]>([]);
   const [revenue, setRevenue]     = React.useState<RevenuePoint[]>([]);
   const [custTotal, setCustTotal] = React.useState(0);
+  const [cashWidget, setCashWidget] = React.useState<{ expected: number; actual: number; difference: number; openShifts: number } | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [sumRes, salesRes, topRes, lowRes, revRes, custRes] = await Promise.allSettled([
+      const [sumRes, salesRes, topRes, lowRes, revRes, custRes, cashRes] = await Promise.allSettled([
         api.get<DailySummary>("/pos/summary"),
         api.get<{ data: SaleRow[] }>("/sales?limit=5"),
         api.get<TopProduct[]>("/sales/top-products?days=30"),
         api.get<LowStockItem[]>("/inventory/low-stock"),
         api.get<RevenuePoint[]>("/sales/revenue?period=day"),
         api.get<{ total: number }>("/customers?limit=1"),
+        api.get<{ expected: number; actual: number; difference: number; openShifts: number }>("/cash/today"),
       ]);
       if (sumRes.status   === "fulfilled") setSummary(sumRes.value.data);
       if (salesRes.status === "fulfilled") setRecentSales(salesRes.value.data?.data ?? []);
@@ -115,7 +117,8 @@ export default function DashboardPage() {
       if (lowRes.status   === "fulfilled") setLowStock(lowRes.value.data ?? []);
       if (revRes.status   === "fulfilled") setRevenue(revRes.value.data ?? []);
       if (custRes.status  === "fulfilled") setCustTotal((custRes.value.data as unknown as { total?: number })?.total ?? 0);
-      const errors = [sumRes, salesRes, topRes, lowRes, revRes, custRes]
+      if (cashRes.status  === "fulfilled") setCashWidget(cashRes.value.data ?? null);
+      const errors = [sumRes, salesRes, topRes, lowRes, revRes, custRes, cashRes]
         .filter((r) => r.status === "rejected")
         .map((r) => (r as PromiseRejectedResult).reason?.message);
       if (errors.length > 0) toast.error(`Dashboard: ${errors[0]}`);
@@ -221,6 +224,43 @@ export default function DashboardPage() {
           );
         })}
       </motion.div>
+
+      {/* Today's Cash */}
+      {cashWidget && (cashWidget.openShifts > 0 || cashWidget.actual > 0) && (
+        <motion.div variants={IV}>
+          <Card className="border-emerald-500/20 bg-gradient-to-r from-emerald-500/5 to-transparent">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-emerald-600" />
+                  Today&apos;s Cash
+                </CardTitle>
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/cash?tab=close">Cash Close →</a>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-xs text-muted-foreground">Expected</p>
+                  <p className="text-lg font-bold tabular-nums">LKR {formatNumber(cashWidget.expected)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Actual</p>
+                  <p className="text-lg font-bold tabular-nums">LKR {formatNumber(cashWidget.actual)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Difference</p>
+                  <p className={`text-lg font-bold tabular-nums ${cashWidget.difference < 0 ? "text-red-600" : cashWidget.difference > 0 ? "text-emerald-600" : ""}`}>
+                    {cashWidget.difference >= 0 ? "+" : ""}{formatNumber(cashWidget.difference)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Charts row */}
       <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-4">

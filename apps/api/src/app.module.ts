@@ -48,6 +48,7 @@ import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
 import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
+import { CashManagementModule } from './modules/cash-management/cash-management.module';
 import { BranchContextInterceptor } from './common/interceptors/branch-context.interceptor';
 
 @Module({
@@ -106,6 +107,7 @@ import { BranchContextInterceptor } from './common/interceptors/branch-context.i
     AuditLogModule,
     CollectionsModule,
     WorkflowModule,
+    CashManagementModule,
     SparePartsModule,
 
     // ── Infrastructure ────────────────────────────────────────

@@ -107,6 +107,8 @@ async function main() {
         { resource: 'purchases', action: 'update' },
         { resource: 'reports', action: 'read' },
         { resource: 'accounting', action: 'create' }, { resource: 'accounting', action: 'read' },
+        { resource: 'cash', action: 'create' }, { resource: 'cash', action: 'read' },
+        { resource: 'cash', action: 'update' },
         { resource: 'hr', action: 'create' }, { resource: 'hr', action: 'read' },
         { resource: 'hr', action: 'update' },
         { resource: 'users', action: 'create' }, { resource: 'users', action: 'read' },

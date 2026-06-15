@@ -13,7 +13,7 @@ CHECK = r"""#!/bin/bash
 cd /opt/fashionerp
 echo "==> Tenants in DB:"
 docker compose exec -T postgres psql -U fashionerp -d fashionerp -tAc \
-  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform') ORDER BY subdomain"
+  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform', '__platform_config__') AND subdomain ~ '^[a-z0-9-]+$' ORDER BY subdomain"
 
 echo ""
 echo "==> Certbot SAN list:"
@@ -22,7 +22,7 @@ certbot certificates 2>/dev/null | grep -A1 "Domains:"
 echo ""
 echo "==> Per-subdomain SSL check:"
 SUBDOMAINS=$(docker compose exec -T postgres psql -U fashionerp -d fashionerp -tAc \
-  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform') ORDER BY subdomain" | tr -d ' ' | grep -v '^$')
+  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform', '__platform_config__') AND subdomain ~ '^[a-z0-9-]+$' ORDER BY subdomain" | tr -d ' ' | grep -v '^$')
 for s in $SUBDOMAINS; do
   host="${s}.shop.hexalyte.com"
   san=$(echo | openssl s_client -connect "$host:443" -servername "$host" 2>/dev/null \

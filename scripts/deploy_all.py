@@ -42,7 +42,7 @@ docker compose exec -u root -T api node prisma/seed.js
 
 echo "==> Renew SSL for all tenant subdomains..."
 SUBDOMAINS=$(docker compose exec -T postgres psql -U fashionerp -d fashionerp -tAc \\
-  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform') ORDER BY subdomain" | tr -d ' ' | grep -v '^$' || true)
+  "SELECT subdomain FROM tenants WHERE subdomain NOT IN ('platform', '__platform_config__') AND subdomain ~ '^[a-z0-9-]+$' ORDER BY subdomain" | tr -d ' ' | grep -v '^$' || true)
 DOMAIN_ARGS="-d shop.hexalyte.com -d shop.clothing.api.hexalyte.com -d admin3.hexalyte.com"
 for s in $SUBDOMAINS; do
   DOMAIN_ARGS="$DOMAIN_ARGS -d ${{s}}.shop.hexalyte.com"

@@ -10,7 +10,7 @@ import {
   Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
-  Car, FileText, Wrench, KeyRound,
+  Car, FileText, Wrench, KeyRound, Banknote,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -85,7 +85,8 @@ function useNavGroups(): NavGroup[] {
       title: S.finance,
       items: [
         { label: L["/accounting"], href: "/accounting", icon: Wallet },
-        { label: L["/expenses"], href: "/expenses", icon: TrendingDown, badge: "NEW" },
+        { label: L["/cash"], href: "/cash", icon: Banknote, badge: "NEW" },
+        { label: L["/expenses"], href: "/expenses", icon: TrendingDown },
         { label: L["/analytics"], href: "/analytics", icon: BarChart3 },
         { label: L["/advanced"], href: "/advanced", icon: Zap },
       ],

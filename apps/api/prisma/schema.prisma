@@ -314,6 +314,8 @@ model Tenant {
   warrantyClaims   WarrantyClaim[]
   quotations       Quotation[]
   receiptPrintLogs ReceiptPrintLog[]
+  cashRegisters    CashRegister[]
+  cashMovements    CashMovement[]
 
   @@map("tenants")
 }
@@ -384,6 +386,7 @@ model Branch {
   employees   Employee[]
   transfers   StockTransfer[]
   warehouses  Warehouse[]
+  cashRegisters CashRegister[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -428,6 +431,9 @@ model User {
   notifications       UserNotification[]
   activityLogs        ActivityLog[]
   receiptPrintLogs    ReceiptPrintLog[]
+  cashRegisters       CashRegister[] @relation("CashierRegisters")
+  cashRegistersApproved CashRegister[] @relation("CashRegisterApprover")
+  cashMovements       CashMovement[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1877,4 +1883,76 @@ model WorkflowEvent {
 
   @@index([instanceId, createdAt])
   @@map("workflow_events")
+}
+
+// ============================================================
+// CASH MANAGEMENT (Daily Cash Close / Shift)
+// ============================================================
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+  PENDING_APPROVAL
+}
+
+enum CashMovementType {
+  OPENING
+  SALE
+  EXPENSE
+  PAYMENT
+  REFUND
+  DEPOSIT
+  WITHDRAWAL
+}
+
+model CashRegister {
+  id                 String             @id @default(cuid())
+  tenantId           String
+  branchId           String
+  cashierId          String
+  openingCash        Float
+  openingTime        DateTime           @default(now())
+  closingCash        Float?
+  closingTime        DateTime?
+  expectedCash       Float?
+  actualCash         Float?
+  variance           Float?
+  status             CashRegisterStatus @default(OPEN)
+  denominationCount  Json               @default("{}")
+  notes              String?
+  approvedById       String?
+  approvedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch             Branch             @relation(fields: [branchId], references: [id])
+  cashier            User               @relation("CashierRegisters", fields: [cashierId], references: [id])
+  approvedBy         User?              @relation("CashRegisterApprover", fields: [approvedById], references: [id])
+  movements          CashMovement[]
+
+  @@index([tenantId, branchId, status])
+  @@index([tenantId, cashierId, status])
+  @@index([openingTime])
+  @@map("cash_registers")
+}
+
+model CashMovement {
+  id          String           @id @default(cuid())
+  tenantId    String
+  registerId  String
+  type        CashMovementType
+  amount      Float
+  reference   String?
+  description String?
+  createdById String?
+  createdAt   DateTime         @default(now())
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  register    CashRegister     @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  createdBy   User?            @relation(fields: [createdById], references: [id])
+
+  @@index([registerId, createdAt])
+  @@index([tenantId, type])
+  @@map("cash_movements")
 }

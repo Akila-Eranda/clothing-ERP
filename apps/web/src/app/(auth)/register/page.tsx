@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from "@/lib/shop-profiles";
 import { getVerticalFeatures } from "@/lib/shop-features";
 import { ShopFeatureList } from "@/components/shop/shop-feature-list";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, STARTER_TRIAL_DAYS } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
@@ -136,7 +136,7 @@ export default function RegisterPage() {
               Your workspace <strong className="text-foreground">{watch("companyName")}</strong> has been created.
             </p>
             <p className="text-sm text-muted-foreground mb-8">
-              Check your email (<span className="font-mono text-foreground">{watch("adminEmail")}</span>) for a welcome message with login details.
+              Your {STARTER_TRIAL_DAYS}-day free trial has started. Check your email (<span className="font-mono text-foreground">{watch("adminEmail")}</span>) for login details.
             </p>
             <Button className="w-full h-11 font-semibold" variant="gradient" onClick={() => router.push("/login")}>
               <ArrowRight className="h-4 w-4 mr-2" />
@@ -159,7 +159,7 @@ export default function RegisterPage() {
           <div className="mb-12">
             <AppLogo variant="full" theme="dark" showTagline />
           </div>
-          <h2 className="text-3xl font-bold leading-tight mb-2">Start your free 14-day trial</h2>
+          <h2 className="text-3xl font-bold leading-tight mb-2">Start your free {STARTER_TRIAL_DAYS}-day trial</h2>
           <p className="text-white/70 text-sm leading-relaxed mb-6">
             {selectedProfile.emoji} <strong className="text-white">{selectedProfile.label}</strong> — {selectedProfile.description}
           </p>
