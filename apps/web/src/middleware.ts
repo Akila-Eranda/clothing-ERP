@@ -11,7 +11,7 @@ function rolesFromAccessToken(token: string): string[] {
   }
 }
 
-const PUBLIC_PATHS = ['/login', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/reset-password', '/features'];
 
 /** Hostnames allowed to serve /admin (company console). */
 const ADMIN_HOSTS = new Set(
@@ -70,5 +70,7 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|logo.png).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|hexaone-logo.png|.*\\.(?:png|jpg|jpeg|gif|svg|ico|webp|woff2?)$).*)',
+  ],
 };
