@@ -597,9 +597,8 @@ export class PosService {
   async lookupBarcode(tenantId: string, branchId: string, code: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const keys = this.barcodeLookupKeys(code);
-    let variant: Awaited<ReturnType<typeof this.prisma.productVariant.findFirst>> = null;
     for (const key of keys) {
-      variant = await this.prisma.productVariant.findFirst({
+      const variant = await this.prisma.productVariant.findFirst({
         where: {
           isActive: true,
           product: { tenantId, status: 'ACTIVE' },
@@ -614,18 +613,18 @@ export class PosService {
           inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
         },
       });
-      if (variant) break;
+      if (!variant) continue;
+      return {
+        variantId: variant.id, productName: variant.product.name, variantName: variant.name,
+        sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
+        costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
+        color: variant.color, size: variant.size, material: variant.material ?? undefined,
+        style: variant.style ?? undefined,
+        category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
+        stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
+      };
     }
-    if (!variant) throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
-    return {
-      variantId: variant.id, productName: variant.product.name, variantName: variant.name,
-      sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
-      costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
-      color: variant.color, size: variant.size, material: variant.material ?? undefined,
-      style: variant.style ?? undefined,
-      category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
-      stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
-    };
+    throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
   }
 
   async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
