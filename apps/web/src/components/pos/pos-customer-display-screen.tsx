@@ -3,7 +3,6 @@
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Package, ShoppingBag, Wifi, WifiOff } from "lucide-react";
-import { AppLogo } from "@/components/brand/app-logo";
 import { formatNumber } from "@/lib/utils";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import {
@@ -11,8 +10,49 @@ import {
   subscribeCustomerDisplayState,
   type CustomerDisplayState,
 } from "@/lib/pos-customer-display";
-import { APP_NAME } from "@/lib/constants";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { cn } from "@/lib/utils";
+
+export interface DisplayBranding {
+  shopName: string;
+  tagline: string;
+  logoUrl: string;
+}
+
+export function mergeDisplayBranding(
+  live: CustomerDisplayState | null | undefined,
+  receipt: { shopName?: string; tagline?: string; logoUrl?: string },
+): DisplayBranding {
+  return {
+    shopName: live?.shopName?.trim() || receipt.shopName?.trim() || "Store",
+    tagline: live?.tagline?.trim() || receipt.tagline?.trim() || "",
+    logoUrl: live?.logoUrl?.trim() || receipt.logoUrl?.trim() || "",
+  };
+}
+
+function ShopBrandLogo({
+  logoUrl,
+  shopName,
+  size = "md",
+  className,
+}: {
+  logoUrl?: string;
+  shopName: string;
+  size?: "sm" | "md" | "lg";
+  className?: string;
+}) {
+  const src = logoUrl ? resolvePublicAssetUrl(logoUrl) : null;
+  if (!src) return null;
+  const heights = { sm: "h-10 max-h-10", md: "h-20 max-h-20", lg: "h-28 max-h-28" };
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={shopName}
+      className={cn("w-auto object-contain object-center", heights[size], className)}
+    />
+  );
+}
 
 function ProductImage({ url, name, className }: { url?: string; name: string; className?: string }) {
   const src = url ? resolvePublicAssetUrl(url) : null;
@@ -29,10 +69,10 @@ function ProductImage({ url, name, className }: { url?: string; name: string; cl
   );
 }
 
-function TotalsPanel({ state }: { state: CustomerDisplayState }) {
+function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?: boolean }) {
   const { currency } = state;
   return (
-    <div className="space-y-2 text-lg">
+    <div className={cn("space-y-2", compact ? "text-base" : "text-lg")}>
       <div className="flex justify-between" style={{ color: "#94a3b8" }}>
         <span>Subtotal</span>
         <span>{currency} {formatNumber(state.subtotal)}</span>
@@ -53,8 +93,8 @@ function TotalsPanel({ state }: { state: CustomerDisplayState }) {
         className="flex justify-between items-baseline pt-3 mt-1 border-t"
         style={{ borderColor: "rgba(255,255,255,0.12)" }}
       >
-        <span className="text-2xl font-bold text-white">Total</span>
-        <span className="text-4xl font-black" style={{ color: "#4f6ef7" }}>
+        <span className={cn("font-bold text-white", compact ? "text-xl" : "text-2xl")}>Total</span>
+        <span className={cn("font-black", compact ? "text-3xl" : "text-4xl")} style={{ color: "#4f6ef7" }}>
           {currency} {formatNumber(state.total)}
         </span>
       </div>
@@ -62,7 +102,86 @@ function TotalsPanel({ state }: { state: CustomerDisplayState }) {
   );
 }
 
-function IdleScreen({ state }: { state: CustomerDisplayState }) {
+function CheckoutCashPanel({ state }: { state: CustomerDisplayState }) {
+  const isCash = state.paymentMethod?.toLowerCase() === "cash";
+  const tendered = state.cashTendered ?? 0;
+  const hasTendered = isCash && tendered > 0;
+  const change = state.changeDue ?? 0;
+  const showChange = hasTendered && change > 0;
+  const balanceDue = hasTendered && tendered < state.total ? state.total - tendered : 0;
+
+  return (
+    <div className="mb-4 space-y-3">
+      <p className="text-center text-xs font-bold uppercase tracking-widest" style={{ color: "#6a8ab8" }}>
+        {isCash ? "Paying with Cash" : `Paying with ${state.paymentMethod ?? "…"}`}
+      </p>
+
+      {isCash && (
+        <div className="grid grid-cols-2 gap-3">
+          <div
+            className="rounded-2xl p-4 text-center"
+            style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.3)" }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "#93c5fd" }}>Amount Due</p>
+            <p className="text-3xl font-black text-white">{state.currency} {formatNumber(state.total)}</p>
+          </div>
+          <div
+            className="rounded-2xl p-4 text-center"
+            style={{
+              background: hasTendered ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${hasTendered ? "rgba(16,185,129,0.35)" : "rgba(255,255,255,0.08)"}`,
+            }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "#6ee7b7" }}>Cash Received</p>
+            <p className="text-3xl font-black text-white">
+              {hasTendered ? `${state.currency} ${formatNumber(tendered)}` : "—"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {showChange && (
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="rounded-2xl p-5 text-center"
+          style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.2),rgba(5,150,105,0.15))", border: "2px solid rgba(16,185,129,0.45)" }}
+        >
+          <p className="text-sm font-bold uppercase tracking-widest mb-1" style={{ color: "#6ee7b7" }}>Your Change</p>
+          <p className="text-5xl font-black text-white">{state.currency} {formatNumber(change)}</p>
+        </motion.div>
+      )}
+
+      {hasTendered && tendered >= state.total && change === 0 && (
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.3)" }}
+        >
+          <p className="text-base font-semibold text-white">Exact amount — no change</p>
+        </div>
+      )}
+
+      {isCash && balanceDue > 0 && (
+        <div
+          className="rounded-xl px-4 py-3 text-center"
+          style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)" }}
+        >
+          <p className="text-sm font-semibold" style={{ color: "#fcd34d" }}>
+            Balance due: {state.currency} {formatNumber(balanceDue)}
+          </p>
+        </div>
+      )}
+
+      {!isCash && (
+        <p className="text-center text-sm font-semibold animate-pulse" style={{ color: "#f59e0b" }}>
+          Processing payment…
+        </p>
+      )}
+    </div>
+  );
+}
+
+function IdleScreen({ branding }: { branding: DisplayBranding }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 text-center px-8">
       <motion.div
@@ -70,10 +189,10 @@ function IdleScreen({ state }: { state: CustomerDisplayState }) {
         animate={{ scale: 1, opacity: 1 }}
         className="mb-8"
       >
-        <AppLogo variant="hero" theme="dark" className="mx-auto mb-4" alt={state.shopName || APP_NAME} />
-        <h1 className="text-4xl font-black text-white">{state.shopName || APP_NAME}</h1>
-        {state.tagline && (
-          <p className="text-xl mt-2" style={{ color: "#6a8ab8" }}>{state.tagline}</p>
+        <ShopBrandLogo logoUrl={branding.logoUrl} shopName={branding.shopName} size="lg" className="mx-auto mb-4" />
+        <h1 className="text-4xl font-black text-white">{branding.shopName}</h1>
+        {branding.tagline && (
+          <p className="text-xl mt-2" style={{ color: "#6a8ab8" }}>{branding.tagline}</p>
         )}
       </motion.div>
       <motion.div
@@ -90,12 +209,13 @@ function IdleScreen({ state }: { state: CustomerDisplayState }) {
   );
 }
 
-function WaitingScreen() {
+function WaitingScreen({ branding }: { branding: DisplayBranding }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 text-center px-8">
-      <WifiOff className="h-16 w-16 mb-6" style={{ color: "#4a6a8a" }} />
-      <h2 className="text-3xl font-bold text-white mb-2">Waiting for cashier</h2>
-      <p className="text-lg" style={{ color: "#6a8ab8" }}>Open POS terminal to start a sale</p>
+      <ShopBrandLogo logoUrl={branding.logoUrl} shopName={branding.shopName} size="lg" className="mx-auto mb-6" />
+      <WifiOff className="h-12 w-12 mb-4" style={{ color: "#4a6a8a" }} />
+      <h2 className="text-3xl font-bold text-white mb-2">{branding.shopName}</h2>
+      <p className="text-lg" style={{ color: "#6a8ab8" }}>Waiting for cashier — open POS to start</p>
     </div>
   );
 }
@@ -136,8 +256,8 @@ function ThankYouScreen({ state }: { state: CustomerDisplayState }) {
           className="px-8 py-4 rounded-2xl mt-2"
           style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}
         >
-          <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: "#6ee7b7" }}>Change</p>
-          <p className="text-3xl font-black text-white">{state.currency} {formatNumber(state.changeDue ?? 0)}</p>
+          <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: "#6ee7b7" }}>Your Change</p>
+          <p className="text-4xl font-black text-white">{state.currency} {formatNumber(state.changeDue ?? 0)}</p>
         </div>
       )}
       <p className="text-base mt-8" style={{ color: "#4a6a8a" }}>Please collect your receipt</p>
@@ -273,15 +393,16 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
         </div>
 
         <div className="px-6 py-5 border-t shrink-0" style={{ borderColor: "#1e3356", background: "#0d1b2e" }}>
-          {state.phase === "checkout" && (
-            <p
-              className="text-center text-sm font-semibold uppercase tracking-widest mb-3 animate-pulse"
-              style={{ color: "#f59e0b" }}
-            >
-              Processing payment…
-            </p>
+          {state.phase === "checkout" ? (
+            <>
+              <CheckoutCashPanel state={state} />
+              {!state.paymentMethod?.toLowerCase().includes("cash") && (
+                <TotalsPanel state={state} compact />
+              )}
+            </>
+          ) : (
+            <TotalsPanel state={state} />
           )}
-          <TotalsPanel state={state} />
         </div>
       </div>
     </div>
@@ -289,6 +410,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
 }
 
 export function PosCustomerDisplayScreen() {
+  const { settings: receiptSettings } = useReceiptSettings();
   const [state, setState] = React.useState<CustomerDisplayState | null>(() => readCustomerDisplayState());
   const [connected, setConnected] = React.useState(true);
 
@@ -308,8 +430,12 @@ export function PosCustomerDisplayScreen() {
     return () => clearInterval(t);
   }, [state?.updatedAt]);
 
+  const branding = React.useMemo(
+    () => mergeDisplayBranding(state, receiptSettings),
+    [state, receiptSettings],
+  );
+
   const displayState = state;
-  const shopName = displayState?.shopName || APP_NAME;
 
   return (
     <div
@@ -322,11 +448,11 @@ export function PosCustomerDisplayScreen() {
         style={{ borderColor: "#1e3356", background: "rgba(15,31,58,0.85)" }}
       >
         <div className="flex items-center gap-4">
-          <AppLogo variant="compact" theme="dark" className="h-10" alt={shopName} />
+          <ShopBrandLogo logoUrl={branding.logoUrl} shopName={branding.shopName} size="sm" />
           <div>
-            <p className="text-lg font-bold text-white leading-tight">{shopName}</p>
-            {displayState?.tagline && (
-              <p className="text-xs" style={{ color: "#6a8ab8" }}>{displayState.tagline}</p>
+            <p className="text-lg font-bold text-white leading-tight">{branding.shopName}</p>
+            {branding.tagline && (
+              <p className="text-xs" style={{ color: "#6a8ab8" }}>{branding.tagline}</p>
             )}
           </div>
         </div>
@@ -339,9 +465,9 @@ export function PosCustomerDisplayScreen() {
       {/* Body */}
       <main className="flex flex-1 min-h-0 flex-col">
         {!displayState || displayState.phase === "waiting" ? (
-          <WaitingScreen />
+          <WaitingScreen branding={branding} />
         ) : displayState.phase === "idle" ? (
-          <IdleScreen state={displayState} />
+          <IdleScreen branding={branding} />
         ) : displayState.phase === "thankyou" ? (
           <ThankYouScreen state={displayState} />
         ) : (

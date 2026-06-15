@@ -583,19 +583,39 @@ export class PosService {
     };
   }
 
+  private barcodeLookupKeys(code: string): string[] {
+    const raw = code.trim();
+    if (!raw) return [];
+    const keys = new Set<string>([raw]);
+    // Printed tags: {variantBarcode|sku}{001} — strip trailing 3-digit serial.
+    if (raw.length > 3 && /\d{3}$/.test(raw)) {
+      keys.add(raw.slice(0, -3));
+    }
+    return [...keys];
+  }
+
   async lookupBarcode(tenantId: string, branchId: string, code: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const variant = await this.prisma.productVariant.findFirst({
-      where: {
-        isActive: true,
-        product: { tenantId, status: 'ACTIVE' },
-        OR: [{ barcode: code }, { sku: code }],
-      },
-      include: {
-        product: { include: { category: true } },
-        inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
-      },
-    });
+    const keys = this.barcodeLookupKeys(code);
+    let variant: Awaited<ReturnType<typeof this.prisma.productVariant.findFirst>> = null;
+    for (const key of keys) {
+      variant = await this.prisma.productVariant.findFirst({
+        where: {
+          isActive: true,
+          product: { tenantId, status: 'ACTIVE' },
+          OR: [
+            { barcode: key },
+            { sku: key },
+            { sku: { equals: key, mode: 'insensitive' } },
+          ],
+        },
+        include: {
+          product: { include: { category: true } },
+          inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
+        },
+      });
+      if (variant) break;
+    }
     if (!variant) throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
     return {
       variantId: variant.id, productName: variant.product.name, variantName: variant.name,

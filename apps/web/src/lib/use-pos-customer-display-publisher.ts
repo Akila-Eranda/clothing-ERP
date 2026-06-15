@@ -33,7 +33,18 @@ interface PublisherInput {
   receiptSettings: ReceiptSettings;
   productImages: Map<string, string | undefined>;
   lastAddedVariantId?: string;
+  activePayment: string;
+  cashTenderedInput: string;
+  totalAmount: number;
 }
+
+const PAYMENT_LABELS: Record<string, string> = {
+  CASH: "Cash",
+  CARD: "Card",
+  UPI: "UPI",
+  WALLET: "Wallet",
+  CUSTOMER_CREDIT: "Credit",
+};
 
 export function usePosCustomerDisplayPublisher(input: PublisherInput) {
   const {
@@ -51,6 +62,9 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     receiptSettings,
     productImages,
     lastAddedVariantId,
+    activePayment,
+    cashTenderedInput,
+    totalAmount,
   } = input;
 
   const itemsKey = React.useMemo(
@@ -84,6 +98,23 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     else if (checkoutOpen) phase = "checkout";
     else if (items.length > 0) phase = "shopping";
 
+    let checkoutCashTendered: number | undefined;
+    let checkoutChangeDue: number | undefined;
+    let checkoutPaymentMethod: string | undefined;
+
+    if (checkoutOpen && !thankYouSale) {
+      checkoutPaymentMethod = PAYMENT_LABELS[activePayment] ?? activePayment;
+      if (activePayment === "CASH" && cashTenderedInput.trim()) {
+        const tendered = parseFloat(cashTenderedInput);
+        if (!Number.isNaN(tendered) && tendered > 0) {
+          checkoutCashTendered = tendered;
+          if (tendered >= totalAmount) {
+            checkoutChangeDue = Math.max(0, tendered - totalAmount);
+          }
+        }
+      }
+    }
+
     const state = buildCustomerDisplayState({
       phase,
       shopName: receiptSettings.shopName,
@@ -100,13 +131,19 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
       productImages,
       lastAddedVariantId,
       invoiceNumber: thankYouSale?.invoiceNumber,
-      changeDue: thankYouSale?.changeDue,
-      paymentMethod: thankYouSale?.paymentMethod,
+      changeDue: thankYouSale?.changeDue ?? checkoutChangeDue,
+      cashTendered: thankYouSale
+        ? undefined
+        : checkoutCashTendered,
+      paymentMethod: thankYouSale?.paymentMethod ?? checkoutPaymentMethod,
       saleTotal: thankYouSale?.total,
     });
 
     if (thankYouSale) {
       state.customerName = thankYouSale.customerName ?? state.customerName;
+      if (thankYouSale.changeDue > 0) {
+        state.changeDue = thankYouSale.changeDue;
+      }
     }
 
     publishCustomerDisplayState(state);
@@ -127,6 +164,9 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     receiptSettings.logoUrl,
     productImages,
     lastAddedVariantId,
+    activePayment,
+    cashTenderedInput,
+    totalAmount,
   ]);
 }
 

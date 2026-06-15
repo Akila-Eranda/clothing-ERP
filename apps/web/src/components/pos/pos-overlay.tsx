@@ -15,6 +15,7 @@ import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-sett
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayWindow } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
+import { barcodeLookupCandidates, isLikelyBarcodeScan } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
@@ -539,6 +540,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     receiptSettings,
     productImages,
     lastAddedVariantId,
+    activePayment,
+    cashTenderedInput: numpad,
+    totalAmount: totalAmt,
   });
 
   const handleOpenCustomerDisplay = React.useCallback(() => {
@@ -570,7 +574,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   );
   const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
-  const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
+  const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase().trim();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.barcode&&p.barcode.toLowerCase().includes(q))||(p.barcode&&qBase&&qBase!==q&&p.barcode.toLowerCase().includes(qBase))||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
 
   const handleAddProduct = React.useCallback((p: ProductItem) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); return; }
@@ -588,22 +592,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
-    const base = trimmed.replace(/\d{3}$/, "");
-    let found = products.find(p => (p.barcode && p.barcode === trimmed) || p.sku.toLowerCase() === trimmed.toLowerCase());
-    if (!found && base && base !== trimmed) {
-      found = products.find(p => (p.barcode && p.barcode === base) || p.sku.toLowerCase() === base.toLowerCase());
+    const candidates = barcodeLookupCandidates(trimmed);
+    let found: ProductItem | undefined;
+    for (const key of candidates) {
+      found = products.find(
+        (p) => (p.barcode && p.barcode === key) || p.sku.toLowerCase() === key.toLowerCase(),
+      );
+      if (found) break;
     }
     if (!found) {
-      try {
-        const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(trimmed)}`);
-        found = r.data;
-      } catch {
-        if (base && base !== trimmed) {
-          try {
-            const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(base)}`);
-            found = r.data;
-          } catch { /* fall through */ }
-        }
+      for (const key of candidates) {
+        try {
+          const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(key)}`);
+          found = r.data;
+          break;
+        } catch { /* try next candidate */ }
       }
     }
     if (!found) { toast.error(`Barcode/SKU not found: ${trimmed}`); return; }
@@ -613,6 +616,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setScanFlash(true);
     setTimeout(() => setScanFlash(false), 500);
   }, [products, handleAddProduct]);
+
+  const handleSearchEnter = React.useCallback(() => {
+    const q = search.trim();
+    if (!q) return;
+    if (isLikelyBarcodeScan(q) || filteredProducts.length === 0) {
+      void scanAndAddProduct(q);
+      return;
+    }
+    handleAddProduct(filteredProducts[0]);
+    setSearch("");
+    setScanFlash(true);
+    setTimeout(() => setScanFlash(false), 500);
+  }, [search, filteredProducts, scanAndAddProduct, handleAddProduct]);
   const handleCardClick = React.useCallback((p:ProductItem)=>{ if(!needsVariantPicker(p.productName)){handleAddProduct(p);return;} setSelectedProductName(p.productName); const initial: Record<string, string | null> = {}; for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null; setSelAttrs(initial); },[needsVariantPicker, handleAddProduct, variantCols]);
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -912,6 +928,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     closePos,
     handlePinEntry,
     scanAndAddProduct,
+    handleSearchEnter,
     handleAddProduct,
     handleCardClick,
     handleNumpad,
@@ -939,7 +956,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, filteredProducts, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
-    closePos, handlePinEntry, scanAndAddProduct, handleAddProduct, handleCardClick,
+    closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, applyCustomer,
@@ -1609,7 +1626,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} onKeyDown={e=>{if(e.key==="Enter"&&filteredProducts.length>0){e.preventDefault();handleAddProduct(filteredProducts[0]);setSearch("");setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}}} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();handleSearchEnter();}}} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">

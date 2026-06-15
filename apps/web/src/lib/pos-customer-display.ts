@@ -39,6 +39,7 @@ export interface CustomerDisplayState {
   lastAdded?: CustomerDisplayItem;
   invoiceNumber?: string;
   changeDue?: number;
+  cashTendered?: number;
   paymentMethod?: string;
 }
 
@@ -71,6 +72,7 @@ export function buildCustomerDisplayState(input: {
   lastAddedVariantId?: string;
   invoiceNumber?: string;
   changeDue?: number;
+  cashTendered?: number;
   paymentMethod?: string;
   saleTotal?: number;
 }): CustomerDisplayState {
@@ -126,6 +128,7 @@ export function buildCustomerDisplayState(input: {
     lastAdded: lastAdded && input.items.length > 0 ? lastAdded : undefined,
     invoiceNumber: input.invoiceNumber,
     changeDue: input.changeDue,
+    cashTendered: input.cashTendered,
     paymentMethod: input.paymentMethod,
   };
 }

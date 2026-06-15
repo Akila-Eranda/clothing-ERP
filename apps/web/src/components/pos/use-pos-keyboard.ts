@@ -95,6 +95,7 @@ export interface PosKeyboardContext {
   closePos: () => void;
   handlePinEntry: (key: string) => void;
   scanAndAddProduct: (code: string) => Promise<void>;
+  handleSearchEnter: () => void;
   handleAddProduct: (p: PosProductItem) => void;
   handleCardClick: (p: PosProductItem) => void;
   handleNumpad: (key: string) => void;
@@ -253,11 +254,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
 
       if (inInput && e.key === "Enter" && document.activeElement === ctx.searchRef.current) {
-        const first = ctx.getFilteredProduct(0);
-        if (first) {
-          e.preventDefault();
-          ctx.handleAddProduct(first);
-        }
+        e.preventDefault();
+        ctx.handleSearchEnter();
         return;
       }
 

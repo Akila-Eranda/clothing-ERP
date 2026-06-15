@@ -14,8 +14,12 @@ export interface UploadedFile {
 export function resolvePublicAssetUrl(url: string): string {
   if (!url) return '';
   if (/^https?:\/\//i.test(url) || url.startsWith('data:')) return url;
-  const apiOrigin = API_BASE.replace(/\/api\/v1\/?$/, '');
   const path = url.startsWith('/') ? url : `/${url}`;
+  // Shop subdomains serve /uploads via nginx — same-origin avoids broken API-host links.
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${path}`;
+  }
+  const apiOrigin = API_BASE.replace(/\/api\/v1\/?$/, '');
   return `${apiOrigin}${path}`;
 }
 
