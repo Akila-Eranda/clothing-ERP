@@ -10,7 +10,7 @@ import {
   type TenantRow,
 } from '@/lib/admin-api'
 import { SubscriptionInvoiceDocument } from '@/components/admin/SubscriptionInvoiceDocument'
-import { buildSubscriptionInvoicePrintHtml } from '@/lib/subscription-invoice-document'
+import { buildSubscriptionInvoicePrintHtml, resolveInvoiceLogoDataUrl } from '@/lib/subscription-invoice-document'
 
 interface Props {
   tenant: TenantRow
@@ -20,6 +20,7 @@ interface Props {
 export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
   const [invoice, setInvoice] = useState<SubscriptionInvoice | null>(null)
   const [loading, setLoading] = useState(true)
+  const [printing, setPrinting] = useState(false)
   const [sending, setSending] = useState(false)
   const [months, setMonths] = useState(1)
   const [email, setEmail] = useState(tenant.email)
@@ -42,18 +43,36 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
     load(1)
   }, [tenant.id])
 
-  function handlePrint() {
+  async function handlePrint() {
     if (!invoice) return
-    const w = window.open('', '_blank')
-    if (!w) {
-      toast.error('Pop-up blocked — allow pop-ups to print')
-      return
+    setPrinting(true)
+    try {
+      const logoUrl = await resolveInvoiceLogoDataUrl()
+      const w = window.open('', '_blank')
+      if (!w) {
+        toast.error('Pop-up blocked — allow pop-ups to print')
+        return
+      }
+      w.document.write(buildSubscriptionInvoicePrintHtml(invoice, logoUrl))
+      w.document.close()
+      w.focus()
+
+      const triggerPrint = () => {
+        w.focus()
+        w.print()
+      }
+
+      const img = w.document.querySelector('.logo') as HTMLImageElement | null
+      if (img && logoUrl && !img.complete) {
+        img.onload = triggerPrint
+        img.onerror = triggerPrint
+        setTimeout(triggerPrint, 2500)
+      } else {
+        setTimeout(triggerPrint, 300)
+      }
+    } finally {
+      setPrinting(false)
     }
-    const logoUrl = `${window.location.origin}/hexaone-logo.png`
-    w.document.write(buildSubscriptionInvoicePrintHtml(invoice, logoUrl))
-    w.document.close()
-    w.focus()
-    setTimeout(() => { w.print() }, 400)
   }
 
   async function handleSend() {
@@ -87,10 +106,10 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={handlePrint}
-              disabled={!invoice || loading}
+              disabled={!invoice || loading || printing}
               className="hidden sm:flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50"
             >
-              <Printer size={13} /> Print / Save PDF
+              {printing ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />} Print / Save PDF
             </button>
             <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-700 rounded-lg hover:bg-gray-100">
               <X size={18} />
@@ -139,10 +158,10 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
           </button>
           <button
             onClick={handlePrint}
-            disabled={!invoice || loading}
+            disabled={!invoice || loading || printing}
             className="sm:hidden flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border border-gray-200 rounded-lg"
           >
-            <Printer size={13} /> PDF
+            {printing ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />} PDF
           </button>
         </div>
 

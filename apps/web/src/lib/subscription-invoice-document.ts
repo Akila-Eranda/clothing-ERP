@@ -1,7 +1,40 @@
 import type { SubscriptionInvoice } from '@/lib/admin-api'
+import { APP_LOGO_PATH } from '@/lib/constants'
 
 export const INVOICE_LOGO_URL =
-  (typeof window !== 'undefined' ? window.location.origin : '') + '/hexaone-logo.png'
+  (typeof window !== 'undefined' ? window.location.origin : '') + APP_LOGO_PATH
+
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result))
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+/** Load logo as inline data URL so print popups and PDF export always render it. */
+export async function resolveInvoiceLogoDataUrl(): Promise<string> {
+  if (typeof window === 'undefined') return ''
+
+  const origin = window.location.origin
+  const candidates = [
+    `${origin}/_next/image?url=${encodeURIComponent(APP_LOGO_PATH)}&w=240&q=90`,
+    `${origin}${APP_LOGO_PATH}`,
+  ]
+
+  for (const url of candidates) {
+    try {
+      const res = await fetch(url, { credentials: 'same-origin' })
+      const type = res.headers.get('content-type') ?? ''
+      if (!res.ok || !type.includes('image')) continue
+      return await blobToDataUrl(await res.blob())
+    } catch {
+      /* try next source */
+    }
+  }
+  return ''
+}
 
 export function fmtInvoiceMoney(amount: number, currency: string) {
   const sym = currency.replace(/\.$/, '').trim() || 'Rs.'
@@ -70,7 +103,7 @@ export function buildSubscriptionInvoicePrintHtml(
   <div class="top-bar"></div>
   <div class="head">
     <div class="brand-block">
-      <img class="logo" src="${logoUrl}" alt="${b.companyBrandName}" />
+      ${logoUrl ? `<img class="logo" src="${logoUrl}" alt="${b.companyBrandName}" />` : ''}
       <div>
         <div class="company-name">${b.companyBrandName}</div>
         <div class="company-legal">${b.companyLegalName}</div>
