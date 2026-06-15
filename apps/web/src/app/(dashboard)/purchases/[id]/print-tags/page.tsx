@@ -130,6 +130,33 @@ function TagRow({ item, className = "" }: { item: POItem; className?: string }) 
   return <p className={`text-[8px] font-semibold text-gray-600 leading-tight ${className}`}>{line}</p>;
 }
 
+function stickerPartType(item: POItem): string {
+  const style = item.variant?.style?.trim();
+  if (style) return style;
+  const tags = productTags(item);
+  const known = tags.find((t) => ["OEM", "Aftermarket", "Genuine"].includes(t));
+  if (known) return known;
+  return tags[0] ?? "";
+}
+
+function stickerTitleLine(item: POItem): string {
+  const partType = stickerPartType(item);
+  if (partType) return `${item.productName} - ${partType}`;
+  return item.productName;
+}
+
+function stickerSubtitleLine(item: POItem): string {
+  const partType = stickerPartType(item);
+  const tags = productTags(item).filter((t) => t !== partType);
+  if (tags.length) return tags.join(" · ");
+  const withoutStyle = [item.variant?.size, item.variant?.material, item.variant?.color]
+    .filter(Boolean)
+    .join(" / ");
+  if (withoutStyle) return withoutStyle;
+  const variantLine = variantDisplayLine(item.variant, item.variantName);
+  return variantLine && variantLine !== partType ? variantLine : "";
+}
+
 function labelBarcode(item: POItem, serial: number): string {
   return printTagBarcodeValue(printTagBaseCode(item), serial);
 }
@@ -138,18 +165,17 @@ function labelBarcode(item: POItem, serial: number): string {
 function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
   const barcodeVal = labelBarcode(item, serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
-  const variantLine = variantDisplayLine(item.variant, item.variantName);
+  const title = stickerTitleLine(item);
+  const subtitle = stickerSubtitleLine(item);
   return (
     <div
       className="label-card label-format-sticker bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
       style={{ width: "7.5cm", minHeight: "4.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}
     >
       <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
-      <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
-      {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
-      <TagRow item={item} />
+      <p className="text-[11px] font-bold leading-tight">{title}</p>
+      {subtitle && <p className="text-[9px] text-gray-500">{subtitle}</p>}
       <BarcodeEl value={barcodeVal} renderKey={`sticker-${item.id}-${serial}`} />
-      <p className="text-[8px] font-mono text-gray-400">{barcodeVal || "—"}</p>
       <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>
   );

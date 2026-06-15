@@ -49,6 +49,37 @@ function tagsLine(item: PrintTagItem): string {
   return tags.length ? tags.join(" · ") : "";
 }
 
+function stickerPartType(item: PrintTagItem): string {
+  const style = item.variant?.style?.trim();
+  if (style) return style;
+  const tags = (item.variant?.product?.tags ?? []).filter(
+    (t) => t.trim() && !SYSTEM_TAG_PREFIXES.some((p) => t.startsWith(p)),
+  );
+  const known = tags.find((t) => ["OEM", "Aftermarket", "Genuine"].includes(t));
+  if (known) return known;
+  return tags[0] ?? "";
+}
+
+function stickerTitleLine(item: PrintTagItem): string {
+  const partType = stickerPartType(item);
+  if (partType) return `${item.productName} - ${partType}`;
+  return item.productName;
+}
+
+function stickerSubtitleLine(item: PrintTagItem): string {
+  const partType = stickerPartType(item);
+  const tags = (item.variant?.product?.tags ?? [])
+    .filter((t) => t.trim() && !SYSTEM_TAG_PREFIXES.some((p) => t.startsWith(p)))
+    .filter((t) => t !== partType);
+  if (tags.length) return tags.join(" · ");
+  const withoutStyle = [item.variant?.size, item.variant?.material, item.variant?.color]
+    .filter(Boolean)
+    .join(" / ");
+  if (withoutStyle) return withoutStyle;
+  const variantLine = variantDisplayLine(item);
+  return variantLine && variantLine !== partType ? variantLine : "";
+}
+
 export function barcodeSvgMarkup(value: string): string {
   const safe = sanitizeBarcodeText(value);
   if (!safe) return "";
@@ -80,16 +111,14 @@ function labelPageSize(format: LabelFormat): string {
 function stickerHtml(item: PrintTagItem, shopName: string, serial: number): string {
   const barcodeVal = printTagBarcodeValue(printTagBaseCode(item), serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
-  const variantLine = variantDisplayLine(item);
-  const tags = tagsLine(item);
+  const title = stickerTitleLine(item);
+  const subtitle = stickerSubtitleLine(item);
   return `
     <div class="label">
       <p class="shop">${escapeHtml(shopName)}</p>
-      <p class="name">${escapeHtml(item.productName)}</p>
-      ${variantLine ? `<p class="variant">${escapeHtml(variantLine)}</p>` : ""}
-      ${tags ? `<p class="tags">${escapeHtml(tags)}</p>` : ""}
+      <p class="name">${escapeHtml(title)}</p>
+      ${subtitle ? `<p class="variant">${escapeHtml(subtitle)}</p>` : ""}
       <div class="barcode">${barcodeSvgMarkup(barcodeVal)}</div>
-      <p class="code">${escapeHtml(barcodeVal)}</p>
       <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>`;
 }
