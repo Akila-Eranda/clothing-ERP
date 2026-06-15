@@ -1,0 +1,13 @@
+{
+  "name": "hexaone-print-server",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Local store print server for HexaOne POS and label printing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "pdf-to-printer": "^5.6.0"
+  }
+}

@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 import type { ReceiptSettings } from '@/lib/use-receipt-settings';
 
-export type ReceiptPrintType = 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP';
+export type ReceiptPrintType = 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL';
 
 export interface ReceiptPrintResult {
   logId?: string;
@@ -33,8 +33,9 @@ export async function executeReceiptPrint(opts: {
   invoiceNumber?: string;
   settings: ReceiptSettings;
   title?: string;
+  paperWidth?: string;
 }): Promise<ReceiptPrintResult> {
-  const { html, printType, invoiceNumber, settings, title } = opts;
+  const { html, printType, invoiceNumber, settings, title, paperWidth } = opts;
   const mode = settings.printMode ?? 'auto';
 
   let result: ReceiptPrintResult = {};
@@ -43,7 +44,7 @@ export async function executeReceiptPrint(opts: {
       html,
       printType,
       invoiceNumber,
-      paperWidth: settings.paperWidth,
+      paperWidth: paperWidth ?? settings.paperWidth,
     });
     result = r.data ?? {};
   } catch (err) {

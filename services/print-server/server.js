@@ -1,9 +1,10 @@
 /**
  * HexaOne Store Print Server
- * Run on the shop PC (same LAN as thermal printer). POS sends jobs via API proxy.
+ * Run on the shop PC (same LAN as thermal / label printer).
  *
  * Setup:
  *   cd services/print-server
+ *   npm install
  *   set PRINT_API_KEY=your-secret-key
  *   node server.js
  *
@@ -13,6 +14,10 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+
+const execFileAsync = promisify(execFile);
 
 const PORT = parseInt(process.env.PORT || '9123', 10);
 const API_KEY = process.env.PRINT_API_KEY || 'shop-print-key';
@@ -52,6 +57,90 @@ function json(res, status, body) {
   res.end(JSON.stringify(body));
 }
 
+function edgePaths() {
+  const roots = [
+    process.env['PROGRAMFILES(X86)'],
+    process.env.PROGRAMFILES,
+    process.env.LOCALAPPDATA,
+  ].filter(Boolean);
+  const out = [];
+  for (const root of roots) {
+    out.push(path.join(root, 'Microsoft', 'Edge', 'Application', 'msedge.exe'));
+    out.push(path.join(root, 'Google', 'Chrome', 'Application', 'chrome.exe'));
+  }
+  return out.filter((p) => fs.existsSync(p));
+}
+
+async function htmlToPdf(htmlPath, pdfPath) {
+  const fileUrl = `file:///${htmlPath.replace(/\\/g, '/')}`;
+  for (const browser of edgePaths()) {
+    try {
+      await execFileAsync(
+        browser,
+        ['--headless', '--disable-gpu', '--no-sandbox', `--print-to-pdf=${pdfPath}`, fileUrl],
+        { timeout: 45000, windowsHide: true },
+      );
+      if (fs.existsSync(pdfPath) && fs.statSync(pdfPath).size > 0) {
+        return { ok: true, browser: path.basename(browser) };
+      }
+    } catch {
+      /* try next browser */
+    }
+  }
+  return { ok: false };
+}
+
+async function printPdf(pdfPath, printerName) {
+  try {
+    const ptp = require('pdf-to-printer');
+    await ptp.print(pdfPath, {
+      printer: printerName || undefined,
+      silent: true,
+    });
+    return { ok: true, method: 'pdf-to-printer' };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+async function printHtmlWindows(htmlPath, printerName) {
+  const pdfPath = htmlPath.replace(/\.html$/i, '.pdf');
+  const pdfResult = await htmlToPdf(htmlPath, pdfPath);
+  if (!pdfResult.ok) {
+    throw new Error('Could not render HTML to PDF for printing (install Edge/Chrome on shop PC)');
+  }
+
+  const printResult = await printPdf(pdfPath, printerName);
+  if (printResult.ok) {
+    return { status: 'PRINTED', method: printResult.method, pdfPath };
+  }
+
+  const escapedPdf = pdfPath.replace(/'/g, "''");
+  const ps = printerName
+    ? `$p='${escapedPdf}'; Start-Process -FilePath $p -Verb PrintTo -ArgumentList '${printerName.replace(/'/g, "''")}'`
+    : `$p='${escapedPdf}'; Start-Process -FilePath $p -Verb Print`;
+  await execFileAsync('powershell', ['-NoProfile', '-Command', ps], {
+    timeout: 60000,
+    windowsHide: true,
+  });
+  return { status: 'PRINTED', method: 'powershell-printto', pdfPath };
+}
+
+async function dispatchPrintJob(htmlPath, printerName) {
+  if (process.platform === 'win32') {
+    return printHtmlWindows(htmlPath, printerName);
+  }
+  if (process.platform === 'linux' && printerName) {
+    try {
+      await execFileAsync('lp', ['-d', printerName, htmlPath], { timeout: 30000 });
+      return { status: 'PRINTED', method: 'lp' };
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'lp print failed');
+    }
+  }
+  return { status: 'QUEUED', method: 'queue-only' };
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') {
     return json(res, 204, {});
@@ -79,27 +168,54 @@ const server = http.createServer(async (req, res) => {
       const invoiceNumber = body.invoiceNumber || jobId;
       const paperWidth = body.paperWidth || '80mm';
       const printType = body.printType || 'SALE';
+      const printerName = body.printerName || process.env.DEFAULT_PRINTER || '';
 
       const htmlPath = path.join(QUEUE_DIR, `${jobId}.html`);
       fs.writeFileSync(htmlPath, html, 'utf8');
+
+      let printResult;
+      try {
+        printResult = await dispatchPrintJob(htmlPath, printerName);
+      } catch (printErr) {
+        appendLog({
+          jobId,
+          invoiceNumber,
+          printType,
+          paperWidth,
+          printerName: printerName || null,
+          status: 'FAILED',
+          htmlPath,
+          error: printErr instanceof Error ? printErr.message : String(printErr),
+        });
+        return json(res, 500, {
+          ok: false,
+          error: printErr instanceof Error ? printErr.message : 'Print failed',
+          jobId,
+        });
+      }
 
       appendLog({
         jobId,
         invoiceNumber,
         printType,
         paperWidth,
-        printerName: body.printerName || null,
-        status: 'QUEUED',
+        printerName: printerName || null,
+        status: printResult.status,
+        method: printResult.method,
         htmlPath,
+        pdfPath: printResult.pdfPath || null,
       });
 
-      // Windows: open default browser print dialog silently is not reliable;
-      // queue file is saved for local print agent / manual reprint from data/queue.
       return json(res, 200, {
         ok: true,
         jobId,
         invoiceNumber,
-        message: 'Print job queued on store server',
+        status: printResult.status,
+        method: printResult.method,
+        message:
+          printResult.status === 'PRINTED'
+            ? 'Sent to printer'
+            : 'Print job queued on store server',
         htmlPath,
       });
     } catch (err) {

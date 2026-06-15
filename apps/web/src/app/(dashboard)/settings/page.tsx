@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
@@ -22,6 +23,7 @@ import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
+import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 
 type Tenant = {
   id: string; name: string; email: string; phone?: string;
@@ -37,6 +39,20 @@ type Me = { id: string; firstName: string; lastName: string; email: string; phon
 const TIMEZONES = ["Asia/Colombo","Asia/Kolkata","Asia/Dubai","Asia/Singapore","UTC","Europe/London","America/New_York"];
 const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
+
+const SETTINGS_TAB_VALUES = [
+  "general", "receipt", "payslip", "profile", "security", "branches",
+  "notifications", "appearance", "billing", "audit-log",
+] as const;
+
+type SettingsTab = (typeof SETTINGS_TAB_VALUES)[number];
+
+function parseSettingsTab(value: string | null): SettingsTab {
+  if (value && SETTINGS_TAB_VALUES.includes(value as SettingsTab)) {
+    return value as SettingsTab;
+  }
+  return "general";
+}
 
 interface AuditEntry { id:string; action:string; resource:string; resourceId?:string; userId?:string; user?:{firstName:string;lastName:string;email:string}|null; ipAddress?:string; createdAt:string; oldData?:object; newData?:object; }
 interface LoginEntry { id:string; userName:string; email:string; ipAddress?:string; deviceName?:string; userAgent?:string; createdAt:string; lastUsedAt?:string; isActive:boolean; }
@@ -330,9 +346,17 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
 }
 
 export default function SettingsPage() {
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   const { profile } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
+  const [activeTab, setActiveTab] = React.useState<SettingsTab>(() =>
+    parseSettingsTab(searchParams.get("tab")),
+  );
+
+  React.useEffect(() => {
+    setActiveTab(parseSettingsTab(searchParams.get("tab")));
+  }, [searchParams]);
 
   const [tenant, setTenant] = React.useState<Tenant | null>(null);
   const [bizForm, setBizForm] = React.useState({ name: "", phone: "", country: "", currency: "", timezone: "" });
@@ -505,10 +529,11 @@ export default function SettingsPage() {
         <p className="text-sm text-muted-foreground">Configure your {APP_NAME} workspace · {profile.emoji} {profile.label}</p>
       </div>
 
-      <Tabs defaultValue="general">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(parseSettingsTab(v))}>
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="general" className="gap-1.5"><Store className="h-3.5 w-3.5" />General</TabsTrigger>
           <TabsTrigger value="receipt" className="gap-1.5"><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
+          <TabsTrigger value="payslip" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
           <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
           <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="branches" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
@@ -880,6 +905,10 @@ export default function SettingsPage() {
             </div>
           </div>
           <ReceiptPrintLogCard />
+        </TabsContent>
+
+        <TabsContent value="payslip">
+          <PayslipSettingsTab receiptSettings={receiptForm} />
         </TabsContent>
 
         <TabsContent value="profile" className="mt-6 space-y-6">

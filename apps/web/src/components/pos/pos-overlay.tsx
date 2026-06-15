@@ -15,7 +15,7 @@ import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-sett
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayWindow } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
-import { barcodeLookupCandidates, isLikelyBarcodeScan } from "@/lib/pos-barcode";
+import { barcodeLookupCandidates, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
@@ -592,24 +592,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
-    const candidates = barcodeLookupCandidates(trimmed);
-    let found: ProductItem | undefined;
-    for (const key of candidates) {
-      found = products.find(
-        (p) => (p.barcode && p.barcode === key) || p.sku.toLowerCase() === key.toLowerCase(),
-      );
-      if (found) break;
-    }
+    let found = findProductByBarcodeCode(trimmed, products);
     if (!found) {
-      for (const key of candidates) {
+      for (const key of barcodeLookupCandidates(trimmed)) {
         try {
           const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(key)}`);
-          found = r.data;
+          const fromApi = r.data;
+          found = products.find((p) => p.variantId === fromApi.variantId) ?? fromApi;
           break;
         } catch { /* try next candidate */ }
       }
     }
     if (!found) { toast.error(`Barcode/SKU not found: ${trimmed}`); return; }
+    setSelectedProductName(null);
+    setSelAttrs({});
     handleAddProduct(found);
     setLastScanAt(new Date());
     setSearch("");
@@ -620,15 +616,29 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
     if (!q) return;
-    if (isLikelyBarcodeScan(q) || filteredProducts.length === 0) {
+    const barcodeLike = isLikelyBarcodeScan(q) || matchesCachedBarcode(q, products);
+    if (barcodeLike) {
       void scanAndAddProduct(q);
       return;
     }
-    handleAddProduct(filteredProducts[0]);
-    setSearch("");
-    setScanFlash(true);
-    setTimeout(() => setScanFlash(false), 500);
-  }, [search, filteredProducts, scanAndAddProduct, handleAddProduct]);
+    if (filteredProducts.length === 1) {
+      const p = filteredProducts[0];
+      if (needsVariantPicker(p.productName)) {
+        handleCardClick(p);
+      } else {
+        handleAddProduct(p);
+        setSearch("");
+        setScanFlash(true);
+        setTimeout(() => setScanFlash(false), 500);
+      }
+      return;
+    }
+    if (filteredProducts.length > 1) {
+      handleCardClick(filteredProducts[0]);
+      return;
+    }
+    void scanAndAddProduct(q);
+  }, [search, products, filteredProducts, scanAndAddProduct, handleAddProduct, handleCardClick, needsVariantPicker]);
   const handleCardClick = React.useCallback((p:ProductItem)=>{ if(!needsVariantPicker(p.productName)){handleAddProduct(p);return;} setSelectedProductName(p.productName); const initial: Record<string, string | null> = {}; for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null; setSelAttrs(initial); },[needsVariantPicker, handleAddProduct, variantCols]);
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -1626,7 +1636,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();handleSearchEnter();}}} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">

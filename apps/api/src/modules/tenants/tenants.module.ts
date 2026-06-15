@@ -62,6 +62,39 @@ export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() printerName?: string;
 }
 
+export class PayslipSettingsDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() headerText?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() footerText?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() thankYouText?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() currencyLabel?: string;
+  @ApiPropertyOptional() @IsOptional() useReceiptShopInfo?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() companyName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() tagline?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address1?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address2?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() phone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() email?: string;
+  @ApiPropertyOptional() @IsOptional() showLogo?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() logoUrl?: string;
+  @ApiPropertyOptional() @IsOptional() showPayslipNumber?: boolean;
+  @ApiPropertyOptional() @IsOptional() showEmployeeId?: boolean;
+  @ApiPropertyOptional() @IsOptional() showDesignation?: boolean;
+  @ApiPropertyOptional() @IsOptional() showPayPeriod?: boolean;
+  @ApiPropertyOptional() @IsOptional() showPaidDate?: boolean;
+  @ApiPropertyOptional() @IsOptional() showShopContact?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelEarningsSection?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelDeductionsSection?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelBasicSalary?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelAllowances?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelBonus?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelDeductions?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() labelNetPay?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() signatureLine?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() paperWidth?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() fontSize?: string;
+}
+
 export class ReceiptPrintDispatchDto {
   @ApiProperty() @IsString() html: string;
   @ApiProperty() @IsString() printType: string;
@@ -93,6 +126,39 @@ interface StoredReceiptSettings {
   printMode: string;
   autoPrintAfterSale: boolean;
   printerName: string;
+}
+
+interface StoredPayslipSettings {
+  title: string;
+  headerText: string;
+  footerText: string;
+  thankYouText: string;
+  currencyLabel: string;
+  useReceiptShopInfo: boolean;
+  companyName: string;
+  tagline: string;
+  address1: string;
+  address2: string;
+  phone: string;
+  email: string;
+  showLogo: boolean;
+  logoUrl: string;
+  showPayslipNumber: boolean;
+  showEmployeeId: boolean;
+  showDesignation: boolean;
+  showPayPeriod: boolean;
+  showPaidDate: boolean;
+  showShopContact: boolean;
+  labelEarningsSection: string;
+  labelDeductionsSection: string;
+  labelBasicSalary: string;
+  labelAllowances: string;
+  labelBonus: string;
+  labelDeductions: string;
+  labelNetPay: string;
+  signatureLine: string;
+  paperWidth: string;
+  fontSize: string;
 }
 
 function str(v: unknown, fallback = ''): string {
@@ -898,6 +964,59 @@ export class TenantsService {
     };
   }
 
+  async getPayslipSettings(tenantId: string): Promise<StoredPayslipSettings> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true, name: true },
+    });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const s = (tenant.settings as Record<string, unknown>) ?? {};
+    const payslip = (s['payslip'] as Record<string, unknown>) ?? {};
+    return {
+      title: str(payslip['title'], 'PAYSLIP'),
+      headerText: str(payslip['headerText']),
+      footerText: str(payslip['footerText'], 'Computer generated payslip. No signature required.'),
+      thankYouText: str(payslip['thankYouText'], 'THANK YOU!'),
+      currencyLabel: str(payslip['currencyLabel'], 'LKR'),
+      useReceiptShopInfo: bool(payslip['useReceiptShopInfo'], true),
+      companyName: str(payslip['companyName'], tenant.name),
+      tagline: str(payslip['tagline']),
+      address1: str(payslip['address1']),
+      address2: str(payslip['address2']),
+      phone: str(payslip['phone']),
+      email: str(payslip['email']),
+      showLogo: bool(payslip['showLogo'], true),
+      logoUrl: str(payslip['logoUrl']),
+      showPayslipNumber: bool(payslip['showPayslipNumber'], true),
+      showEmployeeId: bool(payslip['showEmployeeId'], true),
+      showDesignation: bool(payslip['showDesignation'], true),
+      showPayPeriod: bool(payslip['showPayPeriod'], true),
+      showPaidDate: bool(payslip['showPaidDate'], true),
+      showShopContact: bool(payslip['showShopContact'], true),
+      labelEarningsSection: str(payslip['labelEarningsSection'], 'EARNINGS'),
+      labelDeductionsSection: str(payslip['labelDeductionsSection'], 'DEDUCTIONS'),
+      labelBasicSalary: str(payslip['labelBasicSalary'], 'Basic Salary'),
+      labelAllowances: str(payslip['labelAllowances'], 'Allowances'),
+      labelBonus: str(payslip['labelBonus'], 'Bonus'),
+      labelDeductions: str(payslip['labelDeductions'], 'Total Deductions'),
+      labelNetPay: str(payslip['labelNetPay'], 'NET PAY'),
+      signatureLine: str(payslip['signatureLine']),
+      paperWidth: str(payslip['paperWidth'], 'inherit'),
+      fontSize: str(payslip['fontSize'], 'inherit'),
+    };
+  }
+
+  async savePayslipSettings(tenantId: string, dto: PayslipSettingsDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const existing = (tenant.settings as Record<string, unknown>) ?? {};
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { settings: { ...existing, payslip: { ...dto } } },
+    });
+    return this.getPayslipSettings(tenantId);
+  }
+
   async listReceiptPrintLogs(tenantId: string, limit = 50, page = 1) {
     const take = Math.min(Math.max(limit, 1), 100);
     const skip = Math.max(page - 1, 0) * take;
@@ -1028,9 +1147,9 @@ export class TenantsService {
     dto: ReceiptPrintDispatchDto,
   ) {
     const settings = await this.getReceiptSettings(tenantId);
-    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP'].includes(dto.printType)
+    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP', 'LABEL'].includes(dto.printType)
       ? dto.printType
-      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP';
+      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL';
     const mode = settings.printMode ?? 'auto';
     const useServer = settings.printServerEnabled && settings.printServerUrl;
 
@@ -1162,6 +1281,21 @@ export class TenantsController {
   @ApiOperation({ summary: 'Save receipt/thermal print settings' })
   saveReceiptSettings(@CurrentUser() user: IAuthUser, @Body() dto: ReceiptSettingsDto) {
     return this.tenantsService.saveReceiptSettings(user.tenantId, dto);
+  }
+
+  @Get('payslip-settings')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get payslip print template settings' })
+  getPayslipSettings(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.getPayslipSettings(user.tenantId);
+  }
+
+  @Put('payslip-settings')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Save payslip print template settings' })
+  savePayslipSettings(@CurrentUser() user: IAuthUser, @Body() dto: PayslipSettingsDto) {
+    return this.tenantsService.savePayslipSettings(user.tenantId, dto);
   }
 
   @Get('receipt-print/logs')

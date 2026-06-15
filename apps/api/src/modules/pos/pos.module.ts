@@ -604,6 +604,7 @@ export class PosService {
           product: { tenantId, status: 'ACTIVE' },
           OR: [
             { barcode: key },
+            { product: { barcode: key } },
             { sku: key },
             { sku: { equals: key, mode: 'insensitive' } },
           ],
@@ -614,14 +615,16 @@ export class PosService {
         },
       });
       if (!variant) continue;
+      const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
       return {
         variantId: variant.id, productName: variant.product.name, variantName: variant.name,
-        sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
+        sku: variant.sku, barcode: effectiveBarcode, unitPrice: variant.sellingPrice,
         costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
         color: variant.color, size: variant.size, material: variant.material ?? undefined,
         style: variant.style ?? undefined,
         category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
         stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
+        imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
       };
     }
     throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
@@ -677,7 +680,7 @@ export class PosService {
       style:       v.style ?? undefined,
       stock:       Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0)),
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
-      barcode:     v.barcode ?? undefined,
+      barcode:     v.barcode ?? v.product.barcode ?? undefined,
       warrantyMonths: v.product.warrantyMonths ?? null,
     }));
   }

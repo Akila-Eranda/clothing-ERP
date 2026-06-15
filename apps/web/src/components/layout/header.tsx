@@ -27,6 +27,18 @@ import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
+import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
+import { SupportDialog } from "@/components/layout/support-dialog";
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
+}
+
+function isModKey(e: KeyboardEvent): boolean {
+  return e.metaKey || e.ctrlKey;
+}
 
 const BASE_ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -62,6 +74,8 @@ export function Header() {
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
+  const [supportOpen, setSupportOpen] = React.useState(false);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
   const { profile, workspace } = useShopWorkspace();
   const routeLabels = React.useMemo(
@@ -69,7 +83,47 @@ export function Header() {
     [workspace, profile],
   );
 
-  const handleLogout = async () => { await logoutApi(); router.replace('/login'); };
+  const handleLogout = React.useCallback(async () => {
+    await logoutApi();
+    router.replace("/login");
+  }, [logoutApi, router]);
+
+  const goProfile = React.useCallback(() => {
+    router.push("/settings?tab=profile");
+  }, [router]);
+
+  const goSettings = React.useCallback(() => {
+    router.push("/settings");
+  }, [router]);
+
+  React.useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (isTypingTarget(e.target)) return;
+
+      if (isModKey(e) && e.shiftKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        goProfile();
+        return;
+      }
+      if (isModKey(e) && e.key === ",") {
+        e.preventDefault();
+        goSettings();
+        return;
+      }
+      if (isModKey(e) && e.shiftKey && e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        void handleLogout();
+        return;
+      }
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        setShortcutsOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [goProfile, goSettings, handleLogout]);
 
   const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
@@ -156,7 +210,7 @@ export function Header() {
         </Button>
 
         {/* Refresh */}
-        <Button variant="ghost" size="icon-sm" className="h-8 w-8">
+        <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => router.refresh()}>
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
 
@@ -204,7 +258,7 @@ export function Header() {
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-primary text-sm">
+            <DropdownMenuItem className="justify-center text-primary text-sm" onSelect={() => router.push("/notifications")}>
               View all notifications
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -233,30 +287,30 @@ export function Header() {
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={goProfile}>
               <User className="mr-2 h-4 w-4" />
               <span>Profile</span>
               <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={goSettings}>
               <Settings className="mr-2 h-4 w-4" />
               <span>Settings</span>
               <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
             </DropdownMenuItem>
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
               <Keyboard className="mr-2 h-4 w-4" />
               <span>Keyboard shortcuts</span>
               <DropdownMenuShortcut>?</DropdownMenuShortcut>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSupportOpen(true)}>
               <LifeBuoy className="mr-2 h-4 w-4" />
               <span>Support</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onClick={handleLogout}
+              onSelect={() => { void handleLogout(); }}
             >
               <LogOut className="mr-2 h-4 w-4" />
               <span>Sign out</span>
@@ -265,6 +319,9 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
+      <SupportDialog open={supportOpen} onOpenChange={setSupportOpen} />
     </header>
   );
 }

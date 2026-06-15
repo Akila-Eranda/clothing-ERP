@@ -23,7 +23,9 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { usePayslipSettings } from "@/lib/use-payslip-settings";
 import { printThermalPayslip } from "@/lib/payslip-print";
+import Link from "next/link";
 
 // ── Types ────────────────────────────────────────────────────────────────
 type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE" | "LEAVE" | "HOLIDAY";
@@ -460,6 +462,7 @@ export default function HRPage() {
   const today = new Date().toISOString().split("T")[0];
   const now   = new Date();
   const { settings: receiptSettings } = useReceiptSettings();
+  const { settings: payslipSettings } = usePayslipSettings();
 
   // Employees
   const [employees, setEmployees]       = useState<Employee[]>([]);
@@ -606,7 +609,7 @@ export default function HRPage() {
   const handlePrintPayslip = async (p: Payroll) => {
     setPrintingPayslipId(p.id);
     try {
-      await printThermalPayslip(p, payMonth, payYear, receiptSettings);
+      await printThermalPayslip(p, payMonth, payYear, receiptSettings, payslipSettings);
       toast.success("Payslip sent to printer");
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to print payslip");
@@ -792,6 +795,11 @@ export default function HRPage() {
             </Button>
             <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 ml-auto" onClick={() => setGenAllOpen(true)}>
               <DollarSign className="h-3.5 w-3.5" /> Generate All
+            </Button>
+            <Button size="sm" variant="outline" asChild className="gap-1.5">
+              <Link href="/settings?tab=payslip">
+                <FileText className="h-3.5 w-3.5" /> Customize payslip
+              </Link>
             </Button>
           </div>
 

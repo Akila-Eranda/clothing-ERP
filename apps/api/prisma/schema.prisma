@@ -327,6 +327,7 @@ enum ReceiptPrintType {
   RETURN
   TEST
   PAYSLIP
+  LABEL
 }
 
 enum ReceiptPrintStatus {

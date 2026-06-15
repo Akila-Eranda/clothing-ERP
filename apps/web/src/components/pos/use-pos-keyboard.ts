@@ -158,6 +158,16 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         clearTimeout(ctx.barcodeTimer.current);
         ctx.barcodeBuffer.current = "";
       }
+
+      // Search box has the full scanned code — prefer it over the wedge buffer.
+      if (e.key === "Enter" && document.activeElement === ctx.searchRef.current) {
+        e.preventDefault();
+        ctx.barcodeBuffer.current = "";
+        clearTimeout(ctx.barcodeTimer.current);
+        ctx.handleSearchEnter();
+        return;
+      }
+
       if (e.key === "Enter" && ctx.barcodeBuffer.current.length >= 3) {
         const code = ctx.barcodeBuffer.current.trim();
         ctx.barcodeBuffer.current = "";
@@ -253,9 +263,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (inInput && e.key === "Enter" && document.activeElement === ctx.searchRef.current) {
-        e.preventDefault();
-        ctx.handleSearchEnter();
+      if (inInput && e.key === "Enter" && document.activeElement !== ctx.searchRef.current) {
         return;
       }
 
