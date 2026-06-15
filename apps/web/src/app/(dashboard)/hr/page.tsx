@@ -21,11 +21,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { usePayslipSettings } from "@/lib/use-payslip-settings";
 import { printThermalPayslip } from "@/lib/payslip-print";
 import Link from "next/link";
+
+function fmtLkr(value: number | null | undefined) {
+  return `LKR ${(value ?? 0).toLocaleString()}`;
+}
 
 // ── Types ────────────────────────────────────────────────────────────────
 type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE" | "LEAVE" | "HOLIDAY";
@@ -209,7 +214,17 @@ function buildAttnSummaryColumns(): ColumnDef<AttnSummaryRow>[] {
 function buildLeaveColumns(onUpdate: (id: string, status: string) => void): ColumnDef<LeaveRequest>[] {
   return [
     { id: "employee", header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
-      cell: ({ row }) => <div><p className="font-medium text-sm">{row.original.employee.firstName} {row.original.employee.lastName}</p><p className="text-[10px] text-muted-foreground font-mono">{row.original.employee.code}</p></div> },
+      cell: ({ row }) => {
+        const emp = row.original.employee;
+        if (!emp) return <span className="text-xs text-muted-foreground">—</span>;
+        return (
+          <div>
+            <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
+            <p className="text-[10px] text-muted-foreground font-mono">{emp.code ?? "—"}</p>
+          </div>
+        );
+      },
+    },
     { accessorKey: "leaveType", header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
       cell: ({ row }) => <Badge variant="secondary" className="text-[10px] uppercase">{row.original.leaveType}</Badge> },
     { id: "dates", header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
@@ -312,32 +327,40 @@ function buildPayrollColumns(
     {
       id: "employee",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
-      cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-sm">{row.original.employee.firstName} {row.original.employee.lastName}</p>
-          <p className="text-[10px] text-muted-foreground font-mono">{row.original.employee.code}</p>
-        </div>
-      ),
+      cell: ({ row }) => {
+        const emp = row.original.employee;
+        if (!emp) return <span className="text-xs text-muted-foreground">—</span>;
+        return (
+          <div>
+            <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
+            <p className="text-[10px] text-muted-foreground font-mono">{emp.code ?? "—"}</p>
+          </div>
+        );
+      },
     },
     {
       accessorKey: "basicSalary",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Basic" />,
-      cell: ({ row }) => <span className="text-sm">LKR {row.original.basicSalary.toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm">{fmtLkr(row.original.basicSalary)}</span>,
     },
     {
       id: "bonusAllowances",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Bonus + Allow." />,
-      cell: ({ row }) => <span className="text-sm text-emerald-600">+LKR {(row.original.bonus + row.original.allowances).toLocaleString()}</span>,
+      cell: ({ row }) => (
+        <span className="text-sm text-emerald-600">
+          +LKR {((row.original.bonus ?? 0) + (row.original.allowances ?? 0)).toLocaleString()}
+        </span>
+      ),
     },
     {
       accessorKey: "deductions",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Deductions" />,
-      cell: ({ row }) => <span className="text-sm text-red-500">-LKR {row.original.deductions.toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm text-red-500">-LKR {(row.original.deductions ?? 0).toLocaleString()}</span>,
     },
     {
       accessorKey: "netSalary",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Net Pay" />,
-      cell: ({ row }) => <span className="text-sm font-bold text-primary">LKR {row.original.netSalary.toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm font-bold text-primary">{fmtLkr(row.original.netSalary)}</span>,
     },
     {
       id: "status",
@@ -383,7 +406,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
       header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
       cell: ({ row }) => {
         const e = row.original;
-        const initials = `${e.firstName[0]}${e.lastName[0]}`.toUpperCase();
+        const initials = `${e.firstName?.[0] ?? ""}${e.lastName?.[0] ?? ""}`.toUpperCase() || "?";
         return (
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
@@ -425,14 +448,16 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
     {
       accessorKey: "basicSalary",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Salary" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">LKR {row.original.basicSalary.toLocaleString()}</span>,
+      cell: ({ row }) => <span className="text-sm font-semibold">{fmtLkr(row.original.basicSalary)}</span>,
     },
     {
       accessorKey: "joiningDate",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
       cell: ({ row }) => (
         <span className="text-xs text-muted-foreground">
-          {new Date(row.original.joiningDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
+          {row.original.joiningDate
+            ? new Date(row.original.joiningDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })
+            : "—"}
         </span>
       ),
     },
@@ -507,7 +532,7 @@ export default function HRPage() {
     setEmpLoading(true);
     try {
       const res = await api.get<{ data: Employee[] }>("/hr/employees?limit=200");
-      setEmployees(res.data?.data ?? (res.data as unknown as Employee[]) ?? []);
+      setEmployees(parseApiList<Employee>(res.data));
     } catch { toast.error("Failed to load employees"); }
     finally { setEmpLoading(false); }
   }, []);
@@ -525,7 +550,7 @@ export default function HRPage() {
     setAttnLoading(true);
     try {
       const res = await api.get<EmpWithAttendance[]>(`/hr/employees/attendance/daily?date=${attnDate}`);
-      const rows = (res.data as unknown as EmpWithAttendance[]) ?? [];
+      const rows = parseApiList<EmpWithAttendance>(res.data);
       setAttnRows(rows);
       const map: Record<string, AttendanceStatus> = {};
       rows.forEach((r) => { if (r.todayAttendance) map[r.id] = r.todayAttendance.status; });
@@ -539,7 +564,7 @@ export default function HRPage() {
     setSummaryLoading(true);
     try {
       const res = await api.get<AttnSummaryRow[]>(`/hr/employees/attendance/monthly-summary?month=${summaryMonth}`);
-      setSummaryRows((res.data as unknown as AttnSummaryRow[]) ?? []);
+      setSummaryRows(parseApiList<AttnSummaryRow>(res.data));
     } catch { toast.error("Failed to load summary"); }
     finally { setSummaryLoading(false); }
   }, [summaryMonth]);
@@ -550,7 +575,7 @@ export default function HRPage() {
     try {
       const q = leaveStatus !== "ALL" ? `?status=${leaveStatus}` : "";
       const res = await api.get<LeaveRequest[]>(`/hr/employees/leaves${q}`);
-      setLeaves((res.data as unknown as LeaveRequest[]) ?? []);
+      setLeaves(parseApiList<LeaveRequest>(res.data));
     } catch { toast.error("Failed to load leaves"); }
     finally { setLeaveLoading(false); }
   }, [leaveStatus]);
@@ -560,7 +585,7 @@ export default function HRPage() {
     setPayLoading(true);
     try {
       const res = await api.get<Payroll[]>(`/hr/employees/payroll?month=${payMonth}&year=${payYear}`);
-      setPayrolls((res.data as unknown as Payroll[]) ?? []);
+      setPayrolls(parseApiList<Payroll>(res.data));
     } catch { toast.error("Failed to load payroll"); }
     finally { setPayLoading(false); }
   }, [payMonth, payYear]);
@@ -619,11 +644,13 @@ export default function HRPage() {
   };
 
   // Stats
-  const activeCount    = employees.filter((e) => e.isActive).length;
-  const totalPayroll   = employees.reduce((s, e) => s + e.basicSalary, 0);
-  const pendingLeaves  = leaves.filter((l) => l.status === "PENDING").length;
+  const employeeList   = Array.isArray(employees) ? employees : [];
+  const leaveList      = Array.isArray(leaves) ? leaves : [];
+  const activeCount    = employeeList.filter((e) => e.isActive).length;
+  const totalPayroll   = employeeList.reduce((s, e) => s + (e.basicSalary ?? 0), 0);
+  const pendingLeaves  = leaveList.filter((l) => l.status === "PENDING").length;
   const STATS = [
-    { label: "Total Employees", value: employees.length, icon: Users,     color: "text-blue-500",    bg: "bg-blue-500/10" },
+    { label: "Total Employees", value: employeeList.length, icon: Users,     color: "text-blue-500",    bg: "bg-blue-500/10" },
     { label: "Active",          value: activeCount,      icon: UserCog,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, icon: DollarSign, color: "text-purple-500", bg: "bg-purple-500/10" },
     { label: "Pending Leaves",  value: pendingLeaves,    icon: FileText,  color: "text-amber-500",   bg: "bg-amber-500/10" },
@@ -635,7 +662,8 @@ export default function HRPage() {
   const payrollColumns     = buildPayrollColumns(markPaid, handlePrintPayslip, printingPayslipId);
   const leaveColumns       = buildLeaveColumns(updateLeaveStatus);
 
-  const unpaidEmployees = employees.filter((e) => e.isActive && !payrolls.find((p) => p.employeeId === e.id));
+  const payrollList = Array.isArray(payrolls) ? payrolls : [];
+  const unpaidEmployees = employeeList.filter((e) => e.isActive && !payrollList.find((p) => p.employeeId === e.id));
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
@@ -684,9 +712,9 @@ export default function HRPage() {
         {/* ── Employees ── */}
         <TabsContent value="employees" className="mt-4">
           <ClientSideTable
-            data={employees}
+            data={employeeList}
             columns={empColumns}
-            pageCount={Math.ceil(employees.length / 10)}
+            pageCount={Math.ceil(employeeList.length / 10)}
             searchableColumns={[{ id: "designation", title: "Role" }]}
             filterableColumns={[{
               id: "isActive", title: "Status",
@@ -812,7 +840,7 @@ export default function HRPage() {
                 <Select value={genEmpId} onValueChange={setGenEmpId}>
                   <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
-                    {employees.filter((e) => e.isActive).map((e) => (
+                    {employeeList.filter((e) => e.isActive).map((e) => (
                       <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                     ))}
                   </SelectContent>
@@ -930,7 +958,7 @@ export default function HRPage() {
         editEmployee={editEmployee}
       />
       {genAllOpen && <GenerateAllModal month={payMonth} year={payYear} onClose={() => setGenAllOpen(false)} onDone={fetchPayrolls} />}
-      {newLeaveOpen && <NewLeaveModal employees={employees} onClose={() => setNewLeaveOpen(false)} onSaved={fetchLeaves} />}
+      {newLeaveOpen && <NewLeaveModal employees={employeeList} onClose={() => setNewLeaveOpen(false)} onSaved={fetchLeaves} />}
     </div>
   );
 }

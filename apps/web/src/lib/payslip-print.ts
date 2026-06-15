@@ -1,7 +1,7 @@
 import { executeReceiptPrint } from '@/lib/receipt-print';
 import type { ReceiptSettings } from '@/lib/use-receipt-settings';
-import type { PayslipSettings } from '@/lib/use-payslip-settings';
-import { PAYSLIP_DEFAULTS } from '@/lib/use-payslip-settings';
+import type { PayslipSettings } from '@/lib/payslip-settings';
+import { PAYSLIP_DEFAULTS } from '@/lib/payslip-settings';
 import { APP_NAME } from '@/lib/constants';
 import { resolvePublicAssetUrl } from '@/lib/upload';
 

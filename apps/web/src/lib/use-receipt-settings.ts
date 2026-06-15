@@ -56,6 +56,7 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
 const LS_KEY = "receipt_settings_cache";
 
 function fromCache(): ReceiptSettings | null {
+  if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(LS_KEY);
     return raw ? (JSON.parse(raw) as ReceiptSettings) : null;
@@ -63,6 +64,7 @@ function fromCache(): ReceiptSettings | null {
 }
 
 function toCache(s: ReceiptSettings) {
+  if (typeof window === "undefined") return;
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch { /* noop */ }
 }
 

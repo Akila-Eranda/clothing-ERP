@@ -1,79 +1,14 @@
-'use client';
-
 import * as React from 'react';
 import { api } from '@/lib/api';
+import { PAYSLIP_DEFAULTS, type PayslipSettings } from '@/lib/payslip-settings';
 
-export interface PayslipSettings {
-  /** Document title shown below company header */
-  title: string;
-  headerText: string;
-  footerText: string;
-  thankYouText: string;
-  currencyLabel: string;
-  /** Use shop name / address / contact from Receipt Print settings */
-  useReceiptShopInfo: boolean;
-  companyName: string;
-  tagline: string;
-  address1: string;
-  address2: string;
-  phone: string;
-  email: string;
-  showLogo: boolean;
-  logoUrl: string;
-  showPayslipNumber: boolean;
-  showEmployeeId: boolean;
-  showDesignation: boolean;
-  showPayPeriod: boolean;
-  showPaidDate: boolean;
-  showShopContact: boolean;
-  labelEarningsSection: string;
-  labelDeductionsSection: string;
-  labelBasicSalary: string;
-  labelAllowances: string;
-  labelBonus: string;
-  labelDeductions: string;
-  labelNetPay: string;
-  signatureLine: string;
-  paperWidth: 'inherit' | '58mm' | '80mm';
-  fontSize: 'inherit' | 'small' | 'medium' | 'large';
-}
-
-export const PAYSLIP_DEFAULTS: PayslipSettings = {
-  title: 'PAYSLIP',
-  headerText: '',
-  footerText: 'Computer generated payslip. No signature required.',
-  thankYouText: 'THANK YOU!',
-  currencyLabel: 'LKR',
-  useReceiptShopInfo: true,
-  companyName: '',
-  tagline: '',
-  address1: '',
-  address2: '',
-  phone: '',
-  email: '',
-  showLogo: true,
-  logoUrl: '',
-  showPayslipNumber: true,
-  showEmployeeId: true,
-  showDesignation: true,
-  showPayPeriod: true,
-  showPaidDate: true,
-  showShopContact: true,
-  labelEarningsSection: 'EARNINGS',
-  labelDeductionsSection: 'DEDUCTIONS',
-  labelBasicSalary: 'Basic Salary',
-  labelAllowances: 'Allowances',
-  labelBonus: 'Bonus',
-  labelDeductions: 'Total Deductions',
-  labelNetPay: 'NET PAY',
-  signatureLine: '',
-  paperWidth: 'inherit',
-  fontSize: 'inherit',
-};
+export type { PayslipSettings } from '@/lib/payslip-settings';
+export { PAYSLIP_DEFAULTS } from '@/lib/payslip-settings';
 
 const LS_KEY = 'payslip_settings_cache';
 
 function fromCache(): PayslipSettings | null {
+  if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem(LS_KEY);
     return raw ? ({ ...PAYSLIP_DEFAULTS, ...JSON.parse(raw) } as PayslipSettings) : null;
@@ -83,6 +18,7 @@ function fromCache(): PayslipSettings | null {
 }
 
 function toCache(s: PayslipSettings) {
+  if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(LS_KEY, JSON.stringify(s));
   } catch {
@@ -97,11 +33,15 @@ export function usePayslipSettings() {
   const load = React.useCallback(async () => {
     try {
       const r = await api.get<PayslipSettings>('/tenants/payslip-settings');
-      const s = { ...PAYSLIP_DEFAULTS, ...r.data } as PayslipSettings;
-      setSettings(s);
-      toCache(s);
+      const raw = r.data;
+      const merged =
+        raw && typeof raw === 'object' && !Array.isArray(raw)
+          ? ({ ...PAYSLIP_DEFAULTS, ...raw } as PayslipSettings)
+          : PAYSLIP_DEFAULTS;
+      setSettings(merged);
+      toCache(merged);
     } catch {
-      /* use cache */
+      /* use cache / defaults */
     } finally {
       setLoading(false);
     }
@@ -113,7 +53,11 @@ export function usePayslipSettings() {
 
   const save = React.useCallback(async (next: PayslipSettings) => {
     const r = await api.put<PayslipSettings>('/tenants/payslip-settings', next);
-    const s = { ...PAYSLIP_DEFAULTS, ...r.data } as PayslipSettings;
+    const raw = r.data;
+    const s =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? ({ ...PAYSLIP_DEFAULTS, ...raw } as PayslipSettings)
+        : next;
     setSettings(s);
     toCache(s);
     return s;
