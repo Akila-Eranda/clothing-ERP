@@ -137,17 +137,16 @@ function LoginContent() {
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
 
         <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10">
-          {/* Mobile logo */}
-          <div className="lg:hidden mb-8 self-start">
-            <AppLogo variant="compact" />
-          </div>
-
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-[420px]"
           >
+            <div className="mb-8 flex justify-center">
+              <AppLogo variant="compact" className="items-center" />
+            </div>
+
             <div className="mb-8">
               <p className="text-xs font-bold uppercase tracking-widest text-primary mb-2">Sign in</p>
               <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome back</h2>
