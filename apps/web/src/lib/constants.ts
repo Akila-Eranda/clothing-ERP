@@ -1,8 +1,6 @@
 export const APP_NAME = "HexaOne";
 export const APP_TAGLINE = "ALL IN ONE BUSINESS PLATFORM";
 export const APP_LOGO_PATH = "/hexaone-logo.png";
-export const APP_LOGO_DARK = "/hexaone-logo-dark.png";
-export const APP_LOGO_LIGHT = "/hexaone-logo-light.png";
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 

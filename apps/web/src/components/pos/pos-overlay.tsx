@@ -1386,7 +1386,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="flex items-center gap-2.5 shrink-0">
             <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
             <div className="flex items-center gap-2">
-              <AppLogo variant="sidebar" theme="dark" framed={false} className="h-7 shrink-0" alt={APP_NAME} />
+              <AppLogo variant="sidebar" theme="dark" className="h-7 shrink-0" alt={APP_NAME} />
               <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p>
             </div>
           </div>

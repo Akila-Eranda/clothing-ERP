@@ -270,7 +270,7 @@ export function Sidebar() {
                 className="h-full w-full object-contain p-1"
               />
             ) : (
-              <AppLogo variant="sidebar" theme="auto" framed={false} className="h-full w-full items-center justify-center" alt={APP_NAME} />
+              <AppLogo variant="sidebar" theme="auto" className="h-full w-full items-center justify-center" alt={APP_NAME} />
             )}
           </div>
 

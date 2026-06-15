@@ -143,8 +143,8 @@ function LoginContent() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-[420px]"
           >
-            <div className="mb-8 flex justify-center">
-              <AppLogo variant="compact" theme="light" className="items-center" />
+            <div className="mb-10 flex justify-center w-full">
+              <AppLogo variant="hero" theme="light" className="items-center mx-auto" />
             </div>
 
             <div className="mb-8">
