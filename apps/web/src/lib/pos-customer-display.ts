@@ -192,13 +192,50 @@ export function subscribeCustomerDisplayState(
 }
 
 export const CUSTOMER_DISPLAY_PATH = "/pos/customer-display";
+export const CUSTOMER_DISPLAY_WINDOW_NAME = "hexaone-customer-display";
 
+let customerDisplayWindow: Window | null = null;
+
+export function getCustomerDisplayUrl(): string {
+  if (typeof window === "undefined") return CUSTOMER_DISPLAY_PATH;
+  return `${window.location.origin}${CUSTOMER_DISPLAY_PATH}`;
+}
+
+/** Open/focus customer display. Call synchronously from a user click handler. */
+export function openCustomerDisplayFromClick(
+  event?: { preventDefault?: () => void },
+): "opened" | "focused" | "fallback" {
+  if (typeof window === "undefined") return "fallback";
+
+  const url = getCustomerDisplayUrl();
+
+  if (customerDisplayWindow && !customerDisplayWindow.closed) {
+    event?.preventDefault?.();
+    customerDisplayWindow.focus();
+    return "focused";
+  }
+
+  const features =
+    "popup=yes,width=1280,height=800,menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=yes";
+  const win = window.open(url, CUSTOMER_DISPLAY_WINDOW_NAME, features);
+  if (win) {
+    event?.preventDefault?.();
+    customerDisplayWindow = win;
+    try {
+      win.focus();
+    } catch {
+      /* noop */
+    }
+    return "opened";
+  }
+
+  // Allow native <a target="_blank"> navigation — not treated as a blocked popup.
+  return "fallback";
+}
+
+/** @deprecated Prefer openCustomerDisplayFromClick from a link click handler. */
 export function openCustomerDisplayWindow() {
-  if (typeof window === "undefined") return null;
-  const features = "noopener,noreferrer,width=1280,height=800,menubar=no,toolbar=no";
-  return window.open(
-    `${window.location.origin}${CUSTOMER_DISPLAY_PATH}`,
-    "hexaone-customer-display",
-    features,
-  );
+  const result = openCustomerDisplayFromClick();
+  if (result === "fallback") return null;
+  return customerDisplayWindow;
 }

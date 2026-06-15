@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
-import { openCustomerDisplayWindow } from "@/lib/pos-customer-display";
+import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
 import { barcodeLookupCandidates, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
@@ -545,10 +545,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     totalAmount: totalAmt,
   });
 
-  const handleOpenCustomerDisplay = React.useCallback(() => {
-    const win = openCustomerDisplayWindow();
-    if (!win) toast.error("Popup blocked — allow popups to open customer screen");
-    else toast.success("Customer display opened — drag to second monitor");
+  const handleOpenCustomerDisplay = React.useCallback((event: React.MouseEvent) => {
+    const result = openCustomerDisplayFromClick(event);
+    if (result === "focused") {
+      toast.success("Customer display focused");
+    } else if (result === "opened") {
+      toast.success("Customer display opened — drag to second monitor");
+    } else {
+      toast.success("Customer display opened in new tab — drag to second monitor");
+    }
   }, []);
   const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
   const loyaltyDiscountAmt = loyaltyPointsToRedeem * 0.1;
@@ -1562,8 +1567,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3">
-            {([{icon:Monitor,title:"Customer Display",onClick:handleOpenCustomerDisplay,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;onClick?:()=>void}[]).map((item,i)=>(
-              item.path
+            {([{icon:Monitor,title:"Customer Display",displayLink:true,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;displayLink?:boolean;onClick?:()=>void}[]).map((item,i)=>(
+              item.displayLink
+                ?<a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
+                : item.path
                 ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
                 :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
             ))}
@@ -1664,9 +1671,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               {taxRate > 0 ? `Tax ${taxRate}%` : "No Tax"}
             </button>
             {serverHeldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
-            <button type="button" onClick={handleOpenCustomerDisplay} title="Open customer-facing display on second screen" className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90" style={{background:"rgba(124,58,237,0.15)",color:"#c4b5fd"}}>
+            <a
+              href={getCustomerDisplayUrl()}
+              target={CUSTOMER_DISPLAY_WINDOW_NAME}
+              rel="noopener noreferrer"
+              onClick={handleOpenCustomerDisplay}
+              title="Open customer-facing display on second screen"
+              className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90 no-underline"
+              style={{background:"rgba(124,58,237,0.15)",color:"#c4b5fd"}}
+            >
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
-            </button>
+            </a>
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{user?.name?.[0]??"A"}</div>
               <div><p className="text-white text-xs font-semibold leading-tight">{user?.name??"Admin"}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>{formatUserRole(user?.role)}</p></div>
