@@ -13,6 +13,8 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import {
   isWarrantyEligible,
   isWithinWarrantyPeriod,
@@ -85,7 +87,10 @@ export class CreateQuotationDto {
 
 @Injectable()
 export class SparePartsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workflowService: WorkflowService,
+  ) {}
 
   private async assertModule(tenantId: string, mod: 'vehicles' | 'warranty' | 'quotations') {
     await assertShopModule(this.prisma, tenantId, mod);
@@ -428,14 +433,89 @@ export class SparePartsService {
     });
   }
 
+  async getQuotation(tenantId: string, id: string) {
+    await this.assertModule(tenantId, 'quotations');
+    const q = await this.prisma.quotation.findFirst({
+      where: { id, tenantId },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
+        items: { include: { variant: { include: { product: true } } } },
+      },
+    });
+    if (!q) throw new NotFoundException('Quotation not found');
+    return q;
+  }
+
+  async submitQuotationForApproval(id: string, tenantId: string, userId: string, userRoles: string[]) {
+    const q = await this.getQuotation(tenantId, id);
+    if (q.status !== QuotationStatus.DRAFT) {
+      throw new BadRequestException('Only draft quotations can be submitted for approval');
+    }
+
+    const customerName = q.customer
+      ? `${q.customer.firstName} ${q.customer.lastName ?? ''}`.trim()
+      : 'Walk-in';
+
+    if (bypassesWorkflowApproval(userRoles)) {
+      return this.prisma.quotation.update({
+        where: { id },
+        data: { status: QuotationStatus.SENT },
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
+          items: { include: { variant: { include: { product: true } } } },
+        },
+      });
+    }
+
+    await this.prisma.quotation.update({
+      where: { id },
+      data: { status: QuotationStatus.PENDING_APPROVAL },
+    });
+    await this.workflowService.start(tenantId, userId, {
+      key: 'quotation',
+      entityType: 'Quotation',
+      entityId: id,
+      metadata: {
+        quoteNumber: q.quoteNumber,
+        total: q.total,
+        customerName,
+        reference: q.quoteNumber,
+      },
+    });
+    return this.getQuotation(tenantId, id);
+  }
+
   async updateQuotationStatus(tenantId: string, id: string, status: QuotationStatus) {
     await this.assertModule(tenantId, 'quotations');
     const q = await this.prisma.quotation.findFirst({ where: { id, tenantId } });
     if (!q) throw new NotFoundException('Quotation not found');
+
+    const allowed: Record<QuotationStatus, QuotationStatus[]> = {
+      [QuotationStatus.DRAFT]: [],
+      [QuotationStatus.PENDING_APPROVAL]: [],
+      [QuotationStatus.SENT]: [QuotationStatus.ACCEPTED, QuotationStatus.REJECTED],
+      [QuotationStatus.ACCEPTED]: [QuotationStatus.CONVERTED],
+      [QuotationStatus.REJECTED]: [QuotationStatus.DRAFT],
+      [QuotationStatus.CONVERTED]: [],
+      [QuotationStatus.EXPIRED]: [],
+    };
+
+    if (status === QuotationStatus.SENT) {
+      throw new BadRequestException('Use Submit for Approval to send quotations — manager must approve first');
+    }
+
+    const validNext = allowed[q.status] ?? [];
+    if (!validNext.includes(status)) {
+      throw new BadRequestException(`Cannot change status from ${q.status} to ${status}`);
+    }
+
     return this.prisma.quotation.update({
       where: { id },
       data: { status },
-      include: { items: { include: { variant: { include: { product: true } } } } },
+      include: {
+        customer: { select: { id: true, firstName: true, lastName: true, phone: true, email: true } },
+        items: { include: { variant: { include: { product: true } } } },
+      },
     });
   }
 }
@@ -545,6 +625,18 @@ export class SparePartsController {
     return this.service.createQuotation(user.tenantId, user.branchId ?? '', user.id, dto);
   }
 
+  @Get('quotations/:id')
+  @RequirePermissions('sales:read')
+  getQuotation(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.service.getQuotation(user.tenantId, id);
+  }
+
+  @Post('quotations/:id/submit-approval')
+  @RequirePermissions('sales:update')
+  submitQuotationForApproval(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.service.submitQuotationForApproval(id, user.tenantId, user.id, user.roles);
+  }
+
   @Put('quotations/:id/status')
   @RequirePermissions('sales:update')
   updateQuotationStatus(
@@ -557,6 +649,7 @@ export class SparePartsController {
 }
 
 @Module({
+  imports: [WorkflowModule],
   controllers: [SparePartsController],
   providers: [SparePartsService],
   exports: [SparePartsService],

@@ -10,6 +10,7 @@ import {
   calcPosTaxAmount,
   type PosLineInput,
 } from "@/lib/pos-totals";
+import { readPosTaxRate, writePosTaxRate } from "@/lib/pos-settings";
 
 export interface HeldBillData {
   items: CartItem[];
@@ -66,7 +67,7 @@ export const useCartStore = create<CartStore>()(
       couponCode: null,
       loyaltyPointsToRedeem: 0,
       notes: "",
-      taxRate: 0,
+      taxRate: readPosTaxRate(),
       activeHeldBillId: null,
 
       addItem: (newItem) =>
@@ -113,7 +114,13 @@ export const useCartStore = create<CartStore>()(
       setCoupon: (couponCode) => set({ couponCode }),
       setLoyaltyPoints: (loyaltyPointsToRedeem) => set({ loyaltyPointsToRedeem }),
       setNotes: (notes) => set({ notes }),
-      setTaxRate: (taxRate) => set({ taxRate }),
+      setTaxRate: (taxRate) => {
+        const rate = writePosTaxRate(taxRate);
+        set((state) => ({
+          taxRate: rate,
+          items: state.items.map((i) => ({ ...i, taxRate: rate })),
+        }));
+      },
       setActiveHeldBillId: (activeHeldBillId) => set({ activeHeldBillId }),
 
       clearCart: () =>
@@ -129,17 +136,16 @@ export const useCartStore = create<CartStore>()(
         }),
 
       loadFromHeldBill: (data, heldBillId) =>
-        set({
-          items: data.items,
+        set((state) => ({
+          items: data.items.map((i) => ({ ...i, taxRate: state.taxRate })),
           customer: data.customer,
           discount: data.discount,
           discountType: data.discountType,
-          taxRate: data.taxRate,
           notes: data.notes,
           couponCode: data.couponCode,
           loyaltyPointsToRedeem: data.loyaltyPointsToRedeem,
           activeHeldBillId: heldBillId,
-        }),
+        })),
 
       getHoldPayload: () => {
         const s = get();
@@ -165,14 +171,18 @@ export const useCartStore = create<CartStore>()(
 
       loyaltyDiscount: () => get().loyaltyPointsToRedeem * 0.1,
 
-      taxAmount: () => calcPosTaxAmount(get().items as PosLineInput[]),
+      taxAmount: () => {
+        const { items, taxRate } = get();
+        return calcPosTaxAmount(items as PosLineInput[], taxRate);
+      },
 
       total: () => {
-        const { items, discount, discountType, loyaltyPointsToRedeem } = get();
+        const { items, discount, discountType, loyaltyPointsToRedeem, taxRate } = get();
         return calcPosAmountDue(items as PosLineInput[], {
           manualDiscount: discount,
           manualDiscountType: discountType,
           loyaltyPoints: loyaltyPointsToRedeem,
+          posTaxRate: taxRate,
         });
       },
 

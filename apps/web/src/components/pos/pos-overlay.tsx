@@ -488,9 +488,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         couponDiscount: payState.couponDiscount,
         tierDiscount: calcTierDiscount(subtotal(), customer?.membershipTier),
         loyaltyPoints: loyaltyPointsToRedeem,
+        posTaxRate: taxRate,
       },
     ),
-    [items, discount, discountType, payState.couponDiscount, customer?.membershipTier, loyaltyPointsToRedeem, subtotal],
+    [items, discount, discountType, payState.couponDiscount, customer?.membershipTier, loyaltyPointsToRedeem, subtotal, taxRate],
   );
   const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
   const loyaltyDiscountAmt = loyaltyPointsToRedeem * 0.1;
@@ -509,9 +510,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         couponDiscount: payState.couponDiscount,
         tierDiscount: tierDiscountAmt,
         loyaltyPoints: 0,
+        posTaxRate: taxRate,
       },
     ),
-    [items, discount, discountType, payState.couponDiscount, tierDiscountAmt],
+    [items, discount, discountType, payState.couponDiscount, tierDiscountAmt, taxRate],
   );
   const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
@@ -519,7 +521,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const handleAddProduct = React.useCallback((p: ProductItem) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); return; }
-    const lineTax = p.taxRate ?? taxRate ?? 0;
+    const lineTax = taxRate;
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
       unitPrice: p.unitPrice, quantity: 1, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
@@ -649,7 +651,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const pm=new Map(products.map(p=>[p.variantId,p]));
       const payload={
         customerId:customer?.id,
-        items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:i.taxRate??0})),
+        items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:taxRate})),
         payments,
         discountAmount:discountAmount(),
         couponCode:couponCode??undefined,
@@ -1390,6 +1392,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     // SETTINGS PANEL
     if (activeNav === "settings") {
       const pinIsSet = typeof window !== "undefined" && !!localStorage.getItem("pos_pin");
+      const applyPosTax = (raw: number) => {
+        const v = Math.min(100, Math.max(0, raw));
+        setTaxRate(v);
+        toast.success(v === 0 ? "Tax disabled — no tax on POS sales" : `Tax ${v}% — applied from POS settings`);
+      };
       return (
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <h2 className="text-white font-bold text-xl">POS Settings</h2>
@@ -1397,12 +1404,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="rounded-2xl border p-5" style={{background:"#162338",borderColor:"#1e3356"}}>
             <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Receipt className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
-              <div><h3 className="text-white font-bold text-base">Tax Rate</h3><p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>Current: {taxRate}% {taxRate===0?"(Tax disabled)":""}</p></div>
+              <div className="flex-1">
+                <h3 className="text-white font-bold text-base">Tax Rate</h3>
+                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>
+                  {taxRate > 0
+                    ? `Tax is ON — ${taxRate}% added to every sale from this POS setting`
+                    : "Tax is OFF — no tax added to sales (set a rate below to enable)"}
+                </p>
+              </div>
+              <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0" style={{
+                background: taxRate > 0 ? "rgba(16,185,129,0.15)" : "rgba(107,114,128,0.2)",
+                color: taxRate > 0 ? "#10b981" : "#9ca3af",
+              }}>
+                {taxRate > 0 ? `${taxRate}% Active` : "Tax Off"}
+              </span>
             </div>
+            <p className="text-[11px] mb-3 leading-relaxed" style={{color:"#4a6a8a"}}>
+              Product tax rates are ignored at POS checkout. Only this setting controls tax on bills.
+            </p>
             <div className="flex items-center gap-3">
-              <input type="number" min="0" max="100" defaultValue={taxRate} onBlur={e=>{const v=Math.min(100,Math.max(0,parseFloat(e.target.value)||0));setTaxRate(v);toast.success(`Tax rate set to ${v}%`);}} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+              <input key={`pos-tax-${taxRate}`} type="number" min="0" max="100" step="0.01" defaultValue={taxRate} onBlur={e=>applyPosTax(parseFloat(e.target.value)||0)} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
               <span className="text-white font-bold text-lg">%</span>
-              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>{setTaxRate(v);toast.success(`Tax rate set to ${v}%`);}} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"#1a2b4a",color:taxRate===v?"#fff":"#6a8ab8"}}>{v}%</button>))}</div>
+              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"#1a2b4a",color:taxRate===v?"#fff":"#6a8ab8"}}>{v===0?"Off":`${v}%`}</button>))}</div>
             </div>
           </div>
           {/* PIN Security */}
@@ -1530,6 +1553,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}><span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"/>Online</div>
+            <button type="button" onClick={() => !posOnly && setActiveNav("settings")} title={taxRate > 0 ? `Tax ${taxRate}% from POS settings` : "Tax disabled in POS settings"} className={cn("flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold", !posOnly && "hover:opacity-90")} style={{background:taxRate>0?"rgba(79,110,247,0.15)":"rgba(107,114,128,0.15)",color:taxRate>0?"#93c5fd":"#9ca3af"}}>
+              <Receipt className="h-3.5 w-3.5"/>
+              {taxRate > 0 ? `Tax ${taxRate}%` : "No Tax"}
+            </button>
             {serverHeldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{user?.name?.[0]??"A"}</div>
@@ -1677,7 +1704,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
                     {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
                     {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
-                    {taxAmount()>0&&<div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax</span><span>LKR {formatNumber(taxAmount())}</span></div>}
+                    <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "#6a8ab8" : "#4a6a8a"}}>
+                      <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
+                      <span>LKR {formatNumber(taxAmount())}</span>
+                    </div>
                     <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
                   <div className="p-3">
@@ -1698,6 +1728,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
                   {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
                   {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                  <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "#6a8ab8" : "#4a6a8a"}}>
+                    <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
+                    <span>LKR {formatNumber(taxAmount())}</span>
+                  </div>
                   <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"#1e3356"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                 </div>
                 <PosPaymentPanel

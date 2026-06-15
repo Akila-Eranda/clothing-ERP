@@ -7,7 +7,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus, CashRegisterStatus,
+  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus, CashRegisterStatus, QuotationStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -72,6 +72,13 @@ export class WorkflowService {
       cash_variance: {
         name: 'Cash Variance Approval',
         steps: [{ name: 'Manager Approval', approverRole: 'BRANCH_MANAGER' }],
+      },
+      quotation: {
+        name: 'Quotation Approval',
+        steps: [
+          { name: 'Manager Review', approverRole: 'BRANCH_MANAGER' },
+          { name: 'Admin Approval', approverRole: 'TENANT_ADMIN' },
+        ],
       },
     };
 
@@ -185,6 +192,7 @@ export class WorkflowService {
     'discount_request',
     'stock_transfer',
     'cash_variance',
+    'quotation',
   ] as const;
 
   async getCatalog(tenantId: string) {
@@ -203,6 +211,7 @@ export class WorkflowService {
             discount_request: 'POS → Manager discount override',
             stock_transfer: 'Inventory → Stock transfer',
             cash_variance: 'POS → Cash close with variance over threshold',
+            quotation: 'Quotations → Submit for approval',
           }[key],
         };
       }),
@@ -395,6 +404,11 @@ export class WorkflowService {
           where: { id: entityId, tenantId, status: TransferStatus.PENDING },
           data: { approvedBy: userId },
         });
+      } else if (entityType === 'Quotation') {
+        await this.prisma.quotation.updateMany({
+          where: { id: entityId, tenantId, status: QuotationStatus.PENDING_APPROVAL },
+          data: { status: QuotationStatus.SENT },
+        });
       }
     }
 
@@ -450,6 +464,11 @@ export class WorkflowService {
         await this.prisma.stockTransfer.updateMany({
           where: { id: entityId, tenantId, status: TransferStatus.PENDING },
           data: { status: TransferStatus.CANCELLED },
+        });
+      } else if (entityType === 'Quotation') {
+        await this.prisma.quotation.updateMany({
+          where: { id: entityId, tenantId, status: QuotationStatus.PENDING_APPROVAL },
+          data: { status: QuotationStatus.DRAFT },
         });
       }
       return result;

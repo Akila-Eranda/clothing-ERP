@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   GitBranch, RefreshCw, Loader2, CheckCircle2, XCircle, Clock,
-  ShoppingBag, Package, Tag, ArrowLeftRight, Shield, ExternalLink, Banknote,
+  ShoppingBag, Package, Tag, ArrowLeftRight, Shield, ExternalLink, Banknote, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ interface WorkflowTask {
 
 const WORKFLOW_CFG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   purchase_order:   { label: "Purchase Order",   icon: ShoppingBag,    color: "text-blue-500",    bg: "bg-blue-500/10" },
+  quotation:        { label: "Quotation",        icon: FileText,       color: "text-teal-500",    bg: "bg-teal-500/10" },
   stock_adjustment: { label: "Stock Adjustment", icon: Package,        color: "text-amber-500",   bg: "bg-amber-500/10" },
   discount_request: { label: "Discount Request", icon: Tag,            color: "text-violet-500",  bg: "bg-violet-500/10" },
   stock_transfer:   { label: "Stock Transfer",   icon: ArrowLeftRight, color: "text-emerald-500", bg: "bg-emerald-500/10" },
@@ -46,6 +47,7 @@ const WORKFLOW_CFG: Record<string, { label: string; icon: React.ElementType; col
 
 const GUIDE = [
   { key: "purchase_order", title: "Purchase Order", steps: "Draft → Manager → Finance → GRN", href: "/purchases" },
+  { key: "quotation", title: "Quotation", steps: "Draft → Manager → Admin → Sent to customer", href: "/quotations" },
   { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval", href: "/pos" },
   { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval", href: "/inventory" },
   { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Manager review → Admin approval", href: "/inventory" },
@@ -73,6 +75,7 @@ function workflowCfg(key: string) {
 function entityLink(task: WorkflowTask): string | null {
   const key = task.instance.definition.key;
   if (task.instance.entityType === "PurchaseOrder") return `/purchases/${task.instance.entityId}`;
+  if (task.instance.entityType === "Quotation" || key === "quotation") return "/quotations";
   if (key === "cash_variance" || task.instance.entityType === "CashRegister") return "/cash?tab=variance";
   if (key === "stock_transfer") return "/inventory";
   if (key === "stock_adjustment") return "/inventory";
@@ -83,6 +86,7 @@ function entityLink(task: WorkflowTask): string | null {
 function referenceLabel(task: WorkflowTask): string {
   const meta = task.instance.metadata ?? {};
   if (typeof meta.poNumber === "string") return meta.poNumber;
+  if (typeof meta.quoteNumber === "string") return meta.quoteNumber;
   if (typeof meta.reference === "string") return meta.reference;
   if (typeof meta.discountPercent === "number") return `${meta.discountPercent}% discount`;
   if (typeof meta.variance === "number") return `Variance LKR ${formatNumber(Math.abs(meta.variance as number))}`;

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   FileText, Plus, Loader2, RefreshCw, Trash2, Users, Send, CheckCircle2,
-  Clock, Banknote, ExternalLink, Package, XCircle,
+  Clock, Banknote, ExternalLink, Package, XCircle, Printer, GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,11 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { useAuthStore } from "@/stores/auth-store";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { QuotationApprovalPanel } from "@/components/quotations/quotation-approval-panel";
+import { QuotationPrintModal } from "@/components/quotations/quotation-print-modal";
+import { bypassesWorkflowApproval, type WorkflowInstanceLike } from "@/lib/workflow-access";
 
 interface Quotation {
   id: string;
@@ -30,15 +35,19 @@ interface Quotation {
   status: string;
   total: number;
   subtotal: number;
+  taxAmount?: number;
+  discountAmount?: number;
   validUntil?: string | null;
   createdAt: string;
   notes?: string | null;
-  customer?: { firstName: string; lastName?: string | null; phone: string } | null;
+  customer?: { firstName: string; lastName?: string | null; phone: string; email?: string | null } | null;
   items: {
     quantity: number;
     unitPrice: number;
+    discount?: number;
+    taxRate?: number;
     total?: number;
-    variant: { sku: string; name?: string; product: { name: string } };
+    variant: { sku: string; name?: string | null; product: { name: string } };
   }[];
 }
 
@@ -53,11 +62,12 @@ interface VariantOpt {
 }
 interface LineItem { variantId: string; label: string; quantity: number; unitPrice: number }
 
-type StatusFilter = "ALL" | "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "CONVERTED" | "EXPIRED";
+type StatusFilter = "ALL" | "DRAFT" | "PENDING_APPROVAL" | "SENT" | "ACCEPTED" | "REJECTED" | "CONVERTED" | "EXPIRED";
 
 const STATUS_CFG: Record<string, { label: string; variant: "success" | "secondary" | "warning" | "danger" | "default" }> = {
-  DRAFT:     { label: "Draft",     variant: "secondary" },
-  SENT:      { label: "Sent",      variant: "default"   },
+  DRAFT:              { label: "Draft",              variant: "secondary" },
+  PENDING_APPROVAL:   { label: "Pending Approval",   variant: "warning"   },
+  SENT:               { label: "Sent",               variant: "default"   },
   ACCEPTED:  { label: "Accepted",  variant: "success"   },
   REJECTED:  { label: "Rejected",  variant: "danger"    },
   CONVERTED: { label: "Converted", variant: "success"   },
@@ -67,6 +77,7 @@ const STATUS_CFG: Record<string, { label: string; variant: "success" | "secondar
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "ALL", label: "All" },
   { key: "DRAFT", label: "Draft" },
+  { key: "PENDING_APPROVAL", label: "Pending Approval" },
   { key: "SENT", label: "Sent" },
   { key: "ACCEPTED", label: "Accepted" },
   { key: "REJECTED", label: "Rejected" },
@@ -76,9 +87,9 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
 
 const GUIDE = [
   { title: "Create Quote", desc: "Add parts, set prices, optional customer and validity date for workshop or fleet clients." },
-  { title: "Send to Customer", desc: "Mark as Sent when the quote is shared — track pending responses in one place." },
-  { title: "Accept or Reject", desc: "Update status when the customer confirms — accepted quotes can move to POS sale." },
-  { title: "Track Value", desc: "Monitor draft and sent quote totals to forecast parts revenue before conversion." },
+  { title: "Submit for Approval", desc: "Draft quotes go to Branch Manager → Admin approval before they can be sent to customers." },
+  { title: "Print & Send", desc: "After approval, print a professional quotation PDF and share with the customer." },
+  { title: "Accept & Convert", desc: "When the customer confirms, accept the quote and convert to a POS sale." },
 ];
 
 function fmtDate(d: string) {
@@ -93,6 +104,8 @@ function customerName(q: Quotation) {
 function buildColumns(
   onView: (q: Quotation) => void,
   onStatus: (id: string, status: string) => void,
+  onSubmitApproval: (id: string) => void,
+  onPrint: (q: Quotation) => void,
 ): ColumnDef<Quotation>[] {
   return [
     {
@@ -168,7 +181,8 @@ function buildColumns(
       cell: ({ row }) => {
         const q = row.original;
         const more: { text: string; function: () => void }[] = [];
-        if (q.status === "DRAFT") more.push({ text: "Mark Sent", function: () => onStatus(q.id, "SENT") });
+        more.push({ text: "Print Quotation", function: () => onPrint(q) });
+        if (q.status === "DRAFT") more.push({ text: "Submit for Approval", function: () => onSubmitApproval(q.id) });
         if (q.status === "SENT") {
           more.push({ text: "Accept", function: () => onStatus(q.id, "ACCEPTED") });
           more.push({ text: "Reject", function: () => onStatus(q.id, "REJECTED") });
@@ -191,10 +205,26 @@ function QuoteDetailDialog({
   quote,
   onClose,
   onStatus,
+  onSubmitApproval,
+  onPrint,
+  workflow,
+  workflowActing,
+  onApprove,
+  onReject,
+  userId,
+  userRole,
 }: {
   quote: Quotation | null;
   onClose: () => void;
   onStatus: (id: string, status: string) => void;
+  onSubmitApproval: (id: string) => void;
+  onPrint: (q: Quotation) => void;
+  workflow: WorkflowInstanceLike | null;
+  workflowActing: boolean;
+  onApprove: (taskId: string) => void;
+  onReject: (taskId: string) => void;
+  userId?: string;
+  userRole?: string;
 }) {
   if (!quote) return null;
   const cfg = STATUS_CFG[quote.status] ?? { label: quote.status, variant: "secondary" as const };
@@ -238,7 +268,7 @@ function QuoteDetailDialog({
                   <td className="px-3 py-2 font-mono text-[10px] text-muted-foreground">{item.variant.sku}</td>
                   <td className="px-3 py-2 text-xs">{item.quantity}</td>
                   <td className="px-3 py-2 text-xs">LKR {formatNumber(item.unitPrice)}</td>
-                  <td className="px-3 py-2 text-xs font-semibold">LKR {formatNumber(item.quantity * item.unitPrice)}</td>
+                  <td className="px-3 py-2 text-xs font-semibold">LKR {formatNumber(item.total ?? item.quantity * item.unitPrice)}</td>
                 </tr>
               ))}
             </tbody>
@@ -252,15 +282,32 @@ function QuoteDetailDialog({
           </div>
         )}
 
+        {quote.status === "PENDING_APPROVAL" && (
+          <QuotationApprovalPanel
+            instance={workflow}
+            userId={userId}
+            userRole={userRole}
+            acting={workflowActing}
+            onApprove={onApprove}
+            onReject={onReject}
+          />
+        )}
+
         <div className="flex justify-between items-center pt-2 border-t">
           <div>
             <p className="text-xs text-muted-foreground">Subtotal: LKR {formatNumber(quote.subtotal)}</p>
+            {(quote.taxAmount ?? 0) > 0 && (
+              <p className="text-xs text-muted-foreground">Tax: LKR {formatNumber(quote.taxAmount ?? 0)}</p>
+            )}
             <p className="text-lg font-bold">Total: LKR {formatNumber(quote.total)}</p>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button size="sm" variant="outline" className="gap-1" onClick={() => onPrint(quote)}>
+              <Printer className="h-3.5 w-3.5" /> Print
+            </Button>
             {quote.status === "DRAFT" && (
-              <Button size="sm" variant="outline" className="gap-1" onClick={() => { onStatus(quote.id, "SENT"); onClose(); }}>
-                <Send className="h-3.5 w-3.5" /> Mark Sent
+              <Button size="sm" className="gap-1" onClick={() => { onSubmitApproval(quote.id); }}>
+                <GitBranch className="h-3.5 w-3.5" /> Submit for Approval
               </Button>
             )}
             {quote.status === "SENT" && (
@@ -287,6 +334,8 @@ function QuoteDetailDialog({
 
 export default function QuotationsPage() {
   const { profile } = useShopWorkspace();
+  const { user } = useAuthStore();
+  const { settings: receiptSettings } = useReceiptSettings();
   const [quotes, setQuotes] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -301,6 +350,20 @@ export default function QuotationsPage() {
   const [pickVariant, setPickVariant] = useState("");
   const [partSearch, setPartSearch] = useState("");
   const [saving, setSaving] = useState(false);
+  const [printQuote, setPrintQuote] = useState<Quotation | null>(null);
+  const [viewWorkflow, setViewWorkflow] = useState<WorkflowInstanceLike | null>(null);
+  const [workflowActing, setWorkflowActing] = useState(false);
+
+  const shopBranding = useMemo(() => ({
+    shopName: receiptSettings.shopName,
+    tagline: receiptSettings.tagline,
+    address1: receiptSettings.address1,
+    address2: receiptSettings.address2,
+    phone: receiptSettings.phone,
+    email: receiptSettings.email,
+    website: receiptSettings.website,
+    logoUrl: receiptSettings.logoUrl,
+  }), [receiptSettings]);
 
   const fetchQuotes = useCallback(async () => {
     setLoading(true);
@@ -330,6 +393,66 @@ export default function QuotationsPage() {
       })
       .catch(() => {});
   }, []);
+
+  const loadWorkflow = useCallback(async (quoteId: string) => {
+    try {
+      const res = await api.get<WorkflowInstanceLike>(`/workflows/instances/Quotation/${quoteId}`);
+      setViewWorkflow(res.data ?? null);
+    } catch {
+      setViewWorkflow(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (viewQuote?.status === "PENDING_APPROVAL") {
+      loadWorkflow(viewQuote.id);
+    } else {
+      setViewWorkflow(null);
+    }
+  }, [viewQuote?.id, viewQuote?.status, loadWorkflow]);
+
+  const submitForApproval = useCallback(async (id: string) => {
+    try {
+      await api.post(`/spare-parts/quotations/${id}/submit-approval`);
+      toast.success(bypassesWorkflowApproval(user?.role) ? "Quotation approved and marked Sent" : "Submitted for manager approval");
+      fetchQuotes();
+      if (viewQuote?.id === id) {
+        const updated = await api.get<Quotation>(`/spare-parts/quotations/${id}`);
+        setViewQuote(updated.data);
+        if (updated.data.status === "PENDING_APPROVAL") loadWorkflow(id);
+      }
+    } catch (e: unknown) { toast.error((e as Error).message); }
+  }, [fetchQuotes, viewQuote?.id, user?.role, loadWorkflow]);
+
+  const handleWorkflowApprove = useCallback(async (taskId: string) => {
+    setWorkflowActing(true);
+    try {
+      await api.put(`/workflows/tasks/${taskId}/approve`, {});
+      toast.success("Quotation approved");
+      fetchQuotes();
+      if (viewQuote) {
+        const updated = await api.get<Quotation>(`/spare-parts/quotations/${viewQuote.id}`);
+        setViewQuote(updated.data);
+        loadWorkflow(viewQuote.id);
+      }
+    } catch (e: unknown) { toast.error((e as Error).message); }
+    finally { setWorkflowActing(false); }
+  }, [fetchQuotes, viewQuote, loadWorkflow]);
+
+  const handleWorkflowReject = useCallback(async (taskId: string) => {
+    setWorkflowActing(true);
+    try {
+      await api.put(`/workflows/tasks/${taskId}/reject`, {});
+      toast.success("Quotation rejected — returned to draft");
+      fetchQuotes();
+      if (viewQuote) {
+        const updated = await api.get<Quotation>(`/spare-parts/quotations/${viewQuote.id}`);
+        setViewQuote(updated.data);
+        setViewWorkflow(null);
+      }
+    } catch (e: unknown) { toast.error((e as Error).message); }
+    finally { setWorkflowActing(false); }
+  }, [fetchQuotes, viewQuote]);
 
   const updateStatus = useCallback(async (id: string, status: string) => {
     try {
@@ -453,8 +576,8 @@ export default function QuotationsPage() {
   ];
 
   const columns = useMemo(
-    () => buildColumns((q) => setViewQuote(q), updateStatus),
-    [updateStatus],
+    () => buildColumns((q) => setViewQuote(q), updateStatus, submitForApproval, setPrintQuote),
+    [updateStatus, submitForApproval],
   );
 
   return (
@@ -720,7 +843,23 @@ export default function QuotationsPage() {
           quote={viewQuote}
           onClose={() => setViewQuote(null)}
           onStatus={updateStatus}
+          onSubmitApproval={submitForApproval}
+          onPrint={setPrintQuote}
+          workflow={viewWorkflow}
+          workflowActing={workflowActing}
+          onApprove={handleWorkflowApprove}
+          onReject={handleWorkflowReject}
+          userId={user?.id}
+          userRole={user?.role}
         />
+
+        {printQuote && (
+          <QuotationPrintModal
+            quote={printQuote}
+            shop={shopBranding}
+            onClose={() => setPrintQuote(null)}
+          />
+        )}
       </div>
     </ModuleGate>
   );

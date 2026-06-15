@@ -20,12 +20,14 @@ export function calcPosSubtotal(items: PosLineInput[]) {
   }, 0);
 }
 
-export function calcPosTaxAmount(items: PosLineInput[]) {
+/** When posTaxRate is set, all lines use that rate (POS Settings master control). */
+export function calcPosTaxAmount(items: PosLineInput[], posTaxRate?: number) {
   return items.reduce((sum, item) => {
     const lineTotal = item.unitPrice * item.quantity;
     const disc = lineDiscount(lineTotal, item.discountAmount ?? 0, item.discountType);
     const taxable = lineTotal - disc;
-    return sum + (taxable * (item.taxRate ?? 0)) / 100;
+    const rate = posTaxRate !== undefined ? posTaxRate : (item.taxRate ?? 0);
+    return sum + (taxable * rate) / 100;
   }, 0);
 }
 
@@ -37,10 +39,12 @@ export function calcPosAmountDue(
     couponDiscount?: number;
     tierDiscount?: number;
     loyaltyPoints?: number;
+    /** POS Settings tax rate — overrides per-line product tax when provided. */
+    posTaxRate?: number;
   },
 ) {
   const subtotal = calcPosSubtotal(items);
-  const taxAmount = calcPosTaxAmount(items);
+  const taxAmount = calcPosTaxAmount(items, opts?.posTaxRate);
 
   let manualDiscount = 0;
   if (opts?.manualDiscountType === "percentage") {

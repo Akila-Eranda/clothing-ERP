@@ -205,6 +205,7 @@ enum WarrantyClaimStatus {
 
 enum QuotationStatus {
   DRAFT
+  PENDING_APPROVAL
   SENT
   ACCEPTED
   REJECTED
