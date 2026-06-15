@@ -679,7 +679,11 @@ export class PosService {
           openingTime: { gte: todayStart, lte: todayEnd },
         },
         orderBy: { openingTime: 'desc' },
-        include: { movements: { orderBy: { createdAt: 'asc' } } },
+        include: {
+          movements: { orderBy: { createdAt: 'asc' } },
+          cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
+          branch: { select: { id: true, name: true, code: true } },
+        },
       });
     }
 
