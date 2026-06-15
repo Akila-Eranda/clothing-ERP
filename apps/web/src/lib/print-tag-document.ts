@@ -59,11 +59,11 @@ export function barcodeSvgMarkup(value: string): string {
   try {
     JsBarcode(svg, safe, {
       format: "CODE128",
-      width: 1.4,
-      height: 38,
+      width: 1.2,
+      height: 28,
       displayValue: true,
-      fontSize: 10,
-      margin: 2,
+      fontSize: 8,
+      margin: 1,
     });
     return svg.outerHTML;
   } catch {
@@ -83,14 +83,15 @@ function stickerHtml(item: PrintTagItem, shopName: string, serial: number): stri
   const variantLine = variantDisplayLine(item);
   const tags = tagsLine(item);
   return `
-    <div class="label">
+    <div class="label sticker">
       <p class="shop">${escapeHtml(shopName)}</p>
-      <p class="name">${escapeHtml(item.productName)}</p>
+      <div class="head">
+        <p class="name">${escapeHtml(item.productName)}</p>
+        <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
+      </div>
       ${variantLine ? `<p class="variant">${escapeHtml(variantLine)}</p>` : ""}
       ${tags ? `<p class="tags">${escapeHtml(tags)}</p>` : ""}
       <div class="barcode">${barcodeSvgMarkup(barcodeVal)}</div>
-      <p class="code">${escapeHtml(barcodeVal)}</p>
-      <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>`;
 }
 
@@ -158,26 +159,52 @@ export function buildPrintTagsHtml(opts: {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; background: #fff; color: #111; }
   .label {
-    width: 100%;
-    min-height: 100vh;
-    padding: 3mm;
+    width: 60mm;
+    height: 40mm;
+    padding: 2mm;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 1mm;
+    justify-content: flex-start;
+    gap: 0.5mm;
+    overflow: hidden;
     page-break-after: always;
     break-after: page;
   }
   .label:last-child { page-break-after: auto; break-after: auto; }
-  .shop { font-size: 7px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #666; }
+  .shop { font-size: 6px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #666; width: 100%; }
+  .sticker .head {
+    display: flex;
+    width: 100%;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 2mm;
+    margin: 0.5mm 0;
+  }
+  .sticker .head .name {
+    flex: 1;
+    min-width: 0;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.15;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sticker .head .price {
+    flex-shrink: 0;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
   .name { font-size: 11px; font-weight: 800; line-height: 1.2; }
-  .variant, .tags { font-size: 8px; color: #555; }
-  .code { font-size: 8px; font-family: monospace; color: #666; }
-  .price { font-size: 13px; font-weight: 900; margin-top: 1mm; }
-  .barcode { max-width: 100%; }
-  .barcode svg { max-width: 100%; height: auto; }
+  .variant, .tags { font-size: 7px; color: #555; width: 100%; line-height: 1.2; }
+  .code { font-size: 7px; font-family: monospace; color: #666; }
+  .price { font-size: 13px; font-weight: 900; }
+  .barcode { max-width: 100%; margin-top: auto; }
+  .barcode svg { max-width: 100%; height: auto; display: block; }
   .hangtag .band {
     width: 100%;
     background: #111;

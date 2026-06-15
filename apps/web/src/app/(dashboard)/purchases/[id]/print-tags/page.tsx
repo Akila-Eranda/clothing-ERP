@@ -71,21 +71,21 @@ function BarcodeEl({ value, renderKey }: { value: string; renderKey: string }) {
     try {
       JsBarcode(el, safe, {
         format: "CODE128",
-        width: 1.6,
-        height: 44,
+        width: 1.2,
+        height: 28,
         displayValue: true,
-        fontSize: 11,
-        margin: 4,
+        fontSize: 8,
+        margin: 1,
       });
     } catch {
       try {
         JsBarcode(el, safe.replace(/\D/g, "").slice(0, 20) || "000000000000", {
           format: "CODE128",
-          width: 1.6,
-          height: 44,
+          width: 1.2,
+          height: 28,
           displayValue: true,
-          fontSize: 11,
-          margin: 4,
+          fontSize: 8,
+          margin: 1,
         });
       } catch {
         el.innerHTML = "";
@@ -141,16 +141,21 @@ function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: stri
   const variantLine = variantDisplayLine(item.variant, item.variantName);
   return (
     <div
-      className="label-card label-format-sticker bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
-      style={{ width: "7.5cm", minHeight: "4.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}
+      className="label-card label-format-sticker bg-white border border-gray-300 rounded p-1.5 flex flex-col items-center gap-0.5 text-center overflow-hidden"
+      style={{ width: "6cm", height: "4cm", breakInside: "avoid", pageBreakInside: "avoid" }}
     >
-      <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
-      <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
-      {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
-      <TagRow item={item} />
-      <BarcodeEl value={barcodeVal} renderKey={`sticker-${item.id}-${serial}`} />
-      <p className="text-[8px] font-mono text-gray-400">{barcodeVal || "—"}</p>
-      <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
+      <p className="text-[7px] font-bold tracking-widest uppercase text-gray-400 w-full truncate">{shopName}</p>
+      <div className="flex w-full items-baseline justify-between gap-1">
+        <p className="text-[10px] font-bold leading-tight truncate text-left flex-1">{item.productName}</p>
+        <p className="text-[11px] font-extrabold text-gray-900 shrink-0">
+          LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+      {variantLine && <p className="text-[8px] text-gray-500 w-full truncate text-left">{variantLine}</p>}
+      <TagRow item={item} className="w-full truncate text-left" />
+      <div className="mt-auto w-full flex justify-center">
+        <BarcodeEl value={barcodeVal} renderKey={`sticker-${item.id}-${serial}`} />
+      </div>
     </div>
   );
 }
@@ -258,8 +263,9 @@ const PRINT_CSS = `
       padding: 0;
     }
     .label-format-sticker {
-      width: 7.5cm !important;
-      min-height: 4.5cm !important;
+      width: 6cm !important;
+      height: 4cm !important;
+      overflow: hidden !important;
     }
     .label-format-hangtag {
       width: 6cm !important;
