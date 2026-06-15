@@ -296,7 +296,7 @@ export interface Customer {
   walletBalance?: number;
   totalPurchases: number;
   totalSpent: number;
-  membershipTier: "bronze" | "silver" | "gold" | "platinum";
+  membershipTier: "bronze" | "silver" | "gold" | "platinum" | "diamond";
   creditLimit: number;
   outstandingBalance: number;
   referralCode?: string;

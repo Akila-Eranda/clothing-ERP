@@ -4,9 +4,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard, Activity,
-  BarChart3, ScrollText, Settings, Shield, X, ShoppingBag, Tag,
+  BarChart3, ScrollText, Settings, Shield, X, Tag,
 } from 'lucide-react'
-import { APP_NAME } from '@/lib/constants'
+import { AppLogo } from "@/components/brand/app-logo";
 
 const NAV = [
   { href: '/admin/dashboard',      label: 'Dashboard',       icon: LayoutDashboard },
@@ -29,14 +29,9 @@ export default function AdminSidebar({ onClose }: Props) {
     <aside className="flex flex-col h-full bg-white border-r border-gray-200 w-[220px] flex-shrink-0">
       {/* Logo */}
       <div className="flex items-center justify-between h-14 px-4 border-b border-gray-100 flex-shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 bg-gray-900 rounded-lg flex items-center justify-center flex-shrink-0">
-            <ShoppingBag size={14} className="text-white" />
-          </div>
-          <div>
-            <p className="text-[13px] font-bold text-gray-900 leading-tight">{APP_NAME}</p>
-            <p className="text-[10px] text-gray-400 leading-tight">Platform Admin</p>
-          </div>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <AppLogo variant="sidebar" className="shrink-0" />
+          <p className="text-[10px] text-gray-400 leading-tight truncate">Platform Admin</p>
         </div>
         {onClose && (
           <button onClick={onClose} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">

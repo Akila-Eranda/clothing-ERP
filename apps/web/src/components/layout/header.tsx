@@ -23,7 +23,9 @@ import { getInitials } from "@/lib/utils";
 import { DUMMY_RECENT_SALES } from "@/lib/constants";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
+import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 
 const BASE_ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -84,7 +86,9 @@ export function Header() {
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 text-sm min-w-0 flex-1">
-        <span className="text-muted-foreground hidden sm:block">{APP_NAME}</span>
+        <Link href="/dashboard" className="shrink-0 hidden sm:block">
+          <AppLogo variant="sidebar" />
+        </Link>
         {breadcrumbs.map((crumb, i) => (
           <React.Fragment key={crumb}>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 hidden sm:block shrink-0" />

@@ -557,6 +557,7 @@ export class PosService {
   }
 
   async lookupBarcode(tenantId: string, branchId: string, code: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const variant = await this.prisma.productVariant.findFirst({
       where: {
         isActive: true,
@@ -565,14 +566,17 @@ export class PosService {
       },
       include: {
         product: { include: { category: true } },
-        inventory: { where: branchId ? { branchId } : {}, select: { quantity: true, reservedQty: true }, take: 1 },
+        inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
       },
     });
     if (!variant) throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
     return {
       variantId: variant.id, productName: variant.product.name, variantName: variant.name,
       sku: variant.sku, barcode: variant.barcode, unitPrice: variant.sellingPrice,
-      costPrice: variant.costPrice, color: variant.color, size: variant.size,
+      costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
+      color: variant.color, size: variant.size, material: variant.material ?? undefined,
+      style: variant.style ?? undefined,
+      category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
       stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
     };
   }
@@ -595,6 +599,7 @@ export class PosService {
   }
 
   async getProducts(tenantId: string, branchId: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const variants = await this.prisma.productVariant.findMany({
       where: {
         isActive: true,
@@ -603,7 +608,7 @@ export class PosService {
       include: {
         product: { include: { category: true } },
         inventory: {
-          where: branchId ? { branchId } : {},
+          where: { branchId: resolvedBranchId },
           select: { quantity: true, reservedQty: true },
           take: 1,
         },
@@ -618,6 +623,7 @@ export class PosService {
       sku:         v.sku,
       unitPrice:   v.sellingPrice,
       costPrice:   v.costPrice,
+      taxRate:     v.product.taxRate ?? 0,
       category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
       color:       v.color ?? undefined,
       size:        v.size  ?? undefined,

@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { adminLogin } from '@/lib/admin-api'
+import { AppLogo } from '@/components/brand/app-logo'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -30,10 +31,7 @@ export default function AdminLoginPage() {
     <div className="min-h-screen bg-[#f8fafc] flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-12 h-12 bg-gray-900 rounded-2xl flex items-center justify-center mb-3">
-            <Shield size={22} className="text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-gray-900">Hexalyte Company Admin</h1>
+          <AppLogo variant="full" className="items-center mb-3" />
           <p className="text-sm text-gray-500 mt-1 text-center">
             Internal use only — not for shop staff or tenants
           </p>

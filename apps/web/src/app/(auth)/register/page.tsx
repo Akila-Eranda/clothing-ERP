@@ -7,7 +7,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Building2, User, Globe, Eye, EyeOff, ArrowRight, ArrowLeft,
-  CheckCircle2, Sparkles, Mail, Lock, Phone, Tag, Check,
+  CheckCircle2, Mail, Lock, Phone, Tag, Check,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ import { SHOP_TYPE_LIST, ShopType, getShopProfile } from "@/lib/shop-profiles";
 import { getVerticalFeatures } from "@/lib/shop-features";
 import { ShopFeatureList } from "@/components/shop/shop-feature-list";
 import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -155,11 +156,8 @@ export default function RegisterPage() {
           style={{ backgroundImage:"radial-gradient(circle at 20% 50%, white 1px, transparent 1px)", backgroundSize:"30px 30px" }}
         />
         <div className="relative">
-          <div className="flex items-center gap-3 mb-12">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm">
-              <Sparkles className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-black tracking-wide uppercase">{APP_NAME}</span>
+          <div className="mb-12">
+            <AppLogo variant="full" showTagline />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-2">Start your free 14-day trial</h2>
           <p className="text-white/70 text-sm leading-relaxed mb-6">
@@ -181,10 +179,7 @@ export default function RegisterPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl gradient-primary shadow-glow mb-3">
-              <Sparkles className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-xl font-bold">{APP_NAME}</h1>
+            <AppLogo variant="compact" className="items-center mx-auto" />
           </div>
 
           {/* Step indicator */}

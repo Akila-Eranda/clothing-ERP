@@ -6,12 +6,12 @@ import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Mail, ArrowRight, ArrowLeft, Sparkles, CheckCircle2, ShieldAlert } from "lucide-react";
+import { Mail, ArrowRight, ArrowLeft, CheckCircle2, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authApi } from "@/lib/api";
-import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 
 const schema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -47,10 +47,7 @@ export default function ForgotPasswordPage() {
       >
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl gradient-primary shadow-glow mb-3">
-            <Sparkles className="h-7 w-7 text-white" />
-          </div>
-          <h1 className="text-xl font-bold text-foreground">{APP_NAME}</h1>
+          <AppLogo variant="compact" className="items-center mx-auto" />
         </div>
 
         <div className="glass-card rounded-2xl p-8 shadow-glass">

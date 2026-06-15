@@ -1,8 +1,8 @@
 "use client";
 
-import { ShoppingCart, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 
 interface PosOnlyLandingProps {
   shopLabel?: string;
@@ -17,14 +17,8 @@ export function PosOnlyLanding({ shopLabel, onOpenPos, onLogout }: PosOnlyLandin
       style={{ background: "linear-gradient(160deg,#070d1a 0%,#0f1f3c 50%,#070d1a 100%)" }}
     >
       <div className="max-w-sm w-full text-center space-y-6">
-        <div
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl"
-          style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}
-        >
-          <ShoppingCart className="h-8 w-8" />
-        </div>
+        <AppLogo variant="compact" className="items-center mx-auto" />
         <div>
-          <p className="text-xs uppercase tracking-widest text-indigo-300/80 mb-2">{APP_NAME} POS</p>
           <h1 className="text-2xl font-bold">{shopLabel ?? "Point of Sale"}</h1>
           <p className="text-sm text-slate-400 mt-2">Open the register to start selling.</p>
         </div>

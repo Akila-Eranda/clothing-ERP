@@ -16,18 +16,19 @@ import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, APP_LOGO_PATH } from "@/lib/constants";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
+import type { Customer } from "@/types";
 
 interface POSOverlayProps {
   /** Cashier mode — no ERP shell; exit returns to POS landing only. */
   posOnly?: boolean;
 }
 
-interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
 interface ApiCustomerRow {
@@ -81,7 +82,7 @@ const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", nav
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"rgba(245,158,11,0.15)",color:"#f59e0b"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
-const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6" };
+const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6", diamond:"#a78bfa" };
 
 export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { posOpen, closePos } = useUIStore();
@@ -173,7 +174,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { settings: receiptSettings } = useReceiptSettings();
   const searchRef = React.useRef<HTMLInputElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
+  const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
 
   React.useEffect(() => {
     if (!posOpen) return;
@@ -318,8 +319,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setCartNotes(bill.data.notes ?? "");
     setDiscountInput(bill.data.discount > 0 ? String(bill.data.discount) : "");
     setActiveNav("products");
+    if (bill.data.couponCode) {
+      try {
+        const sub = bill.data.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+        const r = await api.get<{ valid: boolean; discountAmount?: number; reason?: string }>(
+          `/pos/coupons/validate/${encodeURIComponent(bill.data.couponCode)}?amount=${sub}`,
+        );
+        if (r.data.valid) {
+          onCouponChange(bill.data.couponCode.toUpperCase(), r.data.discountAmount ?? 0);
+        } else {
+          setCoupon(null);
+          patchPayState({ couponCode: "", couponDiscount: 0 });
+          toast.error(r.data.reason ?? "Saved coupon no longer valid");
+        }
+      } catch {
+        setCoupon(null);
+        patchPayState({ couponCode: "", couponDiscount: 0 });
+      }
+    } else {
+      patchPayState({ couponCode: "", couponDiscount: 0 });
+    }
     toast.success("Bill restored");
-  }, [items.length, activeHeldBillId, loadFromHeldBill]);
+  }, [items.length, activeHeldBillId, loadFromHeldBill, onCouponChange, setCoupon, patchPayState]);
 
   const handleDeleteHeldBill = React.useCallback(async (id: string) => {
     try {
@@ -431,17 +452,75 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         manualDiscount: discount,
         manualDiscountType: discountType,
         couponDiscount: payState.couponDiscount,
-        tierDiscount: calcTierDiscount(subtotal(), customer?.tier),
+        tierDiscount: calcTierDiscount(subtotal(), customer?.membershipTier),
         loyaltyPoints: loyaltyPointsToRedeem,
       },
     ),
-    [items, discount, discountType, payState.couponDiscount, customer?.tier, loyaltyPointsToRedeem, subtotal],
+    [items, discount, discountType, payState.couponDiscount, customer?.membershipTier, loyaltyPointsToRedeem, subtotal],
+  );
+  const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
+  const loyaltyDiscountAmt = loyaltyPointsToRedeem * 0.1;
+  const amountBeforeLoyalty = React.useMemo(
+    () => calcPosAmountDue(
+      items.map((i) => ({
+        unitPrice: i.unitPrice,
+        quantity: i.quantity,
+        discountAmount: i.discountAmount,
+        discountType: i.discountType,
+        taxRate: i.taxRate,
+      })),
+      {
+        manualDiscount: discount,
+        manualDiscountType: discountType,
+        couponDiscount: payState.couponDiscount,
+        tierDiscount: tierDiscountAmt,
+        loyaltyPoints: 0,
+      },
+    ),
+    [items, discount, discountType, payState.couponDiscount, tierDiscountAmt],
   );
   const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
   const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
 
-  const handleAddProduct = React.useCallback((p:ProductItem)=>{ if(p.stock<=0){toast.error(`${p.productName} (${p.variantName}) — Out of stock`);return;} addItem({variantId:p.variantId,productName:p.productName,variantName:p.variantName,sku:p.sku,unitPrice:p.unitPrice,quantity:1,stock:p.stock,discountAmount:0,discountType:"percentage",taxRate:0}); setRecentScans(prev=>[{id:Date.now().toString(),variantId:p.variantId,name:p.productName,variant:variantDisplayLabel(p, profile),price:p.unitPrice,time:new Date()},...prev].slice(0,8)); toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} added  (Stock: ${p.stock})`,{duration:900}); }, [addItem, profile]);
+  const handleAddProduct = React.useCallback((p: ProductItem) => {
+    if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); return; }
+    const lineTax = p.taxRate ?? taxRate ?? 0;
+    addItem({
+      variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
+      unitPrice: p.unitPrice, quantity: 1, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
+    });
+    setRecentScans(prev => [{ id: Date.now().toString(), variantId: p.variantId, name: p.productName, variant: variantDisplayLabel(p, profile), price: p.unitPrice, time: new Date() }, ...prev].slice(0, 8));
+    toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} added  (Stock: ${p.stock})`, { duration: 900 });
+  }, [addItem, profile, taxRate]);
+
+  const scanAndAddProduct = React.useCallback(async (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    const base = trimmed.replace(/\d{3}$/, "");
+    let found = products.find(p => (p.barcode && p.barcode === trimmed) || p.sku.toLowerCase() === trimmed.toLowerCase());
+    if (!found && base && base !== trimmed) {
+      found = products.find(p => (p.barcode && p.barcode === base) || p.sku.toLowerCase() === base.toLowerCase());
+    }
+    if (!found) {
+      try {
+        const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(trimmed)}`);
+        found = r.data;
+      } catch {
+        if (base && base !== trimmed) {
+          try {
+            const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(base)}`);
+            found = r.data;
+          } catch { /* fall through */ }
+        }
+      }
+    }
+    if (!found) { toast.error(`Barcode/SKU not found: ${trimmed}`); return; }
+    handleAddProduct(found);
+    setSearch("");
+    setScanFlash(true);
+    setTimeout(() => setScanFlash(false), 500);
+  }, [products, handleAddProduct]);
   const handleCardClick = React.useCallback((p:ProductItem)=>{ if(!needsVariantPicker(p.productName)){handleAddProduct(p);return;} setSelectedProductName(p.productName); const initial: Record<string, string | null> = {}; for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null; setSelAttrs(initial); },[needsVariantPicker, handleAddProduct, variantCols]);
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -542,9 +621,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const s=res.data;
       const saleSnapshot = {
         items: [...items],
-        subtotal: items.reduce((a, i) => a + i.quantity * i.unitPrice, 0),
-        discount: discountAmount(),
-        tax: items.reduce((a, i) => a + (i.quantity * i.unitPrice * (i.taxRate ?? 0)) / 100, 0),
+        subtotal: subtotal(),
+        discount: discountAmount() + payState.couponDiscount + tierDiscountAmt + loyaltyDiscountAmt,
+        tax: taxAmount(),
         customerName: customer?.name,
         paymentMethod: payments.map((p) => p.method).join(" + "),
         cashTendered: activePayment === "CASH" && numpad ? parseFloat(numpad) : undefined,
@@ -605,7 +684,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       if(pinLocked){if(/^\d$/.test(e.key)){handlePinEntry(e.key);return;}if(e.key==="Backspace"){handlePinEntry("DEL");return;}if(e.key==="Escape"){closePos();return;}return;}
       const ms=Date.now();const delta=ms-lastKeyTime.current;lastKeyTime.current=ms;
       if(e.key.length===1&&delta<60&&!e.ctrlKey&&!e.altKey){barcodeBuffer.current+=e.key;clearTimeout(barcodeTimer.current);barcodeTimer.current=setTimeout(()=>{barcodeBuffer.current="";},120);}else if(e.key!=="Enter"&&delta>60){clearTimeout(barcodeTimer.current);barcodeBuffer.current="";}
-      if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const code=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(code){const base=code.replace(/\d{3}$/,"");let found=products.find(p=>(p.barcode&&p.barcode===code)||p.sku.toLowerCase()===code.toLowerCase());if(!found&&base&&base!==code)found=products.find(p=>(p.barcode&&p.barcode===base)||p.sku.toLowerCase()===base.toLowerCase());if(found){handleAddProduct(found);setSearch("");setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}else toast.error(`Barcode/SKU not found: ${code}`);e.preventDefault();return;}}
+      if(e.key==="Enter"&&barcodeBuffer.current.length>=3){const code=barcodeBuffer.current.trim();barcodeBuffer.current="";clearTimeout(barcodeTimer.current);if(code){scanAndAddProduct(code);e.preventDefault();return;}}
       if(e.key==="F1"||(e.key==="?"&&!inInput)){e.preventDefault();setShowShortcuts(s=>!s);return;}
       if(e.key==="Escape"){if(showShortcuts){setShowShortcuts(false);return;}if(checkoutOpen){setCheckoutOpen(false);return;}if(selectedProductName){setSelectedProductName(null);return;}if(showCustomerSearch){setShowCustomerSearch(false);setCustomerSearch("");return;}closePos();return;}
       if(inInput&&e.key==="Enter"&&document.activeElement===searchRef.current){const first=filteredProducts[0];if(first){e.preventDefault();handleAddProduct(first);setScanFlash(true);setTimeout(()=>setScanFlash(false),500);}return;}
@@ -634,13 +713,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     };
     window.addEventListener("keydown",onKey);return()=>window.removeEventListener("keydown",onKey);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,checkoutOpen,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts]);
+  },[posOpen,products,items,activePayment,selectedCartIdx,numpad,serverHeldBills,showShortcuts,showCustomerSearch,selectedProductName,checkoutOpen,handleAddProduct,handleNumpad,handleCheckout,handleHoldBill,handleRestoreHeldBill,pinLocked,handlePinEntry,filteredProducts,scanAndAddProduct]);
 
   const applyCustomer = React.useCallback((c: CustomerItem) => {
     if (!c?.id) { toast.error("Invalid customer — try again"); return; }
     setCustomer({
       id: c.id, name: c.name, phone: c.phone, email: c.email,
-      membershipTier: (c.tier?.toLowerCase() ?? "bronze") as "bronze" | "silver" | "gold" | "platinum",
+      membershipTier: (c.tier?.toLowerCase() ?? "bronze") as Customer["membershipTier"],
       loyaltyPoints: c.loyaltyPoints, walletBalance: c.walletBalance,
       totalPurchases: 0, totalSpent: 0,
       creditLimit: c.creditLimit, outstandingBalance: c.creditBalance,
@@ -1303,8 +1382,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="flex items-center gap-2.5 shrink-0">
             <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg flex items-center justify-center" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><ShoppingBag className="h-4 w-4 text-white"/></div>
-              <div><p className="text-white font-bold text-sm leading-none">{APP_NAME}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p></div>
+              <img src={APP_LOGO_PATH} alt={APP_NAME} className="h-7 w-auto object-contain" />
+              <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p>
             </div>
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
@@ -1464,7 +1543,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
                     <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
                     {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
-                    <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax ({taxRate}%)</span><span>LKR {formatNumber(taxAmount())}</span></div>
+                    {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                    {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                    {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                    {taxAmount()>0&&<div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Tax</span><span>LKR {formatNumber(taxAmount())}</span></div>}
                     <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
                   <div className="p-3">
@@ -1482,6 +1564,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"#1e3356"}}>
                   <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
                   {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
+                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
                   <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"#1e3356"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                 </div>
                 <PosPaymentPanel
@@ -1495,6 +1580,36 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   onStateChange={patchPayState}
                   onCouponChange={onCouponChange}
                 />
+                {showLoyalty && customer && (
+                  <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "#1e3356" }}>
+                    <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1.5" style={{ color: "#6a8ab8" }}>
+                      Redeem loyalty points ({customer.loyaltyPoints} available · LKR 0.10/pt)
+                    </label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={customer.loyaltyPoints}
+                        value={loyaltyPointsToRedeem || ""}
+                        onChange={(e) => {
+                          const pts = Math.min(customer.loyaltyPoints, Math.max(0, parseInt(e.target.value, 10) || 0));
+                          setLoyaltyPoints(pts);
+                        }}
+                        placeholder="0"
+                        className="h-8 text-xs text-white flex-1"
+                        style={{ background: "#1a2b4a", borderColor: "#1e3356" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setLoyaltyPoints(Math.min(customer.loyaltyPoints, Math.floor(amountBeforeLoyalty / 0.1)))}
+                        className="px-2.5 h-8 rounded-lg text-[10px] font-bold text-white whitespace-nowrap"
+                        style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+                      >
+                        Max
+                      </button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex gap-1.5 px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
                   {PAY_METHODS.map(({value,label,icon:Icon})=>(
                     <button key={value} onClick={()=>setActivePayment(value)} className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs font-bold transition-all" style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>

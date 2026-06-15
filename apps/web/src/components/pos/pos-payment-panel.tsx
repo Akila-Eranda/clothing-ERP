@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { calcTierDiscount } from "@/lib/pos-totals";
 
 const PAY_OPTIONS = [
   { value: "CASH", label: "Cash" },
@@ -51,7 +52,7 @@ export function PosPaymentPanel({
   totalAmt, subtotal, customerWallet, customerCreditLimit, customerCreditBalance, customerTier, onCouponChange, onStateChange, state,
 }: Props) {
   const tierPct = customerTier ? (TIER_PCT[customerTier.toLowerCase()] ?? 0) : state.tierDiscountPct;
-  const tierAmt = tierPct > 0 ? Math.round(subtotal * tierPct) / 100 : 0;
+  const tierAmt = calcTierDiscount(subtotal, customerTier);
   const creditAvailable = customerCreditLimit !== undefined && customerCreditBalance !== undefined
     ? Math.max(0, customerCreditLimit - customerCreditBalance)
     : undefined;

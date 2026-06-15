@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Sparkles, Shield, Zap, Check } from "lucide-react";
-import { APP_NAME, APP_DESCRIPTION } from "@/lib/constants";
+import { Shield, Zap, Check } from "lucide-react";
+import { APP_DESCRIPTION } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from "@/lib/shop-profiles";
 import { getVerticalFeatures } from "@/lib/shop-features";
 import { formatTenantSlug } from "@/lib/auth-host";
@@ -41,11 +42,8 @@ export function AuthBrandPanel({
 
       <div className="relative z-10 flex flex-col flex-1 p-10 xl:p-12 max-w-xl mx-auto w-full">
         {/* Logo */}
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600">
-            <Sparkles className="h-5 w-5 text-white" />
-          </div>
-          <span className="text-base font-black tracking-tight">{APP_NAME}</span>
+        <div className="shrink-0">
+          <AppLogo variant="full" showTagline />
         </div>
 
         {/* Main content — vertically centred */}

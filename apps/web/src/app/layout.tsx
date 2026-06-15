@@ -15,6 +15,10 @@ export const metadata: Metadata = {
   keywords: ["hexaone", "pos system", "retail management", "inventory", "erp"],
   authors: [{ name: "HexaOne" }],
   creator: "HexaOne",
+  icons: {
+    icon: "/hexaone-logo.png",
+    apple: "/hexaone-logo.png",
+  },
 };
 
 export const viewport: Viewport = {

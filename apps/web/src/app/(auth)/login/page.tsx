@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, Sparkles, Tag, ExternalLink,
+  Eye, EyeOff, Lock, Mail, ArrowRight, Tag, ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { APP_NAME } from "@/lib/constants";
+import { AppLogo } from "@/components/brand/app-logo";
 import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
 import {
   getHostnameTenantSlug,
@@ -137,11 +138,8 @@ function LoginContent() {
 
         <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10">
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2.5 mb-8 self-start">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
-              <Sparkles className="h-4 w-4 text-white" />
-            </div>
-            <span className="font-bold text-lg text-slate-900">{APP_NAME}</span>
+          <div className="lg:hidden mb-8 self-start">
+            <AppLogo variant="compact" />
           </div>
 
           <motion.div

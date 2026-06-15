@@ -18,7 +18,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, APP_LOGO_PATH } from "@/lib/constants";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -269,7 +269,11 @@ export function Sidebar() {
                 className="h-full w-full object-contain p-1"
               />
             ) : (
-              profile.emoji
+              <img
+                src={APP_LOGO_PATH}
+                alt={APP_NAME}
+                className="h-full w-full object-contain p-0.5"
+              />
             )}
           </div>
 

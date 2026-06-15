@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { APP_NAME } from '@/lib/constants';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
+import { AppLogo } from '@/components/brand/app-logo';
 import { Button } from '@/components/ui/button';
 import { SHOP_TYPE_LIST, ShopType } from '@/lib/shop-profiles';
 import { COMMON_FEATURES, getVerticalFeatures } from '@/lib/shop-features';
@@ -21,9 +21,8 @@ export default function FeaturesPage() {
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/80 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/login" className="flex items-center gap-2 font-black tracking-wide">
-            <Sparkles className="h-5 w-5 text-primary" />
-            {APP_NAME}
+          <Link href="/login">
+            <AppLogo variant="compact" />
           </Link>
           <div className="flex gap-2">
             <Button variant="ghost" asChild><Link href="/login">Login</Link></Button>
