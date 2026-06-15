@@ -61,44 +61,37 @@ const FORMAT_LABELS: Record<LabelFormat, string> = {
 };
 
 // ── Barcode SVG component ─────────────────────────────────────────────────
-const STICKER_BARCODE_OPTS = {
-  format: "CODE128" as const,
-  width: 1.15,
-  height: 24,
-  displayValue: true,
-  fontSize: 7,
-  fontOptions: "bold",
-  textMargin: 1,
-  margin: 0,
-};
-
-function BarcodeEl({
-  value,
-  renderKey,
-  compact = false,
-}: {
-  value: string;
-  renderKey: string;
-  compact?: boolean;
-}) {
+function BarcodeEl({ value, renderKey }: { value: string; renderKey: string }) {
   const ref = useRef<SVGSVGElement>(null);
   const safe = sanitizeBarcodeText(value);
+
   useEffect(() => {
     const el = ref.current;
     if (!el || !safe) return;
-    const barcodeOpts = compact
-      ? STICKER_BARCODE_OPTS
-      : { format: "CODE128" as const, width: 1.6, height: 44, displayValue: true, fontSize: 11, margin: 4 };
     try {
-      JsBarcode(el, safe, barcodeOpts);
+      JsBarcode(el, safe, {
+        format: "CODE128",
+        width: 1.6,
+        height: 44,
+        displayValue: true,
+        fontSize: 11,
+        margin: 4,
+      });
     } catch {
       try {
-        JsBarcode(el, safe.replace(/\D/g, "").slice(0, 20) || "000000000000", barcodeOpts);
+        JsBarcode(el, safe.replace(/\D/g, "").slice(0, 20) || "000000000000", {
+          format: "CODE128",
+          width: 1.6,
+          height: 44,
+          displayValue: true,
+          fontSize: 11,
+          margin: 4,
+        });
       } catch {
         el.innerHTML = "";
       }
     }
-  }, [safe, renderKey, compact]);
+  }, [safe, renderKey]);
 
   if (!safe) {
     return <p className="text-[8px] text-red-600 font-semibold">No barcode</p>;
@@ -137,13 +130,6 @@ function TagRow({ item, className = "" }: { item: POItem; className?: string }) 
   return <p className={`text-[8px] font-semibold text-gray-600 leading-tight ${className}`}>{line}</p>;
 }
 
-function stickerMetaLine(item: POItem): string {
-  const variant = variantDisplayLine(item.variant, item.variantName);
-  const tags = tagsLine(item);
-  if (variant && tags) return `${variant} · ${tags}`;
-  return variant || tags;
-}
-
 function labelBarcode(item: POItem, serial: number): string {
   return printTagBarcodeValue(printTagBaseCode(item), serial);
 }
@@ -152,25 +138,19 @@ function labelBarcode(item: POItem, serial: number): string {
 function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
   const barcodeVal = labelBarcode(item, serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
-  const meta = stickerMetaLine(item);
+  const variantLine = variantDisplayLine(item.variant, item.variantName);
   return (
     <div
-      className="label-card label-format-sticker bg-white border border-gray-200 rounded-sm flex flex-col overflow-hidden shadow-sm"
-      style={{ width: "6cm", height: "4cm", breakInside: "avoid", pageBreakInside: "avoid" }}
+      className="label-card label-format-sticker bg-white border border-gray-300 rounded p-2 flex flex-col items-center gap-0.5 text-center"
+      style={{ width: "7.5cm", minHeight: "4.5cm", breakInside: "avoid", pageBreakInside: "avoid" }}
     >
-      <div className="bg-gray-900 px-2 py-1 shrink-0">
-        <p className="text-[6px] font-bold tracking-[0.14em] uppercase text-white text-center truncate">{shopName}</p>
-      </div>
-      <div className="flex flex-col flex-1 min-h-0 px-2 pt-1.5 pb-1 gap-0.5">
-        <p className="text-[11px] font-extrabold leading-tight truncate text-left text-gray-900">{item.productName}</p>
-        {meta && <p className="text-[7px] font-semibold text-gray-600 truncate text-left tracking-wide">{meta}</p>}
-        <p className="text-[12px] font-black text-center bg-gray-100 border border-gray-200 rounded px-1 py-0.5 my-0.5">
-          LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
-        </p>
-        <div className="mt-auto flex justify-center w-full">
-          <BarcodeEl value={barcodeVal} renderKey={`sticker-${item.id}-${serial}`} compact />
-        </div>
-      </div>
+      <p className="text-[8px] font-bold tracking-widest uppercase text-gray-400">{shopName}</p>
+      <p className="text-[11px] font-bold leading-tight">{item.productName}</p>
+      {variantLine && <p className="text-[9px] text-gray-500">{variantLine}</p>}
+      <TagRow item={item} />
+      <BarcodeEl value={barcodeVal} renderKey={`sticker-${item.id}-${serial}`} />
+      <p className="text-[8px] font-mono text-gray-400">{barcodeVal || "—"}</p>
+      <p className="text-[14px] font-extrabold text-gray-900">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>
   );
 }
@@ -278,9 +258,8 @@ const PRINT_CSS = `
       padding: 0;
     }
     .label-format-sticker {
-      width: 6cm !important;
-      height: 4cm !important;
-      overflow: hidden !important;
+      width: 7.5cm !important;
+      min-height: 4.5cm !important;
     }
     .label-format-hangtag {
       width: 6cm !important;

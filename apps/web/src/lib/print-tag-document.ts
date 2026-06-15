@@ -49,24 +49,6 @@ function tagsLine(item: PrintTagItem): string {
   return tags.length ? tags.join(" · ") : "";
 }
 
-function stickerMetaLine(item: PrintTagItem): string {
-  const variant = variantDisplayLine(item);
-  const tags = tagsLine(item);
-  if (variant && tags) return `${variant} · ${tags}`;
-  return variant || tags;
-}
-
-const STICKER_BARCODE_OPTS = {
-  format: "CODE128" as const,
-  width: 1.15,
-  height: 24,
-  displayValue: true,
-  fontSize: 7,
-  fontOptions: "bold",
-  textMargin: 1,
-  margin: 0,
-};
-
 export function barcodeSvgMarkup(value: string): string {
   const safe = sanitizeBarcodeText(value);
   if (!safe) return "";
@@ -75,7 +57,14 @@ export function barcodeSvgMarkup(value: string): string {
   }
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   try {
-    JsBarcode(svg, safe, STICKER_BARCODE_OPTS);
+    JsBarcode(svg, safe, {
+      format: "CODE128",
+      width: 1.4,
+      height: 38,
+      displayValue: true,
+      fontSize: 10,
+      margin: 2,
+    });
     return svg.outerHTML;
   } catch {
     return `<span style="font-family:monospace;font-size:11px;font-weight:bold">${escapeHtml(safe)}</span>`;
@@ -91,16 +80,17 @@ function labelPageSize(format: LabelFormat): string {
 function stickerHtml(item: PrintTagItem, shopName: string, serial: number): string {
   const barcodeVal = printTagBarcodeValue(printTagBaseCode(item), serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
-  const meta = stickerMetaLine(item);
+  const variantLine = variantDisplayLine(item);
+  const tags = tagsLine(item);
   return `
-    <div class="label sticker">
-      <div class="sticker-band">${escapeHtml(shopName)}</div>
-      <div class="sticker-body">
-        <p class="name">${escapeHtml(item.productName)}</p>
-        ${meta ? `<p class="meta">${escapeHtml(meta)}</p>` : ""}
-        <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
-        <div class="barcode-wrap">${barcodeSvgMarkup(barcodeVal)}</div>
-      </div>
+    <div class="label">
+      <p class="shop">${escapeHtml(shopName)}</p>
+      <p class="name">${escapeHtml(item.productName)}</p>
+      ${variantLine ? `<p class="variant">${escapeHtml(variantLine)}</p>` : ""}
+      ${tags ? `<p class="tags">${escapeHtml(tags)}</p>` : ""}
+      <div class="barcode">${barcodeSvgMarkup(barcodeVal)}</div>
+      <p class="code">${escapeHtml(barcodeVal)}</p>
+      <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
     </div>`;
 }
 
@@ -166,87 +156,28 @@ export function buildPrintTagsHtml(opts: {
 <title>Barcode Tags</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: "Segoe UI", Arial, sans-serif; background: #fff; color: #111; }
+  body { font-family: Arial, sans-serif; background: #fff; color: #111; }
   .label {
-    width: 60mm;
-    height: 40mm;
-    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    padding: 3mm;
+    text-align: center;
     display: flex;
     flex-direction: column;
-    align-items: stretch;
-    overflow: hidden;
+    align-items: center;
+    justify-content: center;
+    gap: 1mm;
     page-break-after: always;
     break-after: page;
-    border: 0.15mm solid #e5e7eb;
   }
   .label:last-child { page-break-after: auto; break-after: auto; }
-  .sticker-band {
-    background: #111827;
-    color: #fff;
-    font-size: 6px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    text-align: center;
-    padding: 1.3mm 1.5mm;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    flex-shrink: 0;
-  }
-  .sticker-body {
-    flex: 1;
-    min-height: 0;
-    padding: 1.5mm 2mm 1.2mm;
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.6mm;
-  }
-  .sticker .name {
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1.15;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .sticker .meta {
-    font-size: 7px;
-    font-weight: 600;
-    color: #4b5563;
-    text-align: left;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    letter-spacing: 0.02em;
-  }
-  .sticker .price {
-    font-size: 12px;
-    font-weight: 900;
-    text-align: center;
-    background: #f3f4f6;
-    border: 0.15mm solid #e5e7eb;
-    border-radius: 1mm;
-    padding: 0.9mm 1mm;
-    margin: 0.3mm 0 0.2mm;
-    letter-spacing: -0.01em;
-  }
-  .barcode-wrap {
-    margin-top: auto;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    width: 100%;
-  }
-  .barcode-wrap svg { max-width: 100%; height: auto; display: block; }
+  .shop { font-size: 7px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #666; }
   .name { font-size: 11px; font-weight: 800; line-height: 1.2; }
-  .variant, .tags { font-size: 7px; color: #555; width: 100%; line-height: 1.2; }
-  .code { font-size: 7px; font-family: monospace; color: #666; }
-  .price { font-size: 13px; font-weight: 900; }
+  .variant, .tags { font-size: 8px; color: #555; }
+  .code { font-size: 8px; font-family: monospace; color: #666; }
+  .price { font-size: 13px; font-weight: 900; margin-top: 1mm; }
   .barcode { max-width: 100%; }
-  .barcode svg { max-width: 100%; height: auto; display: block; }
+  .barcode svg { max-width: 100%; height: auto; }
   .hangtag .band {
     width: 100%;
     background: #111;
