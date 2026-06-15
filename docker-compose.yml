@@ -110,6 +110,7 @@ services:
     volumes:
       - ./nginx/nginx.clothing.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./apps/web/public:/var/www/web-public:ro
       - uploads_data:/var/www/uploads:ro
 
 volumes:

@@ -17,10 +17,26 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 export async function resolveInvoiceLogoDataUrl(): Promise<string> {
   if (typeof window === 'undefined') return ''
 
+  const previewImg = document.querySelector<HTMLImageElement>('[data-invoice-logo] img')
+  if (previewImg?.complete && previewImg.naturalWidth > 0) {
+    try {
+      const canvas = document.createElement('canvas')
+      canvas.width = previewImg.naturalWidth
+      canvas.height = previewImg.naturalHeight
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(previewImg, 0, 0)
+        return canvas.toDataURL('image/png')
+      }
+    } catch {
+      /* fall through to fetch */
+    }
+  }
+
   const origin = window.location.origin
   const candidates = [
-    `${origin}/_next/image?url=${encodeURIComponent(APP_LOGO_PATH)}&w=240&q=90`,
     `${origin}${APP_LOGO_PATH}`,
+    `${origin}/_next/image?url=${encodeURIComponent(APP_LOGO_PATH)}&w=240&q=90`,
   ]
 
   for (const url of candidates) {

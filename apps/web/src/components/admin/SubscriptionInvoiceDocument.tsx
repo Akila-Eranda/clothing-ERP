@@ -19,7 +19,7 @@ export function SubscriptionInvoiceDocument({ invoice, monthLabel }: Props) {
       <div className="p-8">
         <div className="flex justify-between items-start gap-6 mb-8">
           <div className="flex gap-4 items-start">
-            <div className="relative w-[120px] h-[52px] shrink-0">
+            <div className="relative w-[120px] h-[52px] shrink-0" data-invoice-logo>
               <Image
                 src="/hexaone-logo.png"
                 alt={b.companyBrandName}
