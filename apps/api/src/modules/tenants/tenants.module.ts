@@ -495,7 +495,12 @@ export class TenantsService {
     }
     const billing = await this.getBillingSettingsInternal();
     const m = Math.max(1, Math.min(months, 24));
-    return buildSubscriptionInvoice(tenant, plan, billing, m);
+    return buildSubscriptionInvoice(
+      { id: tenant.id, name: tenant.name, email: tenant.email ?? '', plan: tenant.plan },
+      plan,
+      billing,
+      m,
+    );
   }
 
   async sendSubscriptionInvoice(
