@@ -5,7 +5,7 @@ import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
 import { APP_LOGO_PATH, APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
-type AppLogoVariant = "hero" | "full" | "compact" | "sidebar";
+type AppLogoVariant = "login" | "hero" | "full" | "compact" | "sidebar";
 type LogoTheme = "dark" | "light" | "auto";
 
 interface AppLogoProps {
@@ -18,6 +18,7 @@ interface AppLogoProps {
 }
 
 const HEIGHT: Record<AppLogoVariant, string> = {
+  login: "h-28 sm:h-32 md:h-36 lg:h-40",
   hero: "h-20 sm:h-24 md:h-28",
   full: "h-16 sm:h-[4.5rem]",
   compact: "h-12 sm:h-14",
@@ -25,6 +26,7 @@ const HEIGHT: Record<AppLogoVariant, string> = {
 };
 
 const MAX_WIDTH: Record<AppLogoVariant, string> = {
+  login: "max-w-[min(100%,560px)]",
   hero: "max-w-[min(100%,420px)]",
   full: "max-w-[min(100%,320px)]",
   compact: "max-w-[min(100%,280px)]",
