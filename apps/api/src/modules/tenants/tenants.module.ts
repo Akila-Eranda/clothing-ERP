@@ -512,7 +512,7 @@ export class TenantsService {
     const email = (dto.email?.trim() || invoice.tenantEmail).toLowerCase();
     if (!email) throw new BadRequestException('No recipient email');
 
-    const html = buildSubscriptionInvoiceHtml(invoice, true);
+    const html = buildSubscriptionInvoiceHtml(invoice);
     const subject = `Subscription Invoice ${invoice.invoiceNumber} — ${invoice.planName} Plan`;
     await this.mailService.send(email, subject, html);
 

@@ -1,73 +1,16 @@
-export interface PlatformBillingSettings {
-  companyLegalName: string;
-  companyBrandName: string;
-  companyWebsite: string;
-  companyEmail: string;
-  companyPhone: string;
-  bankName: string;
-  bankAccountName: string;
-  bankAccountNumber: string;
-  bankSwift: string;
-  invoiceDueDays: number;
-  taxRate: number;
+import type { SubscriptionInvoice } from '@/lib/admin-api'
+
+export const INVOICE_LOGO_URL =
+  (typeof window !== 'undefined' ? window.location.origin : '') + '/hexaone-logo.png'
+
+export function fmtInvoiceMoney(amount: number, currency: string) {
+  const sym = currency.replace(/\.$/, '').trim() || 'Rs.'
+  return `${sym} ${amount.toLocaleString('en-LK')}`
 }
 
-export const DEFAULT_BILLING_SETTINGS: PlatformBillingSettings = {
-  companyLegalName: 'Hexalyte Innovation (Pvt) Ltd',
-  companyBrandName: 'HEXALYTE INNOVATION',
-  companyWebsite: 'www.hexalyte.com',
-  companyEmail: 'info@hexalyte.com',
-  companyPhone: '+94 70 3130100',
-  bankName: 'Commercial Bank',
-  bankAccountName: 'Akila Eranda Gankewela',
-  bankAccountNumber: '2000124779',
-  bankSwift: 'CCEYLKLX',
-  invoiceDueDays: 20,
-  taxRate: 0,
-};
-
-export interface SubscriptionInvoiceData {
-  invoiceNumber: string;
-  tenantId: string;
-  tenantName: string;
-  tenantEmail: string;
-  planKey: string;
-  planName: string;
-  months: number;
-  unitPrice: number;
-  currency: string;
-  intervalLabel: string;
-  subtotal: number;
-  taxRate: number;
-  taxAmount: number;
-  total: number;
-  issueDate: string;
-  validUntil: string;
-  billing: PlatformBillingSettings;
+export function fmtInvoiceDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
 }
-
-export function generateSubscriptionInvoiceNumber(): string {
-  const year = new Date().getFullYear();
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let suffix = '';
-  for (let i = 0; i < 5; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return `HX-${year}-${suffix}`;
-}
-
-function fmtMoney(amount: number, currency: string): string {
-  const sym = currency.replace(/\.$/, '').trim() || 'Rs.';
-  return `${sym} ${amount.toLocaleString('en-LK')}`;
-}
-
-function fmtDate(d: Date): string {
-  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-const DEFAULT_INVOICE_LOGO_URL =
-  process.env.INVOICE_LOGO_URL ||
-  `${process.env.ADMIN_FRONTEND_URL || 'https://admin3.hexalyte.com'}/hexaone-logo.png`;
 
 const INVOICE_CSS = `
   *{margin:0;padding:0;box-sizing:border-box}
@@ -111,14 +54,14 @@ const INVOICE_CSS = `
     .page{padding:24px 32px}
     @page{margin:10mm;size:A4}
   }
-`;
+`
 
-export function buildSubscriptionInvoiceHtml(
-  inv: SubscriptionInvoiceData,
-  logoUrl = DEFAULT_INVOICE_LOGO_URL,
+export function buildSubscriptionInvoicePrintHtml(
+  inv: SubscriptionInvoice,
+  logoUrl = INVOICE_LOGO_URL || 'https://admin3.hexalyte.com/hexaone-logo.png',
 ): string {
-  const monthLabel = inv.months === 1 ? '1 Month' : `${inv.months} Months`;
-  const b = inv.billing;
+  const monthLabel = inv.months === 1 ? '1 Month' : `${inv.months} Months`
+  const b = inv.billing
 
   return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>Invoice ${inv.invoiceNumber}</title>
@@ -149,26 +92,26 @@ export function buildSubscriptionInvoiceHtml(
     </div>
     <div>
       <div class="meta-lbl">Issue Date</div>
-      <div class="meta-val">${fmtDate(new Date(inv.issueDate))}</div>
+      <div class="meta-val">${fmtInvoiceDate(inv.issueDate)}</div>
     </div>
     <div>
       <div class="meta-lbl">Valid Until</div>
-      <div class="meta-val">${fmtDate(new Date(inv.validUntil))}</div>
+      <div class="meta-val">${fmtInvoiceDate(inv.validUntil)}</div>
     </div>
   </div>
   <table>
     <thead><tr><th>Description</th><th>Qty</th><th>Amount</th></tr></thead>
     <tbody><tr>
       <td><div class="item-title">Hexalyte ${inv.planName} Plan</div>
-          <div class="item-sub">${monthLabel} subscription · ${fmtMoney(inv.unitPrice, inv.currency)} / month</div></td>
+          <div class="item-sub">${monthLabel} subscription · ${fmtInvoiceMoney(inv.unitPrice, inv.currency)} / month</div></td>
       <td>${inv.months}</td>
-      <td>${fmtMoney(inv.subtotal, inv.currency)}</td>
+      <td>${fmtInvoiceMoney(inv.subtotal, inv.currency)}</td>
     </tr></tbody>
   </table>
   <div class="totals-wrap"><div class="totals">
-    <div class="tot-row"><span>Subtotal</span><span>${fmtMoney(inv.subtotal, inv.currency)}</span></div>
-    <div class="tot-row"><span>Tax (${inv.taxRate}%)</span><span>${fmtMoney(inv.taxAmount, inv.currency)}</span></div>
-    <div class="tot-grand"><span>Total (${monthLabel})</span><span>${fmtMoney(inv.total, inv.currency)}</span></div>
+    <div class="tot-row"><span>Subtotal</span><span>${fmtInvoiceMoney(inv.subtotal, inv.currency)}</span></div>
+    <div class="tot-row"><span>Tax (${inv.taxRate}%)</span><span>${fmtInvoiceMoney(inv.taxAmount, inv.currency)}</span></div>
+    <div class="tot-grand"><span>Total (${monthLabel})</span><span>${fmtInvoiceMoney(inv.total, inv.currency)}</span></div>
   </div></div>
   <div class="bank">
     <div class="bank-title">Bank Transfer Details</div>
@@ -180,44 +123,5 @@ export function buildSubscriptionInvoiceHtml(
     </div>
   </div>
   <div class="footer">Thank you for your business · ${b.companyLegalName}</div>
-</div></body></html>`;
-}
-
-export function buildSubscriptionInvoice(
-  tenant: { id: string; name: string; email: string; plan: string },
-  plan: { key: string; name: string; price: number; currency: string; interval: string },
-  billing: PlatformBillingSettings,
-  months = 1,
-): SubscriptionInvoiceData {
-  const issue = new Date();
-  const valid = new Date(issue);
-  valid.setDate(valid.getDate() + (billing.invoiceDueDays || 20));
-
-  const unitPrice = plan.price;
-  const subtotal = unitPrice * months;
-  const taxRate = billing.taxRate ?? 0;
-  const taxAmount = Math.round(subtotal * (taxRate / 100));
-  const total = subtotal + taxAmount;
-
-  const intervalLabel = plan.interval === 'mo' ? 'month' : plan.interval;
-
-  return {
-    invoiceNumber: generateSubscriptionInvoiceNumber(),
-    tenantId: tenant.id,
-    tenantName: tenant.name,
-    tenantEmail: tenant.email,
-    planKey: plan.key,
-    planName: plan.name,
-    months,
-    unitPrice,
-    currency: plan.currency || 'Rs.',
-    intervalLabel,
-    subtotal,
-    taxRate,
-    taxAmount,
-    total,
-    issueDate: issue.toISOString(),
-    validUntil: valid.toISOString(),
-    billing,
-  };
+</div></body></html>`
 }
