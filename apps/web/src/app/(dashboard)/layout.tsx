@@ -12,6 +12,7 @@ import { useBranchStore } from "@/stores/branch-store";
 import { isPosOnlyRole } from "@/lib/role-access";
 import { PosOnlyLanding } from "@/components/pos/pos-only-landing";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
 
 const POSOverlay = dynamic(
   () => import("@/components/pos/pos-overlay").then((m) => m.POSOverlay),
@@ -74,6 +75,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (posOnly) {
     return (
       <BranchProvider>
+        <MaintenanceBanner />
         <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} posOnly />
         {!posOpen && (
           <PosOnlyLanding
@@ -110,6 +112,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Main content */}
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           <Header />
+          <MaintenanceBanner />
           <main className="flex-1 overflow-y-auto">
             <div className="h-full" key={`${activeBranchId ?? "none"}-${branchRevision}`}>
               {children}

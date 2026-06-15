@@ -18,7 +18,9 @@ export class TenantSslProvisioner {
     const zoneId = process.env.CLOUDFLARE_ZONE_ID;
     const ip = process.env.SERVER_IP;
     if (!token || !zoneId || !ip) {
-      this.logger.warn('[SSL] CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID, or SERVER_IP not set — skipping DNS');
+      this.logger.warn(
+        '[SSL] CLOUDFLARE_API_TOKEN, CLOUDFLARE_ZONE_ID, and SERVER_IP must all be set — skipping DNS',
+      );
       return;
     }
 

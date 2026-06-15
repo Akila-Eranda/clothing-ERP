@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import {
-  Search, Plus, MoreHorizontal, RefreshCw, Trash2,
+  Search, Plus, MoreHorizontal, RefreshCw,
   ChevronLeft, ChevronRight, Building2, Users, CheckCircle,
-  AlertCircle, Ban, Edit2, X, Check,
+  AlertCircle, Ban, Edit2, X, Check, Eye,
 } from 'lucide-react'
 import {
   fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans,
@@ -32,6 +34,7 @@ function fmtDate(s: string) {
 const PER_PAGE = 20
 
 export default function TenantsPage() {
+  const router = useRouter()
   const [tenants, setTenants]               = useState<TenantRow[]>([])
   const [total, setTotal]                   = useState(0)
   const [stats, setStats]                   = useState<PlatformStats | null>(null)
@@ -64,6 +67,12 @@ export default function TenantsPage() {
   useEffect(() => {
     load()
     fetchPlatformStats().then(setStats).catch(() => {})
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('create') === '1') setShowCreate(true)
+      const status = params.get('status')
+      if (status) { setStatusFilter(status); load({ status, page: 1 }) }
+    }
   }, [])
 
   function handleSearch(v: string) {
@@ -173,7 +182,8 @@ export default function TenantsPage() {
                 <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-400">No tenants match filters.</td></tr>
               )}
               {!loading && tenants.map(t => (
-                <tr key={t.id} className={`hover:bg-gray-50 transition-colors ${actionLoading === t.id ? 'opacity-50' : ''}`}>
+                <tr key={t.id} className={`hover:bg-gray-50 transition-colors cursor-pointer ${actionLoading === t.id ? 'opacity-50' : ''}`}
+                  onClick={() => router.push(`/admin/tenants/${t.id}`)}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
@@ -197,8 +207,13 @@ export default function TenantsPage() {
                   <td className="px-4 py-3 text-xs text-gray-600 text-center">{t._count?.users ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-gray-600 text-center">{t._count?.branches ?? '—'}</td>
                   <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                     <div className="relative flex items-center justify-center gap-1">
+                      <Link href={`/admin/tenants/${t.id}`}
+                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
+                        title="View details">
+                        <Eye size={13} />
+                      </Link>
                       <button
                         onClick={() => setEditTenant(t)}
                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
@@ -213,6 +228,11 @@ export default function TenantsPage() {
                       </button>
                       {menuOpen === t.id && (
                         <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-20">
+                          <Link href={`/admin/tenants/${t.id}`}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
+                            onClick={() => setMenuOpen(null)}>
+                            <Eye size={13} /> View Details
+                          </Link>
                           <button
                             onClick={() => handleStatusToggle(t)}
                             className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${t.status === 'ACTIVE' ? 'text-amber-600' : 'text-green-600'}`}
@@ -220,14 +240,6 @@ export default function TenantsPage() {
                             <Ban size={13} />
                             {t.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
                           </button>
-                          <div className="border-t border-gray-100 mt-1 pt-1">
-                            <button
-                              onClick={() => { setMenuOpen(null) }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                            >
-                              <Trash2 size={13} />Delete
-                            </button>
-                          </div>
                         </div>
                       )}
                     </div>

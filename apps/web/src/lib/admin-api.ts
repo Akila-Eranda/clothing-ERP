@@ -105,6 +105,108 @@ export interface TenantRow {
   createdAt: string
   updatedAt: string
   _count?: { users: number; branches: number }
+  branches?: { id: string; name: string; code: string; isDefault: boolean }[]
+}
+
+export interface PlatformAlert {
+  type: string
+  severity: 'info' | 'warning' | 'error'
+  message: string
+  href?: string
+  tenantId?: string
+}
+
+export interface PlatformOverview {
+  stats: {
+    totalTenants: number
+    activeTenants: number
+    suspendedTenants: number
+    trialTenants: number
+    totalUsers: number
+    newThisMonth: number
+    mrr: number
+    arr: number
+  }
+  planBreakdown: { plan: string; count: number }[]
+  alerts: PlatformAlert[]
+  recentTenants: {
+    id: string
+    name: string
+    subdomain: string
+    email: string
+    plan: string
+    status: string
+    shopType?: string
+    createdAt: string
+    userCount: number
+    branchCount: number
+  }[]
+  trialsExpiring: {
+    id: string
+    name: string
+    subdomain: string
+    trialEndsAt: string
+    daysLeft: number
+  }[]
+  billing: {
+    mrr: number
+    arr: number
+    trialExpiringSoon: number
+    byPlan: Record<string, { count: number; active: number; mrr: number }>
+  }
+}
+
+export interface PlatformConfig {
+  platformName: string
+  supportEmail: string
+  defaultCurrency: string
+  defaultTimezone: string
+  defaultLanguage: string
+  trialDays: number
+  defaultPlan: string
+  maintenanceMode: boolean
+  maintenanceMessage: string
+  sessionTimeoutMins: number
+  maxLoginAttempts: number
+  requireMFA: boolean
+  passwordMinLength: number
+  allowedOrigins: string
+  apiRateLimitPerMin: number
+  notificationEmail: string
+}
+
+export interface PlatformBillingSettings {
+  companyLegalName: string
+  companyBrandName: string
+  companyWebsite: string
+  companyEmail: string
+  companyPhone: string
+  bankName: string
+  bankAccountName: string
+  bankAccountNumber: string
+  bankSwift: string
+  invoiceDueDays: number
+  taxRate: number
+}
+
+export interface SubscriptionInvoice {
+  invoiceNumber: string
+  tenantId: string
+  tenantName: string
+  tenantEmail: string
+  planKey: string
+  planName: string
+  months: number
+  unitPrice: number
+  currency: string
+  intervalLabel: string
+  subtotal: number
+  taxRate: number
+  taxAmount: number
+  total: number
+  issueDate: string
+  validUntil: string
+  billing: PlatformBillingSettings
 }
 
 export interface UserRow {
@@ -304,11 +406,64 @@ export async function fetchTenant(id: string) {
   return req<TenantRow>(`/tenants/${id}`)
 }
 
+export async function provisionTenantSsl(id: string) {
+  return req<{ subdomain: string; url: string; message: string }>(`/tenants/${id}/provision-ssl`, {
+    method: 'POST',
+  })
+}
+
 export async function updateTenant(
   id: string,
-  data: { name?: string; status?: string; plan?: string },
+  data: {
+    name?: string
+    status?: string
+    plan?: string
+    maxUsers?: number
+    maxBranches?: number
+    maxProducts?: number
+  },
 ) {
   return req<TenantRow>(`/tenants/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function fetchPlatformOverview(): Promise<PlatformOverview> {
+  return req<PlatformOverview>('/tenants/platform-overview')
+}
+
+export async function fetchPlatformConfig(): Promise<PlatformConfig> {
+  return req<PlatformConfig>('/tenants/platform-config')
+}
+
+export async function updatePlatformConfig(data: Partial<PlatformConfig>): Promise<PlatformConfig> {
+  return req<PlatformConfig>('/tenants/platform-config', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function fetchBillingSettings(): Promise<PlatformBillingSettings> {
+  return req<PlatformBillingSettings>('/tenants/platform-billing')
+}
+
+export async function updateBillingSettings(data: Partial<PlatformBillingSettings>): Promise<PlatformBillingSettings> {
+  return req<PlatformBillingSettings>('/tenants/platform-billing', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function fetchSubscriptionInvoice(tenantId: string, months = 1): Promise<SubscriptionInvoice> {
+  return req<SubscriptionInvoice>(`/tenants/${tenantId}/subscription-invoice?months=${months}`)
+}
+
+export async function sendSubscriptionInvoice(
+  tenantId: string,
+  data?: { months?: number; email?: string },
+): Promise<{ sent: boolean; email: string; invoice: SubscriptionInvoice }> {
+  return req(`/tenants/${tenantId}/subscription-invoice/send`, {
+    method: 'POST',
+    body: JSON.stringify(data ?? {}),
+  })
 }
 
 export interface RegisterTenantResult {
@@ -397,6 +552,16 @@ export async function fetchUsers(params?: Record<string, string>) {
     page: result.meta?.page ?? 1,
     limit: result.meta?.limit ?? 20,
   }
+}
+
+export async function fetchTenantUsers(tenantId: string, params?: { search?: string; limit?: number }) {
+  const qs = new URLSearchParams({ tenantId, limit: String(params?.limit ?? 50) })
+  if (params?.search) qs.set('search', params.search)
+  return fetchUsers(Object.fromEntries(qs))
+}
+
+export async function fetchTenantAuditLogs(tenantId: string, limit = 20) {
+  return fetchPlatformAuditLogs({ limit: String(limit), search: tenantId })
 }
 
 export async function updateUserStatus(id: string, status: string) {

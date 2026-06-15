@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { RefreshCw, CreditCard, TrendingUp, Edit2, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { RefreshCw, CreditCard, TrendingUp, Edit2, X, CheckCircle, AlertCircle, FileText } from 'lucide-react'
 import { fetchTenants, fetchPlans, fetchBillingSummary, updateTenant, type TenantRow, type PlanDef } from '@/lib/admin-api'
+import SubscriptionInvoiceModal from '@/components/admin/SubscriptionInvoiceModal'
 
 const PLAN_BADGE: Record<string, string> = {
   STARTER:      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600',
@@ -37,6 +38,7 @@ export default function SubscriptionsPage() {
   const [error, setError] = useState('')
   const [planFilter, setPlanFilter] = useState('ALL')
   const [editTenant, setEditTenant] = useState<TenantRow | null>(null)
+  const [invoiceTenant, setInvoiceTenant] = useState<TenantRow | null>(null)
   const [billing, setBilling] = useState<{
     mrr: number; arr: number; totalTenants: number; activeTenants: number; trialTenants: number; trialExpiringSoon: number;
     recentInvoices: { tenantName: string; plan: string; amount: number; status: string; dueDate: string | null }[];
@@ -215,9 +217,18 @@ export default function SubscriptionsPage() {
                     {new Date(t.createdAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })}
                   </td>
                   <td className="px-4 py-3">
-                    <button onClick={() => setEditTenant(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                      <Edit2 size={13} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setInvoiceTenant(t)}
+                        title="Generate invoice"
+                        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
+                      >
+                        <FileText size={13} />
+                      </button>
+                      <button onClick={() => setEditTenant(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
+                        <Edit2 size={13} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -233,6 +244,10 @@ export default function SubscriptionsPage() {
           onClose={() => setEditTenant(null)}
           onSaved={() => { load(planFilter === 'ALL' ? undefined : planFilter); setEditTenant(null) }}
         />
+      )}
+
+      {invoiceTenant && (
+        <SubscriptionInvoiceModal tenant={invoiceTenant} onClose={() => setInvoiceTenant(null)} />
       )}
     </div>
   )

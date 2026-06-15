@@ -21,6 +21,7 @@ import { ShopFeatureList } from "@/components/shop/shop-feature-list";
 import { APP_NAME, STARTER_TRIAL_DAYS } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { SHOP_DOMAIN_SUFFIX, tenantLoginUrl } from "@/lib/auth-host";
+import { MaintenanceBanner, useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -72,6 +73,7 @@ export default function RegisterPage() {
     email: string;
     companyName: string;
   } | null>(null);
+  const { isMaintenance, status: maintenance } = useMaintenanceStatus(45_000);
 
   const selectedProfile = getShopProfile(shopType);
   const verticalFeatures = getVerticalFeatures(shopType);
@@ -101,6 +103,10 @@ export default function RegisterPage() {
   };
 
   const onSubmit = async (data: FormData) => {
+    if (isMaintenance) {
+      toast.error(maintenance?.message ?? "Registration is disabled during maintenance");
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE}/tenants/register`, {
@@ -147,6 +153,9 @@ export default function RegisterPage() {
             </p>
             <p className="text-sm text-muted-foreground mb-4">
               Your {STARTER_TRIAL_DAYS}-day free trial has started.
+            </p>
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
+              Your secure workspace URL is being prepared. HTTPS usually works within 1–3 minutes after signup.
             </p>
             <div className="rounded-xl bg-muted/50 border border-border px-4 py-3 text-left text-sm mb-6 space-y-2">
               <p>
@@ -210,6 +219,12 @@ export default function RegisterPage() {
           <div className="lg:hidden text-center mb-8">
             <AppLogo variant="compact" theme="light" className="items-center mx-auto" />
           </div>
+
+          {isMaintenance && (
+            <div className="mb-6 rounded-xl overflow-hidden border border-amber-300">
+              <MaintenanceBanner compact />
+            </div>
+          )}
 
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-2 mb-8">

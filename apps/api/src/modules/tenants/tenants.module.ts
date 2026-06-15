@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray } from 'class-validator';
 import {
@@ -26,6 +26,15 @@ import { getShopProfile, SHOP_TYPE_LIST, slugifyCategory } from '@/shared/shop-p
 import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
 import { TenantSslProvisioner } from '@/shared/tenant-ssl.provisioner';
 import { TenantSslListener } from './tenant-ssl.listener';
+import { getMaintenanceStatus } from '@/shared/maintenance.helper';
+import { MailModule, MailService } from '@/modules/mail/mail.module';
+import {
+  DEFAULT_BILLING_SETTINGS,
+  PlatformBillingSettings,
+  buildSubscriptionInvoice,
+  buildSubscriptionInvoiceHtml,
+  SubscriptionInvoiceData,
+} from './subscription-invoice.helper';
 
 export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() shopName?: string;
@@ -116,7 +125,86 @@ export class UpdateTenantAdminDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
   @ApiPropertyOptional() @IsOptional() @IsEnum(TenantStatus) status?: TenantStatus;
   @ApiPropertyOptional() @IsOptional() @IsEnum(SubscriptionPlan) plan?: SubscriptionPlan;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxUsers?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxBranches?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxProducts?: number;
 }
+
+export class UpdatePlatformConfigDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() platformName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() supportEmail?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() defaultCurrency?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() defaultTimezone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() defaultLanguage?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() trialDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() defaultPlan?: string;
+  @ApiPropertyOptional() @IsOptional() maintenanceMode?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() maintenanceMessage?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() sessionTimeoutMins?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() maxLoginAttempts?: number;
+  @ApiPropertyOptional() @IsOptional() requireMFA?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() passwordMinLength?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() allowedOrigins?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() apiRateLimitPerMin?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() notificationEmail?: string;
+}
+
+export class UpdateBillingSettingsDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() companyLegalName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() companyBrandName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() companyWebsite?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() companyEmail?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() companyPhone?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankSwift?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() invoiceDueDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+}
+
+export class SendSubscriptionInvoiceDto {
+  @ApiPropertyOptional() @IsOptional() @IsNumber() months?: number;
+  @ApiPropertyOptional() @IsOptional() @IsEmail() email?: string;
+}
+
+interface PlatformConfigSettings {
+  platformName: string;
+  supportEmail: string;
+  defaultCurrency: string;
+  defaultTimezone: string;
+  defaultLanguage: string;
+  trialDays: number;
+  defaultPlan: string;
+  maintenanceMode: boolean;
+  maintenanceMessage: string;
+  sessionTimeoutMins: number;
+  maxLoginAttempts: number;
+  requireMFA: boolean;
+  passwordMinLength: number;
+  allowedOrigins: string;
+  apiRateLimitPerMin: number;
+  notificationEmail: string;
+}
+
+const DEFAULT_PLATFORM_CONFIG: PlatformConfigSettings = {
+  platformName: 'HexaOne',
+  supportEmail: 'support@hexalyte.com',
+  defaultCurrency: 'LKR',
+  defaultTimezone: 'Asia/Colombo',
+  defaultLanguage: 'en',
+  trialDays: 7,
+  defaultPlan: 'STARTER',
+  maintenanceMode: false,
+  maintenanceMessage: 'Hexalyte is currently in maintenance mode. New logins are disabled and some features may be unavailable.',
+  sessionTimeoutMins: 480,
+  maxLoginAttempts: 5,
+  requireMFA: false,
+  passwordMinLength: 8,
+  allowedOrigins: '',
+  apiRateLimitPerMin: 100,
+  notificationEmail: '',
+};
 
 export class UpdatePlanCatalogDto {
   @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
@@ -137,6 +225,7 @@ export class TenantsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly kcAdmin: KeycloakAdminService,
     private readonly sslProvisioner: TenantSslProvisioner,
+    private readonly mailService: MailService,
   ) {}
 
   private async seedTenantDefaults(
@@ -203,6 +292,11 @@ export class TenantsService {
   }
 
   async register(dto: RegisterTenantDto) {
+    const maintenance = await getMaintenanceStatus(this.prisma);
+    if (maintenance.enabled) {
+      throw new ServiceUnavailableException(maintenance.message);
+    }
+
     const existing = await this.prisma.tenant.findFirst({
       where: { subdomain: dto.subdomain },
     });
@@ -321,20 +415,50 @@ export class TenantsService {
     return this.provisionTenantSsl(tenant.subdomain);
   }
 
-  private async getPlanCatalogOverrides(): Promise<Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>> {
-    const row = await this.prisma.tenant.findUnique({
+  private async getPlatformConfigRow() {
+    return this.prisma.tenant.findUnique({
       where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
       select: { settings: true },
     });
+  }
+
+  private async getPlanCatalogOverrides(): Promise<Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>> {
+    const row = await this.getPlatformConfigRow();
     if (!row?.settings || typeof row.settings !== 'object') return {};
     const catalog = (row.settings as { planCatalog?: Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>> })
       .planCatalog;
     return catalog ?? {};
   }
 
-  private async savePlanCatalogOverrides(
-    overrides: Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>,
-  ): Promise<void> {
+  async getPlatformConfig(): Promise<PlatformConfigSettings> {
+    const row = await this.getPlatformConfigRow();
+    const stored = (row?.settings as { platform?: Partial<PlatformConfigSettings> } | null)?.platform ?? {};
+    return { ...DEFAULT_PLATFORM_CONFIG, ...stored };
+  }
+
+  async getPlatformStatus() {
+    return getMaintenanceStatus(this.prisma);
+  }
+
+  private async getBillingSettingsInternal(): Promise<PlatformBillingSettings> {
+    const row = await this.getPlatformConfigRow();
+    const stored =
+      row?.settings && typeof row.settings === 'object'
+        ? ((row.settings as { billing?: Partial<PlatformBillingSettings> }).billing ?? {})
+        : {};
+    return { ...DEFAULT_BILLING_SETTINGS, ...stored };
+  }
+
+  async getBillingSettings(): Promise<PlatformBillingSettings> {
+    return this.getBillingSettingsInternal();
+  }
+
+  async updateBillingSettings(dto: UpdateBillingSettingsDto): Promise<PlatformBillingSettings> {
+    const row = await this.getPlatformConfigRow();
+    const currentSettings =
+      row?.settings && typeof row.settings === 'object' ? (row.settings as Record<string, unknown>) : {};
+    const currentBilling = (currentSettings.billing as Partial<PlatformBillingSettings> | undefined) ?? {};
+    const billing = { ...DEFAULT_BILLING_SETTINGS, ...currentBilling, ...dto };
     await this.prisma.tenant.upsert({
       where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
       create: {
@@ -346,10 +470,197 @@ export class TenantsService {
         maxUsers: 1,
         maxBranches: 0,
         maxProducts: 0,
-        settings: { planCatalog: overrides },
+        settings: { ...currentSettings, billing },
       },
       update: {
-        settings: { planCatalog: overrides },
+        settings: { ...currentSettings, billing },
+      },
+    });
+    return billing;
+  }
+
+  async generateSubscriptionInvoice(tenantId: string, months = 1): Promise<SubscriptionInvoiceData> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, name: true, email: true, plan: true, subdomain: true },
+    });
+    if (!tenant || tenant.subdomain === PLATFORM_CONFIG_SUBDOMAIN) {
+      throw new NotFoundException('Tenant not found');
+    }
+    const plans = await this.getMergedSubscriptionPlans();
+    const plan = plans.find((p) => p.key === tenant.plan);
+    if (!plan) throw new BadRequestException('Plan not found for tenant');
+    if (plan.price <= 0) {
+      throw new BadRequestException('Cannot invoice a custom/zero-price plan without manual pricing');
+    }
+    const billing = await this.getBillingSettingsInternal();
+    const m = Math.max(1, Math.min(months, 24));
+    return buildSubscriptionInvoice(tenant, plan, billing, m);
+  }
+
+  async sendSubscriptionInvoice(
+    tenantId: string,
+    dto: SendSubscriptionInvoiceDto,
+  ): Promise<{ sent: boolean; email: string; invoice: SubscriptionInvoiceData }> {
+    const months = dto.months ?? 1;
+    const invoice = await this.generateSubscriptionInvoice(tenantId, months);
+    const email = (dto.email?.trim() || invoice.tenantEmail).toLowerCase();
+    if (!email) throw new BadRequestException('No recipient email');
+
+    const html = buildSubscriptionInvoiceHtml(invoice, true);
+    const subject = `Subscription Invoice ${invoice.invoiceNumber} — ${invoice.planName} Plan`;
+    await this.mailService.send(email, subject, html);
+
+    return { sent: true, email, invoice };
+  }
+
+  async updatePlatformConfig(dto: UpdatePlatformConfigDto): Promise<PlatformConfigSettings> {
+    const row = await this.getPlatformConfigRow();
+    const currentSettings =
+      row?.settings && typeof row.settings === 'object' ? (row.settings as Record<string, unknown>) : {};
+    const currentPlatform = (currentSettings.platform as Partial<PlatformConfigSettings> | undefined) ?? {};
+    const platform = { ...DEFAULT_PLATFORM_CONFIG, ...currentPlatform, ...dto };
+    await this.prisma.tenant.upsert({
+      where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
+      create: {
+        subdomain: PLATFORM_CONFIG_SUBDOMAIN,
+        name: 'Platform Configuration',
+        email: 'platform@internal.local',
+        status: TenantStatus.ACTIVE,
+        plan: SubscriptionPlan.CUSTOM,
+        maxUsers: 1,
+        maxBranches: 0,
+        maxProducts: 0,
+        settings: { ...currentSettings, platform },
+      },
+      update: {
+        settings: { ...currentSettings, platform },
+      },
+    });
+    return platform;
+  }
+
+  async getPlatformOverview() {
+    const [billing, tenants, userCount] = await Promise.all([
+      this.getBillingSummary(),
+      this.prisma.tenant.findMany({
+        where: { subdomain: { not: PLATFORM_CONFIG_SUBDOMAIN } },
+        include: { _count: { select: { users: true, branches: true } } },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.user.count({
+        where: { tenant: { subdomain: { not: PLATFORM_CONFIG_SUBDOMAIN } } },
+      }),
+    ]);
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    const planBreakdown = ['STARTER', 'PROFESSIONAL', 'ENTERPRISE', 'CUSTOM'].map((plan) => ({
+      plan,
+      count: tenants.filter((t) => t.plan === plan).length,
+    }));
+
+    const trialsExpiring = tenants
+      .filter((t) => t.status === 'TRIAL' && t.trialEndsAt && t.trialEndsAt <= in7Days && t.trialEndsAt >= now)
+      .map((t) => ({
+        id: t.id,
+        name: t.name,
+        subdomain: t.subdomain,
+        trialEndsAt: t.trialEndsAt!.toISOString(),
+        daysLeft: Math.ceil((t.trialEndsAt!.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)),
+      }))
+      .sort((a, b) => a.trialEndsAt.localeCompare(b.trialEndsAt))
+      .slice(0, 10);
+
+    const alerts: { type: string; severity: 'info' | 'warning' | 'error'; message: string; href?: string; tenantId?: string }[] = [];
+
+    if (billing.trialExpiringSoon > 0) {
+      alerts.push({
+        type: 'trial_expiring',
+        severity: 'warning',
+        message: `${billing.trialExpiringSoon} trial(s) expiring within 7 days`,
+        href: '/admin/subscriptions',
+      });
+    }
+    const suspended = tenants.filter((t) => t.status === 'SUSPENDED').length;
+    if (suspended > 0) {
+      alerts.push({
+        type: 'suspended',
+        severity: 'warning',
+        message: `${suspended} suspended tenant(s)`,
+        href: '/admin/tenants?status=SUSPENDED',
+      });
+    }
+    const expiredTrials = tenants.filter(
+      (t) => t.status === 'TRIAL' && t.trialEndsAt && t.trialEndsAt < now,
+    ).length;
+    if (expiredTrials > 0) {
+      alerts.push({
+        type: 'trial_expired',
+        severity: 'error',
+        message: `${expiredTrials} expired trial(s) need action`,
+        href: '/admin/subscriptions',
+      });
+    }
+
+    return {
+      stats: {
+        totalTenants: tenants.length,
+        activeTenants: tenants.filter((t) => t.status === 'ACTIVE').length,
+        suspendedTenants: suspended,
+        trialTenants: billing.trialTenants,
+        totalUsers: userCount,
+        newThisMonth: tenants.filter((t) => t.createdAt >= monthStart).length,
+        mrr: billing.mrr,
+        arr: billing.arr,
+      },
+      planBreakdown,
+      alerts,
+      recentTenants: tenants.slice(0, 8).map((t) => ({
+        id: t.id,
+        name: t.name,
+        subdomain: t.subdomain,
+        email: t.email,
+        plan: t.plan,
+        status: t.status,
+        shopType: t.shopType,
+        createdAt: t.createdAt.toISOString(),
+        userCount: t._count.users,
+        branchCount: t._count.branches,
+      })),
+      trialsExpiring,
+      billing: {
+        mrr: billing.mrr,
+        arr: billing.arr,
+        trialExpiringSoon: billing.trialExpiringSoon,
+        byPlan: billing.byPlan,
+      },
+    };
+  }
+
+  private async savePlanCatalogOverrides(
+    overrides: Partial<Record<SubscriptionPlan, Partial<SubscriptionPlanDef>>>,
+  ): Promise<void> {
+    const row = await this.getPlatformConfigRow();
+    const currentSettings =
+      row?.settings && typeof row.settings === 'object' ? (row.settings as Record<string, unknown>) : {};
+    await this.prisma.tenant.upsert({
+      where: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
+      create: {
+        subdomain: PLATFORM_CONFIG_SUBDOMAIN,
+        name: 'Platform Configuration',
+        email: 'platform@internal.local',
+        status: TenantStatus.ACTIVE,
+        plan: SubscriptionPlan.CUSTOM,
+        maxUsers: 1,
+        maxBranches: 0,
+        maxProducts: 0,
+        settings: { ...currentSettings, planCatalog: overrides },
+      },
+      update: {
+        settings: { ...currentSettings, planCatalog: overrides },
       },
     });
   }
@@ -498,6 +809,9 @@ export class TenantsService {
           ...limits,
           ...subscription,
         }),
+        ...(dto.maxUsers !== undefined && { maxUsers: dto.maxUsers }),
+        ...(dto.maxBranches !== undefined && { maxBranches: dto.maxBranches }),
+        ...(dto.maxProducts !== undefined && { maxProducts: dto.maxProducts }),
       },
       include: { _count: { select: { users: true, branches: true } } },
     });
@@ -763,6 +1077,13 @@ export class TenantsController {
   }
 
   @Public()
+  @Get('platform-status')
+  @ApiOperation({ summary: 'Public platform maintenance status' })
+  getPlatformStatus() {
+    return this.tenantsService.getPlatformStatus();
+  }
+
+  @Public()
   @Get('resolve/:subdomain')
   @ApiOperation({ summary: 'Public workspace lookup for login branding' })
   resolveBySubdomain(@Param('subdomain') subdomain: string) {
@@ -857,6 +1178,46 @@ export class TenantsController {
     return this.tenantsService.getBillingSummary();
   }
 
+  @Get('platform-overview')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Platform dashboard overview with stats and alerts' })
+  getPlatformOverview() {
+    return this.tenantsService.getPlatformOverview();
+  }
+
+  @Get('platform-config')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get platform-wide configuration' })
+  getPlatformConfig() {
+    return this.tenantsService.getPlatformConfig();
+  }
+
+  @Put('platform-config')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update platform-wide configuration' })
+  updatePlatformConfig(@Body() dto: UpdatePlatformConfigDto) {
+    return this.tenantsService.updatePlatformConfig(dto);
+  }
+
+  @Get('platform-billing')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get invoice & bank billing settings' })
+  getBillingSettings() {
+    return this.tenantsService.getBillingSettings();
+  }
+
+  @Put('platform-billing')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Update invoice & bank billing settings' })
+  updateBillingSettings(@Body() dto: UpdateBillingSettingsDto) {
+    return this.tenantsService.updateBillingSettings(dto);
+  }
+
   @Put('subscription-plans/:planKey')
   @ApiBearerAuth('access-token')
   @Roles(RoleType.SUPER_ADMIN)
@@ -884,6 +1245,23 @@ export class TenantsController {
     return this.tenantsService.provisionSslById(id);
   }
 
+  @Get(':id/subscription-invoice')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Generate subscription invoice preview for tenant' })
+  getSubscriptionInvoice(@Param('id') id: string, @Query('months') months?: string) {
+    const m = months ? parseInt(months, 10) : 1;
+    return this.tenantsService.generateSubscriptionInvoice(id, Number.isFinite(m) ? m : 1);
+  }
+
+  @Post(':id/subscription-invoice/send')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Email subscription invoice to tenant client' })
+  sendSubscriptionInvoice(@Param('id') id: string, @Body() dto: SendSubscriptionInvoiceDto) {
+    return this.tenantsService.sendSubscriptionInvoice(id, dto);
+  }
+
   @Put(':id')
   @ApiBearerAuth('access-token')
   @Roles(RoleType.SUPER_ADMIN)
@@ -894,7 +1272,7 @@ export class TenantsController {
 }
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, MailModule],
   controllers: [TenantsController],
   providers: [TenantsService, TenantTrialCron, TenantSslProvisioner, TenantSslListener],
   exports: [TenantsService, TenantSslProvisioner],

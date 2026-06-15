@@ -17,7 +17,10 @@ if [[ ${#files[@]} -eq 0 ]]; then
 fi
 
 echo "[ssl-pending] Found ${#files[@]} pending tenant(s) — renewing SSL..."
-bash scripts/renew_tenant_ssl.sh
+if ! bash scripts/renew_tenant_ssl.sh; then
+  echo "[ssl-pending] Renewal failed — keeping pending files for retry"
+  exit 1
+fi
 
 for f in "${files[@]}"; do
   rm -f "$f"

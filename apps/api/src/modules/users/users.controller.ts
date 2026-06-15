@@ -27,8 +27,8 @@ export class UsersController {
   @Get('platform')
   @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'List all users across tenants (Super Admin)' })
-  findAllPlatform(@Query() query: PaginationDto) {
-    return this.usersService.findAllPlatform(query);
+  findAllPlatform(@Query() query: PaginationDto, @Query('tenantId') tenantId?: string) {
+    return this.usersService.findAllPlatform(query, tenantId);
   }
 
   @Get()

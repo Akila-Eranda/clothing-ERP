@@ -52,8 +52,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (isLogin) return <>{children}</>
 
-  const baseRoute = '/' + path.split('/').slice(1, 3).join('/')
-  const title = PAGE_TITLES[baseRoute] ?? 'Admin'
+  const segments = path.split('/').filter(Boolean)
+  const baseRoute = '/' + segments.slice(0, 2).join('/')
+  let title = PAGE_TITLES[baseRoute] ?? 'Admin'
+  if (segments[1] === 'tenants' && segments[2]) title = 'Tenant Details'
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#f8fafc]">

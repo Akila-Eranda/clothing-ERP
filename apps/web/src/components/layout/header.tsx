@@ -26,6 +26,7 @@ import { getRouteLabels } from "@/lib/shop-vertical";
 import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
+import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 
 const BASE_ROUTE_LABELS: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -61,6 +62,7 @@ export function Header() {
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
   const [searchOpen, setSearchOpen] = React.useState(false);
+  const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
   const { profile, workspace } = useShopWorkspace();
   const routeLabels = React.useMemo(
     () => ({ ...BASE_ROUTE_LABELS, ...getRouteLabels(workspace, profile) }),
@@ -163,17 +165,30 @@ export function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon-sm" className="h-8 w-8 relative">
               <Bell className="h-4 w-4" />
-              <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
-                4
-              </span>
+              {(isMaintenance || 4 > 0) && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                  {isMaintenance ? '!' : '4'}
+                </span>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel className="flex items-center justify-between">
               <span>Notifications</span>
-              <Badge variant="default" className="text-[10px] h-5">4 new</Badge>
+              {isMaintenance && (
+                <Badge variant="destructive" className="text-[10px] h-5">Maintenance</Badge>
+              )}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            {isMaintenance && maintenance && (
+              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-default bg-amber-50/80 focus:bg-amber-50">
+                <div className="flex items-center gap-2 w-full">
+                  <span className="text-sm font-semibold text-amber-900">Maintenance Mode ON</span>
+                  <span className="text-[10px] text-amber-600 ml-auto">Now</span>
+                </div>
+                <span className="text-xs text-amber-800 leading-relaxed">{maintenance.message}</span>
+              </DropdownMenuItem>
+            )}
             {[
               { title: "Low stock alert", desc: "Running Sports Shoes (Size 9) — 2 left", time: "2m ago", type: "warning" },
               { title: "New order received", desc: "INV-0891 — LKR 12,500 via UPI", time: "15m ago", type: "success" },

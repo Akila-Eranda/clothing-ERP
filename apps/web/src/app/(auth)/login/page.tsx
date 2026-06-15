@@ -27,6 +27,7 @@ import {
 import { ShopType } from "@/lib/shop-profiles";
 import { useAuthStore } from "@/stores/auth-store";
 import { isPosOnlyRole, POS_HOME_PATH } from "@/lib/role-access";
+import { MaintenanceBanner, useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -50,6 +51,7 @@ function LoginContent() {
   const [isMainDomain, setIsMainDomain] = React.useState(false);
   const [hostnameSlug, setHostnameSlug] = React.useState<string | null>(null);
   const [tenantPreview, setTenantPreview] = React.useState<TenantPreview | null>(null);
+  const { status: maintenance, isMaintenance } = useMaintenanceStatus(45_000);
 
   const urlTenant = searchParams.get("tenant");
   const urlEmail = searchParams.get("email");
@@ -96,6 +98,10 @@ function LoginContent() {
   const showSubdomainField = isMainDomain;
 
   const onSubmit = async (data: LoginForm) => {
+    if (isMaintenance) {
+      toast.error(maintenance?.message ?? "System is under maintenance");
+      return;
+    }
     if (isMainDomain && !subdomain.trim()) {
       toast.error("Enter your shop subdomain to continue");
       return;
@@ -164,6 +170,12 @@ function LoginContent() {
                     : "Enter your credentials to continue"}
               </p>
             </div>
+
+            {isMaintenance && (
+              <div className="mb-6 rounded-xl overflow-hidden border border-amber-300">
+                <MaintenanceBanner compact />
+              </div>
+            )}
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               {showSubdomainField && (
@@ -248,9 +260,11 @@ function LoginContent() {
                 type="submit"
                 variant="gradient"
                 className="w-full h-12 rounded-xl text-base font-bold shadow-lg shadow-primary/25 mt-1"
-                disabled={isLoading}
+                disabled={isLoading || isMaintenance}
               >
-                {isLoading ? (
+                {isMaintenance ? (
+                  <span>Login disabled — Maintenance Mode</span>
+                ) : isLoading ? (
                   <span className="flex items-center gap-2">
                     <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
                     Signing in...

@@ -4,6 +4,13 @@
 set -e
 cd "$(dirname "$0")/.."
 
+LOCK_FILE="${SSL_RENEW_LOCK:-/var/lock/fashionerp-ssl-renew.lock}"
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  echo "==> Another SSL renewal is already running — skipping"
+  exit 0
+fi
+
 EMAIL="${CERTBOT_EMAIL:-admin@hexalyte.com}"
 CF_INI="${CLOUDFLARE_CREDENTIALS:-/opt/fashionerp/nginx/ssl/cloudflare.ini}"
 

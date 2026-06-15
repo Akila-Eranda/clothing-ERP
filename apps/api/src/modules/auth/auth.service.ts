@@ -6,6 +6,7 @@ import {
   ForbiddenException,
   NotFoundException,
   Logger,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -17,6 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '@/prisma/prisma.service';
 import { UserStatus } from '@prisma/client';
 import { enforceTenantSubscriptionActive } from '@/shared/tenant-subscription.helper';
+import { getMaintenanceStatus, isPlatformTenantSlug } from '@/shared/maintenance.helper';
 import {
   LoginDto,
   ForgotPasswordDto,
@@ -42,6 +44,14 @@ export class AuthService {
 
   // ── Login ──────────────────────────────────────────────────
   async login(dto: LoginDto, ip?: string, userAgent?: string, tenantSlug?: string) {
+    const platformSlug =
+      this.configService.get<string>('app.platformTenantSubdomain') ?? 'platform';
+
+    const maintenance = await getMaintenanceStatus(this.prisma);
+    if (maintenance.enabled && !isPlatformTenantSlug(tenantSlug, platformSlug)) {
+      throw new ServiceUnavailableException(maintenance.message);
+    }
+
     // Resolve tenantId from slug when provided (multi-tenant isolation)
     let tenantId: string | undefined;
     if (tenantSlug) {

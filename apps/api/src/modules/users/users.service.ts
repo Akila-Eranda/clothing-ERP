@@ -83,9 +83,10 @@ export class UsersService {
     return user;
   }
 
-  async findAllPlatform(query: PaginationDto) {
+  async findAllPlatform(query: PaginationDto, tenantId?: string) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
+      ...(tenantId && { tenantId }),
       ...(query.search && {
         OR: [
           { firstName: { contains: query.search, mode: 'insensitive' as const } },
