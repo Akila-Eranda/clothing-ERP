@@ -597,18 +597,31 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
     if (!trimmed) return;
-    let found = findProductByBarcodeCode(trimmed, products);
-    if (!found) {
-      for (const key of barcodeLookupCandidates(trimmed)) {
-        try {
-          const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(key)}`);
-          const fromApi = r.data;
-          found = products.find((p) => p.variantId === fromApi.variantId) ?? fromApi;
-          break;
-        } catch { /* try next candidate */ }
+
+    let found: ProductItem | undefined;
+    for (const key of barcodeLookupCandidates(trimmed)) {
+      try {
+        const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(key)}`);
+        const fromApi = r.data;
+        const cached = products.find((p) => p.variantId === fromApi.variantId);
+        found = cached ? { ...cached, ...fromApi, stock: fromApi.stock } : fromApi;
+        setProducts((prev) =>
+          prev.map((p) => (p.variantId === fromApi.variantId ? { ...p, stock: fromApi.stock } : p)),
+        );
+        break;
+      } catch {
+        /* try next candidate key */
       }
     }
-    if (!found) { toast.error(`Barcode/SKU not found: ${trimmed}`); return; }
+
+    if (!found) {
+      found = findProductByBarcodeCode(trimmed, products);
+    }
+
+    if (!found) {
+      toast.error(`Barcode/SKU not found: ${trimmed}`);
+      return;
+    }
     setSelectedProductName(null);
     setSelAttrs({});
     handleAddProduct(found);
@@ -632,7 +645,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
     if (!q) return;
-    const barcodeLike = isLikelyBarcodeScan(q) || matchesCachedBarcode(q, products);
+    const barcodeLike =
+      isLikelyBarcodeScan(q) ||
+      matchesCachedBarcode(q, products) ||
+      !!findProductByBarcodeCode(q, products);
     if (barcodeLike) {
       void scanAndAddProduct(q);
       return;

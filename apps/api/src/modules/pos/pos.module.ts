@@ -598,13 +598,15 @@ export class PosService {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const keys = this.barcodeLookupKeys(code);
     for (const key of keys) {
-      const variant = await this.prisma.productVariant.findFirst({
+      const variants = await this.prisma.productVariant.findMany({
         where: {
           isActive: true,
           product: { tenantId, status: 'ACTIVE' },
           OR: [
             { barcode: key },
+            { barcode: { equals: key, mode: 'insensitive' } },
             { product: { barcode: key } },
+            { product: { barcode: { equals: key, mode: 'insensitive' } } },
             { sku: key },
             { sku: { equals: key, mode: 'insensitive' } },
           ],
@@ -614,7 +616,19 @@ export class PosService {
           inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
         },
       });
-      if (!variant) continue;
+      if (variants.length === 0) continue;
+
+      const ranked = variants
+        .map((variant) => ({
+          variant,
+          stock: Math.max(
+            0,
+            (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0),
+          ),
+        }))
+        .sort((a, b) => b.stock - a.stock);
+
+      const variant = (ranked.find((row) => row.stock > 0) ?? ranked[0]).variant;
       const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
       return {
         variantId: variant.id, productName: variant.product.name, variantName: variant.name,
