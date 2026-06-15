@@ -5,27 +5,37 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Banknote, PlayCircle, StopCircle, History, AlertTriangle,
   RefreshCw, Loader2, CheckCircle2, ArrowDownCircle, ArrowUpCircle,
-  Printer, FileText,
+  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ColumnDef } from "@tanstack/react-table";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { api } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 import { DenominationInput, denominationTotal } from "@/components/cash/denomination-input";
+import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-movement-ledger";
+import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
 import { useAuthStore } from "@/stores/auth-store";
-import { cn } from "@/lib/utils";
 
 const TABS = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "open", label: "Cash Open", icon: PlayCircle },
   { id: "close", label: "Cash Close", icon: StopCircle },
-  { id: "history", label: "Cash History", icon: History },
-  { id: "variance", label: "Variance Report", icon: AlertTriangle },
   { id: "movements", label: "Cash In / Out", icon: ArrowUpCircle },
+  { id: "history", label: "History", icon: History },
+  { id: "variance", label: "Variance", icon: AlertTriangle },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -41,6 +51,7 @@ interface CashRegister {
   status: "OPEN" | "CLOSED" | "PENDING_APPROVAL";
   cashierName?: string;
   denominationCount?: Record<string, number>;
+  movements?: CashMovement[];
   summary?: {
     openingCash: number;
     cashSales: number;
@@ -49,20 +60,53 @@ interface CashRegister {
     cashRefunds: number;
     expectedCash: number;
   };
-  cashier?: { firstName: string; lastName: string };
   branch?: { name: string };
 }
 
+interface TodaySummary {
+  openShifts: number;
+  closedToday: number;
+  expected: number;
+  actual: number;
+  difference: number;
+  pendingApproval: number;
+}
+
+interface OpeningSuggestion {
+  suggestedOpening: number | null;
+  lastClosedAt: string | null;
+  lastVariance: number | null;
+  lastOpening: number | null;
+}
+
 const VARIANCE_THRESHOLD = 500;
+const FLOAT_PRESETS = [5000, 10000, 15000, 20000];
+const AUTO_REFRESH_MS = 30_000;
+
+const _n = new Date();
+const HISTORY_PRESETS = [
+  { label: "This Week", start: new Date(_n.getFullYear(), _n.getMonth(), _n.getDate() - _n.getDay()).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
+  { label: "This Month", start: new Date(_n.getFullYear(), _n.getMonth(), 1).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
+  { label: "Last 30 Days", start: new Date(_n.getFullYear(), _n.getMonth(), _n.getDate() - 30).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
+  { label: "Last 3 Months", start: new Date(_n.getFullYear(), _n.getMonth() - 3, 1).toISOString().split("T")[0], end: _n.toISOString().split("T")[0] },
+];
+
+function statusBadge(status: CashRegister["status"]) {
+  if (status === "OPEN") return <Badge variant="success" className="text-[10px]">Open</Badge>;
+  if (status === "PENDING_APPROVAL") return <Badge variant="warning" className="text-[10px]">Pending Approval</Badge>;
+  return <Badge variant="secondary" className="text-[10px]">Closed</Badge>;
+}
 
 export default function CashManagementPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tab = (searchParams.get("tab") as TabId) || "open";
+  const tab = (searchParams.get("tab") as TabId) || "overview";
   const { user } = useAuthStore();
 
   const [loading, setLoading] = React.useState(true);
   const [active, setActive] = React.useState<CashRegister | null>(null);
+  const [today, setToday] = React.useState<TodaySummary | null>(null);
+  const [suggestion, setSuggestion] = React.useState<OpeningSuggestion | null>(null);
   const [openingCash, setOpeningCash] = React.useState("");
   const [openingNotes, setOpeningNotes] = React.useState("");
   const [opening, setOpening] = React.useState(false);
@@ -70,6 +114,8 @@ export default function CashManagementPage() {
   const [closeNotes, setCloseNotes] = React.useState("");
   const [closing, setClosing] = React.useState(false);
   const [history, setHistory] = React.useState<CashRegister[]>([]);
+  const [historyRange, setHistoryRange] = React.useState({ from: HISTORY_PRESETS[1].start, to: HISTORY_PRESETS[1].end });
+  const [varianceDays, setVarianceDays] = React.useState("30");
   const [varianceReport, setVarianceReport] = React.useState<{
     totalShifts: number;
     totalVariance: number;
@@ -82,8 +128,11 @@ export default function CashManagementPage() {
   const [movementAmount, setMovementAmount] = React.useState("");
   const [movementDesc, setMovementDesc] = React.useState("");
   const [moving, setMoving] = React.useState(false);
+  const [detailShiftId, setDetailShiftId] = React.useState<string | null>(null);
+  const [autoRouted, setAutoRouted] = React.useState(false);
+  const [lastRefreshed, setLastRefreshed] = React.useState<Date | null>(null);
 
-  const setTab = (id: TabId) => router.push(`/cash?tab=${id}`);
+  const setTab = (id: string) => router.push(`/cash?tab=${id}`);
 
   const loadActive = React.useCallback(async () => {
     try {
@@ -94,33 +143,88 @@ export default function CashManagementPage() {
     }
   }, []);
 
+  const loadToday = React.useCallback(async () => {
+    try {
+      const res = await api.get<TodaySummary>("/cash/today");
+      setToday(res.data ?? null);
+    } catch {
+      setToday(null);
+    }
+  }, []);
+
+  const loadSuggestion = React.useCallback(async () => {
+    try {
+      const res = await api.get<OpeningSuggestion>("/cash/opening-suggestion");
+      setSuggestion(res.data ?? null);
+    } catch {
+      setSuggestion(null);
+    }
+  }, []);
+
   const loadHistory = React.useCallback(async () => {
     try {
-      const res = await api.get<{ data: CashRegister[] }>("/cash/history?limit=50");
+      const res = await api.get<{ data: CashRegister[] }>(
+        `/cash/history?limit=100&from=${historyRange.from}&to=${historyRange.to}`,
+      );
       setHistory((res.data as { data?: CashRegister[] })?.data ?? []);
     } catch {
       toast.error("Failed to load cash history");
     }
-  }, []);
+  }, [historyRange]);
 
   const loadVariance = React.useCallback(async () => {
     try {
-      const res = await api.get<typeof varianceReport>("/cash/variance-report?days=30");
+      const res = await api.get<typeof varianceReport>(`/cash/variance-report?days=${varianceDays}`);
       setVarianceReport(res.data ?? null);
     } catch {
       toast.error("Failed to load variance report");
     }
-  }, []);
+  }, [varianceDays]);
 
-  const refresh = React.useCallback(async () => {
-    setLoading(true);
-    await loadActive();
-    if (tab === "history") await loadHistory();
-    if (tab === "variance") await loadVariance();
-    setLoading(false);
-  }, [tab, loadActive, loadHistory, loadVariance]);
+  const refresh = React.useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
+    await Promise.all([loadActive(), loadToday(), loadSuggestion(), loadHistory(), loadVariance()]);
+    setLastRefreshed(new Date());
+    if (!silent) setLoading(false);
+  }, [loadActive, loadToday, loadSuggestion, loadHistory, loadVariance]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
+
+  // Auto-route to sensible tab on first load
+  React.useEffect(() => {
+    if (loading || autoRouted) return;
+    const urlTab = searchParams.get("tab");
+    if (!urlTab) {
+      if (active?.status === "OPEN") setTab("overview");
+      else if (active?.status === "PENDING_APPROVAL") setTab("variance");
+      else setTab("open");
+    }
+    setAutoRouted(true);
+  }, [loading, active, autoRouted, searchParams]);
+
+  // Pre-fill opening float from last shift
+  React.useEffect(() => {
+    if (suggestion?.suggestedOpening != null && !openingCash && active?.status !== "OPEN") {
+      setOpeningCash(String(suggestion.suggestedOpening));
+    }
+  }, [suggestion, openingCash, active?.status]);
+
+  const shiftOpen = active?.status === "OPEN";
+  const shiftPending = active?.status === "PENDING_APPROVAL";
+
+  // Live refresh while shift is open (POS sales auto-update expected cash)
+  React.useEffect(() => {
+    if (!shiftOpen) return;
+    const id = setInterval(() => {
+      void loadActive();
+      void loadToday();
+      setLastRefreshed(new Date());
+    }, AUTO_REFRESH_MS);
+    return () => clearInterval(id);
+  }, [shiftOpen, loadActive, loadToday]);
+
+  React.useEffect(() => { void loadHistory(); }, [loadHistory]);
+  React.useEffect(() => { void loadVariance(); }, [loadVariance]);
 
   const handleOpenShift = async () => {
     const amount = parseFloat(openingCash);
@@ -134,8 +238,8 @@ export default function CashManagementPage() {
       toast.success("Shift started");
       setOpeningCash("");
       setOpeningNotes("");
-      await loadActive();
-      setTab("close");
+      await refresh();
+      setTab("overview");
     } catch (e: unknown) {
       toast.error((e as Error).message || "Failed to open shift");
     } finally {
@@ -166,6 +270,7 @@ export default function CashManagementPage() {
       setDenominations({});
       setCloseNotes("");
       await refresh();
+      setTab("open");
     } catch (e: unknown) {
       toast.error((e as Error).message || "Failed to close shift");
     } finally {
@@ -194,6 +299,7 @@ export default function CashManagementPage() {
       setMovementAmount("");
       setMovementDesc("");
       await loadActive();
+      await loadToday();
     } catch (e: unknown) {
       toast.error((e as Error).message || "Failed to record movement");
     } finally {
@@ -211,272 +317,719 @@ export default function CashManagementPage() {
     }
   };
 
-  const cashierName = active?.cashierName
-    ?? (user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : "Cashier");
-  const today = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const cashierName = active?.cashierName ?? user?.name ?? "Cashier";
+  const todayLabel = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
   const summary = active?.summary;
   const actualTotal = denominationTotal(denominations);
-  const expected = summary?.expectedCash ?? active?.expectedCash ?? 0;
+  const expected = summary?.expectedCash ?? active?.expectedCash ?? today?.expected ?? 0;
   const variancePreview = actualTotal > 0 ? actualTotal - expected : 0;
   const needsApprovalPreview = Math.abs(variancePreview) > VARIANCE_THRESHOLD;
+  const movements = active?.movements ?? [];
+  const autoSalesTotal = movements.filter((m) => m.type === "SALE").reduce((s, m) => s + m.amount, 0);
+  const pendingItems = [
+    ...(active?.status === "PENDING_APPROVAL" ? [active] : []),
+    ...(varianceReport?.registers.filter((r) => r.status === "PENDING_APPROVAL") ?? []),
+  ].filter((r, i, arr) => arr.findIndex((x) => x.id === r.id) === i);
+
+  const varianceChartData = React.useMemo(() => {
+    if (!varianceReport?.registers.length) return [];
+    const byDay = new Map<string, number>();
+    for (const r of varianceReport.registers) {
+      if (!r.closingTime) continue;
+      const day = new Date(r.closingTime).toLocaleDateString("en-LK", { day: "2-digit", month: "short" });
+      byDay.set(day, (byDay.get(day) ?? 0) + (r.variance ?? 0));
+    }
+    return Array.from(byDay.entries()).map(([day, variance]) => ({ day, variance })).reverse();
+  }, [varianceReport]);
+
+  const KPI = [
+    {
+      label: "Shift Status",
+      value: shiftOpen ? "Open" : shiftPending ? "Pending" : "Closed",
+      icon: shiftOpen ? CheckCircle2 : Clock,
+      bg: shiftOpen ? "bg-emerald-600" : shiftPending ? "bg-amber-500" : "bg-slate-500",
+      sub: shiftOpen
+        ? `Opened LKR ${formatNumber(active?.openingCash ?? 0)}`
+        : shiftPending
+          ? "Awaiting manager approval"
+          : `${today?.closedToday ?? 0} closed today`,
+    },
+    {
+      label: "Expected Cash",
+      value: `LKR ${formatNumber(expected)}`,
+      icon: DollarSign,
+      bg: "bg-blue-600",
+      sub: shiftOpen ? "Live · updates from POS" : "No active shift",
+    },
+    {
+      label: "Today's Difference",
+      value: `LKR ${formatNumber(Math.abs(today?.difference ?? 0))}`,
+      icon: Activity,
+      bg: (today?.difference ?? 0) < 0 ? "bg-red-500" : "bg-teal-600",
+      sub: (today?.difference ?? 0) >= 0 ? "Over / balanced" : "Short count",
+    },
+    {
+      label: "Pending Approvals",
+      value: String(today?.pendingApproval ?? varianceReport?.pendingApproval ?? 0),
+      icon: AlertTriangle,
+      bg: "bg-orange-500",
+      sub: "Variance over LKR 500",
+    },
+  ];
+
+  const historyColumns: ColumnDef<CashRegister>[] = [
+    {
+      accessorKey: "cashierName",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Cashier" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-semibold">{row.original.cashierName ?? "Cashier"}</p>
+          <p className="text-[10px] text-muted-foreground">{row.original.branch?.name ?? "Branch"}</p>
+        </div>
+      ),
+    },
+    {
+      id: "opened",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Opened" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {new Date(row.original.openingTime).toLocaleString("en-LK", {
+            day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+          })}
+        </span>
+      ),
+    },
+    {
+      id: "closed",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Closed" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.closingTime
+            ? new Date(row.original.closingTime).toLocaleString("en-LK", {
+                day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit",
+              })
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => statusBadge(row.original.status),
+    },
+    {
+      id: "variance",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Variance" />,
+      cell: ({ row }) => {
+        const v = row.original.variance;
+        if (v == null) return <span className="text-xs text-muted-foreground">—</span>;
+        return (
+          <span className={cn("text-sm font-bold tabular-nums", v < 0 ? "text-red-600" : v > 0 ? "text-emerald-600" : "")}>
+            {v >= 0 ? "+" : ""}{formatNumber(v)}
+          </span>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <TableActionsRow
+          dropMoreActions={[
+            { text: "View details", function: () => setDetailShiftId(row.original.id) },
+            ...(row.original.status === "PENDING_APPROVAL"
+              ? [{ text: "Approve variance", function: () => void handleApprove(row.original.id) }]
+              : []),
+          ]}
+        />
+      ),
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="bg-card border-b px-6 py-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-emerald-600 rounded-xl p-2.5"><Banknote className="h-5 w-5 text-white" /></div>
-            <div>
-              <h1 className="text-lg font-bold">Cash Management</h1>
-              <p className="text-xs text-muted-foreground">Daily cash close · shift control · variance tracking</p>
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+
+        {/* Header */}
+        <div className="bg-card border-b sticky top-0 z-10">
+          <div className="px-6 py-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="bg-emerald-600 rounded-xl p-2.5 shrink-0">
+                <Banknote className="h-5 w-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-lg font-bold text-foreground">Cash Management</h1>
+                <p className="text-xs text-muted-foreground truncate">
+                  Automated POS tracking · shift control · variance
+                  {lastRefreshed && shiftOpen && (
+                    <span className="ml-1">· Live {lastRefreshed.toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" })}</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => void refresh()} className="h-9 w-9 p-0">
+                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+              </Button>
+              {!shiftOpen && !shiftPending && (
+                <Button size="sm" className="gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
+                  <Plus className="h-4 w-4" /> Start Shift
+                </Button>
+              )}
+              {shiftOpen && (
+                <Button size="sm" className="gap-1.5 h-9 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
+                  <StopCircle className="h-4 w-4" /> Cash Close
+                </Button>
+              )}
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => void refresh()} className="h-9 w-9 p-0">
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </Button>
-        </div>
-        <div className="flex gap-1 mt-4 overflow-x-auto pb-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors",
-                tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80",
-              )}
-            >
-              <t.icon className="h-3.5 w-3.5" />
-              {t.label}
-            </button>
-          ))}
-        </div>
-      </div>
 
-      <div className="px-6 py-6 max-w-4xl mx-auto space-y-6">
-        {tab === "open" && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <PlayCircle className="h-4 w-4 text-emerald-600" /> Opening Cash
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {active?.status === "OPEN" ? (
-                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">Shift is open</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">Opened with LKR {formatNumber(active.openingCash)} at {new Date(active.openingTime).toLocaleTimeString()}</p>
-                  <Button className="mt-3" size="sm" onClick={() => setTab("close")}>Go to Cash Close</Button>
-                </div>
-              ) : active?.status === "PENDING_APPROVAL" ? (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-                  <p className="font-semibold text-amber-700">Previous shift pending manager approval</p>
-                  <p className="text-sm text-muted-foreground mt-1">Contact your manager before starting a new shift.</p>
-                </div>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><span className="text-muted-foreground">Cashier</span><p className="font-semibold">{cashierName}</p></div>
-                    <div><span className="text-muted-foreground">Date</span><p className="font-semibold">{today}</p></div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Opening amount (LKR)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      placeholder="10,000.00"
-                      value={openingCash}
-                      onChange={(e) => setOpeningCash(e.target.value)}
-                      className="text-lg font-semibold h-12"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Notes (optional)</Label>
-                    <Textarea value={openingNotes} onChange={(e) => setOpeningNotes(e.target.value)} rows={2} />
-                  </div>
-                  <Button onClick={() => void handleOpenShift()} disabled={opening} className="w-full h-11 gap-2">
-                    {opening ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
-                    Start Shift
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {tab === "close" && (
-          !active || active.status !== "OPEN" ? (
-            <Card><CardContent className="py-12 text-center text-muted-foreground">
-              <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
-              <p>No open shift. Start a shift from Cash Open first.</p>
-              <Button className="mt-4" size="sm" onClick={() => setTab("open")}>Cash Open</Button>
-            </CardContent></Card>
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader><CardTitle className="text-base">Daily Cash Close</CardTitle></CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  {[
-                    ["Opening Cash", summary?.openingCash ?? active.openingCash],
-                    ["Cash Sales", summary?.cashSales ?? 0],
-                    ["Cash Received", summary?.cashReceived ?? 0],
-                    ["Cash Expenses", summary?.cashExpenses ?? 0],
-                  ].map(([label, val]) => (
-                    <div key={String(label)} className="flex justify-between py-1 border-b border-dashed">
-                      <span className="text-muted-foreground">{label}</span>
-                      <span className="font-semibold tabular-nums">LKR {formatNumber(Number(val))}</span>
-                    </div>
-                  ))}
-                  <div className="flex justify-between py-2 font-bold text-base">
-                    <span>Expected Cash</span>
-                    <span className="text-primary tabular-nums">LKR {formatNumber(expected)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader><CardTitle className="text-base">Physical Count</CardTitle></CardHeader>
-                <CardContent>
-                  <DenominationInput value={denominations} onChange={setDenominations} />
-                  {actualTotal > 0 && (
-                    <div className="mt-4 space-y-2 rounded-xl bg-muted/50 p-3 text-sm">
-                      <div className="flex justify-between"><span>Expected</span><span className="tabular-nums">{formatNumber(expected)}</span></div>
-                      <div className="flex justify-between"><span>Actual</span><span className="tabular-nums">{formatNumber(actualTotal)}</span></div>
-                      <div className={cn("flex justify-between font-bold", variancePreview < 0 ? "text-red-600" : variancePreview > 0 ? "text-emerald-600" : "")}>
-                        <span>Variance</span>
-                        <span className="tabular-nums">{variancePreview >= 0 ? "+" : ""}{formatNumber(variancePreview)}</span>
-                      </div>
-                      {needsApprovalPreview && (
-                        <Badge variant="outline" className="mt-2 border-amber-500 text-amber-600">
-                          🟡 Pending Approval — variance &gt; LKR {VARIANCE_THRESHOLD}
-                        </Badge>
-                      )}
-                    </div>
-                  )}
-                  <Textarea className="mt-4" placeholder="Closing notes (optional)" value={closeNotes} onChange={(e) => setCloseNotes(e.target.value)} rows={2} />
-                  <div className="flex gap-2 mt-4">
-                    <Button variant="outline" size="sm" className="gap-1.5 flex-1"><Printer className="h-3.5 w-3.5" />Print</Button>
-                    <Button variant="outline" size="sm" className="gap-1.5 flex-1"><FileText className="h-3.5 w-3.5" />PDF</Button>
-                  </div>
-                  <Button
-                    onClick={() => void handleCloseShift()}
-                    disabled={closing || actualTotal <= 0}
-                    className="w-full mt-3 h-11 gap-2 bg-red-600 hover:bg-red-700"
-                  >
-                    {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />}
-                    Close Shift
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )
-        )}
-
-        {tab === "history" && (
-          <Card>
-            <CardHeader><CardTitle className="text-base">Cash History</CardTitle></CardHeader>
-            <CardContent>
-              {history.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">No closed shifts yet</p>
-              ) : (
-                <div className="space-y-2">
-                  {history.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between p-3 rounded-xl border text-sm">
-                      <div>
-                        <p className="font-semibold">{h.cashierName ?? "Cashier"} · {h.branch?.name ?? "Branch"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(h.openingTime).toLocaleString("en-LK")}
-                          {h.closingTime && ` → ${new Date(h.closingTime).toLocaleTimeString("en-LK")}`}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <Badge variant={h.status === "PENDING_APPROVAL" ? "outline" : "secondary"} className="mb-1">
-                          {h.status.replace("_", " ")}
-                        </Badge>
-                        <p className="tabular-nums font-semibold">
-                          {h.variance != null && (
-                            <span className={h.variance < 0 ? "text-red-600" : h.variance > 0 ? "text-emerald-600" : ""}>
-                              {h.variance >= 0 ? "+" : ""}{formatNumber(h.variance)}
-                            </span>
-                          )}
-                        </p>
-                        {h.status === "PENDING_APPROVAL" && (
-                          <Button size="sm" variant="outline" className="mt-1 h-7 text-xs" onClick={() => void handleApprove(h.id)}>
-                            Approve
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {tab === "variance" && varianceReport && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {[
-                ["Total Shifts", varianceReport.totalShifts],
-                ["Net Variance", varianceReport.totalVariance],
-                ["Over", varianceReport.overCount],
-                ["Short", varianceReport.shortCount],
-              ].map(([label, val]) => (
-                <Card key={String(label)}><CardContent className="pt-4">
-                  <p className="text-xs text-muted-foreground">{label}</p>
-                  <p className="text-xl font-bold tabular-nums">{typeof val === "number" ? formatNumber(val) : val}</p>
-                </CardContent></Card>
+          <div className="px-6 border-t">
+            <TabsList className="h-12 bg-transparent p-0 gap-0 rounded-none border-none w-full justify-start overflow-x-auto">
+              {TABS.map((t) => (
+                <TabsTrigger
+                  key={t.id}
+                  value={t.id}
+                  className="h-12 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors gap-1.5"
+                >
+                  <t.icon className="h-3.5 w-3.5" />
+                  {t.label}
+                </TabsTrigger>
               ))}
+            </TabsList>
+          </div>
+        </div>
+
+        <div className="px-6 py-6 space-y-6">
+
+          {/* Pending approval banner */}
+          {pendingItems.length > 0 && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    {pendingItems.length} shift{pendingItems.length > 1 ? "s" : ""} pending approval
+                  </p>
+                  <p className="text-xs text-muted-foreground">Variance exceeds LKR {VARIANCE_THRESHOLD} — manager action required</p>
+                </div>
+              </div>
+              <Button size="sm" variant="outline" className="border-amber-500 text-amber-700" onClick={() => setTab("variance")}>
+                Review variances
+              </Button>
             </div>
-            <Card>
-              <CardHeader><CardTitle className="text-base">Recent variances (30 days)</CardTitle></CardHeader>
-              <CardContent className="space-y-2">
-                {varianceReport.registers.map((r) => (
-                  <div key={r.id} className="flex justify-between p-3 rounded-lg border text-sm">
-                    <span>{r.cashierName} · {r.closingTime ? new Date(r.closingTime).toLocaleDateString("en-LK") : "—"}</span>
-                    <span className={cn("font-bold tabular-nums", (r.variance ?? 0) < 0 ? "text-red-600" : "text-emerald-600")}>
-                      {(r.variance ?? 0) >= 0 ? "+" : ""}{formatNumber(r.variance ?? 0)}
-                    </span>
-                  </div>
+          )}
+
+          {/* KPI row */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {loading
+              ? Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
+                ))
+              : KPI.map((kpi) => (
+                  <Card key={kpi.label} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
+                    <CardContent className="p-5 flex items-center gap-4">
+                      <div className={cn(kpi.bg, "rounded-full p-2.5 shrink-0")}>
+                        <kpi.icon className="h-5 w-5 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
+                        <p className="text-xl font-bold text-foreground truncate">{kpi.value}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{kpi.sub}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
+          </div>
+
+          {/* Overview — live shift dashboard */}
+          <TabsContent value="overview" className="m-0 mt-0 space-y-4">
+            {!shiftOpen ? (
+              <Card className="border shadow-sm">
+                <CardContent className="py-16 text-center">
+                  <LayoutDashboard className="h-12 w-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {shiftPending ? "Previous shift awaiting approval — start a new shift after manager clears it." : "No active shift. Open cash to start tracking POS sales automatically."}
+                  </p>
+                  {!shiftPending && (
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 gap-1.5" onClick={() => setTab("open")}>
+                      <PlayCircle className="h-4 w-4" /> Start Shift
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-5">
+                <Card className="lg:col-span-2 border shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-emerald-600" /> Live Shift Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cashier</span>
+                      <span className="font-semibold">{cashierName}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Opened</span>
+                      <span>{new Date(active!.openingTime).toLocaleTimeString("en-LK")}</span>
+                    </div>
+                    {[
+                      ["Opening float", summary?.openingCash ?? active!.openingCash],
+                      ["POS cash sales", summary?.cashSales ?? autoSalesTotal],
+                      ["Cash in", summary?.cashReceived ?? 0],
+                      ["Cash out / expenses", summary?.cashExpenses ?? 0],
+                      ["Refunds", summary?.cashRefunds ?? 0],
+                    ].map(([label, val]) => (
+                      <div key={String(label)} className="flex justify-between py-1 border-b border-dashed">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="font-semibold tabular-nums">LKR {formatNumber(Number(val))}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 font-bold text-base">
+                      <span>Expected in drawer</span>
+                      <span className="text-emerald-600 tabular-nums">LKR {formatNumber(expected)}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                      <RefreshCw className="h-3 w-3" /> Auto-refreshes every 30s · POS sales recorded automatically
+                    </p>
+                    <div className="flex gap-2 pt-1">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => setTab("movements")}>Cash In/Out</Button>
+                      <Button size="sm" className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>Close Shift</Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="lg:col-span-3 border shadow-sm">
+                  <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                    <CardTitle className="text-sm font-semibold">Activity Log</CardTitle>
+                    <Badge variant="outline" className="text-[10px]">{movements.length} entries</Badge>
+                  </CardHeader>
+                  <CardContent className="max-h-[420px] overflow-y-auto">
+                    <CashMovementLedger movements={movements} emptyMessage="Sales and movements appear here automatically" />
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* Cash Open */}
+          <TabsContent value="open" className="m-0 mt-0">
+            <Card className="border shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <PlayCircle className="h-4 w-4 text-emerald-600" /> Opening Cash
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 max-w-xl">
+                {shiftOpen ? (
+                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Shift is open</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Opened with LKR {formatNumber(active!.openingCash)} at{" "}
+                      {new Date(active!.openingTime).toLocaleTimeString("en-LK")}
+                    </p>
+                    <Button className="mt-4" size="sm" onClick={() => setTab("overview")}>Go to Overview</Button>
+                  </div>
+                ) : shiftPending ? (
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
+                    <p className="font-semibold text-amber-700">Previous shift pending manager approval</p>
+                    <p className="text-sm text-muted-foreground mt-1">Contact your manager before starting a new shift.</p>
+                  </div>
+                ) : (
+                  <>
+                    {suggestion?.suggestedOpening != null && (
+                      <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Suggested opening float</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            From last close
+                            {suggestion.lastClosedAt && ` (${new Date(suggestion.lastClosedAt).toLocaleDateString("en-LK")})`}
+                            {suggestion.lastVariance != null && suggestion.lastVariance !== 0 && (
+                              <span> · variance was {suggestion.lastVariance >= 0 ? "+" : ""}{formatNumber(suggestion.lastVariance)}</span>
+                            )}
+                          </p>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="mt-2 h-7 text-xs border-blue-500/50"
+                            onClick={() => setOpeningCash(String(suggestion.suggestedOpening))}
+                          >
+                            Use LKR {formatNumber(suggestion.suggestedOpening)}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground text-xs">Cashier</span>
+                        <p className="font-semibold">{cashierName}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground text-xs">Date</span>
+                        <p className="font-semibold">{todayLabel}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">Opening amount (LKR)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        placeholder="10,000.00"
+                        value={openingCash}
+                        onChange={(e) => setOpeningCash(e.target.value)}
+                        className="text-lg font-semibold h-12"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        {FLOAT_PRESETS.map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setOpeningCash(String(p))}
+                            className={cn(
+                              "px-3 py-1 text-xs rounded-lg border font-medium transition-all",
+                              openingCash === String(p)
+                                ? "bg-emerald-600 text-white border-emerald-600"
+                                : "bg-background text-muted-foreground hover:bg-muted",
+                            )}
+                          >
+                            {formatNumber(p)}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-semibold">Notes (optional)</Label>
+                      <Textarea value={openingNotes} onChange={(e) => setOpeningNotes(e.target.value)} rows={2} />
+                    </div>
+                    <Button onClick={() => void handleOpenShift()} disabled={opening} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                      {opening ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+                      Start Shift
+                    </Button>
+                  </>
+                )}
               </CardContent>
             </Card>
-          </div>
-        )}
+          </TabsContent>
 
-        {tab === "movements" && (
-          <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><ArrowDownCircle className="h-4 w-4" /> Cash In / Cash Out</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              {!active || active.status !== "OPEN" ? (
-                <p className="text-muted-foreground text-sm">Open a shift to record cash movements.</p>
-              ) : (
-                <>
-                  <div className="flex gap-2">
-                    {(["DEPOSIT", "WITHDRAWAL", "EXPENSE"] as const).map((t) => (
-                      <Button key={t} size="sm" variant={movementType === t ? "default" : "outline"} onClick={() => setMovementType(t)}>
-                        {t === "DEPOSIT" ? "Cash In" : t === "WITHDRAWAL" ? "Cash Out" : "Petty Expense"}
-                      </Button>
+          {/* Cash Close */}
+          <TabsContent value="close" className="m-0 mt-0">
+            {!shiftOpen ? (
+              <Card className="border shadow-sm">
+                <CardContent className="py-16 text-center text-muted-foreground">
+                  <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                  <p className="text-sm">No open shift. Start a shift from Cash Open first.</p>
+                  <Button className="mt-4" size="sm" variant="outline" onClick={() => setTab("open")}>Cash Open</Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="border shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Daily Cash Close</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    {[
+                      ["Opening Cash", summary?.openingCash ?? active!.openingCash],
+                      ["Cash Sales (auto)", summary?.cashSales ?? autoSalesTotal],
+                      ["Cash Received", summary?.cashReceived ?? 0],
+                      ["Cash Expenses", summary?.cashExpenses ?? 0],
+                      ["Cash Refunds (auto)", summary?.cashRefunds ?? 0],
+                    ].map(([label, val]) => (
+                      <div key={String(label)} className="flex justify-between py-1.5 border-b border-dashed">
+                        <span className="text-muted-foreground">{label}</span>
+                        <span className="font-semibold tabular-nums">LKR {formatNumber(Number(val))}</span>
+                      </div>
                     ))}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5"><Label>Amount (LKR)</Label><Input type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} /></div>
-                    <div className="space-y-1.5"><Label>Description</Label><Input value={movementDesc} onChange={(e) => setMovementDesc(e.target.value)} placeholder="Reason..." /></div>
-                  </div>
-                  <Button onClick={() => void handleMovement()} disabled={moving} className="gap-2">
-                    {moving ? <Loader2 className="h-4 w-4 animate-spin" /> : movementType === "DEPOSIT" ? <ArrowDownCircle className="h-4 w-4" /> : <ArrowUpCircle className="h-4 w-4" />}
-                    Record
-                  </Button>
-                </>
+                    <div className="flex justify-between py-2 font-bold text-base">
+                      <span>Expected Cash</span>
+                      <span className="text-emerald-600 tabular-nums">LKR {formatNumber(expected)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Physical Count</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <DenominationInput value={denominations} onChange={setDenominations} />
+                    {actualTotal > 0 && (
+                      <div className="mt-4 space-y-2 rounded-xl bg-muted/50 border p-4 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Expected</span>
+                          <span className="tabular-nums font-medium">{formatNumber(expected)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Actual</span>
+                          <span className="tabular-nums font-medium">{formatNumber(actualTotal)}</span>
+                        </div>
+                        <div className={cn(
+                          "flex justify-between font-bold pt-1 border-t",
+                          variancePreview < 0 ? "text-red-600" : variancePreview > 0 ? "text-emerald-600" : "",
+                        )}>
+                          <span>Variance</span>
+                          <span className="tabular-nums">
+                            {variancePreview >= 0 ? "+" : ""}{formatNumber(variancePreview)}
+                          </span>
+                        </div>
+                        {needsApprovalPreview && (
+                          <Badge variant="outline" className="mt-2 border-amber-500 text-amber-600">
+                            Pending approval — variance &gt; LKR {VARIANCE_THRESHOLD}
+                          </Badge>
+                        )}
+                      </div>
+                    )}
+                    <div className="space-y-2 mt-4">
+                      <Label className="text-xs font-semibold">Closing notes (optional)</Label>
+                      <Textarea
+                        placeholder="Notes for this close…"
+                        value={closeNotes}
+                        onChange={(e) => setCloseNotes(e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+                    <Button
+                      onClick={() => void handleCloseShift()}
+                      disabled={closing || actualTotal <= 0}
+                      className="w-full mt-4 h-11 gap-2 bg-red-600 hover:bg-red-700"
+                    >
+                      {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />}
+                      Close Shift
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
+          {/* History */}
+          <TabsContent value="history" className="m-0 mt-0 space-y-4">
+            <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
+              {HISTORY_PRESETS.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  onClick={() => setHistoryRange({ from: p.start, to: p.end })}
+                  className={cn(
+                    "px-3 py-1.5 text-xs rounded-lg border font-medium transition-all",
+                    historyRange.from === p.start && historyRange.to === p.end
+                      ? "bg-emerald-600 text-white border-emerald-600"
+                      : "bg-background text-muted-foreground hover:bg-muted",
+                  )}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="w-px h-4 bg-border" />
+              <Input
+                type="date"
+                value={historyRange.from}
+                onChange={(e) => setHistoryRange((r) => ({ ...r, from: e.target.value }))}
+                className="h-7 text-xs w-32"
+              />
+              <span className="text-muted-foreground text-xs">–</span>
+              <Input
+                type="date"
+                value={historyRange.to}
+                onChange={(e) => setHistoryRange((r) => ({ ...r, to: e.target.value }))}
+                className="h-7 text-xs w-32"
+              />
+              <span className="ml-auto text-xs text-muted-foreground">{history.length} shifts</span>
+            </div>
+            <ClientSideTable
+              data={history}
+              columns={historyColumns}
+              pageCount={Math.max(1, Math.ceil(history.length / 10))}
+              searchableColumns={[{ id: "cashierName", title: "Cashier" }]}
+              filterableColumns={[{
+                id: "status",
+                title: "Status",
+                options: [
+                  { value: "CLOSED", label: "Closed" },
+                  { value: "PENDING_APPROVAL", label: "Pending Approval" },
+                  { value: "OPEN", label: "Open" },
+                ],
+              }]}
+              isShowExportButtons={{ isShow: true, fileName: "cash-history-export" }}
+            />
+          </TabsContent>
+
+          {/* Variance */}
+          <TabsContent value="variance" className="m-0 mt-0 space-y-4">
+            <div className="flex items-center gap-3">
+              <Label className="text-xs font-semibold shrink-0">Period</Label>
+              <Select value={varianceDays} onValueChange={setVarianceDays}>
+                <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">Last 7 days</SelectItem>
+                  <SelectItem value="30">Last 30 days</SelectItem>
+                  <SelectItem value="90">Last 90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {loading ? (
+              <Skeleton className="h-48 w-full rounded-xl" />
+            ) : varianceReport ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[
+                    { label: "Total Shifts", value: varianceReport.totalShifts, color: "text-blue-600", bg: "bg-blue-500/10" },
+                    { label: "Net Variance", value: varianceReport.totalVariance, color: "text-foreground", bg: "bg-muted" },
+                    { label: "Over Count", value: varianceReport.overCount, color: "text-emerald-600", bg: "bg-emerald-500/10" },
+                    { label: "Short Count", value: varianceReport.shortCount, color: "text-red-600", bg: "bg-red-500/10" },
+                  ].map((s) => (
+                    <Card key={s.label} className="border shadow-sm">
+                      <CardContent className="p-5">
+                        <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
+                        <p className={cn("text-2xl font-bold tabular-nums mt-1", s.color)}>
+                          {formatNumber(Number(s.value))}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {varianceChartData.length > 0 && (
+                  <Card className="border shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-semibold">Variance trend</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <BarChart data={varianceChartData}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                          <XAxis dataKey="day" tick={{ fontSize: 10 }} />
+                          <YAxis tick={{ fontSize: 10 }} />
+                          <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, "Variance"]} />
+                          <Bar dataKey="variance" radius={[4, 4, 0, 0]}>
+                            {varianceChartData.map((entry, i) => (
+                              <Cell key={i} fill={entry.variance >= 0 ? "#10b981" : "#ef4444"} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </CardContent>
+                  </Card>
+                )}
+
+                <Card className="border shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Recent variances ({varianceDays} days)</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {varianceReport.registers.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8 text-sm">No variance data yet</p>
+                    ) : (
+                      varianceReport.registers.map((r) => (
+                        <div key={r.id} className="flex items-center justify-between p-3 rounded-xl border text-sm hover:bg-muted/30 transition-colors">
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <p className="font-medium">{r.cashierName ?? "Cashier"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {r.closingTime ? new Date(r.closingTime).toLocaleDateString("en-LK") : "—"}
+                              </p>
+                            </div>
+                            {r.status === "PENDING_APPROVAL" && statusBadge(r.status)}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "font-bold tabular-nums",
+                              (r.variance ?? 0) < 0 ? "text-red-600" : "text-emerald-600",
+                            )}>
+                              {(r.variance ?? 0) >= 0 ? "+" : ""}{formatNumber(r.variance ?? 0)}
+                            </span>
+                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setDetailShiftId(r.id)}>
+                              <Eye className="h-3.5 w-3.5" />
+                            </Button>
+                            {r.status === "PENDING_APPROVAL" && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void handleApprove(r.id)}>
+                                Approve
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card className="border shadow-sm">
+                <CardContent className="py-12 text-center text-muted-foreground text-sm">No variance report available</CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Movements */}
+          <TabsContent value="movements" className="m-0 mt-0">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="border shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <ArrowDownCircle className="h-4 w-4 text-emerald-600" /> Record Movement
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!shiftOpen ? (
+                    <p className="text-muted-foreground text-sm">Open a shift to record cash movements.</p>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap gap-2">
+                        {(["DEPOSIT", "WITHDRAWAL", "EXPENSE"] as const).map((t) => (
+                          <Button
+                            key={t}
+                            size="sm"
+                            variant={movementType === t ? "default" : "outline"}
+                            className={movementType === t ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                            onClick={() => setMovementType(t)}
+                          >
+                            {t === "DEPOSIT" ? "Cash In" : t === "WITHDRAWAL" ? "Cash Out" : "Petty Expense"}
+                          </Button>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Amount (LKR)</Label>
+                          <Input type="number" value={movementAmount} onChange={(e) => setMovementAmount(e.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">Description</Label>
+                          <Input value={movementDesc} onChange={(e) => setMovementDesc(e.target.value)} placeholder="Reason…" />
+                        </div>
+                      </div>
+                      <Button onClick={() => void handleMovement()} disabled={moving} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                        {moving ? <Loader2 className="h-4 w-4 animate-spin" /> : movementType === "DEPOSIT" ? <ArrowDownCircle className="h-4 w-4" /> : <ArrowUpCircle className="h-4 w-4" />}
+                        Record Movement
+                      </Button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {shiftOpen && (
+                <Card className="border shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm font-semibold">Today&apos;s movements</CardTitle>
+                  </CardHeader>
+                  <CardContent className="max-h-[360px] overflow-y-auto">
+                    <CashMovementLedger movements={movements} />
+                  </CardContent>
+                </Card>
               )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+          </TabsContent>
+        </div>
+      </Tabs>
+
+      {detailShiftId && (
+        <ShiftDetailSheet shiftId={detailShiftId} onClose={() => setDetailShiftId(null)} />
+      )}
     </div>
   );
 }

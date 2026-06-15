@@ -20,18 +20,26 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const [checking, setChecking] = React.useState(true);
   const [openingCash, setOpeningCash] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
+  const [suggested, setSuggested] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get<{ status?: string } | null>("/cash/active");
+        const [activeRes, suggestRes] = await Promise.all([
+          api.get<{ status?: string } | null>("/cash/active"),
+          api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
+        ]);
         if (cancelled) return;
-        if (res.data?.status === "OPEN") {
+        if (suggestRes.data?.suggestedOpening != null) {
+          setSuggested(suggestRes.data.suggestedOpening);
+          setOpeningCash(String(suggestRes.data.suggestedOpening));
+        }
+        if (activeRes.data?.status === "OPEN") {
           onShiftReady();
           return;
         }
-        if (res.data?.status === "PENDING_APPROVAL") {
+        if (activeRes.data?.status === "PENDING_APPROVAL") {
           toast.error("Previous shift pending manager approval");
           onClose?.();
           return;
@@ -106,6 +114,9 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           </div>
           <div className="space-y-2">
             <Label className="text-white/70">Opening amount (LKR)</Label>
+            {suggested != null && (
+              <p className="text-[10px] text-emerald-400/80">Auto-filled from last close: LKR {suggested.toLocaleString()}</p>
+            )}
             <Input
               type="number"
               min={0}

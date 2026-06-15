@@ -7,6 +7,7 @@ import {
   ArrowUpRight, ArrowDownRight, Sparkles, AlertTriangle,
   RefreshCw, Plus, Eye, Clock, Zap, CreditCard,
 } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import dynamic from "next/dynamic";
 const RevenueChart = dynamic(() => import("./_charts").then((m) => m.RevenueChart), { ssr: false, loading: () => <Skeleton className="h-[300px] w-full rounded-xl" /> });
 const PaymentMethodsChart = dynamic(() => import("./_charts").then((m) => m.PaymentMethodsChart), { ssr: false, loading: () => <Skeleton className="h-[240px] w-full rounded-xl" /> });
@@ -16,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
@@ -116,7 +116,10 @@ export default function DashboardPage() {
       if (topRes.status   === "fulfilled") setTopProducts(topRes.value.data ?? []);
       if (lowRes.status   === "fulfilled") setLowStock(lowRes.value.data ?? []);
       if (revRes.status   === "fulfilled") setRevenue(revRes.value.data ?? []);
-      if (custRes.status  === "fulfilled") setCustTotal((custRes.value.data as unknown as { total?: number })?.total ?? 0);
+      if (custRes.status  === "fulfilled") {
+        const payload = custRes.value.data as unknown as { total?: number; meta?: { total?: number } };
+        setCustTotal(payload?.meta?.total ?? payload?.total ?? 0);
+      }
       if (cashRes.status  === "fulfilled") setCashWidget(cashRes.value.data ?? null);
       const errors = [sumRes, salesRes, topRes, lowRes, revRes, custRes, cashRes]
         .filter((r) => r.status === "rejected")
@@ -286,7 +289,7 @@ export default function DashboardPage() {
           <CardContent className="space-y-3">
             {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />) :
               AI_INSIGHTS.map((insight, i) => {
-                const InsightIcon = insightIcons[insight.type];
+                const InsightIcon = insightIcons[insight.type] ?? Zap;
                 return (
                   <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * i }}
                     className={`p-3 rounded-lg border ${insightColors[insight.type]} cursor-pointer hover:opacity-90 transition-opacity`}>
@@ -407,8 +410,8 @@ export default function DashboardPage() {
               lowStock.slice(0, 5).map((item) => (
                 <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.variant.product.name}</p>
-                    <p className="text-xs text-muted-foreground">{item.variant.name} · {item.variant.sku}</p>
+                    <p className="text-sm font-medium truncate">{item.variant?.product?.name ?? "Unknown product"}</p>
+                    <p className="text-xs text-muted-foreground">{item.variant?.name ?? "—"} · {item.variant?.sku ?? "—"}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-bold text-amber-500">{item.quantity} left</p>

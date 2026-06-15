@@ -10,7 +10,6 @@ import {
   CheckCircle2, Mail, Lock, Phone, Tag, Check,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +20,7 @@ import { getVerticalFeatures } from "@/lib/shop-features";
 import { ShopFeatureList } from "@/components/shop/shop-feature-list";
 import { APP_NAME, STARTER_TRIAL_DAYS } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
+import { SHOP_DOMAIN_SUFFIX, tenantLoginUrl } from "@/lib/auth-host";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -62,12 +62,16 @@ const TIMEZONES  = [
 ];
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [step, setStep]             = React.useState(1);
   const [shopType, setShopType]     = React.useState<ShopType>(ShopType.CLOTHING);
   const [showPass, setShowPass]     = React.useState(false);
   const [isLoading, setIsLoading]   = React.useState(false);
   const [subPreview, setSubPreview] = React.useState("");
+  const [createdWorkspace, setCreatedWorkspace] = React.useState<{
+    subdomain: string;
+    email: string;
+    companyName: string;
+  } | null>(null);
 
   const selectedProfile = getShopProfile(shopType);
   const verticalFeatures = getVerticalFeatures(shopType);
@@ -111,6 +115,11 @@ export default function RegisterPage() {
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.message ?? "Registration failed");
+      setCreatedWorkspace({
+        subdomain: data.subdomain.trim().toLowerCase(),
+        email: data.adminEmail.trim().toLowerCase(),
+        companyName: data.companyName,
+      });
       setStep(4);
     } catch (err: any) {
       toast.error(err.message ?? "Something went wrong");
@@ -119,7 +128,8 @@ export default function RegisterPage() {
     }
   };
 
-  if (step === 4) {
+  if (step === 4 && createdWorkspace) {
+    const loginUrl = `${tenantLoginUrl(createdWorkspace.subdomain)}?email=${encodeURIComponent(createdWorkspace.email)}`;
     return (
       <div className="min-h-screen flex items-center justify-center bg-background mesh-bg">
         <motion.div
@@ -133,14 +143,33 @@ export default function RegisterPage() {
             </div>
             <h1 className="text-2xl font-bold mb-2">You&apos;re all set! 🎉</h1>
             <p className="text-muted-foreground mb-2">
-              Your workspace <strong className="text-foreground">{watch("companyName")}</strong> has been created.
+              Your workspace <strong className="text-foreground">{createdWorkspace.companyName}</strong> has been created.
             </p>
-            <p className="text-sm text-muted-foreground mb-8">
-              Your {STARTER_TRIAL_DAYS}-day free trial has started. Check your email (<span className="font-mono text-foreground">{watch("adminEmail")}</span>) for login details.
+            <p className="text-sm text-muted-foreground mb-4">
+              Your {STARTER_TRIAL_DAYS}-day free trial has started.
             </p>
-            <Button className="w-full h-11 font-semibold" variant="gradient" onClick={() => router.push("/login")}>
+            <div className="rounded-xl bg-muted/50 border border-border px-4 py-3 text-left text-sm mb-6 space-y-2">
+              <p>
+                <span className="text-muted-foreground">Workspace:</span>{" "}
+                <strong className="font-mono text-foreground">
+                  {createdWorkspace.subdomain}{SHOP_DOMAIN_SUFFIX}
+                </strong>
+              </p>
+              <p>
+                <span className="text-muted-foreground">Email:</span>{" "}
+                <strong className="font-mono text-foreground">{createdWorkspace.email}</strong>
+              </p>
+              <p className="text-muted-foreground">
+                Sign in with the <strong className="text-foreground">password you just created</strong> during registration.
+              </p>
+            </div>
+            <Button
+              className="w-full h-11 font-semibold"
+              variant="gradient"
+              onClick={() => { window.location.href = loginUrl; }}
+            >
               <ArrowRight className="h-4 w-4 mr-2" />
-              Go to Login
+              Sign in to your workspace
             </Button>
           </div>
         </motion.div>

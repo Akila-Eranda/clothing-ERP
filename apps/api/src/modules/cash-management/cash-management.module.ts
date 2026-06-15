@@ -341,6 +341,34 @@ export class CashManagementService {
     };
   }
 
+  async getOpeningSuggestion(tenantId: string, branchId: string | undefined, cashierId: string) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const lastClosed = await this.prisma.cashRegister.findFirst({
+      where: {
+        tenantId,
+        branchId: resolvedBranchId,
+        cashierId,
+        status: CashRegisterStatus.CLOSED,
+      },
+      orderBy: { closingTime: 'desc' },
+      select: {
+        actualCash: true,
+        closingCash: true,
+        openingCash: true,
+        closingTime: true,
+        variance: true,
+      },
+    });
+
+    const raw = lastClosed?.actualCash ?? lastClosed?.closingCash ?? null;
+    return {
+      suggestedOpening: raw != null ? Math.round(raw * 100) / 100 : null,
+      lastClosedAt: lastClosed?.closingTime ?? null,
+      lastVariance: lastClosed?.variance ?? null,
+      lastOpening: lastClosed?.openingCash ?? null,
+    };
+  }
+
   async getTodayWidget(tenantId: string, branchId: string | undefined) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const todayStart = dayjs().startOf('day').toDate();
@@ -476,6 +504,13 @@ export class CashManagementController {
   @ApiOperation({ summary: 'Today cash widget data' })
   getToday(@CurrentUser() user: IAuthUser) {
     return this.cashService.getTodayWidget(user.tenantId, user.branchId);
+  }
+
+  @Get('opening-suggestion')
+  @RequireAnyPermissions('cash:read', 'sales:read')
+  @ApiOperation({ summary: 'Suggested opening float from last closed shift' })
+  getOpeningSuggestion(@CurrentUser() user: IAuthUser) {
+    return this.cashService.getOpeningSuggestion(user.tenantId, user.branchId, user.id);
   }
 
   @Get('history')

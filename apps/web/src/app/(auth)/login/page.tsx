@@ -52,6 +52,7 @@ function LoginContent() {
   const [tenantPreview, setTenantPreview] = React.useState<TenantPreview | null>(null);
 
   const urlTenant = searchParams.get("tenant");
+  const urlEmail = searchParams.get("email");
   const [subdomain, setSubdomain] = React.useState(urlTenant || "");
 
   React.useEffect(() => {
@@ -81,10 +82,14 @@ function LoginContent() {
     return () => { cancelled = true; };
   }, [hostnameSlug, subdomain, isMainDomain]);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: urlEmail ?? "", password: "" },
   });
+
+  React.useEffect(() => {
+    if (urlEmail) setValue("email", urlEmail);
+  }, [urlEmail, setValue]);
 
   const effectiveSlug = hostnameSlug ?? (subdomain.trim() || undefined);
   const shopType = tenantPreview?.shopType ?? ShopType.CLOTHING;
@@ -97,7 +102,8 @@ function LoginContent() {
     }
     setIsLoading(true);
     try {
-      await loginWithApi(data.email, data.password, effectiveSlug);
+      const email = data.email.trim().toLowerCase();
+      await loginWithApi(email, data.password, effectiveSlug);
       toast.success("Welcome back!");
       const from = searchParams.get("from");
       const role = useAuthStore.getState().user?.role;

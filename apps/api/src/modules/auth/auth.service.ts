@@ -46,10 +46,13 @@ export class AuthService {
     let tenantId: string | undefined;
     if (tenantSlug) {
       const tenant = await this.prisma.tenant.findFirst({
-        where: { OR: [{ subdomain: tenantSlug }, { id: tenantSlug }] },
+        where: { OR: [{ subdomain: tenantSlug.toLowerCase() }, { id: tenantSlug }] },
         select: { id: true },
       });
-      if (tenant) tenantId = tenant.id;
+      if (!tenant) {
+        throw new UnauthorizedException('Workspace not found. Check your subdomain.');
+      }
+      tenantId = tenant.id;
     }
 
     const user = await this.prisma.user.findFirst({

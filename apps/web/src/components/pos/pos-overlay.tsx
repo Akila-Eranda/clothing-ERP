@@ -23,6 +23,7 @@ import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
 import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
+import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import type { Customer } from "@/types";
 
