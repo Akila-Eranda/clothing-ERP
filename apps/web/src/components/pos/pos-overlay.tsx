@@ -294,6 +294,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const handleHoldBill = React.useCallback(async () => {
     if (!items.length) { toast.info("Cart is empty"); return; }
     try {
+      if (activeHeldBillId) {
+        await api.delete(`/pos/hold/${activeHeldBillId}`);
+      }
       const payload = getHoldPayload();
       await api.post("/pos/hold", {
         label: `Hold ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
@@ -308,7 +311,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to hold bill");
     }
-  }, [items.length, getHoldPayload, clearCart, loadHeldBills, loadProducts]);
+  }, [items.length, activeHeldBillId, getHoldPayload, clearCart, loadHeldBills, loadProducts]);
 
   const handleRestoreHeldBill = React.useCallback(async (bill: ServerHeldBill) => {
     if (items.length > 0 && activeHeldBillId !== bill.id) {

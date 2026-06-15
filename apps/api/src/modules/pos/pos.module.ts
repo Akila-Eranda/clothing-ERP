@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -70,7 +70,7 @@ export class CreateSaleDto {
 
 export class HoldBillDto {
   @ApiPropertyOptional() @IsOptional() @IsString() label?: string;
-  @ApiProperty() data: object;
+  @ApiProperty() @IsObject() data: Record<string, unknown>;
 }
 
 @Injectable()
