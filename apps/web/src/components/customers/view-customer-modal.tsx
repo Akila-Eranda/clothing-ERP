@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Phone, Mail, MapPin, Star, Crown, Diamond, Gift, Wallet, ShoppingBag, Calendar, Tag, Loader2, Plus, UserCheck } from "lucide-react";
+import { X, Phone, Mail, MapPin, Star, Crown, Diamond, Gift, Wallet, ShoppingBag, Calendar, Tag, Loader2, Plus, UserCheck, Car } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -17,6 +17,11 @@ interface SaleItem { id: string; invoiceNumber: string; invoiceDate: string; tot
 interface LoyaltyTxn { id: string; points: number; type: string; description?: string | null; createdAt: string }
 interface WalletTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
 interface CreditTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
+interface CustomerVehicleRow {
+  id: string; registrationNo?: string | null; make?: string | null; model?: string | null;
+  year?: number | null; vin?: string | null; notes?: string | null; isPrimary: boolean;
+  vehicleModel?: { name: string; brand: { name: string } } | null;
+}
 
 interface FullCustomer extends Customer {
   sales: SaleItem[];
@@ -35,12 +40,15 @@ const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon
   DIAMOND:  { label: "Diamond",  color: "text-cyan-400",    bg: "bg-cyan-400/10",    icon: Diamond },
 };
 
-type Tab = "overview" | "purchases" | "loyalty" | "wallet" | "credit";
+type Tab = "overview" | "purchases" | "loyalty" | "wallet" | "credit" | "vehicles";
 
 export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const profile = useShopProfile();
   const showLoyalty = hasShopModule(profile, "loyalty");
+  const showVehicles = hasShopModule(profile, "vehicles");
   const [customer, setCustomer]   = useState<FullCustomer | null>(null);
+  const [vehicles, setVehicles]     = useState<CustomerVehicleRow[]>([]);
+  const [vehForm, setVehForm]       = useState({ registrationNo: "", make: "", model: "", year: "" });
   const [tab, setTab]             = useState<Tab>("overview");
   const [loading, setLoading]     = useState(false);
   const [pointsInput, setPointsInput] = useState("");
@@ -60,6 +68,33 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       .catch(() => toast.error("Failed to load customer"))
       .finally(() => setLoading(false));
   }, [customerId]);
+
+  useEffect(() => {
+    if (tab !== "vehicles" || !customerId) return;
+    api.get<CustomerVehicleRow[]>(`/spare-parts/customers/${customerId}/vehicles`)
+      .then((r) => setVehicles(Array.isArray(r.data) ? r.data : []))
+      .catch(() => setVehicles([]));
+  }, [tab, customerId]);
+
+  const addVehicle = async () => {
+    if (!customer || !vehForm.registrationNo.trim()) { toast.error("Vehicle number required"); return; }
+    setActionLoading(true);
+    try {
+      await api.post("/spare-parts/customer-vehicles", {
+        customerId: customer.id,
+        registrationNo: vehForm.registrationNo.trim(),
+        make: vehForm.make.trim() || undefined,
+        model: vehForm.model.trim() || undefined,
+        year: vehForm.year ? parseInt(vehForm.year, 10) : undefined,
+        isPrimary: vehicles.length === 0,
+      });
+      toast.success("Vehicle added");
+      setVehForm({ registrationNo: "", make: "", model: "", year: "" });
+      const r = await api.get<CustomerVehicleRow[]>(`/spare-parts/customers/${customer.id}/vehicles`);
+      setVehicles(Array.isArray(r.data) ? r.data : []);
+    } catch (e: unknown) { toast.error((e as Error).message); }
+    finally { setActionLoading(false); }
+  };
 
   const addPoints = async () => {
     const pts = parseInt(pointsInput, 10);
@@ -129,6 +164,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     { id: "overview",  label: "Overview" },
     { id: "purchases", label: `Purchases${customer ? ` (${customer.sales.length})` : ""}` },
     ...(showLoyalty ? [{ id: "loyalty" as Tab, label: "Loyalty" }] : []),
+    ...(showVehicles ? [{ id: "vehicles" as Tab, label: `Vehicles${vehicles.length ? ` (${vehicles.length})` : ""}` }] : []),
     { id: "wallet",    label: "Wallet" },
     { id: "credit",    label: "Credit" },
   ];
@@ -382,6 +418,33 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {customer && tab === "vehicles" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <Input placeholder="Vehicle no (ABC-1234)" value={vehForm.registrationNo} onChange={(e) => setVehForm((f) => ({ ...f, registrationNo: e.target.value }))} />
+                <Input placeholder="Year" value={vehForm.year} onChange={(e) => setVehForm((f) => ({ ...f, year: e.target.value }))} />
+                <Input placeholder="Make (Toyota)" value={vehForm.make} onChange={(e) => setVehForm((f) => ({ ...f, make: e.target.value }))} />
+                <Input placeholder="Model (Axio)" value={vehForm.model} onChange={(e) => setVehForm((f) => ({ ...f, model: e.target.value }))} />
+              </div>
+              <Button size="sm" onClick={addVehicle} disabled={actionLoading} className="gap-1">
+                <Car className="h-3.5 w-3.5" /> Add Vehicle
+              </Button>
+              {vehicles.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">No vehicles registered</p>
+              ) : vehicles.map((v) => (
+                <div key={v.id} className="flex items-center justify-between p-3 rounded-lg border text-sm">
+                  <div>
+                    <p className="font-semibold">{v.registrationNo ?? "—"} {v.isPrimary && <Badge variant="secondary" className="ml-1 text-[10px]">Primary</Badge>}</p>
+                    <p className="text-muted-foreground text-xs">
+                      {v.vehicleModel ? `${v.vehicleModel.brand.name} ${v.vehicleModel.name}` : `${v.make ?? ""} ${v.model ?? ""}`.trim() || "—"}
+                      {v.year ? ` · ${v.year}` : ""}
+                    </p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

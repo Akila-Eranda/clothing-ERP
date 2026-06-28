@@ -214,6 +214,55 @@ enum QuotationStatus {
   EXPIRED
 }
 
+enum TubeType {
+  TUBE
+  TUBELESS
+}
+
+enum JobCardStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING_PARTS
+  COMPLETED
+  INVOICED
+  CANCELLED
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  CONFIRMED
+  CHECKED_IN
+  IN_SERVICE
+  COMPLETED
+  NO_SHOW
+  CANCELLED
+}
+
+enum ServiceLineType {
+  PART
+  LABOR
+  SERVICE
+}
+
+enum TyreSerialStatus {
+  IN_STOCK
+  SOLD
+  CLAIMED
+}
+
+enum ServiceReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum ServiceReminderChannel {
+  SMS
+  WHATSAPP
+  EMAIL
+}
+
 enum TenantStatus {
   TRIAL
   ACTIVE
@@ -315,6 +364,11 @@ model Tenant {
   vehicleBrands    VehicleBrand[]
   warrantyClaims   WarrantyClaim[]
   quotations       Quotation[]
+  jobCards         JobCard[]
+  appointments     Appointment[]
+  workshopServices WorkshopServiceCatalog[]
+  serviceReminders ServiceReminder[]
+  tyreSerials      TyreSerial[]
   receiptPrintLogs ReceiptPrintLog[]
   cashRegisters    CashRegister[]
   cashMovements    CashMovement[]
@@ -621,6 +675,8 @@ model Product {
   modelNumber     String?
   loadIndex       String?
   speedRating     String?
+  tubeType        TubeType?
+  pattern         String?
   warrantyMonths  Int?
   seoTitle        String?
   seoDescription  String?
@@ -655,6 +711,7 @@ model ProductVariant {
   color         String?
   material      String?
   style         String?
+  dotCode       String?
   attributes    Json          @default("{}")
   costPrice     Float         @default(0)
   sellingPrice  Float         @default(0)
@@ -677,6 +734,8 @@ model ProductVariant {
   partCompatibilities PartCompatibility[]
   warrantyClaims WarrantyClaim[]
   quotationItems QuotationItem[]
+  jobCardLines   JobCardLine[]
+  tyreSerials    TyreSerial[]
 
   @@unique([productId, sku])
   @@index([productId])
@@ -922,6 +981,7 @@ model Customer {
   referredBy      String?
   notes           String?
   tags            String[]     @default([])
+  isFleet         Boolean      @default(false)
   metadata        Json         @default("{}")
   lastPurchaseAt  DateTime?
   createdAt       DateTime     @default(now())
@@ -935,6 +995,9 @@ model Customer {
   vehicles        CustomerVehicle[]
   warrantyClaims  WarrantyClaim[]
   quotations      Quotation[]
+  jobCards        JobCard[]
+  appointments    Appointment[]
+  serviceReminders ServiceReminder[]
 
   @@unique([tenantId, phone])
   @@index([tenantId])
@@ -1019,6 +1082,8 @@ model CustomerVehicle {
 
   customer     Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
   vehicleModel VehicleModel? @relation(fields: [vehicleModelId], references: [id])
+  appointments Appointment[]
+  jobCards     JobCard[]
 
   @@index([customerId])
   @@index([tenantId])
@@ -1098,6 +1163,170 @@ model QuotationItem {
 
   @@index([quotationId])
   @@map("quotation_items")
+}
+
+// ============================================================
+// TYRE SHOP — WORKSHOP, APPOINTMENTS, SERIAL TRACKING
+// ============================================================
+
+model WorkshopServiceCatalog {
+  id              String   @id @default(cuid())
+  tenantId        String
+  code            String
+  name            String
+  description     String?
+  category        String   @default("GENERAL")
+  defaultPrice    Float    @default(0)
+  durationMinutes Int      @default(30)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant  Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines   JobCardLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("workshop_service_catalog")
+}
+
+model JobCard {
+  id                String         @id @default(cuid())
+  tenantId          String
+  branchId          String?
+  customerId        String
+  customerVehicleId String?
+  appointmentId     String?        @unique
+  jobNumber         String
+  status            JobCardStatus  @default(OPEN)
+  technicianId      String?
+  odometer          Int?
+  complaintNotes    String?
+  beforeNotes       String?
+  afterNotes        String?
+  technicianNotes   String?
+  customerSignature String?
+  subtotal          Float          @default(0)
+  taxAmount         Float          @default(0)
+  discountAmount    Float          @default(0)
+  total             Float          @default(0)
+  saleId            String?
+  quotationId       String?
+  createdBy         String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  customerVehicle CustomerVehicle? @relation(fields: [customerVehicleId], references: [id])
+  appointment     Appointment?     @relation(fields: [appointmentId], references: [id])
+  lines           JobCardLine[]
+
+  @@unique([tenantId, jobNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([status])
+  @@map("job_cards")
+}
+
+model JobCardLine {
+  id                 String          @id @default(cuid())
+  jobCardId          String
+  lineType           ServiceLineType @default(SERVICE)
+  variantId          String?
+  serviceCatalogId   String?
+  description        String?
+  quantity           Int             @default(1)
+  unitPrice          Float           @default(0)
+  discount           Float           @default(0)
+  taxRate            Float           @default(0)
+  total              Float           @default(0)
+
+  jobCard         JobCard                 @relation(fields: [jobCardId], references: [id], onDelete: Cascade)
+  variant         ProductVariant?         @relation(fields: [variantId], references: [id])
+  serviceCatalog  WorkshopServiceCatalog? @relation(fields: [serviceCatalogId], references: [id])
+
+  @@index([jobCardId])
+  @@map("job_card_lines")
+}
+
+model Appointment {
+  id                String            @id @default(cuid())
+  tenantId          String
+  branchId          String?
+  customerId        String
+  customerVehicleId String?
+  appointmentNumber String
+  status            AppointmentStatus @default(SCHEDULED)
+  scheduledAt       DateTime
+  durationMinutes   Int               @default(60)
+  serviceTypes      String[]          @default([])
+  notes             String?
+  createdBy         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer        Customer         @relation(fields: [customerId], references: [id])
+  customerVehicle CustomerVehicle? @relation(fields: [customerVehicleId], references: [id])
+  jobCard         JobCard?
+
+  @@unique([tenantId, appointmentNumber])
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([scheduledAt])
+  @@map("appointments")
+}
+
+model TyreSerial {
+  id           String           @id @default(cuid())
+  tenantId     String
+  variantId    String
+  serialNumber String
+  dotCode      String?
+  branchId     String?
+  status       TyreSerialStatus @default(IN_STOCK)
+  jobCardId    String?
+  saleId       String?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@unique([tenantId, serialNumber])
+  @@index([tenantId])
+  @@index([variantId])
+  @@map("tyre_serials")
+}
+
+model ServiceReminder {
+  id                String                 @id @default(cuid())
+  tenantId          String
+  customerId        String
+  customerVehicleId String?
+  appointmentId     String?
+  jobCardId         String?
+  reminderType      String                 @default("SERVICE_DUE")
+  channel           ServiceReminderChannel @default(SMS)
+  scheduledFor      DateTime
+  message           String
+  status            ServiceReminderStatus  @default(PENDING)
+  sentAt            DateTime?
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([scheduledFor])
+  @@index([status])
+  @@map("service_reminders")
 }
 
 model LoyaltyTransaction {

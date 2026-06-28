@@ -19,6 +19,7 @@ export interface PrintTagItem {
     size?: string | null;
     style?: string | null;
     material?: string | null;
+    dotCode?: string | null;
     product?: {
       barcode?: string | null;
       tags?: string[];
@@ -71,6 +72,8 @@ function stickerSubtitleLine(item: PrintTagItem): string {
   const speed = item.variant?.product?.speedRating?.trim();
   if (load && speed) parts.push(`${load}${speed}`);
   else if (load) parts.push(`Load ${load}`);
+  const dot = item.variant?.dotCode?.trim();
+  if (dot) parts.push(`DOT ${dot}`);
   const tags = tagsLine(item);
   if (tags) parts.push(tags);
   if (!parts.length && season) return season;

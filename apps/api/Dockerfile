@@ -12,6 +12,8 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
+RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
+
 RUN pnpm prisma generate
 RUN pnpm build
 

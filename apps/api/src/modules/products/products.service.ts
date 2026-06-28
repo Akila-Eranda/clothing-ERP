@@ -4,7 +4,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductStatus } from '@prisma/client';
+import { ProductStatus, TubeType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -18,6 +18,7 @@ export class CreateVariantDto {
   @ApiPropertyOptional() @IsOptional() @IsString() color?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() dotCode?: string;
   @ApiProperty() @IsNumber() @Min(0) sellingPrice: number;
   @ApiProperty() @IsNumber() @Min(0) costPrice: number;
   @ApiProperty() @IsNumber() @Min(0) mrp: number;
@@ -45,6 +46,8 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsString() modelNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() loadIndex?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() speedRating?: string;
+  @ApiPropertyOptional() @IsOptional() @IsEnum(TubeType) tubeType?: TubeType;
+  @ApiPropertyOptional() @IsOptional() @IsString() pattern?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) warrantyMonths?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() seoTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() seoDescription?: string;
@@ -173,6 +176,8 @@ export class ProductsService {
         modelNumber: dto.modelNumber,
         loadIndex: dto.loadIndex,
         speedRating: dto.speedRating,
+        tubeType: dto.tubeType,
+        pattern: dto.pattern,
         warrantyMonths: dto.warrantyMonths,
         seoTitle: dto.seoTitle,
         seoDescription: dto.seoDescription,
@@ -190,6 +195,7 @@ export class ProductsService {
           color: v.color,
           material: v.material,
           style: v.style,
+          dotCode: v.dotCode,
           sellingPrice: v.sellingPrice,
           costPrice: v.costPrice,
           mrp: v.mrp,
@@ -287,7 +293,7 @@ export class ProductsService {
     const allowed = [
       'name', 'description', 'shortDesc', 'categoryId', 'brandId', 'hsn', 'barcode',
       'sellingPrice', 'costPrice', 'mrp', 'taxRate', 'status', 'images', 'tags',
-      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'loadIndex', 'speedRating', 'warrantyMonths',
+      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'loadIndex', 'speedRating', 'tubeType', 'pattern', 'warrantyMonths',
       'seoTitle', 'seoDescription',
     ] as const;
     const data: Record<string, unknown> = {};

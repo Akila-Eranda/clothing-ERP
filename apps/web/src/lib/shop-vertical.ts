@@ -71,6 +71,9 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/vehicles': 'Vehicle Compatibility',
     '/warranty': 'Warranty Claims',
     '/quotations': 'Quotations',
+    '/job-cards': 'Job Cards',
+    '/appointments': 'Appointments',
+    '/services': 'Workshop Services',
     printTags: printLabel,
   };
 }
@@ -112,6 +115,9 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     '/vehicles': profile.type === ShopType.SPARE_PARTS || profile.type === ShopType.TIRE_SHOP ? 'Vehicles' : 'Vehicle Compat.',
     '/warranty': 'Warranty',
     '/quotations': 'Quotations',
+    '/job-cards': 'Job Cards',
+    '/appointments': 'Appointments',
+    '/services': 'Services',
     '/users': 'Users & Roles',
     '/cash': 'Cash Management',
   };

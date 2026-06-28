@@ -48,6 +48,8 @@ interface Form {
   warrantyMonths: string;
   loadIndex: string;
   speedRating: string;
+  tubeType: string;
+  pattern: string;
   branchScope: ProductBranchScope;
   branchId: string;
 }
@@ -66,6 +68,8 @@ function buildInitial(type?: string): Form {
     warrantyMonths: "",
     loadIndex: "",
     speedRating: "",
+    tubeType: "",
+    pattern: "",
     branchScope: "ALL",
     branchId: "",
   };
@@ -238,6 +242,8 @@ export default function AddProductPage() {
           : showWarranty ? { warrantyMonths: 0 } : {}),
         ...(showTireMeta && form.loadIndex.trim() ? { loadIndex: form.loadIndex.trim() } : {}),
         ...(showTireMeta && form.speedRating.trim() ? { speedRating: form.speedRating.trim() } : {}),
+        ...(showTireMeta && form.tubeType ? { tubeType: form.tubeType } : {}),
+        ...(showTireMeta && form.pattern.trim() ? { pattern: form.pattern.trim() } : {}),
         branchScope: form.trackInventory ? form.branchScope : undefined,
         branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
         variants: variants.length > 0 ? variants : undefined,
@@ -436,6 +442,20 @@ export default function AddProductPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Speed Rating</Label>
                   <Input placeholder="e.g. H, V, W" value={form.speedRating} onChange={(e) => set("speedRating", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tube / Tubeless</Label>
+                  <Select value={form.tubeType} onValueChange={(v) => set("tubeType", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TUBELESS">Tubeless</SelectItem>
+                      <SelectItem value="TUBE">Tube</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Pattern / Model</Label>
+                  <Input placeholder="e.g. Primacy 4" value={form.pattern} onChange={(e) => set("pattern", e.target.value)} />
                 </div>
               </div>
             )}

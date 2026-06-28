@@ -47,6 +47,7 @@ import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
 import { SparePartsModule } from './modules/spare-parts/spare-parts.module';
+import { WorkshopModule } from './modules/workshop/workshop.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { CashManagementModule } from './modules/cash-management/cash-management.module';
 import { BranchContextInterceptor } from './common/interceptors/branch-context.interceptor';
@@ -109,6 +110,7 @@ import { BranchContextInterceptor } from './common/interceptors/branch-context.i
     WorkflowModule,
     CashManagementModule,
     SparePartsModule,
+    WorkshopModule,
 
     // ── Infrastructure ────────────────────────────────────────
     MailModule,

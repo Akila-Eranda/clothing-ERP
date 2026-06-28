@@ -286,6 +286,104 @@ export class ReportsService {
     });
     return { summary: aggregated._sum, count: aggregated._count.id, byTaxRate };
   }
+
+  async tyreBrandSales(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const items = await this.prisma.saleItem.findMany({
+      where: {
+        sale: {
+          tenantId,
+          status: { not: 'CANCELLED' },
+          invoiceDate: dateRange,
+          ...(branchId && { branchId }),
+        },
+      },
+      include: { variant: { include: { product: { include: { brand: true } } } } },
+    });
+    const map: Record<string, { brand: string; qty: number; revenue: number }> = {};
+    for (const i of items) {
+      const brand = i.variant?.product?.brand?.name ?? 'Unknown';
+      if (!map[brand]) map[brand] = { brand, qty: 0, revenue: 0 };
+      map[brand].qty += i.quantity;
+      map[brand].revenue += i.total;
+    }
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue);
+  }
+
+  async serviceRevenueReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const cards = await this.prisma.jobCard.findMany({
+      where: {
+        tenantId,
+        status: { in: ['COMPLETED', 'INVOICED'] },
+        completedAt: dateRange,
+        ...(branchId && { branchId }),
+      },
+      include: { lines: { include: { serviceCatalog: true } } },
+    });
+    const byService: Record<string, { name: string; count: number; revenue: number }> = {};
+    let totalParts = 0;
+    let totalLabor = 0;
+    for (const card of cards) {
+      for (const line of card.lines) {
+        if (line.lineType === 'PART') totalParts += line.total;
+        else {
+          totalLabor += line.total;
+          const key = line.serviceCatalog?.name ?? line.description ?? 'Other Service';
+          if (!byService[key]) byService[key] = { name: key, count: 0, revenue: 0 };
+          byService[key].count += line.quantity;
+          byService[key].revenue += line.total;
+        }
+      }
+    }
+    return {
+      jobCount: cards.length,
+      totalParts,
+      totalLabor,
+      total: totalParts + totalLabor,
+      byService: Object.values(byService).sort((a, b) => b.revenue - a.revenue),
+    };
+  }
+
+  async technicianPerformanceReport(tenantId: string, startDate: string, endDate: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const cards = await this.prisma.jobCard.findMany({
+      where: {
+        tenantId,
+        status: { in: ['COMPLETED', 'INVOICED'] },
+        completedAt: dateRange,
+        technicianId: { not: null },
+      },
+      select: { technicianId: true, total: true },
+    });
+    const map: Record<string, { technicianId: string; jobs: number; revenue: number }> = {};
+    for (const c of cards) {
+      const id = c.technicianId!;
+      if (!map[id]) map[id] = { technicianId: id, jobs: 0, revenue: 0 };
+      map[id].jobs += 1;
+      map[id].revenue += c.total;
+    }
+    const techIds = Object.keys(map);
+    const users = techIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: techIds } },
+          select: { id: true, firstName: true, lastName: true },
+        })
+      : [];
+    const nameMap = Object.fromEntries(users.map((u) => [u.id, `${u.firstName} ${u.lastName ?? ''}`.trim()]));
+    return Object.values(map)
+      .map((r) => ({ ...r, name: nameMap[r.technicianId] ?? r.technicianId }))
+      .sort((a, b) => b.revenue - a.revenue);
+  }
 }
 
 @ApiTags('Reports')
@@ -381,6 +479,27 @@ export class ReportsController {
     @Query('limit') limit?: string,
   ) {
     return this.reportsService.supplierPriceHistory(user.tenantId, variantId, supplierId, limit ? parseInt(limit, 10) : 50);
+  }
+
+  @Get('tyre-brands')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Best selling tyre brands by revenue' })
+  tyreBrandSales(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.tyreBrandSales(user.tenantId, start, end, branchId);
+  }
+
+  @Get('service-revenue')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Workshop service revenue breakdown' })
+  serviceRevenue(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string, @Query('branchId') branchId?: string) {
+    return this.reportsService.serviceRevenueReport(user.tenantId, start, end, branchId);
+  }
+
+  @Get('technician-performance')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Technician job count and revenue' })
+  technicianPerformance(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
+    return this.reportsService.technicianPerformanceReport(user.tenantId, start, end);
   }
 }
 

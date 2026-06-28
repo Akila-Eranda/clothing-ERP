@@ -1,4 +1,9 @@
-import { PrismaClient, RoleType, SubscriptionPlan, TenantStatus, UserStatus, ShopType, ProductStatus } from '@prisma/client';
+import {
+  PrismaClient, RoleType, SubscriptionPlan, TenantStatus, UserStatus, ShopType, ProductStatus,
+  JobCardStatus, AppointmentStatus, ServiceLineType, TyreSerialStatus,
+  ServiceReminderStatus, ServiceReminderChannel, QuotationStatus,
+  PaymentMethod, SaleStatus, PaymentStatus, WarrantyClaimStatus,
+} from '@prisma/client';
 import type { Permission } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { getShopProfile, slugifyCategory } from '../src/shared/shop-profiles';
@@ -975,6 +980,540 @@ async function main() {
       },
     },
   });
+
+  const workshopDefaults = [
+    { code: 'FIT', name: 'Tyre Fitting', category: 'FITTING', defaultPrice: 1500, durationMinutes: 30 },
+    { code: 'BAL', name: 'Wheel Balancing', category: 'BALANCING', defaultPrice: 2000, durationMinutes: 45 },
+    { code: 'ALN', name: 'Wheel Alignment', category: 'ALIGNMENT', defaultPrice: 3500, durationMinutes: 60 },
+    { code: 'ROT', name: 'Tyre Rotation', category: 'MAINTENANCE', defaultPrice: 2500, durationMinutes: 45 },
+    { code: 'NIT', name: 'Nitrogen Filling', category: 'MAINTENANCE', defaultPrice: 1000, durationMinutes: 20 },
+    { code: 'PUN', name: 'Puncture Repair', category: 'REPAIR', defaultPrice: 800, durationMinutes: 30 },
+  ];
+  for (const s of workshopDefaults) {
+    await prisma.workshopServiceCatalog.upsert({
+      where: { tenantId_code: { tenantId: tyreTenant.id, code: s.code } },
+      update: { name: s.name, defaultPrice: s.defaultPrice, durationMinutes: s.durationMinutes, category: s.category },
+      create: { tenantId: tyreTenant.id, ...s },
+    });
+  }
+
+  const v205 = await prisma.productVariant.findFirst({
+    where: { sku: 'TYR-MIC-2055516', product: { tenantId: tyreTenant.id } },
+  });
+  const v195 = await prisma.productVariant.findFirst({
+    where: { sku: 'TYR-MIC-1956515', product: { tenantId: tyreTenant.id } },
+  });
+  const v215 = await prisma.productVariant.findFirst({
+    where: { sku: 'TYR-BS-2156016', product: { tenantId: tyreTenant.id } },
+  });
+  if (v205) await prisma.productVariant.update({ where: { id: v205.id }, data: { dotCode: '2424' } });
+  if (v195) await prisma.productVariant.update({ where: { id: v195.id }, data: { dotCode: '2323' } });
+  if (v215) await prisma.productVariant.update({ where: { id: v215.id }, data: { dotCode: '2412' } });
+
+  const svcFit = await prisma.workshopServiceCatalog.findUnique({
+    where: { tenantId_code: { tenantId: tyreTenant.id, code: 'FIT' } },
+  });
+  const svcBal = await prisma.workshopServiceCatalog.findUnique({
+    where: { tenantId_code: { tenantId: tyreTenant.id, code: 'BAL' } },
+  });
+  const svcAln = await prisma.workshopServiceCatalog.findUnique({
+    where: { tenantId_code: { tenantId: tyreTenant.id, code: 'ALN' } },
+  });
+  const svcRot = await prisma.workshopServiceCatalog.findUnique({
+    where: { tenantId_code: { tenantId: tyreTenant.id, code: 'ROT' } },
+  });
+
+  const tyreAdmin = await prisma.user.findFirst({
+    where: { tenantId: tyreTenant.id, email: 'admin@tyres.demo.fashionerp.com' },
+  });
+
+  if (tyreAdmin) {
+    await prisma.supplier.findFirst({ where: { tenantId: tyreTenant.id, phone: '0112555000' } })
+      ?? await prisma.supplier.create({
+        data: {
+          tenantId: tyreTenant.id,
+          code: 'SUP-MIC',
+          name: 'Michelin Lanka Distributors',
+          contactPerson: 'Ravi Mendis',
+          phone: '0112555000',
+          email: 'orders@michelin.lk',
+          city: 'Colombo',
+          creditDays: 30,
+          isActive: true,
+        },
+      });
+
+    const kamal = await prisma.customer.upsert({
+      where: { tenantId_phone: { tenantId: tyreTenant.id, phone: '0771234567' } },
+      update: {},
+      create: {
+        tenantId: tyreTenant.id,
+        firstName: 'Kamal',
+        lastName: 'Perera',
+        phone: '0771234567',
+        email: 'kamal@example.com',
+      },
+    });
+    const nimal = await prisma.customer.upsert({
+      where: { tenantId_phone: { tenantId: tyreTenant.id, phone: '0772345678' } },
+      update: {},
+      create: {
+        tenantId: tyreTenant.id,
+        firstName: 'Nimal',
+        lastName: 'Silva',
+        phone: '0772345678',
+        email: 'nimal@example.com',
+      },
+    });
+    const fleetCo = await prisma.customer.upsert({
+      where: { tenantId_phone: { tenantId: tyreTenant.id, phone: '0112555123' } },
+      update: { isFleet: true },
+      create: {
+        tenantId: tyreTenant.id,
+        firstName: 'Lanka',
+        lastName: 'Fleet Services',
+        phone: '0112555123',
+        email: 'fleet@lankafleet.lk',
+        isFleet: true,
+      },
+    });
+    const sasha = await prisma.customer.upsert({
+      where: { tenantId_phone: { tenantId: tyreTenant.id, phone: '0773456789' } },
+      update: {},
+      create: {
+        tenantId: tyreTenant.id,
+        firstName: 'Sasha',
+        lastName: 'Fernando',
+        phone: '0773456789',
+        email: 'sasha@example.com',
+      },
+    });
+
+    const upsertVehicle = async (
+      customerId: string,
+      registrationNo: string,
+      vehicleModelId: string | undefined,
+      make: string,
+      model: string,
+      year: number,
+      isPrimary = false,
+    ) => {
+      const existing = await prisma.customerVehicle.findFirst({
+        where: { tenantId: tyreTenant.id, customerId, registrationNo },
+      });
+      if (existing) return existing;
+      return prisma.customerVehicle.create({
+        data: {
+          tenantId: tyreTenant.id,
+          customerId,
+          vehicleModelId,
+          registrationNo,
+          make,
+          model,
+          year,
+          isPrimary,
+        },
+      });
+    };
+
+    const kamalVeh = await upsertVehicle(kamal.id, 'CAB-1234', axioModel.id, 'Toyota', 'Axio', 2018, true);
+    const nimalVeh = await upsertVehicle(nimal.id, 'CAR-5678', vezelModel.id, 'Honda', 'Vezel', 2019, true);
+    const fleetVeh1 = await upsertVehicle(fleetCo.id, 'VAN-1001', axioModel.id, 'Toyota', 'Hiace', 2017, true);
+    const fleetVeh2 = await upsertVehicle(fleetCo.id, 'VAN-1002', wagonRModel.id, 'Suzuki', 'Wagon R', 2020, false);
+    const sashaVeh = await upsertVehicle(sasha.id, 'CAB-9012', wagonRModel.id, 'Suzuki', 'Wagon R', 2021, true);
+
+    const now = new Date();
+    const tomorrow = new Date(now); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(10, 0, 0, 0);
+    const nextWeek = new Date(now); nextWeek.setDate(nextWeek.getDate() + 5); nextWeek.setHours(14, 30, 0, 0);
+    const lastWeek = new Date(now); lastWeek.setDate(lastWeek.getDate() - 7); lastWeek.setHours(9, 0, 0, 0);
+    const inThreeDays = new Date(now); inThreeDays.setDate(inThreeDays.getDate() + 3);
+
+    const upsertAppointment = async (data: {
+      appointmentNumber: string;
+      customerId: string;
+      customerVehicleId: string;
+      status: AppointmentStatus;
+      scheduledAt: Date;
+      serviceTypes: string[];
+      notes?: string;
+    }) => {
+      const existing = await prisma.appointment.findUnique({
+        where: { tenantId_appointmentNumber: { tenantId: tyreTenant.id, appointmentNumber: data.appointmentNumber } },
+      });
+      if (existing) return existing;
+      return prisma.appointment.create({
+        data: {
+          tenantId: tyreTenant.id,
+          branchId: tyreBranch.id,
+          createdBy: tyreAdmin.id,
+          durationMinutes: 60,
+          ...data,
+        },
+      });
+    };
+
+    await upsertAppointment({
+      appointmentNumber: 'DEMO-APT-001',
+      customerId: kamal.id,
+      customerVehicleId: kamalVeh.id,
+      status: AppointmentStatus.SCHEDULED,
+      scheduledAt: tomorrow,
+      serviceTypes: ['Wheel Alignment', 'Tyre Rotation'],
+      notes: 'Customer requested morning slot',
+    });
+    await upsertAppointment({
+      appointmentNumber: 'DEMO-APT-002',
+      customerId: nimal.id,
+      customerVehicleId: nimalVeh.id,
+      status: AppointmentStatus.CONFIRMED,
+      scheduledAt: nextWeek,
+      serviceTypes: ['Tyre Fitting', 'Wheel Balancing'],
+      notes: '4 new tyres — Bridgestone Turanza',
+    });
+    const aptCompleted = await upsertAppointment({
+      appointmentNumber: 'DEMO-APT-003',
+      customerId: kamal.id,
+      customerVehicleId: kamalVeh.id,
+      status: AppointmentStatus.COMPLETED,
+      scheduledAt: lastWeek,
+      serviceTypes: ['Tyre Fitting', 'Wheel Balancing'],
+      notes: 'Completed — 4× Michelin Primacy 205/55R16',
+    });
+    await upsertAppointment({
+      appointmentNumber: 'DEMO-APT-004',
+      customerId: sasha.id,
+      customerVehicleId: sashaVeh.id,
+      status: AppointmentStatus.CANCELLED,
+      scheduledAt: inThreeDays,
+      serviceTypes: ['Puncture Repair'],
+      notes: 'Customer rescheduled — cancelled',
+    });
+
+    const lineTotal = (qty: number, price: number, taxRate = 18) => {
+      const sub = qty * price;
+      const tax = sub * (taxRate / 100);
+      return { total: sub + tax, taxRate };
+    };
+
+    const upsertJobCard = async (data: {
+      jobNumber: string;
+      customerId: string;
+      customerVehicleId: string;
+      status: JobCardStatus;
+      appointmentId?: string;
+      complaintNotes?: string;
+      afterNotes?: string;
+      odometer?: number;
+      startedAt?: Date;
+      completedAt?: Date;
+      lines: Array<{
+        lineType: ServiceLineType;
+        description: string;
+        quantity: number;
+        unitPrice: number;
+        variantId?: string;
+        serviceCatalogId?: string;
+      }>;
+    }) => {
+      const existing = await prisma.jobCard.findUnique({
+        where: { tenantId_jobNumber: { tenantId: tyreTenant.id, jobNumber: data.jobNumber } },
+        include: { lines: true },
+      });
+      if (existing) return existing;
+
+      const { lines, ...jobData } = data;
+      let subtotal = 0;
+      let taxAmount = 0;
+      const lineRows = lines.map((l) => {
+        const { total, taxRate } = lineTotal(l.quantity, l.unitPrice);
+        const preTax = l.quantity * l.unitPrice;
+        subtotal += preTax;
+        taxAmount += total - preTax;
+        return { ...l, taxRate, total, discount: 0 };
+      });
+
+      return prisma.jobCard.create({
+        data: {
+          tenantId: tyreTenant.id,
+          branchId: tyreBranch.id,
+          createdBy: tyreAdmin.id,
+          technicianId: tyreAdmin.id,
+          subtotal,
+          taxAmount,
+          total: subtotal + taxAmount,
+          ...jobData,
+          lines: { create: lineRows },
+        },
+        include: { lines: true },
+      });
+    };
+
+    await upsertJobCard({
+      jobNumber: 'DEMO-JC-001',
+      customerId: kamal.id,
+      customerVehicleId: kamalVeh.id,
+      status: JobCardStatus.OPEN,
+      odometer: 68420,
+      complaintNotes: 'Front tyres worn — replace all four',
+      lines: [
+        ...(v205 ? [{ lineType: ServiceLineType.PART, description: 'Michelin Primacy 205/55R16', quantity: 4, unitPrice: 42000, variantId: v205.id }] : []),
+        ...(svcFit ? [{ lineType: ServiceLineType.SERVICE, description: 'Tyre Fitting', quantity: 4, unitPrice: 1500, serviceCatalogId: svcFit.id }] : []),
+      ].filter((l) => l.quantity > 0),
+    });
+
+    await upsertJobCard({
+      jobNumber: 'DEMO-JC-002',
+      customerId: nimal.id,
+      customerVehicleId: nimalVeh.id,
+      status: JobCardStatus.IN_PROGRESS,
+      odometer: 45200,
+      complaintNotes: 'Vibration above 80 km/h',
+      startedAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
+      lines: [
+        ...(svcBal ? [{ lineType: ServiceLineType.SERVICE, description: 'Wheel Balancing', quantity: 4, unitPrice: 2000, serviceCatalogId: svcBal.id }] : []),
+        ...(svcAln ? [{ lineType: ServiceLineType.SERVICE, description: 'Wheel Alignment', quantity: 1, unitPrice: 3500, serviceCatalogId: svcAln.id }] : []),
+      ],
+    });
+
+    await upsertJobCard({
+      jobNumber: 'DEMO-JC-003',
+      customerId: kamal.id,
+      customerVehicleId: kamalVeh.id,
+      status: JobCardStatus.COMPLETED,
+      appointmentId: aptCompleted.id,
+      odometer: 68100,
+      complaintNotes: 'Replace rear tyres',
+      afterNotes: 'All tyres fitted and balanced. Alignment checked — within spec.',
+      startedAt: lastWeek,
+      completedAt: new Date(lastWeek.getTime() + 2 * 60 * 60 * 1000),
+      lines: [
+        ...(v205 ? [{ lineType: ServiceLineType.PART, description: 'Michelin Primacy 205/55R16', quantity: 2, unitPrice: 42000, variantId: v205.id }] : []),
+        ...(svcFit ? [{ lineType: ServiceLineType.SERVICE, description: 'Tyre Fitting', quantity: 2, unitPrice: 1500, serviceCatalogId: svcFit.id }] : []),
+        ...(svcBal ? [{ lineType: ServiceLineType.SERVICE, description: 'Wheel Balancing', quantity: 2, unitPrice: 2000, serviceCatalogId: svcBal.id }] : []),
+      ],
+    });
+
+    await upsertJobCard({
+      jobNumber: 'DEMO-JC-004',
+      customerId: fleetCo.id,
+      customerVehicleId: fleetVeh1.id,
+      status: JobCardStatus.WAITING_PARTS,
+      odometer: 125800,
+      complaintNotes: 'Bulk tyre order for fleet van — awaiting stock',
+      lines: [
+        ...(v195 ? [{ lineType: ServiceLineType.PART, description: 'Michelin Primacy 195/65R15', quantity: 4, unitPrice: 38000, variantId: v195.id }] : []),
+        ...(svcRot ? [{ lineType: ServiceLineType.SERVICE, description: 'Tyre Rotation', quantity: 1, unitPrice: 2500, serviceCatalogId: svcRot.id }] : []),
+      ],
+    });
+
+    const jcInvoiced = await upsertJobCard({
+      jobNumber: 'DEMO-JC-005',
+      customerId: fleetCo.id,
+      customerVehicleId: fleetVeh2.id,
+      status: JobCardStatus.INVOICED,
+      odometer: 34200,
+      complaintNotes: 'Seasonal tyre change',
+      afterNotes: 'Completed and invoiced to fleet account.',
+      completedAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
+      lines: [
+        ...(v195 ? [{ lineType: ServiceLineType.PART, description: 'Michelin Primacy 195/65R15', quantity: 4, unitPrice: 38000, variantId: v195.id }] : []),
+        ...(svcFit ? [{ lineType: ServiceLineType.SERVICE, description: 'Tyre Fitting', quantity: 4, unitPrice: 1500, serviceCatalogId: svcFit.id }] : []),
+      ],
+    });
+
+    if (v205) {
+      for (const [serial, dot] of [['TYR-SN-001', '2424'], ['TYR-SN-002', '2424'], ['TYR-SN-003', '2323']] as const) {
+        await prisma.tyreSerial.upsert({
+          where: { tenantId_serialNumber: { tenantId: tyreTenant.id, serialNumber: serial } },
+          update: { dotCode: dot },
+          create: {
+            tenantId: tyreTenant.id,
+            variantId: v205.id,
+            serialNumber: serial,
+            dotCode: dot,
+            branchId: tyreBranch.id,
+            status: TyreSerialStatus.IN_STOCK,
+            notes: 'Demo stock unit',
+          },
+        });
+      }
+      await prisma.tyreSerial.upsert({
+        where: { tenantId_serialNumber: { tenantId: tyreTenant.id, serialNumber: 'TYR-SN-SOLD-001' } },
+        update: {},
+        create: {
+          tenantId: tyreTenant.id,
+          variantId: v205.id,
+          serialNumber: 'TYR-SN-SOLD-001',
+          dotCode: '2424',
+          branchId: tyreBranch.id,
+          status: TyreSerialStatus.SOLD,
+          notes: 'Sold on demo job card',
+        },
+      });
+    }
+
+    const upsertReminder = async (
+      customerId: string,
+      customerVehicleId: string,
+      scheduledFor: Date,
+      message: string,
+      status: ServiceReminderStatus,
+      channel: ServiceReminderChannel = ServiceReminderChannel.SMS,
+    ) => {
+      const existing = await prisma.serviceReminder.findFirst({
+        where: { tenantId: tyreTenant.id, customerId, message },
+      });
+      if (existing) return existing;
+      return prisma.serviceReminder.create({
+        data: {
+          tenantId: tyreTenant.id,
+          customerId,
+          customerVehicleId,
+          reminderType: 'SERVICE_DUE',
+          channel,
+          scheduledFor,
+          message,
+          status,
+          sentAt: status === ServiceReminderStatus.SENT ? new Date(scheduledFor.getTime() - 3600000) : undefined,
+        },
+      });
+    };
+
+    await upsertReminder(
+      kamal.id, kamalVeh.id, tomorrow,
+      'Hi Kamal, your wheel alignment is due tomorrow at 10:00 AM. Reply YES to confirm.',
+      ServiceReminderStatus.PENDING,
+    );
+    await upsertReminder(
+      nimal.id, nimalVeh.id, nextWeek,
+      'Reminder: Tyre fitting appointment on ' + nextWeek.toLocaleDateString('en-LK') + ' at 2:30 PM.',
+      ServiceReminderStatus.PENDING,
+      ServiceReminderChannel.WHATSAPP,
+    );
+    await upsertReminder(
+      fleetCo.id, fleetVeh1.id, lastWeek,
+      'Lanka Fleet: Your van VAN-1001 service is complete. Invoice DEMO-INV-001 attached.',
+      ServiceReminderStatus.SENT,
+      ServiceReminderChannel.EMAIL,
+    );
+
+    if (v215) {
+      const quoteSent = await prisma.quotation.findUnique({
+        where: { tenantId_quoteNumber: { tenantId: tyreTenant.id, quoteNumber: 'DEMO-QUO-001' } },
+      }) ?? await prisma.quotation.create({
+        data: {
+          tenantId: tyreTenant.id,
+          branchId: tyreBranch.id,
+          customerId: nimal.id,
+          quoteNumber: 'DEMO-QUO-001',
+          status: QuotationStatus.SENT,
+          createdBy: tyreAdmin.id,
+          validUntil: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+          notes: '4× Bridgestone Turanza 215/60R16 + fitting',
+          subtotal: 192000,
+          taxAmount: 34560,
+          total: 226560,
+          items: {
+            create: [{
+              variantId: v215.id,
+              quantity: 4,
+              unitPrice: 48000,
+              taxRate: 18,
+              total: 226560,
+            }],
+          },
+        },
+      });
+      void quoteSent;
+
+      await prisma.quotation.findUnique({
+        where: { tenantId_quoteNumber: { tenantId: tyreTenant.id, quoteNumber: 'DEMO-QUO-002' } },
+      }) ?? await prisma.quotation.create({
+        data: {
+          tenantId: tyreTenant.id,
+          branchId: tyreBranch.id,
+          customerId: sasha.id,
+          quoteNumber: 'DEMO-QUO-002',
+          status: QuotationStatus.DRAFT,
+          createdBy: tyreAdmin.id,
+          notes: 'Budget option — 4× Michelin 195/65R15',
+          subtotal: v195 ? 152000 : 0,
+          taxAmount: v195 ? 27360 : 0,
+          total: v195 ? 179360 : 0,
+          items: v195 ? {
+            create: [{
+              variantId: v195.id,
+              quantity: 4,
+              unitPrice: 38000,
+              taxRate: 18,
+              total: 179360,
+            }],
+          } : undefined,
+        },
+      });
+    }
+
+    const existingSale = await prisma.sale.findUnique({
+      where: { tenantId_invoiceNumber: { tenantId: tyreTenant.id, invoiceNumber: 'DEMO-INV-001' } },
+    });
+    if (!existingSale && v195 && jcInvoiced) {
+      const saleTotal = jcInvoiced.total;
+      await prisma.sale.create({
+        data: {
+          tenantId: tyreTenant.id,
+          branchId: tyreBranch.id,
+          customerId: fleetCo.id,
+          cashierId: tyreAdmin.id,
+          invoiceNumber: 'DEMO-INV-001',
+          status: SaleStatus.COMPLETED,
+          subtotal: jcInvoiced.subtotal,
+          taxAmount: jcInvoiced.taxAmount,
+          total: saleTotal,
+          amountPaid: saleTotal,
+          paymentMethod: PaymentMethod.CASH,
+          paymentStatus: PaymentStatus.COMPLETED,
+          notes: 'Fleet van seasonal tyre change — linked to DEMO-JC-005',
+          items: {
+            create: [{
+              variantId: v195.id,
+              productName: 'Michelin Primacy 4',
+              variantName: '195/65R15 · All Season',
+              sku: 'TYR-MIC-1956515',
+              quantity: 4,
+              unitPrice: 38000,
+              costPrice: 28000,
+              taxRate: 18,
+              taxAmount: 4 * 38000 * 0.18,
+              total: 4 * 38000 * 1.18,
+            }],
+          },
+          payments: {
+            create: [{ method: PaymentMethod.CASH, amount: saleTotal }],
+          },
+        },
+      });
+    }
+
+    if (v205) {
+      await prisma.warrantyClaim.findUnique({
+        where: { tenantId_claimNumber: { tenantId: tyreTenant.id, claimNumber: 'DEMO-WC-001' } },
+      }) ?? await prisma.warrantyClaim.create({
+        data: {
+          tenantId: tyreTenant.id,
+          customerId: kamal.id,
+          variantId: v205.id,
+          claimNumber: 'DEMO-WC-001',
+          status: WarrantyClaimStatus.PENDING,
+          warrantyMonths: 24,
+          purchaseDate: new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000),
+          issueDescription: 'Premature sidewall crack on rear left tyre — DOT 2424',
+        },
+      });
+    }
+
+    console.log('✅ Tyre Shop demo data: customers, vehicles, job cards, appointments, quotes, sales, warranty');
+  }
+
   console.log('✅ Tyre Shop demo: tyres.shop.hexalyte.com — admin@tyres.demo.fashionerp.com / Admin@123456');
 
   await prisma.user.updateMany({
