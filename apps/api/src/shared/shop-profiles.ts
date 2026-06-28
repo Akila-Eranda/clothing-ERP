@@ -1,4 +1,4 @@
-/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE, SPARE_PARTS */
+/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE, SPARE_PARTS, TIRE_SHOP */
 
 export enum ShopType {
   CLOTHING = 'CLOTHING',
@@ -6,6 +6,7 @@ export enum ShopType {
   HARDWARE = 'HARDWARE',
   AGRICULTURE = 'AGRICULTURE',
   SPARE_PARTS = 'SPARE_PARTS',
+  TIRE_SHOP = 'TIRE_SHOP',
 }
 
 export interface VariantAttributeDef {
@@ -119,6 +120,22 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'liter'],
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true },
+    labelTemplates: ['sticker', 'shelf'],
+  },
+  [ShopType.TIRE_SHOP]: {
+    type: ShopType.TIRE_SHOP,
+    label: 'Tyre Shop',
+    labelSi: 'Tyre Shop',
+    emoji: '🛞',
+    description: 'Tyres & rims — size fitment, vehicle lookup, warranty, fleet quotations',
+    defaultCategories: ['Passenger Tyres', 'SUV & 4x4 Tyres', 'Commercial Tyres', 'Rims & Wheels', 'Accessories'],
+    variantAttributes: [
+      { name: 'Tyre Size', presets: ['205/55R16', '195/65R15', '215/60R16', '265/65R17'], mapsTo: 'size' },
+      { name: 'Season', presets: ['All Season', 'Summer', 'Winter'], mapsTo: 'style' },
+    ],
+    defaultUnit: 'pcs',
+    units: ['pcs', 'set', 'pair', 'box'],
     modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true },
     labelTemplates: ['sticker', 'shelf'],
   },

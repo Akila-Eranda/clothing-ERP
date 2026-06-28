@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
+import { useShopProfile, hasShopModule, isTireShop } from "@/lib/use-shop-profile";
 import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
@@ -40,6 +40,8 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   trackInventory: boolean;
   warrantyMonths: string;
+  loadIndex: string;
+  speedRating: string;
 }
 interface ExistingVariant {
   id: string; name: string; sku: string;
@@ -52,6 +54,8 @@ interface ProductData {
   status: string; description?: string | null; shortDesc?: string | null;
   costPrice: number; sellingPrice: number; mrp: number; taxRate: number;
   warrantyMonths?: number | null;
+  loadIndex?: string | null;
+  speedRating?: string | null;
   tags: string[]; hasVariants: boolean; trackInventory: boolean;
   category?: { id: string; name: string } | null;
   brand?: { id: string; name: string } | null;
@@ -85,6 +89,7 @@ export default function EditProductPage() {
   const router  = useRouter();
   const shopProfile = useShopProfile();
   const showWarranty = hasShopModule(shopProfile, "warranty");
+  const showTireMeta = isTireShop(shopProfile);
   const variantCols = variantTableColumns(shopProfile);
   const variantHint = variantVariantHint(shopProfile);
 
@@ -96,6 +101,8 @@ export default function EditProductPage() {
     hasVariants: false, attributes: variantAttrsFromProfile(shopProfile.type),
     trackInventory: true,
     warrantyMonths: "",
+    loadIndex: "",
+    speedRating: "",
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -141,6 +148,8 @@ export default function EditProductPage() {
         attributes:    variantAttrsFromProfile(shopProfile.type),
         trackInventory: p.trackInventory,
         warrantyMonths: p.warrantyMonths != null && p.warrantyMonths > 0 ? String(p.warrantyMonths) : "",
+        loadIndex: p.loadIndex ?? "",
+        speedRating: p.speedRating ?? "",
       });
       if (p.variants.length > 0) {
         setVariantRows(p.variants.map((v) => ({
@@ -265,6 +274,7 @@ export default function EditProductPage() {
         ...(showWarranty
           ? { warrantyMonths: form.warrantyMonths.trim() ? parseInt(form.warrantyMonths, 10) || 0 : 0 }
           : {}),
+        ...(showTireMeta ? { loadIndex: form.loadIndex.trim() || undefined, speedRating: form.speedRating.trim() || undefined } : {}),
         variants,
       });
       toast.success(`"${form.name}" updated successfully!`);
@@ -424,8 +434,20 @@ export default function EditProductPage() {
                   onChange={(e) => set("warrantyMonths", e.target.value)}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Leave empty or 0 if this part has no warranty. Only products with months set can receive warranty claims.
+                  Leave empty or 0 if this {showTireMeta ? "tyre" : "part"} has no warranty. Only products with months set can receive warranty claims.
                 </p>
+              </div>
+            )}
+            {showTireMeta && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Load Index</Label>
+                  <Input placeholder="e.g. 91" value={form.loadIndex} onChange={(e) => set("loadIndex", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Speed Rating</Label>
+                  <Input placeholder="e.g. H, V, W" value={form.speedRating} onChange={(e) => set("speedRating", e.target.value)} />
+                </div>
               </div>
             )}
           </div>

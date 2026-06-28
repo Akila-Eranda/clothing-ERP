@@ -86,3 +86,7 @@ export function useShopWorkspace(): { profile: ShopProfile; workspace: Workspace
 }
 
 export { hasShopModule };
+
+export function isTireShop(profile: ShopProfile): boolean {
+  return profile.type === ShopType.TIRE_SHOP;
+}

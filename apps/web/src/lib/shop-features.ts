@@ -89,6 +89,20 @@ export const VERTICAL_FEATURES: Record<ShopType, ShopFeature[]> = {
     { label: 'Low Stock & Reorder Alerts', live: true },
     { label: 'Sales & Profit Reports', live: true },
   ],
+  [ShopType.TIRE_SHOP]: [
+    { label: 'Tyre Size Variants (205/55R16)', live: true },
+    { label: 'Vehicle Fitment Lookup', live: true },
+    { label: 'Load Index & Speed Rating', live: true },
+    { label: 'Warranty Management', live: true },
+    { label: 'Fleet Quotation Management', live: true },
+    { label: 'Barcode Sticker Printing', live: true },
+    { label: 'Batch / DOT Tracking', live: true },
+    { label: 'Multi-Branch Stock', live: true },
+    { label: 'Customer Vehicle Records', live: true },
+    { label: 'POS Barcode Scanning', live: true },
+    { label: 'Purchase Orders & GRN', live: true },
+    { label: 'Sales & Profit Reports', live: true },
+  ],
 };
 
 export function getVerticalFeatures(type: ShopType): ShopFeature[] {

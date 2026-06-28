@@ -43,6 +43,8 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() oemNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() modelNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() loadIndex?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() speedRating?: string;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) warrantyMonths?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() seoTitle?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() seoDescription?: string;
@@ -169,6 +171,8 @@ export class ProductsService {
         barcode: dto.barcode,
         oemNumber: dto.oemNumber,
         modelNumber: dto.modelNumber,
+        loadIndex: dto.loadIndex,
+        speedRating: dto.speedRating,
         warrantyMonths: dto.warrantyMonths,
         seoTitle: dto.seoTitle,
         seoDescription: dto.seoDescription,
@@ -283,7 +287,7 @@ export class ProductsService {
     const allowed = [
       'name', 'description', 'shortDesc', 'categoryId', 'brandId', 'hsn', 'barcode',
       'sellingPrice', 'costPrice', 'mrp', 'taxRate', 'status', 'images', 'tags',
-      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'warrantyMonths',
+      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'loadIndex', 'speedRating', 'warrantyMonths',
       'seoTitle', 'seoDescription',
     ] as const;
     const data: Record<string, unknown> = {};

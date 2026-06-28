@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, hasShopModule, useShopWorkspace } from "@/lib/use-shop-profile";
+import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, hasShopModule, useShopWorkspace, isTireShop } from "@/lib/use-shop-profile";
 import { getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
@@ -46,6 +46,8 @@ interface Form {
   unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
   warrantyMonths: string;
+  loadIndex: string;
+  speedRating: string;
   branchScope: ProductBranchScope;
   branchId: string;
 }
@@ -62,6 +64,8 @@ function buildInitial(type?: string): Form {
     unit: d.unit, expiryDate: "", batchNumber: "",
     trackInventory: true,
     warrantyMonths: "",
+    loadIndex: "",
+    speedRating: "",
     branchScope: "ALL",
     branchId: "",
   };
@@ -102,6 +106,7 @@ export default function AddProductPage() {
   const showExpiry = hasExpiryTracking(shopProfile);
   const showBatch = hasBatchTracking(shopProfile);
   const showWarranty = hasShopModule(shopProfile, "warranty");
+  const showTireMeta = isTireShop(shopProfile);
   const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -231,6 +236,8 @@ export default function AddProductPage() {
         ...(showWarranty && form.warrantyMonths.trim()
           ? { warrantyMonths: parseInt(form.warrantyMonths, 10) || 0 }
           : showWarranty ? { warrantyMonths: 0 } : {}),
+        ...(showTireMeta && form.loadIndex.trim() ? { loadIndex: form.loadIndex.trim() } : {}),
+        ...(showTireMeta && form.speedRating.trim() ? { speedRating: form.speedRating.trim() } : {}),
         branchScope: form.trackInventory ? form.branchScope : undefined,
         branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
         variants: variants.length > 0 ? variants : undefined,
@@ -416,8 +423,20 @@ export default function AddProductPage() {
                   onChange={(e) => set("warrantyMonths", e.target.value)}
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Leave empty or 0 if this part has no warranty. Only products with months set can receive warranty claims.
+                  Leave empty or 0 if this {showTireMeta ? "tyre" : "part"} has no warranty. Only products with months set can receive warranty claims.
                 </p>
+              </div>
+            )}
+            {showTireMeta && (
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Load Index</Label>
+                  <Input placeholder="e.g. 91" value={form.loadIndex} onChange={(e) => set("loadIndex", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Speed Rating</Label>
+                  <Input placeholder="e.g. H, V, W" value={form.speedRating} onChange={(e) => set("speedRating", e.target.value)} />
+                </div>
               </div>
             )}
           </div>

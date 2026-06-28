@@ -22,6 +22,8 @@ export interface PrintTagItem {
     product?: {
       barcode?: string | null;
       tags?: string[];
+      loadIndex?: string | null;
+      speedRating?: string | null;
     };
   };
 }
@@ -49,35 +51,30 @@ function tagsLine(item: PrintTagItem): string {
   return tags.length ? tags.join(" · ") : "";
 }
 
-function stickerPartType(item: PrintTagItem): string {
-  const style = item.variant?.style?.trim();
-  if (style) return style;
-  const tags = (item.variant?.product?.tags ?? []).filter(
-    (t) => t.trim() && !SYSTEM_TAG_PREFIXES.some((p) => t.startsWith(p)),
-  );
-  const known = tags.find((t) => ["OEM", "Aftermarket", "Genuine"].includes(t));
-  if (known) return known;
-  return tags[0] ?? "";
-}
-
 function stickerTitleLine(item: PrintTagItem): string {
-  const partType = stickerPartType(item);
-  if (partType) return `${item.productName} - ${partType}`;
+  const size = item.variant?.size?.trim();
+  const style = item.variant?.style?.trim();
+  if (style && ["OEM", "Aftermarket", "Genuine"].includes(style)) {
+    return `${item.productName} - ${style}`;
+  }
+  if (size) return `${item.productName} - ${size}`;
+  if (style) return `${item.productName} - ${style}`;
   return item.productName;
 }
 
 function stickerSubtitleLine(item: PrintTagItem): string {
-  const partType = stickerPartType(item);
-  const tags = (item.variant?.product?.tags ?? [])
-    .filter((t) => t.trim() && !SYSTEM_TAG_PREFIXES.some((p) => t.startsWith(p)))
-    .filter((t) => t !== partType);
-  if (tags.length) return tags.join(" · ");
-  const withoutStyle = [item.variant?.size, item.variant?.material, item.variant?.color]
-    .filter(Boolean)
-    .join(" / ");
-  if (withoutStyle) return withoutStyle;
-  const variantLine = variantDisplayLine(item);
-  return variantLine && variantLine !== partType ? variantLine : "";
+  const parts: string[] = [];
+  const season = item.variant?.style?.trim();
+  const size = item.variant?.size?.trim();
+  if (season && size) parts.push(season);
+  const load = item.variant?.product?.loadIndex?.trim();
+  const speed = item.variant?.product?.speedRating?.trim();
+  if (load && speed) parts.push(`${load}${speed}`);
+  else if (load) parts.push(`Load ${load}`);
+  const tags = tagsLine(item);
+  if (tags) parts.push(tags);
+  if (!parts.length && season) return season;
+  return parts.join(" · ");
 }
 
 export function barcodeSvgMarkup(value: string): string {

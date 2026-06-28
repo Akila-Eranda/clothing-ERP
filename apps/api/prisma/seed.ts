@@ -1,4 +1,4 @@
-import { PrismaClient, RoleType, SubscriptionPlan, TenantStatus, UserStatus, ShopType } from '@prisma/client';
+import { PrismaClient, RoleType, SubscriptionPlan, TenantStatus, UserStatus, ShopType, ProductStatus } from '@prisma/client';
 import type { Permission } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { getShopProfile, slugifyCategory } from '../src/shared/shop-profiles';
@@ -579,7 +579,7 @@ async function main() {
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: agriTenant.id, email: 'admin@agri.demo.fashionerp.com' } },
     update: { status: UserStatus.ACTIVE, emailVerified: true },
-    create: {
+      create: {
       tenantId: agriTenant.id,
       branchId: agriBranch.id,
       email: 'admin@agri.demo.fashionerp.com',
@@ -745,6 +745,238 @@ async function main() {
   });
   console.log('✅ Spare Parts demo: spareparts.shop.hexalyte.com — admin@spareparts.demo.fashionerp.com / Admin@123456');
 
+  // ── Tyre Shop demo tenant ───────────────────────────────────
+  const tyreProfile = getShopProfile(ShopType.TIRE_SHOP);
+  const tyreTenant = await prisma.tenant.upsert({
+    where: { subdomain: 'tyres' },
+    update: { shopType: ShopType.TIRE_SHOP },
+    create: {
+      name: 'Demo Tyre Shop',
+      subdomain: 'tyres',
+      email: 'admin@tyres.demo.fashionerp.com',
+      shopType: ShopType.TIRE_SHOP,
+      plan: SubscriptionPlan.PROFESSIONAL,
+      status: TenantStatus.ACTIVE,
+      currency: 'LKR',
+      country: 'LK',
+      timezone: 'Asia/Colombo',
+    },
+  });
+  const tyreBranch = await prisma.branch.upsert({
+    where: { tenantId_code: { tenantId: tyreTenant.id, code: 'HO-001' } },
+    update: {},
+    create: {
+      tenantId: tyreTenant.id,
+      name: 'Main Tyre Store',
+      code: 'HO-001',
+      isDefault: true,
+      city: 'Colombo',
+    },
+  });
+  const tyreAdminRole = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId: tyreTenant.id, name: 'Tenant Admin' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+  });
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tyreTenant.id, email: 'admin@tyres.demo.fashionerp.com' } },
+    update: { status: UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: tyreTenant.id,
+      branchId: tyreBranch.id,
+      email: 'admin@tyres.demo.fashionerp.com',
+      firstName: 'Tyre',
+      lastName: 'Admin',
+      passwordHash,
+      emailVerified: true,
+      status: UserStatus.ACTIVE,
+      roles: { create: [{ roleId: tyreAdminRole.id }] },
+    },
+  });
+  for (const name of tyreProfile.defaultCategories) {
+    await prisma.category.upsert({
+      where: { tenantId_slug: { tenantId: tyreTenant.id, slug: slugifyCategory(name) } },
+      update: {},
+      create: { tenantId: tyreTenant.id, name, slug: slugifyCategory(name) },
+    });
+  }
+  const passengerTyresCat = await prisma.category.findFirst({
+    where: { tenantId: tyreTenant.id, slug: slugifyCategory('Passenger Tyres') },
+  });
+  const michelinBrand = await prisma.brand.upsert({
+    where: { tenantId_slug: { tenantId: tyreTenant.id, slug: 'michelin' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Michelin', slug: 'michelin', isActive: true },
+  });
+  const bridgestoneBrand = await prisma.brand.upsert({
+    where: { tenantId_slug: { tenantId: tyreTenant.id, slug: 'bridgestone' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Bridgestone', slug: 'bridgestone', isActive: true },
+  });
+  const toyotaTyre = await prisma.vehicleBrand.upsert({
+    where: { tenantId_name: { tenantId: tyreTenant.id, name: 'Toyota' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Toyota' },
+  });
+  const hondaTyre = await prisma.vehicleBrand.upsert({
+    where: { tenantId_name: { tenantId: tyreTenant.id, name: 'Honda' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Honda' },
+  });
+  const suzukiTyre = await prisma.vehicleBrand.upsert({
+    where: { tenantId_name: { tenantId: tyreTenant.id, name: 'Suzuki' } },
+    update: {},
+    create: { tenantId: tyreTenant.id, name: 'Suzuki' },
+  });
+  const axioModel = await prisma.vehicleModel.findFirst({
+    where: { tenantId: tyreTenant.id, brandId: toyotaTyre.id, name: 'Axio' },
+  }) ?? await prisma.vehicleModel.create({
+    data: { tenantId: tyreTenant.id, brandId: toyotaTyre.id, name: 'Axio', yearFrom: 2012, yearTo: 2020, engineCapacity: '1500cc' },
+  });
+  const vezelModel = await prisma.vehicleModel.findFirst({
+    where: { tenantId: tyreTenant.id, brandId: hondaTyre.id, name: 'Vezel' },
+  }) ?? await prisma.vehicleModel.create({
+    data: { tenantId: tyreTenant.id, brandId: hondaTyre.id, name: 'Vezel', yearFrom: 2014, yearTo: 2022, engineCapacity: '1500cc' },
+  });
+  const wagonRModel = await prisma.vehicleModel.findFirst({
+    where: { tenantId: tyreTenant.id, brandId: suzukiTyre.id, name: 'Wagon R' },
+  }) ?? await prisma.vehicleModel.create({
+    data: { tenantId: tyreTenant.id, brandId: suzukiTyre.id, name: 'Wagon R', yearFrom: 2014, yearTo: 2023, engineCapacity: '1000cc' },
+  });
+
+  if (passengerTyresCat) {
+    const existingTyreProduct = await prisma.product.findFirst({
+      where: { tenantId: tyreTenant.id, sku: 'TYR-MIC-PRIM4' },
+    });
+    if (!existingTyreProduct) {
+      const primacy = await prisma.product.create({
+        data: {
+          tenantId: tyreTenant.id,
+          name: 'Michelin Primacy 4',
+          slug: 'michelin-primacy-4',
+          sku: 'TYR-MIC-PRIM4',
+          categoryId: passengerTyresCat.id,
+          brandId: michelinBrand.id,
+          status: ProductStatus.ACTIVE,
+          loadIndex: '91',
+          speedRating: 'H',
+          warrantyMonths: 24,
+          hasVariants: true,
+          trackInventory: true,
+          sellingPrice: 42000,
+          costPrice: 31000,
+          mrp: 45000,
+          taxRate: 18,
+          tags: ['Premium', 'Passenger'],
+        },
+      });
+      const v205 = await prisma.productVariant.create({
+        data: {
+          productId: primacy.id,
+          sku: 'TYR-MIC-2055516',
+          name: '205/55R16 · All Season',
+          size: '205/55R16',
+          style: 'All Season',
+          barcode: '2288854718885000',
+          sellingPrice: 42000,
+          costPrice: 31000,
+          mrp: 45000,
+        },
+      });
+      const v195 = await prisma.productVariant.create({
+        data: {
+          productId: primacy.id,
+          sku: 'TYR-MIC-1956515',
+          name: '195/65R15 · All Season',
+          size: '195/65R15',
+          style: 'All Season',
+          barcode: '2288854718886000',
+          sellingPrice: 38000,
+          costPrice: 28000,
+          mrp: 41000,
+        },
+      });
+      await prisma.inventory.createMany({
+        data: [
+          { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v205.id, quantity: 12 },
+          { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v195.id, quantity: 8 },
+        ],
+        skipDuplicates: true,
+      });
+      await prisma.partCompatibility.createMany({
+        data: [
+          { tenantId: tyreTenant.id, vehicleModelId: axioModel.id, variantId: v205.id, notes: 'Factory size' },
+          { tenantId: tyreTenant.id, vehicleModelId: vezelModel.id, variantId: v205.id, notes: 'Recommended upgrade' },
+          { tenantId: tyreTenant.id, vehicleModelId: wagonRModel.id, variantId: v195.id, notes: 'Factory size' },
+        ],
+        skipDuplicates: true,
+      });
+    }
+
+    const existingBsProduct = await prisma.product.findFirst({
+      where: { tenantId: tyreTenant.id, sku: 'TYR-BS-TUR' },
+    });
+    if (!existingBsProduct) {
+      const turanza = await prisma.product.create({
+        data: {
+          tenantId: tyreTenant.id,
+          name: 'Bridgestone Turanza T005',
+          slug: 'bridgestone-turanza-t005',
+          sku: 'TYR-BS-TUR',
+          categoryId: passengerTyresCat.id,
+          brandId: bridgestoneBrand.id,
+          status: ProductStatus.ACTIVE,
+          loadIndex: '94',
+          speedRating: 'V',
+          warrantyMonths: 36,
+          hasVariants: true,
+          trackInventory: true,
+          sellingPrice: 48000,
+          costPrice: 35000,
+          mrp: 52000,
+          taxRate: 18,
+          tags: ['Premium', 'Summer'],
+        },
+      });
+      const v215 = await prisma.productVariant.create({
+        data: {
+          productId: turanza.id,
+          sku: 'TYR-BS-2156016',
+          name: '215/60R16 · Summer',
+          size: '215/60R16',
+          style: 'Summer',
+          barcode: '2288854718887000',
+          sellingPrice: 48000,
+          costPrice: 35000,
+          mrp: 52000,
+        },
+      });
+      await prisma.inventory.create({
+        data: { tenantId: tyreTenant.id, branchId: tyreBranch.id, variantId: v215.id, quantity: 6 },
+      });
+      await prisma.partCompatibility.create({
+        data: { tenantId: tyreTenant.id, vehicleModelId: vezelModel.id, variantId: v215.id, notes: 'Optional wider fit' },
+      }).catch(() => undefined);
+    }
+  }
+
+  await prisma.tenant.update({
+    where: { id: tyreTenant.id },
+    data: {
+      settings: {
+        shopProfile: {
+          type: tyreProfile.type,
+          defaultUnit: tyreProfile.defaultUnit,
+          units: tyreProfile.units,
+          modules: tyreProfile.modules,
+          labelTemplates: tyreProfile.labelTemplates,
+          variantAttributes: tyreProfile.variantAttributes,
+        },
+      },
+    },
+  });
+  console.log('✅ Tyre Shop demo: tyres.shop.hexalyte.com — admin@tyres.demo.fashionerp.com / Admin@123456');
+
   await prisma.user.updateMany({
     where: { emailVerified: true, status: UserStatus.PENDING_VERIFICATION },
     data: { status: UserStatus.ACTIVE },
@@ -759,6 +991,7 @@ async function main() {
   console.log('  Hardware demo: admin@hardware.demo.fashionerp.com / Admin@123456 (subdomain: hardware)');
   console.log('  Agri demo:     admin@agri.demo.fashionerp.com / Admin@123456 (subdomain: agri)');
   console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)');
+  console.log('  Tyre Shop:     admin@tyres.demo.fashionerp.com / Admin@123456 (subdomain: tyres)');
   console.log('  Cashier:       cashier@demo.fashionerp.com / Cashier@123456');
   console.log('  Branch Mgr:    manager@demo.fashionerp.com / Manager@123456');
   console.log('  Inv. Manager:  inventory@demo.fashionerp.com / Manager@123456');

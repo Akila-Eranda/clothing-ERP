@@ -123,6 +123,26 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
       'Use quotations for workshop and fleet customers',
     ],
   },
+  [ShopType.TIRE_SHOP]: {
+    dashboardTitle: 'Tyre Shop Dashboard',
+    dashboardSubtitle: 'Tyre sizes, vehicle fitment, warranty & fleet sales',
+    dashboardSubtitleSi: 'Tyre sizes, vehicle fitment, stock — tyre shop easy manage',
+    customerLabel: 'Customers',
+    productLabel: 'Tyres',
+    topSellingLabel: 'Top Selling Tyres',
+    aiBrand: 'ShopAI™',
+    quickActions: [
+      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
+      { label: 'Add Tyre', labelSi: 'Tyre add', href: '/products', icon: 'product' },
+      { label: 'Vehicle Lookup', labelSi: 'Fitment search', href: '/vehicles', icon: 'barcode' },
+      { label: 'New Quotation', labelSi: 'Fleet quote', href: '/quotations', icon: 'report' },
+    ],
+    tips: [
+      'Set tyre size (205/55R16) and season on every SKU',
+      'Map compatible tyres to vehicle make & model',
+      'Print barcode stickers when tyres arrive via GRN',
+    ],
+  },
 };
 
 export function getWorkspace(type: ShopType | string | null | undefined): WorkspaceConfig {

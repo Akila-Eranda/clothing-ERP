@@ -232,6 +232,16 @@ export const INDUSTRY_MODULES = [
       { label: 'VIN / Chassis Lookup', status: 'live' as const },
     ],
   },
+  {
+    type: 'TIRE_SHOP',
+    emoji: '🛞',
+    items: [
+      { label: 'Tyre Size Fitment', status: 'live' as const },
+      { label: 'Vehicle Compatibility', status: 'live' as const },
+      { label: 'Warranty Claims', status: 'live' as const },
+      { label: 'Fleet Quotations', status: 'live' as const },
+    ],
+  },
 ];
 
 export function countByStatus(items: Capability[]) {

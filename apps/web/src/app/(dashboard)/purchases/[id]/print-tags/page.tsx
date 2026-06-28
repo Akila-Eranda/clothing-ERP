@@ -41,6 +41,8 @@ interface POItem {
       tags?: string[];
       oemNumber?: string | null;
       modelNumber?: string | null;
+      loadIndex?: string | null;
+      speedRating?: string | null;
     };
   };
 }
@@ -130,31 +132,29 @@ function TagRow({ item, className = "" }: { item: POItem; className?: string }) 
   return <p className={`text-[8px] font-semibold text-gray-600 leading-tight ${className}`}>{line}</p>;
 }
 
-function stickerPartType(item: POItem): string {
-  const style = item.variant?.style?.trim();
-  if (style) return style;
-  const tags = productTags(item);
-  const known = tags.find((t) => ["OEM", "Aftermarket", "Genuine"].includes(t));
-  if (known) return known;
-  return tags[0] ?? "";
-}
-
 function stickerTitleLine(item: POItem): string {
-  const partType = stickerPartType(item);
-  if (partType) return `${item.productName} - ${partType}`;
+  const size = item.variant?.size?.trim();
+  const style = item.variant?.style?.trim();
+  if (style && ["OEM", "Aftermarket", "Genuine"].includes(style)) {
+    return `${item.productName} - ${style}`;
+  }
+  if (size) return `${item.productName} - ${size}`;
+  if (style) return `${item.productName} - ${style}`;
   return item.productName;
 }
 
 function stickerSubtitleLine(item: POItem): string {
-  const partType = stickerPartType(item);
-  const tags = productTags(item).filter((t) => t !== partType);
-  if (tags.length) return tags.join(" · ");
-  const withoutStyle = [item.variant?.size, item.variant?.material, item.variant?.color]
-    .filter(Boolean)
-    .join(" / ");
-  if (withoutStyle) return withoutStyle;
-  const variantLine = variantDisplayLine(item.variant, item.variantName);
-  return variantLine && variantLine !== partType ? variantLine : "";
+  const parts: string[] = [];
+  const season = item.variant?.style?.trim();
+  const size = item.variant?.size?.trim();
+  if (season && size) parts.push(season);
+  const load = item.variant?.product?.loadIndex?.trim();
+  const speed = item.variant?.product?.speedRating?.trim();
+  if (load && speed) parts.push(`${load}${speed}`);
+  else if (load) parts.push(`Load ${load}`);
+  const tags = tagsLine(item);
+  if (tags) parts.push(tags);
+  return parts.join(" · ");
 }
 
 function labelBarcode(item: POItem, serial: number): string {

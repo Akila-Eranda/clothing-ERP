@@ -193,6 +193,7 @@ enum ShopType {
   HARDWARE
   AGRICULTURE
   SPARE_PARTS
+  TIRE_SHOP
 }
 
 enum WarrantyClaimStatus {
@@ -618,6 +619,8 @@ model Product {
   attributes      Json          @default("{}")
   oemNumber       String?
   modelNumber     String?
+  loadIndex       String?
+  speedRating     String?
   warrantyMonths  Int?
   seoTitle        String?
   seoDescription  String?

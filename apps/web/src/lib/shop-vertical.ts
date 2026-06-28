@@ -28,6 +28,9 @@ export function getReturnReasons(type: ShopType | string | null | undefined) {
   if (t === ShopType.SPARE_PARTS) {
     return [{ v: 'WARRANTY', l: 'Warranty Claim' }, { v: 'WRONG_PART', l: 'Wrong Part' }, ...common];
   }
+  if (t === ShopType.TIRE_SHOP) {
+    return [{ v: 'WARRANTY', l: 'Warranty Claim' }, { v: 'DEFECTIVE_TREAD', l: 'Tread Defect' }, { v: 'WRONG_SIZE', l: 'Wrong Size' }, ...common];
+  }
   return common;
 }
 
@@ -84,6 +87,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.HARDWARE]: 'Manufacturers',
     [ShopType.AGRICULTURE]: 'Agri Brands',
     [ShopType.SPARE_PARTS]: 'Manufacturers',
+    [ShopType.TIRE_SHOP]: 'Tyre Brands',
   };
 
   const supplierShort: Record<ShopType, string> = {
@@ -92,6 +96,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.HARDWARE]: 'Suppliers',
     [ShopType.AGRICULTURE]: 'Agri Suppliers',
     [ShopType.SPARE_PARTS]: 'Distributors',
+    [ShopType.TIRE_SHOP]: 'Distributors',
   };
 
   return {
@@ -104,7 +109,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     '/promotions': 'Promotions',
     '/brands': brandShort[profile.type] ?? brand.pageTitle,
     '/suppliers': supplierShort[profile.type] ?? supplier.pageTitle,
-    '/vehicles': profile.type === ShopType.SPARE_PARTS ? 'Vehicles' : 'Vehicle Compat.',
+    '/vehicles': profile.type === ShopType.SPARE_PARTS || profile.type === ShopType.TIRE_SHOP ? 'Vehicles' : 'Vehicle Compat.',
     '/warranty': 'Warranty',
     '/quotations': 'Quotations',
     '/users': 'Users & Roles',
@@ -115,6 +120,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
 export function getSidebarSectionTitles(profile: ShopProfile) {
   const product =
     profile.type === ShopType.SPARE_PARTS ? 'PARTS & STOCK'
+    : profile.type === ShopType.TIRE_SHOP ? 'TYRES & STOCK'
     : profile.type === ShopType.AGRICULTURE ? 'AGRI PRODUCTS'
     : profile.type === ShopType.HARDWARE ? 'ITEMS & STOCK'
     : 'PRODUCTS';
@@ -359,6 +365,26 @@ export function getBrandPageCopy(profile: ShopProfile, workspace: WorkspaceConfi
       ],
       csvFileName: 'part-manufacturers-export',
     },
+    [ShopType.TIRE_SHOP]: {
+      pageTitle: 'Tyre Brands',
+      subtitle: 'Passenger, SUV & commercial tyre manufacturers',
+      singular: 'Brand',
+      plural: 'Tyre Brands',
+      addButton: 'Add Tyre Brand',
+      addModalTitle: 'Add Tyre Brand',
+      editModalTitle: 'Edit Tyre Brand',
+      addModalSubtitle: 'Register a tyre manufacturer or importer brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: 'e.g. Michelin, Bridgestone, Dunlop',
+      descriptionPlaceholder: 'Brief description of this tyre brand…',
+      activeHint: 'Brand visible on tyre catalog, POS and quotations',
+      tips: [
+        'Group tyres by brand for easy shelf and warehouse planning',
+        'Set load index and speed rating on premium tyre lines',
+        'Map each size variant to compatible vehicle models',
+      ],
+      csvFileName: 'tyre-brands-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -548,6 +574,36 @@ export function getSupplierPageCopy(profile: ShopProfile, _workspace: WorkspaceC
       ],
       csvFileName: 'parts-distributors-export',
     },
+    [ShopType.TIRE_SHOP]: {
+      pageTitle: 'Tyre Distributors',
+      subtitle: 'Tyre importers & wholesale distributors',
+      singular: 'Distributor',
+      plural: 'Distributors',
+      addButton: 'Add Distributor',
+      addPageTitle: 'Add Tyre Distributor',
+      editPageTitle: 'Edit Distributor',
+      editButton: 'Edit Distributor',
+      saveButton: 'Save Distributor',
+      updateButton: 'Update Distributor',
+      nameLabel: 'Distributor Name',
+      namePlaceholder: 'e.g. CEAT Distributors, Tyre Lanka Wholesale',
+      notesPlaceholder: 'Internal notes about this tyre distributor…',
+      activeLabel: 'Active Distributor',
+      activeHint: 'Available for tyre purchase orders and GRN',
+      backLabel: 'Back to Distributors',
+      backToDetailLabel: 'Back to Distributor',
+      addModalTitle: 'Add Tyre Distributor',
+      editModalTitle: 'Edit Distributor',
+      addModalSubtitle: 'Register a tyre importer or wholesaler',
+      paymentModalTitle: 'Record Distributor Payment',
+      detailsSectionTitle: 'Distributor Details',
+      tips: [
+        'Record DOT batch numbers when receiving tyre stock',
+        'Track credit limits with import distributors',
+        'Print barcode stickers on GRN for each tyre unit',
+      ],
+      csvFileName: 'tyre-distributors-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -564,6 +620,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.HARDWARE]: 'Track by unit (pcs, meter, box) and use Material variants for fittings.',
     [ShopType.AGRICULTURE]: 'Record batch number and grade for seeds, fertilizer and feed.',
     [ShopType.SPARE_PARTS]: 'Set OEM number, part type and warranty months. Map to compatible vehicles.',
+    [ShopType.TIRE_SHOP]: 'Set tyre size, season, load index and speed rating. Map to compatible vehicles.',
   };
   const placeholders: Record<ShopType, string> = {
     [ShopType.CLOTHING]: 'e.g. Premium Cotton T-Shirt',
@@ -571,6 +628,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.HARDWARE]: 'e.g. PVC Pipe 20mm',
     [ShopType.AGRICULTURE]: 'e.g. Hybrid Tomato Seeds 1kg',
     [ShopType.SPARE_PARTS]: 'e.g. Oil Filter — Toyota Axio',
+    [ShopType.TIRE_SHOP]: 'e.g. Michelin Primacy 205/55R16',
   };
   const lowTax = profile.type === ShopType.GROCERY || profile.type === ShopType.AGRICULTURE;
   return {
