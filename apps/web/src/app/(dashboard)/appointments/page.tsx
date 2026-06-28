@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Calendar, Plus, Loader2, RefreshCw, LogIn } from "lucide-react";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import Link from "next/link";
+import {
+  Calendar, Plus, Loader2, RefreshCw, LogIn, Users, Clock, Wrench,
+  CheckCircle2, ClipboardList, Car,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,30 +13,279 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ColumnDef } from "@tanstack/react-table";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { ModuleGate } from "@/components/shop/module-gate";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 interface Appointment {
-  id: string; appointmentNumber: string; status: string;
-  scheduledAt: string; durationMinutes: number; serviceTypes: string[]; notes?: string | null;
+  id: string;
+  appointmentNumber: string;
+  status: string;
+  scheduledAt: string;
+  durationMinutes: number;
+  serviceTypes: string[];
+  notes?: string | null;
   customer: { firstName: string; lastName?: string | null; phone: string };
-  customerVehicle?: { registrationNo?: string | null } | null;
+  customerVehicle?: { registrationNo?: string | null; make?: string | null; model?: string | null } | null;
   jobCard?: { id: string; jobNumber: string; status: string } | null;
 }
 interface Customer { id: string; firstName: string; lastName?: string | null; phone: string }
 interface Service { id: string; name: string }
 
-const STATUS_VARIANT: Record<string, "warning" | "success" | "secondary" | "danger"> = {
-  SCHEDULED: "secondary", CONFIRMED: "warning", CHECKED_IN: "success",
-  IN_SERVICE: "warning", COMPLETED: "success", NO_SHOW: "danger", CANCELLED: "danger",
+type StatusFilter = "ALL" | "SCHEDULED" | "CONFIRMED" | "CHECKED_IN" | "IN_SERVICE" | "COMPLETED" | "NO_SHOW" | "CANCELLED";
+
+const STATUS_CFG: Record<string, { label: string; variant: "success" | "secondary" | "warning" | "danger" | "default" }> = {
+  SCHEDULED:  { label: "Scheduled",  variant: "secondary" },
+  CONFIRMED:  { label: "Confirmed",  variant: "warning"   },
+  CHECKED_IN: { label: "Checked In", variant: "default"   },
+  IN_SERVICE: { label: "In Service", variant: "warning"   },
+  COMPLETED:  { label: "Completed",  variant: "success"   },
+  NO_SHOW:    { label: "No Show",    variant: "danger"    },
+  CANCELLED:  { label: "Cancelled",  variant: "danger"    },
 };
 
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "ALL", label: "All" },
+  { key: "SCHEDULED", label: "Scheduled" },
+  { key: "CONFIRMED", label: "Confirmed" },
+  { key: "CHECKED_IN", label: "Checked In" },
+  { key: "IN_SERVICE", label: "In Service" },
+  { key: "COMPLETED", label: "Completed" },
+  { key: "CANCELLED", label: "Cancelled" },
+];
+
+const GUIDE = [
+  { title: "Book Slot", desc: "Schedule tyre fitting, balancing or alignment for a customer at a specific date and time." },
+  { title: "Confirm", desc: "Mark appointments as Confirmed once the customer acknowledges the booking." },
+  { title: "Check In", desc: "When the vehicle arrives, check in to automatically create a linked job card." },
+  { title: "Complete", desc: "Close the appointment when workshop work is finished or cancel if rescheduled." },
+];
+
+function customerName(a: Appointment) {
+  return `${a.customer.firstName} ${a.customer.lastName ?? ""}`.trim();
+}
+
+function vehicleLabel(a: Appointment) {
+  if (a.customerVehicle?.registrationNo) return a.customerVehicle.registrationNo;
+  const mm = [a.customerVehicle?.make, a.customerVehicle?.model].filter(Boolean).join(" ");
+  return mm || "—";
+}
+
+function fmtDateTime(d: string) {
+  return new Date(d).toLocaleString("en-LK", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function buildColumns(
+  onView: (a: Appointment) => void,
+  onStatus: (id: string, status: string) => void,
+  onCheckIn: (id: string) => void,
+): ColumnDef<Appointment>[] {
+  return [
+    {
+      accessorKey: "appointmentNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Appt #" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2.5 min-w-[120px]">
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <Calendar className="h-4 w-4 text-primary" />
+          </div>
+          <span className="font-mono text-xs font-semibold">{row.original.appointmentNumber}</span>
+        </div>
+      ),
+    },
+    {
+      id: "customer",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-medium">{customerName(row.original)}</p>
+          <p className="text-[10px] text-muted-foreground font-mono">{row.original.customer.phone}</p>
+        </div>
+      ),
+    },
+    {
+      id: "vehicle",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Vehicle" />,
+      cell: ({ row }) => (
+        <span className="text-xs font-mono inline-flex items-center gap-1">
+          <Car className="h-3 w-3 text-muted-foreground" />
+          {vehicleLabel(row.original)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: "scheduledAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Scheduled" />,
+      cell: ({ row }) => <span className="text-xs">{fmtDateTime(row.original.scheduledAt)}</span>,
+    },
+    {
+      id: "services",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Services" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground max-w-[160px] truncate block">
+          {row.original.serviceTypes.length ? row.original.serviceTypes.join(", ") : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "job",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Job Card" />,
+      cell: ({ row }) => (
+        row.original.jobCard ? (
+          <span className="text-xs font-mono text-emerald-600">{row.original.jobCard.jobNumber}</span>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )
+      ),
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const cfg = STATUS_CFG[row.original.status] ?? { label: row.original.status.replace(/_/g, " "), variant: "secondary" as const };
+        return <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>;
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const a = row.original;
+        return (
+          <div className="flex gap-1 flex-wrap justify-end">
+            <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => onView(a)}>
+              View
+            </Button>
+            {a.status === "SCHEDULED" && (
+              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => onStatus(a.id, "CONFIRMED")}>
+                Confirm
+              </Button>
+            )}
+            {(a.status === "SCHEDULED" || a.status === "CONFIRMED") && !a.jobCard && (
+              <Button size="sm" className="h-7 text-[10px] gap-1" onClick={() => onCheckIn(a.id)}>
+                <LogIn className="h-3 w-3" /> Check In
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+}
+
+function AppointmentDetailDialog({
+  appt,
+  onClose,
+  onStatus,
+  onCheckIn,
+}: {
+  appt: Appointment | null;
+  onClose: () => void;
+  onStatus: (id: string, status: string) => void;
+  onCheckIn: (id: string) => void;
+}) {
+  if (!appt) return null;
+  const cfg = STATUS_CFG[appt.status] ?? { label: appt.status, variant: "secondary" as const };
+
+  return (
+    <Dialog open={!!appt} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
+            <Calendar className="h-5 w-5 text-primary" />
+            {appt.appointmentNumber}
+            <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 text-sm">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-xs text-muted-foreground">Customer</p>
+              <p className="font-medium">{customerName(appt)}</p>
+              <p className="text-xs font-mono text-muted-foreground">{appt.customer.phone}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Vehicle</p>
+              <p className="font-mono">{vehicleLabel(appt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Scheduled</p>
+              <p>{fmtDateTime(appt.scheduledAt)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Duration</p>
+              <p>{appt.durationMinutes} minutes</p>
+            </div>
+          </div>
+          {appt.serviceTypes.length > 0 && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Services</p>
+              <div className="flex flex-wrap gap-1">
+                {appt.serviceTypes.map((s) => (
+                  <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
+          {appt.notes && (
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Notes</p>
+              <p className="text-muted-foreground whitespace-pre-wrap">{appt.notes}</p>
+            </div>
+          )}
+          {appt.jobCard && (
+            <div className="rounded-lg border bg-emerald-500/5 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Linked job card</p>
+              <p className="font-mono font-semibold text-emerald-700">{appt.jobCard.jobNumber}</p>
+              <p className="text-xs text-muted-foreground">{appt.jobCard.status.replace(/_/g, " ")}</p>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2 justify-between pt-2 border-t">
+            <div className="flex gap-2 flex-wrap">
+              {appt.status === "SCHEDULED" && (
+                <Button size="sm" variant="outline" onClick={() => onStatus(appt.id, "CONFIRMED")}>Confirm</Button>
+              )}
+              {(appt.status === "SCHEDULED" || appt.status === "CONFIRMED") && !appt.jobCard && (
+                <Button size="sm" className="gap-1" onClick={() => onCheckIn(appt.id)}>
+                  <LogIn className="h-3.5 w-3.5" /> Check In
+                </Button>
+              )}
+              {["SCHEDULED", "CONFIRMED"].includes(appt.status) && (
+                <Button size="sm" variant="destructive" onClick={() => onStatus(appt.id, "CANCELLED")}>Cancel</Button>
+              )}
+              {["CHECKED_IN", "IN_SERVICE"].includes(appt.status) && (
+                <Button size="sm" onClick={() => onStatus(appt.id, "COMPLETED")}>Complete</Button>
+              )}
+              {appt.jobCard && (
+                <Button size="sm" variant="outline" asChild>
+                  <Link href="/job-cards">View Job Card</Link>
+                </Button>
+              )}
+            </div>
+            <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function AppointmentsPage() {
+  const { profile } = useShopWorkspace();
   const [items, setItems] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [services, setServices] = useState<Service[]>([]);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [viewAppt, setViewAppt] = useState<Appointment | null>(null);
   const [form, setForm] = useState({
     customerId: "", scheduledAt: "", durationMinutes: "60", serviceTypes: [] as string[], notes: "",
   });
@@ -53,6 +306,8 @@ export default function AppointmentsPage() {
     api.get<Service[]>("/workshop/services").then((r) => setServices(Array.isArray(r.data) ? r.data : [])).catch(() => {});
   }, []);
 
+  const resetForm = () => setForm({ customerId: "", scheduledAt: "", durationMinutes: "60", serviceTypes: [], notes: "" });
+
   const createAppt = async () => {
     if (!form.customerId || !form.scheduledAt) { toast.error("Customer and date/time required"); return; }
     setSaving(true);
@@ -65,19 +320,30 @@ export default function AppointmentsPage() {
         notes: form.notes || undefined,
       });
       toast.success("Appointment booked");
-      setForm({ customerId: "", scheduledAt: "", durationMinutes: "60", serviceTypes: [], notes: "" });
+      resetForm();
+      setCreateOpen(false);
       fetchItems();
     } catch (e: unknown) { toast.error((e as Error).message); }
     finally { setSaving(false); }
   };
 
-  const checkIn = async (id: string) => {
+  const updateStatus = useCallback(async (id: string, status: string) => {
+    try {
+      await api.put(`/workshop/appointments/${id}`, { status });
+      toast.success("Appointment updated");
+      fetchItems();
+      setViewAppt((prev) => (prev?.id === id ? null : prev));
+    } catch (e: unknown) { toast.error((e as Error).message); }
+  }, [fetchItems]);
+
+  const checkIn = useCallback(async (id: string) => {
     try {
       await api.put(`/workshop/appointments/${id}`, { status: "CHECKED_IN" });
       toast.success("Checked in — job card created");
       fetchItems();
+      setViewAppt((prev) => (prev?.id === id ? null : prev));
     } catch (e: unknown) { toast.error((e as Error).message); }
-  };
+  }, [fetchItems]);
 
   const toggleService = (name: string) => {
     setForm((f) => ({
@@ -88,86 +354,219 @@ export default function AppointmentsPage() {
     }));
   };
 
+  const displayed = useMemo(
+    () => statusFilter === "ALL" ? items : items.filter((a) => a.status === statusFilter),
+    [items, statusFilter],
+  );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  const todayCount = items.filter((a) => {
+    const d = new Date(a.scheduledAt);
+    return d >= today && d < tomorrow && !["CANCELLED", "NO_SHOW"].includes(a.status);
+  }).length;
+
+  const STATS = [
+    { label: "Total Bookings", value: items.length, icon: Calendar, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Today", value: todayCount, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Confirmed", value: items.filter((a) => a.status === "CONFIRMED").length, icon: CheckCircle2, color: "text-violet-500", bg: "bg-violet-500/10" },
+    { label: "Completed", value: items.filter((a) => a.status === "COMPLETED").length, icon: Wrench, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  ];
+
+  const columns = useMemo(
+    () => buildColumns(setViewAppt, updateStatus, checkIn),
+    [updateStatus, checkIn],
+  );
+
   return (
     <ModuleGate module="appointments">
-      <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-6 space-y-6 w-full">
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Calendar className="h-6 w-6 text-primary" /> Appointments
+              <span>{profile.emoji}</span> Appointments
             </h1>
-            <p className="text-sm text-muted-foreground">Book tyre fitting, balancing & alignment slots</p>
+            <p className="text-sm text-muted-foreground">
+              Book tyre fitting, balancing, alignment & workshop service slots
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={fetchItems} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={fetchItems} className="gap-1.5">
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href="/customers"><Users className="h-3.5 w-3.5" /> Customers</Link>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href="/job-cards"><ClipboardList className="h-3.5 w-3.5" /> Job Cards</Link>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-1.5" asChild>
+              <Link href="/services"><Wrench className="h-3.5 w-3.5" /> Services</Link>
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={() => { resetForm(); setCreateOpen(true); }}>
+              <Plus className="h-3.5 w-3.5" /> Book Appointment
+            </Button>
+          </div>
         </div>
 
-        <div className="grid xl:grid-cols-3 gap-4">
-          <Card className="xl:col-span-1"><CardContent className="p-4 space-y-3">
-            <h3 className="font-semibold text-sm">Book Appointment</h3>
-            <div className="space-y-1"><Label className="text-xs">Customer</Label>
-              <Select value={form.customerId} onValueChange={(v) => setForm((f) => ({ ...f, customerId: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
-                <SelectContent>{customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName} — {c.phone}</SelectItem>
-                ))}</SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Date & Time</Label>
-              <Input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))} />
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Duration (minutes)</Label>
-              <Input type="number" value={form.durationMinutes} onChange={(e) => setForm((f) => ({ ...f, durationMinutes: e.target.value }))} />
-            </div>
-            <div className="space-y-1"><Label className="text-xs">Services</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {services.map((s) => (
-                  <Button key={s.id} type="button" size="sm" variant={form.serviceTypes.includes(s.name) ? "default" : "outline"}
-                    onClick={() => toggleService(s.name)}>{s.name}</Button>
-                ))}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {STATS.map((s) => (
+            <Card key={s.label}>
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                  <s.icon className={`h-5 w-5 ${s.color}`} />
+                </div>
+                <div>
+                  <p className="text-xl font-bold">{loading && typeof s.value === "number" ? "—" : s.value}</p>
+                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground">Status:</span>
+          {STATUS_FILTERS.map((f) => {
+            const count = f.key === "ALL" ? items.length : items.filter((a) => a.status === f.key).length;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setStatusFilter(f.key)}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+                  statusFilter === f.key
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background text-muted-foreground border-border hover:border-primary/40",
+                )}
+              >
+                {f.label} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {displayed.length === 0 && !loading ? (
+          <Card className="border-dashed">
+            <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+              <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Calendar className="h-7 w-7 text-primary" />
+              </div>
+              <h3 className="font-semibold">No appointments scheduled</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Book a slot when customers call ahead for tyre fitting, balancing, alignment or other workshop services.
+              </p>
+              <Button className="gap-1.5 mt-2" onClick={() => { resetForm(); setCreateOpen(true); }}>
+                <Plus className="h-4 w-4" /> Book Appointment
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <ClientSideTable
+            data={displayed}
+            columns={columns}
+            pageCount={Math.ceil(displayed.length / 10)}
+            searchableColumns={[
+              { id: "appointmentNumber", title: "Appt #" },
+            ]}
+            filterableColumns={[
+              {
+                id: "status",
+                title: "Status",
+                options: STATUS_FILTERS.filter((f) => f.key !== "ALL").map((f) => ({
+                  label: f.label,
+                  value: f.key,
+                })),
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "appointments-export" }}
+          />
+        )}
+
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+          {GUIDE.map((g) => (
+            <Card key={g.title} className="border-dashed">
+              <CardContent className="p-4 space-y-1">
+                <p className="text-sm font-semibold">{g.title}</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">{g.desc}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <Dialog open={createOpen} onOpenChange={(o) => { setCreateOpen(o); if (!o) resetForm(); }}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogHeader><DialogTitle>Book Appointment</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Customer</Label>
+                <Select value={form.customerId || undefined} onValueChange={(v) => setForm((f) => ({ ...f, customerId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger>
+                  <SelectContent>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName ?? ""} · {c.phone}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">Date & time</Label>
+                  <Input type="datetime-local" value={form.scheduledAt} onChange={(e) => setForm((f) => ({ ...f, scheduledAt: e.target.value }))} />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Duration (minutes)</Label>
+                  <Input type="number" min={15} value={form.durationMinutes} onChange={(e) => setForm((f) => ({ ...f, durationMinutes: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Services</Label>
+                {services.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    No services yet — load defaults from{" "}
+                    <Link href="/services" className="text-primary underline">Workshop Services</Link>.
+                  </p>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5">
+                    {services.map((s) => (
+                      <Button
+                        key={s.id}
+                        type="button"
+                        size="sm"
+                        variant={form.serviceTypes.includes(s.name) ? "default" : "outline"}
+                        onClick={() => toggleService(s.name)}
+                      >
+                        {s.name}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Notes (optional)</Label>
+                <Textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Customer requests morning slot…" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
+                <Button onClick={createAppt} disabled={saving || !form.customerId || !form.scheduledAt} className="gap-1.5">
+                  {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Calendar className="h-4 w-4" />}
+                  Book Appointment
+                </Button>
               </div>
             </div>
-            <div className="space-y-1"><Label className="text-xs">Notes</Label>
-              <Textarea rows={2} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} />
-            </div>
-            <Button onClick={createAppt} disabled={saving} className="w-full gap-1.5">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Book
-            </Button>
-          </CardContent></Card>
+          </DialogContent>
+        </Dialog>
 
-          <div className="xl:col-span-2 space-y-2">
-            {loading ? (
-              <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
-            ) : items.length === 0 ? (
-              <Card><CardContent className="p-8 text-center text-muted-foreground">No appointments scheduled</CardContent></Card>
-            ) : items.map((a) => (
-              <Card key={a.id}><CardContent className="p-4 flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{a.appointmentNumber}</span>
-                    <Badge variant={STATUS_VARIANT[a.status] ?? "secondary"}>{a.status.replace(/_/g, " ")}</Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {new Date(a.scheduledAt).toLocaleString("en-LK")} · {a.durationMinutes} min
-                  </p>
-                  <p className="text-sm">{a.customer.firstName} {a.customer.lastName} · {a.customer.phone}</p>
-                  {a.serviceTypes.length > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">{a.serviceTypes.join(", ")}</p>
-                  )}
-                  {a.jobCard && <p className="text-xs text-emerald-600 mt-1">Job: {a.jobCard.jobNumber}</p>}
-                </div>
-                <div className="flex gap-2">
-                  {(a.status === "SCHEDULED" || a.status === "CONFIRMED") && !a.jobCard && (
-                    <Button size="sm" onClick={() => checkIn(a.id)} className="gap-1">
-                      <LogIn className="h-3.5 w-3.5" /> Check In
-                    </Button>
-                  )}
-                </div>
-              </CardContent></Card>
-            ))}
-          </div>
-        </div>
+        <AppointmentDetailDialog
+          appt={viewAppt}
+          onClose={() => setViewAppt(null)}
+          onStatus={updateStatus}
+          onCheckIn={checkIn}
+        />
       </div>
     </ModuleGate>
   );

@@ -31,6 +31,7 @@ FILES = [
     "apps/web/src/app/(dashboard)/job-cards/page.tsx",
     "apps/web/src/app/(dashboard)/appointments/page.tsx",
     "apps/web/src/app/(dashboard)/services/page.tsx",
+    "apps/web/src/app/(dashboard)/warranty/page.tsx",
     "apps/web/src/app/(dashboard)/products/new/page.tsx",
 ]
 
