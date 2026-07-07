@@ -3,7 +3,7 @@ import { registerAs } from '@nestjs/config';
 export default registerAs('storage', () => ({
   provider: process.env.STORAGE_PROVIDER || 'local', // 's3' | 'r2' | 'local'
   local: {
-    uploadDir: process.env.LOCAL_UPLOAD_DIR || './uploads',
+    uploadDir: process.env.UPLOAD_DIR || process.env.LOCAL_UPLOAD_DIR || './uploads',
     baseUrl: process.env.LOCAL_BASE_URL || 'http://localhost:4000/uploads',
   },
   s3: {

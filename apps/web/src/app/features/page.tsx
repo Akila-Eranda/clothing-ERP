@@ -15,6 +15,7 @@ const VERTICAL_ICONS: Record<ShopType, string> = {
   [ShopType.AGRICULTURE]: '🌾',
   [ShopType.SPARE_PARTS]: '🚗',
   [ShopType.TIRE_SHOP]: '🛞',
+  [ShopType.GENERAL]: '🏪',
 };
 
 export default function FeaturesPage() {

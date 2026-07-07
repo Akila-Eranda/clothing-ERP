@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag,
-  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban, Scan,
+  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,6 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
-import { StockBarcodeScanPanel } from "@/components/inventory/stock-barcode-scan-panel";
 import { StockTransferModal } from "@/components/inventory/stock-transfer-modal";
 import { TransferApprovalActions } from "@/components/inventory/transfer-approval-actions";
 import { CreatePOModal } from "@/components/purchases/create-po-modal";
@@ -365,19 +364,12 @@ export default function InventoryPage() {
       <Tabs defaultValue="stock">
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="stock">Stock Levels</TabsTrigger>
-          <TabsTrigger value="scan-restock" className="gap-1.5">
-            <Scan className="h-3.5 w-3.5" /> Scan Restock
-          </TabsTrigger>
           <TabsTrigger value="ledger">Inventory Ledger</TabsTrigger>
           <TabsTrigger value="abc">ABC Analysis</TabsTrigger>
           <TabsTrigger value="dead">Dead Stock</TabsTrigger>
           <TabsTrigger value="aging">Stock Aging</TabsTrigger>
           <TabsTrigger value="transfers">Stock Transfers</TabsTrigger>
         </TabsList>
-
-        <TabsContent value="scan-restock" className="mt-4">
-          <StockBarcodeScanPanel stock={stock} onRestocked={fetchAll} />
-        </TabsContent>
 
         <TabsContent value="stock" className="mt-4">
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-4">

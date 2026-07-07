@@ -23,6 +23,7 @@ import {
   applyVariantCombo, autoFillVariantAttributes, findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags } from "@/lib/product-tags";
 
@@ -50,6 +51,7 @@ interface Form {
   speedRating: string;
   tubeType: string;
   pattern: string;
+  images: string[];
   branchScope: ProductBranchScope;
   branchId: string;
 }
@@ -70,6 +72,7 @@ function buildInitial(type?: string): Form {
     speedRating: "",
     tubeType: "",
     pattern: "",
+    images: [],
     branchScope: "ALL",
     branchId: "",
   };
@@ -246,6 +249,7 @@ export default function AddProductPage() {
         ...(showTireMeta && form.pattern.trim() ? { pattern: form.pattern.trim() } : {}),
         branchScope: form.trackInventory ? form.branchScope : undefined,
         branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
+        images: form.images.length > 0 ? form.images : undefined,
         variants: variants.length > 0 ? variants : undefined,
       });
       toast.success(`"${form.name}" ${status === "DRAFT" ? "saved as draft" : "created"}!`);
@@ -381,6 +385,17 @@ export default function AddProductPage() {
                   onChange={(e) => set("description", e.target.value)} />
               </div>
             </div>
+          </div>
+
+          {/* Images */}
+          <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
+            <h2 className="font-semibold text-base border-b pb-2">Product Images</h2>
+            <p className="text-xs text-muted-foreground">The first image is shown as the cover in listings.</p>
+            <ProductImageUpload
+              images={form.images}
+              onChange={(images) => set("images", images)}
+              disabled={loading}
+            />
           </div>
 
           {/* Pricing */}

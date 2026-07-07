@@ -143,6 +143,26 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
       'Print barcode stickers when tyres arrive via GRN',
     ],
   },
+  [ShopType.GENERAL]: {
+    dashboardTitle: 'General Shop Dashboard',
+    dashboardSubtitle: 'Mixed retail — products, stock, sales & customers',
+    dashboardSubtitleSi: 'සාමාන්‍ය retail shop — stock, sales, customers easy manage',
+    customerLabel: 'Customers',
+    productLabel: 'Products',
+    topSellingLabel: 'Top Selling Products',
+    aiBrand: 'ShopAI™',
+    quickActions: [
+      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', labelSi: 'Product add', href: '/products', icon: 'product' },
+      { label: 'New Purchase', labelSi: 'Purchase order', href: '/purchases/new', icon: 'purchase' },
+      { label: 'Stock Check', labelSi: 'Stock බලන්න', href: '/inventory', icon: 'inventory' },
+    ],
+    tips: [
+      'Use Size or Variant attributes only when products need them',
+      'Set selling price and barcode on each SKU for fast POS',
+      'Run promotions on weekends for higher foot traffic',
+    ],
+  },
 };
 
 export function getWorkspace(type: ShopType | string | null | undefined): WorkspaceConfig {

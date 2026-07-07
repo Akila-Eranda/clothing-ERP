@@ -25,7 +25,8 @@ export class FilesService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.uploadDir = path.resolve(process.env.UPLOAD_DIR ?? 'uploads');
+    const configured = this.config.get<string>('storage.local.uploadDir');
+    this.uploadDir = path.resolve(configured || process.env.UPLOAD_DIR || 'uploads');
   }
 
   async uploadFile(

@@ -1516,6 +1516,78 @@ async function main() {
 
   console.log('✅ Tyre Shop demo: tyres.shop.hexalyte.com — admin@tyres.demo.fashionerp.com / Admin@123456');
 
+  // ── General Shop demo tenant ────────────────────────────────
+  const generalProfile = getShopProfile(ShopType.GENERAL);
+  const generalTenant = await prisma.tenant.upsert({
+    where: { subdomain: 'general' },
+    update: { shopType: ShopType.GENERAL },
+    create: {
+      name: 'Demo General Store',
+      subdomain: 'general',
+      email: 'admin@general.demo.fashionerp.com',
+      shopType: ShopType.GENERAL,
+      plan: SubscriptionPlan.PROFESSIONAL,
+      status: TenantStatus.ACTIVE,
+      currency: 'LKR',
+      country: 'LK',
+      timezone: 'Asia/Colombo',
+    },
+  });
+  const generalBranch = await prisma.branch.upsert({
+    where: { tenantId_code: { tenantId: generalTenant.id, code: 'HO-001' } },
+    update: {},
+    create: {
+      tenantId: generalTenant.id,
+      name: 'Main Store',
+      code: 'HO-001',
+      isDefault: true,
+      city: 'Colombo',
+    },
+  });
+  const generalAdminRole = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId: generalTenant.id, name: 'Tenant Admin' } },
+    update: {},
+    create: { tenantId: generalTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+  });
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: generalTenant.id, email: 'admin@general.demo.fashionerp.com' } },
+    update: { status: UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: generalTenant.id,
+      branchId: generalBranch.id,
+      email: 'admin@general.demo.fashionerp.com',
+      firstName: 'General',
+      lastName: 'Admin',
+      passwordHash,
+      emailVerified: true,
+      status: UserStatus.ACTIVE,
+      roles: { create: [{ roleId: generalAdminRole.id }] },
+    },
+  });
+  for (const name of generalProfile.defaultCategories) {
+    await prisma.category.upsert({
+      where: { tenantId_slug: { tenantId: generalTenant.id, slug: slugifyCategory(name) } },
+      update: {},
+      create: { tenantId: generalTenant.id, name, slug: slugifyCategory(name) },
+    });
+  }
+  await prisma.tenant.update({
+    where: { id: generalTenant.id },
+    data: {
+      settings: {
+        shopProfile: {
+          type: generalProfile.type,
+          defaultUnit: generalProfile.defaultUnit,
+          units: generalProfile.units,
+          modules: generalProfile.modules,
+          labelTemplates: generalProfile.labelTemplates,
+          variantAttributes: generalProfile.variantAttributes,
+        },
+      },
+    },
+  });
+  console.log('✅ General Shop demo: general.shop.hexalyte.com — admin@general.demo.fashionerp.com / Admin@123456');
+
   await prisma.user.updateMany({
     where: { emailVerified: true, status: UserStatus.PENDING_VERIFICATION },
     data: { status: UserStatus.ACTIVE },
@@ -1531,6 +1603,7 @@ async function main() {
   console.log('  Agri demo:     admin@agri.demo.fashionerp.com / Admin@123456 (subdomain: agri)');
   console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)');
   console.log('  Tyre Shop:     admin@tyres.demo.fashionerp.com / Admin@123456 (subdomain: tyres)');
+  console.log('  General Shop:  admin@general.demo.fashionerp.com / Admin@123456 (subdomain: general)');
   console.log('  Cashier:       cashier@demo.fashionerp.com / Cashier@123456');
   console.log('  Branch Mgr:    manager@demo.fashionerp.com / Manager@123456');
   console.log('  Inv. Manager:  inventory@demo.fashionerp.com / Manager@123456');

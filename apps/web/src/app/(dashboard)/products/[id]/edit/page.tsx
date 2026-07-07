@@ -19,6 +19,7 @@ import { useShopProfile, hasShopModule, isTireShop } from "@/lib/use-shop-profil
 import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
+import { ProductImageUpload } from "@/components/products/product-image-upload";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -42,6 +43,7 @@ interface Form {
   warrantyMonths: string;
   loadIndex: string;
   speedRating: string;
+  images: string[];
 }
 interface ExistingVariant {
   id: string; name: string; sku: string;
@@ -57,6 +59,7 @@ interface ProductData {
   loadIndex?: string | null;
   speedRating?: string | null;
   tags: string[]; hasVariants: boolean; trackInventory: boolean;
+  images: string[];
   category?: { id: string; name: string } | null;
   brand?: { id: string; name: string } | null;
   variants: ExistingVariant[];
@@ -103,6 +106,7 @@ export default function EditProductPage() {
     warrantyMonths: "",
     loadIndex: "",
     speedRating: "",
+    images: [],
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -150,6 +154,7 @@ export default function EditProductPage() {
         warrantyMonths: p.warrantyMonths != null && p.warrantyMonths > 0 ? String(p.warrantyMonths) : "",
         loadIndex: p.loadIndex ?? "",
         speedRating: p.speedRating ?? "",
+        images: p.images ?? [],
       });
       if (p.variants.length > 0) {
         setVariantRows(p.variants.map((v) => ({
@@ -275,6 +280,7 @@ export default function EditProductPage() {
           ? { warrantyMonths: form.warrantyMonths.trim() ? parseInt(form.warrantyMonths, 10) || 0 : 0 }
           : {}),
         ...(showTireMeta ? { loadIndex: form.loadIndex.trim() || undefined, speedRating: form.speedRating.trim() || undefined } : {}),
+        images: form.images,
         variants,
       });
       toast.success(`"${form.name}" updated successfully!`);
@@ -386,6 +392,17 @@ export default function EditProductPage() {
                   onChange={(e) => set("description", e.target.value)} />
               </div>
             </div>
+          </div>
+
+          {/* Images */}
+          <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
+            <h2 className="font-semibold text-base border-b pb-2">Product Images</h2>
+            <p className="text-xs text-muted-foreground">The first image is shown as the cover in listings.</p>
+            <ProductImageUpload
+              images={form.images}
+              onChange={(images) => set("images", images)}
+              disabled={loading}
+            />
           </div>
 
           {/* Pricing */}

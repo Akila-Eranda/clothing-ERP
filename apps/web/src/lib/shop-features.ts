@@ -105,6 +105,19 @@ export const VERTICAL_FEATURES: Record<ShopType, ShopFeature[]> = {
     { label: 'Best Selling Brand Reports', live: true },
     { label: 'Service Revenue & Tech Performance', live: true },
   ],
+  [ShopType.GENERAL]: [
+    { label: 'Mixed Product Catalog', live: true },
+    { label: 'Barcode & QR POS Scanning', live: true },
+    { label: 'Size / Variant Options', live: true },
+    { label: 'Brand Management', live: true },
+    { label: 'Customer Loyalty Points', live: true },
+    { label: 'Returns & Exchanges', live: true },
+    { label: 'Promotions & Discounts', live: true },
+    { label: 'Quotations for Bulk Orders', live: true },
+    { label: 'Multi-Branch Inventory', live: true },
+    { label: 'Purchase Orders & GRN', live: true },
+    { label: 'Sales & Profit Reports', live: true },
+  ],
 };
 
 export function getVerticalFeatures(type: ShopType): ShopFeature[] {

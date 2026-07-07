@@ -91,6 +91,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.AGRICULTURE]: 'Agri Brands',
     [ShopType.SPARE_PARTS]: 'Manufacturers',
     [ShopType.TIRE_SHOP]: 'Tyre Brands',
+    [ShopType.GENERAL]: 'Brands',
   };
 
   const supplierShort: Record<ShopType, string> = {
@@ -100,6 +101,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.AGRICULTURE]: 'Agri Suppliers',
     [ShopType.SPARE_PARTS]: 'Distributors',
     [ShopType.TIRE_SHOP]: 'Distributors',
+    [ShopType.GENERAL]: 'Suppliers',
   };
 
   return {
@@ -129,6 +131,7 @@ export function getSidebarSectionTitles(profile: ShopProfile) {
     : profile.type === ShopType.TIRE_SHOP ? 'TYRES & STOCK'
     : profile.type === ShopType.AGRICULTURE ? 'AGRI PRODUCTS'
     : profile.type === ShopType.HARDWARE ? 'ITEMS & STOCK'
+    : profile.type === ShopType.GENERAL ? 'PRODUCTS'
     : 'PRODUCTS';
 
   const sales =
@@ -391,6 +394,26 @@ export function getBrandPageCopy(profile: ShopProfile, workspace: WorkspaceConfi
       ],
       csvFileName: 'tyre-brands-export',
     },
+    [ShopType.GENERAL]: {
+      pageTitle: 'Brands',
+      subtitle: 'Product brands for your general retail catalog',
+      singular: 'Brand',
+      plural: 'Brands',
+      addButton: 'Add Brand',
+      addModalTitle: 'Add New Brand',
+      editModalTitle: 'Edit Brand',
+      addModalSubtitle: 'Create a product brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: 'e.g. Samsung, Unilever, Local Brand',
+      descriptionPlaceholder: 'Brief description of this brand…',
+      activeHint: 'Brand visible in catalog and product forms',
+      tips: [
+        'Group products by brand for easier browsing',
+        'Filter reports by brand to see top sellers',
+        'Use brands on quotations for bulk customer orders',
+      ],
+      csvFileName: 'general-brands-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -610,6 +633,36 @@ export function getSupplierPageCopy(profile: ShopProfile, _workspace: WorkspaceC
       ],
       csvFileName: 'tyre-distributors-export',
     },
+    [ShopType.GENERAL]: {
+      pageTitle: 'Suppliers',
+      subtitle: 'Wholesale vendors & product suppliers',
+      singular: 'Supplier',
+      plural: 'Suppliers',
+      addButton: 'Add Supplier',
+      addPageTitle: 'Add New Supplier',
+      editPageTitle: 'Edit Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. Metro Wholesale, Local Distributor',
+      notesPlaceholder: 'Internal notes about this supplier…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Visible and available for purchase orders',
+      backLabel: 'Back to Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Supplier',
+      editModalTitle: 'Edit Supplier',
+      addModalSubtitle: 'Create a supplier profile',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Create purchase orders before restocking fast-moving items',
+        'Track supplier credit limits for monthly settlements',
+        'Receive GRN to update stock and print labels',
+      ],
+      csvFileName: 'general-suppliers-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -627,6 +680,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.AGRICULTURE]: 'Record batch number and grade for seeds, fertilizer and feed.',
     [ShopType.SPARE_PARTS]: 'Set OEM number, part type and warranty months. Map to compatible vehicles.',
     [ShopType.TIRE_SHOP]: 'Set tyre size, season, load index and speed rating. Map to compatible vehicles.',
+    [ShopType.GENERAL]: 'Add products with optional Size/Variant attributes. Use barcodes for fast POS billing.',
   };
   const placeholders: Record<ShopType, string> = {
     [ShopType.CLOTHING]: 'e.g. Premium Cotton T-Shirt',
@@ -635,6 +689,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.AGRICULTURE]: 'e.g. Hybrid Tomato Seeds 1kg',
     [ShopType.SPARE_PARTS]: 'e.g. Oil Filter — Toyota Axio',
     [ShopType.TIRE_SHOP]: 'e.g. Michelin Primacy 205/55R16',
+    [ShopType.GENERAL]: 'e.g. Wireless Mouse, Shampoo 400ml',
   };
   const lowTax = profile.type === ShopType.GROCERY || profile.type === ShopType.AGRICULTURE;
   return {

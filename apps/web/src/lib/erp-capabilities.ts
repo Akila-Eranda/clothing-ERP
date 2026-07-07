@@ -242,6 +242,16 @@ export const INDUSTRY_MODULES = [
       { label: 'Fleet Quotations', status: 'live' as const },
     ],
   },
+  {
+    type: 'GENERAL',
+    emoji: '🏪',
+    items: [
+      { label: 'Mixed Product Catalog', status: 'live' as const },
+      { label: 'Barcode POS', status: 'live' as const },
+      { label: 'Quotations', status: 'live' as const },
+      { label: 'Loyalty & Promotions', status: 'live' as const },
+    ],
+  },
 ];
 
 export function countByStatus(items: Capability[]) {

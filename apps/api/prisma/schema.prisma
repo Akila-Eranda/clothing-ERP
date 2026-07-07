@@ -194,6 +194,7 @@ enum ShopType {
   AGRICULTURE
   SPARE_PARTS
   TIRE_SHOP
+  GENERAL
 }
 
 enum WarrantyClaimStatus {

@@ -93,6 +93,37 @@ function getCardBg(c="") { const m: Record<string,string> = { black:"linear-grad
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"rgba(245,158,11,0.15)",color:"#f59e0b"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6", diamond:"#a78bfa" };
 
+function posImageSrc(url?: string | null) {
+  return url ? resolvePublicAssetUrl(url) : null;
+}
+
+function PosProductThumb({
+  url,
+  name,
+  className,
+  fallbackBg,
+  iconClassName = "h-5 w-5",
+}: {
+  url?: string | null;
+  name: string;
+  className?: string;
+  fallbackBg?: string;
+  iconClassName?: string;
+}) {
+  const src = posImageSrc(url);
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={name} className={cn("object-cover", className)} />
+    );
+  }
+  return (
+    <div className={cn("flex items-center justify-center", className)} style={fallbackBg ? { background: fallbackBg } : undefined}>
+      <Package className={cn("text-white/30", iconClassName)} />
+    </div>
+  );
+}
+
 export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { posOpen, closePos } = useUIStore();
   const { user } = useAuthStore();
@@ -1033,8 +1064,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 const kbFocus = focusedProductIdx === pIdx;
                 return (
                   <motion.div key={p.variantId} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
-                    <div className="relative" style={{aspectRatio:"4/3",background:p.imageUrl?"#162338":getCardBg(p.color)}}>
-                      {p.imageUrl?<img src={p.imageUrl} alt={p.productName} className="absolute inset-0 w-full h-full object-cover opacity-90"/>:<Package className="absolute inset-0 m-auto h-10 w-10 text-white/20"/>}
+                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"#162338":getCardBg(p.color)}}>
+                      <PosProductThumb url={p.imageUrl} name={p.productName} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={getCardBg(p.color)} iconClassName="h-10 w-10 text-white/20" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(220,38,38,0.85)",color:"#fff"}}>Out of Stock</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(217,119,6,0.9)",color:"#fff"}}>Low Stock</div>}
                       <button onClick={e=>{e.stopPropagation();setLiked(s=>{const n=new Set(s);n.has(p.variantId)?n.delete(p.variantId):n.add(p.variantId);return n;});}} className="absolute top-1.5 right-1.5 p-1 rounded-full" style={{background:"rgba(0,0,0,0.3)"}}><Heart className="h-3 w-3" style={{color:liked.has(p.variantId)?"#ef4444":"#fff",fill:liked.has(p.variantId)?"#ef4444":"none"}}/></button>
@@ -1050,12 +1081,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
           <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><div className="h-10 w-10 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(p.color??p.material)}}><Package className="h-5 w-5 text-white/30"/></div><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col border-r" style={{borderColor:"#1e3356"}}>
             {selectedProductName&&activeVariant?(
               <div className="flex h-full">
-                <div className="w-24 shrink-0 p-2 flex items-center justify-center border-r" style={{borderColor:"#1e3356"}}><div className="w-full aspect-square rounded-xl flex items-center justify-center" style={{background:getCardBg(activeVariant.color)}}><Package className="h-8 w-8 text-white/30"/></div></div>
+                <div className="w-24 shrink-0 p-2 flex items-center justify-center border-r" style={{borderColor:"#1e3356"}}><PosProductThumb url={activeVariant.imageUrl} name={activeVariant.productName} className="w-full aspect-square rounded-xl overflow-hidden" fallbackBg={getCardBg(activeVariant.color)} iconClassName="h-8 w-8" /></div>
                 <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
                   <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold leading-tight">{activeVariant.productName}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{variantDisplayLabel(activeVariant, profile)}</p></div><button onClick={()=>setSelectedProductName(null)} className="p-0.5 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
                   {variantCols.map((col) => {
@@ -1355,7 +1386,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         const ex=exchangeItems.get(p.variantId);
                         return(
                           <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"#162338",borderColor:(ex?.qty??0)>0?"#4f6ef7":"#1e3356"}}>
-                            <div className="h-8 w-8 rounded-lg flex items-center justify-center shrink-0" style={{background:getCardBg(p.color)}}><Package className="h-4 w-4 text-white/30"/></div>
+                            <PosProductThumb url={p.imageUrl} name={p.productName} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color)} iconClassName="h-4 w-4" />
                             <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{p.variantName} · {p.sku}</p></div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
@@ -1805,7 +1836,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                          <div className="h-12 w-12 rounded-lg shrink-0 flex items-center justify-center" style={{background:getCardBg(item.variantName)}}><Package className="h-6 w-6 text-white/20"/></div>
+                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-12 w-12 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(item.variantName)} iconClassName="h-6 w-6 text-white/20" />
                           <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{item.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
                           <div className="flex items-center gap-1.5 shrink-0">
                             <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>

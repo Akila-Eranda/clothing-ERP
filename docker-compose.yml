@@ -67,11 +67,13 @@ services:
       SERVER_IP: ${SERVER_IP:-95.217.14.198}
       TENANT_SSL_HOOK_URL: ${TENANT_SSL_HOOK_URL:-}
       TENANT_SSL_HOOK_SECRET: ${TENANT_SSL_HOOK_SECRET:-}
+      UPLOAD_DIR: /app/uploads
+      LOCAL_UPLOAD_DIR: /app/uploads
       SSL_PENDING_DIR: /app/uploads/.ssl-pending
     ports:
       - '3001:3001'
     volumes:
-      - uploads_data:/app/uploads
+      - ./storage:/app/uploads
     healthcheck:
       test: ['CMD-SHELL', 'node -e "require(\"http\").get(\"http://127.0.0.1:3001/api/v1/health\",r=>process.exit(r.statusCode===200?0:1)).on(\"error\",()=>process.exit(1))"']
       interval: 30s
@@ -111,9 +113,8 @@ services:
       - ./nginx/nginx.clothing.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./apps/web/public:/var/www/web-public:ro
-      - uploads_data:/var/www/uploads:ro
+      - ./storage:/var/www/uploads:ro
 
 volumes:
   postgres_data:
   redis_data:
-  uploads_data:

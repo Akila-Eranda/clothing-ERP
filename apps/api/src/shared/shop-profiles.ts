@@ -1,4 +1,4 @@
-/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE, SPARE_PARTS, TIRE_SHOP */
+/** Shop vertical profiles — shared config for CLOTHING, GROCERY, HARDWARE, AGRICULTURE, SPARE_PARTS, TIRE_SHOP, GENERAL */
 
 export enum ShopType {
   CLOTHING = 'CLOTHING',
@@ -7,6 +7,7 @@ export enum ShopType {
   AGRICULTURE = 'AGRICULTURE',
   SPARE_PARTS = 'SPARE_PARTS',
   TIRE_SHOP = 'TIRE_SHOP',
+  GENERAL = 'GENERAL',
 }
 
 export interface VariantAttributeDef {
@@ -140,6 +141,22 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box'],
     modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: true, appointments: true },
+    labelTemplates: ['sticker', 'shelf'],
+  },
+  [ShopType.GENERAL]: {
+    type: ShopType.GENERAL,
+    label: 'General Shop',
+    labelSi: 'සාමාන්‍ය කඩය',
+    emoji: '🏪',
+    description: 'General retail — mixed products, simple variants, POS & inventory',
+    defaultCategories: ['General Merchandise', 'Electronics', 'Home & Living', 'Health & Beauty', 'Stationery', 'Other'],
+    variantAttributes: [
+      { name: 'Size', presets: ['Small', 'Medium', 'Large', 'Standard'], mapsTo: 'size' },
+      { name: 'Variant', presets: ['Standard', 'Premium', 'Economy'], mapsTo: 'style' },
+    ],
+    defaultUnit: 'pcs',
+    units: ['pcs', 'set', 'pair', 'box', 'kg', 'pack'],
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
     labelTemplates: ['sticker', 'shelf'],
   },
 };

@@ -16,8 +16,10 @@ cd {DEPLOY_DIR}
 git fetch origin main
 git reset --hard origin/main
 docker compose build api
-docker compose up -d api
-docker compose exec -u root -T api sh -c 'mkdir -p /app/uploads; chown -R nestjs:nodejs /app/uploads'
+docker compose up -d api nginx
+chmod +x scripts/setup_storage.sh
+bash scripts/setup_storage.sh
+docker compose exec -u root -T api sh -c 'mkdir -p /app/uploads/.ssl-pending && chown -R nestjs:nodejs /app/uploads'
 sleep 8
 curl -sk https://shop.clothing.api.hexalyte.com/api/v1/health | head -c 200
 echo ""

@@ -25,6 +25,7 @@ import { getWorkspace } from "@/lib/shop-workspace";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
+import { ProductImageUpload } from "@/components/products/product-image-upload";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -56,6 +57,7 @@ interface Form {
   unit: string; expiryDate: string; batchNumber: string;
   trackInventory: boolean;
   seoTitle: string; seoDescription: string;
+  images: string[];
   branchScope: ProductBranchScope;
   branchId: string;
 }
@@ -74,6 +76,7 @@ const buildInitialForm = (): Form => {
     expiryDate: "",
     batchNumber: "",
     trackInventory: true, seoTitle: "", seoDescription: "",
+    images: [],
     branchScope: "ALL",
     branchId: "",
   };
@@ -156,6 +159,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         batchNumber: (editProduct.tags ?? []).find((t) => t.startsWith("batch:"))?.slice(6) ?? "",
         trackInventory: editProduct.trackInventory,
         seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
+        images: editProduct.images ?? [],
         branchScope: "ALL",
         branchId: "",
       });
@@ -233,6 +237,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       branchId: !editProduct && form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
       seoTitle: form.seoTitle || undefined,
       seoDescription: form.seoDescription || undefined,
+      images: form.images.length > 0 ? form.images : undefined,
       variants: variants.length > 0 ? variants : undefined,
     };
     try {
@@ -683,13 +688,13 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-bold">Images</h3>
-        <p className="text-sm text-muted-foreground">Upload product images (coming soon)</p>
+        <p className="text-sm text-muted-foreground">Upload product photos. The first image is used as the cover.</p>
       </div>
-      <div className="rounded-xl border-2 border-dashed border-border p-12 flex flex-col items-center justify-center gap-3 bg-muted/20">
-        <ImageIcon className="h-12 w-12 text-muted-foreground/30" />
-        <p className="font-medium text-muted-foreground">Image upload coming soon</p>
-        <p className="text-xs text-muted-foreground">Images can be added after product creation</p>
-      </div>
+      <ProductImageUpload
+        images={form.images}
+        onChange={(images) => set("images", images)}
+        disabled={loading}
+      />
     </div>
   );
 

@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-PENDING_DIR="${SSL_PENDING_DIR:-/var/lib/docker/volumes/fashionerp_uploads_data/_data/.ssl-pending}"
+PENDING_DIR="${SSL_PENDING_DIR:-/opt/fashionerp/storage/.ssl-pending}"
 
 if [[ ! -d "$PENDING_DIR" ]]; then
   exit 0

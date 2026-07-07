@@ -42,6 +42,10 @@ prisma/migrations/dev
 # Docker
 docker-compose.override.yml
 
+# Local file storage (product images, receipts, etc.)
+storage/*
+!storage/.gitkeep
+
 # Editor
 .vscode/settings.json
 .idea

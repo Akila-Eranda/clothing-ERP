@@ -23,7 +23,8 @@ docker compose build api web
 docker compose up -d
 
 echo "==> Fix uploads volume permissions..."
-docker compose exec -u root -T api sh -c 'mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads'
+bash scripts/setup_storage.sh
+docker compose exec -u root -T api sh -c 'mkdir -p /app/uploads/.ssl-pending && chown -R nestjs:nodejs /app/uploads'
 
 echo "==> Waiting for API to become healthy..."
 for i in $(seq 1 45); do
