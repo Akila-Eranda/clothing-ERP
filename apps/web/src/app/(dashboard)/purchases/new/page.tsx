@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Package, Plus, Printer, Search, ScanLine, Trash2, Building2, Warehouse } from "lucide-react";
+import { ArrowLeft, FileText, Package, Plus, Search, ScanLine, Trash2, Building2, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ interface VariantOpt {
   imageUrl?: string | null;
   sellingPrice?: number | null;
   unitPrice?: number | null;
+  currentStock?: number | null;
   availableStock?: number | null;
   reservedStock?: number | null;
   minStock?: number | null;
@@ -183,21 +184,36 @@ export default function CreatePOPage() {
   const qtyInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const costInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const supplierSelectRef = useRef<HTMLSelectElement>(null);
+  const supplierDetailReqRef = useRef(0);
+
+  const catalogReqRef = useRef(0);
 
   const loadSupplierCatalog = useCallback(async (sid: string) => {
     if (!sid) {
       setAllVariants([]);
       return;
     }
+    const reqId = ++catalogReqRef.current;
     setLoadingProducts(true);
+    setAllVariants([]);
     try {
-      const res = await api.get<VariantOpt[]>(`/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`);
-      setAllVariants(Array.isArray(res.data) ? res.data : []);
+      const res = await api.get<VariantOpt[]>(
+        `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
+      );
+      if (reqId !== catalogReqRef.current) return;
+      const rows = Array.isArray(res.data) ? res.data : [];
+      // Strict: only this supplier's assigned catalog (never widen to all products)
+      setAllVariants(
+        rows
+          .filter((v) => !v.supplierId || v.supplierId === sid)
+          .map((v) => ({ ...v, supplierId: sid })),
+      );
     } catch {
+      if (reqId !== catalogReqRef.current) return;
       setAllVariants([]);
       toast.error("Failed to load supplier products");
     } finally {
-      setLoadingProducts(false);
+      if (reqId === catalogReqRef.current) setLoadingProducts(false);
     }
   }, []);
 
@@ -231,6 +247,7 @@ export default function CreatePOPage() {
 
   const loadSupplierDetail = useCallback(async (sid: string) => {
     if (!sid) return;
+    const reqId = ++supplierDetailReqRef.current;
     setLoadingSupplierDetail(true);
     try {
       const res = await api.get<Supplier & {
@@ -241,15 +258,16 @@ export default function CreatePOPage() {
         lastPurchaseDate?: string | null;
         purchases?: { orderDate?: string; createdAt?: string }[];
       }>(`/suppliers/${sid}`);
+      if (reqId !== supplierDetailReqRef.current) return;
       const mapped = mapSupplierDetail(res.data as Supplier);
-      // Ignore stale responses if user already switched supplier
-      if (mapped && mapped.id === sid) {
-        setSupplier(mapped);
-      }
+      if (mapped) setSupplier(mapped);
     } catch (e: unknown) {
+      if (reqId !== supplierDetailReqRef.current) return;
       toast.error((e as Error)?.message || "Failed to load supplier details");
     } finally {
-      setLoadingSupplierDetail(false);
+      if (reqId === supplierDetailReqRef.current) {
+        setLoadingSupplierDetail(false);
+      }
     }
   }, [mapSupplierDetail]);
 
@@ -267,14 +285,24 @@ export default function CreatePOPage() {
     setProductSearchQ("");
     setProductSearchOpen(false);
     setSearchHighlight(0);
+    setSearchOpen(null);
+    setSelectedRowIdx(null);
+    // Switching supplier resets lines so other-supplier products cannot remain
+    if (!fromGrnId) {
+      setItems([]);
+      setSearchQ([]);
+    }
     if (id) {
       void loadSupplierCatalog(id);
       window.setTimeout(() => productSearchRef.current?.focus(), 50);
     } else {
+      catalogReqRef.current += 1;
       setAllVariants([]);
+      setLoadingProducts(false);
+      supplierDetailReqRef.current += 1;
       setLoadingSupplierDetail(false);
     }
-  }, [suppliers, loadSupplierCatalog, mapSupplierDetail]);
+  }, [suppliers, loadSupplierCatalog, mapSupplierDetail, fromGrnId]);
 
   // Always fetch full supplier summary when selection changes
   useEffect(() => {
@@ -439,10 +467,12 @@ export default function CreatePOPage() {
 
   const filteredVariants = (q: string) => {
     if (!supplierId) return [];
-    const base = (() => {
-      if (!q) return allVariants.slice(0, 40);
-      const lq = q.toLowerCase();
-      return allVariants.filter((v) =>
+    // Catalog is loaded only for the selected supplier — search within that set only
+    const scoped = allVariants.filter((v) => v.supplierId === supplierId);
+    if (!q.trim()) return scoped.slice(0, 40);
+    const lq = q.trim().toLowerCase();
+    return scoped
+      .filter((v) =>
         v.productName.toLowerCase().includes(lq)
         || v.sku.toLowerCase().includes(lq)
         || v.variantName.toLowerCase().includes(lq)
@@ -450,24 +480,21 @@ export default function CreatePOPage() {
         || (v.supplierProductCode?.toLowerCase().includes(lq) ?? false)
         || (v.category?.toLowerCase().includes(lq) ?? false)
         || (v.brand?.toLowerCase().includes(lq) ?? false)
-      );
-    })();
-
-    // Catalog is already supplier-scoped via /pos/products?supplierId=
-    const supplierFiltered =
-      base.some((v) => v.supplierId)
-        ? base.filter((v) => !v.supplierId || v.supplierId === supplierId)
-        : base;
-
-    return supplierFiltered.slice(0, 25);
+      )
+      .slice(0, 25);
   };
 
   const resolveVariantByCode = async (code: string): Promise<VariantOpt | null> => {
     const trimmed = code.trim();
-    if (!trimmed) return null;
+    if (!trimmed || !supplierId) return null;
+    // Prefer in-catalog match only (already supplier-scoped)
     const local = allVariants.find((v) =>
-      v.sku.toLowerCase() === trimmed.toLowerCase()
-      || v.barcode?.toLowerCase() === trimmed.toLowerCase()
+      v.supplierId === supplierId
+      && (
+        v.sku.toLowerCase() === trimmed.toLowerCase()
+        || v.barcode?.toLowerCase() === trimmed.toLowerCase()
+        || v.supplierProductCode?.toLowerCase() === trimmed.toLowerCase()
+      )
     );
     if (local) return local;
     try {
@@ -492,8 +519,10 @@ export default function CreatePOPage() {
         lastBuyingPrice?: number | null;
         supplierId?: string | null;
         supplierProductCode?: string | null;
-      }>(`/pos/barcode/${encodeURIComponent(trimmed)}${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`);
+        supplierAssigned?: boolean;
+      }>(`/pos/barcode/${encodeURIComponent(trimmed)}?supplierId=${encodeURIComponent(supplierId)}`);
       const d = res.data;
+      if (!d?.variantId || d.supplierId !== supplierId) return null;
       return {
         variantId: d.variantId,
         productName: d.productName,
@@ -516,7 +545,7 @@ export default function CreatePOPage() {
         lastPurchaseQty: d.lastPurchaseQty ?? undefined,
         soldAfterLastPurchase: d.soldAfterLastPurchase ?? undefined,
         lastBuyingPrice: d.lastBuyingPrice ?? undefined,
-        supplierId: d.supplierId ?? undefined,
+        supplierId,
         supplierProductCode: d.supplierProductCode ?? undefined,
       };
     } catch {
@@ -560,6 +589,10 @@ export default function CreatePOPage() {
   const addVariantToItems = (v: VariantOpt) => {
     if (!supplierId) {
       toast.error("Select a supplier first");
+      return;
+    }
+    if (v.supplierId && v.supplierId !== supplierId) {
+      toast.error("Product is not assigned to this supplier");
       return;
     }
     const existingIdx = items.findIndex((i) => i.variantId === v.variantId);
@@ -1430,16 +1463,6 @@ export default function CreatePOPage() {
               className="flex-1 sm:hidden"
             >
               Draft
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => window.print()}
-              disabled={saving || items.length === 0}
-              className="hidden gap-1.5 md:inline-flex"
-            >
-              <Printer className="h-4 w-4" />
-              Print Preview
             </Button>
             {fromGrnId ? (
               <Button

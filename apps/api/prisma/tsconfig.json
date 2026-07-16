@@ -1,12 +1,16 @@
 {
-  "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "..",
-    "baseUrl": "..",
+    "module": "commonjs",
+    "target": "ES2021",
+    "strictNullChecks": true,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
     "noEmit": true,
+    "rootDir": "..",
     "paths": {
-      "@prisma/client": ["node_modules/.prisma/client"],
-      "@prisma/client/*": ["node_modules/.prisma/client/*"]
+      "@prisma/client": ["../node_modules/.prisma/client"],
+      "@prisma/client/*": ["../node_modules/.prisma/client/*"]
     }
   },
   "include": ["./**/*"],

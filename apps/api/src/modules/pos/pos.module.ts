@@ -894,7 +894,7 @@ export class PosService {
     }
 
     const assignment = await this.prisma.supplierProductAssignment.findFirst({
-      where: { tenantId, supplierId, variantId: result.variantId, isActive: true },
+      where: { tenantId, supplierId, variantId: result.variantId },
       select: {
         supplierId: true,
         supplierProductCode: true,
@@ -902,10 +902,11 @@ export class PosService {
         lastBuyingPrice: true,
         minOrderQty: true,
         isPreferred: true,
+        isActive: true,
       },
     });
 
-    if (!assignment) {
+    if (!assignment || assignment.isActive === false) {
       throw new NotFoundException('Product is not assigned to this supplier');
     }
 
@@ -1094,7 +1095,7 @@ export class PosService {
         ...(opts?.supplierId
           ? {
               supplierAssignments: {
-                some: { tenantId, supplierId: opts.supplierId, isActive: true },
+                some: { tenantId, supplierId: opts.supplierId },
               },
             }
           : {}),
@@ -1112,7 +1113,6 @@ export class PosService {
                         some: {
                           tenantId,
                           supplierId: opts.supplierId,
-                          isActive: true,
                           supplierProductCode: { contains: search, mode: 'insensitive' as const },
                         },
                       },
@@ -1121,7 +1121,6 @@ export class PosService {
                       supplierAssignments: {
                         some: {
                           tenantId,
-                          isActive: true,
                           supplierProductCode: { contains: search, mode: 'insensitive' as const },
                         },
                       },
@@ -1134,7 +1133,7 @@ export class PosService {
         product: { include: { category: true, brand: true } },
         supplierAssignments: opts?.supplierId
           ? {
-              where: { tenantId, supplierId: opts.supplierId, isActive: true },
+              where: { tenantId, supplierId: opts.supplierId },
               select: {
                 supplierId: true,
                 supplierProductCode: true,
@@ -1162,6 +1161,10 @@ export class PosService {
       const reserved = v.inventory[0]?.reservedQty ?? 0;
       const available = Math.max(0, onHand - reserved);
       const assignment = Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined;
+      // When filtering by supplier, never return inactive assignments
+      if (opts?.supplierId && assignment && assignment.isActive === false) {
+        return null;
+      }
       return {
         assignment,
         variantId:   v.id,
@@ -1188,14 +1191,14 @@ export class PosService {
         imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
         barcode:     v.barcode ?? v.product.barcode ?? undefined,
         warrantyMonths: v.product.warrantyMonths ?? null,
-        supplierId: assignment?.supplierId ?? null,
+        supplierId: assignment?.supplierId ?? opts?.supplierId ?? null,
         supplierProductCode: assignment?.supplierProductCode ?? null,
         leadTimeDays: assignment?.leadTimeDays ?? null,
         lastBuyingPrice: assignment?.lastBuyingPrice ?? null,
         minOrderQty: assignment?.minOrderQty ?? null,
         isPreferredSupplier: assignment?.isPreferred ?? null,
       };
-    });
+    }).filter((row): row is NonNullable<typeof row> => row != null);
 
     if (!opts?.supplierId) {
       return mapped.map(({ assignment: _a, ...rest }) => rest);
