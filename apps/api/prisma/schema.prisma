@@ -171,6 +171,15 @@ enum SupplierInvoiceStatus {
   CANCELLED
 }
 
+enum SupplierLedgerEntryType {
+  GRN
+  INVOICE
+  PAYMENT
+  RETURN
+  ADJUSTMENT
+  SYNC
+}
+
 enum CustomerTier {
   BRONZE
   SILVER
@@ -413,6 +422,7 @@ model Tenant {
   supplierReturns  SupplierReturn[]
   supplierInvoices SupplierInvoice[]
   supplierProductAssignments SupplierProductAssignment[]
+  supplierLedgerEntries SupplierLedgerEntry[]
   employees        Employee[]
   accounts         Account[]
   notifications    Notification[]
@@ -1913,6 +1923,7 @@ model Supplier {
   returns       SupplierReturn[]
   invoices      SupplierInvoice[]
   productAssignments SupplierProductAssignment[]
+  ledgerEntries SupplierLedgerEntry[]
 
   @@index([tenantId])
   @@map("suppliers")
@@ -1941,6 +1952,27 @@ model SupplierProductAssignment {
   @@index([tenantId, supplierId])
   @@index([tenantId, variantId])
   @@map("supplier_product_assignments")
+}
+
+model SupplierLedgerEntry {
+  id            String                  @id @default(cuid())
+  tenantId      String
+  supplierId    String
+  entryType     SupplierLedgerEntryType
+  amount        Float
+  balanceAfter  Float
+  referenceType String?
+  referenceId   String?
+  notes         String?
+  createdBy     String?
+  createdAt     DateTime                @default(now())
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier      Supplier                @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, supplierId, createdAt])
+  @@index([referenceType, referenceId])
+  @@map("supplier_ledger_entries")
 }
 
 model PurchaseOrder {

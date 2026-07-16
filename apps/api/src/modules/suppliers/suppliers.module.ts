@@ -5,7 +5,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus } from '@prisma/client';
+import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus, PurchaseRequestStatus, SupplierLedgerEntryType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -17,7 +17,12 @@ import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { createLinkedExpense } from '@/shared/expense.helper';
 import { ProcurementService } from './procurement.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
-import { PurchaseRequestStatus } from '@prisma/client';
+import {
+  assertSupplierCreditLimit,
+  bucketAging,
+  computeSupplierOutstanding,
+  syncSupplierBalanceWithLedger,
+} from './supplier-ap.helper';
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -138,14 +143,24 @@ export class SuppliersService {
       }),
       this.prisma.supplier.count({ where }),
     ]);
-    const data = rows.map(({ purchases, ...supplier }) => {
+
+    const data = await Promise.all(rows.map(async ({ purchases, ...supplier }) => {
+      const { outstanding } = await computeSupplierOutstanding(this.prisma, tenantId, supplier.id);
+      // Keep cached balance in sync for dashboard aggregates
+      if (Math.abs((supplier.balance ?? 0) - outstanding) > 0.01) {
+        await this.prisma.supplier.update({
+          where: { id: supplier.id },
+          data: { balance: outstanding },
+        });
+      }
       const lastPo = purchases[0];
       return {
         ...supplier,
-        outstandingBalance: supplier.balance,
+        balance: outstanding,
+        outstandingBalance: outstanding,
         lastPurchaseDate: lastPo?.orderDate ?? lastPo?.createdAt ?? null,
       };
-    });
+    }));
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
@@ -154,7 +169,7 @@ export class SuppliersService {
       where: { id, tenantId },
       include: {
         purchases: { orderBy: { createdAt: 'desc' }, take: 10 },
-        payments: { take: 10 },
+        payments: { take: 10, orderBy: { paidAt: 'desc' } },
         productAssignments: {
           include: {
             variant: { include: { product: { select: { id: true, name: true } } } },
@@ -162,14 +177,30 @@ export class SuppliersService {
           orderBy: { updatedAt: 'desc' },
           take: 30,
         },
+        ledgerEntries: {
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        },
       },
     });
     if (!supplier) throw new NotFoundException('Supplier not found');
+    const { outstanding, lines } = await computeSupplierOutstanding(this.prisma, tenantId, id);
+    if (Math.abs((supplier.balance ?? 0) - outstanding) > 0.01) {
+      await this.prisma.supplier.update({ where: { id }, data: { balance: outstanding } });
+    }
     const lastPo = supplier.purchases[0];
+    const aging = bucketAging(lines);
     return {
       ...supplier,
+      balance: outstanding,
       lastPurchaseDate: lastPo?.orderDate ?? lastPo?.createdAt ?? null,
-      outstandingBalance: supplier.balance,
+      outstandingBalance: outstanding,
+      apLines: lines.map((l) => ({
+        ...l,
+        dueDate: l.dueDate.toISOString(),
+        asOfDate: l.asOfDate.toISOString(),
+      })),
+      aging,
     };
   }
 
@@ -195,6 +226,16 @@ export class SuppliersService {
     const subtotal   = itemsData.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
     const discountAmount = itemsData.reduce((s, i) => s + i.discount, 0);
     const taxAmount  = itemsData.reduce((s, i) => s + i.taxAmount, 0);
+    const poTotal = subtotal - discountAmount + taxAmount;
+
+    // Credit limit: only enforce when PO will immediately become payable (from GRN / received)
+    if (dto.fromGrnId) {
+      try {
+        await assertSupplierCreditLimit(this.prisma, tenantId, dto.supplierId, poTotal);
+      } catch (e) {
+        throw new BadRequestException((e as Error).message);
+      }
+    }
 
     let grnToLink: {
       id: string;
@@ -259,6 +300,14 @@ export class SuppliersService {
             });
           }
         }
+        await syncSupplierBalanceWithLedger(tx, tenantId, dto.supplierId, {
+          entryType: SupplierLedgerEntryType.GRN,
+          amount: poTotal,
+          referenceType: 'GoodsReceipt',
+          referenceId: grnToLink!.id,
+          notes: `PO ${po.poNumber} linked from GRN ${grnToLink!.grnNumber}`,
+          createdBy: userId,
+        });
       });
       return this.findOnePO(po.id, tenantId);
     }
@@ -429,6 +478,15 @@ export class SuppliersService {
         categoryId: 'Operations',
         paymentMethod: dto.method,
         reference: `supplier-payment:${payment.id}`,
+      });
+
+      await syncSupplierBalanceWithLedger(tx, tenantId, supplierId, {
+        entryType: SupplierLedgerEntryType.PAYMENT,
+        amount: -dto.amount,
+        referenceType: 'SupplierPayment',
+        referenceId: payment.id,
+        notes: poNumber ? `Payment against PO ${poNumber}` : 'Supplier payment',
+        createdBy: userId,
       });
 
       return payment;

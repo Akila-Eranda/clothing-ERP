@@ -36,10 +36,21 @@ interface SupplierDetail {
   city?: string | null; state?: string | null; pincode?: string | null;
   gstNumber?: string | null; panNumber?: string | null;
   creditDays: number; creditLimit: number; balance: number;
+  outstandingBalance?: number;
   rating: number; isActive: boolean; notes?: string | null;
   createdAt: string; updatedAt: string;
   purchases: PurchaseOrder[];
   payments: SupplierPayment[];
+  aging?: {
+    current: number;
+    days1to30: number;
+    days31to60: number;
+    days61to90: number;
+    days90plus: number;
+    total: number;
+  };
+  apLines?: { id: string; source: string; docNumber: string; amount: number; dueDate: string }[];
+  ledgerEntries?: { id: string; entryType: string; amount: number; balanceAfter: number; notes?: string | null; createdAt: string }[];
 }
 interface VariantOpt {
   variantId: string;
@@ -442,6 +453,8 @@ export default function SupplierDetailPage() {
   const totalPaid    = supplier.purchases.reduce((s, p) => s + p.paidAmount, 0);
   const stars        = Math.round(supplier.rating ?? 0);
   const location     = [supplier.city, supplier.state].filter(Boolean).join(", ");
+  const outstanding  = supplier.outstandingBalance ?? supplier.balance ?? 0;
+  const aging        = supplier.aging;
 
   return (
     <div className="h-full flex flex-col bg-muted/30">
@@ -733,8 +746,8 @@ export default function SupplierDetailPage() {
           <div className="bg-background border rounded-2xl p-5 shadow-sm">
             <h3 className="font-semibold text-sm border-b pb-3 mb-1">Financial Summary (LKR)</h3>
             <InfoRow label="Outstanding Balance" value={
-              <span className={supplier.balance > 0 ? "text-amber-500 font-bold" : "text-emerald-500 font-bold"}>
-                {supplier.balance > 0 ? `LKR ${fmt(supplier.balance)}` : "Clear"}
+              <span className={outstanding > 0 ? "text-amber-500 font-bold" : "text-emerald-500 font-bold"}>
+                {outstanding > 0 ? `LKR ${fmt(outstanding)}` : "Clear"}
               </span>
             } />
             <InfoRow label="Credit Limit"   value={`LKR ${fmt(supplier.creditLimit)}`} />
@@ -743,12 +756,42 @@ export default function SupplierDetailPage() {
               <div className="mt-3">
                 <div className="flex justify-between text-xs text-muted-foreground mb-1">
                   <span>Credit Used</span>
-                  <span>{Math.min(100, ((supplier.balance / supplier.creditLimit) * 100)).toFixed(0)}%</span>
+                  <span>{Math.min(100, ((outstanding / supplier.creditLimit) * 100)).toFixed(0)}%</span>
                 </div>
                 <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                   <div className="h-full rounded-full bg-amber-400 transition-all"
-                    style={{ width: `${Math.min(100, (supplier.balance / supplier.creditLimit) * 100)}%` }} />
+                    style={{ width: `${Math.min(100, (outstanding / supplier.creditLimit) * 100)}%` }} />
                 </div>
+              </div>
+            )}
+            {aging && aging.total > 0.01 && (
+              <div className="mt-4 pt-3 border-t space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">AP Aging</p>
+                {[
+                  ["Current", aging.current],
+                  ["1–30 days", aging.days1to30],
+                  ["31–60 days", aging.days31to60],
+                  ["61–90 days", aging.days61to90],
+                  ["90+ days", aging.days90plus],
+                ].map(([label, value]) => (
+                  <div key={label as string} className="flex justify-between text-xs">
+                    <span className="text-muted-foreground">{label}</span>
+                    <span className="font-medium tabular-nums">LKR {fmt(value as number)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {supplier.apLines && supplier.apLines.length > 0 && (
+              <div className="mt-4 pt-3 border-t space-y-1.5">
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Open dues</p>
+                {supplier.apLines.slice(0, 6).map((line) => (
+                  <div key={line.id} className="flex justify-between gap-2 text-xs">
+                    <span className="truncate text-muted-foreground">
+                      {line.source} {line.docNumber}
+                    </span>
+                    <span className="font-medium tabular-nums shrink-0">LKR {fmt(line.amount)}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -792,7 +835,7 @@ export default function SupplierDetailPage() {
           supplierId={id}
           paymentTitle={copy.paymentModalTitle}
           purchases={supplier.purchases}
-          balance={supplier.balance}
+          balance={outstanding}
           onClose={() => setPayOpen(false)}
           onSaved={() => { setPayOpen(false); load(); }}
         />

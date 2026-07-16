@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { computeSupplierOutstanding } from '@/modules/suppliers/supplier-ap.helper';
 import * as dayjs from 'dayjs';
 
 @Injectable()
@@ -24,7 +25,7 @@ export class DashboardService {
       todaySales, thisMonthSales, lastMonthSales,
       totalCustomers, newCustomersToday, newCustomersMonth,
       lowStockCount, pendingPOs, pendingReturns,
-      totalProducts, customerReceivables, supplierPayables,
+      totalProducts, customerReceivables, supplierRows,
     ] = await this.prisma.$transaction([
       this.prisma.sale.aggregate({ where: { ...saleWhere, invoiceDate: { gte: today, lte: todayEnd } }, _sum: { total: true }, _count: { id: true } }),
       this.prisma.sale.aggregate({ where: { ...saleWhere, invoiceDate: { gte: thisMonthStart } }, _sum: { total: true }, _count: { id: true } }),
@@ -37,8 +38,20 @@ export class DashboardService {
       this.prisma.return.count({ where: { tenantId, status: 'INITIATED' as any } }),
       this.prisma.product.count({ where: { tenantId, status: { not: 'ARCHIVED' as any } } }),
       this.prisma.customer.aggregate({ where: { tenantId, creditBalance: { gt: 0 } }, _sum: { creditBalance: true }, _count: { id: true } }),
-      this.prisma.supplier.aggregate({ where: { tenantId, balance: { gt: 0 } }, _sum: { balance: true }, _count: { id: true } }),
+      this.prisma.supplier.findMany({ where: { tenantId }, select: { id: true } }),
     ]);
+
+    let supplierPayablesSum = 0;
+    let supplierPayableCount = 0;
+    for (const s of supplierRows) {
+      const { outstanding } = await computeSupplierOutstanding(this.prisma, tenantId, s.id);
+      if (outstanding > 0.01) {
+        supplierPayablesSum += outstanding;
+        supplierPayableCount += 1;
+      }
+    }
+    // Keep variable names used below compatible
+    const supplierPayables = { _sum: { balance: supplierPayablesSum }, _count: { id: supplierPayableCount } };
 
     const monthlyRevenue = thisMonthSales._sum.total ?? 0;
     const lastMonthRevenue = lastMonthSales._sum.total ?? 0;

@@ -10,6 +10,7 @@ import {
   PurchaseRequestStatus,
   StockMovementType,
   SupplierInvoiceStatus,
+  SupplierLedgerEntryType,
   SupplierReturnStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -25,6 +26,10 @@ import {
   canConvertPurchaseRequest,
   canReceiveAgainstPo,
 } from './procurement.helper';
+import {
+  assertSupplierCreditLimit,
+  syncSupplierBalanceWithLedger,
+} from './supplier-ap.helper';
 
 export type PrItemInput = {
   variantId: string;
@@ -368,6 +373,43 @@ export class ProcurementService {
         await afterStock(tx, created);
       }
 
+      // Direct/Quick GRN (no PO): auto-post supplier invoice so Outstanding includes it
+      const receivedValue = effectiveLines.reduce(
+        (s, l) => s + Math.max(0, l.receivedQty) * l.unitCost,
+        0,
+      );
+      if (!purchaseId && receivedValue > 0.01) {
+        try {
+          await assertSupplierCreditLimit(tx, tenantId, supplierId, receivedValue);
+        } catch (e) {
+          throw new BadRequestException((e as Error).message);
+        }
+        await tx.supplierInvoice.create({
+          data: {
+            tenantId,
+            supplierId,
+            invoiceNumber: `AUTO-${grnNumber}`,
+            invoiceDate: new Date(),
+            goodsReceiptId: created.id,
+            subtotal: receivedValue,
+            taxAmount: 0,
+            total: receivedValue,
+            status: SupplierInvoiceStatus.POSTED,
+            notes: `Auto invoice from ${grnNumber}`,
+            createdBy: userId,
+          },
+        });
+      }
+
+      await syncSupplierBalanceWithLedger(tx, tenantId, supplierId, {
+        entryType: SupplierLedgerEntryType.GRN,
+        amount: receivedValue,
+        referenceType: 'GoodsReceipt',
+        referenceId: created.id,
+        notes: `GRN ${grnNumber}`,
+        createdBy: userId,
+      });
+
       return created;
     });
 
@@ -432,6 +474,13 @@ export class ProcurementService {
         expiryDate: item.expiryDate,
         manufactureDate: item.manufactureDate,
       });
+    }
+
+    const receiveValue = grnLines.reduce((s, l) => s + Math.max(0, l.receivedQty) * l.unitCost, 0);
+    try {
+      await assertSupplierCreditLimit(this.prisma, tenantId, po.supplierId, receiveValue);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
     }
 
     const grn = await this.postGoodsReceipt({
@@ -630,14 +679,45 @@ export class ProcurementService {
       }
 
       const credit = doc.items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
-      await tx.supplier.update({
-        where: { id: doc.supplierId },
-        data: { balance: { decrement: credit } },
-      });
+
+      // Apply credit against linked PO or GRN auto-invoice so outstanding drops
+      if (doc.purchaseId) {
+        await tx.purchaseOrder.update({
+          where: { id: doc.purchaseId },
+          data: { paidAmount: { increment: credit } },
+        });
+      } else if (doc.goodsReceiptId) {
+        const inv = await tx.supplierInvoice.findFirst({
+          where: { tenantId, goodsReceiptId: doc.goodsReceiptId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (inv) {
+          const nextPaid = Math.min(inv.total, inv.paidAmount + credit);
+          const status =
+            nextPaid >= inv.total - 0.01
+              ? SupplierInvoiceStatus.PAID
+              : nextPaid > 0.01
+                ? SupplierInvoiceStatus.PARTIALLY_PAID
+                : inv.status;
+          await tx.supplierInvoice.update({
+            where: { id: inv.id },
+            data: { paidAmount: nextPaid, status },
+          });
+        }
+      }
 
       await tx.supplierReturn.update({
         where: { id },
         data: { status: SupplierReturnStatus.POSTED, postedAt: new Date() },
+      });
+
+      await syncSupplierBalanceWithLedger(tx, tenantId, doc.supplierId, {
+        entryType: SupplierLedgerEntryType.RETURN,
+        amount: -credit,
+        referenceType: 'SupplierReturn',
+        referenceId: doc.id,
+        notes: `Return ${doc.returnNumber}`,
+        createdBy: userId,
       });
     });
 
@@ -683,7 +763,15 @@ export class ProcurementService {
   ) {
     const tax = dto.taxAmount ?? 0;
     const total = dto.subtotal + tax;
-    return this.prisma.supplierInvoice.create({
+    if (dto.post) {
+      try {
+        await assertSupplierCreditLimit(this.prisma, tenantId, dto.supplierId, total);
+      } catch (e) {
+        throw new BadRequestException((e as Error).message);
+      }
+    }
+
+    const inv = await this.prisma.supplierInvoice.create({
       data: {
         tenantId,
         supplierId: dto.supplierId,
@@ -701,6 +789,19 @@ export class ProcurementService {
       },
       include: { supplier: true },
     });
+
+    if (dto.post) {
+      await syncSupplierBalanceWithLedger(this.prisma, tenantId, dto.supplierId, {
+        entryType: SupplierLedgerEntryType.INVOICE,
+        amount: total,
+        referenceType: 'SupplierInvoice',
+        referenceId: inv.id,
+        notes: `Invoice ${inv.invoiceNumber}`,
+        createdBy: userId,
+      });
+    }
+
+    return inv;
   }
 
   async listSupplierInvoices(tenantId: string, query: PaginationDto & { supplierId?: string }) {
@@ -775,9 +876,13 @@ export class ProcurementService {
         });
       }
 
-      await tx.supplier.update({
-        where: { id: inv.supplierId },
-        data: { balance: { decrement: dto.amount } },
+      await syncSupplierBalanceWithLedger(tx, tenantId, inv.supplierId, {
+        entryType: SupplierLedgerEntryType.PAYMENT,
+        amount: -dto.amount,
+        referenceType: 'SupplierPayment',
+        referenceId: payment.id,
+        notes: `Payment against invoice ${inv.invoiceNumber}`,
+        createdBy: userId,
       });
 
       if (dto.method === PaymentMethod.CHEQUE) {

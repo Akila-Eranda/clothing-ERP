@@ -32,7 +32,7 @@ export class FinanceService {
   async getAccountsPayableAging(tenantId: string, asOfDate?: string) {
     const asOf = asOfDate ? dayjs(asOfDate).endOf('day').toDate() : new Date();
 
-    const [invoices, pos, suppliers] = await Promise.all([
+    const [invoices, pos] = await Promise.all([
       this.prisma.supplierInvoice.findMany({
         where: {
           tenantId,
@@ -53,10 +53,6 @@ export class FinanceService {
           },
         },
         include: { supplier: { select: { id: true, name: true, creditDays: true } } },
-      }),
-      this.prisma.supplier.findMany({
-        where: { tenantId, balance: { gt: 0 } },
-        select: { id: true, name: true, balance: true },
       }),
     ]);
 
@@ -98,7 +94,10 @@ export class FinanceService {
       .filter((l) => l.amount > 0.01);
 
     const aging = buildAgingReport([...invoiceLines, ...poLines], asOf);
-    const supplierBalanceTotal = suppliers.reduce((s, x) => s + x.balance, 0);
+    // Prefer document-derived AP total over stale Supplier.balance cache
+    const supplierBalanceTotal = round2(
+      invoiceLines.reduce((s, l) => s + l.amount, 0) + poLines.reduce((s, l) => s + l.amount, 0),
+    );
 
     return {
       asOf: asOf.toISOString(),

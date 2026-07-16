@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Package, Plus, Search, ScanLine, Trash2, Building2, Warehouse } from "lucide-react";
+import { ArrowLeft, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
@@ -747,45 +746,39 @@ export default function CreatePOPage() {
 
   return (
     <div className="min-h-screen bg-muted/30 pb-32 sm:pb-28">
-      {/* Header */}
-      <div className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex w-full items-center gap-3 px-3 py-3 sm:px-6">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="h-9 shrink-0 gap-1.5"
-            onClick={() => router.push("/purchases")}
-            disabled={saving}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span className="hidden sm:inline">Back</span>
-          </Button>
-          <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold sm:text-lg">
-              {fromGrnId ? "Create PO from GRN" : "Purchase Order"}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
-              <span className="rounded-full border bg-muted/50 px-2 py-0.5 font-mono">PO Number · Auto</span>
-              <Badge variant="secondary" className={cn(
-                "rounded-full text-[10px]",
-                fromGrnId ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" : "bg-amber-500/10 text-amber-700 border-amber-500/20",
-              )}>
-                {fromGrnId ? "From GRN" : "Draft"}
-              </Badge>
-              <span className="tabular-nums">{todayIso}</span>
-              <span className="hidden sm:inline">·</span>
-              <span className="inline-flex items-center gap-1">
-                <Building2 className="h-3 w-3" />
-                {activeBranchName || "Current branch"}
-              </span>
-            </div>
-          </div>
-          <div className="hidden shrink-0 text-right md:block">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Grand total</p>
-            <p className="text-sm font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</p>
-          </div>
+      {/* Header — same layout as New Product (grocery master) */}
+      <div className="sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => router.push("/purchases")}
+          disabled={saving}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium disabled:opacity-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Back to Purchases</span>
+          <span className="sm:hidden">Back</span>
+        </button>
+        <div className="text-center min-w-0">
+          <h1 className="text-base font-semibold text-foreground truncate">
+            {fromGrnId ? "Create PO from GRN" : "New Purchase Order"}
+          </h1>
+          <p className="text-[11px] text-muted-foreground truncate">
+            {fromGrnId && fromGrnNumber
+              ? `From ${fromGrnNumber}`
+              : activeBranchName
+                ? `${activeBranchName} · Draft`
+                : "Purchase order master"}
+          </p>
         </div>
+        <Button
+          size="sm"
+          className="gap-1.5 h-9 shrink-0"
+          disabled={saving || !supplierId || items.length === 0 || grnPrefillLoading}
+          onClick={() => submit(fromGrnId ? false : true)}
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          <span className="hidden sm:inline">{fromGrnId ? "Create" : "Save"}</span>
+        </Button>
       </div>
 
       <div className="mx-auto w-full space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-6">
