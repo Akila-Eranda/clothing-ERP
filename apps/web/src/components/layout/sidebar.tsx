@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Scan,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -69,6 +69,7 @@ function useNavGroups(): NavGroup[] {
 
   const inventoryChildren: NavItem[] = [
     { label: L["/inventory"] ?? "Stock Levels", href: "/inventory", icon: Warehouse },
+    { label: L["/inventory/scan"] ?? "Scan Restock", href: "/inventory/scan", icon: Scan },
     { label: L["/inventory/ledger"] ?? "Inventory Ledger", href: "/inventory/ledger", icon: ScrollText },
     { label: L["/inventory/abc"] ?? "ABC Analysis", href: "/inventory/abc", icon: BarChart3 },
     { label: L["/inventory/dead-stock"] ?? "Dead Stock", href: "/inventory/dead-stock", icon: Skull },
@@ -393,20 +394,25 @@ export function Sidebar() {
     const onToggle = () => setOpenMenus((prev) => ({ ...prev, [menuKey]: !open }));
 
     if (sidebarCollapsed) {
+      const collapsedInner = (
+        <div
+          className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
+          style={childActive
+            ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
+            : { color: textMut }}
+        >
+          <Icon className="h-5 w-5" strokeWidth={childActive ? 2.2 : 1.8} />
+        </div>
+      );
       return (
         <div key={key} className="space-y-0.5">
           <Tooltip>
             <TooltipTrigger asChild>
-              <button
-                type="button"
-                onClick={onToggle}
-                className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
-                style={childActive
-                  ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
-                  : { color: textMut }}
-              >
-                <Icon className="h-5 w-5" strokeWidth={childActive ? 2.2 : 1.8} />
-              </button>
+              {item.href ? (
+                <Link href={item.href} onClick={closeMobile}>{collapsedInner}</Link>
+              ) : (
+                <button type="button" onClick={onToggle}>{collapsedInner}</button>
+              )}
             </TooltipTrigger>
             <TooltipContent side="right" className="text-xs p-0 overflow-hidden">
               <div className="py-1 min-w-[160px]">
@@ -435,31 +441,60 @@ export function Sidebar() {
 
     return (
       <div key={key}>
-        <button
-          type="button"
-          onClick={onToggle}
-          className="group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none min-h-11 py-2 px-3 w-full cursor-pointer"
+        <div
+          className="group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none min-h-11 py-2 px-3 w-full"
           style={childActive
             ? { background: "rgba(99,102,241,0.08)", color: "#4f46e5" }
             : { color: textMut }}
           onMouseEnter={e => { if (!childActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
           onMouseLeave={e => { if (!childActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
         >
-          <Icon
-            className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
-            strokeWidth={childActive ? 2.2 : 1.8}
-          />
-          <span
-            className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
-            style={!childActive && !isDark ? { color: "#000000" } : undefined}
+          {item.href ? (
+            <Link
+              href={item.href}
+              onClick={() => {
+                setOpenMenus((prev) => ({ ...prev, [menuKey]: true }));
+                closeMobile();
+              }}
+              className="flex flex-1 items-center gap-3 min-w-0"
+            >
+              <Icon
+                className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
+                strokeWidth={childActive ? 2.2 : 1.8}
+              />
+              <span
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
+                style={!childActive && !isDark ? { color: "#000000" } : undefined}
+              >
+                {item.label}
+              </span>
+            </Link>
+          ) : (
+            <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left">
+              <Icon
+                className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
+                strokeWidth={childActive ? 2.2 : 1.8}
+              />
+              <span
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
+                style={!childActive && !isDark ? { color: "#000000" } : undefined}
+              >
+                {item.label}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
+            className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10"
+            aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
           >
-            {item.label}
-          </span>
-          <ChevronDown
-            className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")}
-            strokeWidth={1.8}
-          />
-        </button>
+            <ChevronDown
+              className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")}
+              strokeWidth={1.8}
+            />
+          </button>
+        </div>
         {open && (
           <div className="mt-0.5 space-y-0.5 border-l ml-5 pl-0" style={{ borderColor: border }}>
             {item.children!.map((child, ci) => renderLeaf(child, `${key}-c${ci}`, true, peerHrefs))}

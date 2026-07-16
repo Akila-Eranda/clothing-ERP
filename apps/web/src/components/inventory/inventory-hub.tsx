@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag,
-  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban,
+  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban, Scan,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import { api } from "@/lib/api";
 import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { StockTransferModal } from "@/components/inventory/stock-transfer-modal";
 import { TransferApprovalActions } from "@/components/inventory/transfer-approval-actions";
+import { StockBarcodeScanPanel } from "@/components/inventory/stock-barcode-scan-panel";
 import { CreatePOModal } from "@/components/purchases/create-po-modal";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/utils";
@@ -26,10 +27,11 @@ import { variantTableColumns } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
 
-export type InventorySection = "stock" | "ledger" | "abc" | "dead" | "aging" | "transfers";
+export type InventorySection = "stock" | "scan" | "ledger" | "abc" | "dead" | "aging" | "transfers";
 
 const SECTION_META: Record<InventorySection, { title: string; description: string }> = {
   stock: { title: "Stock Levels", description: "On-hand quantities, low stock and adjustments" },
+  scan: { title: "Scan Restock", description: "Add stock by scanning barcode or typing SKU" },
   ledger: { title: "Inventory Ledger", description: "Stock movement history and quantity changes" },
   abc: { title: "ABC Analysis", description: "Classify SKUs by revenue contribution" },
   dead: { title: "Dead Stock", description: "Items with stock but no recent sales" },
@@ -244,7 +246,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      if (section === "stock" || section === "transfers") {
+      if (section === "stock" || section === "transfers" || section === "scan") {
         const [stockRes, summaryRes] = await Promise.all([
           api.get<{ data: InventoryItem[] }>("/inventory?limit=500"),
           api.get<LedgerSummary>("/inventory/ledger/summary"),
@@ -348,6 +350,9 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </Button>
           {section === "stock" && (
             <>
+              <Button variant="outline" size="sm" onClick={() => router.push("/inventory/scan")} className="gap-1.5">
+                <Scan className="h-3.5 w-3.5" /> Scan Restock
+              </Button>
               <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
                 <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
               </Button>
@@ -415,6 +420,10 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </div>
           <ClientSideTable data={stock} columns={columns} pageCount={Math.ceil(stock.length / 10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{ isShow: true, fileName: "inventory" }} />
         </>
+      )}
+
+      {section === "scan" && (
+        <StockBarcodeScanPanel stock={stock} onRestocked={fetchData} />
       )}
 
       {section === "ledger" && (

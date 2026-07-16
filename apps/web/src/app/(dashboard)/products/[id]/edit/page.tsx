@@ -112,7 +112,7 @@ export default function EditProductPage() {
   const [brands, setBrands]         = useState<Brand[]>([]);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [loading, setLoading]       = useState(false);
-  const [listView, setListView]     = useState(false);
+  const [listView, setListView]     = useState(true);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [productName, setProductName] = useState("");
   const [systemTags, setSystemTags] = useState<string[]>([]);
@@ -489,8 +489,23 @@ export default function EditProductPage() {
                     <span className="ml-2 text-xs text-muted-foreground">({variantRows.filter((r) => r.active).length} active)</span>
                   </p>
                   <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => {
+                      const label = `Variant ${variantRows.length + 1}`;
+                      setVariantRows((r) => [...r, {
+                        key: `${Date.now()}`,
+                        sku: genSku(form.name || "PRD", [label]),
+                        name: label,
+                        sellingPrice: form.sellingPrice,
+                        costPrice: form.costPrice,
+                        mrp: form.mrp,
+                        active: true,
+                      }]);
+                      setListView(true);
+                    }}>
+                      <Plus className="h-3 w-3" /> Add row
+                    </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setListView(false)}>
-                      Add More
+                      Attributes
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
                       setVariantRows(buildRows(cartesian(form.attributes), form.attributes))}>
@@ -507,13 +522,11 @@ export default function EditProductPage() {
                           <th className="px-3 py-2.5 text-left">SKU</th>
                           <th className="px-3 py-2.5 text-left">Variant</th>
                           {variantCols.map((col) => (
-                            variantRows.some((r) => r[col.field] !== undefined) && (
-                              <th key={col.field} className="px-3 py-2.5 text-left">{col.label}</th>
-                            )
+                            <th key={col.field} className="px-3 py-2.5 text-left">{col.label}</th>
                           ))}
-                          <th className="px-3 py-2.5 text-right">Selling</th>
-                          <th className="px-3 py-2.5 text-right">Cost</th>
-                          <th className="px-3 py-2.5 text-right">MRP</th>
+                          <th className="px-3 py-2.5 text-right">Selling (LKR)</th>
+                          <th className="px-3 py-2.5 text-right">Cost (LKR)</th>
+                          <th className="px-3 py-2.5 text-right">MRP (LKR)</th>
                           <th className="px-3 py-2.5 text-center">Active</th>
                           <th className="px-2 py-2.5 w-6"></th>
                         </tr>
@@ -528,31 +541,54 @@ export default function EditProductPage() {
                                 <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)}
                                   className="h-7 text-xs font-mono w-28" />
                               </td>
-                              <td className="px-3 py-2 font-medium">
-                                {row.name}
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={row.name}
+                                  onChange={(e) => updateRow(row.key, "name", e.target.value)}
+                                  className="h-8 text-xs font-medium w-28"
+                                />
                                 {row.id && <span className="ml-1 text-[9px] text-muted-foreground/60">existing</span>}
                               </td>
                               {variantCols.map((col) => (
-                                variantRows.some((r) => r[col.field] !== undefined) && (
                                   <td key={col.field} className="px-3 py-2">
-                                    {row[col.field] ? (
-                                      col.isColor ? (
-                                        <div className="flex items-center gap-1.5">
-                                          {getColorHex(String(row[col.field])) && (
-                                            <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: getColorHex(String(row[col.field]))! }} />
-                                          )}
-                                          {row[col.field]}
-                                        </div>
-                                      ) : (
-                                        <Badge variant="secondary" className="text-[10px]">{row[col.field]}</Badge>
-                                      )
-                                    ) : "—"}
+                                    {col.presets.length > 0 ? (
+                                      <select
+                                        value={String(row[col.field] ?? "")}
+                                        onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                        className="h-8 w-full min-w-[90px] rounded-md border bg-background px-2 text-xs"
+                                      >
+                                        <option value="">Select…</option>
+                                        {col.presets.map((p) => (
+                                          <option key={p} value={p}>{p}</option>
+                                        ))}
+                                        {row[col.field] && !col.presets.includes(String(row[col.field])) && (
+                                          <option value={String(row[col.field])}>{row[col.field]}</option>
+                                        )}
+                                      </select>
+                                    ) : (
+                                      <Input
+                                        value={String(row[col.field] ?? "")}
+                                        onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                        className="h-8 text-xs w-24"
+                                      />
+                                    )}
                                   </td>
-                                )
                               ))}
-                              <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                              <td className="px-3 py-2"><Input type="number" value={row.costPrice}    onChange={(e) => updateRow(row.key, "costPrice",    e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                              <td className="px-3 py-2"><Input type="number" value={row.mrp}          onChange={(e) => updateRow(row.key, "mrp",          e.target.value)} className="h-7 text-xs text-right w-20" /></td>
+                              <td className="px-3 py-2">
+                                <Input type="number" min={0} step="0.01" value={row.sellingPrice}
+                                  onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)}
+                                  className="h-8 text-xs text-right w-24 font-semibold" placeholder="0.00" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input type="number" min={0} step="0.01" value={row.costPrice}
+                                  onChange={(e) => updateRow(row.key, "costPrice", e.target.value)}
+                                  className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input type="number" min={0} step="0.01" value={row.mrp}
+                                  onChange={(e) => updateRow(row.key, "mrp", e.target.value)}
+                                  className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                              </td>
                               <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} /></td>
                               <td className="px-2 py-2">
                                 <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}

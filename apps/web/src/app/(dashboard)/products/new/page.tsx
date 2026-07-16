@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, X, Loader2, Package,
-  Zap, List, ChevronDown, ArrowLeft,
+  Zap, ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,8 +19,8 @@ import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, hasS
 import { getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
-  buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint,
-  applyVariantCombo, autoFillVariantAttributes, findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
+  buildProductFormDefaults, variantTableColumns, variantVariantHint,
+  applyVariantCombo, autoFillVariantAttributes, getProductFormCopy,
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
@@ -92,14 +92,6 @@ function genSku(name: string, combo: string[]): string {
   return [b, ...combo.map((v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase())].join("-");
 }
 
-const COLOR_HEX: Record<string, string> = {
-  black: "#1a1a1a", white: "#f5f5f5", red: "#ef4444", blue: "#3b82f6",
-  green: "#22c55e", yellow: "#eab308", purple: "#8b5cf6", pink: "#ec4899",
-  orange: "#f97316", navy: "#1e3a8a", grey: "#9ca3af", gray: "#9ca3af",
-  olive: "#6b7c3a", brown: "#92400e", cream: "#fef3c7", beige: "#d4a574",
-  maroon: "#7f1d1d", teal: "#0d9488", cyan: "#06b6d4", indigo: "#6366f1",
-};
-
 // â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AddProductPage() {
   const router = useRouter();
@@ -118,12 +110,10 @@ export default function AddProductPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
   const [loading, setLoading]       = useState(false);
-  const [listView, setListView]     = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
   useEffect(() => {
     setForm(buildInitial(shopProfile.type));
-    setListView(false);
     setVariantRows([]);
   }, [shopProfile.type]);
 
@@ -142,45 +132,118 @@ export default function AddProductPage() {
       branchId: scope === "SINGLE" && !p.branchId ? (activeBranchId ?? "") : p.branchId,
     }));
   };
-  const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
 
-  const addAttrValue = (i: number) => {
-    const a = form.attributes.map((x, j) => {
-      if (j !== i) return x;
-      const val = x.input.trim().replace(/,$/, "");
-      if (!val || x.values.includes(val)) return { ...x, input: "" };
-      return { ...x, values: [...x.values, val], input: "" };
-    });
-    set("attributes", a);
-  };
-
-  const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
+  const buildRows = (combos: string[][], attrs: VariantAttr[], prev: VariantRow[] = []): VariantRow[] => {
     const validAttrs = attrs.filter((a) => a.values.length > 0);
-    return combos.map((combo) => ({
-      key: combo.join("|"), sku: genSku(form.name, combo), name: combo.join(" / "),
-      ...applyVariantCombo(shopProfile, validAttrs, combo),
-      sellingPrice: form.sellingPrice, costPrice: form.costPrice, mrp: form.mrp, active: true,
+    return combos.map((combo) => {
+      const key = combo.join("|");
+      const old = prev.find((p) => p.key === key);
+      return {
+        key,
+        sku: old?.sku ?? genSku(form.name, combo),
+        name: combo.join(" / "),
+        ...applyVariantCombo(shopProfile, validAttrs, combo),
+        sellingPrice: old?.sellingPrice ?? form.sellingPrice,
+        costPrice: old?.costPrice ?? form.costPrice,
+        mrp: old?.mrp ?? form.mrp,
+        active: old?.active ?? true,
+      };
+    });
+  };
+
+  const syncVariantRows = React.useCallback((attrs: VariantAttr[] = form.attributes) => {
+    const combos = cartesian(attrs);
+    if (!form.hasVariants || combos.length === 0) {
+      setVariantRows([]);
+      return;
+    }
+    setVariantRows((prev) => buildRows(combos, attrs, prev));
+  }, [form.hasVariants, form.attributes, form.name, form.sellingPrice, form.costPrice, form.mrp, shopProfile]);
+
+  // Keep rows when toggling on; don't wipe user edits while typing attributes elsewhere
+  useEffect(() => {
+    if (!form.hasVariants) setVariantRows([]);
+  }, [form.hasVariants]);
+
+  const sanitizePrice = (value: string) => {
+    if (value === "" || value === ".") return value;
+    const n = Number(value);
+    if (Number.isNaN(n)) return "";
+    return n < 0 ? "0" : value;
+  };
+
+  const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) => {
+    const next = (field === "sellingPrice" || field === "costPrice" || field === "mrp") && typeof value === "string"
+      ? sanitizePrice(value)
+      : value;
+    setVariantRows((rows) => rows.map((r) => {
+      if (r.key !== key) return r;
+      const updated = { ...r, [field]: next } as VariantRow;
+      // Keep variant name + primary attr field in sync when editing either
+      if (field === "name" && typeof next === "string" && variantCols.length === 1) {
+        updated[variantCols[0].field] = next;
+      }
+      if (
+        typeof next === "string"
+        && (field === "size" || field === "color" || field === "material" || field === "style")
+        && variantCols.length === 1
+        && variantCols[0].field === field
+      ) {
+        updated.name = next;
+        updated.sku = genSku(form.name || "PRD", [next]);
+      }
+      return updated;
     }));
   };
 
-  const openListView = () => {
-    const combos = cartesian(form.attributes);
-    if (!combos.length) { toast.error("Add attribute values first"); return; }
-    setVariantRows(buildRows(combos, form.attributes));
-    setListView(true);
+  const addVariantRow = (preset?: string) => {
+    const primary = variantCols[0];
+    const label = (preset ?? "").trim() || `Variant ${variantRows.length + 1}`;
+    const comboFields = applyVariantCombo(
+      shopProfile,
+      form.attributes.length ? form.attributes : [{ name: primary?.label ?? "Variant", values: [label], input: "" }],
+      [label],
+    );
+    const row: VariantRow = {
+      key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
+      sku: genSku(form.name || "PRD", [label]),
+      name: label,
+      ...comboFields,
+      sellingPrice: form.sellingPrice,
+      costPrice: form.costPrice,
+      mrp: form.mrp,
+      active: true,
+    };
+    if (primary && !row[primary.field]) {
+      row[primary.field] = label;
+    }
+    setVariantRows((r) => [...r, row]);
   };
 
-  const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
-    setVariantRows((rows) => rows.map((r) => r.key === key ? { ...r, [field]: value } : r));
+  const applyBasePricesToAll = () => {
+    if (!form.sellingPrice && !form.costPrice && !form.mrp) {
+      toast.error("Set selling / cost / MRP in Pricing first");
+      return;
+    }
+    setVariantRows((rows) => rows.map((r) => ({
+      ...r,
+      sellingPrice: form.sellingPrice || r.sellingPrice,
+      costPrice: form.costPrice || r.costPrice,
+      mrp: form.mrp || r.mrp,
+    })));
+    toast.success("Base prices applied to all variants");
+  };
 
-  const autoGenerate = () => set("attributes", autoFillVariantAttributes(shopProfile, form.attributes));
-
-  const togglePreset = (attrIdx: number, preset: string) => {
-    set("attributes", form.attributes.map((x, j) => {
-      if (j !== attrIdx) return x;
-      const has = x.values.includes(preset);
-      return { ...x, values: has ? x.values.filter((v) => v !== preset) : [...x.values, preset] };
-    }));
+  const fillPresetRows = () => {
+    const attrs = autoFillVariantAttributes(shopProfile, form.attributes);
+    set("attributes", attrs);
+    const combos = cartesian(attrs);
+    if (!combos.length) {
+      toast.error("No presets available");
+      return;
+    }
+    setVariantRows((prev) => buildRows(combos, attrs, prev));
+    toast.success(`Added ${combos.length} variants from presets`);
   };
 
   const submit = async (status: "ACTIVE" | "DRAFT") => {
@@ -191,7 +254,7 @@ export default function AddProductPage() {
     setLoading(true);
     let variants: Record<string, unknown>[] = [];
     if (form.hasVariants) {
-      if (listView && variantRows.length > 0) {
+      if (variantRows.length > 0) {
         variants = variantRows.filter((r) => r.active).map((r) => ({
           sku: r.sku, name: r.name,
           size: r.size, color: r.color, material: r.material, style: r.style,
@@ -261,7 +324,9 @@ export default function AddProductPage() {
 
   // â”€â”€ Computed â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const allVariants = cartesian(form.attributes);
-  const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
+  const activeVariantCount = variantRows.filter((r) => r.active).length;
+  // Always show profile attribute columns so Weight/etc. are editable in the table
+  const editableAttrCols = variantCols;
   const sp = parseFloat(form.sellingPrice || "0");
   const cp = parseFloat(form.costPrice    || "0");
   const margin = sp > 0 ? ((sp - cp) / sp * 100).toFixed(1) : "0.0";
@@ -476,199 +541,234 @@ export default function AddProductPage() {
             )}
           </div>
 
-          {/* Variants */}
+          {/* Variants — editable list (type / select / edit everything here) */}
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b pb-2">
-              <div>
+            <div className="flex items-center justify-between gap-3 border-b pb-3">
+              <div className="min-w-0">
                 <h2 className="font-semibold text-base">Variants</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">{formCopy.variantSectionHint}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formCopy.variantSectionHint} · edit SKU, name, {variantHint} & prices in the table
+                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Enable variants</span>
-                <Switch checked={form.hasVariants} onCheckedChange={(v) => { set("hasVariants", v); setListView(false); }} />
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs text-muted-foreground">Enable</span>
+                <Switch
+                  checked={form.hasVariants}
+                  onCheckedChange={(v) => {
+                    set("hasVariants", v);
+                    if (!v) {
+                      setVariantRows([]);
+                      return;
+                    }
+                    setVariantRows((rows) => {
+                      if (rows.length > 0) return rows;
+                      const label = "Variant 1";
+                      const primary = variantCols[0];
+                      return [{
+                        key: `${label}|${Date.now()}`,
+                        sku: genSku(form.name || "PRD", [label]),
+                        name: label,
+                        ...(primary ? { [primary.field]: label } : {}),
+                        sellingPrice: form.sellingPrice,
+                        costPrice: form.costPrice,
+                        mrp: form.mrp,
+                        active: true,
+                      }];
+                    });
+                  }}
+                />
               </div>
             </div>
 
             {!form.hasVariants ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">Enable variants to add {variantHint}</p>
-            ) : listView ? (
-              /* â”€â”€ List view â”€â”€ */
+              <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
+                Enable variants to add rows and set separate selling prices
+              </div>
+            ) : (
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium">{variantRows.length} variants</p>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setListView(false)}>
-                      Back to Grid
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>
+                      <Plus className="h-3.5 w-3.5" /> Add variant
                     </Button>
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
-                      setVariantRows(buildRows(cartesian(form.attributes), form.attributes))}>
-                      <Zap className="h-3 w-3" /> Regenerate
+                    {shopProfile.variantAttributes.some((a) => a.presets.length > 0) && (
+                      <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={fillPresetRows}>
+                        <Zap className="h-3.5 w-3.5" /> Fill presets
+                      </Button>
+                    )}
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={applyBasePricesToAll}>
+                      Apply base price
                     </Button>
                   </div>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {activeVariantCount} / {variantRows.length} active
+                  </Badge>
                 </div>
-                <div className="rounded-xl border overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2.5 text-left w-8">#</th>
-                          <th className="px-3 py-2.5 text-left">SKU</th>
-                          <th className="px-3 py-2.5 text-left">Variant</th>
-                          {variantCols.map((col) => (
-                            variantRows[0]?.[col.field] !== undefined && (
-                              <th key={col.field} className="px-3 py-2.5 text-left">{col.label}</th>
-                            )
-                          ))}
-                          <th className="px-3 py-2.5 text-right">Selling</th>
-                          <th className="px-3 py-2.5 text-right">Cost</th>
-                          <th className="px-3 py-2.5 text-right">MRP</th>
-                          <th className="px-3 py-2.5 text-center">Active</th>
-                          <th className="px-2 py-2.5 w-6"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {variantRows.map((row, idx) => {
-                          const hex = row.color ? getColorHex(row.color) : null;
-                          return (
-                            <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
-                              <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+
+                {/* Quick-select presets → adds an editable row */}
+                {shopProfile.variantAttributes.map((attr) =>
+                  attr.presets.length > 0 ? (
+                    <div key={attr.name} className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">{attr.name}</span>
+                      {attr.presets.map((preset) => {
+                        const used = variantRows.some(
+                          (r) => r.name === preset || r.size === preset || r.color === preset || r.material === preset || r.style === preset,
+                        );
+                        return (
+                          <button
+                            key={preset}
+                            type="button"
+                            disabled={used}
+                            onClick={() => addVariantRow(preset)}
+                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                              used
+                                ? "opacity-40 cursor-not-allowed"
+                                : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null,
+                )}
+
+                {variantRows.length === 0 ? (
+                  <div className="rounded-xl border border-dashed py-8 text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">No variants yet — add a row or tap a preset</p>
+                    <Button type="button" size="sm" className="gap-1.5" onClick={() => addVariantRow()}>
+                      <Plus className="h-3.5 w-3.5" /> Add first variant
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/40 border-b">
+                          <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2.5 text-left w-10">#</th>
+                            <th className="px-3 py-2.5 text-left min-w-[130px]">SKU</th>
+                            <th className="px-3 py-2.5 text-left min-w-[120px]">Variant</th>
+                            {editableAttrCols.map((col) => (
+                              <th key={col.field} className="px-3 py-2.5 text-left min-w-[110px]">{col.label}</th>
+                            ))}
+                            <th className="px-3 py-2.5 text-right min-w-[110px]">Selling</th>
+                            <th className="px-3 py-2.5 text-right min-w-[110px]">Cost</th>
+                            <th className="px-3 py-2.5 text-right min-w-[110px]">MRP</th>
+                            <th className="px-3 py-2.5 text-center w-16">Active</th>
+                            <th className="px-2 py-2.5 w-10" />
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y">
+                          {variantRows.map((row, idx) => (
+                            <tr key={row.key} className={!row.active ? "opacity-45 bg-muted/10" : "hover:bg-muted/5"}>
+                              <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
                               <td className="px-3 py-2">
-                                <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)}
-                                  className="h-7 text-xs font-mono w-28" />
+                                <Input
+                                  value={row.sku}
+                                  onChange={(e) => updateRow(row.key, "sku", e.target.value)}
+                                  className="h-9 text-xs font-mono"
+                                  placeholder="SKU"
+                                />
                               </td>
-                              <td className="px-3 py-2 font-medium">{row.name}</td>
-                              {variantCols.map((col) => (
-                                row[col.field] !== undefined && (
-                                  <td key={col.field} className="px-3 py-2">
-                                    {col.isColor ? (
-                                      <div className="flex items-center gap-1.5">
-                                        {getColorHex(String(row[col.field])) && (
-                                          <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: getColorHex(String(row[col.field]))! }} />
-                                        )}
-                                        {row[col.field]}
-                                      </div>
-                                    ) : (
-                                      <Badge variant="secondary" className="text-[10px]">{row[col.field]}</Badge>
-                                    )}
-                                  </td>
-                                )
+                              <td className="px-3 py-2">
+                                <Input
+                                  value={row.name}
+                                  onChange={(e) => updateRow(row.key, "name", e.target.value)}
+                                  className="h-9 text-sm font-medium"
+                                  placeholder="e.g. 5kg"
+                                />
+                              </td>
+                              {editableAttrCols.map((col) => (
+                                <td key={col.field} className="px-3 py-2">
+                                  {col.presets.length > 0 ? (
+                                    <select
+                                      value={String(row[col.field] ?? "")}
+                                      onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                      className="h-9 w-full rounded-md border bg-background px-2 text-xs"
+                                    >
+                                      <option value="">Select…</option>
+                                      {col.presets.map((p) => (
+                                        <option key={p} value={p}>{p}</option>
+                                      ))}
+                                      {row[col.field] && !col.presets.includes(String(row[col.field])) && (
+                                        <option value={String(row[col.field])}>{row[col.field]}</option>
+                                      )}
+                                    </select>
+                                  ) : (
+                                    <Input
+                                      value={String(row[col.field] ?? "")}
+                                      onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                      className="h-9 text-xs"
+                                      placeholder={col.label}
+                                    />
+                                  )}
+                                </td>
                               ))}
-                              <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                              <td className="px-3 py-2"><Input type="number" value={row.costPrice} onChange={(e) => updateRow(row.key, "costPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                              <td className="px-3 py-2"><Input type="number" value={row.mrp} onChange={(e) => updateRow(row.key, "mrp", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                              <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} /></td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={row.sellingPrice}
+                                  onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)}
+                                  className="h-9 text-sm text-right font-semibold tabular-nums"
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={row.costPrice}
+                                  onChange={(e) => updateRow(row.key, "costPrice", e.target.value)}
+                                  className="h-9 text-sm text-right tabular-nums"
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={row.mrp}
+                                  onChange={(e) => updateRow(row.key, "mrp", e.target.value)}
+                                  className="h-9 text-sm text-right tabular-nums"
+                                  placeholder="0.00"
+                                />
+                              </td>
+                              <td className="px-3 py-2 text-center">
+                                <Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} />
+                              </td>
                               <td className="px-2 py-2">
-                                <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                                  className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                <button
+                                  type="button"
+                                  onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
+                                  className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                                >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </td>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="px-4 py-2.5 border-t bg-muted/10 flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{variantRows.filter((r) => r.active).length} / {variantRows.length} active</span>
-                    <Button variant="ghost" size="sm" className="h-6 text-xs text-destructive hover:text-destructive gap-1"
-                      onClick={() => setVariantRows([])}>
-                      <Trash2 className="h-3 w-3" /> Clear All
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              /* â”€â”€ Attribute builder â”€â”€ */
-              <div className="space-y-4">
-                {form.attributes.map((attr, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Input value={attr.name} className="w-24 h-7 text-xs font-semibold border-0 bg-transparent px-0 focus-visible:ring-0"
-                        onChange={(e) => { const a = [...form.attributes]; a[i] = { ...a[i], name: e.target.value }; set("attributes", a); }}
-                        placeholder="Attribute" />
-                      <button className="p-1 rounded hover:bg-muted text-muted-foreground transition-colors"
-                        onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                    <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[40px] bg-background cursor-text"
-                      onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
-                      {attr.values.map((v, vi) => {
-                        const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
-                        return (
-                          <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
-                            {hex && <span className="h-3.5 w-3.5 rounded-full border shrink-0" style={{ backgroundColor: hex }} />}
-                            {v}
-                            <button className="hover:text-destructive ml-0.5"
-                              onClick={(e) => { e.stopPropagation(); set("attributes", form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) })); }}>
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        );
-                      })}
-                      <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
-                        placeholder={`Add ${attr.name}…`} value={attr.input}
-                        onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }} />
-                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </div>
-                    {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
-                          <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
-                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                              attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
-                            }`}>
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-2">
-                    {form.attributes.length < shopProfile.variantAttributes.length && (
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => {
-                      const next = nextVariantAttributeName(shopProfile, form.attributes);
-                      if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
-                    }}>
-                      <Plus className="h-3 w-3" /> Add Attribute
-                    </Button>
-                    )}
-                    {shopProfile.variantAttributes.some((a) => a.presets.length > 0) && (
-                    <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3 w-3" /> Fill {variantHint} presets
-                    </Button>
-                    )}
-                  </div>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    {allVariants.length} variants
-                  </span>
-                </div>
-                {allVariants.length > 0 && (
-                  <div className="rounded-lg border bg-muted/10 p-3 space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Preview ({allVariants.length})</p>
-                      <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={openListView}>
-                        <List className="h-3 w-3" /> Edit in List View
+                    <div className="px-4 py-2.5 border-t bg-muted/15 flex items-center justify-between gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        Type or select values in any cell · same product barcode · different prices
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive gap-1"
+                        onClick={() => setVariantRows([])}
+                      >
+                        <Trash2 className="h-3 w-3" /> Clear All
                       </Button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-28 overflow-auto">
-                      {allVariants.slice(0, 30).map((combo, idx) => {
-                        const colorAttr = validAttrs.find((a) => isColorVariantAttr(shopProfile, a.name));
-                        const colorVal  = colorAttr ? combo[validAttrs.indexOf(colorAttr)] : null;
-                        const hex = colorVal ? getColorHex(colorVal) : null;
-                        return (
-                          <div key={idx} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-background border text-xs">
-                            {hex && <span className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: hex }} />}
-                            <span className="font-mono text-primary text-[10px]">{genSku(form.name, combo)}</span>
-                            <span className="text-muted-foreground">{combo.join(" / ")}</span>
-                          </div>
-                        );
-                      })}
-                      {allVariants.length > 30 && <p className="text-xs text-muted-foreground">+{allVariants.length - 30} more</p>}
                     </div>
                   </div>
                 )}
@@ -717,7 +817,7 @@ export default function AddProductPage() {
               ["Category", categories.find((c) => c.id === form.categoryId)?.name || <span className="text-muted-foreground italic">None</span>],
               ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">â€”</span>],
               ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}`    : <span className="text-muted-foreground italic">â€”</span>],
-              ["Variants", form.hasVariants  ? `${allVariants.length} (${variantHint})` : "Single SKU"],
+              ["Variants", form.hasVariants  ? `${activeVariantCount || allVariants.length} (${variantHint})` : "Single SKU"],
               ...(form.trackInventory
                 ? [["Branches", form.branchScope === "ALL" ? "All Branches" : "Single Branch"] as const]
                 : []),

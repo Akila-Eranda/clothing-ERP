@@ -192,26 +192,6 @@ export default function PurchasesPage() {
         </div>
       </div>
 
-      {/* Recommended flow */}
-      <div className="rounded-xl border bg-blue-50/60 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900 p-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Recommended purchase flow</p>
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-muted-foreground flex-wrap">
-            {["1. New PO", "→ 2. Mark Ordered", "→ 3. Receive Items", "→ 4. GRN + Stock"].map((s) => (
-              <span key={s} className="bg-background/80 px-2.5 py-1 rounded-full border text-foreground/80">{s}</span>
-            ))}
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground max-w-xs">
-          Use <span className="font-semibold text-foreground">Quick GRN</span> only for walk-in cash purchases without a PO.
-          {ordered > 0 && (
-            <span className="block mt-1 text-amber-700 dark:text-amber-400 font-medium">
-              {ordered} PO(s) waiting to receive — use Receive Items on the row.
-            </span>
-          )}
-        </p>
-      </div>
-
       {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map((s) => (

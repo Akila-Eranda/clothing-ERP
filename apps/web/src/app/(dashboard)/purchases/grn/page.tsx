@@ -207,22 +207,6 @@ export default function GrnPage() {
         ))}
       </div>
 
-      {/* Workflow hint — PO first */}
-      <div className="rounded-xl border bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-900 p-4 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">Best practice</p>
-          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-muted-foreground flex-wrap">
-            {["PO Ordered", "→ Receive Items", "→ GRN (FROM_PO)", "→ Stock Updated"].map((s) => (
-              <span key={s} className="bg-background/80 px-2.5 py-1 rounded-full border text-foreground/80">{s}</span>
-            ))}
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground max-w-sm">
-          <span className="font-semibold text-foreground">Receive from PO</span> is the default.
-          Use <span className="font-semibold text-foreground">Quick GRN (no PO)</span> only for walk-in cash purchases.
-        </p>
-      </div>
-
       {/* Table */}
       <div className="space-y-3">
         <div>

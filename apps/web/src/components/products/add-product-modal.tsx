@@ -705,17 +705,29 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                             <td className="px-3 py-2 font-medium whitespace-nowrap">{row.name}</td>
                             <td className="px-3 py-2">
                               <Input type="number" min="0" step="0.01" value={row.sellingPrice}
-                                onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  const n = Number(v);
+                                  updateRow(row.key, "sellingPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                                }}
                                 className="h-8 text-xs text-right w-24 font-semibold" placeholder="0.00" />
                             </td>
                             <td className="px-3 py-2">
                               <Input type="number" min="0" step="0.01" value={row.costPrice}
-                                onChange={(e) => updateRow(row.key, "costPrice", e.target.value)}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  const n = Number(v);
+                                  updateRow(row.key, "costPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                                }}
                                 className="h-8 text-xs text-right w-24" placeholder="0.00" />
                             </td>
                             <td className="px-3 py-2">
                               <Input type="number" min="0" step="0.01" value={row.mrp}
-                                onChange={(e) => updateRow(row.key, "mrp", e.target.value)}
+                                onChange={(e) => {
+                                  const v = e.target.value;
+                                  const n = Number(v);
+                                  updateRow(row.key, "mrp", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                                }}
                                 className="h-8 text-xs text-right w-24" placeholder="0.00" />
                             </td>
                             <td className="px-3 py-2 text-center">
