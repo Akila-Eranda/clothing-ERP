@@ -109,6 +109,34 @@ export class ProductsService {
     return branches.map((b) => b.id);
   }
 
+  private async ensureDefaultWarehouse(tenantId: string, branchId: string) {
+    const existing = await this.prisma.warehouse.findFirst({
+      where: { tenantId, branchId, isDefault: true, isActive: true },
+    });
+    if (existing) return existing;
+
+    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, tenantId } });
+    if (!branch) throw new BadRequestException('Branch not found');
+
+    const codeBase = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+    let code = codeBase;
+    let n = 1;
+    while (await this.prisma.warehouse.findFirst({ where: { tenantId, code } })) {
+      code = `${codeBase}-${n++}`.slice(0, 24);
+    }
+
+    return this.prisma.warehouse.create({
+      data: {
+        tenantId,
+        branchId,
+        name: `${branch.name} Main`,
+        code,
+        isDefault: true,
+        isActive: true,
+      },
+    });
+  }
+
   private async seedVariantInventory(
     tenantId: string,
     variantIds: string[],
@@ -120,12 +148,19 @@ export class ProductsService {
     const branchIds = await this.resolveInventoryBranchIds(tenantId, branchScope, branchId);
     if (!branchIds.length) return;
 
+    const warehouseByBranch = new Map<string, string>();
+    for (const bid of branchIds) {
+      const warehouse = await this.ensureDefaultWarehouse(tenantId, bid);
+      warehouseByBranch.set(bid, warehouse.id);
+    }
+
     await this.prisma.inventory.createMany({
       data: branchIds.flatMap((bid) =>
         variantIds.map((variantId) => ({
           tenantId,
           branchId: bid,
           variantId,
+          warehouseId: warehouseByBranch.get(bid)!,
           quantity: 0,
         })),
       ),
@@ -397,11 +432,17 @@ export class ProductsService {
         },
       });
       if (branchIds.length) {
+        const warehouseByBranch = new Map<string, string>();
+        for (const branchId of branchIds) {
+          const warehouse = await this.ensureDefaultWarehouse(tenantId, branchId);
+          warehouseByBranch.set(branchId, warehouse.id);
+        }
         await this.prisma.inventory.createMany({
           data: branchIds.map((branchId) => ({
             tenantId,
             branchId,
             variantId: variant.id,
+            warehouseId: warehouseByBranch.get(branchId)!,
             quantity: 0,
           })),
           skipDuplicates: true,

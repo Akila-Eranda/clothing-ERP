@@ -38,6 +38,34 @@ export class DiscountRequestDto {
 export class WorkflowService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async ensureDefaultWarehouse(tenantId: string, branchId: string) {
+    const existing = await this.prisma.warehouse.findFirst({
+      where: { tenantId, branchId, isDefault: true, isActive: true },
+    });
+    if (existing) return existing;
+
+    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, tenantId } });
+    if (!branch) throw new NotFoundException('Branch not found');
+
+    const codeBase = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
+    let code = codeBase;
+    let n = 1;
+    while (await this.prisma.warehouse.findFirst({ where: { tenantId, code } })) {
+      code = `${codeBase}-${n++}`.slice(0, 24);
+    }
+
+    return this.prisma.warehouse.create({
+      data: {
+        tenantId,
+        branchId,
+        name: `${branch.name} Main`,
+        code,
+        isDefault: true,
+        isActive: true,
+      },
+    });
+  }
+
   async ensureDefinition(tenantId: string, key: string) {
     let def = await this.prisma.workflowDefinition.findFirst({
       where: { tenantId, key, isActive: true },
@@ -259,8 +287,15 @@ export class WorkflowService {
           data: { quantity: Math.max(0, newQty) },
         });
       } else {
+        const warehouse = await this.ensureDefaultWarehouse(tenantId, branchId);
         await tx.inventory.create({
-          data: { tenantId, branchId, variantId, quantity: Math.max(0, newQty) },
+          data: {
+            tenantId,
+            branchId,
+            variantId,
+            warehouseId: warehouse.id,
+            quantity: Math.max(0, newQty),
+          },
         });
       }
       await tx.inventoryLog.create({
