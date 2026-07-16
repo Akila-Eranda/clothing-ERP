@@ -35,6 +35,7 @@ export class ReportsService {
         payments: true,
       },
       orderBy: { invoiceDate: 'desc' },
+      take: 5000,
     });
   }
 
@@ -51,6 +52,7 @@ export class ReportsService {
         warehouse: { select: { id: true, name: true, code: true } },
       },
       orderBy: { quantity: 'asc' },
+      take: 10000,
     });
     return {
       summary: summarizeInventoryRows(rows),
@@ -70,6 +72,7 @@ export class ReportsService {
       },
       include: { variant: { include: { product: true } } },
       orderBy: { createdAt: 'desc' },
+      take: 10000,
     });
   }
 
@@ -323,12 +326,14 @@ export class ReportsService {
         items: { select: { orderedQty: true, receivedQty: true, productName: true, sku: true } },
       },
       orderBy: { orderDate: 'desc' },
+      take: 5000,
     });
 
     const payments = await this.prisma.supplierPayment.findMany({
       where: { tenantId, paidAt: dateRange },
       include: { supplier: { select: { name: true } } },
       orderBy: { paidAt: 'desc' },
+      take: 5000,
     });
 
     const rows = orders.map((o) => ({
@@ -387,6 +392,7 @@ export class ReportsService {
       where,
       include: { bankAccount: { select: { name: true, code: true } } },
       orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+      take: 5000,
     });
 
     const mapped = rows.map((c) => ({

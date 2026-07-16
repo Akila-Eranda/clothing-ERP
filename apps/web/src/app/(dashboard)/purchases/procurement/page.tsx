@@ -1,18 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ClipboardList, PackageCheck, Zap, RotateCcw, FileText, Plus, Loader2, RefreshCw, Send,
+  ClipboardList, FileText, Loader2, PackageCheck, Plus, RefreshCw, RotateCcw, Send, ShoppingBag, Zap,
 } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type PrRow = {
   id: string;
@@ -58,6 +62,7 @@ type VariantOpt = { id: string; sku: string; name: string; costPrice: number; pr
 
 export default function ProcurementHubPage() {
   const router = useRouter();
+  const { profile } = useShopWorkspace();
   const [loading, setLoading] = useState(true);
   const [prs, setPrs] = useState<PrRow[]>([]);
   const [grns, setGrns] = useState<GrnRow[]>([]);
@@ -65,7 +70,6 @@ export default function ProcurementHubPage() {
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
-  // Quick GRN form
   const [qgSupplier, setQgSupplier] = useState("");
   const [qgSku, setQgSku] = useState("");
   const [qgQty, setQgQty] = useState("1");
@@ -73,7 +77,6 @@ export default function ProcurementHubPage() {
   const [qgVariant, setQgVariant] = useState<VariantOpt | null>(null);
   const [qgBusy, setQgBusy] = useState(false);
 
-  // Invoice form
   const [invSupplier, setInvSupplier] = useState("");
   const [invNumber, setInvNumber] = useState("");
   const [invTotal, setInvTotal] = useState("");
@@ -186,6 +189,19 @@ export default function ProcurementHubPage() {
     }
   };
 
+  const convertPr = async (id: string) => {
+    if (!suppliers[0]) { toast.error("Add a supplier first"); return; }
+    try {
+      const po = await api.post<{ poNumber: string }>(`/procurement/purchase-requests/${id}/convert`, {
+        supplierId: suppliers[0].id,
+      });
+      toast.success(`Converted to ${(po.data as { poNumber?: string })?.poNumber ?? "PO"}`);
+      load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Convert failed");
+    }
+  };
+
   const postReturn = async (id: string) => {
     try {
       await api.post(`/procurement/supplier-returns/${id}/post`, {});
@@ -196,38 +212,223 @@ export default function ProcurementHubPage() {
     }
   };
 
+  const prColumns = useMemo<ColumnDef<PrRow>[]>(() => [
+    {
+      id: "requestNumber",
+      accessorKey: "requestNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="PR #" />,
+      cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.requestNumber}</span>,
+    },
+    {
+      id: "items",
+      accessorFn: (r) => r.items?.length ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.items?.length ?? 0} lines</span>,
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+    },
+    {
+      id: "createdAt",
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Created" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {new Date(row.original.createdAt).toLocaleDateString("en-LK")}
+        </span>
+      ),
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) => {
+        const p = row.original;
+        return (
+          <div className="flex gap-1 justify-end">
+            {p.status === "DRAFT" && (
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => submitPr(p.id)}>
+                <Send className="h-3 w-3" /> Submit
+              </Button>
+            )}
+            {p.status === "APPROVED" && !p.convertedPo && (
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => convertPr(p.id)}>
+                → PO
+              </Button>
+            )}
+            {p.convertedPo && (
+              <span className="text-[10px] font-mono text-muted-foreground">{p.convertedPo.poNumber}</span>
+            )}
+          </div>
+        );
+      },
+    },
+  ], [suppliers]);
+
+  const grnColumns = useMemo<ColumnDef<GrnRow>[]>(() => [
+    {
+      id: "grnNumber",
+      accessorKey: "grnNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="GRN #" />,
+      cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.grnNumber}</span>,
+    },
+    {
+      id: "source",
+      accessorKey: "source",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Source" />,
+      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.source}</Badge>,
+    },
+    {
+      id: "supplier",
+      accessorFn: (r) => r.supplier?.name ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.supplier?.name ?? "—"}</span>,
+    },
+    {
+      id: "po",
+      accessorFn: (r) => r.purchase?.poNumber ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="PO" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.purchase?.poNumber ?? "—"}</span>,
+    },
+    {
+      id: "lines",
+      accessorFn: (r) => r._count?.items ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,
+      cell: ({ row }) => <span className="text-sm">{row.original._count?.items ?? 0}</span>,
+    },
+    {
+      id: "receivedAt",
+      accessorKey: "receivedAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Received" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {new Date(row.original.receivedAt).toLocaleString("en-LK")}
+        </span>
+      ),
+    },
+  ], []);
+
+  const returnColumns = useMemo<ColumnDef<ReturnRow>[]>(() => [
+    {
+      id: "returnNumber",
+      accessorKey: "returnNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Return #" />,
+      cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.returnNumber}</span>,
+    },
+    {
+      id: "supplier",
+      accessorFn: (r) => r.supplier?.name ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.supplier?.name ?? "—"}</span>,
+    },
+    {
+      id: "lines",
+      accessorFn: (r) => r._count?.items ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,
+      cell: ({ row }) => <span className="text-sm">{row.original._count?.items ?? 0}</span>,
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) =>
+        row.original.status === "DRAFT" ? (
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => postReturn(row.original.id)}>
+            Post
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
+    },
+  ], []);
+
+  const invoiceColumns = useMemo<ColumnDef<InvoiceRow>[]>(() => [
+    {
+      id: "invoiceNumber",
+      accessorKey: "invoiceNumber",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice #" />,
+      cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.invoiceNumber}</span>,
+    },
+    {
+      id: "supplier",
+      accessorFn: (r) => r.supplier?.name ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.supplier?.name ?? "—"}</span>,
+    },
+    {
+      id: "po",
+      accessorFn: (r) => r.purchase?.poNumber ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="PO" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.purchase?.poNumber ?? "—"}</span>,
+    },
+    {
+      id: "total",
+      accessorKey: "total",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Total" />,
+      cell: ({ row }) => <span className="text-sm font-medium">LKR {formatNumber(row.original.total)}</span>,
+    },
+    {
+      id: "paid",
+      accessorKey: "paidAmount",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Paid" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-emerald-600">LKR {formatNumber(row.original.paidAmount)}</span>
+      ),
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+    },
+  ], []);
+
+  const STATS = [
+    { label: "Purchase Requests", value: prs.length, icon: ClipboardList, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Goods Receipts", value: grns.length, icon: PackageCheck, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Supplier Returns", value: returns.length, icon: RotateCcw, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Invoices", value: invoices.length, icon: FileText, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+  ];
+
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Procurement</h1>
           <p className="text-sm text-muted-foreground">
-            Purchase requests · PO · GRN (PO / Direct / Quick) · Returns · Invoices · Approvals
+            {profile.label} · Purchase requests, GRN, returns & supplier invoices
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
-            Purchase Orders
-          </Button>
           <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
+            <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
+          </Button>
+          <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
+            <Plus className="h-3.5 w-3.5" /> New PO
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {[
-          { label: "Purchase Requests", val: prs.length, icon: ClipboardList },
-          { label: "Goods Receipts", val: grns.length, icon: PackageCheck },
-          { label: "Supplier Returns", val: returns.length, icon: RotateCcw },
-          { label: "Invoices", val: invoices.length, icon: FileText },
-        ].map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-3 flex items-center gap-2.5">
-              <div className="p-2 rounded-lg bg-primary/10"><k.icon className="h-4 w-4 text-primary" /></div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {STATS.map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
+              </div>
               <div>
-                <p className="text-lg font-bold">{k.val}</p>
-                <p className="text-[10px] text-muted-foreground">{k.label}</p>
+                <p className="text-xl font-bold leading-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -244,83 +445,60 @@ export default function ProcurementHubPage() {
         </TabsList>
 
         <TabsContent value="requests" className="mt-4 space-y-3">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-muted-foreground">Request stock → approve → convert to PO</p>
-            <Button size="sm" className="gap-1.5" onClick={async () => {
-              toast.message("Create a draft PO from Purchases, or use Convert after approving a PR created via API");
-              router.push("/purchases/new");
-            }}>
-              <Plus className="h-3.5 w-3.5" /> New PO / Request
-            </Button>
-          </div>
-          <SimpleTable
-            headers={["PR #", "Items", "Status", "Created", ""]}
-            rows={prs.map((p) => [
-              p.requestNumber,
-              `${p.items?.length ?? 0} lines`,
-              <Badge key="s" variant="secondary" className="text-[10px]">{p.status}</Badge>,
-              new Date(p.createdAt).toLocaleDateString("en-LK"),
-              <div key="a" className="flex gap-1 justify-end">
-                {p.status === "DRAFT" && (
-                  <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => submitPr(p.id)}>
-                    <Send className="h-3 w-3" /> Submit
-                  </Button>
-                )}
-                {p.status === "APPROVED" && !p.convertedPo && suppliers[0] && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="h-7 text-xs"
-                    onClick={async () => {
-                      try {
-                        const po = await api.post<{ poNumber: string }>(`/procurement/purchase-requests/${p.id}/convert`, {
-                          supplierId: suppliers[0].id,
-                        });
-                        toast.success(`Converted to ${(po.data as { poNumber?: string })?.poNumber ?? "PO"}`);
-                        load();
-                      } catch (e: unknown) {
-                        toast.error((e as Error).message ?? "Convert failed");
-                      }
-                    }}
-                  >
-                    → PO
-                  </Button>
-                )}
-                {p.convertedPo && <span className="text-[10px] font-mono text-muted-foreground">{p.convertedPo.poNumber}</span>}
-              </div>,
-            ])}
-            empty="No purchase requests yet"
-          />
+          <p className="text-sm text-muted-foreground">Request stock → approve → convert to PO</p>
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={prs}
+              columns={prColumns}
+              pageCount={Math.ceil(prs.length / 10) || 1}
+              searchableColumns={[
+                { id: "requestNumber", title: "PR #" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "purchase-requests" }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="grn" className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">
-            Formal GRN documents from PO receive, Direct GRN, or Quick GRN. Partial receiving updates PO status.
+            Formal GRN documents from PO receive, Direct GRN, or Quick GRN.
           </p>
-          <SimpleTable
-            headers={["GRN #", "Source", "Supplier", "PO", "Lines", "Received"]}
-            rows={grns.map((g) => [
-              g.grnNumber,
-              <Badge key="src" variant="outline" className="text-[10px]">{g.source}</Badge>,
-              g.supplier?.name ?? "—",
-              g.purchase?.poNumber ?? "—",
-              String(g._count?.items ?? 0),
-              new Date(g.receivedAt).toLocaleString("en-LK"),
-            ])}
-            empty="No GRN documents — receive a PO or use Quick GRN"
-          />
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={grns}
+              columns={grnColumns}
+              pageCount={Math.ceil(grns.length / 10) || 1}
+              searchableColumns={[
+                { id: "grnNumber", title: "GRN #" },
+                { id: "supplier", title: "Supplier" },
+                { id: "source", title: "Source" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="quick" className="mt-4">
           <Card>
             <CardContent className="p-5 space-y-4 max-w-xl">
               <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-amber-500" />
-                <h2 className="font-semibold text-sm">Quick GRN (Cashier)</h2>
+                <div className="p-2 rounded-xl bg-amber-500/10">
+                  <Zap className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <h2 className="font-semibold text-sm">Quick GRN (Cashier)</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Walk-in purchase — posts stock immediately without a PO
+                  </p>
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Walk-in / cash purchase — posts stock immediately without a PO. Creates a QUICK GRN document.
-              </p>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold">Supplier</label>
                 <select
@@ -366,28 +544,35 @@ export default function ProcurementHubPage() {
         </TabsContent>
 
         <TabsContent value="returns" className="mt-4 space-y-3">
-          <p className="text-sm text-muted-foreground">Draft → Post deducts stock (DAMAGE) and reduces supplier balance.</p>
-          <SimpleTable
-            headers={["Return #", "Supplier", "Lines", "Status", ""]}
-            rows={returns.map((r) => [
-              r.returnNumber,
-              r.supplier?.name ?? "—",
-              String(r._count?.items ?? 0),
-              <Badge key="s" variant="secondary" className="text-[10px]">{r.status}</Badge>,
-              r.status === "DRAFT" ? (
-                <Button key="p" size="sm" variant="outline" className="h-7 text-xs" onClick={() => postReturn(r.id)}>Post</Button>
-              ) : "—",
-            ])}
-            empty="No supplier returns"
-          />
+          <p className="text-sm text-muted-foreground">Draft → Post deducts stock and reduces supplier balance.</p>
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={returns}
+              columns={returnColumns}
+              pageCount={Math.ceil(returns.length / 10) || 1}
+              searchableColumns={[
+                { id: "returnNumber", title: "Return #" },
+                { id: "supplier", title: "Supplier" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "supplier-returns" }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="invoices" className="mt-4 space-y-4">
           <Card>
-            <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end max-w-3xl">
+            <CardContent className="p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
               <div className="space-y-1">
                 <label className="text-xs font-semibold">Supplier</label>
-                <select className="w-full h-9 rounded-md border bg-background px-2 text-sm" value={invSupplier} onChange={(e) => setInvSupplier(e.target.value)}>
+                <select
+                  className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                  value={invSupplier}
+                  onChange={(e) => setInvSupplier(e.target.value)}
+                >
                   <option value="">Select…</option>
                   {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
@@ -406,55 +591,24 @@ export default function ProcurementHubPage() {
               </Button>
             </CardContent>
           </Card>
-          <SimpleTable
-            headers={["Invoice #", "Supplier", "PO", "Total", "Paid", "Status"]}
-            rows={invoices.map((i) => [
-              i.invoiceNumber,
-              i.supplier?.name ?? "—",
-              i.purchase?.poNumber ?? "—",
-              `LKR ${formatNumber(i.total)}`,
-              `LKR ${formatNumber(i.paidAmount)}`,
-              <Badge key="s" variant="secondary" className="text-[10px]">{i.status}</Badge>,
-            ])}
-            empty="No supplier invoices"
-          />
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={invoices}
+              columns={invoiceColumns}
+              pageCount={Math.ceil(invoices.length / 10) || 1}
+              searchableColumns={[
+                { id: "invoiceNumber", title: "Invoice #" },
+                { id: "supplier", title: "Supplier" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "supplier-invoices" }}
+            />
+          )}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function SimpleTable({
-  headers,
-  rows,
-  empty,
-}: {
-  headers: string[];
-  rows: React.ReactNode[][];
-  empty: string;
-}) {
-  return (
-    <div className="rounded-xl border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40">
-          <tr>
-            {headers.map((h) => (
-              <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase">{h || ""}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length === 0 ? (
-            <tr><td colSpan={headers.length} className="px-3 py-8 text-center text-sm text-muted-foreground">{empty}</td></tr>
-          ) : rows.map((row, i) => (
-            <tr key={i} className="border-t">
-              {row.map((cell, j) => (
-                <td key={j} className="px-3 py-2.5 text-xs">{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

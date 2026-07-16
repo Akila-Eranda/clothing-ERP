@@ -212,10 +212,10 @@ async function main() {
     }
   });
   console.log("\u2705 Platform admin: admin@hexalyte.com (password: Admin@123456) \u2014 admin3.hexalyte.com only");
-  const tenant = await prisma.tenant.upsert({
+    const tenant = await prisma.tenant.upsert({
     where: { subdomain: "demo" },
-    update: {},
-    create: {
+        update: {},
+        create: {
       name: "Demo Fashion Store",
       subdomain: "demo",
       email: "admin@demo.fashionerp.com",
@@ -228,20 +228,20 @@ async function main() {
     }
   });
   console.log(`\u2705 Tenant: ${tenant.name} (${tenant.id})`);
-  const branch = await prisma.branch.upsert({
+    const branch = await prisma.branch.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: "HO-001" } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
+        update: {},
+        create: {
+            tenantId: tenant.id,
       name: "Main Store - Head Office",
       code: "HO-001",
-      isDefault: true,
+            isDefault: true,
       city: "Mumbai",
       state: "Maharashtra"
     }
   });
   console.log(`\u2705 Branch: ${branch.name} (${branch.id})`);
-  const permissionDefs = [
+    const permissionDefs = [
     // Products
     { resource: "products", action: "create" },
     { resource: "products", action: "read" },
@@ -310,31 +310,31 @@ async function main() {
       });
     }
   };
-  const superAdminRole = await prisma.role.upsert({
+    const superAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Super Admin" } },
-    update: {},
+        update: {},
     create: { tenantId: tenant.id, name: "Super Admin", type: import_client.RoleType.SUPER_ADMIN, isSystem: true }
-  });
-  const tenantAdminRole = await prisma.role.upsert({
+    });
+    const tenantAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Tenant Admin" } },
-    update: {},
-    create: {
+        update: {},
+        create: {
       tenantId: tenant.id,
       name: "Tenant Admin",
       type: import_client.RoleType.TENANT_ADMIN,
       isSystem: true,
       permissions: { create: permissions.map((p) => ({ permissionId: p.id })) }
     }
-  });
-  const cashierRole = await prisma.role.upsert({
+    });
+    const cashierRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Cashier" } },
-    update: {},
-    create: {
+        update: {},
+        create: {
       tenantId: tenant.id,
       name: "Cashier",
       type: import_client.RoleType.CASHIER,
       isSystem: true,
-      permissions: {
+            permissions: {
         create: permissions.filter((p) => ["sales", "customers", "inventory", "products"].includes(p.resource) && p.action !== "delete").map((p) => ({ permissionId: p.id }))
       }
     }
@@ -455,17 +455,17 @@ async function main() {
     "inventory:read"
   ]);
   console.log("\u2705 Seeded roles: Super Admin, Tenant Admin, Cashier, Branch Manager, Inventory Manager, Accountant, Purchasing Staff");
-  const adminUser = await prisma.user.upsert({
+    const adminUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "admin@demo.fashionerp.com" } },
     update: { status: import_client.UserStatus.ACTIVE, emailVerified: true },
-    create: {
-      tenantId: tenant.id,
-      branchId: branch.id,
+        create: {
+            tenantId: tenant.id,
+            branchId: branch.id,
       email: "admin@demo.fashionerp.com",
       firstName: "Admin",
       lastName: "User",
-      passwordHash,
-      emailVerified: true,
+            passwordHash,
+            emailVerified: true,
       status: import_client.UserStatus.ACTIVE,
       roles: { create: [{ roleId: tenantAdminRole.id }] }
     }
@@ -479,17 +479,17 @@ async function main() {
     create: { userId: adminUser.id, roleId: tenantAdminRole.id }
   });
   console.log(`\u2705 Shop admin: ${adminUser.email} (password: Admin@123456) \u2014 shop.hexalyte.com only`);
-  const cashierUser = await prisma.user.upsert({
+    const cashierUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "cashier@demo.fashionerp.com" } },
-    update: {},
-    create: {
-      tenantId: tenant.id,
-      branchId: branch.id,
+        update: {},
+        create: {
+            tenantId: tenant.id,
+            branchId: branch.id,
       email: "cashier@demo.fashionerp.com",
       firstName: "Demo",
       lastName: "Cashier",
       passwordHash: await bcrypt.hash("Cashier@123456", 12),
-      emailVerified: true,
+            emailVerified: true,
       status: import_client.UserStatus.ACTIVE,
       roles: { create: [{ roleId: cashierRole.id }] }
     }
@@ -946,7 +946,7 @@ async function main() {
     }
   });
   for (const name of tyreProfile.defaultCategories) {
-    await prisma.category.upsert({
+        await prisma.category.upsert({
       where: { tenantId_slug: { tenantId: tyreTenant.id, slug: slugifyCategory(name) } },
       update: {},
       create: { tenantId: tyreTenant.id, name, slug: slugifyCategory(name) }
@@ -1182,8 +1182,8 @@ async function main() {
     });
     const kamal = await prisma.customer.upsert({
       where: { tenantId_phone: { tenantId: tyreTenant.id, phone: "0771234567" } },
-      update: {},
-      create: {
+            update: {},
+            create: {
         tenantId: tyreTenant.id,
         firstName: "Kamal",
         lastName: "Perera",

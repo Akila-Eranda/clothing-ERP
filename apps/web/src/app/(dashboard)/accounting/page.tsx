@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useCallback } from "react";
 import {
@@ -21,6 +21,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import Link from "next/link";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Expense {
@@ -1014,9 +1015,65 @@ export default function AccountingPage() {
           </TabsContent>
 
           {/* ══ SETTINGS ══ */}
-          <TabsContent value="settings" className="m-0">
-            <div className="h-64 flex items-center justify-center text-muted-foreground bg-card rounded-xl border shadow-sm">
-              <div className="text-center"><Scale className="h-10 w-10 mx-auto mb-3 opacity-30" /><p className="text-sm font-medium">Settings coming soon</p></div>
+          <TabsContent value="settings" className="m-0 space-y-4">
+            <div className="grid md:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Receipt &amp; tax defaults</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>Shop name, logo, thermal width, and tax labels are managed in Settings.</p>
+                  <Button asChild size="sm" variant="outline" className="gap-1.5">
+                    <Link href="/settings">Open Settings</Link>
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Chart of accounts</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>Add or edit ledger accounts from the Chart of Accounts tab. Journal entries post to those accounts.</p>
+                  <Button size="sm" variant="outline" onClick={() => setActiveTab("accounts")}>
+                    Go to Accounts
+                  </Button>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Finance hubs</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>Cheques, bank accounts, and cash book live in Finance Hub. Customer credit limits and reminders are under Customer Credit.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/accounting/finance">Finance Hub</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/accounting/credit">Customer Credit</Link>
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/cash">Cash Management</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-semibold">Reports</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-sm text-muted-foreground">
+                  <p>P&amp;L and Balance Sheet are on the Reports tab here. Operational reports (sales, expiry, cheques) are under Reports in the sidebar.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" onClick={() => setActiveTab("reports")}>
+                      Accounting Reports
+                    </Button>
+                    <Button asChild size="sm" variant="outline">
+                      <Link href="/reports">All Reports</Link>
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 

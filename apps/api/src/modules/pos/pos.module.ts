@@ -660,11 +660,39 @@ export class PosService {
     if (raw.length > 3 && /\d{3}$/.test(raw)) {
       keys.add(raw.slice(0, -3));
     }
+    // Scale / embedded-price EAN-13 (prefix 2): extract PLU article codes
+    const scale = this.parseScaleBarcode(raw);
+    if (scale) {
+      for (const k of scale.pluKeys) keys.add(k);
+    }
     return [...keys];
+  }
+
+  /**
+   * Supermarket scale barcodes (EAN-13 starting with 2):
+   * digits 2–6 = PLU/article, 7–11 = price (cents) or weight×1000.
+   */
+  private parseScaleBarcode(code: string): {
+    pluKeys: string[];
+    embeddedValue: number;
+    asPrice: number;
+    asWeightKg: number;
+  } | null {
+    const raw = code.trim();
+    if (!/^2\d{12}$/.test(raw)) return null;
+    const embeddedValue = parseInt(raw.slice(7, 12), 10);
+    if (Number.isNaN(embeddedValue)) return null;
+    return {
+      pluKeys: [raw.slice(2, 7), raw.slice(1, 7), raw.slice(0, 7)],
+      embeddedValue,
+      asPrice: embeddedValue / 100,
+      asWeightKg: embeddedValue / 1000,
+    };
   }
 
   async lookupBarcode(tenantId: string, branchId: string, code: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const scale = this.parseScaleBarcode(code.trim());
     const keys = this.barcodeLookupKeys(code);
     for (const key of keys) {
       const variants = await this.prisma.productVariant.findMany({
@@ -699,15 +727,24 @@ export class PosService {
 
       const variant = (ranked.find((row) => row.stock > 0) ?? ranked[0]).variant;
       const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
+      const basePrice = variant.sellingPrice;
+      // Prefer embedded price when scale barcode and value looks like currency (>= 1.00)
+      const unitPrice = scale && scale.asPrice >= 1
+        ? scale.asPrice
+        : basePrice;
+      const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
+        ? scale.asWeightKg
+        : undefined;
       return {
         variantId: variant.id, productName: variant.product.name, variantName: variant.name,
-        sku: variant.sku, barcode: effectiveBarcode, unitPrice: variant.sellingPrice,
+        sku: variant.sku, barcode: effectiveBarcode, unitPrice,
         costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
         color: variant.color, size: variant.size, material: variant.material ?? undefined,
         style: variant.style ?? undefined,
         category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
         stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
         imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
+        ...(scale ? { isScaleBarcode: true, scaleQty, embeddedValue: scale.embeddedValue } : {}),
       };
     }
     throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
@@ -718,24 +755,38 @@ export class PosService {
     const refundNumber = `RET-${dayjs().format('YYYYMMDD')}-${nanoid(4).toUpperCase()}`;
     const total = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
 
-    for (const item of dto.items) {
-      await this.inventoryService.adjustStock(tenantId, branchId, userId, {
-        variantId: item.variantId,
-        quantity: item.quantity,
-        movementType: StockMovementType.RETURN,
-        referenceId: refundNumber,
-        notes: dto.reason ?? 'Customer return',
-      });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      for (const item of dto.items) {
+        await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+          variantId: item.variantId,
+          quantity: item.quantity,
+          movementType: StockMovementType.RETURN,
+          referenceId: refundNumber,
+          notes: dto.reason ?? 'Customer return',
+        }, tx);
+      }
+    });
     return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
   }
 
-  async getProducts(tenantId: string, branchId: string) {
+  async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number }) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const take = Math.min(Math.max(opts?.limit ?? 1500, 1), 2000);
+    const search = opts?.search?.trim();
     const variants = await this.prisma.productVariant.findMany({
       where: {
         isActive: true,
         product: { tenantId, status: 'ACTIVE' },
+        ...(search
+          ? {
+              OR: [
+                { sku: { contains: search, mode: 'insensitive' } },
+                { barcode: { contains: search, mode: 'insensitive' } },
+                { name: { contains: search, mode: 'insensitive' } },
+                { product: { name: { contains: search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
       },
       include: {
         product: { include: { category: true } },
@@ -746,6 +797,7 @@ export class PosService {
         },
       },
       orderBy: [{ product: { name: 'asc' } }, { name: 'asc' }],
+      take,
     });
 
     return variants.map((v) => ({
@@ -1065,8 +1117,15 @@ export class PosController {
 
   @Get('products')
   @ApiOperation({ summary: 'Get all active products/variants for POS with current stock' })
-  getProducts(@CurrentUser() user: IAuthUser) {
-    return this.posService.getProducts(user.tenantId, user.branchId ?? '');
+  getProducts(
+    @CurrentUser() user: IAuthUser,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.posService.getProducts(user.tenantId, user.branchId ?? '', {
+      search,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Post('day-end')

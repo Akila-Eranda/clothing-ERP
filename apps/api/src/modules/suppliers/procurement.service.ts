@@ -3,6 +3,7 @@ import {
   GoodsReceiptSource,
   GoodsReceiptStatus,
   PaymentMethod,
+  Prisma,
   PurchaseOrderStatus,
   PurchaseRequestStatus,
   StockMovementType,
@@ -270,8 +271,10 @@ export class ProcurementService {
     notes?: string;
     supplierInvoiceRef?: string;
     lines: GrnLineInput[];
+    /** Runs inside the same DB transaction after stock is posted (e.g. PO qty updates). */
+    afterStock?: (tx: Prisma.TransactionClient, grn: { id: string; items: { id: string; variantId: string; lotId: string | null }[] }) => Promise<void>;
   }) {
-    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines } = params;
+    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines, afterStock } = params;
     if (!lines?.length) throw new BadRequestException('At least one GRN line is required');
     if (!branchId) throw new BadRequestException('Branch is required to post GRN');
 
@@ -350,6 +353,10 @@ export class ProcurementService {
         }
       }
 
+      if (afterStock) {
+        await afterStock(tx, created);
+      }
+
       return created;
     });
 
@@ -425,31 +432,30 @@ export class ProcurementService {
       purchaseId: poId,
       notes: `GRN from PO ${po.poNumber}`,
       lines: grnLines,
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
-        await tx.purchaseOrderItem.update({
-          where: { id: item.itemId },
+      afterStock: async (tx) => {
+        for (const item of items) {
+          if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
+          await tx.purchaseOrderItem.update({
+            where: { id: item.itemId },
+            data: {
+              receivedQty: { increment: item.receivedQty },
+              rejectedQty: { increment: item.rejectedQty ?? 0 },
+            },
+          });
+        }
+        await tx.purchaseOrder.update({
+          where: { id: poId },
           data: {
-            receivedQty: { increment: item.receivedQty },
-            rejectedQty: { increment: item.rejectedQty ?? 0 },
+            status:
+              plan.status === 'RECEIVED'
+                ? PurchaseOrderStatus.RECEIVED
+                : plan.status === 'PARTIALLY_RECEIVED'
+                  ? PurchaseOrderStatus.PARTIALLY_RECEIVED
+                  : po.status,
+            receivedDate: plan.fullyReceived ? new Date() : undefined,
           },
         });
-      }
-      await tx.purchaseOrder.update({
-        where: { id: poId },
-        data: {
-          status:
-            plan.status === 'RECEIVED'
-              ? PurchaseOrderStatus.RECEIVED
-              : plan.status === 'PARTIALLY_RECEIVED'
-                ? PurchaseOrderStatus.PARTIALLY_RECEIVED
-                : po.status,
-          receivedDate: plan.fullyReceived ? new Date() : undefined,
-        },
-      });
+      },
     });
 
     return {

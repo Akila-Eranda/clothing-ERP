@@ -387,9 +387,19 @@ export class InventoryService {
     const warehouseId = await this.resolveWarehouseId(tenantId, effectiveBranch, dto.warehouseId);
 
     const execute = async (client: Prisma.TransactionClient) => {
-      const inventory = await client.inventory.findFirst({
-        where: { tenantId, warehouseId, variantId: dto.variantId },
-      });
+      // Row lock to reduce concurrent oversell under multi-cashier load
+      const locked = await client.$queryRaw<{ id: string }[]>`
+        SELECT id FROM inventory
+        WHERE "tenantId" = ${tenantId}
+          AND "warehouseId" = ${warehouseId}
+          AND "variantId" = ${dto.variantId}
+        FOR UPDATE
+      `;
+      const inventory = locked[0]
+        ? await client.inventory.findUnique({ where: { id: locked[0].id } })
+        : await client.inventory.findFirst({
+            where: { tenantId, warehouseId, variantId: dto.variantId },
+          });
 
       const currentQty = inventory?.quantity ?? 0;
       const currentReserved = inventory?.reservedQty ?? 0;
@@ -453,6 +463,7 @@ export class InventoryService {
             referenceId: dto.referenceId,
             notes: dto.notes,
             lotId: dto.lotId,
+            warehouseId,
           });
           primaryLotId = lot?.id;
           primaryBatch = lot?.batchNumber ?? primaryBatch;
@@ -460,7 +471,7 @@ export class InventoryService {
         } else if (adjDelta < 0) {
           outboundAllocations = await planLotAllocation(
             client, tenantId, effectiveBranch, dto.variantId, Math.abs(adjDelta), dto.lotId, strategy,
-            { blockExpired: false },
+            { blockExpired: false, warehouseId },
           );
           await applyOutboundLots(client, outboundAllocations);
           if (outboundAllocations[0]) {
@@ -483,6 +494,7 @@ export class InventoryService {
           referenceId: dto.referenceId,
           notes: dto.notes,
           lotId: dto.lotId,
+          warehouseId,
         });
         primaryLotId = lot?.id;
         primaryBatch = lot?.batchNumber ?? primaryBatch;
@@ -492,7 +504,7 @@ export class InventoryService {
         const blockExpired = dto.movementType === StockMovementType.SALE && tenantBlockExpired;
         outboundAllocations = await planLotAllocation(
           client, tenantId, effectiveBranch, dto.variantId, qty, dto.lotId, strategy,
-          { blockExpired },
+          { blockExpired, warehouseId },
         );
         await applyOutboundLots(client, outboundAllocations);
         if (outboundAllocations[0]) {
@@ -1080,13 +1092,14 @@ export class InventoryService {
         throw new BadRequestException('Transfer must be approved before dispatch');
       }
 
+      const fromWarehouseId = transfer.fromWarehouseId
+        ?? await this.resolveWarehouseId(transfer.tenantId, transfer.fromBranchId);
+
       for (const item of transfer.items) {
-        const fromWh = transfer.fromWarehouseId
-          ?? await this.resolveWarehouseId(transfer.tenantId, transfer.fromBranchId);
         const inv = await this.prisma.inventory.findFirst({
           where: {
             tenantId: transfer.tenantId,
-            warehouseId: fromWh,
+            warehouseId: fromWarehouseId,
             variantId: item.variantId,
           },
         });
@@ -1097,47 +1110,46 @@ export class InventoryService {
         }
       }
 
-      const fromWarehouseId = transfer.fromWarehouseId
-        ?? await this.resolveWarehouseId(transfer.tenantId, transfer.fromBranchId);
+      const updated = await this.prisma.$transaction(async (tx) => {
+        for (const item of transfer.items) {
+          const result = await this.adjustStock(transfer.tenantId, transfer.fromBranchId, userId, {
+            variantId: item.variantId,
+            quantity: item.requestedQty,
+            movementType: StockMovementType.TRANSFER_OUT,
+            referenceId: transfer.id,
+            referenceType: 'StockTransfer',
+            warehouseId: fromWarehouseId,
+            notes: `Transfer dispatched to warehouse ${transfer.toWarehouseId ?? transfer.toBranchId}`,
+          }, tx) as Awaited<ReturnType<InventoryService['adjustStock']>> & {
+            _lotAllocations?: { lotId: string; quantity: number; batchNumber: string | null; expiryDate: Date | null }[];
+          };
 
-      for (const item of transfer.items) {
-        const result = await this.adjustStock(transfer.tenantId, transfer.fromBranchId, userId, {
-          variantId: item.variantId,
-          quantity: item.requestedQty,
-          movementType: StockMovementType.TRANSFER_OUT,
-          referenceId: transfer.id,
-          referenceType: 'StockTransfer',
-          warehouseId: fromWarehouseId,
-          notes: `Transfer dispatched to warehouse ${transfer.toWarehouseId ?? transfer.toBranchId}`,
-        }) as Awaited<ReturnType<InventoryService['adjustStock']>> & {
-          _lotAllocations?: { lotId: string; quantity: number; batchNumber: string | null; expiryDate: Date | null }[];
-        };
-
-        await this.prisma.stockTransferItem.update({
-          where: { id: item.id },
-          data: { sentQty: item.requestedQty },
-        });
-
-        for (const a of result._lotAllocations ?? []) {
-          await this.prisma.stockTransferLot.create({
-            data: {
-              transferItemId: item.id,
-              fromLotId: a.lotId,
-              batchNumber: a.batchNumber,
-              expiryDate: a.expiryDate,
-              quantity: a.quantity,
-            },
+          await tx.stockTransferItem.update({
+            where: { id: item.id },
+            data: { sentQty: item.requestedQty },
           });
-        }
-      }
 
-      const updated = await this.prisma.stockTransfer.update({
-        where: { id },
-        data: { status, dispatchedAt: new Date() },
-        include: {
-          items: { include: { variant: { include: { product: true } } } },
-          fromBranch: { select: { id: true, name: true, code: true } },
-        },
+          for (const a of result._lotAllocations ?? []) {
+            await tx.stockTransferLot.create({
+              data: {
+                transferItemId: item.id,
+                fromLotId: a.lotId,
+                batchNumber: a.batchNumber,
+                expiryDate: a.expiryDate,
+                quantity: a.quantity,
+              },
+            });
+          }
+        }
+
+        return tx.stockTransfer.update({
+          where: { id },
+          data: { status, dispatchedAt: new Date() },
+          include: {
+            items: { include: { variant: { include: { product: true } } } },
+            fromBranch: { select: { id: true, name: true, code: true } },
+          },
+        });
       });
       const [enriched] = await this.enrichTransfers([updated]);
       return enriched;
@@ -1151,74 +1163,77 @@ export class InventoryService {
       const toWarehouseId = transfer.toWarehouseId
         ?? await this.resolveWarehouseId(transfer.tenantId, transfer.toBranchId);
 
-      for (const item of transfer.items) {
-        const qty = item.sentQty || item.requestedQty;
-        const lotRows = await this.prisma.stockTransferLot.findMany({
-          where: { transferItemId: item.id },
-        });
+      const updated = await this.prisma.$transaction(async (tx) => {
+        for (const item of transfer.items) {
+          const qty = item.sentQty || item.requestedQty;
+          const lotRows = await tx.stockTransferLot.findMany({
+            where: { transferItemId: item.id },
+          });
 
-        if (lotRows.length) {
-          for (const lr of lotRows) {
+          if (lotRows.length) {
+            for (const lr of lotRows) {
+              await this.adjustStock(transfer.tenantId, transfer.toBranchId, userId, {
+                variantId: item.variantId,
+                quantity: lr.quantity,
+                movementType: StockMovementType.TRANSFER_IN,
+                referenceId: transfer.id,
+                referenceType: 'StockTransfer',
+                warehouseId: toWarehouseId,
+                notes: `Transfer received from warehouse ${transfer.fromWarehouseId ?? transfer.fromBranchId}`,
+                batchNumber: lr.batchNumber ?? undefined,
+                expiryDate: lr.expiryDate?.toISOString(),
+              }, tx);
+              const toLot = await tx.inventoryLot.findFirst({
+                where: {
+                  tenantId: transfer.tenantId,
+                  branchId: transfer.toBranchId,
+                  warehouseId: toWarehouseId,
+                  variantId: item.variantId,
+                  batchNumber: lr.batchNumber ?? null,
+                  ...(lr.expiryDate
+                    ? {
+                        expiryDate: {
+                          gte: new Date(new Date(lr.expiryDate).setHours(0, 0, 0, 0)),
+                          lt: new Date(new Date(lr.expiryDate).setHours(24, 0, 0, 0)),
+                        },
+                      }
+                    : { expiryDate: null }),
+                },
+                orderBy: { receivedAt: 'desc' },
+              });
+              if (toLot) {
+                await tx.stockTransferLot.update({
+                  where: { id: lr.id },
+                  data: { toLotId: toLot.id },
+                });
+              }
+            }
+          } else {
             await this.adjustStock(transfer.tenantId, transfer.toBranchId, userId, {
               variantId: item.variantId,
-              quantity: lr.quantity,
+              quantity: qty,
               movementType: StockMovementType.TRANSFER_IN,
               referenceId: transfer.id,
               referenceType: 'StockTransfer',
               warehouseId: toWarehouseId,
               notes: `Transfer received from warehouse ${transfer.fromWarehouseId ?? transfer.fromBranchId}`,
-              batchNumber: lr.batchNumber ?? undefined,
-              expiryDate: lr.expiryDate?.toISOString(),
-            });
-            const toLot = await this.prisma.inventoryLot.findFirst({
-              where: {
-                tenantId: transfer.tenantId,
-                branchId: transfer.toBranchId,
-                variantId: item.variantId,
-                batchNumber: lr.batchNumber ?? null,
-                ...(lr.expiryDate
-                  ? {
-                      expiryDate: {
-                        gte: new Date(new Date(lr.expiryDate).setHours(0, 0, 0, 0)),
-                        lt: new Date(new Date(lr.expiryDate).setHours(24, 0, 0, 0)),
-                      },
-                    }
-                  : { expiryDate: null }),
-              },
-              orderBy: { receivedAt: 'desc' },
-            });
-            if (toLot) {
-              await this.prisma.stockTransferLot.update({
-                where: { id: lr.id },
-                data: { toLotId: toLot.id },
-              });
-            }
+            }, tx);
           }
-        } else {
-          await this.adjustStock(transfer.tenantId, transfer.toBranchId, userId, {
-            variantId: item.variantId,
-            quantity: qty,
-            movementType: StockMovementType.TRANSFER_IN,
-            referenceId: transfer.id,
-            referenceType: 'StockTransfer',
-            warehouseId: toWarehouseId,
-            notes: `Transfer received from warehouse ${transfer.fromWarehouseId ?? transfer.fromBranchId}`,
+
+          await tx.stockTransferItem.update({
+            where: { id: item.id },
+            data: { receivedQty: qty },
           });
         }
 
-        await this.prisma.stockTransferItem.update({
-          where: { id: item.id },
-          data: { receivedQty: qty },
+        return tx.stockTransfer.update({
+          where: { id },
+          data: { status, receivedAt: new Date(), approvedBy: userId },
+          include: {
+            items: { include: { variant: { include: { product: true } } } },
+            fromBranch: { select: { id: true, name: true, code: true } },
+          },
         });
-      }
-
-      const updated = await this.prisma.stockTransfer.update({
-        where: { id },
-        data: { status, receivedAt: new Date(), approvedBy: userId },
-        include: {
-          items: { include: { variant: { include: { product: true } } } },
-          fromBranch: { select: { id: true, name: true, code: true } },
-        },
       });
       const [enriched] = await this.enrichTransfers([updated]);
       return enriched;

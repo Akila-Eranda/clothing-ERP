@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Banknote, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, FileText,
-  Loader2, Plus, RefreshCw, StickyNote, TrendingUp, Users, Wallet,
+  AlertTriangle, Banknote, CalendarDays, CheckSquare, ChevronLeft, ChevronRight,
+  FileText, Loader2, Plus, RefreshCw, StickyNote, TrendingUp, Users, Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type DayBadges = {
   sales: number; expenses: number; chequesDue: number; customerDue: number;
@@ -54,6 +55,7 @@ function badgeDot(counts?: DayBadges) {
 }
 
 export default function BusinessCalendarPage() {
+  const { profile } = useShopWorkspace();
   const today = new Date().toISOString().slice(0, 10);
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [month, setMonth] = useState(() => new Date().getMonth() + 1);
@@ -171,104 +173,156 @@ export default function BusinessCalendarPage() {
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed"); }
   };
 
-  const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleString(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
+  const monthLabel = new Date(Date.UTC(year, month - 1, 1)).toLocaleString(undefined, {
+    month: "long", year: "numeric", timeZone: "UTC",
+  });
+
+  const DAY_STATS = day ? [
+    {
+      label: "Sales",
+      value: `LKR ${formatNumber(day.sales.net)}`,
+      sub: `${day.sales.count} orders`,
+      icon: TrendingUp,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      label: "Net Profit",
+      value: `LKR ${formatNumber(day.profit.netProfit)}`,
+      sub: `${day.profit.netMarginPct}% margin`,
+      icon: Wallet,
+      color: day.profit.netProfit >= 0 ? "text-indigo-500" : "text-rose-500",
+      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/10" : "bg-rose-500/10",
+    },
+    {
+      label: "Expenses",
+      value: `LKR ${formatNumber(day.expenses.total)}`,
+      sub: `${day.expenses.items.length} items`,
+      icon: Banknote,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    },
+    {
+      label: "Customer Due",
+      value: `LKR ${formatNumber(day.customerDue.reduce((s, c) => s + c.amount, 0))}`,
+      sub: `${day.customerDue.length} due`,
+      icon: AlertTriangle,
+      color: "text-rose-500",
+      bg: "bg-rose-500/10",
+    },
+  ] : [];
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <CalendarDays className="h-6 w-6" /> Business Calendar
-          </h1>
-          <p className="text-sm text-muted-foreground">Sales, profit, dues, notes, tasks & meetings</p>
+          <h1 className="text-2xl font-bold">Business Calendar</h1>
+          <p className="text-sm text-muted-foreground">
+            {profile.label} · Sales, profit, dues, notes, tasks & meetings
+          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => { loadMonth(); loadDay(selected); }} disabled={loading}>
-          <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} /> Refresh
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => { loadMonth(); loadDay(selected); }}
+            disabled={loading}
+            className="gap-1.5"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-4">
-        {/* Month grid */}
+      <div className="grid lg:grid-cols-12 gap-6">
         <Card className="lg:col-span-5">
-          <CardContent className="pt-4 space-y-3">
+          <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <Button variant="ghost" size="icon" onClick={() => shiftMonth(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <div className="font-semibold">{monthLabel}</div>
-              <Button variant="ghost" size="icon" onClick={() => shiftMonth(1)}><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => shiftMonth(-1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <p className="font-semibold text-sm">{monthLabel}</p>
+              <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => shiftMonth(1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground uppercase">
-              {WEEKDAYS.map((w) => <div key={w} className="py-1">{w}</div>)}
-            </div>
-            <div className="grid grid-cols-7 gap-1">
-              {gridDays.map((cell) => {
-                if (!cell.inMonth || !cell.date) {
-                  return <div key={cell.key} className="h-12 rounded-md bg-muted/20" />;
-                }
-                const isSel = cell.date === selected;
-                const isToday = cell.date === today;
-                return (
-                  <button
-                    key={cell.key}
-                    type="button"
-                    onClick={() => setSelected(cell.date!)}
-                    className={cn(
-                      "h-12 rounded-md text-sm transition-colors border",
-                      isSel ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted/50 border-transparent",
-                      isToday && !isSel && "ring-1 ring-primary/40",
-                    )}
-                  >
-                    <div className="font-medium">{cell.dayNum}</div>
-                    {badgeDot(badgeMap[cell.date!])}
-                  </button>
-                );
-              })}
-            </div>
-            <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pt-1">
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Sales</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Expenses</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Dues</span>
-              <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> Notes/Tasks</span>
-            </div>
+            {loading ? (
+              <div className="flex justify-center py-16">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground uppercase font-semibold">
+                  {WEEKDAYS.map((w) => <div key={w} className="py-1">{w}</div>)}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {gridDays.map((cell) => {
+                    if (!cell.inMonth || !cell.date) {
+                      return <div key={cell.key} className="h-12 rounded-xl bg-muted/20" />;
+                    }
+                    const isSel = cell.date === selected;
+                    const isToday = cell.date === today;
+                    return (
+                      <button
+                        key={cell.key}
+                        type="button"
+                        onClick={() => setSelected(cell.date!)}
+                        className={cn(
+                          "h-12 rounded-xl text-sm transition-colors border",
+                          isSel
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : "hover:bg-muted/50 border-transparent",
+                          isToday && !isSel && "ring-1 ring-indigo-400/50",
+                        )}
+                      >
+                        <div className="font-medium">{cell.dayNum}</div>
+                        {badgeDot(badgeMap[cell.date!])}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground pt-1">
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> Sales</span>
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Expenses</span>
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> Dues</span>
+                  <span className="flex items-center gap-1"><span className="h-1.5 w-1.5 rounded-full bg-sky-500" /> Notes/Tasks</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        {/* Day panel */}
-        <div className="lg:col-span-7 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-lg">{selected}</h2>
+        <div className="lg:col-span-7 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold">{selected}</h2>
+              <p className="text-xs text-muted-foreground">Day detail</p>
+            </div>
             {dayLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
           </div>
 
           {day && (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <Card><CardContent className="pt-3 pb-3">
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Sales</div>
-                  <div className="text-lg font-semibold tabular-nums">LKR {formatNumber(day.sales.net)}</div>
-                  <div className="text-[10px] text-muted-foreground">{day.sales.count} orders</div>
-                </CardContent></Card>
-                <Card><CardContent className="pt-3 pb-3">
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Wallet className="h-3 w-3" /> Net profit</div>
-                  <div className={cn("text-lg font-semibold tabular-nums", day.profit.netProfit >= 0 ? "text-emerald-600" : "text-rose-600")}>
-                    LKR {formatNumber(day.profit.netProfit)}
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">{day.profit.netMarginPct}% margin</div>
-                </CardContent></Card>
-                <Card><CardContent className="pt-3 pb-3">
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Banknote className="h-3 w-3" /> Expenses</div>
-                  <div className="text-lg font-semibold tabular-nums">LKR {formatNumber(day.expenses.total)}</div>
-                </CardContent></Card>
-                <Card><CardContent className="pt-3 pb-3">
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1"><Users className="h-3 w-3" /> Customer due</div>
-                  <div className="text-lg font-semibold tabular-nums text-amber-600">
-                    LKR {formatNumber(day.customerDue.reduce((s, c) => s + c.amount, 0))}
-                  </div>
-                </CardContent></Card>
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                {DAY_STATS.map((s) => (
+                  <Card key={s.label}>
+                    <CardContent className="p-4 flex items-center gap-3">
+                      <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                        <s.icon className={`h-5 w-5 ${s.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold leading-tight">{s.value}</p>
+                        <p className="text-xs text-muted-foreground">{s.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{s.sub}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-3">
+              <div className="grid md:grid-cols-2 gap-4">
                 <Section title="Expenses" icon={Banknote}>
-                  {day.expenses.items.slice(0, 6).map((e) => (
+                  {day.expenses.items.slice(0, 8).map((e) => (
                     <Row key={e.id} label={e.description} value={`LKR ${formatNumber(e.amount)}`} />
                   ))}
                   {!day.expenses.items.length && <Empty />}
@@ -311,10 +365,12 @@ export default function BusinessCalendarPage() {
                     <Row key={m.id} label={m.title} value={String(m.startsAt).slice(11, 16)} />
                   ))}
                   {!day.meetings.length && <Empty />}
-                  <div className="flex gap-1 mt-2">
-                    <Input placeholder="Meeting title" value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)} className="h-8 text-xs" />
-                    <Input type="time" value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)} className="h-8 text-xs w-24" />
-                    <Button size="sm" className="h-8" onClick={addMeeting} disabled={busy}><Plus className="h-3.5 w-3.5" /></Button>
+                  <div className="flex gap-1.5 mt-3 pt-2 border-t">
+                    <Input placeholder="Meeting title" value={meetingTitle} onChange={(e) => setMeetingTitle(e.target.value)} className="h-9 text-xs" />
+                    <Input type="time" value={meetingTime} onChange={(e) => setMeetingTime(e.target.value)} className="h-9 text-xs w-24" />
+                    <Button size="sm" className="h-9 gap-1" onClick={addMeeting} disabled={busy}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </Section>
 
@@ -323,9 +379,17 @@ export default function BusinessCalendarPage() {
                     <Row key={n.id} label={n.title} value={n.body ?? ""} />
                   ))}
                   {!day.notes.length && <Empty />}
-                  <div className="flex gap-1 mt-2">
-                    <Input placeholder="Add note" value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} className="h-8 text-xs" onKeyDown={(e) => e.key === "Enter" && addNote()} />
-                    <Button size="sm" className="h-8" onClick={addNote} disabled={busy}><Plus className="h-3.5 w-3.5" /></Button>
+                  <div className="flex gap-1.5 mt-3 pt-2 border-t">
+                    <Input
+                      placeholder="Add note"
+                      value={noteTitle}
+                      onChange={(e) => setNoteTitle(e.target.value)}
+                      className="h-9 text-xs"
+                      onKeyDown={(e) => e.key === "Enter" && addNote()}
+                    />
+                    <Button size="sm" className="h-9" onClick={addNote} disabled={busy}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </Section>
 
@@ -335,16 +399,24 @@ export default function BusinessCalendarPage() {
                       key={t.id}
                       type="button"
                       onClick={() => toggleTask(t.id, t.status)}
-                      className="w-full flex items-center justify-between py-1 text-left text-sm hover:bg-muted/40 rounded px-1"
+                      className="w-full flex items-center justify-between py-1.5 text-left text-sm hover:bg-muted/40 rounded-lg px-2"
                     >
                       <span className={cn(t.status === "DONE" && "line-through text-muted-foreground")}>{t.title}</span>
                       <Badge variant="outline" className="text-[10px]">{t.status}</Badge>
                     </button>
                   ))}
                   {!day.tasks.length && <Empty />}
-                  <div className="flex gap-1 mt-2">
-                    <Input placeholder="Add task" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} className="h-8 text-xs" onKeyDown={(e) => e.key === "Enter" && addTask()} />
-                    <Button size="sm" className="h-8" onClick={addTask} disabled={busy}><Plus className="h-3.5 w-3.5" /></Button>
+                  <div className="flex gap-1.5 mt-3 pt-2 border-t">
+                    <Input
+                      placeholder="Add task"
+                      value={taskTitle}
+                      onChange={(e) => setTaskTitle(e.target.value)}
+                      className="h-9 text-xs"
+                      onKeyDown={(e) => e.key === "Enter" && addTask()}
+                    />
+                    <Button size="sm" className="h-9" onClick={addTask} disabled={busy}>
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </Section>
               </div>
@@ -358,18 +430,23 @@ export default function BusinessCalendarPage() {
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border p-3 space-y-1">
-      <div className="text-xs font-semibold flex items-center gap-1.5 mb-1">
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" /> {title}
-      </div>
-      {children}
-    </div>
+    <Card>
+      <CardContent className="p-4 space-y-1">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="p-1.5 rounded-lg bg-muted">
+            <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+          </div>
+          <p className="text-xs font-semibold">{title}</p>
+        </div>
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between gap-2 text-xs py-0.5">
+    <div className="flex justify-between gap-2 text-xs py-1">
       <span className="truncate text-muted-foreground">{label}</span>
       <span className="shrink-0 tabular-nums font-medium">{value}</span>
     </div>
@@ -377,5 +454,5 @@ function Row({ label, value }: { label: string; value: string }) {
 }
 
 function Empty() {
-  return <p className="text-xs text-muted-foreground py-2">None</p>;
+  return <p className="text-xs text-muted-foreground py-3 text-center">None for this day</p>;
 }

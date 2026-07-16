@@ -9,6 +9,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { NotificationChannel, NotificationType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
+import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
@@ -532,6 +533,7 @@ export class NotificationsController {
   }
 
   @Post('scan')
+  @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Run Phase 12 notification scans (manual / ops)' })
   runScan(@Query('mode') mode?: 'morning' | 'evening-summary' | 'all') {
     return this.notificationsService.runPhase12Scans(mode ?? 'all');
@@ -550,12 +552,14 @@ export class NotificationsController {
   }
 
   @Post('send')
+  @RequirePermissions('users:update')
   @ApiOperation({ summary: 'Send notification to users' })
   send(@CurrentUser() user: IAuthUser, @Body() dto: CreateNotificationDto) {
     return this.notificationsService.send(user.tenantId, dto);
   }
 
   @Post('sms')
+  @RequirePermissions('customers:update')
   @ApiOperation({ summary: 'Queue SMS notification (invoice, reminder, promo)' })
   sendSms(
     @CurrentUser() user: IAuthUser,

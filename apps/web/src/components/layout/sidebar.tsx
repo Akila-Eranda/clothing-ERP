@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown,
+  ChevronDown, Scale, BookOpen, FileCheck,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -88,6 +88,22 @@ function useNavGroups(): NavGroup[] {
     },
   ];
 
+  const financeHubChildren: NavItem[] = [
+    { label: L["/accounting/finance/payable"] ?? "Payable", href: "/accounting/finance/payable", icon: Scale },
+    { label: L["/accounting/finance/receivable"] ?? "Receivable", href: "/accounting/finance/receivable", icon: Wallet },
+    { label: L["/accounting/finance/cash-book"] ?? "Cash Book", href: "/accounting/finance/cash-book", icon: BookOpen },
+    { label: L["/accounting/finance/banks"] ?? "Banks", href: "/accounting/finance/banks", icon: Landmark },
+    { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
+    { label: L["/accounting/finance/reconciliation"] ?? "Reconciliation", href: "/accounting/finance/reconciliation", icon: Building2 },
+  ];
+
+  const financeHubItem: NavItem = {
+    label: L["/accounting/finance"] ?? "Finance Hub",
+    icon: Landmark,
+    href: "/accounting/finance",
+    children: financeHubChildren,
+  };
+
   const salesItems: NavItem[] = [
     { label: "Point of Sale", icon: ShoppingCart, badge: "POS", action: openPos },
     { label: L["/sales"], href: "/sales", icon: History },
@@ -123,7 +139,7 @@ function useNavGroups(): NavGroup[] {
       title: S.finance,
       items: [
         { label: L["/accounting"], href: "/accounting", icon: Wallet },
-        { label: L["/accounting/finance"] ?? "Finance Hub", href: "/accounting/finance", icon: Landmark },
+        financeHubItem,
         { label: L["/accounting/credit"] ?? "Customer Credit", href: "/accounting/credit", icon: UserCheck },
         { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
         { label: L["/cash"], href: "/cash", icon: Banknote, badge: "NEW" },

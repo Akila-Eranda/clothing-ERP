@@ -1,14 +1,25 @@
 #!/usr/bin/env python3
-"""Full production deploy: git pull, build, migrate, seed, SSL."""
+"""Full production deploy: git pull, build, migrate, seed, SSL.
+
+Credentials via env (never hardcode):
+  DEPLOY_HOST (default 95.217.14.198)
+  DEPLOY_USER (default root)
+  DEPLOY_SSH_PASSWORD or DEPLOY_PASSWORD (required)
+"""
+import os
 import sys
 import paramiko
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-HOST = "95.217.14.198"
-USER = "root"
-PASSWORD = r"pwrU\r*UGS£?8H2V$8]<qT"
+HOST = os.environ.get("DEPLOY_HOST", "95.217.14.198")
+USER = os.environ.get("DEPLOY_USER", "root")
+PASSWORD = os.environ.get("DEPLOY_SSH_PASSWORD") or os.environ.get("DEPLOY_PASSWORD")
 DEPLOY_DIR = "/opt/fashionerp"
+
+if not PASSWORD:
+    print("ERROR: Set DEPLOY_SSH_PASSWORD (or DEPLOY_PASSWORD) in the environment.", file=sys.stderr)
+    sys.exit(1)
 
 DEPLOY = f"""#!/bin/bash
 set -e
@@ -35,8 +46,8 @@ for i in $(seq 1 45); do
   sleep 2
 done
 
-echo "==> Database schema..."
-docker compose exec -u root -T api npx prisma db push --accept-data-loss
+echo "==> Database migrations (prisma migrate deploy)..."
+docker compose exec -u root -T api npx prisma migrate deploy
 
 echo "==> Seed demo tenants..."
 docker compose exec -u root -T api node prisma/seed.js

@@ -868,7 +868,7 @@ model Inventory {
   id            String   @id @default(cuid())
   tenantId      String
   branchId      String
-  warehouseId   String?
+  warehouseId   String
   variantId     String
   quantity      Int      @default(0)
   reservedQty   Int      @default(0)
@@ -884,7 +884,7 @@ model Inventory {
   updatedAt     DateTime @updatedAt
 
   branch        Branch         @relation(fields: [branchId], references: [id])
-  warehouse     Warehouse?     @relation(fields: [warehouseId], references: [id])
+  warehouse     Warehouse      @relation(fields: [warehouseId], references: [id])
   variant       ProductVariant @relation(fields: [variantId], references: [id])
 
   @@unique([warehouseId, variantId])
@@ -2571,6 +2571,8 @@ model Notification {
   userNotifs  UserNotification[]
 
   @@index([tenantId])
+  @@index([tenantId, isRead, createdAt])
+  @@index([tenantId, createdAt])
   @@map("notifications")
 }
 
@@ -2587,6 +2589,7 @@ model UserNotification {
 
   @@unique([userId, notificationId])
   @@index([userId])
+  @@index([userId, isRead])
   @@map("user_notifications")
 }
 

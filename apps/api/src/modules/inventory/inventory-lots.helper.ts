@@ -192,7 +192,14 @@ export type LotPlanOptions = {
   /** When true, expired lots are excluded from allocation (POS Block Expired). */
   blockExpired?: boolean;
   now?: Date;
+  /** Prefer lots for this warehouse; also includes legacy null-warehouse lots on the branch. */
+  warehouseId?: string | null;
 };
+
+function lotWarehouseWhere(warehouseId?: string | null): Record<string, unknown> {
+  if (!warehouseId) return {};
+  return { OR: [{ warehouseId }, { warehouseId: null }] };
+}
 
 export async function listActiveLots(
   client: LotClient,
@@ -209,6 +216,7 @@ export async function listActiveLots(
       variantId,
       isActive: true,
       quantity: { gt: 0 },
+      ...lotWarehouseWhere(options.warehouseId),
     },
     orderBy: lotOrderBy(strategy),
   });
@@ -247,7 +255,14 @@ export async function planLotAllocation(
 
   if (preferredLotId) {
     const lot = await client.inventoryLot.findFirst({
-      where: { id: preferredLotId, tenantId, branchId, variantId, isActive: true },
+      where: {
+        id: preferredLotId,
+        tenantId,
+        branchId,
+        variantId,
+        isActive: true,
+        ...lotWarehouseWhere(options.warehouseId),
+      },
     });
     if (!lot) throw new BadRequestException('Lot not found for this branch/variant');
     if (blockExpired && isLotExpired(lot.expiryDate, now)) {
@@ -278,6 +293,7 @@ export async function planLotAllocation(
       variantId,
       isActive: true,
       quantity: { gt: 0 },
+      ...lotWarehouseWhere(options.warehouseId),
     },
     orderBy: lotOrderBy(strategy),
   });
@@ -355,12 +371,13 @@ export async function addToLot(
     referenceId?: string;
     notes?: string;
     lotId?: string;
+    warehouseId?: string | null;
   },
 ) {
   const {
     tenantId, branchId, variantId, quantity,
     batchNumber, expiryDate, manufactureDate, unitCost,
-    referenceType, referenceId, notes, lotId,
+    referenceType, referenceId, notes, lotId, warehouseId,
   } = params;
 
   if (quantity <= 0) return null;
@@ -371,6 +388,7 @@ export async function addToLot(
       data: {
         quantity: { increment: quantity },
         isActive: true,
+        ...(warehouseId ? { warehouseId } : {}),
         ...(unitCost != null ? { unitCost } : {}),
         ...(manufactureDate ? { manufactureDate } : {}),
       },
@@ -384,6 +402,9 @@ export async function addToLot(
       variantId,
       isActive: true,
       batchNumber: batchNumber ?? null,
+      ...(warehouseId
+        ? { OR: [{ warehouseId }, { warehouseId: null }] }
+        : {}),
       ...(expiryDate
         ? {
             expiryDate: {
@@ -406,6 +427,7 @@ export async function addToLot(
         quantity: { increment: quantity },
         unitCost: nextCost,
         isActive: true,
+        ...(warehouseId && !existing.warehouseId ? { warehouseId } : {}),
         ...(manufactureDate && !existing.manufactureDate ? { manufactureDate } : {}),
       },
     });
@@ -415,6 +437,7 @@ export async function addToLot(
     data: {
       tenantId,
       branchId,
+      warehouseId: warehouseId ?? null,
       variantId,
       batchNumber: batchNumber ?? null,
       expiryDate: expiryDate ?? null,

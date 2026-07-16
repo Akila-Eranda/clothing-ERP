@@ -1,17 +1,21 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Bell, CalendarClock, FileBarChart, Loader2, Plus, RefreshCw, Users,
+  AlertTriangle, Bell, CalendarClock, CheckCircle2, FileBarChart, Loader2, Plus, RefreshCw, TrendingUp, Users, Wallet,
 } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type CreditCustomer = {
   id: string; code?: string | null; firstName: string; lastName?: string | null;
@@ -38,7 +42,11 @@ type CollectionReport = {
   overdue: { id: string; amount: number; dueDate: string; daysPastDue: number; customer: { firstName: string; phone: string } }[];
 };
 
+type PaymentRow = CollectionReport["payments"][number];
+type OverdueRow = CollectionReport["overdue"][number];
+
 export default function CustomerCreditPage() {
+  const { profile, workspace } = useShopWorkspace();
   const today = new Date().toISOString().slice(0, 10);
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
@@ -117,234 +125,399 @@ export default function CustomerCreditPage() {
     }
   };
 
-  if (loading && !customers.length) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  const customerColumns = useMemo<ColumnDef<CreditCustomer>[]>(() => [
+    {
+      id: "customer",
+      accessorFn: (c) => `${c.firstName} ${c.lastName ?? ""}`,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-medium">{row.original.firstName} {row.original.lastName}</p>
+          <p className="text-xs text-muted-foreground">{row.original.phone}</p>
+        </div>
+      ),
+    },
+    {
+      id: "balance",
+      accessorKey: "creditBalance",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-medium tabular-nums">LKR {formatNumber(row.original.creditBalance)}</span>
+      ),
+    },
+    {
+      id: "limit",
+      accessorKey: "creditLimit",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Limit" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground tabular-nums">LKR {formatNumber(row.original.creditLimit)}</span>
+      ),
+    },
+    {
+      id: "terms",
+      accessorKey: "creditDays",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Terms" />,
+      cell: ({ row }) => <span className="text-xs">{row.original.creditDays}d</span>,
+    },
+    {
+      id: "nextDue",
+      accessorFn: (c) => c.nextDueDate ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Next Due" />,
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {row.original.nextDueDate ? String(row.original.nextDueDate).slice(0, 10) : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      accessorFn: (c) => (c.isOverdue ? "overdue" : c.creditBalance > 0 ? "current" : "clear"),
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const c = row.original;
+        if (c.isOverdue) return <Badge variant="danger" className="text-[10px]">{c.daysPastDue}d overdue</Badge>;
+        if (c.creditBalance > 0) return <Badge variant="outline" className="text-[10px]">Current</Badge>;
+        return <Badge variant="secondary" className="text-[10px]">Clear</Badge>;
+      },
+    },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) =>
+        row.original.creditBalance > 0 ? (
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => sendReminder(row.original.id)}>
+            <Bell className="h-3 w-3" /> Remind
+          </Button>
+        ) : null,
+    },
+  ], []);
+
+  const reminderColumns = useMemo<ColumnDef<Reminder>[]>(() => [
+    {
+      id: "customer",
+      accessorFn: (r) => `${r.customer.firstName} ${r.customer.lastName ?? ""}`,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-medium">
+          {row.original.customer.firstName} {row.original.customer.lastName}
+        </span>
+      ),
+    },
+    {
+      id: "title",
+      accessorKey: "title",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Title" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-medium">{row.original.title}</p>
+          <p className="text-xs text-muted-foreground line-clamp-1">{row.original.message}</p>
+        </div>
+      ),
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.status}</Badge>,
+    },
+    {
+      id: "sent",
+      accessorFn: (r) => r.sentAt ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Sent" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.sentAt ? String(row.original.sentAt).slice(0, 16).replace("T", " ") : "—"}
+        </span>
+      ),
+    },
+  ], []);
+
+  const paymentColumns = useMemo<ColumnDef<PaymentRow>[]>(() => [
+    {
+      id: "customer",
+      accessorFn: (p) => p.customer.firstName,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.customer.firstName}</span>,
+    },
+    {
+      id: "date",
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">{String(row.original.createdAt).slice(0, 10)}</span>
+      ),
+    },
+    {
+      id: "amount",
+      accessorKey: "amount",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-medium tabular-nums text-emerald-600">
+          LKR {formatNumber(row.original.amount)}
+        </span>
+      ),
+    },
+  ], []);
+
+  const overdueColumns = useMemo<ColumnDef<OverdueRow>[]>(() => [
+    {
+      id: "customer",
+      accessorFn: (o) => o.customer.firstName,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.customer.firstName}</span>,
+    },
+    {
+      id: "due",
+      accessorFn: (o) => `${o.daysPastDue} · ${o.dueDate}`,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Due" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {row.original.daysPastDue}d · due {String(row.original.dueDate).slice(0, 10)}
+        </span>
+      ),
+    },
+    {
+      id: "amount",
+      accessorKey: "amount",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-medium tabular-nums text-amber-600">
+          LKR {formatNumber(row.original.amount)}
+        </span>
+      ),
+    },
+  ], []);
+
+  const STATS = [
+    {
+      label: "Outstanding",
+      value: `LKR ${formatNumber(report?.outstanding ?? 0)}`,
+      icon: Wallet,
+      color: "text-blue-500",
+      bg: "bg-blue-500/10",
+    },
+    {
+      label: "Overdue",
+      value: `LKR ${formatNumber(report?.overdueAmount ?? 0)}`,
+      icon: AlertTriangle,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    },
+    {
+      label: "Collected (period)",
+      value: `LKR ${formatNumber(report?.collectedInPeriod ?? 0)}`,
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+    {
+      label: "Recovery Rate",
+      value: `${report?.recoveryRate ?? 0}%`,
+      icon: TrendingUp,
+      color: "text-indigo-500",
+      bg: "bg-indigo-500/10",
+    },
+  ];
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Customer Credit</h1>
-          <p className="text-sm text-muted-foreground">Due dates, schedules, reminders & collections</p>
+          <h1 className="text-2xl font-bold">Customer Credit</h1>
+          <p className="text-sm text-muted-foreground">
+            {profile.label} · {workspace.customerLabel} due dates, schedules, reminders & collections
+          </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => load()} disabled={loading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => load()} disabled={loading} className="gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={queueOverdue} className="gap-1.5">
+            <Bell className="h-3.5 w-3.5" /> Queue Overdue
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card><CardContent className="pt-4">
-          <div className="text-xs text-muted-foreground">Outstanding</div>
-          <div className="text-xl font-semibold tabular-nums">LKR {formatNumber(report?.outstanding ?? 0)}</div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <div className="text-xs text-muted-foreground">Overdue</div>
-          <div className="text-xl font-semibold tabular-nums text-amber-600">LKR {formatNumber(report?.overdueAmount ?? 0)}</div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <div className="text-xs text-muted-foreground">Collected (period)</div>
-          <div className="text-xl font-semibold tabular-nums text-emerald-600">LKR {formatNumber(report?.collectedInPeriod ?? 0)}</div>
-        </CardContent></Card>
-        <Card><CardContent className="pt-4">
-          <div className="text-xs text-muted-foreground">Recovery rate</div>
-          <div className="text-xl font-semibold tabular-nums">{report?.recoveryRate ?? 0}%</div>
-        </CardContent></Card>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {STATS.map((s) => (
+          <Card key={s.label}>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
+              </div>
+              <div>
+                <p className="text-xl font-bold leading-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Tabs defaultValue="customers">
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="customers"><Users className="h-3.5 w-3.5 mr-1.5" />Credit Customers</TabsTrigger>
-          <TabsTrigger value="schedules"><CalendarClock className="h-3.5 w-3.5 mr-1.5" />Schedules</TabsTrigger>
-          <TabsTrigger value="reminders"><Bell className="h-3.5 w-3.5 mr-1.5" />Reminders</TabsTrigger>
-          <TabsTrigger value="collections"><FileBarChart className="h-3.5 w-3.5 mr-1.5" />Collections</TabsTrigger>
+        <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="customers" className="gap-1.5">
+            <Users className="h-3.5 w-3.5" /> Credit Customers
+          </TabsTrigger>
+          <TabsTrigger value="schedules" className="gap-1.5">
+            <CalendarClock className="h-3.5 w-3.5" /> Schedules
+          </TabsTrigger>
+          <TabsTrigger value="reminders" className="gap-1.5">
+            <Bell className="h-3.5 w-3.5" /> Reminders
+          </TabsTrigger>
+          <TabsTrigger value="collections" className="gap-1.5">
+            <FileBarChart className="h-3.5 w-3.5" /> Collections
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="customers" className="mt-4 space-y-3">
-          <div className="rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Customer</th>
-                  <th className="px-3 py-2 text-right">Balance</th>
-                  <th className="px-3 py-2 text-right">Limit</th>
-                  <th className="px-3 py-2">Terms</th>
-                  <th className="px-3 py-2">Next due</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {customers.map((c) => (
-                  <tr key={c.id} className="border-t">
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{c.firstName} {c.lastName}</div>
-                      <div className="text-xs text-muted-foreground">{c.phone}</div>
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums font-medium">LKR {formatNumber(c.creditBalance)}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">LKR {formatNumber(c.creditLimit)}</td>
-                    <td className="px-3 py-2 text-xs">{c.creditDays}d</td>
-                    <td className="px-3 py-2 text-xs">{c.nextDueDate ? String(c.nextDueDate).slice(0, 10) : "—"}</td>
-                    <td className="px-3 py-2">
-                      {c.isOverdue
-                        ? <Badge variant="destructive">{c.daysPastDue}d overdue</Badge>
-                        : c.creditBalance > 0
-                          ? <Badge variant="outline">Current</Badge>
-                          : <Badge variant="secondary">Clear</Badge>}
-                    </td>
-                    <td className="px-3 py-2">
-                      {c.creditBalance > 0 && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => sendReminder(c.id)}>
-                          Remind
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-                {!customers.length && (
-                  <tr><td colSpan={7} className="px-3 py-8 text-center text-muted-foreground">No credit customers</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <TabsContent value="customers" className="mt-4">
+          {loading && !customers.length ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={customers}
+              columns={customerColumns}
+              pageCount={Math.ceil(customers.length / 10) || 1}
+              searchableColumns={[
+                { id: "customer", title: "Customer" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "credit-customers" }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="schedules" className="mt-4 space-y-4">
-          <div className="rounded-lg border p-4 space-y-3">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Plus className="h-4 w-4" /> New installment plan</h3>
-            <div className="grid sm:grid-cols-4 gap-2">
-              <select
-                className="h-10 rounded-md border bg-background px-3 text-sm"
-                value={schCustomerId}
-                onChange={(e) => setSchCustomerId(e.target.value)}
-              >
-                <option value="">Select customer</option>
-                {customers.filter((c) => c.creditBalance > 0).map((c) => (
-                  <option key={c.id} value={c.id}>{c.firstName} {c.lastName} — {formatNumber(c.creditBalance)}</option>
-                ))}
-              </select>
-              <Input type="number" placeholder="Total amount" value={schAmount} onChange={(e) => setSchAmount(e.target.value)} />
-              <Input type="number" placeholder="Installments" value={schCount} onChange={(e) => setSchCount(e.target.value)} />
-              <Button onClick={createSchedule} disabled={schBusy}>
-                {schBusy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                Create
-              </Button>
-            </div>
-          </div>
+          <Card>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 rounded-xl bg-indigo-500/10">
+                  <Plus className="h-4 w-4 text-indigo-500" />
+                </div>
+                <h3 className="text-sm font-semibold">New installment plan</h3>
+              </div>
+              <div className="grid sm:grid-cols-4 gap-3 items-end">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold">Customer</label>
+                  <select
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    value={schCustomerId}
+                    onChange={(e) => setSchCustomerId(e.target.value)}
+                  >
+                    <option value="">Select customer</option>
+                    {customers.filter((c) => c.creditBalance > 0).map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.firstName} {c.lastName} — {formatNumber(c.creditBalance)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold">Total amount</label>
+                  <Input type="number" placeholder="Amount" value={schAmount} onChange={(e) => setSchAmount(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold">Installments</label>
+                  <Input type="number" placeholder="Count" value={schCount} onChange={(e) => setSchCount(e.target.value)} className="h-9" />
+                </div>
+                <Button onClick={createSchedule} disabled={schBusy} className="h-9 gap-1.5">
+                  {schBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                  Create
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="space-y-3">
             {schedules.map((s) => (
-              <div key={s.id} className="rounded-lg border p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <div className="font-medium">{s.customer.firstName} {s.customer.lastName}</div>
-                    <div className="text-xs text-muted-foreground">{s.installmentCount} installments · LKR {formatNumber(s.totalAmount)}</div>
-                  </div>
-                  <Badge variant="outline">{s.status}</Badge>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {s.lines.map((l) => (
-                    <div key={l.sequence} className="rounded border px-2 py-1.5 text-xs">
-                      <div className="text-muted-foreground">#{l.sequence} · {String(l.dueDate).slice(0, 10)}</div>
-                      <div className="font-medium tabular-nums">LKR {formatNumber(l.amount)}</div>
-                      <div className="text-muted-foreground">{l.status} · paid {formatNumber(l.paidAmount)}</div>
+              <Card key={s.id}>
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-semibold text-sm">{s.customer.firstName} {s.customer.lastName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {s.installmentCount} installments · LKR {formatNumber(s.totalAmount)}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              </div>
+                    <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {s.lines.map((l) => (
+                      <div key={l.sequence} className="rounded-xl border px-3 py-2 text-xs">
+                        <p className="text-muted-foreground">#{l.sequence} · {String(l.dueDate).slice(0, 10)}</p>
+                        <p className="font-semibold tabular-nums mt-0.5">LKR {formatNumber(l.amount)}</p>
+                        <p className="text-muted-foreground mt-0.5">{l.status} · paid {formatNumber(l.paidAmount)}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
-            {!schedules.length && <p className="text-sm text-muted-foreground text-center py-6">No schedules yet</p>}
+            {!schedules.length && (
+              <p className="text-sm text-muted-foreground text-center py-8">No schedules yet</p>
+            )}
           </div>
         </TabsContent>
 
-        <TabsContent value="reminders" className="mt-4 space-y-3">
-          <div className="flex justify-end">
-            <Button size="sm" variant="outline" onClick={queueOverdue}>
-              <Bell className="h-4 w-4 mr-2" /> Queue overdue reminders
-            </Button>
-          </div>
-          <div className="rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="px-3 py-2">Customer</th>
-                  <th className="px-3 py-2">Title</th>
-                  <th className="px-3 py-2">Status</th>
-                  <th className="px-3 py-2">Sent</th>
-                </tr>
-              </thead>
-              <tbody>
-                {reminders.map((r) => (
-                  <tr key={r.id} className="border-t">
-                    <td className="px-3 py-2">{r.customer.firstName} {r.customer.lastName}</td>
-                    <td className="px-3 py-2">
-                      <div className="font-medium">{r.title}</div>
-                      <div className="text-xs text-muted-foreground line-clamp-1">{r.message}</div>
-                    </td>
-                    <td className="px-3 py-2"><Badge variant="outline">{r.status}</Badge></td>
-                    <td className="px-3 py-2 text-xs text-muted-foreground">
-                      {r.sentAt ? String(r.sentAt).slice(0, 16).replace("T", " ") : "—"}
-                    </td>
-                  </tr>
-                ))}
-                {!reminders.length && (
-                  <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">No reminders yet</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <TabsContent value="reminders" className="mt-4">
+          {loading && !reminders.length ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <ClientSideTable
+              data={reminders}
+              columns={reminderColumns}
+              pageCount={Math.ceil(reminders.length / 10) || 1}
+              searchableColumns={[
+                { id: "customer", title: "Customer" },
+                { id: "title", title: "Title" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "credit-reminders" }}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="collections" className="mt-4 space-y-4">
-          <div className="flex flex-wrap items-end gap-2">
-            <div>
-              <label className="text-xs text-muted-foreground">From</label>
-              <Input type="date" value={repStart} onChange={(e) => setRepStart(e.target.value)} className="w-40" />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">To</label>
-              <Input type="date" value={repEnd} onChange={(e) => setRepEnd(e.target.value)} className="w-40" />
-            </div>
-            <Button size="sm" onClick={() => load()}>Load report</Button>
-          </div>
+          <Card>
+            <CardContent className="p-4 flex flex-wrap items-end gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">From</label>
+                <Input type="date" value={repStart} onChange={(e) => setRepStart(e.target.value)} className="w-40 h-9" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">To</label>
+                <Input type="date" value={repEnd} onChange={(e) => setRepEnd(e.target.value)} className="w-40 h-9" />
+              </div>
+              <Button size="sm" onClick={() => load()} className="h-9 gap-1.5">
+                <FileBarChart className="h-3.5 w-3.5" /> Load Report
+              </Button>
+            </CardContent>
+          </Card>
+
           <div className="grid md:grid-cols-2 gap-4">
-            <div className="rounded-lg border overflow-hidden">
-              <div className="px-3 py-2 text-xs font-semibold bg-muted/40">Payments received</div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {(report?.payments ?? []).map((p) => (
-                    <tr key={p.id} className="border-t">
-                      <td className="px-3 py-2">{p.customer.firstName}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{String(p.createdAt).slice(0, 10)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-emerald-600">LKR {formatNumber(p.amount)}</td>
-                    </tr>
-                  ))}
-                  {!report?.payments?.length && (
-                    <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={3}>No payments in period</td></tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Payments received</p>
+              <ClientSideTable
+                data={report?.payments ?? []}
+                columns={paymentColumns}
+                pageCount={Math.ceil((report?.payments?.length ?? 0) / 10) || 1}
+                searchableColumns={[{ id: "customer", title: "Customer" }]}
+                filterableColumns={[]}
+                isShowExportButtons={{ isShow: true, fileName: "credit-payments" }}
+              />
             </div>
-            <div className="rounded-lg border overflow-hidden">
-              <div className="px-3 py-2 text-xs font-semibold bg-muted/40">Overdue charges</div>
-              <table className="w-full text-sm">
-                <tbody>
-                  {(report?.overdue ?? []).map((o) => (
-                    <tr key={o.id} className="border-t">
-                      <td className="px-3 py-2">{o.customer.firstName}</td>
-                      <td className="px-3 py-2 text-xs text-muted-foreground">{o.daysPastDue}d · due {String(o.dueDate).slice(0, 10)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-amber-600">LKR {formatNumber(o.amount)}</td>
-                    </tr>
-                  ))}
-                  {!report?.overdue?.length && (
-                    <tr><td className="px-3 py-6 text-center text-muted-foreground" colSpan={3}>No overdue charges</td></tr>
-                  )}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              <p className="text-sm font-semibold">Overdue charges</p>
+              <ClientSideTable
+                data={report?.overdue ?? []}
+                columns={overdueColumns}
+                pageCount={Math.ceil((report?.overdue?.length ?? 0) / 10) || 1}
+                searchableColumns={[{ id: "customer", title: "Customer" }]}
+                filterableColumns={[]}
+                isShowExportButtons={{ isShow: true, fileName: "credit-overdue" }}
+              />
             </div>
           </div>
         </TabsContent>

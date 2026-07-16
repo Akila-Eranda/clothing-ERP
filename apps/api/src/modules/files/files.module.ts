@@ -16,6 +16,16 @@ import * as mime from 'mime-types';
 import { memoryStorage } from 'multer';
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const ALLOWED_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/pdf',
+  'text/csv',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-excel',
+]);
 
 @Injectable()
 export class FilesService {
@@ -36,6 +46,11 @@ export class FilesService {
     folder = 'general',
   ) {
     if (!file) throw new BadRequestException('No file uploaded');
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      throw new BadRequestException(
+        `File type not allowed (${file.mimetype}). Allowed: images, PDF, CSV, Excel`,
+      );
+    }
 
     const safeFolder = (folder || 'general').replace(/[^a-zA-Z0-9_-]/g, '') || 'general';
     const ext = mime.extension(file.mimetype) || path.extname(file.originalname).slice(1) || 'bin';
