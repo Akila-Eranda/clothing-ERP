@@ -7,7 +7,7 @@ import { Injectable, NotFoundException, BadRequestException, ForbiddenException 
 import { IsString, IsOptional, IsNumber, IsEnum, IsObject, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { CashMovementType, CashRegisterStatus, PaymentMethod } from '@prisma/client';
+import { CashMovementType, CashRegisterStatus, PaymentMethod, RoleType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions, RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
@@ -21,6 +21,7 @@ import {
 } from '@/shared/cash-register.helper';
 import { WorkflowService } from '@/modules/workflow/workflow.module';
 import { WorkflowModule } from '@/modules/workflow/workflow.module';
+import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import * as dayjs from 'dayjs';
 
 export class OpenCashRegisterDto {
@@ -190,11 +191,22 @@ export class CashManagementService {
     };
   }
 
-  async approveRegister(registerId: string, tenantId: string, approverId: string) {
+  async approveRegister(
+    registerId: string,
+    tenantId: string,
+    approverId: string,
+    userRoles: string[] = [],
+  ) {
     const register = await this.getRegisterEntity(registerId, tenantId);
     if (register.status !== CashRegisterStatus.PENDING_APPROVAL) {
       throw new BadRequestException('This shift is not pending approval');
     }
+
+    const canForceClose =
+      bypassesWorkflowApproval(userRoles)
+      || userRoles.includes(RoleType.BRANCH_MANAGER)
+      || userRoles.includes(RoleType.ACCOUNTANT)
+      || userRoles.includes(RoleType.INVENTORY_MANAGER);
 
     const instance = await this.prisma.workflowInstance.findUnique({
       where: {
@@ -208,15 +220,25 @@ export class CashManagementService {
     });
 
     if (instance?.tasks[0]) {
-      await this.workflowService.approveTask(
-        instance.tasks[0].id,
-        tenantId,
-        approverId,
-        [],
-        'Cash variance approved',
+      try {
+        await this.workflowService.approveTask(
+          instance.tasks[0].id,
+          tenantId,
+          approverId,
+          userRoles,
+          'Cash variance approved',
+        );
+      } catch (err) {
+        // Cashiers who are also managers often closed their own shift — allow override
+        if (!canForceClose) throw err;
+      }
+    } else if (!canForceClose) {
+      throw new ForbiddenException(
+        'No pending approval workflow found. A branch manager or admin must approve this shift.',
       );
     }
 
+    // Always persist CLOSED (workflow may have already done this — idempotent)
     return this.prisma.cashRegister.update({
       where: { id: registerId },
       data: {
@@ -625,7 +647,7 @@ export class CashManagementController {
   @RequirePermissions('cash:update')
   @ApiOperation({ summary: 'Manager approve cash variance' })
   approve(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.cashService.approveRegister(id, user.tenantId, user.id);
+    return this.cashService.approveRegister(id, user.tenantId, user.id, user.roles ?? []);
   }
 
   @Post(':id/movements')

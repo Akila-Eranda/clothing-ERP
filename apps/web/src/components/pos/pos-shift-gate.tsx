@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Banknote, Loader2, PlayCircle, X, AlertTriangle } from "lucide-react";
+import { Banknote, Loader2, PlayCircle, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
 
 interface PosShiftGateProps {
   onShiftReady: () => void;
@@ -20,16 +21,20 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const { user } = useAuthStore();
   const [checking, setChecking] = React.useState(true);
   const [pendingApproval, setPendingApproval] = React.useState(false);
+  const [pendingRegisterId, setPendingRegisterId] = React.useState<string | null>(null);
+  const [approving, setApproving] = React.useState(false);
   const [openingCash, setOpeningCash] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [suggested, setSuggested] = React.useState<number | null>(null);
+  const canApprove =
+    bypassesWorkflowApproval(user?.role) || isWorkflowApproverRole(user?.role);
 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const [activeRes, suggestRes] = await Promise.all([
-          api.get<{ status?: string; variance?: number } | null>("/cash/active"),
+          api.get<{ id?: string; status?: string; variance?: number } | null>("/cash/active"),
           api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
         ]);
         if (cancelled) return;
@@ -43,6 +48,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         }
         if (activeRes.data?.status === "PENDING_APPROVAL") {
           setPendingApproval(true);
+          setPendingRegisterId(activeRes.data.id ?? null);
           return;
         }
       } catch {
@@ -69,6 +75,24 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
       toast.error((e as Error).message || "Failed to start shift");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleApprovePending = async () => {
+    if (!pendingRegisterId) {
+      toast.error("Pending shift not found — open Cash Management to approve");
+      return;
+    }
+    setApproving(true);
+    try {
+      await api.put(`/cash/${pendingRegisterId}/approve`);
+      toast.success("Variance approved — you can start a new shift");
+      setPendingApproval(false);
+      setPendingRegisterId(null);
+    } catch (e: unknown) {
+      toast.error((e as Error).message || "Approval failed");
+    } finally {
+      setApproving(false);
     }
   };
 
@@ -101,9 +125,20 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
             <p className="text-white/80">
               Your previous cash shift has a variance pending manager approval. You cannot start a new shift until it is approved.
             </p>
-            <p className="text-xs" style={{ color: "#6a8ab8" }}>
-              Ask your branch manager to approve from Cash Management or Workflows.
-            </p>
+            {canApprove && pendingRegisterId ? (
+              <Button
+                onClick={() => void handleApprovePending()}
+                disabled={approving}
+                className="w-full gap-2 bg-amber-600 hover:bg-amber-700"
+              >
+                {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                Approve variance & continue
+              </Button>
+            ) : (
+              <p className="text-xs" style={{ color: "#6a8ab8" }}>
+                Ask your branch manager or admin to approve from Cash Management → Variance.
+              </p>
+            )}
             {onClose && (
               <Button onClick={onClose} variant="outline" className="w-full border-[#1e3356] text-white/70">
                 Exit POS

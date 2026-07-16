@@ -28,6 +28,7 @@ import { DenominationInput, denominationTotal } from "@/components/cash/denomina
 import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-movement-ledger";
 import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
 import { useAuthStore } from "@/stores/auth-store";
+import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -245,6 +246,9 @@ export default function CashManagementPage() {
 
   const shiftOpen = active?.status === "OPEN";
   const shiftPending = active?.status === "PENDING_APPROVAL";
+  const canApproveVariance =
+    bypassesWorkflowApproval(user?.role)
+    || isWorkflowApproverRole(user?.role);
 
   // Live refresh while shift is open (today only)
   React.useEffect(() => {
@@ -580,18 +584,30 @@ export default function CashManagementPage() {
           {/* Pending approval banner */}
           {pendingItems.length > 0 && (
             <div className="rounded-xl border border-amber-500/40 bg-amber-500/5 p-4 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
                 <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
                     {pendingItems.length} shift{pendingItems.length > 1 ? "s" : ""} pending approval
                   </p>
                   <p className="text-xs text-muted-foreground">Variance exceeds LKR {VARIANCE_THRESHOLD} — manager action required</p>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="border-amber-500 text-amber-700" onClick={() => setTab("variance")}>
-                Review variances
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {canApproveVariance && pendingItems[0] && (
+                  <Button
+                    size="sm"
+                    className="bg-amber-600 hover:bg-amber-700"
+                    onClick={() => void handleApprove(pendingItems[0].id)}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                    Approve now
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" className="border-amber-500 text-amber-700" onClick={() => setTab("variance")}>
+                  Review variances
+                </Button>
+              </div>
             </div>
           )}
 
@@ -624,11 +640,21 @@ export default function CashManagementPage() {
                 <CardContent className="py-16 text-center">
                   <LayoutDashboard className="h-12 w-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground mb-4">
-                    {shiftPending ? "Previous shift awaiting approval — start a new shift after manager clears it." : "No active shift. Open cash to start tracking POS sales automatically."}
+                    {shiftPending
+                      ? "Previous shift awaiting approval — approve the variance to start a new shift."
+                      : "No active shift. Open cash to start tracking POS sales automatically."}
                   </p>
-                  {!shiftPending && (
+                  {shiftPending && active && canApproveVariance ? (
+                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 gap-1.5" onClick={() => void handleApprove(active.id)}>
+                      <CheckCircle2 className="h-4 w-4" /> Approve variance & continue
+                    </Button>
+                  ) : !shiftPending ? (
                     <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 gap-1.5" onClick={() => setTab("open")}>
                       <PlayCircle className="h-4 w-4" /> Start Shift
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" onClick={() => setTab("variance")}>
+                      View pending variances
                     </Button>
                   )}
                 </CardContent>
@@ -711,9 +737,21 @@ export default function CashManagementPage() {
                     <Button className="mt-4" size="sm" onClick={() => setTab("overview")}>Go to Overview</Button>
                   </div>
                 ) : shiftPending ? (
-                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5">
-                    <p className="font-semibold text-amber-700">Previous shift pending manager approval</p>
-                    <p className="text-sm text-muted-foreground mt-1">Contact your manager before starting a new shift.</p>
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3">
+                    <p className="font-semibold text-amber-700 dark:text-amber-400">Previous shift pending manager approval</p>
+                    <p className="text-sm text-muted-foreground">
+                      Close variance must be approved before opening a new shift
+                      {active?.variance != null && (
+                        <> (variance LKR {formatNumber(Math.abs(active.variance))})</>
+                      )}.
+                    </p>
+                    {canApproveVariance && active ? (
+                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700 gap-1.5" onClick={() => void handleApprove(active.id)}>
+                        <CheckCircle2 className="h-4 w-4" /> Approve variance
+                      </Button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Ask a branch manager or admin to approve from Cash Management → Variance.</p>
+                    )}
                   </div>
                 ) : (
                   <>
