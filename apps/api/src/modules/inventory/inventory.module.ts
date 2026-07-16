@@ -543,6 +543,18 @@ export class InventoryService {
             },
           });
 
+      // Keep variant master cost in sync with latest GRN/PO inward cost.
+      if (
+        dto.movementType === StockMovementType.PURCHASE
+        && dto.unitCost != null
+        && dto.unitCost > 0
+      ) {
+        await client.productVariant.update({
+          where: { id: dto.variantId },
+          data: { costPrice: dto.unitCost },
+        });
+      }
+
       // Aggregate ledger row (branch stock)
       await client.inventoryLog.create({
         data: {

@@ -769,7 +769,7 @@ export class PosService {
     return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
   }
 
-  async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number }) {
+  async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number; supplierId?: string }) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const take = Math.min(Math.max(opts?.limit ?? 1500, 1), 2000);
     const search = opts?.search?.trim();
@@ -777,6 +777,13 @@ export class PosService {
       where: {
         isActive: true,
         product: { tenantId, status: 'ACTIVE' },
+        ...(opts?.supplierId
+          ? {
+              supplierAssignments: {
+                some: { tenantId, supplierId: opts.supplierId },
+              },
+            }
+          : {}),
         ...(search
           ? {
               OR: [
@@ -790,6 +797,19 @@ export class PosService {
       },
       include: {
         product: { include: { category: true } },
+        supplierAssignments: opts?.supplierId
+          ? {
+              where: { tenantId, supplierId: opts.supplierId },
+              select: {
+                supplierId: true,
+                supplierProductCode: true,
+                leadTimeDays: true,
+                lastBuyingPrice: true,
+                isPreferred: true,
+              },
+              take: 1,
+            }
+          : false,
         inventory: {
           where: { branchId: resolvedBranchId },
           select: { quantity: true, reservedQty: true },
@@ -801,6 +821,7 @@ export class PosService {
     });
 
     return variants.map((v) => ({
+      assignment: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined,
       variantId:   v.id,
       productName: v.product.name,
       variantName: v.name,
@@ -817,6 +838,11 @@ export class PosService {
       imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
       barcode:     v.barcode ?? v.product.barcode ?? undefined,
       warrantyMonths: v.product.warrantyMonths ?? null,
+      supplierId: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierId ?? null : null,
+      supplierProductCode: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierProductCode ?? null : null,
+      leadTimeDays: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.leadTimeDays ?? null : null,
+      lastBuyingPrice: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.lastBuyingPrice ?? null : null,
+      isPreferredSupplier: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.isPreferred ?? null : null,
     }));
   }
 
@@ -1121,10 +1147,12 @@ export class PosController {
     @CurrentUser() user: IAuthUser,
     @Query('search') search?: string,
     @Query('limit') limit?: string,
+    @Query('supplierId') supplierId?: string,
   ) {
     return this.posService.getProducts(user.tenantId, user.branchId ?? '', {
       search,
       limit: limit ? parseInt(limit, 10) : undefined,
+      supplierId,
     });
   }
 

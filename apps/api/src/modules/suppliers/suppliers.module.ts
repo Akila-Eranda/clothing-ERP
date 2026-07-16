@@ -76,6 +76,15 @@ export class RecordPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() paidAt?: string;
 }
 
+export class AssignSupplierProductDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() supplierProductCode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) leadTimeDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) lastBuyingPrice?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isPreferred?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
 @Injectable()
 export class SuppliersService {
   constructor(
@@ -111,7 +120,17 @@ export class SuppliersService {
   async findOneSupplier(id: string, tenantId: string) {
     const supplier = await this.prisma.supplier.findFirst({
       where: { id, tenantId },
-      include: { purchases: { orderBy: { createdAt: 'desc' }, take: 10 }, payments: { take: 10 } },
+      include: {
+        purchases: { orderBy: { createdAt: 'desc' }, take: 10 },
+        payments: { take: 10 },
+        productAssignments: {
+          include: {
+            variant: { include: { product: { select: { id: true, name: true } } } },
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 30,
+        },
+      },
     });
     if (!supplier) throw new NotFoundException('Supplier not found');
     return supplier;
@@ -304,6 +323,70 @@ export class SuppliersService {
     });
   }
 
+  async listAssignedProducts(supplierId: string, tenantId: string) {
+    await this.findOneSupplier(supplierId, tenantId);
+    return this.prisma.supplierProductAssignment.findMany({
+      where: { tenantId, supplierId },
+      include: {
+        variant: {
+          include: {
+            product: { select: { id: true, name: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  async assignProductToSupplier(supplierId: string, tenantId: string, dto: AssignSupplierProductDto) {
+    await this.findOneSupplier(supplierId, tenantId);
+    const variant = await this.prisma.productVariant.findFirst({
+      where: { id: dto.variantId, product: { tenantId } },
+      select: { id: true },
+    });
+    if (!variant) throw new NotFoundException('Product variant not found');
+
+    return this.prisma.supplierProductAssignment.upsert({
+      where: {
+        supplierId_variantId: {
+          supplierId,
+          variantId: dto.variantId,
+        },
+      },
+      create: {
+        tenantId,
+        supplierId,
+        variantId: dto.variantId,
+        supplierProductCode: dto.supplierProductCode,
+        leadTimeDays: dto.leadTimeDays,
+        lastBuyingPrice: dto.lastBuyingPrice,
+        isPreferred: dto.isPreferred ?? false,
+        notes: dto.notes,
+      },
+      update: {
+        supplierProductCode: dto.supplierProductCode,
+        leadTimeDays: dto.leadTimeDays,
+        lastBuyingPrice: dto.lastBuyingPrice,
+        isPreferred: dto.isPreferred,
+        notes: dto.notes,
+      },
+      include: {
+        variant: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+  }
+
+  async unassignProductFromSupplier(supplierId: string, variantId: string, tenantId: string) {
+    await this.findOneSupplier(supplierId, tenantId);
+    const existing = await this.prisma.supplierProductAssignment.findFirst({
+      where: { tenantId, supplierId, variantId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('Assigned product not found');
+    return this.prisma.supplierProductAssignment.delete({ where: { id: existing.id } });
+  }
+
   async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
     // Phase 3: PO receive creates a formal GoodsReceipt (GRN from PO) + partial receive status
     const result = await this.procurementService.receiveFromPurchaseOrder(poId, tenantId, branchId, userId, items);
@@ -388,6 +471,27 @@ export class SuppliersController {
   @ApiOperation({ summary: 'List payments for a supplier' })
   getPayments(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
     return this.suppliersService.getPayments(id, user.tenantId);
+  }
+
+  @Get(':id/products')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List products assigned to supplier' })
+  listAssignedProducts(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.suppliersService.listAssignedProducts(id, user.tenantId);
+  }
+
+  @Post(':id/products')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Assign product to supplier' })
+  assignProduct(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: AssignSupplierProductDto) {
+    return this.suppliersService.assignProductToSupplier(id, user.tenantId, dto);
+  }
+
+  @Delete(':id/products/:variantId')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Unassign product from supplier' })
+  unassignProduct(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Param('variantId') variantId: string) {
+    return this.suppliersService.unassignProductFromSupplier(id, variantId, user.tenantId);
   }
 }
 
