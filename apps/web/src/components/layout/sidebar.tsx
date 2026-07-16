@@ -11,6 +11,7 @@ import {
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
+  ChevronDown,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -32,8 +33,25 @@ interface NavItem {
   icon: React.ElementType;
   badge?: string;
   action?: () => void;
+  children?: NavItem[];
 }
 interface NavGroup { title: string; items: NavItem[] }
+
+function pathMatches(pathname: string, href?: string, peerHrefs: string[] = []) {
+  if (!href) return false;
+  if (pathname === href) return true;
+  if (!pathname.startsWith(href + "/")) return false;
+  // Prefer the most specific peer (e.g. /inventory/expiry over /inventory)
+  return !peerHrefs.some(
+    (h) => h !== href && (pathname === h || pathname.startsWith(h + "/")) && h.startsWith(href),
+  );
+}
+
+function itemOrChildActive(pathname: string, item: NavItem): boolean {
+  const peerHrefs = (item.children ?? []).map((c) => c.href).filter(Boolean) as string[];
+  if (pathMatches(pathname, item.href, peerHrefs)) return true;
+  return !!item.children?.some((c) => pathMatches(pathname, c.href, peerHrefs));
+}
 
 /* ── Navigation structure ────────────────────────────────── */
 function useNavGroups(): NavGroup[] {
@@ -44,7 +62,7 @@ function useNavGroups(): NavGroup[] {
   const L = getSidebarLabels(ws, profile);
   const S = getSidebarSectionTitles(profile);
 
-  const productItems: NavItem[] = [
+  const inventoryChildren: NavItem[] = [
     { label: L["/products"], href: "/products", icon: Package },
     { label: L["/categories"], href: "/categories", icon: Layers },
     ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
@@ -59,6 +77,15 @@ function useNavGroups(): NavGroup[] {
     ...(hasShopModule(profile, "workshop") ? [{ label: L["/services"], href: "/services", icon: Cog }] : []),
     ...(hasShopModule(profile, "appointments") ? [{ label: L["/appointments"], href: "/appointments", icon: Calendar }] : []),
     ...(!skipWorkflows ? [{ label: L["/workflows"], href: "/workflows", icon: GitBranch }] : []),
+  ];
+
+  const productItems: NavItem[] = [
+    {
+      label: L["/inventory"],
+      icon: Warehouse,
+      href: "/inventory",
+      children: inventoryChildren,
+    },
   ];
 
   const salesItems: NavItem[] = [
@@ -165,35 +192,42 @@ export function Sidebar() {
   const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
   const sectLbl  = isDark ? "rgba(255,255,255,0.5)" : "#6b7280";
 
-  /* ── single nav item renderer ── */
-  const renderItem = (item: NavItem, groupIdx: number) => {
-    const isActive = !!item.href && (pathname === item.href || pathname.startsWith(item.href + "/"));
-    const Icon = item.icon;
-    const key = `${groupIdx}-${item.label}`;
+  const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
-    const inner = item.href ? (
-      <Link
-        href={item.href}
-        onClick={closeMobile}
-        className={cn(
-          "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 px-3 w-full",
-        )}
-        style={isActive
-          ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
-          : { color: textMut }
-        }
-        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
-        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
-      >
+  /* ── leaf link / action button ── */
+  const renderLeaf = (item: NavItem, key: string, nested = false, peerHrefs: string[] = []) => {
+    const isActive = pathMatches(pathname, item.href, peerHrefs);
+    const Icon = item.icon;
+
+    const className = cn(
+      "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
+      sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 w-full",
+      !sidebarCollapsed && (nested ? "pl-9 pr-3" : "px-3"),
+    );
+
+    const style = isActive
+      ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
+      : { color: textMut };
+
+    const body = (
+      <>
         <Icon
-          className={cn("shrink-0 h-5 w-5", isActive && "text-indigo-500", !isActive && !isDark && "text-black")}
+          className={cn(
+            "shrink-0",
+            nested && !sidebarCollapsed ? "h-4 w-4" : "h-5 w-5",
+            isActive && "text-indigo-500",
+            !isActive && !isDark && "text-black",
+          )}
           strokeWidth={isActive ? 2.2 : 1.8}
         />
         {!sidebarCollapsed && (
           <>
             <span
-              className={cn("flex-1 text-[14px] leading-snug", isActive ? "font-semibold text-indigo-600" : "font-medium")}
+              className={cn(
+                "flex-1 leading-snug",
+                nested ? "text-[13px]" : "text-[14px]",
+                isActive ? "font-semibold text-indigo-600" : "font-medium",
+              )}
               style={!isActive && !isDark ? { color: "#000000" } : undefined}
               title={item.label}
             >
@@ -202,32 +236,30 @@ export function Sidebar() {
             {item.badge && <NavBadge text={item.badge} />}
           </>
         )}
+      </>
+    );
+
+    const inner = item.href ? (
+      <Link
+        href={item.href}
+        onClick={closeMobile}
+        className={className}
+        style={style}
+        onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
+        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
+      >
+        {body}
       </Link>
     ) : (
       <button
         type="button"
         onClick={() => { item.action?.(); closeMobile(); }}
-        className={cn(
-          "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none cursor-pointer",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 px-3 w-full",
-        )}
+        className={cn(className, "cursor-pointer")}
         style={{ color: textMut }}
         onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
         onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
       >
-        <Icon className={cn("shrink-0 h-5 w-5", !isDark && "text-black")} strokeWidth={1.8} />
-        {!sidebarCollapsed && (
-          <>
-            <span
-              className="flex-1 text-[14px] leading-snug font-medium"
-              style={!isDark ? { color: "#000000" } : undefined}
-              title={item.label}
-            >
-              {item.label}
-            </span>
-            {item.badge && <NavBadge text={item.badge} />}
-          </>
-        )}
+        {body}
       </button>
     );
 
@@ -240,6 +272,100 @@ export function Sidebar() {
       );
     }
     return <div key={key}>{inner}</div>;
+  };
+
+  /* ── single nav item renderer (supports dropdown children) ── */
+  const renderItem = (item: NavItem, groupIdx: number, groupTitle: string) => {
+    const key = `${groupIdx}-${item.label}`;
+    const menuKey = `${groupTitle}-${item.label}`;
+    const hasChildren = !!item.children?.length;
+
+    if (!hasChildren) {
+      return renderLeaf(item, key);
+    }
+
+    const peerHrefs = item.children!.map((c) => c.href).filter(Boolean) as string[];
+    const childActive = itemOrChildActive(pathname, item);
+    const open = openMenus[menuKey] ?? childActive;
+    const Icon = item.icon;
+
+    const onToggle = () => setOpenMenus((prev) => ({ ...prev, [menuKey]: !open }));
+
+    if (sidebarCollapsed) {
+      return (
+        <div key={key} className="space-y-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
+                style={childActive
+                  ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
+                  : { color: textMut }}
+              >
+                <Icon className="h-5 w-5" strokeWidth={childActive ? 2.2 : 1.8} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="text-xs p-0 overflow-hidden">
+              <div className="py-1 min-w-[160px]">
+                <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide opacity-60">{item.label}</p>
+                {item.children!.map((child) => (
+                  child.href ? (
+                    <Link
+                      key={child.href}
+                      href={child.href}
+                      onClick={closeMobile}
+                      className={cn(
+                        "block px-3 py-1.5 text-xs hover:bg-accent",
+                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-indigo-600",
+                      )}
+                    >
+                      {child.label}
+                    </Link>
+                  ) : null
+                ))}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      );
+    }
+
+    return (
+      <div key={key}>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none min-h-11 py-2 px-3 w-full cursor-pointer"
+          style={childActive
+            ? { background: "rgba(99,102,241,0.08)", color: "#4f46e5" }
+            : { color: textMut }}
+          onMouseEnter={e => { if (!childActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
+          onMouseLeave={e => { if (!childActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
+        >
+          <Icon
+            className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
+            strokeWidth={childActive ? 2.2 : 1.8}
+          />
+          <span
+            className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
+            style={!childActive && !isDark ? { color: "#000000" } : undefined}
+          >
+            {item.label}
+          </span>
+          <ChevronDown
+            className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")}
+            strokeWidth={1.8}
+          />
+        </button>
+        {open && (
+          <div className="mt-0.5 space-y-0.5 border-l ml-5 pl-0" style={{ borderColor: border }}>
+            {item.children!.map((child, ci) => renderLeaf(child, `${key}-c${ci}`, true, peerHrefs))}
+          </div>
+        )}
+      </div>
+    );
   };
 
   /* ── collapsed icon button helper ── */
@@ -336,7 +462,7 @@ export function Sidebar() {
                   </p>
                 )}
                 <div className="space-y-0.5">
-                  {group.items.map((item, ii) => renderItem(item, gi * 100 + ii))}
+                  {group.items.map((item, ii) => renderItem(item, gi * 100 + ii, group.title))}
                 </div>
               </div>
             ))}
