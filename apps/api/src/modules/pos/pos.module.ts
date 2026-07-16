@@ -788,12 +788,12 @@ export class PosService {
       where: {
         variantId: { in: variantIds },
         receivedQty: { gt: 0 },
-        goodsReceipt: { tenantId, supplierId, branchId },
+        grn: { tenantId, supplierId, branchId },
       },
       include: {
-        goodsReceipt: { select: { id: true, receivedAt: true } },
+        grn: { select: { id: true, receivedAt: true } },
       },
-      orderBy: { goodsReceipt: { receivedAt: 'desc' } },
+      orderBy: { grn: { receivedAt: 'desc' } },
     });
 
     const lastByVariant = new Map<string, typeof grnItems[number]>();
@@ -801,7 +801,7 @@ export class PosService {
       if (!lastByVariant.has(item.variantId)) lastByVariant.set(item.variantId, item);
     }
 
-    const grnIds = [...new Set([...lastByVariant.values()].map((i) => i.goodsReceipt.id))];
+    const grnIds = [...new Set([...lastByVariant.values()].map((i) => i.grn.id))];
     const purchaseLogs = grnIds.length
       ? await this.prisma.inventoryLog.findMany({
           where: {
@@ -848,13 +848,13 @@ export class PosService {
         continue;
       }
 
-      const stockAtLastPurchase = stockAfterByVariantGrn.get(`${row.variantId}:${last.goodsReceipt.id}`) ?? null;
+      const stockAtLastPurchase = stockAfterByVariantGrn.get(`${row.variantId}:${last.grn.id}`) ?? null;
       const soldAfterLastPurchase = stockAtLastPurchase != null
         ? Math.max(0, stockAtLastPurchase - row.stock)
         : null;
 
       insights.set(row.variantId, {
-        lastPurchaseDate: last.goodsReceipt.receivedAt.toISOString(),
+        lastPurchaseDate: last.grn.receivedAt.toISOString(),
         lastPurchaseQty: last.receivedQty,
         stockAtLastPurchase,
         soldAfterLastPurchase,
