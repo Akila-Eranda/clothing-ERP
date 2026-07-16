@@ -254,53 +254,72 @@ export class ProductsService {
     return ProductKind.STANDARD;
   }
 
+  private normalizeSupplierAssignments(dto: Pick<CreateProductDto, 'suppliers' | 'supplierIds'>) {
+    const byId = new Map<string, SupplierAssignmentDto>();
+
+    for (const sid of dto.supplierIds ?? []) {
+      if (!sid?.trim()) continue;
+      if (!byId.has(sid)) {
+        byId.set(sid, { supplierId: sid, isActive: true, isPreferred: false });
+      }
+    }
+
+    for (const row of dto.suppliers ?? []) {
+      const supplierId = row?.supplierId?.trim();
+      if (!supplierId) continue;
+      const prev = byId.get(supplierId);
+      byId.set(supplierId, {
+        supplierId,
+        buyingPrice: Number.isFinite(row.buyingPrice as number) ? row.buyingPrice : prev?.buyingPrice,
+        leadTimeDays: Number.isFinite(row.leadTimeDays as number) ? row.leadTimeDays : prev?.leadTimeDays,
+        minOrderQty: Number.isFinite(row.minOrderQty as number) ? row.minOrderQty : prev?.minOrderQty,
+        isPreferred: row.isPreferred ?? prev?.isPreferred ?? false,
+        isActive: row.isActive ?? prev?.isActive ?? true,
+      });
+    }
+
+    return Array.from(byId.values());
+  }
+
   private async upsertSupplierAssignments(
     tenantId: string,
     variantIds: string[],
-    dto: CreateProductDto,
+    dto: Pick<CreateProductDto, 'suppliers' | 'supplierIds'>,
   ) {
     if (!variantIds.length) return;
 
-    const rich = (dto.suppliers ?? []).filter((s) => s?.supplierId);
-    const plainIds = Array.from(new Set((dto.supplierIds ?? []).filter(Boolean)));
+    const rows = this.normalizeSupplierAssignments(dto);
+    if (!rows.length) return;
 
-    if (!rich.length && !plainIds.length) return;
-
-    const supplierIds = rich.length
-      ? Array.from(new Set(rich.map((s) => s.supplierId)))
-      : plainIds;
-
+    const supplierIds = rows.map((r) => r.supplierId);
     const validSuppliers = await this.prisma.supplier.findMany({
-      where: { tenantId, id: { in: supplierIds } },
+      where: { tenantId, id: { in: supplierIds }, isActive: true },
       select: { id: true },
     });
     if (validSuppliers.length !== supplierIds.length) {
-      throw new BadRequestException('One or more suppliers are invalid');
+      throw new BadRequestException('One or more suppliers are invalid or inactive');
     }
 
-    const byId = new Map(rich.map((s) => [s.supplierId, s]));
-
-    for (const supplierId of supplierIds) {
-      const meta = byId.get(supplierId);
+    for (const meta of rows) {
       for (const variantId of variantIds) {
         await this.prisma.supplierProductAssignment.upsert({
-          where: { supplierId_variantId: { supplierId, variantId } },
+          where: { supplierId_variantId: { supplierId: meta.supplierId, variantId } },
           create: {
             tenantId,
-            supplierId,
+            supplierId: meta.supplierId,
             variantId,
-            lastBuyingPrice: meta?.buyingPrice ?? null,
-            leadTimeDays: meta?.leadTimeDays ?? null,
-            minOrderQty: meta?.minOrderQty ?? null,
-            isPreferred: meta?.isPreferred ?? false,
-            isActive: meta?.isActive ?? true,
+            lastBuyingPrice: meta.buyingPrice ?? null,
+            leadTimeDays: meta.leadTimeDays ?? null,
+            minOrderQty: meta.minOrderQty ?? null,
+            isPreferred: meta.isPreferred ?? false,
+            isActive: meta.isActive ?? true,
           },
           update: {
-            ...(meta?.buyingPrice !== undefined ? { lastBuyingPrice: meta.buyingPrice } : {}),
-            ...(meta?.leadTimeDays !== undefined ? { leadTimeDays: meta.leadTimeDays } : {}),
-            ...(meta?.minOrderQty !== undefined ? { minOrderQty: meta.minOrderQty } : {}),
-            ...(meta?.isPreferred !== undefined ? { isPreferred: meta.isPreferred } : {}),
-            ...(meta?.isActive !== undefined ? { isActive: meta.isActive } : {}),
+            lastBuyingPrice: meta.buyingPrice ?? null,
+            leadTimeDays: meta.leadTimeDays ?? null,
+            minOrderQty: meta.minOrderQty ?? null,
+            isPreferred: meta.isPreferred ?? false,
+            isActive: meta.isActive ?? true,
           },
         });
       }
@@ -530,6 +549,12 @@ export class ProductsService {
             supplierAssignments: {
               select: {
                 supplierId: true,
+                lastBuyingPrice: true,
+                leadTimeDays: true,
+                minOrderQty: true,
+                isPreferred: true,
+                isActive: true,
+                supplierProductCode: true,
                 supplier: { select: { id: true, name: true } },
               },
             },
@@ -669,9 +694,11 @@ export class ProductsService {
       });
       const variantIds = productVariants.map((v) => v.id);
       if (variantIds.length) {
-        const nextIds = Array.isArray(suppliers)
-          ? Array.from(new Set(suppliers.map((s) => s.supplierId).filter(Boolean)))
-          : Array.from(new Set((supplierIds ?? []).filter(Boolean)));
+        const nextRows = this.normalizeSupplierAssignments({
+          suppliers: Array.isArray(suppliers) ? suppliers : undefined,
+          supplierIds: Array.isArray(supplierIds) ? supplierIds : undefined,
+        });
+        const nextIds = nextRows.map((r) => r.supplierId);
 
         if (nextIds.length) {
           await this.prisma.supplierProductAssignment.deleteMany({
@@ -682,9 +709,8 @@ export class ProductsService {
             },
           });
           await this.upsertSupplierAssignments(tenantId, variantIds, {
-            ...(dto as CreateProductDto),
+            suppliers: nextRows,
             supplierIds: nextIds,
-            suppliers: Array.isArray(suppliers) ? suppliers : undefined,
           });
         } else {
           await this.prisma.supplierProductAssignment.deleteMany({

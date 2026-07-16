@@ -169,6 +169,7 @@ export default function CreatePOPage() {
   const [fromGrnId, setFromGrnId] = useState<string | null>(null);
   const [fromGrnNumber, setFromGrnNumber] = useState<string | null>(null);
   const [grnPrefillLoading, setGrnPrefillLoading] = useState(false);
+  const [loadingSupplierDetail, setLoadingSupplierDetail] = useState(false);
 
   const [searchQ,      setSearchQ]      = useState<string[]>([]);
   const [searchOpen,   setSearchOpen]   = useState<number | null>(null);
@@ -200,7 +201,37 @@ export default function CreatePOPage() {
     }
   }, []);
 
+  const mapSupplierDetail = useCallback((raw: Record<string, unknown> | Supplier | null | undefined): Supplier | null => {
+    if (!raw || typeof raw !== "object" || !("id" in raw) || !raw.id) return null;
+    const s = raw as Supplier & {
+      outstandingBalance?: number | null;
+      lastPurchaseDate?: string | null;
+      purchases?: { orderDate?: string; createdAt?: string }[];
+    };
+    const lastPo = s.purchases?.[0];
+    const lastPurchaseDate =
+      s.lastPurchaseDate
+      ?? lastPo?.orderDate
+      ?? lastPo?.createdAt
+      ?? null;
+    return {
+      id: String(s.id),
+      name: s.name ?? "Supplier",
+      phone: s.phone ?? null,
+      email: s.email ?? null,
+      address: s.address ?? null,
+      city: s.city ?? null,
+      contactPerson: s.contactPerson ?? null,
+      creditDays: s.creditDays ?? null,
+      creditLimit: s.creditLimit ?? null,
+      balance: s.outstandingBalance ?? s.balance ?? null,
+      lastPurchaseDate,
+    };
+  }, []);
+
   const loadSupplierDetail = useCallback(async (sid: string) => {
+    if (!sid) return;
+    setLoadingSupplierDetail(true);
     try {
       const res = await api.get<Supplier & {
         creditDays?: number;
@@ -210,25 +241,17 @@ export default function CreatePOPage() {
         lastPurchaseDate?: string | null;
         purchases?: { orderDate?: string; createdAt?: string }[];
       }>(`/suppliers/${sid}`);
-      const s = res.data;
-      const lastPo = s.purchases?.[0];
-      setSupplier({
-        id: s.id,
-        name: s.name,
-        phone: s.phone,
-        email: s.email,
-        address: s.address,
-        city: s.city,
-        contactPerson: s.contactPerson,
-        creditDays: s.creditDays ?? null,
-        creditLimit: s.creditLimit ?? null,
-        balance: s.outstandingBalance ?? s.balance ?? null,
-        lastPurchaseDate: s.lastPurchaseDate ?? lastPo?.orderDate ?? lastPo?.createdAt ?? null,
-      });
-    } catch {
-      // keep list-level supplier if detail fails
+      const mapped = mapSupplierDetail(res.data as Supplier);
+      // Ignore stale responses if user already switched supplier
+      if (mapped && mapped.id === sid) {
+        setSupplier(mapped);
+      }
+    } catch (e: unknown) {
+      toast.error((e as Error)?.message || "Failed to load supplier details");
+    } finally {
+      setLoadingSupplierDetail(false);
     }
-  }, []);
+  }, [mapSupplierDetail]);
 
   useEffect(() => {
     api.get<{ data: Supplier[] }>("/suppliers?limit=200").then((r) =>
@@ -239,26 +262,33 @@ export default function CreatePOPage() {
   const handleSupplierChange = useCallback((id: string) => {
     setSupplierId(id);
     const fromList = suppliers.find((s) => s.id === id) ?? null;
-    setSupplier(fromList);
+    // Optimistic list row — detail effect below replaces with full credit / last-PO data
+    setSupplier(fromList ? mapSupplierDetail(fromList) : null);
     setProductSearchQ("");
     setProductSearchOpen(false);
     setSearchHighlight(0);
     if (id) {
-      void loadSupplierDetail(id);
       void loadSupplierCatalog(id);
       window.setTimeout(() => productSearchRef.current?.focus(), 50);
     } else {
       setAllVariants([]);
+      setLoadingSupplierDetail(false);
     }
-  }, [suppliers, loadSupplierDetail, loadSupplierCatalog]);
+  }, [suppliers, loadSupplierCatalog, mapSupplierDetail]);
+
+  // Always fetch full supplier summary when selection changes
+  useEffect(() => {
+    if (!supplierId) return;
+    void loadSupplierDetail(supplierId);
+  }, [supplierId, loadSupplierDetail]);
 
   // Prefill supplier from ?supplier=
   useEffect(() => {
     const prefill = searchParams.get("supplier");
-    if (prefill && suppliers.length && suppliers.some((s) => s.id === prefill)) {
+    if (prefill && suppliers.length && suppliers.some((s) => s.id === prefill) && supplierId !== prefill) {
       handleSupplierChange(prefill);
     }
-  }, [searchParams, suppliers, handleSupplierChange]);
+  }, [searchParams, suppliers, handleSupplierChange, supplierId]);
 
   // Prefill entire form from Quick/Direct GRN (?fromGrn=)
   useEffect(() => {
@@ -317,7 +347,7 @@ export default function CreatePOPage() {
           }));
         setItems(lines);
         setSearchQ(lines.map(() => ""));
-        void loadSupplierDetail(g.supplier.id);
+        // supplierId change triggers loadSupplierDetail via effect
         void loadSupplierCatalog(g.supplier.id);
         toast.success(`Loaded ${g.grnNumber} — review & create PO`);
       })
@@ -330,14 +360,7 @@ export default function CreatePOPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, router, loadSupplierDetail, loadSupplierCatalog]);
-
-  // Keep supplier object in sync when suppliers load after GRN prefill
-  useEffect(() => {
-    if (!fromGrnId || !supplierId || !suppliers.length) return;
-    const s = suppliers.find((x) => x.id === supplierId);
-    if (s) setSupplier(s);
-  }, [fromGrnId, supplierId, suppliers]);
+  }, [searchParams, router, loadSupplierCatalog]);
 
   const variantById = useMemo(() => {
     return new Map(allVariants.map((v) => [v.variantId, v]));
@@ -469,9 +492,7 @@ export default function CreatePOPage() {
         lastBuyingPrice?: number | null;
         supplierId?: string | null;
         supplierProductCode?: string | null;
-      }>(`/pos/barcode/${encodeURIComponent(trimmed)}`, {
-        params: supplierId ? { supplierId } : undefined,
-      });
+      }>(`/pos/barcode/${encodeURIComponent(trimmed)}${supplierId ? `?supplierId=${encodeURIComponent(supplierId)}` : ""}`);
       const d = res.data;
       return {
         variantId: d.variantId,
@@ -525,10 +546,14 @@ export default function CreatePOPage() {
 
     const resolved = await resolveVariantByCode(q);
     if (resolved) {
+      if (!resolved.supplierId || resolved.supplierId !== supplierId) {
+        toast.error("Product is not assigned to this supplier — assign it on the product or supplier page first");
+        return;
+      }
       selectVariant(idx, resolved);
       toast.success(`Added ${resolved.productName}`);
     } else {
-      toast.error(`Product not found: ${q}`);
+      toast.error(`Product not found or not assigned to this supplier: ${q}`);
     }
   };
 
@@ -615,14 +640,14 @@ export default function CreatePOPage() {
 
     const resolved = await resolveVariantByCode(q);
     if (resolved) {
-      if (resolved.supplierId && resolved.supplierId !== supplierId) {
-        toast.error("Product is not assigned to this supplier");
+      if (!resolved.supplierId || resolved.supplierId !== supplierId) {
+        toast.error("Product is not assigned to this supplier — assign it on the product or supplier page first");
         return;
       }
       toast.success(`Added ${resolved.productName}`);
       addVariantToItems(resolved);
     } else {
-      toast.error(`Product not found: ${q}`);
+      toast.error(`Product not found or not assigned to this supplier: ${q}`);
     }
   };
 
@@ -811,7 +836,7 @@ export default function CreatePOPage() {
                     ["Credit Period", supplier.creditDays != null ? `${supplier.creditDays} days` : "—"],
                     ["Outstanding", supplier.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"],
                     ["Credit Limit", supplier.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"],
-                    ["Last Purchase", fmtDate(supplier.lastPurchaseDate)],
+                    ["Last Purchase", loadingSupplierDetail && !supplier.lastPurchaseDate ? "Loading…" : fmtDate(supplier.lastPurchaseDate)],
                   ].map(([label, value]) => (
                     <div key={label} className="min-w-0 rounded-lg border bg-background/80 px-2.5 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -819,6 +844,8 @@ export default function CreatePOPage() {
                     </div>
                   ))}
                 </div>
+              ) : supplierId && loadingSupplierDetail ? (
+                <p className="text-xs text-muted-foreground">Loading supplier details…</p>
               ) : null}
             </SectionCard>
 
@@ -1328,10 +1355,23 @@ export default function CreatePOPage() {
             </SidebarBlock>
 
             <SidebarBlock title="Supplier Summary">
-              <MetaRow label="Supplier" value={supplier?.name ?? "—"} />
-              <MetaRow label="Outstanding" value={supplier?.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"} />
-              <MetaRow label="Credit Limit" value={supplier?.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"} />
-              <MetaRow label="Last Purchase" value={fmtDate(supplier?.lastPurchaseDate)} />
+              {!supplierId ? (
+                <p className="text-xs text-muted-foreground">Select a supplier to view credit & purchase history.</p>
+              ) : loadingSupplierDetail && !supplier ? (
+                <p className="text-xs text-muted-foreground">Loading supplier details…</p>
+              ) : (
+                <>
+                  <MetaRow label="Supplier" value={supplier?.name ?? "—"} />
+                  <MetaRow label="Phone" value={dash(supplier?.phone)} />
+                  <MetaRow label="Credit Period" value={supplier?.creditDays != null ? `${supplier.creditDays} days` : "—"} />
+                  <MetaRow label="Outstanding" value={supplier?.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"} />
+                  <MetaRow label="Credit Limit" value={supplier?.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"} />
+                  <MetaRow
+                    label="Last Purchase"
+                    value={loadingSupplierDetail && !supplier?.lastPurchaseDate ? "Loading…" : fmtDate(supplier?.lastPurchaseDate)}
+                  />
+                </>
+              )}
             </SidebarBlock>
 
             <SidebarBlock title="Order Information">

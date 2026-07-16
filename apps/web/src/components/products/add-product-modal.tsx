@@ -313,7 +313,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       seoDescription: form.seoDescription || undefined,
       images: form.images.length > 0 ? form.images : undefined,
       variants: variants.length > 0 ? variants : undefined,
-      supplierIds: form.supplierIds,
+      supplierIds: form.supplierIds.length > 0 ? form.supplierIds : (editProduct ? [] : undefined),
     };
     try {
       if (editProduct) {

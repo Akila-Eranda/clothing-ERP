@@ -886,10 +886,15 @@ export class PosService {
     result: Record<string, unknown> & { variantId: string; stock: number; requiresVariantPick?: boolean },
     supplierId?: string,
   ) {
-    if (!supplierId || result.requiresVariantPick) return result;
+    if (!supplierId || result.requiresVariantPick) {
+      return {
+        ...result,
+        supplierAssigned: supplierId ? Boolean(result.supplierId) : undefined,
+      };
+    }
 
     const assignment = await this.prisma.supplierProductAssignment.findFirst({
-      where: { tenantId, supplierId, variantId: result.variantId },
+      where: { tenantId, supplierId, variantId: result.variantId, isActive: true },
       select: {
         supplierId: true,
         supplierProductCode: true,
@@ -899,6 +904,10 @@ export class PosService {
         isPreferred: true,
       },
     });
+
+    if (!assignment) {
+      throw new NotFoundException('Product is not assigned to this supplier');
+    }
 
     const insights = await this.attachSupplierPurchaseInsights(
       tenantId,
@@ -910,11 +919,12 @@ export class PosService {
 
     return {
       ...result,
-      supplierId: assignment?.supplierId ?? supplierId,
-      supplierProductCode: assignment?.supplierProductCode ?? null,
-      leadTimeDays: assignment?.leadTimeDays ?? null,
-      lastBuyingPrice: assignment?.lastBuyingPrice ?? result.lastBuyingPrice ?? null,
-      minOrderQty: assignment?.minOrderQty ?? null,
+      supplierAssigned: true,
+      supplierId: assignment.supplierId,
+      supplierProductCode: assignment.supplierProductCode ?? null,
+      leadTimeDays: assignment.leadTimeDays ?? null,
+      lastBuyingPrice: assignment.lastBuyingPrice ?? result.lastBuyingPrice ?? null,
+      minOrderQty: assignment.minOrderQty ?? null,
       lastPurchaseDate: insight?.lastPurchaseDate ?? null,
       lastPurchaseQty: insight?.lastPurchaseQty ?? null,
       soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
@@ -1084,7 +1094,7 @@ export class PosService {
         ...(opts?.supplierId
           ? {
               supplierAssignments: {
-                some: { tenantId, supplierId: opts.supplierId },
+                some: { tenantId, supplierId: opts.supplierId, isActive: true },
               },
             }
           : {}),
@@ -1102,6 +1112,7 @@ export class PosService {
                         some: {
                           tenantId,
                           supplierId: opts.supplierId,
+                          isActive: true,
                           supplierProductCode: { contains: search, mode: 'insensitive' as const },
                         },
                       },
@@ -1110,6 +1121,7 @@ export class PosService {
                       supplierAssignments: {
                         some: {
                           tenantId,
+                          isActive: true,
                           supplierProductCode: { contains: search, mode: 'insensitive' as const },
                         },
                       },
@@ -1122,7 +1134,7 @@ export class PosService {
         product: { include: { category: true, brand: true } },
         supplierAssignments: opts?.supplierId
           ? {
-              where: { tenantId, supplierId: opts.supplierId },
+              where: { tenantId, supplierId: opts.supplierId, isActive: true },
               select: {
                 supplierId: true,
                 supplierProductCode: true,

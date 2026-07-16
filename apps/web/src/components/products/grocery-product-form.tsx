@@ -645,17 +645,37 @@ export function GroceryProductForm() {
       showBatch: !!batchNumber,
     });
 
-    const suppliersPayload = supplierRows.map((s) => ({
+    const numOrUndef = (raw: string) => {
+      const n = parseFloat(raw);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    const intOrUndef = (raw: string) => {
+      const n = parseInt(raw, 10);
+      return Number.isFinite(n) ? n : undefined;
+    };
+
+    const activeSupplierRows = supplierRows.filter((s) => s.active);
+    if (status === "ACTIVE" && activeSupplierRows.length === 0) {
+      toast.error("Assign at least one active supplier before saving");
+      setLoading(false);
+      return;
+    }
+
+    const suppliersPayload = activeSupplierRows.map((s) => ({
       supplierId: s.supplierId,
-      buyingPrice: s.buyingPrice ? parseFloat(s.buyingPrice) : undefined,
-      leadTimeDays: s.leadTime ? parseInt(s.leadTime, 10) || 0 : undefined,
-      minOrderQty: s.moq ? parseFloat(s.moq) : undefined,
+      buyingPrice: numOrUndef(s.buyingPrice),
+      leadTimeDays: intOrUndef(s.leadTime),
+      minOrderQty: numOrUndef(s.moq),
       isPreferred: s.isDefault,
-      isActive: s.active,
+      isActive: true,
     }));
+    const supplierIdsPayload = suppliersPayload.map((s) => s.supplierId);
 
     try {
-      await api.post("/products", {
+      const created = await api.post<{
+        id: string;
+        variants?: { supplierAssignments?: { supplierId: string }[] }[];
+      }>("/products", {
         name: name.trim(),
         description: description || undefined,
         categoryId: resolvedCategoryId,
@@ -686,12 +706,28 @@ export function GroceryProductForm() {
         branchId: trackInventory && branchScope === "SINGLE" ? branchId : undefined,
         images: images.length > 0 ? images : undefined,
         variants: variants.length > 0 ? variants : undefined,
+        // Send both shapes so assignment always persists (backend merges them)
         suppliers: suppliersPayload.length > 0 ? suppliersPayload : undefined,
+        supplierIds: supplierIdsPayload.length > 0 ? supplierIdsPayload : undefined,
       });
 
-      const label =
-        mode === "DRAFT" ? "saved as draft" : mode === "ADD_ANOTHER" ? "created — add another" : "created";
-      toast.success(`"${name}" ${label}`);
+      const assignedIds = new Set(
+        (created.data?.variants ?? []).flatMap((v) =>
+          (v.supplierAssignments ?? []).map((a) => a.supplierId),
+        ),
+      );
+      const missing = supplierIdsPayload.filter((id) => !assignedIds.has(id));
+      if (missing.length) {
+        toast.error("Product saved but supplier assignment failed — edit the product and re-assign");
+      } else {
+        const label =
+          mode === "DRAFT" ? "saved as draft" : mode === "ADD_ANOTHER" ? "created — add another" : "created";
+        toast.success(
+          suppliersPayload.length
+            ? `"${name}" ${label} (linked to ${suppliersPayload.length} supplier${suppliersPayload.length > 1 ? "s" : ""})`
+            : `"${name}" ${label}`,
+        );
+      }
 
       if (mode === "ADD_ANOTHER") {
         resetForm();
@@ -1000,7 +1036,7 @@ return (
               ) : null}
             </Section>
 
-            <Section step={hasVariants ? "7" : isWeighted ? "6" : "5"} title="Suppliers" subtitle="Linked suppliers appear on Purchase Orders">
+            <Section step={hasVariants ? "7" : isWeighted ? "6" : "5"} title="Suppliers" subtitle="Required for Purchase Orders — linked suppliers see this product in Create PO">
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />

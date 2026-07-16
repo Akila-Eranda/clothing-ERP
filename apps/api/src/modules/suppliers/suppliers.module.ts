@@ -121,10 +121,31 @@ export class SuppliersService {
         ],
       }),
     };
-    const [data, total] = await this.prisma.$transaction([
-      this.prisma.supplier.findMany({ where, skip, take, orderBy: { name: 'asc' }, include: { _count: { select: { purchases: true } } } }),
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.supplier.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { name: 'asc' },
+        include: {
+          _count: { select: { purchases: true } },
+          purchases: {
+            orderBy: [{ orderDate: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            select: { orderDate: true, createdAt: true },
+          },
+        },
+      }),
       this.prisma.supplier.count({ where }),
     ]);
+    const data = rows.map(({ purchases, ...supplier }) => {
+      const lastPo = purchases[0];
+      return {
+        ...supplier,
+        outstandingBalance: supplier.balance,
+        lastPurchaseDate: lastPo?.orderDate ?? lastPo?.createdAt ?? null,
+      };
+    });
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
@@ -426,11 +447,11 @@ export class SuppliersService {
   async listAssignedProducts(supplierId: string, tenantId: string) {
     await this.findOneSupplier(supplierId, tenantId);
     return this.prisma.supplierProductAssignment.findMany({
-      where: { tenantId, supplierId },
+      where: { tenantId, supplierId, isActive: true },
       include: {
         variant: {
           include: {
-            product: { select: { id: true, name: true } },
+            product: { select: { id: true, name: true, status: true } },
           },
         },
       },
@@ -462,6 +483,7 @@ export class SuppliersService {
         leadTimeDays: dto.leadTimeDays,
         lastBuyingPrice: dto.lastBuyingPrice,
         isPreferred: dto.isPreferred ?? false,
+        isActive: true,
         notes: dto.notes,
       },
       update: {
@@ -469,6 +491,7 @@ export class SuppliersService {
         leadTimeDays: dto.leadTimeDays,
         lastBuyingPrice: dto.lastBuyingPrice,
         isPreferred: dto.isPreferred,
+        isActive: true,
         notes: dto.notes,
       },
       include: {

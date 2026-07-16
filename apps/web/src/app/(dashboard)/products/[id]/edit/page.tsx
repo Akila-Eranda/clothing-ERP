@@ -53,7 +53,11 @@ interface ExistingVariant {
   size?: string | null; color?: string | null; material?: string | null; style?: string | null;
   costPrice: number; sellingPrice: number; mrp: number;
   isActive: boolean;
-  supplierAssignments?: { supplierId: string; supplier?: { id: string; name: string } }[];
+  supplierAssignments?: {
+    supplierId: string;
+    isActive?: boolean;
+    supplier?: { id: string; name: string };
+  }[];
 }
 interface ProductData {
   id: string; name: string; sku: string; hsn?: string | null;
@@ -140,7 +144,11 @@ export default function EditProductPage() {
       setBrands(brandRes.data ?? []);
       setSuppliers(supplierRes.data?.data ?? (supplierRes.data as unknown as SupplierOpt[]) ?? []);
       const assignedSupplierIds = Array.from(new Set(
-        (p.variants ?? []).flatMap((v) => (v.supplierAssignments ?? []).map((a) => a.supplierId)),
+        (p.variants ?? []).flatMap((v) =>
+          (v.supplierAssignments ?? [])
+            .filter((a) => a.isActive !== false)
+            .map((a) => a.supplierId),
+        ),
       ));
       setForm({
         name:          p.name,
