@@ -50,7 +50,7 @@ interface POSOverlayProps {
   posOnly?: boolean;
 }
 
-interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; mrp?: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
 interface ApiCustomerRow {
@@ -89,7 +89,7 @@ function formatSaleCustomerName(customer?: SaleCustomer | null): string {
   const full = `${customer.firstName ?? ""} ${customer.lastName ?? ""}`.trim();
   return full || customer.phone || "Walk-in";
 }
-interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; cashTendered?: number; }
+interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; savings?: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; paymentMethod?: string; customer?: SaleCustomer | null; _count?: { items: number }; payments?: { method: string }[]; }
 interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
@@ -709,7 +709,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const lineTax = taxRate;
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
-      unitPrice: p.unitPrice, quantity: qty, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
+      unitPrice: p.unitPrice, mrp: p.mrp && p.mrp > 0 ? p.mrp : p.unitPrice,
+      quantity: qty, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
       image: p.imageUrl,
     });
     setLastAddedVariantId(p.variantId);
@@ -898,10 +899,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const headerMsg=s.headerText?`<sub style="font-style:italic">${s.headerText}</sub>`:"";
     const cashierHtml=s.showCashier?`<div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div>`:"";
     const customerHtml=(s.showCustomer&&r.customerName)?`<div class="row"><span>Customer:</span><span>${r.customerName}</span></div>`:"";
-    const discountHtml=(s.showDiscount&&r.discount>0)?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:"";
+    const discountHtml=r.discount>0?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:"";
     const taxHtml=(s.showTax&&r.tax>0)?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:"";
+    const savingsAmt = r.savings ?? 0;
+    const savingsHtml=savingsAmt>0?`<div class="save"><span>You saved</span><span>LKR ${savingsAmt.toFixed(2)}</span></div>`:"";
     const barcodeHtml=s.showBarcode?`<div style="text-align:center;font-family:monospace;letter-spacing:2px;font-size:9px;margin:4px 0">${r.invoiceNumber}</div>`:"";
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:${fs};padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px}.d{border:none;border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em;line-height:1.6}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div><hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:#ffffff!important;color:#000000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Courier New',monospace;font-size:${fs};padding:6mm;max-width:${pw};margin:0 auto}
+h1{font-size:1.4em;font-weight:900;text-align:center;color:#000}
+sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#000}
+.d{border:none;border-top:1px dashed #000;margin:5px 0}
+.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em;color:#000}
+.iname{font-size:0.9em;font-weight:bold;margin-top:4px;color:#000}
+.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px;color:#000}
+.save{display:flex;justify-content:space-between;margin:6px 0 2px;font-size:0.95em;font-weight:900;color:#000;border:1px dashed #000;padding:4px 6px}
+.foot{text-align:center;margin-top:10px;font-size:0.8em;line-height:1.6;color:#000}
+@media print{@page{margin:0;size:${pw} auto}html,body{background:#fff!important;color:#000!important}body{padding:3mm}}
+</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
   },[user, receiptSettings]);
 
   const reprintSale = React.useCallback(async (saleId: string) => {
@@ -929,6 +945,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         subtotal: s.subtotal,
         discount: (s.discountAmount ?? 0) + (s.loyaltyDiscount ?? 0),
         tax: s.taxAmount ?? 0,
+        savings: (s.discountAmount ?? 0) + (s.loyaltyDiscount ?? 0),
       };
       await executeReceiptPrint({
         html: buildReceiptHtml(receipt),
@@ -1025,6 +1042,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         customerName: customer?.name,
         paymentMethod: payments.map((p) => p.method).join(" + "),
         cashTendered: activePayment === "CASH" && numpad ? parseFloat(numpad) : undefined,
+        savings: items.reduce((sum, i) => {
+          const mrp = i.mrp && i.mrp > i.unitPrice ? i.mrp : i.unitPrice;
+          return sum + Math.max(0, (mrp - i.unitPrice) * i.quantity);
+        }, 0) + discountAmount() + payState.couponDiscount + tierDiscountAmt + loyaltyDiscountAmt,
       };
       setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
       setThankYouSale({
@@ -1060,6 +1081,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           subtotal: saleSnapshot.subtotal,
           discount: saleSnapshot.discount,
           tax: saleSnapshot.tax,
+          savings: saleSnapshot.savings,
           cashTendered: saleSnapshot.cashTendered,
         };
         executeReceiptPrint({

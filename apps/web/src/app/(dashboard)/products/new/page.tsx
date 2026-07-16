@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, hasShopModule, useShopWorkspace, isTireShop } from "@/lib/use-shop-profile";
+import { useShopProfile, hasMultiUnit, hasBatchTracking, hasShopModule, useShopWorkspace, isTireShop, isGroceryShop } from "@/lib/use-shop-profile";
 import { getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
+import { GroceryProductForm } from "@/components/products/grocery-product-form";
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags } from "@/lib/product-tags";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
@@ -46,7 +47,7 @@ interface Form {
   tags: string[]; tagInput: string;
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
-  unit: string; expiryDate: string; batchNumber: string;
+  unit: string; batchNumber: string;
   trackInventory: boolean;
   warrantyMonths: string;
   loadIndex: string;
@@ -68,7 +69,7 @@ function buildInitial(type?: string): Form {
     tags: [], tagInput: "",
     sellingPrice: "", costPrice: "", mrp: "", taxRate: copy.defaultTaxRate,
     hasVariants: d.hasVariants, attributes: d.attributes,
-    unit: d.unit, expiryDate: "", batchNumber: "",
+    unit: d.unit, batchNumber: "",
     trackInventory: true,
     warrantyMonths: "",
     loadIndex: "",
@@ -94,6 +95,12 @@ function cartesian(attrs: VariantAttr[]): string[][] {
 
 // â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AddProductPage() {
+  const shopProfile = useShopProfile();
+  if (isGroceryShop(shopProfile)) return <GroceryProductForm />;
+  return <StandardAddProductPage />;
+}
+
+function StandardAddProductPage() {
   const router = useRouter();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const shopProfile = useShopProfile();
@@ -102,7 +109,6 @@ export default function AddProductPage() {
   const variantCols = variantTableColumns(shopProfile);
   const variantHint = variantVariantHint(shopProfile);
   const showUnit = hasMultiUnit(shopProfile);
-  const showExpiry = hasExpiryTracking(shopProfile);
   const showBatch = hasBatchTracking(shopProfile);
   const showWarranty = hasShopModule(shopProfile, "warranty");
   const showTireMeta = isTireShop(shopProfile);
@@ -186,47 +192,23 @@ export default function AddProductPage() {
       : value;
     setVariantRows((rows) => rows.map((r) => {
       if (r.key !== key) return r;
-      const updated = { ...r, [field]: next } as VariantRow;
-      // Keep variant name + primary attr field in sync when editing either
-      if (field === "name" && typeof next === "string" && variantCols.length === 1) {
-        updated[variantCols[0].field] = next;
-      }
-      if (
-        typeof next === "string"
-        && (field === "size" || field === "color" || field === "material" || field === "style")
-        && variantCols.length === 1
-        && variantCols[0].field === field
-      ) {
-        updated.name = next;
-        const used = rows.filter((x) => x.key !== key).map((x) => x.sku);
-        updated.sku = uniqueSku(genSku(form.name || "PRD", [next]), used);
-      }
-      return updated;
+      return { ...r, [field]: next } as VariantRow;
     }));
   };
 
   const addVariantRow = (preset?: string) => {
-    const primary = variantCols[0];
     const label = (preset ?? "").trim() || `Variant ${variantRows.length + 1}`;
-    const comboFields = applyVariantCombo(
-      shopProfile,
-      form.attributes.length ? form.attributes : [{ name: primary?.label ?? "Variant", values: [label], input: "" }],
-      [label],
-    );
     const usedSkus = variantRows.map((r) => r.sku);
     const row: VariantRow = {
       key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
       sku: uniqueSku(genSku(form.name || "PRD", [label]), usedSkus),
       name: label,
-      ...comboFields,
+      size: "",
       sellingPrice: form.sellingPrice,
       costPrice: form.costPrice,
       mrp: form.mrp,
       active: true,
     };
-    if (primary && !row[primary.field]) {
-      row[primary.field] = label;
-    }
     setVariantRows((r) => [...r, row]);
   };
 
@@ -285,10 +267,9 @@ export default function AddProductPage() {
       tags: form.tags,
       tagInput: form.tagInput,
       unit: form.unit,
-      expiryDate: form.expiryDate,
       batchNumber: form.batchNumber,
       showUnit,
-      showExpiry,
+      showExpiry: false,
       showBatch,
     });
     if (form.branchScope === "SINGLE" && !form.branchId) {
@@ -420,12 +401,6 @@ export default function AddProductPage() {
                       {shopProfile.units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
                   </Select>
-                </div>
-              )}
-              {showExpiry && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Expiry Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                  <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
                 </div>
               )}
               {showBatch && (
@@ -589,7 +564,7 @@ export default function AddProductPage() {
               <div className="min-w-0">
                 <h2 className="font-semibold text-base">Variants</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {formCopy.variantSectionHint} · edit SKU, name, {variantHint} & prices in the table
+                  Select brand, set Weight per variant, and enter prices — Variant name and Weight are separate
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -605,12 +580,11 @@ export default function AddProductPage() {
                     setVariantRows((rows) => {
                       if (rows.length > 0) return rows;
                       const label = "Variant 1";
-                      const primary = variantCols[0];
                       return [{
                         key: `${label}|${Date.now()}`,
-                        sku: genSku(form.name || "PRD", [label]),
+                        sku: uniqueSku(genSku(form.name || "PRD", [label]), []),
                         name: label,
-                        ...(primary ? { [primary.field]: label } : {}),
+                        size: "",
                         sellingPrice: form.sellingPrice,
                         costPrice: form.costPrice,
                         mrp: form.mrp,
@@ -628,6 +602,23 @@ export default function AddProductPage() {
               </div>
             ) : (
               <div className="space-y-3">
+                {formCopy.showBrand && (
+                  <div className="space-y-1.5 max-w-sm">
+                    <Label className="text-xs font-semibold">Brand</Label>
+                    <Select
+                      value={form.brandId || undefined}
+                      onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+                    >
+                      <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_none">No brand</SelectItem>
+                        {brands.length === 0
+                          ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
+                          : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>

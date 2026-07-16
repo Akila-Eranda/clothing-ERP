@@ -261,6 +261,8 @@ export interface CartItem {
   barcode?: string;
   image?: string;
   unitPrice: number;
+  /** List / MRP price — used for “You saved” on receipts when above unitPrice */
+  mrp?: number;
   quantity: number;
   discountAmount: number;
   discountType: "percentage" | "fixed";

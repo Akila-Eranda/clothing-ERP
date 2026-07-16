@@ -556,6 +556,21 @@ export default function EditProductPage() {
             ) : listView ? (
               /* ── List view (existing + new variants) ── */
               <div className="space-y-3">
+                <div className="space-y-1.5 max-w-sm">
+                  <Label className="text-xs font-semibold">Brand</Label>
+                  <Select
+                    value={form.brandId || undefined}
+                    onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">No brand</SelectItem>
+                      {brands.length === 0
+                        ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
+                        : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium">{variantRows.length} variants
                     <span className="ml-2 text-xs text-muted-foreground">({variantRows.filter((r) => r.active).length} active)</span>

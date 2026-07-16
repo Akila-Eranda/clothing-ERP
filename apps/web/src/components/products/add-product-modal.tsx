@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
-import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
+import { useShopProfile, hasMultiUnit, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
 import {
   variantVariantHint, applyVariantCombo, getProductFormCopy,
 } from "@/lib/shop-vertical";
@@ -81,7 +81,7 @@ interface Form {
   tags: string[]; tagInput: string;
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
-  unit: string; expiryDate: string; batchNumber: string;
+  unit: string; batchNumber: string;
   trackInventory: boolean;
   seoTitle: string; seoDescription: string;
   images: string[];
@@ -101,7 +101,6 @@ const buildInitialForm = (): Form => {
     hasVariants: defaultHasVariants(profile.type),
     attributes: variantAttrsFromProfile(profile.type),
     unit: profile.defaultUnit,
-    expiryDate: "",
     batchNumber: "",
     trackInventory: true, seoTitle: "", seoDescription: "",
     images: [],
@@ -133,7 +132,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const formCopy = getProductFormCopy(shopProfile, workspace);
   const variantHint = variantVariantHint(shopProfile);
   const showUnit = hasMultiUnit(shopProfile);
-  const showExpiry = hasExpiryTracking(shopProfile);
   const showBatch = hasBatchTracking(shopProfile);
   const [tab, setTab]               = useState<TabId>("basic");
   const [form, setForm]             = useState<Form>(INITIAL);
@@ -180,7 +178,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         hasVariants: editProduct.hasVariants,
         attributes: variantAttrsFromProfile(shopProfile.type),
         unit: (editProduct.tags ?? []).find((t) => t.startsWith("unit:"))?.slice(5) ?? shopProfile.defaultUnit,
-        expiryDate: (editProduct.tags ?? []).find((t) => t.startsWith("exp:"))?.slice(4) ?? "",
         batchNumber: (editProduct.tags ?? []).find((t) => t.startsWith("batch:"))?.slice(6) ?? "",
         trackInventory: editProduct.trackInventory,
         seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
@@ -210,17 +207,10 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
   const addVariantRow = () => {
     const label = `Variant ${variantRows.length + 1}`;
-    const primary = shopProfile.variantAttributes[0];
-    const comboFields = applyVariantCombo(
-      shopProfile,
-      form.attributes.length ? form.attributes : [{ name: primary?.label ?? "Variant", values: [label], input: "" }],
-      [label],
-    );
     setVariantRows((r) => [...r, {
       key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
       sku: uniqueSku(genSku(form.name || "PRD", [label]), r.map((x) => x.sku)),
       name: label,
-      ...comboFields,
       sellingPrice: form.sellingPrice,
       costPrice: form.costPrice,
       mrp: form.mrp,
@@ -295,10 +285,9 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       tags: form.tags,
       tagInput: form.tagInput,
       unit: form.unit,
-      expiryDate: form.expiryDate,
       batchNumber: form.batchNumber,
       showUnit,
-      showExpiry,
+      showExpiry: false,
       showBatch,
       preserveSystemTags: editProduct ? editSystemTags : undefined,
     });
@@ -458,12 +447,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
               </SelectContent>
             </Select>
           </div>
-          {showExpiry && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Expiry Date <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
-            </div>
-          )}
           {showBatch && (
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Batch Number <span className="text-muted-foreground font-normal">(optional)</span></Label>
@@ -472,20 +455,12 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           )}
         </div>
       )}
-      {!showUnit && (showExpiry || showBatch) && (
+      {!showUnit && showBatch && (
         <div className="grid grid-cols-2 gap-4">
-          {showExpiry && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Expiry Date</Label>
-              <Input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)} />
-            </div>
-          )}
-          {showBatch && (
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Batch Number</Label>
-              <Input placeholder="e.g. BATCH-2026-001" value={form.batchNumber} onChange={(e) => set("batchNumber", e.target.value)} />
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Batch Number</Label>
+            <Input placeholder="e.g. BATCH-2026-001" value={form.batchNumber} onChange={(e) => set("batchNumber", e.target.value)} />
+          </div>
         </div>
       )}
       {/* Status */}
@@ -535,6 +510,23 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
         {form.hasVariants ? (
           <div className="space-y-4">
+            {formCopy.showBrand && (
+              <div className="space-y-1.5 max-w-sm">
+                <Label className="text-xs font-semibold">Brand</Label>
+                <Select
+                  value={form.brandId || undefined}
+                  onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No brand</SelectItem>
+                    {brands.length === 0
+                      ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
+                      : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex flex-wrap gap-2">
                 <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={addVariantRow}>
