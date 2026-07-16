@@ -372,6 +372,12 @@ export class ProductsService {
         variants: {
           include: {
             inventory: { include: { branch: true } },
+            supplierAssignments: {
+              select: {
+                supplierId: true,
+                supplier: { select: { id: true, name: true } },
+              },
+            },
           },
           orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
         },
@@ -384,7 +390,9 @@ export class ProductsService {
 
   async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
     await this.findOne(id, tenantId);
-    const { variants, branchScope: _bs, branchId: _bi, ...rest } = dto as Record<string, unknown>;
+    const { variants, branchScope: _bs, branchId: _bi, supplierIds, ...rest } = dto as Record<string, unknown> & {
+      supplierIds?: string[];
+    };
     const allowed = [
       'name', 'description', 'shortDesc', 'categoryId', 'brandId', 'hsn', 'barcode',
       'sellingPrice', 'costPrice', 'mrp', 'taxRate', 'status', 'images', 'tags',
@@ -452,6 +460,48 @@ export class ProductsService {
         }
       }
     }
+
+    if (Array.isArray(supplierIds)) {
+      const uniqueSupplierIds = Array.from(new Set(supplierIds.filter(Boolean)));
+      const productVariants = await this.prisma.productVariant.findMany({
+        where: { productId: id },
+        select: { id: true },
+      });
+      const variantIds = productVariants.map((v) => v.id);
+      if (variantIds.length) {
+        if (uniqueSupplierIds.length) {
+          const validSuppliers = await this.prisma.supplier.findMany({
+            where: { tenantId, id: { in: uniqueSupplierIds } },
+            select: { id: true },
+          });
+          if (validSuppliers.length !== uniqueSupplierIds.length) {
+            throw new BadRequestException('One or more suppliers are invalid');
+          }
+          await this.prisma.supplierProductAssignment.deleteMany({
+            where: {
+              tenantId,
+              variantId: { in: variantIds },
+              supplierId: { notIn: uniqueSupplierIds },
+            },
+          });
+          await this.prisma.supplierProductAssignment.createMany({
+            data: validSuppliers.flatMap((s) =>
+              variantIds.map((variantId) => ({
+                tenantId,
+                supplierId: s.id,
+                variantId,
+              })),
+            ),
+            skipDuplicates: true,
+          });
+        } else {
+          await this.prisma.supplierProductAssignment.deleteMany({
+            where: { tenantId, variantId: { in: variantIds } },
+          });
+        }
+      }
+    }
+
     return this.findOne(id, tenantId);
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Package, Paperclip, Plus, Printer, Search, ScanLine, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, FileText, Package, Plus, Printer, Search, ScanLine, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -482,168 +482,162 @@ export default function CreatePOPage() {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-28">
-      {/* Top Header */}
-      <div className="sticky top-0 z-40 bg-background/80 backdrop-blur border-b">
-        <div className="max-w-[1800px] mx-auto px-6 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 min-w-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9 gap-2 shrink-0"
-              onClick={() => router.push("/purchases")}
-              disabled={saving}
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
-            <div className="min-w-0">
-              <h1 className="text-lg font-bold truncate">
-                {fromGrnId ? "Create PO from GRN" : "Create Purchase Order"}
-              </h1>
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <span className="text-xs text-muted-foreground">PO Number</span>
-                <span className="text-xs font-mono bg-muted/50 border px-2 py-0.5 rounded-full">Auto-generated</span>
-                <span className={`text-xs font-semibold border px-2 py-0.5 rounded-full ${
+    <div className="min-h-screen bg-muted/20 pb-32 sm:pb-28">
+      {/* Header */}
+      <div className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-3 sm:px-6 sm:py-3.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9 shrink-0 gap-1.5"
+            onClick={() => router.push("/purchases")}
+            disabled={saving}
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back</span>
+          </Button>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-base font-bold sm:text-lg">
+              {fromGrnId ? "Create PO from GRN" : "Create Purchase Order"}
+            </h1>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border bg-muted/50 px-2 py-0.5 font-mono text-[10px] text-muted-foreground sm:text-xs">
+                Auto PO #
+              </span>
+              <span
+                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${
                   fromGrnId
-                    ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
-                    : "bg-amber-500/10 text-amber-700 border-amber-500/20"
-                }`}>
-                  {fromGrnId ? "From GRN" : "Draft"}
-                </span>
-              </div>
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
+                    : "border-amber-500/20 bg-amber-500/10 text-amber-700"
+                }`}
+              >
+                {fromGrnId ? "From GRN" : "Draft"}
+              </span>
             </div>
+          </div>
+          <div className="hidden shrink-0 text-right md:block">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Grand total</p>
+            <p className="text-sm font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-[1800px] mx-auto p-6 space-y-6">
+      <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-6">
         {grnPrefillLoading && (
-          <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
-            Loading GRN details…
-          </div>
+          <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">Loading GRN details…</div>
         )}
         {fromGrnId && fromGrnNumber && !grnPrefillLoading && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 dark:bg-emerald-950/30 dark:border-emerald-900 p-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">
-                Cashier already posted stock
+          <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300 sm:text-xs">
+                Stock already posted
               </p>
-              <p className="text-sm mt-1">
-                Creating PO from <span className="font-mono font-bold">{fromGrnNumber}</span>.
-                Supplier, items, qty &amp; cost are filled — no second stock add.
+              <p className="mt-0.5 text-sm">
+                Creating PO from <span className="font-mono font-bold">{fromGrnNumber}</span> — no second stock add.
               </p>
             </div>
-            <span className="text-xs font-mono bg-background/80 border px-2.5 py-1 rounded-full">
+            <span className="w-fit shrink-0 rounded-full border bg-background/80 px-2.5 py-1 font-mono text-xs">
               {fromGrnNumber}
             </span>
           </div>
         )}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 items-start">
+
+        <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-5">
           {/* Main */}
-          <div className="space-y-6">
-            {/* Section 01: Supplier Information */}
-            <div className="bg-background border rounded-2xl shadow-sm p-6 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-semibold">Supplier Information</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Supplier, delivery, payment terms & notes</p>
-                </div>
+          <div className="min-w-0 space-y-4 sm:space-y-5">
+            {/* Supplier */}
+            <section className="space-y-4 rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
+              <div>
+                <h2 className="text-sm font-semibold">1. Supplier & terms</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Who you are ordering from</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
                   <label className="text-xs font-semibold text-muted-foreground">Supplier *</label>
                   <select
                     value={supplierId}
                     onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full h-10 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">Choose a supplier…</option>
                     {suppliers.map((s) => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
-
                   {supplier && (
-                    <div className="rounded-xl border bg-muted/20 p-3 space-y-1">
-                      <p className="text-sm font-semibold">{supplier.name}</p>
-                      {supplier.contactPerson && <p className="text-xs text-muted-foreground">{supplier.contactPerson}</p>}
-                      {(supplier.phone || supplier.email) && (
-                        <div className="pt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          {supplier.phone && <span className="inline-flex items-center gap-2">📞 {supplier.phone}</span>}
-                          {supplier.email && <span className="inline-flex items-center gap-2">✉️ {supplier.email}</span>}
-                        </div>
-                      )}
+                    <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
+                      <p className="font-semibold text-foreground">{supplier.name}</p>
+                      <p className="mt-0.5 truncate">
+                        {[supplier.contactPerson, supplier.phone, supplier.email].filter(Boolean).join(" · ") || "—"}
+                      </p>
                     </div>
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Expected Delivery</label>
-                  <Input
-                    type="date"
-                    value={expectedDate}
-                    onChange={(e) => setExpectedDate(e.target.value)}
-                    className="h-10"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Expected delivery</label>
+                  <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="h-10" />
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Payment Terms</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Payment terms</label>
                   <select
                     value={paymentTerms}
                     onChange={(e) => setPaymentTerms(e.target.value)}
-                    className="w-full h-10 rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-muted-foreground">Reference Number</label>
-                  <Input
-                    value={reference}
-                    onChange={(e) => setReference(e.target.value)}
-                    placeholder="e.g. REF-2026-001"
-                    className="h-10"
-                  />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-muted-foreground">Reference</label>
+                  <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="REF-…" className="h-10" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Currency</label>
                   <Input value="LKR" disabled className="h-10 bg-muted/40" />
                 </div>
 
-                <div className="space-y-2">
+                <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
                   <label className="text-xs font-semibold text-muted-foreground">Notes</label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    rows={3}
+                    rows={2}
                     placeholder="Internal notes for this PO…"
-                    className="w-full text-sm border rounded-lg px-3 py-2.5 bg-background resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                    className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
               </div>
-            </div>
+            </section>
 
-            {/* Section 02: Product Search */}
-            <div className="bg-background border rounded-2xl shadow-sm p-6 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-semibold">Product Search</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Search by product name, SKU, barcode, supplier product code</p>
+            {/* Items */}
+            <section className="overflow-hidden rounded-2xl border bg-background shadow-sm">
+              <div className="flex flex-col gap-3 border-b bg-muted/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold">2. Purchase items</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Search or scan, then set qty & cost</p>
                 </div>
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={addRow} disabled={saving}>
-                  <Plus className="h-4 w-4" /> Add Row
-                </Button>
+                <div className="flex items-center gap-2">
+                  {items.length > 0 && (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                      {items.length} · qty {totalQty}
+                    </span>
+                  )}
+                  <Button size="sm" onClick={addRow} disabled={saving} className="gap-1.5">
+                    <Plus className="h-4 w-4" /> Add row
+                  </Button>
+                </div>
               </div>
 
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <ScanLine className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70 pointer-events-none" />
+              {/* Search */}
+              <div className="relative border-b px-3 py-3 sm:px-5">
+                <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-8" />
+                <ScanLine className="pointer-events-none absolute right-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70 sm:right-8" />
                 <input
                   value={productSearchQ}
                   onChange={(e) => {
@@ -652,94 +646,229 @@ export default function CreatePOPage() {
                   }}
                   onFocus={() => setProductSearchOpen(true)}
                   onKeyDown={handleBigSearchKeyDown}
-                  placeholder="Type to search… press Enter to add"
-                  className="w-full pl-10 pr-10 py-3 text-sm border rounded-xl bg-background focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder="Search name, SKU, barcode… Enter to add"
+                  className="h-11 w-full rounded-xl border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
-
                 {productSearchOpen && productSearchQ.trim() && (
-                  <div className="absolute top-full left-0 right-0 z-50 bg-background border rounded-xl shadow-xl mt-2 overflow-hidden">
+                  <div className="absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl sm:left-5 sm:right-5">
                     <div className="max-h-64 overflow-y-auto">
                       {bigMatches.length === 0 ? (
-                        <p className="px-4 py-6 text-center text-muted-foreground text-xs">
+                        <p className="px-4 py-6 text-center text-xs text-muted-foreground">
                           No match — press Enter to scan barcode/SKU
                         </p>
                       ) : (
-                        bigMatches.map((v) => {
-                          return (
-                            <button
-                              key={v.variantId}
-                              type="button"
-                              onClick={() => addVariantToItems(v)}
-                              className="w-full px-4 py-3 hover:bg-muted/50 text-left flex items-center gap-3 border-b last:border-0"
-                            >
-                              <div className="h-9 w-9 rounded-lg bg-muted/30 overflow-hidden shrink-0 flex items-center justify-center">
-                                {v.imageUrl ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img src={v.imageUrl} alt={v.productName} className="h-full w-full object-cover" />
-                                ) : (
-                                  <Package className="h-4 w-4 text-muted-foreground/60" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{v.productName}</p>
-                                <p className="text-muted-foreground text-xs truncate">
-                                  <span className="font-mono">{v.sku}</span>
-                                  {v.variantName ? ` · ${v.variantName}` : ""}
-                                </p>
-                              </div>
-                              <div className="text-right shrink-0">
-                                <p className="text-xs font-semibold tabular-nums">LKR {v.costPrice.toLocaleString()}</p>
-                                <p className="text-[10px] text-muted-foreground tabular-nums">Stock {v.stock}</p>
-                              </div>
-                            </button>
-                          );
-                        })
+                        bigMatches.map((v) => (
+                          <button
+                            key={v.variantId}
+                            type="button"
+                            onClick={() => addVariantToItems(v)}
+                            className="flex w-full items-center gap-3 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50 sm:px-4"
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
+                              {v.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={v.imageUrl} alt={v.productName} className="h-full w-full object-cover" />
+                              ) : (
+                                <Package className="h-4 w-4 text-muted-foreground/60" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">{v.productName}</p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                <span className="font-mono">{v.sku}</span>
+                                {v.variantName ? ` · ${v.variantName}` : ""}
+                              </p>
+                            </div>
+                            <div className="shrink-0 text-right">
+                              <p className="text-xs font-semibold tabular-nums">LKR {v.costPrice.toLocaleString()}</p>
+                              <p className="text-[10px] tabular-nums text-muted-foreground">Stock {v.stock}</p>
+                            </div>
+                          </button>
+                        ))
                       )}
                     </div>
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Section 03: Purchase Items Table */}
-            <div className="bg-background border rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-6 py-4 border-b bg-muted/20">
-                <div>
-                  <h2 className="text-sm font-semibold">Purchase Items</h2>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Select a row to see detailed stock & supplier context
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  {items.length > 0 && (
-                    <span className="text-xs bg-primary/10 text-primary font-semibold px-2 py-0.5 rounded-full tabular-nums">
-                      {items.length} products
-                    </span>
-                  )}
-                  <Button size="sm" onClick={addRow} disabled={saving} className="gap-1.5">
-                    <Plus className="h-4 w-4" /> Add
-                  </Button>
-                </div>
+              {/* Mobile / tablet cards */}
+              <div className="divide-y lg:hidden">
+                {items.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 px-4 py-12 text-center text-muted-foreground">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+                      <Package className="h-6 w-6 opacity-40" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">No items yet</p>
+                      <p className="mt-1 text-xs">Search above or add a blank row</p>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={addRow} disabled={saving} className="mt-1 gap-1.5">
+                      <Plus className="h-3.5 w-3.5" /> Add first item
+                    </Button>
+                  </div>
+                ) : (
+                  items.map((item, idx) => {
+                    const v = item.variantId ? variantById.get(item.variantId) : undefined;
+                    const { total } = calcItem(item);
+                    const q = searchQ[idx] ?? "";
+                    const matches = searchOpen === idx ? filteredVariants(q) : [];
+                    const stock = v?.stock ?? null;
+                    const selected = selectedRowIdx === idx;
+
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => setSelectedRowIdx(idx)}
+                        className={`space-y-3 p-3 sm:p-4 ${selected ? "bg-primary/5" : ""}`}
+                      >
+                        {item.variantId ? (
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/30">
+                              {item.imageUrl || v?.imageUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
+                              ) : (
+                                <Package className="h-5 w-5 text-muted-foreground/60" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold leading-snug">{item.productName}</p>
+                              <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                                {item.sku}{item.variantName ? ` · ${item.variantName}` : ""}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                Stock {stock ?? "—"}
+                                {item.size ? ` · ${item.size}` : ""}
+                                {item.color ? ` · ${item.color}` : ""}
+                              </p>
+                            </div>
+                            <div className="flex shrink-0 flex-col items-end gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); clearVariant(idx); }}
+                                className="text-[11px] font-semibold text-primary hover:underline"
+                              >
+                                Change
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); removeRow(idx); }}
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                aria-label="Remove row"
+                                disabled={saving}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="relative" onClick={(e) => e.stopPropagation()}>
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                            <input
+                              value={q}
+                              onChange={(e) => setSearchQ((p) => p.map((x, i) => (i === idx ? e.target.value : x)))}
+                              onFocus={() => setSearchOpen(idx)}
+                              onKeyDown={(e) => handleItemSearchKeyDown(idx, e)}
+                              placeholder="Search or scan…"
+                              className="h-10 w-full rounded-lg border bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                            {searchOpen === idx && (
+                              <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl">
+                                <div className="max-h-48 overflow-y-auto">
+                                  {matches.length === 0 ? (
+                                    <p className="px-3 py-4 text-center text-xs text-muted-foreground">
+                                      {q ? "No match — press Enter" : "Type to search"}
+                                    </p>
+                                  ) : matches.map((vv) => (
+                                    <button
+                                      key={vv.variantId}
+                                      type="button"
+                                      onClick={() => selectVariant(idx, vv)}
+                                      className="flex w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50"
+                                    >
+                                      <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">{vv.productName}</p>
+                                        <p className="truncate text-xs text-muted-foreground">{vv.sku} · {vv.variantName}</p>
+                                      </div>
+                                      <span className="shrink-0 text-xs font-semibold tabular-nums">LKR {vv.costPrice.toLocaleString()}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Qty</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={item.orderedQty}
+                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Cost</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={item.unitCost}
+                              onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
+                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Discount</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={item.discount}
+                              onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
+                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Tax %</label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step="0.1"
+                              value={item.taxRate}
+                              onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
+                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t pt-2 text-sm">
+                          <span className="text-xs text-muted-foreground">Line total</span>
+                          <span className="font-bold tabular-nums text-primary">LKR {fmt(total)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[1280px]">
-                  <thead className="bg-muted/40 border-b">
+              {/* Desktop table */}
+              <div className="hidden overflow-x-auto lg:block">
+                <table className="w-full min-w-[860px] text-sm">
+                  <thead className="border-b bg-muted/40">
                     <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <th className="px-4 py-3 text-left font-semibold w-[280px]">Product</th>
-                      <th className="px-4 py-3 text-left font-semibold w-[110px]">SKU</th>
-                      <th className="px-4 py-3 text-left font-semibold w-[110px]">Storage</th>
-                      <th className="px-4 py-3 text-left font-semibold w-[100px]">Color</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[130px]">Current Stock</th>
-                      <th className="px-4 py-3 text-left font-semibold w-[140px]">Last PO Date</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[120px]">Last PO Qty</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[160px]">Sold After Last PO</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[120px]">Order Qty</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[140px]">Buying Price</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[120px]">Discount</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[110px]">Tax %</th>
-                      <th className="px-4 py-3 text-right font-semibold w-[140px]">Total</th>
-                      <th className="px-4 py-3 w-[70px] text-right" />
+                      <th className="px-4 py-3 text-left font-semibold">Product</th>
+                      <th className="px-3 py-3 text-right font-semibold">Stock</th>
+                      <th className="px-3 py-3 text-right font-semibold">Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold">Buying</th>
+                      <th className="px-3 py-3 text-right font-semibold">Disc</th>
+                      <th className="px-3 py-3 text-right font-semibold">Tax %</th>
+                      <th className="px-3 py-3 text-right font-semibold">Total</th>
+                      <th className="w-12 px-2 py-3" />
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -750,107 +879,90 @@ export default function CreatePOPage() {
                       const matches = searchOpen === idx ? filteredVariants(q) : [];
                       const stock = v?.stock ?? null;
                       const status = v?.status ?? (stock !== null ? (stock <= 0 ? "out_of_stock" : stock < 5 ? "low_stock" : "in_stock") : "unknown");
-
                       const statusPill =
                         status === "in_stock"
-                          ? "bg-emerald-500/10 text-emerald-700 border border-emerald-500/20"
+                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
                           : status === "low_stock"
-                            ? "bg-amber-500/10 text-amber-700 border border-amber-500/20"
-                            : "bg-rose-500/10 text-rose-700 border border-rose-500/20";
+                            ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
+                            : "bg-rose-500/10 text-rose-700 border-rose-500/20";
 
-                      const storageLabel = item.size ?? null;
-                      const colorLabel = item.color ?? null;
                       return (
                         <tr
                           key={idx}
                           onClick={() => setSelectedRowIdx(idx)}
-                          className={[
-                            "align-top hover:bg-muted/15 transition-colors cursor-pointer",
-                            selectedRowIdx === idx ? "ring-2 ring-primary/30 bg-primary/5" : "",
-                          ].join(" ")}
+                          className={`cursor-pointer align-top transition-colors hover:bg-muted/15 ${
+                            selectedRowIdx === idx ? "bg-primary/5 ring-1 ring-inset ring-primary/25" : ""
+                          }`}
                         >
-                          {/* Product */}
                           <td className="px-4 py-3">
                             {item.variantId ? (
-                              <div className="flex items-start gap-3 min-w-0">
-                                <div className="h-12 w-12 rounded-xl bg-muted/30 overflow-hidden shrink-0 flex items-center justify-center">
+                              <div className="flex min-w-0 items-start gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
                                   {item.imageUrl || v?.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
                                   ) : (
-                                    <Package className="h-5 w-5 text-muted-foreground/60" />
+                                    <Package className="h-4 w-4 text-muted-foreground/60" />
                                   )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="font-medium text-sm leading-snug truncate">{item.productName}</p>
-                                  <p className="text-xs text-muted-foreground mt-0.5 font-mono truncate">
-                                    {item.sku}
-                                    {item.variantName ? ` · ${item.variantName}` : ""}
+                                  <p className="truncate text-sm font-medium">{item.productName}</p>
+                                  <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
+                                    {item.sku}{item.variantName ? ` · ${item.variantName}` : ""}
                                   </p>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/15 tabular-nums">
-                                      {item.sku}
-                                    </span>
-                                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${statusPill}`}>
-                                      {status === "unknown" ? "—" : status.replaceAll("_", " ")}
-                                    </span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/50 border text-muted-foreground">
-                                      {storageLabel ?? "—"}
-                                    </span>
-                                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/50 border text-muted-foreground">
-                                      {colorLabel ?? "—"}
-                                    </span>
+                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    {status !== "unknown" && (
+                                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+                                        {status.replaceAll("_", " ")}
+                                      </span>
+                                    )}
+                                    {(item.size || item.color) && (
+                                      <span className="rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                        {[item.size, item.color].filter(Boolean).join(" · ")}
+                                      </span>
+                                    )}
                                   </div>
                                 </div>
                                 <button
                                   type="button"
-                                  onClick={(e) => {
-                                    clearVariant(idx);
-                                  }}
-                                  className="text-[11px] font-semibold text-primary hover:underline shrink-0"
+                                  onClick={(e) => { e.stopPropagation(); clearVariant(idx); }}
+                                  className="shrink-0 text-[11px] font-semibold text-primary hover:underline"
                                 >
                                   Change
                                 </button>
                               </div>
                             ) : (
-                              <div className="relative">
-                                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                                <ScanLine className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/70 pointer-events-none" />
+                              <div className="relative" onClick={(e) => e.stopPropagation()}>
+                                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                 <input
                                   value={q}
-                                  onChange={(e) => setSearchQ((p) => p.map((x, i) => i === idx ? e.target.value : x))}
+                                  onChange={(e) => setSearchQ((p) => p.map((x, i) => (i === idx ? e.target.value : x)))}
                                   onFocus={() => setSearchOpen(idx)}
                                   onKeyDown={(e) => handleItemSearchKeyDown(idx, e)}
-                                  placeholder="Search name, SKU, or scan barcode…"
-                                  className="w-full pl-8 pr-8 py-2 text-sm border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring"
-                                  onClick={(e) => e.stopPropagation()}
+                                  placeholder="Search name, SKU, or scan…"
+                                  className="h-9 w-full rounded-lg border bg-background pl-8 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                                 />
                                 {searchOpen === idx && (
-                                  <div className="absolute top-full left-0 right-0 z-50 bg-background border rounded-xl shadow-xl mt-1 overflow-hidden">
+                                  <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl">
                                     <div className="max-h-52 overflow-y-auto">
                                       {matches.length === 0 ? (
-                                        <p className="px-3 py-5 text-center text-muted-foreground text-xs">
-                                          {q ? "No match — press Enter to scan barcode/SKU" : "Type to search products"}
+                                        <p className="px-3 py-5 text-center text-xs text-muted-foreground">
+                                          {q ? "No match — press Enter" : "Type to search"}
                                         </p>
                                       ) : matches.map((vv) => (
                                         <button
                                           key={vv.variantId}
                                           type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            selectVariant(idx, vv);
-                                          }}
-                                          className="w-full px-3 py-2.5 hover:bg-muted/50 text-left flex items-center gap-3 border-b last:border-0"
+                                          onClick={() => selectVariant(idx, vv)}
+                                          className="flex w-full items-center gap-3 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50"
                                         >
-                                          <div className="flex-1 min-w-0">
-                                            <p className="font-medium text-sm truncate">{vv.productName}</p>
-                                            <p className="text-muted-foreground text-xs truncate">
-                                              {vv.sku} · {vv.variantName}
-                                            </p>
+                                          <div className="min-w-0 flex-1">
+                                            <p className="truncate text-sm font-medium">{vv.productName}</p>
+                                            <p className="truncate text-xs text-muted-foreground">{vv.sku} · {vv.variantName}</p>
                                           </div>
-                                          <div className="text-right shrink-0">
+                                          <div className="shrink-0 text-right">
                                             <p className="text-xs font-semibold tabular-nums">LKR {vv.costPrice.toLocaleString()}</p>
-                                            <p className="text-[10px] text-muted-foreground tabular-nums">Stock {vv.stock}</p>
+                                            <p className="text-[10px] tabular-nums text-muted-foreground">Stock {vv.stock}</p>
                                           </div>
                                         </button>
                                       ))}
@@ -860,90 +972,37 @@ export default function CreatePOPage() {
                               </div>
                             )}
                           </td>
-
-                          {/* SKU */}
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/50 border text-xs font-mono tabular-nums">
-                              {item.sku || "—"}
-                            </span>
-                          </td>
-
-                          {/* Storage */}
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/50 border text-xs text-muted-foreground">
-                              {item.size ?? "—"}
-                            </span>
-                          </td>
-
-                          {/* Color */}
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-muted/50 border text-xs text-muted-foreground">
-                              {item.color ?? "—"}
-                            </span>
-                          </td>
-
-                          {/* Current Stock */}
-                          <td className="px-4 py-3 text-right">
-                            <span className="text-sm font-semibold tabular-nums">
-                              {stock === null ? "—" : stock}
-                            </span>
-                          </td>
-
-                          {/* Last PO Date */}
-                          <td className="px-4 py-3">
-                            <span className="text-xs text-muted-foreground">{v?.lastPurchaseDate ?? "-"}</span>
-                          </td>
-
-                          {/* Last PO Qty */}
-                          <td className="px-4 py-3 text-right">
-                            <span className="text-xs text-muted-foreground tabular-nums">{v?.lastPurchaseQty ?? "-"}</span>
-                          </td>
-
-                          {/* Sold After Last PO */}
-                          <td className="px-4 py-3 text-right">
-                            <span className="text-xs text-muted-foreground tabular-nums">{v?.soldAfterLastPurchase ?? "-"}</span>
-                          </td>
-
-                          {/* Order Qty */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 py-3 text-right font-semibold tabular-nums">{stock ?? "—"}</td>
+                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min={1}
                               value={item.orderedQty}
                               onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
-                              className="w-24 text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                              onClick={(e) => e.stopPropagation()}
+                              className="h-9 w-[4.5rem] rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
-
-                          {/* Buying Price */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min={0}
                               step="0.01"
                               value={item.unitCost}
                               onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
-                              className="w-28 text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                              onClick={(e) => e.stopPropagation()}
+                              className="h-9 w-24 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
-
-                          {/* Discount */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min={0}
                               step="0.01"
                               value={item.discount}
                               onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
-                              className="w-24 text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                              onClick={(e) => e.stopPropagation()}
+                              className="h-9 w-20 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
-
-                          {/* Tax % (kept to preserve existing functionality) */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
                               type="number"
                               min={0}
@@ -951,27 +1010,15 @@ export default function CreatePOPage() {
                               step="0.1"
                               value={item.taxRate}
                               onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                              className="w-20 text-right text-sm border rounded-lg px-2 py-2 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                              onClick={(e) => e.stopPropagation()}
+                              className="h-9 w-16 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
-
-                          {/* Total */}
-                          <td className="px-4 py-3 text-right">
-                            <span className="text-sm font-bold text-primary tabular-nums whitespace-nowrap">
-                              {fmt(total)}
-                            </span>
-                          </td>
-
-                          {/* Delete */}
-                          <td className="px-4 py-3 text-right">
+                          <td className="px-3 py-3 text-right font-bold tabular-nums text-primary whitespace-nowrap">{fmt(total)}</td>
+                          <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                removeRow(idx);
-                              }}
-                              className="text-muted-foreground hover:text-destructive transition-colors p-1.5 rounded-md hover:bg-destructive/10"
+                              onClick={() => removeRow(idx)}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                               aria-label="Remove row"
                               disabled={saving}
                             >
@@ -984,16 +1031,16 @@ export default function CreatePOPage() {
 
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={14} className="py-16 text-center">
+                        <td colSpan={8} className="py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-muted-foreground">
-                            <div className="h-12 w-12 rounded-full bg-muted/50 flex items-center justify-center">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
                               <Package className="h-6 w-6 opacity-40" />
                             </div>
                             <div>
                               <p className="text-sm font-medium text-foreground">No items yet</p>
-                              <p className="text-xs mt-1">Use the product search above or add a row.</p>
+                              <p className="mt-1 text-xs">Use search above or add a row</p>
                             </div>
-                            <Button size="sm" variant="outline" onClick={addRow} disabled={saving} className="gap-1.5 mt-1">
+                            <Button size="sm" variant="outline" onClick={addRow} disabled={saving} className="mt-1 gap-1.5">
                               <Plus className="h-3.5 w-3.5" /> Add first item
                             </Button>
                           </div>
@@ -1005,225 +1052,162 @@ export default function CreatePOPage() {
               </div>
 
               {items.length > 0 && (
-                <div className="px-6 py-3 border-t bg-muted/10">
-                  <div className="flex items-center justify-between text-sm">
-                    <div className="text-muted-foreground">
-                      Totals <span className="text-muted-foreground font-normal">({items.length} items)</span>
-                    </div>
-                    <div className="flex items-center gap-6">
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Subtotal</div>
-                        <div className="font-semibold tabular-nums">LKR {fmt(subtotal)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Discount</div>
-                        <div className="font-semibold text-green-600 tabular-nums">− LKR {fmt(totalDisc)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Tax</div>
-                        <div className="font-semibold tabular-nums">LKR {fmt(totalTax)}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs text-muted-foreground">Grand Total</div>
-                        <div className="font-bold text-primary tabular-nums">LKR {fmt(grandTotal)}</div>
-                      </div>
-                    </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/10 px-4 py-3 text-sm sm:px-5">
+                  <span className="text-xs text-muted-foreground sm:text-sm">
+                    {items.length} line{items.length === 1 ? "" : "s"} · {totalQty} units
+                  </span>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm">
+                    <span className="tabular-nums text-muted-foreground">Sub <strong className="text-foreground">LKR {fmt(subtotal)}</strong></span>
+                    {totalDisc > 0 && (
+                      <span className="tabular-nums text-emerald-600">Disc −LKR {fmt(totalDisc)}</span>
+                    )}
+                    <span className="font-bold tabular-nums text-primary">Total LKR {fmt(grandTotal)}</span>
                   </div>
                 </div>
               )}
-            </div>
+            </section>
 
-            {/* Section 04: Selected Product Details */}
-            <div className="bg-background border rounded-2xl shadow-sm p-6 space-y-4">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-sm font-semibold">Selected Product Details</h2>
-                  <p className="text-xs text-muted-foreground mt-1">Read-only snapshot for the selected row</p>
-                </div>
+            {/* Selected details — mobile/tablet only (sidebar on xl) */}
+            <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm xl:hidden sm:p-5">
+              <div>
+                <h2 className="text-sm font-semibold">Selected product</h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">Tap a row to see stock context</p>
               </div>
-
               {!selectedItem ? (
-                <div className="rounded-xl border border-dashed p-8 text-center">
-                  <p className="text-sm text-muted-foreground">Click a row in the items table to view details.</p>
-                </div>
+                <p className="rounded-xl border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
+                  No row selected
+                </p>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                  <div className="flex items-center gap-4">
-                    <div className="h-16 w-16 rounded-2xl bg-muted/30 overflow-hidden flex items-center justify-center">
-                      {(selectedItem.imageUrl || selectedVariant?.imageUrl) ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={selectedItem.imageUrl || selectedVariant?.imageUrl || ""}
-                          alt={selectedItem.productName}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <Package className="h-7 w-7 text-muted-foreground/60" />
-                      )}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold truncate">{selectedItem.productName}</p>
-                      <p className="text-xs text-muted-foreground font-mono truncate">{selectedItem.sku}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{selectedItem.variantName ? selectedItem.variantName : "—"}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                    {[
-                      ["Barcode", selectedVariant?.barcode ?? selectedItem.barcode ?? "-"],
-                      ["Current Stock", selectedVariant?.stock ?? "-"],
-                      ["Available Stock", selectedVariant?.availableStock ?? "-"],
-                      ["Reserved Stock", selectedVariant?.reservedStock ?? "-"],
-                      ["Last Purchase Date", selectedVariant?.lastPurchaseDate ?? "-"],
-                      ["Last Purchase Qty", selectedVariant?.lastPurchaseQty ?? "-"],
-                      ["Sold After Last Purchase", selectedVariant?.soldAfterLastPurchase ?? "-"],
-                      ["Last Buying Price", selectedVariant?.lastBuyingPrice ?? "-"],
-                    ].map(([label, value]) => (
-                      <div key={label} className="space-y-1">
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-                        <div className="text-sm font-semibold tabular-nums">{value ?? "-"}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="md:col-span-2 border rounded-2xl p-4 bg-muted/10">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {[
-                        ["Current Buying Price", selectedItem.unitCost ?? 0],
-                        ["Selling Price", selectedVariant?.sellingPrice ?? selectedVariant?.unitPrice ?? "-"],
-                        ["Supplier", supplier?.name ?? "-"],
-                        ["Lead Time", selectedVariant?.leadTimeDays ?? "-"],
-                      ].map(([label, value]) => (
-                        <div key={label} className="space-y-1">
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
-                          <div className="text-sm font-semibold tabular-nums">{value}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                <SelectedProductPanel item={selectedItem} variant={selectedVariant} supplierName={supplier?.name} />
               )}
-            </div>
+            </section>
           </div>
 
-          {/* Right Sidebar */}
-          <div className="space-y-6">
-            <div className="sticky top-24 space-y-6">
-              {/* Sticky Summary Card */}
-              <div className="bg-background border rounded-2xl shadow-sm p-6">
-                <h3 className="text-sm font-semibold">Summary</h3>
-                <div className="mt-4 space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Total Products</span>
-                    <span className="font-semibold tabular-nums">{items.length}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Total Quantity</span>
-                    <span className="font-semibold tabular-nums">{totalQty}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-semibold tabular-nums">LKR {fmt(subtotal)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Discount</span>
-                    <span className="font-semibold text-green-600 tabular-nums">− LKR {fmt(totalDisc)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Tax</span>
-                    <span className="font-semibold tabular-nums">LKR {fmt(totalTax)}</span>
-                  </div>
-                  <div className="pt-2 border-t flex items-center justify-between">
-                    <span className="font-bold">Grand Total</span>
-                    <span className="font-bold text-primary tabular-nums">LKR {fmt(grandTotal)}</span>
-                  </div>
+          {/* Sidebar */}
+          <aside className="space-y-4 xl:sticky xl:top-24">
+            <div className="rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
+              <h3 className="text-sm font-semibold">Summary</h3>
+              <div className="mt-3 space-y-2.5 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Products</span>
+                  <span className="font-semibold tabular-nums">{items.length}</span>
                 </div>
-              </div>
-
-              {/* Attachments */}
-              <div className="bg-background border rounded-2xl shadow-sm p-6">
-                <h3 className="text-sm font-semibold">Attachments</h3>
-                <p className="text-xs text-muted-foreground mt-1">Upload supplier quotation and other documents</p>
-                <div className="mt-4 space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                      <Upload className="h-3.5 w-3.5" /> Upload Supplier Quotation
-                    </label>
-                    <input type="file" className="w-full text-sm" />
-                    <p className="text-[11px] text-muted-foreground">Backend upload is not enabled for this screen.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-muted-foreground flex items-center gap-2">
-                      <Paperclip className="h-3.5 w-3.5" /> Upload Other Documents
-                    </label>
-                    <input type="file" className="w-full text-sm" />
-                  </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Quantity</span>
+                  <span className="font-semibold tabular-nums">{totalQty}</span>
                 </div>
-              </div>
-
-              {/* Order Information */}
-              <div className="bg-background border rounded-2xl shadow-sm p-6">
-                <h3 className="text-sm font-semibold">Order Information</h3>
-                <div className="mt-4 grid grid-cols-1 gap-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Created By</span>
-                    <span className="font-semibold">{user?.name ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Branch</span>
-                    <span className="font-semibold">{user?.branchId ?? "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Warehouse</span>
-                    <span className="font-semibold">—</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Date</span>
-                    <span className="font-semibold tabular-nums">{todayIso}</span>
-                  </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="font-semibold tabular-nums">LKR {fmt(subtotal)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Discount</span>
+                  <span className="font-semibold tabular-nums text-emerald-600">− LKR {fmt(totalDisc)}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Tax</span>
+                  <span className="font-semibold tabular-nums">LKR {fmt(totalTax)}</span>
+                </div>
+                <div className="flex justify-between gap-3 border-t pt-2.5">
+                  <span className="font-bold">Grand total</span>
+                  <span className="font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</span>
                 </div>
               </div>
             </div>
-          </div>
+
+            <div className="hidden rounded-2xl border bg-background p-4 shadow-sm xl:block sm:p-5">
+              <h3 className="text-sm font-semibold">Selected product</h3>
+              <p className="mt-0.5 text-xs text-muted-foreground">Click a table row</p>
+              <div className="mt-3">
+                {!selectedItem ? (
+                  <p className="rounded-xl border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                    No row selected
+                  </p>
+                ) : (
+                  <SelectedProductPanel item={selectedItem} variant={selectedVariant} supplierName={supplier?.name} compact />
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
+              <h3 className="text-sm font-semibold">Order info</h3>
+              <div className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Created by</span>
+                  <span className="truncate font-semibold">{user?.name ?? "—"}</span>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <span className="text-muted-foreground">Date</span>
+                  <span className="font-semibold tabular-nums">{todayIso}</span>
+                </div>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
 
-      {/* Sticky Footer */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur border-t">
-        <div className="max-w-[1800px] mx-auto px-6 py-3 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => router.push("/purchases")} disabled={saving}>
-              Cancel
-            </Button>
-            <Button variant="outline" onClick={() => submit(false)} disabled={saving || !supplierId || items.length === 0}>
-              Save Draft
-            </Button>
+      {/* Footer */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-3">
+          <div className="flex items-center justify-between gap-2 sm:justify-start">
+            <div className="md:hidden">
+              <p className="text-[10px] text-muted-foreground">Total</p>
+              <p className="text-sm font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} disabled={saving}>
+                Cancel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => submit(false)}
+                disabled={saving || !supplierId || items.length === 0}
+                className="hidden sm:inline-flex"
+              >
+                Save draft
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                window.print();
-              }}
+              size="sm"
+              onClick={() => submit(false)}
+              disabled={saving || !supplierId || items.length === 0}
+              className="flex-1 sm:hidden"
+            >
+              Draft
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => window.print()}
               disabled={saving || items.length === 0}
-              className="gap-2"
+              className="hidden gap-1.5 md:inline-flex"
             >
               <Printer className="h-4 w-4" />
-              Print Preview
+              Print
             </Button>
             {fromGrnId ? (
               <Button
+                size="sm"
                 onClick={() => submit(false)}
                 disabled={saving || !supplierId || items.length === 0 || grnPrefillLoading}
-                className="gap-2 bg-emerald-600 hover:bg-emerald-700"
+                className="flex-1 gap-1.5 bg-emerald-600 hover:bg-emerald-700 sm:flex-none"
               >
                 <FileText className="h-4 w-4" />
-                Create PO & Link GRN
+                <span className="truncate">Create & link GRN</span>
               </Button>
             ) : (
-              <Button onClick={() => submit(true)} disabled={saving || !supplierId || items.length === 0} className="gap-2">
+              <Button
+                size="sm"
+                onClick={() => submit(true)}
+                disabled={saving || !supplierId || items.length === 0}
+                className="flex-1 gap-1.5 sm:flex-none"
+              >
                 <FileText className="h-4 w-4" />
-                Create Purchase Order
+                Create PO
               </Button>
             )}
           </div>
@@ -1239,6 +1223,60 @@ export default function CreatePOPage() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+function SelectedProductPanel({
+  item,
+  variant,
+  supplierName,
+  compact,
+}: {
+  item: LineItem;
+  variant?: VariantOpt;
+  supplierName?: string;
+  compact?: boolean;
+}) {
+  const rows: [string, string | number][] = [
+    ["Barcode", variant?.barcode ?? item.barcode ?? "—"],
+    ["Stock", variant?.stock ?? "—"],
+    ["Available", variant?.availableStock ?? "—"],
+    ["Reserved", variant?.reservedStock ?? "—"],
+    ["Last PO", variant?.lastPurchaseDate ?? "—"],
+    ["Last qty", variant?.lastPurchaseQty ?? "—"],
+    ["Sold after", variant?.soldAfterLastPurchase ?? "—"],
+    ["Last cost", variant?.lastBuyingPrice ?? "—"],
+    ["Selling", variant?.sellingPrice ?? variant?.unitPrice ?? "—"],
+    ["Supplier", supplierName ?? "—"],
+    ["Lead days", variant?.leadTimeDays ?? "—"],
+  ];
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/30 ${compact ? "h-12 w-12" : "h-14 w-14"}`}>
+          {(item.imageUrl || variant?.imageUrl) ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.imageUrl || variant?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
+          ) : (
+            <Package className="h-5 w-5 text-muted-foreground/60" />
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold">{item.productName}</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">{item.sku}</p>
+          {item.variantName && <p className="truncate text-xs text-muted-foreground">{item.variantName}</p>}
+        </div>
+      </div>
+      <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
+        {rows.map(([label, value]) => (
+          <div key={label} className="min-w-0 rounded-lg border bg-muted/10 px-2.5 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold tabular-nums">{value}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

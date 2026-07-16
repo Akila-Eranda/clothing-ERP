@@ -24,6 +24,7 @@ import { ProductImageUpload } from "@/components/products/product-image-upload";
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
 interface Brand    { id: string; name: string; }
+interface SupplierOpt { id: string; name: string; }
 interface VariantAttr { name: string; values: string[]; input: string; }
 interface VariantRow {
   id?: string;
@@ -44,12 +45,14 @@ interface Form {
   loadIndex: string;
   speedRating: string;
   images: string[];
+  supplierIds: string[];
 }
 interface ExistingVariant {
   id: string; name: string; sku: string;
   size?: string | null; color?: string | null; material?: string | null; style?: string | null;
   costPrice: number; sellingPrice: number; mrp: number;
   isActive: boolean;
+  supplierAssignments?: { supplierId: string; supplier?: { id: string; name: string } }[];
 }
 interface ProductData {
   id: string; name: string; sku: string; hsn?: string | null;
@@ -107,9 +110,12 @@ export default function EditProductPage() {
     loadIndex: "",
     speedRating: "",
     images: [],
+    supplierIds: [],
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
+  const [suppliers, setSuppliers]   = useState<SupplierOpt[]>([]);
+  const [supplierPick, setSupplierPick] = useState("");
   const [fetchLoading, setFetchLoading] = useState(true);
   const [loading, setLoading]       = useState(false);
   const [listView, setListView]     = useState(true);
@@ -123,10 +129,11 @@ export default function EditProductPage() {
   // ── Load product ─────────────────────────────────────────────────────
   const load = useCallback(async () => {
     try {
-      const [prodRes, catRes, brandRes] = await Promise.all([
+      const [prodRes, catRes, brandRes, supplierRes] = await Promise.all([
         api.get<ProductData>(`/products/${id}`),
         api.get<Category[]>("/categories"),
         api.get<Brand[]>("/brands"),
+        api.get<{ data: SupplierOpt[] }>("/suppliers?limit=200"),
       ]);
       const p = prodRes.data;
       const { userTags, systemTags: sysTags } = splitProductTags(p.tags ?? []);
@@ -134,6 +141,10 @@ export default function EditProductPage() {
       setSystemTags(sysTags);
       setCategories(catRes.data ?? []);
       setBrands(brandRes.data ?? []);
+      setSuppliers(supplierRes.data?.data ?? (supplierRes.data as unknown as SupplierOpt[]) ?? []);
+      const assignedSupplierIds = Array.from(new Set(
+        (p.variants ?? []).flatMap((v) => (v.supplierAssignments ?? []).map((a) => a.supplierId)),
+      ));
       setForm({
         name:          p.name,
         description:   p.description   ?? "",
@@ -155,6 +166,7 @@ export default function EditProductPage() {
         loadIndex: p.loadIndex ?? "",
         speedRating: p.speedRating ?? "",
         images: p.images ?? [],
+        supplierIds: assignedSupplierIds,
       });
       if (p.variants.length > 0) {
         setVariantRows(p.variants.map((v) => ({
@@ -177,7 +189,7 @@ export default function EditProductPage() {
       toast.error("Failed to load product");
       router.push("/products");
     } finally { setFetchLoading(false); }
-  }, [id, router]);
+  }, [id, router, shopProfile.type]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -232,9 +244,33 @@ export default function EditProductPage() {
   // ── Submit ────────────────────────────────────────────────────────────
   const submit = async (status: "ACTIVE" | "DRAFT") => {
     if (!form.name.trim()) { toast.error("Product name is required"); return; }
-    if (!form.sellingPrice || !form.costPrice || !form.mrp) {
-      toast.error("Selling price, cost price and MRP are required"); return;
+
+    const activeRows = form.hasVariants ? variantRows.filter((r) => r.active) : [];
+    const pricesFromVariants = form.hasVariants && activeRows.length > 0;
+
+    if (pricesFromVariants) {
+      const missing = activeRows.find((r) => !r.sellingPrice?.trim());
+      if (missing) {
+        toast.error(`Set selling price on variant "${missing.name || missing.sku || "row"}"`);
+        return;
+      }
+    } else if (!form.sellingPrice || !form.costPrice || !form.mrp) {
+      toast.error("Selling price, cost price and MRP are required");
+      return;
     }
+
+    const derivedSelling = pricesFromVariants
+      ? Math.min(...activeRows.map((r) => parseFloat(r.sellingPrice) || 0))
+      : parseFloat(form.sellingPrice) || 0;
+    const derivedCost = pricesFromVariants
+      ? (parseFloat(form.costPrice)
+        || Math.min(...activeRows.map((r) => parseFloat(r.costPrice) || 0).filter((n) => n > 0).concat([0])))
+      : parseFloat(form.costPrice) || 0;
+    const derivedMrp = pricesFromVariants
+      ? (parseFloat(form.mrp)
+        || Math.max(...activeRows.map((r) => parseFloat(r.mrp) || parseFloat(r.sellingPrice) || 0), 0))
+      : parseFloat(form.mrp) || 0;
+
     setLoading(true);
 
     let variants: Record<string, unknown>[] | undefined = undefined;
@@ -247,9 +283,9 @@ export default function EditProductPage() {
         color:        r.color,
         material:     r.material,
         style:        r.style,
-        sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
-        costPrice:    parseFloat(r.costPrice)    || parseFloat(form.costPrice)    || 0,
-        mrp:          parseFloat(r.mrp)          || parseFloat(form.mrp)          || 0,
+        sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
+        costPrice:    parseFloat(r.costPrice)    || derivedCost    || 0,
+        mrp:          parseFloat(r.mrp)          || derivedMrp    || 0,
         isActive:     r.active,
       }));
     }
@@ -268,9 +304,9 @@ export default function EditProductPage() {
         categoryId:     form.categoryId   || undefined,
         brandId:        form.brandId      || undefined,
         hsn:            form.hsn          || undefined,
-        sellingPrice:   parseFloat(form.sellingPrice),
-        costPrice:      parseFloat(form.costPrice),
-        mrp:            parseFloat(form.mrp),
+        sellingPrice:   parseFloat(form.sellingPrice) || derivedSelling,
+        costPrice:      parseFloat(form.costPrice) || derivedCost,
+        mrp:            parseFloat(form.mrp) || derivedMrp,
         taxRate:        parseFloat(form.taxRate) || 0,
         status,
         tags:           savedTags,
@@ -282,6 +318,7 @@ export default function EditProductPage() {
         ...(showTireMeta ? { loadIndex: form.loadIndex.trim() || undefined, speedRating: form.speedRating.trim() || undefined } : {}),
         images: form.images,
         variants,
+        supplierIds: form.supplierIds,
       });
       toast.success(`"${form.name}" updated successfully!`);
       router.push(`/products/${id}`);
@@ -407,38 +444,67 @@ export default function EditProductPage() {
 
           {/* Pricing */}
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
-            <h2 className="font-semibold text-base border-b pb-2">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Selling Price <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
-                  onChange={(e) => set("sellingPrice", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Cost Price <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
-                  onChange={(e) => set("costPrice", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">MRP <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.mrp}
-                  onChange={(e) => set("mrp", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tax Rate (%)</Label>
-                <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="border-b pb-2 space-y-1">
+              <h2 className="font-semibold text-base">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
+              {form.hasVariants && (
+                <p className="text-xs text-muted-foreground">
+                  Main price is hidden — set Selling / Cost / MRP on each variant row.
+                </p>
+              )}
             </div>
-            {form.sellingPrice && form.costPrice && (
-              <div className="flex gap-6 pt-1 text-sm border-t mt-2">
-                <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
-                <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+            {form.hasVariants ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tax Rate (%)</Label>
+                  <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      Selling Price <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
+                      onChange={(e) => set("sellingPrice", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      Cost Price <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
+                      onChange={(e) => set("costPrice", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      MRP <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.mrp}
+                      onChange={(e) => set("mrp", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Tax Rate (%)</Label>
+                    <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {form.sellingPrice && form.costPrice && (
+                  <div className="flex gap-6 pt-1 text-sm border-t mt-2">
+                    <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
+                    <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+                  </div>
+                )}
+              </>
             )}
             {showWarranty && (
               <div className="space-y-1.5 pt-2 border-t">
@@ -551,27 +617,12 @@ export default function EditProductPage() {
                               </td>
                               {variantCols.map((col) => (
                                   <td key={col.field} className="px-3 py-2">
-                                    {col.presets.length > 0 ? (
-                                      <select
-                                        value={String(row[col.field] ?? "")}
-                                        onChange={(e) => updateRow(row.key, col.field, e.target.value)}
-                                        className="h-8 w-full min-w-[90px] rounded-md border bg-background px-2 text-xs"
-                                      >
-                                        <option value="">Select…</option>
-                                        {col.presets.map((p) => (
-                                          <option key={p} value={p}>{p}</option>
-                                        ))}
-                                        {row[col.field] && !col.presets.includes(String(row[col.field])) && (
-                                          <option value={String(row[col.field])}>{row[col.field]}</option>
-                                        )}
-                                      </select>
-                                    ) : (
-                                      <Input
-                                        value={String(row[col.field] ?? "")}
-                                        onChange={(e) => updateRow(row.key, col.field, e.target.value)}
-                                        className="h-8 text-xs w-24"
-                                      />
-                                    )}
+                                    <Input
+                                      value={String(row[col.field] ?? "")}
+                                      onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                      className="h-8 text-xs w-24"
+                                      placeholder={col.label}
+                                    />
                                   </td>
                               ))}
                               <td className="px-3 py-2">
@@ -700,6 +751,63 @@ export default function EditProductPage() {
                   </div>
                 )}
               </div>
+            )}
+          </div>
+
+          {/* Assign Suppliers */}
+          <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="border-b pb-2 space-y-1">
+              <h2 className="font-semibold text-base">Assign Suppliers</h2>
+              <p className="text-xs text-muted-foreground">
+                Link this product to one or more suppliers (used in PO / Quick GRN).
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={supplierPick || undefined} onValueChange={setSupplierPick}>
+                <SelectTrigger className="h-10 sm:flex-1">
+                  <SelectValue placeholder="Select supplier…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.length === 0
+                    ? <SelectItem value="_none" disabled>No suppliers found</SelectItem>
+                    : suppliers
+                      .filter((s) => !form.supplierIds.includes(s.id))
+                      .map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-1.5"
+                disabled={!supplierPick}
+                onClick={() => {
+                  if (!supplierPick || form.supplierIds.includes(supplierPick)) return;
+                  set("supplierIds", [...form.supplierIds, supplierPick]);
+                  setSupplierPick("");
+                }}
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+            {form.supplierIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {form.supplierIds.map((sid) => (
+                  <Badge key={sid} variant="secondary" className="gap-1 pl-2.5 pr-1 h-7">
+                    {suppliers.find((s) => s.id === sid)?.name ?? sid}
+                    <button
+                      type="button"
+                      className="p-0.5 rounded hover:bg-muted"
+                      onClick={() => set("supplierIds", form.supplierIds.filter((x) => x !== sid))}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center">
+                No suppliers assigned yet
+              </p>
             )}
           </div>
 

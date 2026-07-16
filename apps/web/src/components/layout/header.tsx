@@ -50,7 +50,6 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
   "/categories": "Categories",
   "/brands": "Brands",
   "/inventory": "Stock Levels",
-  "/inventory/scan": "Scan Restock",
   "/inventory/ledger": "Inventory Ledger",
   "/inventory/abc": "ABC Analysis",
   "/inventory/dead-stock": "Dead Stock",

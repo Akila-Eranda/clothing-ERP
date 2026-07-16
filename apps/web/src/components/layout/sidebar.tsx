@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Scan,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -69,7 +69,6 @@ function useNavGroups(): NavGroup[] {
 
   const inventoryChildren: NavItem[] = [
     { label: L["/inventory"] ?? "Stock Levels", href: "/inventory", icon: Warehouse },
-    { label: L["/inventory/scan"] ?? "Scan Restock", href: "/inventory/scan", icon: Scan },
     { label: L["/inventory/ledger"] ?? "Inventory Ledger", href: "/inventory/ledger", icon: ScrollText },
     { label: L["/inventory/abc"] ?? "ABC Analysis", href: "/inventory/abc", icon: BarChart3 },
     { label: L["/inventory/dead-stock"] ?? "Dead Stock", href: "/inventory/dead-stock", icon: Skull },

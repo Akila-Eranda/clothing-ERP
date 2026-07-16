@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, X, Loader2, Package,
-  Zap, ArrowLeft,
+  ArrowLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
   buildProductFormDefaults, variantTableColumns, variantVariantHint,
-  applyVariantCombo, autoFillVariantAttributes, getProductFormCopy,
+  applyVariantCombo, getProductFormCopy,
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
@@ -30,6 +30,7 @@ import { buildProductTags } from "@/lib/product-tags";
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
 interface Brand    { id: string; name: string; }
+interface SupplierOpt { id: string; name: string; }
 interface VariantAttr { name: string; values: string[]; input: string; }
 interface VariantRow {
   key: string; sku: string; name: string;
@@ -54,6 +55,7 @@ interface Form {
   images: string[];
   branchScope: ProductBranchScope;
   branchId: string;
+  supplierIds: string[];
 }
 function buildInitial(type?: string): Form {
   const d = buildProductFormDefaults(type);
@@ -75,6 +77,7 @@ function buildInitial(type?: string): Form {
     images: [],
     branchScope: "ALL",
     branchId: "",
+    supplierIds: [],
   };
 }
 const INITIAL: Form = buildInitial();
@@ -109,6 +112,8 @@ export default function AddProductPage() {
   const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
+  const [suppliers, setSuppliers]   = useState<SupplierOpt[]>([]);
+  const [supplierPick, setSupplierPick] = useState("");
   const [loading, setLoading]       = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
@@ -122,6 +127,9 @@ export default function AddProductPage() {
     if (formCopy.showBrand) {
       api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
     }
+    api.get<{ data: SupplierOpt[] }>("/suppliers?limit=200")
+      .then((r) => setSuppliers(r.data?.data ?? (r.data as unknown as SupplierOpt[]) ?? []))
+      .catch(() => {});
   }, [formCopy.showBrand]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -220,56 +228,54 @@ export default function AddProductPage() {
     setVariantRows((r) => [...r, row]);
   };
 
-  const applyBasePricesToAll = () => {
-    if (!form.sellingPrice && !form.costPrice && !form.mrp) {
-      toast.error("Set selling / cost / MRP in Pricing first");
-      return;
-    }
-    setVariantRows((rows) => rows.map((r) => ({
-      ...r,
-      sellingPrice: form.sellingPrice || r.sellingPrice,
-      costPrice: form.costPrice || r.costPrice,
-      mrp: form.mrp || r.mrp,
-    })));
-    toast.success("Base prices applied to all variants");
-  };
-
-  const fillPresetRows = () => {
-    const attrs = autoFillVariantAttributes(shopProfile, form.attributes);
-    set("attributes", attrs);
-    const combos = cartesian(attrs);
-    if (!combos.length) {
-      toast.error("No presets available");
-      return;
-    }
-    setVariantRows((prev) => buildRows(combos, attrs, prev));
-    toast.success(`Added ${combos.length} variants from presets`);
-  };
-
   const submit = async (status: "ACTIVE" | "DRAFT") => {
     if (!form.name.trim()) { toast.error("Product name is required"); return; }
-    if (!form.sellingPrice || !form.costPrice || !form.mrp) {
-      toast.error("Selling price, cost price and MRP are required"); return;
+
+    const activeRows = form.hasVariants ? variantRows.filter((r) => r.active) : [];
+    const pricesFromVariants = form.hasVariants && activeRows.length > 0;
+
+    if (pricesFromVariants) {
+      const missing = activeRows.find((r) => !r.sellingPrice?.trim());
+      if (missing) {
+        toast.error(`Set selling price on variant "${missing.name || missing.sku || "row"}"`);
+        return;
+      }
+    } else if (!form.sellingPrice || !form.costPrice || !form.mrp) {
+      toast.error("Selling price, cost price and MRP are required");
+      return;
     }
+
+    const derivedSelling = pricesFromVariants
+      ? Math.min(...activeRows.map((r) => parseFloat(r.sellingPrice) || 0))
+      : parseFloat(form.sellingPrice) || 0;
+    const derivedCost = pricesFromVariants
+      ? (parseFloat(form.costPrice)
+        || Math.min(...activeRows.map((r) => parseFloat(r.costPrice) || 0).filter((n) => n > 0).concat([0])))
+      : parseFloat(form.costPrice) || 0;
+    const derivedMrp = pricesFromVariants
+      ? (parseFloat(form.mrp)
+        || Math.max(...activeRows.map((r) => parseFloat(r.mrp) || parseFloat(r.sellingPrice) || 0), 0))
+      : parseFloat(form.mrp) || 0;
+
     setLoading(true);
     let variants: Record<string, unknown>[] = [];
     if (form.hasVariants) {
       if (variantRows.length > 0) {
-        variants = variantRows.filter((r) => r.active).map((r) => ({
+        variants = activeRows.map((r) => ({
           sku: r.sku, name: r.name,
           size: r.size, color: r.color, material: r.material, style: r.style,
-          sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
-          costPrice:    parseFloat(r.costPrice)    || parseFloat(form.costPrice)    || 0,
-          mrp:          parseFloat(r.mrp)          || parseFloat(form.mrp)          || 0,
+          sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
+          costPrice:    parseFloat(r.costPrice)    || derivedCost    || 0,
+          mrp:          parseFloat(r.mrp)          || derivedMrp    || 0,
         }));
       } else {
         const validAttrs = form.attributes.filter((a) => a.values.length > 0);
         variants = (validAttrs.length > 0 ? cartesian(form.attributes) : []).map((combo) => ({
           sku: genSku(form.name, combo), name: combo.join(" / "),
           ...applyVariantCombo(shopProfile, validAttrs, combo),
-          sellingPrice: parseFloat(form.sellingPrice) || 0,
-          costPrice:    parseFloat(form.costPrice)    || 0,
-          mrp:          parseFloat(form.mrp)          || 0,
+          sellingPrice: derivedSelling,
+          costPrice:    derivedCost,
+          mrp:          derivedMrp,
         }));
       }
     }
@@ -296,9 +302,9 @@ export default function AddProductPage() {
         brandId: formCopy.showBrand && form.brandId ? form.brandId : undefined,
         hsn: form.hsn || undefined,
         barcode: form.barcode || undefined,
-        sellingPrice: parseFloat(form.sellingPrice),
-        costPrice: parseFloat(form.costPrice),
-        mrp: parseFloat(form.mrp),
+        sellingPrice: parseFloat(form.sellingPrice) || derivedSelling,
+        costPrice: parseFloat(form.costPrice) || derivedCost,
+        mrp: parseFloat(form.mrp) || derivedMrp,
         taxRate: parseFloat(form.taxRate) || 0,
         status, tags: extraTags,
         hasVariants: form.hasVariants,
@@ -314,6 +320,7 @@ export default function AddProductPage() {
         branchId: form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
         images: form.images.length > 0 ? form.images : undefined,
         variants: variants.length > 0 ? variants : undefined,
+        supplierIds: form.supplierIds.length > 0 ? form.supplierIds : undefined,
       });
       toast.success(`"${form.name}" ${status === "DRAFT" ? "saved as draft" : "created"}!`);
       router.push("/products");
@@ -465,38 +472,67 @@ export default function AddProductPage() {
 
           {/* Pricing */}
           <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
-            <h2 className="font-semibold text-base border-b pb-2">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Selling Price <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
-                  onChange={(e) => set("sellingPrice", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Cost Price <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
-                  onChange={(e) => set("costPrice", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">MRP <span className="text-destructive">*</span></Label>
-                <Input type="number" min="0" placeholder="0.00" value={form.mrp}
-                  onChange={(e) => set("mrp", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Tax Rate (%)</Label>
-                <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="border-b pb-2 space-y-1">
+              <h2 className="font-semibold text-base">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
+              {form.hasVariants && (
+                <p className="text-xs text-muted-foreground">
+                  Main price is hidden — set Selling / Cost / MRP on each variant row.
+                </p>
+              )}
             </div>
-            {form.sellingPrice && form.costPrice && (
-              <div className="flex gap-6 pt-1 text-sm border-t mt-2">
-                <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
-                <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+            {form.hasVariants ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tax Rate (%)</Label>
+                  <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      Selling Price <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
+                      onChange={(e) => set("sellingPrice", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      Cost Price <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
+                      onChange={(e) => set("costPrice", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">
+                      MRP <span className="text-destructive">*</span>
+                    </Label>
+                    <Input type="number" min="0" placeholder="0.00" value={form.mrp}
+                      onChange={(e) => set("mrp", e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-semibold">Tax Rate (%)</Label>
+                    <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {["0","5","12","18","28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {form.sellingPrice && form.costPrice && (
+                  <div className="flex gap-6 pt-1 text-sm border-t mt-2">
+                    <span className="text-muted-foreground">Gross Margin: <strong className="text-emerald-500">LKR {(sp - cp).toFixed(2)}</strong></span>
+                    <span className="text-muted-foreground">Margin %: <strong className="text-emerald-500">{margin}%</strong></span>
+                  </div>
+                )}
+              </>
             )}
             {showWarranty && (
               <div className="space-y-1.5 pt-2 border-t">
@@ -591,52 +627,15 @@ export default function AddProductPage() {
                     <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>
                       <Plus className="h-3.5 w-3.5" /> Add variant
                     </Button>
-                    {shopProfile.variantAttributes.some((a) => a.presets.length > 0) && (
-                      <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={fillPresetRows}>
-                        <Zap className="h-3.5 w-3.5" /> Fill presets
-                      </Button>
-                    )}
-                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={applyBasePricesToAll}>
-                      Apply base price
-                    </Button>
                   </div>
                   <Badge variant="secondary" className="text-[10px]">
                     {activeVariantCount} / {variantRows.length} active
                   </Badge>
                 </div>
 
-                {/* Quick-select presets → adds an editable row */}
-                {shopProfile.variantAttributes.map((attr) =>
-                  attr.presets.length > 0 ? (
-                    <div key={attr.name} className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">{attr.name}</span>
-                      {attr.presets.map((preset) => {
-                        const used = variantRows.some(
-                          (r) => r.name === preset || r.size === preset || r.color === preset || r.material === preset || r.style === preset,
-                        );
-                        return (
-                          <button
-                            key={preset}
-                            type="button"
-                            disabled={used}
-                            onClick={() => addVariantRow(preset)}
-                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                              used
-                                ? "opacity-40 cursor-not-allowed"
-                                : "hover:bg-primary hover:text-primary-foreground hover:border-primary"
-                            }`}
-                          >
-                            {preset}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : null,
-                )}
-
                 {variantRows.length === 0 ? (
                   <div className="rounded-xl border border-dashed py-8 text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">No variants yet — add a row or tap a preset</p>
+                    <p className="text-sm text-muted-foreground">No variants yet — add a row and enter prices</p>
                     <Button type="button" size="sm" className="gap-1.5" onClick={() => addVariantRow()}>
                       <Plus className="h-3.5 w-3.5" /> Add first variant
                     </Button>
@@ -682,28 +681,12 @@ export default function AddProductPage() {
                               </td>
                               {editableAttrCols.map((col) => (
                                 <td key={col.field} className="px-3 py-2">
-                                  {col.presets.length > 0 ? (
-                                    <select
-                                      value={String(row[col.field] ?? "")}
-                                      onChange={(e) => updateRow(row.key, col.field, e.target.value)}
-                                      className="h-9 w-full rounded-md border bg-background px-2 text-xs"
-                                    >
-                                      <option value="">Select…</option>
-                                      {col.presets.map((p) => (
-                                        <option key={p} value={p}>{p}</option>
-                                      ))}
-                                      {row[col.field] && !col.presets.includes(String(row[col.field])) && (
-                                        <option value={String(row[col.field])}>{row[col.field]}</option>
-                                      )}
-                                    </select>
-                                  ) : (
-                                    <Input
-                                      value={String(row[col.field] ?? "")}
-                                      onChange={(e) => updateRow(row.key, col.field, e.target.value)}
-                                      className="h-9 text-xs"
-                                      placeholder={col.label}
-                                    />
-                                  )}
+                                  <Input
+                                    value={String(row[col.field] ?? "")}
+                                    onChange={(e) => updateRow(row.key, col.field, e.target.value)}
+                                    className="h-9 text-xs"
+                                    placeholder={col.label}
+                                  />
                                 </td>
                               ))}
                               <td className="px-3 py-2">
@@ -776,6 +759,63 @@ export default function AddProductPage() {
             )}
           </div>
 
+          {/* Assign Suppliers */}
+          <div className="bg-background border rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="border-b pb-2 space-y-1">
+              <h2 className="font-semibold text-base">Assign Suppliers</h2>
+              <p className="text-xs text-muted-foreground">
+                Link this product to one or more suppliers (used in PO / Quick GRN).
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Select value={supplierPick || undefined} onValueChange={setSupplierPick}>
+                <SelectTrigger className="h-10 sm:flex-1">
+                  <SelectValue placeholder="Select supplier…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {suppliers.length === 0
+                    ? <SelectItem value="_none" disabled>No suppliers found</SelectItem>
+                    : suppliers
+                      .filter((s) => !form.supplierIds.includes(s.id))
+                      .map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 gap-1.5"
+                disabled={!supplierPick}
+                onClick={() => {
+                  if (!supplierPick || form.supplierIds.includes(supplierPick)) return;
+                  set("supplierIds", [...form.supplierIds, supplierPick]);
+                  setSupplierPick("");
+                }}
+              >
+                <Plus className="h-4 w-4" /> Add
+              </Button>
+            </div>
+            {form.supplierIds.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {form.supplierIds.map((sid) => (
+                  <Badge key={sid} variant="secondary" className="gap-1 pl-2.5 pr-1 h-7">
+                    {suppliers.find((s) => s.id === sid)?.name ?? sid}
+                    <button
+                      type="button"
+                      className="p-0.5 rounded hover:bg-muted"
+                      onClick={() => set("supplierIds", form.supplierIds.filter((x) => x !== sid))}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-center">
+                No suppliers assigned yet
+              </p>
+            )}
+          </div>
+
         </div>
         {/* â•â• END LEFT COLUMN â•â• */}
 
@@ -815,8 +855,12 @@ export default function AddProductPage() {
             {[
               ["Name",     form.name     || <span className="text-muted-foreground italic">Not set</span>],
               ["Category", categories.find((c) => c.id === form.categoryId)?.name || <span className="text-muted-foreground italic">None</span>],
-              ["Selling",  form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">â€”</span>],
-              ["Cost",     form.costPrice    ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}`    : <span className="text-muted-foreground italic">â€”</span>],
+              ["Selling",  form.hasVariants
+                ? <span className="text-muted-foreground italic">Per variant</span>
+                : form.sellingPrice ? `LKR ${parseFloat(form.sellingPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">—</span>],
+              ["Cost",     form.hasVariants
+                ? <span className="text-muted-foreground italic">Per variant</span>
+                : form.costPrice ? `LKR ${parseFloat(form.costPrice).toLocaleString("en-LK")}` : <span className="text-muted-foreground italic">—</span>],
               ["Variants", form.hasVariants  ? `${activeVariantCount || allVariants.length} (${variantHint})` : "Single SKU"],
               ...(form.trackInventory
                 ? [["Branches", form.branchScope === "ALL" ? "All Branches" : "Single Branch"] as const]

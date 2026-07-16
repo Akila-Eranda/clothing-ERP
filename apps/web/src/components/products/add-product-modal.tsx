@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import {
   Info, Layers, DollarSign, ImageIcon, Tag, Settings2,
   CheckCircle2, Plus, Trash2, X, Loader2, Sparkles, Package,
-  Zap, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +17,7 @@ import { api } from "@/lib/api";
 import { getStoredShopType, variantAttrsFromProfile, ShopType, getShopProfile, defaultHasVariants } from "@/lib/shop-profiles";
 import { useShopProfile, hasMultiUnit, hasExpiryTracking, hasBatchTracking, useShopWorkspace } from "@/lib/use-shop-profile";
 import {
-  nextVariantAttributeName, variantVariantHint, applyVariantCombo, autoFillVariantAttributes,
-  findVariantAttrDef, getProductFormCopy, isColorVariantAttr,
+  variantVariantHint, applyVariantCombo, getProductFormCopy,
 } from "@/lib/shop-vertical";
 import { getWorkspace } from "@/lib/shop-workspace";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
@@ -124,14 +122,6 @@ const TABS = [
 ] as const;
 type TabId = typeof TABS[number]["id"];
 
-function cartesian(attrs: VariantAttr[]): string[][] {
-  const valid = attrs.filter((a) => a.values.length > 0);
-  if (!valid.length) return [];
-  return valid.reduce<string[][]>(
-    (acc, a) => acc.flatMap((prev) => a.values.map((v) => [...prev, v])),
-    [[]]
-  );
-}
 function genSku(name: string, combo: string[]): string {
   const b = name ? name.replace(/\s+/g, "").slice(0, 3).toUpperCase() : "PRD";
   return [b, ...combo.map((v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase())].join("-");
@@ -222,51 +212,24 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   };
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
 
-  const buildRows = (combos: string[][], attrs: VariantAttr[], prev: VariantRow[] = []): VariantRow[] => {
-    const validAttrs = attrs.filter((a) => a.values.length > 0);
-    return combos.map((combo) => {
-      const key = combo.join("|");
-      const old = prev.find((p) => p.key === key);
-      return {
-        key,
-        sku: old?.sku ?? genSku(form.name, combo),
-        name: combo.join(" / "),
-        ...applyVariantCombo(shopProfile, validAttrs, combo),
-        sellingPrice: old?.sellingPrice ?? form.sellingPrice,
-        costPrice: old?.costPrice ?? form.costPrice,
-        mrp: old?.mrp ?? form.mrp,
-        active: old?.active ?? true,
-      };
-    });
-  };
-
-  const syncVariantRows = React.useCallback((attrs: VariantAttr[] = form.attributes) => {
-    const combos = cartesian(attrs);
-    if (!form.hasVariants || combos.length === 0) {
-      setVariantRows([]);
-      return;
-    }
-    setVariantRows((prev) => buildRows(combos, attrs, prev));
-  }, [form.hasVariants, form.attributes, form.name, form.sellingPrice, form.costPrice, form.mrp, shopProfile]);
-
-  useEffect(() => {
-    if (!open || !form.hasVariants) return;
-    syncVariantRows();
-  }, [open, form.hasVariants, form.attributes, form.name, syncVariantRows]);
-
-  const applyBasePricesToAll = () => {
-    if (!form.sellingPrice && !form.costPrice && !form.mrp) {
-      toast.error("Set base prices in the Pricing tab first");
-      setTab("pricing");
-      return;
-    }
-    setVariantRows((rows) => rows.map((r) => ({
-      ...r,
-      sellingPrice: form.sellingPrice || r.sellingPrice,
-      costPrice: form.costPrice || r.costPrice,
-      mrp: form.mrp || r.mrp,
-    })));
-    toast.success("Base prices applied to all variants");
+  const addVariantRow = () => {
+    const label = `Variant ${variantRows.length + 1}`;
+    const primary = shopProfile.variantAttributes[0];
+    const comboFields = applyVariantCombo(
+      shopProfile,
+      form.attributes.length ? form.attributes : [{ name: primary?.label ?? "Variant", values: [label], input: "" }],
+      [label],
+    );
+    setVariantRows((r) => [...r, {
+      key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
+      sku: genSku(form.name || "PRD", [label]),
+      name: label,
+      ...comboFields,
+      sellingPrice: form.sellingPrice,
+      costPrice: form.costPrice,
+      mrp: form.mrp,
+      active: true,
+    }]);
   };
 
   const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
@@ -278,20 +241,44 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
   const submit = async (status: "ACTIVE" | "DRAFT") => {
     if (!form.name.trim()) { toast.error("Product name is required"); setTab("basic"); return; }
-    if (!editProduct && (!form.sellingPrice || !form.costPrice || !form.mrp)) {
-      toast.error("Selling price, cost price, and MRP are required"); setTab("pricing"); return;
+
+    const activeRows = form.hasVariants ? variantRows.filter((r) => r.active) : [];
+    const pricesFromVariants = !editProduct && form.hasVariants && activeRows.length > 0;
+
+    if (pricesFromVariants) {
+      const missing = activeRows.find((r) => !r.sellingPrice?.trim());
+      if (missing) {
+        toast.error(`Set selling price on variant "${missing.name || missing.sku || "row"}"`);
+        setTab("variants");
+        return;
+      }
+    } else if (!editProduct && (!form.sellingPrice || !form.costPrice || !form.mrp)) {
+      toast.error("Selling price, cost price, and MRP are required");
+      setTab("pricing");
+      return;
     }
+
     if (!editProduct && form.trackInventory && form.branchScope === "SINGLE" && !form.branchId) {
       toast.error("Select a branch or choose All Branches");
       setTab("additional");
       return;
     }
+
+    const derivedSelling = pricesFromVariants
+      ? Math.min(...activeRows.map((r) => parseFloat(r.sellingPrice) || 0))
+      : parseFloat(form.sellingPrice) || 0;
+    const derivedCost = pricesFromVariants
+      ? (parseFloat(form.costPrice)
+        || Math.min(...activeRows.map((r) => parseFloat(r.costPrice) || 0).filter((n) => n > 0).concat([0])))
+      : parseFloat(form.costPrice) || 0;
+    const derivedMrp = pricesFromVariants
+      ? (parseFloat(form.mrp)
+        || Math.max(...activeRows.map((r) => parseFloat(r.mrp) || parseFloat(r.sellingPrice) || 0), 0))
+      : parseFloat(form.mrp) || 0;
+
     setLoading(true);
-    const validAttrs = form.attributes.filter((a) => a.values.length > 0);
-    const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
     const variants = form.hasVariants
-      ? (variantRows.length > 0
-        ? variantRows
+      ? variantRows
           .filter((r) => r.active)
           .map((r) => ({
             sku: r.sku,
@@ -300,20 +287,11 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             color: r.color,
             material: r.material,
             style: r.style,
-            sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
-            costPrice: parseFloat(r.costPrice) || parseFloat(form.costPrice) || 0,
-            mrp: parseFloat(r.mrp) || parseFloat(form.mrp) || 0,
+            sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
+            costPrice: parseFloat(r.costPrice) || derivedCost || 0,
+            mrp: parseFloat(r.mrp) || derivedMrp || 0,
             taxRate: parseFloat(form.taxRate) || 18,
           }))
-        : variantCombos.map((combo) => ({
-          sku: genSku(form.name, combo),
-          name: combo.join(" / "),
-          ...applyVariantCombo(shopProfile, validAttrs, combo),
-          sellingPrice: parseFloat(form.sellingPrice) || 0,
-          costPrice: parseFloat(form.costPrice) || 0,
-          mrp: parseFloat(form.mrp) || 0,
-          taxRate: parseFloat(form.taxRate) || 18,
-        })))
       : [];
     const extraTags = buildProductTags({
       tags: form.tags,
@@ -334,9 +312,9 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       brandId: formCopy.showBrand && form.brandId ? form.brandId : undefined,
       hsn: form.hsn || undefined,
       barcode: form.barcode || undefined,
-      sellingPrice: form.sellingPrice ? parseFloat(form.sellingPrice) : undefined,
-      costPrice: form.costPrice ? parseFloat(form.costPrice) : undefined,
-      mrp: form.mrp ? parseFloat(form.mrp) : undefined,
+      sellingPrice: form.sellingPrice ? parseFloat(form.sellingPrice) : (pricesFromVariants ? derivedSelling : undefined),
+      costPrice: form.costPrice ? parseFloat(form.costPrice) : (pricesFromVariants ? derivedCost : undefined),
+      mrp: form.mrp ? parseFloat(form.mrp) : (pricesFromVariants ? derivedMrp : undefined),
       taxRate: parseFloat(form.taxRate) || 18,
       status,
       tags: extraTags,
@@ -348,7 +326,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       seoDescription: form.seoDescription || undefined,
       images: form.images.length > 0 ? form.images : undefined,
       variants: variants.length > 0 ? variants : undefined,
-      supplierIds: !editProduct && form.supplierIds.length > 0 ? form.supplierIds : undefined,
+      supplierIds: form.supplierIds,
     };
     try {
       if (editProduct) {
@@ -367,17 +345,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   };
 
   if (!open) return null;
-
-  // ── Attribute chip helper ────────────────────────────────────────────────
-  const addAttrValue = (i: number) => {
-    const a = form.attributes.map((x, j) => {
-      if (j !== i) return x;
-      const val = x.input.trim().replace(/,$/, "");
-      if (!val || x.values.includes(val)) return { ...x, input: "" };
-      return { ...x, values: [...x.values, val], input: "" };
-    });
-    set("attributes", a);
-  };
 
   // ── Tab renders ───────────────────────────────────────────────────────────
   const renderBasic = () => (
@@ -542,35 +509,15 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     </div>
   );
 
-  // ── Color swatch map ────────────────────────────────────────────────────
-  const COLOR_HEX: Record<string, string> = {
-    black: "#1a1a1a", white: "#f5f5f5", red: "#ef4444", blue: "#3b82f6",
-    green: "#22c55e", yellow: "#eab308", purple: "#8b5cf6", pink: "#ec4899",
-    orange: "#f97316", navy: "#1e3a8a", grey: "#9ca3af", gray: "#9ca3af",
-    olive: "#6b7c3a", brown: "#92400e", cream: "#fef3c7", beige: "#d4a574",
-    maroon: "#7f1d1d", teal: "#0d9488", cyan: "#06b6d4", indigo: "#6366f1",
-  };
-  const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
-
-  const autoGenerate = () => set("attributes", autoFillVariantAttributes(shopProfile, form.attributes));
-
-  const togglePreset = (attrIdx: number, preset: string) => {
-    set("attributes", form.attributes.map((x, j) => {
-      if (j !== attrIdx) return x;
-      const has = x.values.includes(preset);
-      return { ...x, values: has ? x.values.filter((v) => v !== preset) : [...x.values, preset] };
-    }));
-  };
-
+  // ── Color swatch map (tags UI) ──────────────────────────────────────────
   const renderVariants = () => {
-    const allVariants = cartesian(form.attributes);
-    const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
+    const activeCount = variantRows.filter((r) => r.active).length;
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
           <div>
             <h3 className="text-lg font-bold">Variants</h3>
-            <p className="text-sm text-muted-foreground">Add {variantHint}, then set selling price for each variant</p>
+            <p className="text-sm text-muted-foreground">Add rows and set selling price for each variant</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Manage Variants</span>
@@ -585,172 +532,92 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         </div>
 
         {form.hasVariants ? (
-          <div className="space-y-5">
-            <div className="rounded-xl border p-4 space-y-4 bg-card">
-              <div>
-                <h4 className="font-semibold text-sm">1. Select Variant Attributes</h4>
-                <p className="text-xs text-muted-foreground mt-0.5">Choose attributes that best describe your product</p>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={addVariantRow}>
+                  <Plus className="h-3.5 w-3.5" /> Add variant
+                </Button>
               </div>
-
-              {form.attributes.map((attr, i) => (
-                <div key={i} className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Input value={attr.name} className="w-24 h-7 text-xs font-semibold border-0 bg-transparent px-0 focus-visible:ring-0"
-                      onChange={(e) => { const a = [...form.attributes]; a[i] = { ...a[i], name: e.target.value }; set("attributes", a); }}
-                      placeholder="Attribute" />
-                    <button type="button" className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                      onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[42px] bg-background cursor-text"
-                    onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
-                    {attr.values.map((v, vi) => {
-                      const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
-                      return (
-                        <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
-                          {hex && <span className="h-3.5 w-3.5 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
-                          {v}
-                          <button type="button" className="hover:text-destructive ml-0.5" onClick={(e) => {
-                            e.stopPropagation();
-                            const a = form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) });
-                            set("attributes", a);
-                          }}><X className="h-3 w-3" /></button>
-                        </Badge>
-                      );
-                    })}
-                    <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
-                      placeholder={`Add ${attr.name}…`}
-                      value={attr.input}
-                      onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
-                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }}
-                    />
-                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                  </div>
-                  {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
-                    <div className="flex flex-wrap gap-1 pt-1">
-                      {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
-                        <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                            attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
-                          }`}>
-                          {preset}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div className="flex gap-2">
-                  {form.attributes.length < shopProfile.variantAttributes.length && (
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => {
-                    const next = nextVariantAttributeName(shopProfile, form.attributes);
-                    if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
-                  }}>
-                    <Plus className="h-3.5 w-3.5" /> Add Attribute
-                  </Button>
-                  )}
-                  <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                    <Zap className="h-3.5 w-3.5" /> Fill {variantHint} presets
-                  </Button>
-                </div>
-                <span className="text-xs text-muted-foreground font-medium">
-                  Total Variants: <span className="font-bold text-primary">{allVariants.length}</span>
-                </span>
-              </div>
+              <Badge variant="secondary" className="text-[10px]">
+                {activeCount} / {variantRows.length} active
+              </Badge>
             </div>
 
-            {variantRows.length > 0 && (
-              <div className="rounded-xl border p-4 space-y-3 bg-card">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h4 className="font-semibold text-sm">2. Set price for each variant</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Enter selling / cost / MRP per variant. Use Pricing tab for the default base price.
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={applyBasePricesToAll}>
-                      <DollarSign className="h-3.5 w-3.5" /> Apply base price to all
-                    </Button>
-                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => syncVariantRows()}>
-                      <Zap className="h-3.5 w-3.5" /> Refresh rows
-                    </Button>
-                  </div>
-                </div>
-                <div className="rounded-xl border overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2.5 text-left w-8">#</th>
-                          <th className="px-3 py-2.5 text-left">SKU</th>
-                          <th className="px-3 py-2.5 text-left">Variant</th>
-                          <th className="px-3 py-2.5 text-right">Selling (LKR)</th>
-                          <th className="px-3 py-2.5 text-right">Cost (LKR)</th>
-                          <th className="px-3 py-2.5 text-right">MRP (LKR)</th>
-                          <th className="px-3 py-2.5 text-center">Active</th>
-                          <th className="px-2 py-2.5 w-6"></th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {variantRows.map((row, idx) => (
-                          <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
-                            <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
-                            <td className="px-3 py-2">
-                              <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)} className="h-8 text-xs font-mono w-28" />
-                            </td>
-                            <td className="px-3 py-2 font-medium whitespace-nowrap">{row.name}</td>
-                            <td className="px-3 py-2">
-                              <Input type="number" min="0" step="0.01" value={row.sellingPrice}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  const n = Number(v);
-                                  updateRow(row.key, "sellingPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
-                                }}
-                                className="h-8 text-xs text-right w-24 font-semibold" placeholder="0.00" />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input type="number" min="0" step="0.01" value={row.costPrice}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  const n = Number(v);
-                                  updateRow(row.key, "costPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
-                                }}
-                                className="h-8 text-xs text-right w-24" placeholder="0.00" />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input type="number" min="0" step="0.01" value={row.mrp}
-                                onChange={(e) => {
-                                  const v = e.target.value;
-                                  const n = Number(v);
-                                  updateRow(row.key, "mrp", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
-                                }}
-                                className="h-8 text-xs text-right w-24" placeholder="0.00" />
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} />
-                            </td>
-                            <td className="px-2 py-2">
-                              <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+            {variantRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed py-10 text-center space-y-3">
+                <p className="text-sm text-muted-foreground">No variants yet — add a row and enter prices</p>
+                <Button type="button" size="sm" className="gap-1.5" onClick={addVariantRow}>
+                  <Plus className="h-3.5 w-3.5" /> Add first variant
+                </Button>
               </div>
-            )}
-
-            {form.hasVariants && allVariants.length === 0 && (
-              <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-                Add attribute values (e.g. S, M, L) to generate variants and set prices.
+            ) : (
+              <div className="rounded-xl border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2.5 text-left w-8">#</th>
+                        <th className="px-3 py-2.5 text-left">SKU</th>
+                        <th className="px-3 py-2.5 text-left">Variant</th>
+                        <th className="px-3 py-2.5 text-right">Selling (LKR)</th>
+                        <th className="px-3 py-2.5 text-right">Cost (LKR)</th>
+                        <th className="px-3 py-2.5 text-right">MRP (LKR)</th>
+                        <th className="px-3 py-2.5 text-center">Active</th>
+                        <th className="px-2 py-2.5 w-6" />
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {variantRows.map((row, idx) => (
+                        <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
+                          <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                          <td className="px-3 py-2">
+                            <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)} className="h-8 text-xs font-mono w-28" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input value={row.name} onChange={(e) => updateRow(row.key, "name", e.target.value)} className="h-8 text-xs font-medium min-w-[120px]" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min="0" step="0.01" value={row.sellingPrice}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const n = Number(v);
+                                updateRow(row.key, "sellingPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                              }}
+                              className="h-8 text-xs text-right w-24 font-semibold" placeholder="0.00" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min="0" step="0.01" value={row.costPrice}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const n = Number(v);
+                                updateRow(row.key, "costPrice", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                              }}
+                              className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min="0" step="0.01" value={row.mrp}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                const n = Number(v);
+                                updateRow(row.key, "mrp", v !== "" && !Number.isNaN(n) && n < 0 ? "0" : v);
+                              }}
+                              className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            <Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} />
+                          </td>
+                          <td className="px-2 py-2">
+                            <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
+                              className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
           </div>
@@ -771,28 +638,12 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         <h3 className="text-lg font-bold">Pricing</h3>
         <p className="text-sm text-muted-foreground">
           {form.hasVariants
-            ? "Base price for new variants. Override each variant under the Variants tab."
+            ? "Main price is hidden — set Selling / Cost / MRP on each variant row."
             : "Set selling price, cost price, and tax rates"}
         </p>
       </div>
-      <div className="grid grid-cols-2 gap-5">
-        <div className="rounded-xl border p-5 space-y-4 bg-card">
-          <h4 className="font-semibold text-sm">Price Details</h4>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Selling Price (LKR ) <span className="text-destructive">*</span></Label>
-            <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
-              onChange={(e) => set("sellingPrice", e.target.value)} onBlur={() => form.sellingPrice && mark("pricing")} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Cost Price (LKR ) <span className="text-destructive">*</span></Label>
-            <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
-              onChange={(e) => set("costPrice", e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">MRP (LKR ) <span className="text-destructive">*</span></Label>
-            <Input type="number" min="0" placeholder="0.00" value={form.mrp}
-              onChange={(e) => set("mrp", e.target.value)} />
-          </div>
+      {form.hasVariants ? (
+        <div className="rounded-xl border p-5 space-y-4 bg-card max-w-sm">
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Tax Rate (%)</Label>
             <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
@@ -802,29 +653,67 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
               </SelectContent>
             </Select>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Open the Variants tab to enter prices per row.
+          </p>
         </div>
-        {/* Margin preview */}
-        <div className="rounded-xl border p-5 bg-card space-y-4">
-          <h4 className="font-semibold text-sm">Margin Preview</h4>
-          {form.sellingPrice && form.costPrice ? (
-            <div className="space-y-3">
-              {[
-                { label: "Selling Price", val: `LKR ${parseFloat(form.sellingPrice || "0").toFixed(2)}`, bold: true },
-                { label: "Cost Price",    val: `LKR ${parseFloat(form.costPrice    || "0").toFixed(2)}`, bold: false },
-                { label: "Gross Margin",  val: `LKR ${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-emerald-500" },
-                { label: "Margin %",      val: `${((parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")) / Math.max(parseFloat(form.sellingPrice || "1"), 0.01) * 100).toFixed(1)}%`, bold: true, color: "text-emerald-500" },
-              ].map((r) => (
-                <div key={r.label} className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{r.label}</span>
-                  <span className={`${r.bold ? "font-bold" : ""} ${r.color ?? ""}`}>{r.val}</span>
-                </div>
-              ))}
+      ) : (
+        <div className="grid grid-cols-2 gap-5">
+          <div className="rounded-xl border p-5 space-y-4 bg-card">
+            <h4 className="font-semibold text-sm">Price Details</h4>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Selling Price (LKR) <span className="text-destructive">*</span>
+              </Label>
+              <Input type="number" min="0" placeholder="0.00" value={form.sellingPrice}
+                onChange={(e) => set("sellingPrice", e.target.value)} onBlur={() => form.sellingPrice && mark("pricing")} />
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground text-center py-8">Enter selling & cost price to see margin</p>
-          )}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Cost Price (LKR) <span className="text-destructive">*</span>
+              </Label>
+              <Input type="number" min="0" placeholder="0.00" value={form.costPrice}
+                onChange={(e) => set("costPrice", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                MRP (LKR) <span className="text-destructive">*</span>
+              </Label>
+              <Input type="number" min="0" placeholder="0.00" value={form.mrp}
+                onChange={(e) => set("mrp", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Tax Rate (%)</Label>
+              <Select value={form.taxRate} onValueChange={(v) => set("taxRate", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {["0", "5", "12", "18", "28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="rounded-xl border p-5 bg-card space-y-4">
+            <h4 className="font-semibold text-sm">Margin Preview</h4>
+            {form.sellingPrice && form.costPrice ? (
+              <div className="space-y-3">
+                {[
+                  { label: "Selling Price", val: `LKR ${parseFloat(form.sellingPrice || "0").toFixed(2)}`, bold: true },
+                  { label: "Cost Price",    val: `LKR ${parseFloat(form.costPrice    || "0").toFixed(2)}`, bold: false },
+                  { label: "Gross Margin",  val: `LKR ${(parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")).toFixed(2)}`, bold: true, color: "text-emerald-500" },
+                  { label: "Margin %",      val: `${((parseFloat(form.sellingPrice || "0") - parseFloat(form.costPrice || "0")) / Math.max(parseFloat(form.sellingPrice || "1"), 0.01) * 100).toFixed(1)}%`, bold: true, color: "text-emerald-500" },
+                ].map((r) => (
+                  <div key={r.label} className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{r.label}</span>
+                    <span className={`${r.bold ? "font-bold" : ""} ${r.color ?? ""}`}>{r.val}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">Enter selling & cost price to see margin</p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 
