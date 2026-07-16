@@ -58,7 +58,7 @@ export default function VerticalAuditPage() {
       <div>
         <h1 className="text-2xl font-bold">Business Type QA Audit</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Current tenant: {profile.emoji} <strong>{profile.label}</strong> ({profile.labelSi}) — verify each area matches this vertical before production.
+          Current tenant: {profile.emoji} <strong>{profile.label}</strong> — verify each area matches this vertical before production.
         </p>
       </div>
 

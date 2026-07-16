@@ -332,6 +332,11 @@ export default function InventoryPage() {
           <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
             <ArrowLeftRight className="h-3.5 w-3.5" /> Stock Transfer
           </Button>
+          {(showBatch || showExpiry) && (
+            <Button variant="outline" size="sm" onClick={() => router.push("/inventory/expiry")} className="gap-1.5">
+              <Clock className="h-3.5 w-3.5" /> Expiry Dashboard
+            </Button>
+          )}
           <Button size="sm" onClick={startCycleCount} disabled={cycleLoading} className="gap-1.5">
             {cycleLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
             Start Cycle Count

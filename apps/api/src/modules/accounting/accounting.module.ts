@@ -5,12 +5,21 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsBoolean, ValidateNested, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AccountType, JournalEntryType, PaymentMethod } from '@prisma/client';
+import {
+  AccountType,
+  BankAccountType,
+  BankTxnType,
+  ChequeDirection,
+  ChequeStatus,
+  JournalEntryType,
+  PaymentMethod,
+} from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
+import { FinanceService } from './finance.service';
 import * as dayjs from 'dayjs';
 
 export class CreateAccountDto {
@@ -54,9 +63,73 @@ export class CreateJournalEntryDto {
   @ApiProperty({ type: [JournalLineDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => JournalLineDto) lines: JournalLineDto[];
 }
 
+export class CreateBankAccountDto {
+  @ApiProperty() @IsString() code: string;
+  @ApiProperty() @IsString() name: string;
+  @ApiPropertyOptional({ enum: BankAccountType }) @IsOptional() @IsEnum(BankAccountType) type?: BankAccountType;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() accountNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() openingBalance?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() currency?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class CreateBankTxnDto {
+  @ApiProperty() @IsString() bankAccountId: string;
+  @ApiProperty({ enum: BankTxnType }) @IsEnum(BankTxnType) type: BankTxnType;
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() txnDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+}
+
+export class CreateChequeDto {
+  @ApiProperty({ enum: ChequeDirection }) @IsEnum(ChequeDirection) direction: ChequeDirection;
+  @ApiProperty() @IsString() chequeNumber: string;
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() issueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() dueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() partyType?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() partyId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() partyName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class UpdateChequeStatusDto {
+  @ApiProperty({ enum: ChequeStatus }) @IsEnum(ChequeStatus) status: ChequeStatus;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
+}
+
+export class StartReconciliationDto {
+  @ApiProperty() @IsString() bankAccountId: string;
+  @ApiProperty() @IsDateString() statementDate: string;
+  @ApiProperty() @IsNumber() statementBalance: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class CompleteReconciliationDto {
+  @ApiPropertyOptional() @IsOptional() @IsArray() @IsString({ each: true }) matchedTxnIds?: string[];
+}
+
+export class CashBookEntryDto {
+  @ApiProperty() @IsString() type: string;
+  @ApiProperty() @IsString() description: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() entryDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() debit?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() credit?: number;
+  @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() referenceType?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() referenceId?: string;
+}
+
 @Injectable()
 export class AccountingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly finance: FinanceService,
+  ) {}
 
   private static readonly SETTLED_RETURN_STATUSES = ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] as const;
 
@@ -114,55 +187,7 @@ export class AccountingService {
   }
 
   async getProfitLoss(tenantId: string, startDate: string, endDate: string) {
-    const dateRange = {
-      gte: dayjs(startDate).startOf('day').toDate(),
-      lte: dayjs(endDate).endOf('day').toDate(),
-    };
-    const saleWhere = { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' as const } };
-
-    const [revenue, expenses, returns, saleItems] = await this.prisma.$transaction([
-      this.prisma.sale.aggregate({
-        where: saleWhere,
-        _sum: { total: true, taxAmount: true, discountAmount: true },
-        _count: { _all: true },
-      }),
-      this.prisma.expense.aggregate({
-        where: { tenantId, date: dateRange },
-        _sum: { amount: true },
-        _count: { _all: true },
-      }),
-      this.prisma.return.aggregate({
-        where: {
-          tenantId,
-          createdAt: dateRange,
-          status: { in: [...AccountingService.SETTLED_RETURN_STATUSES] },
-        },
-        _sum: { refundAmount: true },
-      }),
-      this.prisma.saleItem.findMany({
-        where: { sale: saleWhere },
-        select: { quantity: true, costPrice: true },
-      }),
-    ]);
-
-    const grossRevenue = revenue._sum?.total ?? 0;
-    const totalExpenses = expenses._sum?.amount ?? 0;
-    const totalReturns = returns._sum?.refundAmount ?? 0;
-    const costOfGoodsSold = saleItems.reduce((s, i) => s + i.costPrice * i.quantity, 0);
-    const netRevenue = grossRevenue - totalReturns;
-    const grossProfit = netRevenue - costOfGoodsSold;
-    const netProfit = grossProfit - totalExpenses;
-
-    return {
-      period: { startDate, endDate },
-      revenue: { gross: grossRevenue, returns: totalReturns, net: netRevenue },
-      costOfGoodsSold,
-      grossProfit,
-      expenses: { total: totalExpenses, count: expenses._count?._all ?? 0 },
-      netProfit,
-      profitMargin: netRevenue > 0 ? ((netProfit / netRevenue) * 100).toFixed(2) : '0',
-      salesCount: revenue._count?._all ?? 0,
-    };
+    return this.finance.getEnhancedProfitLoss(tenantId, startDate, endDate);
   }
 
   async getTrialBalance(tenantId: string) {
@@ -444,20 +469,29 @@ export class AccountingService {
     return this.prisma.account.update({ where: { id }, data: { isActive: false } });
   }
 
-  async getAccountsReceivable(tenantId: string) {
-    const customers = await this.prisma.customer.findMany({
-      where: { tenantId, creditBalance: { gt: 0 } },
-      select: {
-        id: true, code: true, firstName: true, lastName: true, phone: true,
-        creditBalance: true, creditLimit: true, lastPurchaseAt: true,
-      },
-      orderBy: { creditBalance: 'desc' },
-    });
-    const total = customers.reduce((s, c) => s + c.creditBalance, 0);
-    return { total, count: customers.length, customers };
+  async getAccountsReceivable(tenantId: string, asOfDate?: string) {
+    const aging = await this.finance.getAccountsReceivableAging(tenantId, asOfDate);
+    return {
+      total: aging.total,
+      count: aging.customers.length,
+      asOf: aging.asOf,
+      buckets: aging.buckets,
+      customers: aging.customers.map((c) => ({
+        id: c.id,
+        code: c.code,
+        firstName: c.firstName,
+        lastName: c.lastName,
+        phone: c.phone,
+        creditBalance: c.creditBalance,
+        creditLimit: c.creditLimit,
+        bucket: c.bucket,
+        daysPastDue: c.daysPastDue,
+      })),
+    };
   }
 
-  async getAccountsPayable(tenantId: string) {
+  async getAccountsPayable(tenantId: string, asOfDate?: string) {
+    const aging = await this.finance.getAccountsPayableAging(tenantId, asOfDate);
     const purchaseOrders = await this.prisma.purchaseOrder.findMany({
       where: { tenantId, status: { in: ['RECEIVED', 'PARTIALLY_RECEIVED', 'CONFIRMED', 'SENT'] } },
       select: {
@@ -469,18 +503,22 @@ export class AccountingService {
     const unpaidPos = purchaseOrders
       .map((po) => ({ ...po, balanceDue: Math.max(0, po.total - po.paidAmount) }))
       .filter((po) => po.balanceDue > 0.01);
-    const poTotal = unpaidPos.reduce((s, po) => s + po.balanceDue, 0);
-    const supplierMap = new Map<string, { id: string; name: string; balance: number }>();
-    for (const po of unpaidPos) {
-      const cur = supplierMap.get(po.supplier.id) ?? { id: po.supplier.id, name: po.supplier.name, balance: 0 };
-      cur.balance += po.balanceDue;
-      supplierMap.set(po.supplier.id, cur);
+    const byParty = new Map<string, { id: string; name: string; balance: number }>();
+    for (const line of aging.lines) {
+      const key = line.partyName;
+      const cur = byParty.get(key) ?? { id: line.id, name: line.partyName, balance: 0 };
+      cur.balance += line.amount;
+      byParty.set(key, cur);
     }
     return {
-      total: poTotal,
-      supplierBalanceTotal: 0,
-      purchaseOrderDueTotal: poTotal,
-      suppliers: [...supplierMap.values()].sort((a, b) => b.balance - a.balance),
+      total: aging.total,
+      supplierBalanceTotal: aging.supplierBalanceTotal,
+      purchaseOrderDueTotal: aging.purchaseOrderDueTotal,
+      invoiceDueTotal: aging.invoiceDueTotal,
+      asOf: aging.asOf,
+      buckets: aging.buckets,
+      agingLines: aging.lines,
+      suppliers: [...byParty.values()].sort((a, b) => b.balance - a.balance),
       unpaidPurchaseOrders: unpaidPos,
     };
   }
@@ -490,7 +528,10 @@ export class AccountingService {
 @ApiBearerAuth('access-token')
 @Controller({ path: 'accounting', version: '1' })
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    private readonly financeService: FinanceService,
+  ) {}
 
   @Get('accounts')
   @RequirePermissions('accounting:read')
@@ -599,16 +640,16 @@ export class AccountingController {
 
   @Get('accounts-receivable')
   @RequirePermissions('accounting:read')
-  @ApiOperation({ summary: 'Customer credit outstanding (AR)' })
-  getAccountsReceivable(@CurrentUser() user: IAuthUser) {
-    return this.accountingService.getAccountsReceivable(user.tenantId);
+  @ApiOperation({ summary: 'Customer credit outstanding (AR) with aging' })
+  getAccountsReceivable(@CurrentUser() user: IAuthUser, @Query('asOfDate') asOfDate?: string) {
+    return this.accountingService.getAccountsReceivable(user.tenantId, asOfDate);
   }
 
   @Get('accounts-payable')
   @RequirePermissions('accounting:read')
-  @ApiOperation({ summary: 'Supplier balances and unpaid POs (AP)' })
-  getAccountsPayable(@CurrentUser() user: IAuthUser) {
-    return this.accountingService.getAccountsPayable(user.tenantId);
+  @ApiOperation({ summary: 'Supplier balances, invoices, unpaid POs (AP) with aging' })
+  getAccountsPayable(@CurrentUser() user: IAuthUser, @Query('asOfDate') asOfDate?: string) {
+    return this.accountingService.getAccountsPayable(user.tenantId, asOfDate);
   }
 
   @Get('trial-balance')
@@ -617,11 +658,110 @@ export class AccountingController {
   getTrialBalance(@CurrentUser() user: IAuthUser) {
     return this.accountingService.getTrialBalance(user.tenantId);
   }
+
+  // ── Phase 5 Finance ──────────────────────────────────────────────
+
+  @Get('cash-book')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'Cash book for date range' })
+  getCashBook(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') start: string,
+    @Query('endDate') end: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.financeService.getCashBook(
+      user.tenantId,
+      branchId ?? user.branchId ?? '',
+      start ?? dayjs().startOf('month').format('YYYY-MM-DD'),
+      end ?? dayjs().format('YYYY-MM-DD'),
+    );
+  }
+
+  @Post('cash-book')
+  @RequirePermissions('accounting:create')
+  @ApiOperation({ summary: 'Append cash book entry' })
+  appendCashBook(@CurrentUser() user: IAuthUser, @Body() dto: CashBookEntryDto) {
+    return this.financeService.appendCashBookEntry(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('bank-accounts')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List bank accounts' })
+  listBankAccounts(@CurrentUser() user: IAuthUser) {
+    return this.financeService.listBankAccounts(user.tenantId);
+  }
+
+  @Post('bank-accounts')
+  @RequirePermissions('accounting:create')
+  @ApiOperation({ summary: 'Create bank account' })
+  createBankAccount(@CurrentUser() user: IAuthUser, @Body() dto: CreateBankAccountDto) {
+    return this.financeService.createBankAccount(user.tenantId, user.branchId ?? '', dto);
+  }
+
+  @Post('bank-transactions')
+  @RequirePermissions('accounting:create')
+  @ApiOperation({ summary: 'Post bank transaction' })
+  postBankTxn(@CurrentUser() user: IAuthUser, @Body() dto: CreateBankTxnDto) {
+    return this.financeService.postBankTransaction(user.tenantId, user.id, dto);
+  }
+
+  @Get('bank-accounts/:id/transactions')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List bank account transactions' })
+  listBankTxns(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Query() query: PaginationDto) {
+    return this.financeService.listBankTransactions(user.tenantId, id, query);
+  }
+
+  @Get('cheques')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List cheques' })
+  listCheques(
+    @CurrentUser() user: IAuthUser,
+    @Query() query: PaginationDto & { status?: ChequeStatus; direction?: ChequeDirection },
+  ) {
+    return this.financeService.listCheques(user.tenantId, query);
+  }
+
+  @Post('cheques')
+  @RequirePermissions('accounting:create')
+  @ApiOperation({ summary: 'Register cheque' })
+  createCheque(@CurrentUser() user: IAuthUser, @Body() dto: CreateChequeDto) {
+    return this.financeService.createCheque(user.tenantId, user.id, dto);
+  }
+
+  @Put('cheques/:id/status')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Update cheque status (deposit/clear/bounce)' })
+  updateChequeStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: UpdateChequeStatusDto) {
+    return this.financeService.updateChequeStatus(id, user.tenantId, user.id, dto.status, dto.bankAccountId);
+  }
+
+  @Get('bank-reconciliations')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List bank reconciliations' })
+  listRecons(@CurrentUser() user: IAuthUser, @Query('bankAccountId') bankAccountId?: string) {
+    return this.financeService.listReconciliations(user.tenantId, bankAccountId);
+  }
+
+  @Post('bank-reconciliations')
+  @RequirePermissions('accounting:create')
+  @ApiOperation({ summary: 'Start bank reconciliation' })
+  startRecon(@CurrentUser() user: IAuthUser, @Body() dto: StartReconciliationDto) {
+    return this.financeService.startReconciliation(user.tenantId, user.id, dto);
+  }
+
+  @Post('bank-reconciliations/:id/complete')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Complete bank reconciliation' })
+  completeRecon(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: CompleteReconciliationDto) {
+    return this.financeService.completeReconciliation(id, user.tenantId, dto.matchedTxnIds ?? []);
+  }
 }
 
 @Module({
   controllers: [AccountingController],
-  providers: [AccountingService],
-  exports: [AccountingService],
+  providers: [AccountingService, FinanceService],
+  exports: [AccountingService, FinanceService],
 })
 export class AccountingModule {}

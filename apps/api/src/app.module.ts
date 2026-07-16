@@ -51,6 +51,8 @@ import { WorkshopModule } from './modules/workshop/workshop.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { CashManagementModule } from './modules/cash-management/cash-management.module';
 import { BranchContextInterceptor } from './common/interceptors/branch-context.interceptor';
+import { CalendarModule } from './modules/calendar/calendar.module';
+import { WarehouseModule } from './modules/warehouse/warehouse.module';
 
 @Module({
   imports: [
@@ -111,6 +113,8 @@ import { BranchContextInterceptor } from './common/interceptors/branch-context.i
     CashManagementModule,
     SparePartsModule,
     WorkshopModule,
+    CalendarModule,
+    WarehouseModule,
 
     // ── Infrastructure ────────────────────────────────────────
     MailModule,

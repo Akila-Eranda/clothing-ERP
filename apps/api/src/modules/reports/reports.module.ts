@@ -7,6 +7,14 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import * as dayjs from 'dayjs';
+import {
+  summarizeChequeRows,
+  summarizeCommissionRows,
+  summarizeCustomerRows,
+  summarizeInventoryRows,
+  summarizePurchaseRows,
+  sumField,
+} from './reports.helper';
 
 @Injectable()
 export class ReportsService {
@@ -31,7 +39,7 @@ export class ReportsService {
   }
 
   async inventoryReport(tenantId: string, branchId?: string) {
-    return this.prisma.inventory.findMany({
+    const rows = await this.prisma.inventory.findMany({
       where: { tenantId, ...(branchId && { branchId }) },
       include: {
         variant: {
@@ -40,15 +48,21 @@ export class ReportsService {
           },
         },
         branch: { select: { name: true } },
+        warehouse: { select: { id: true, name: true, code: true } },
       },
       orderBy: { quantity: 'asc' },
     });
+    return {
+      summary: summarizeInventoryRows(rows),
+      rows,
+    };
   }
 
   async stockMovementReport(tenantId: string, startDate: string, endDate: string) {
     return this.prisma.inventoryLog.findMany({
       where: {
         tenantId,
+        NOT: { notes: 'LOT_ALLOCATION' },
         createdAt: {
           gte: dayjs(startDate).startOf('day').toDate(),
           lte: dayjs(endDate).endOf('day').toDate(),
@@ -59,25 +73,115 @@ export class ReportsService {
     });
   }
 
+  async expiryReport(tenantId: string, branchId?: string, withinDays = 90) {
+    const now = new Date();
+    const until = new Date(now);
+    until.setDate(until.getDate() + withinDays);
+
+    const lots = await this.prisma.inventoryLot.findMany({
+      where: {
+        tenantId,
+        ...(branchId && { branchId }),
+        isActive: true,
+        quantity: { gt: 0 },
+        expiryDate: { not: null, lte: until },
+      },
+      include: {
+        variant: { include: { product: { include: { category: true } } } },
+        branch: { select: { name: true, code: true } },
+      },
+      orderBy: { expiryDate: 'asc' },
+    });
+
+    const rows = lots.map((lot) => {
+      const days = lot.expiryDate
+        ? Math.floor(
+          (new Date(lot.expiryDate.getFullYear(), lot.expiryDate.getMonth(), lot.expiryDate.getDate()).getTime()
+            - new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()) / 86400000,
+        )
+        : null;
+      const status = days == null ? 'NO_EXPIRY' : days < 0 ? 'EXPIRED' : days <= 7 ? 'CRITICAL' : days <= 30 ? 'WARNING' : 'WATCH';
+      return {
+        lotId: lot.id,
+        batchNumber: lot.batchNumber,
+        expiryDate: lot.expiryDate,
+        daysToExpiry: days,
+        status,
+        quantity: lot.quantity,
+        reservedQty: lot.reservedQty,
+        availableQty: Math.max(0, lot.quantity - lot.reservedQty),
+        unitCost: lot.unitCost,
+        value: lot.quantity * (lot.unitCost || 0),
+        sku: lot.variant.sku,
+        productName: lot.variant.product.name,
+        variantName: lot.variant.name,
+        category: lot.variant.product.category?.name ?? null,
+        branch: lot.branch.name,
+      };
+    });
+
+    const summary = {
+      withinDays,
+      expired: rows.filter((r) => r.status === 'EXPIRED').length,
+      critical: rows.filter((r) => r.status === 'CRITICAL').length,
+      warning: rows.filter((r) => r.status === 'WARNING').length,
+      watch: rows.filter((r) => r.status === 'WATCH').length,
+      totalLots: rows.length,
+      totalQty: rows.reduce((s, r) => s + r.quantity, 0),
+      totalValue: rows.reduce((s, r) => s + r.value, 0),
+      expiredValue: rows.filter((r) => r.status === 'EXPIRED').reduce((s, r) => s + r.value, 0),
+      nearExpiryValue: rows.filter((r) => r.status !== 'EXPIRED').reduce((s, r) => s + r.value, 0),
+    };
+
+    return { summary, rows };
+  }
+
   async customerReport(tenantId: string) {
-    return this.prisma.customer.findMany({
+    const rows = await this.prisma.customer.findMany({
       where: { tenantId },
       select: {
         id: true, code: true, firstName: true, lastName: true,
         phone: true, email: true, tier: true,
         totalSpent: true, totalOrders: true, loyaltyPoints: true,
-        walletBalance: true, createdAt: true, lastPurchaseAt: true,
+        walletBalance: true, creditBalance: true, creditLimit: true,
+        createdAt: true, lastPurchaseAt: true,
       },
       orderBy: { totalSpent: 'desc' },
     });
+    return {
+      summary: summarizeCustomerRows(rows),
+      rows,
+    };
   }
 
   async supplierReport(tenantId: string) {
-    return this.prisma.supplier.findMany({
+    const suppliers = await this.prisma.supplier.findMany({
       where: { tenantId },
       include: { _count: { select: { purchases: true } } },
       orderBy: { name: 'asc' },
     });
+    const payments = await this.prisma.supplierPayment.groupBy({
+      by: ['supplierId'],
+      where: { tenantId },
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+    const payMap = Object.fromEntries(
+      payments.map((p) => [p.supplierId, { paid: p._sum.amount ?? 0, paymentCount: p._count._all }]),
+    );
+    const rows = suppliers.map((s) => ({
+      ...s,
+      totalPaid: payMap[s.id]?.paid ?? 0,
+      paymentCount: payMap[s.id]?.paymentCount ?? 0,
+    }));
+    return {
+      summary: {
+        suppliers: rows.length,
+        purchaseOrders: rows.reduce((n, r) => n + (r._count?.purchases ?? 0), 0),
+        totalPaid: sumField(rows, (r) => r.totalPaid),
+      },
+      rows,
+    };
   }
 
   async profitReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
@@ -141,7 +245,7 @@ export class ReportsService {
       ? await this.prisma.user.findMany({ where: { id: { in: cashierIds } }, select: { id: true, firstName: true, lastName: true, email: true } })
       : [];
     const userMap = Object.fromEntries(users.map(u => [u.id, u]));
-    return grouped.map(g => ({
+    const rows = grouped.map(g => ({
       cashierId: g.cashierId,
       cashierName: g.cashierId && userMap[g.cashierId] ? `${userMap[g.cashierId].firstName} ${userMap[g.cashierId].lastName}` : 'Unknown',
       salesCount: g._count.id,
@@ -149,6 +253,17 @@ export class ReportsService {
       totalDiscount: g._sum.discountAmount ?? 0,
       totalTax: g._sum.taxAmount ?? 0,
     })).sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    return {
+      summary: {
+        cashiers: rows.length,
+        salesCount: rows.reduce((s, r) => s + r.salesCount, 0),
+        totalRevenue: sumField(rows, (r) => r.totalRevenue),
+        totalDiscount: sumField(rows, (r) => r.totalDiscount),
+        totalTax: sumField(rows, (r) => r.totalTax),
+      },
+      rows,
+    };
   }
 
   async branchReport(tenantId: string, startDate: string, endDate: string) {
@@ -167,7 +282,7 @@ export class ReportsService {
       ? await this.prisma.branch.findMany({ where: { id: { in: branchIds } }, select: { id: true, name: true, code: true } })
       : [];
     const branchMap = Object.fromEntries(branches.map((b) => [b.id, b]));
-    return grouped
+    const rows = grouped
       .map((g) => ({
         branchId: g.branchId,
         branchName: g.branchId ? branchMap[g.branchId]?.name ?? 'Unknown' : 'No branch',
@@ -178,6 +293,190 @@ export class ReportsService {
         totalDiscount: g._sum.discountAmount ?? 0,
       }))
       .sort((a, b) => b.totalRevenue - a.totalRevenue);
+
+    return {
+      summary: {
+        branches: rows.length,
+        salesCount: rows.reduce((s, r) => s + r.salesCount, 0),
+        totalRevenue: sumField(rows, (r) => r.totalRevenue),
+        totalTax: sumField(rows, (r) => r.totalTax),
+        totalDiscount: sumField(rows, (r) => r.totalDiscount),
+      },
+      rows,
+    };
+  }
+
+  async purchaseReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const orders = await this.prisma.purchaseOrder.findMany({
+      where: {
+        tenantId,
+        orderDate: dateRange,
+        status: { not: 'CANCELLED' },
+        ...(branchId ? { branchId } : {}),
+      },
+      include: {
+        supplier: { select: { id: true, name: true, code: true } },
+        items: { select: { orderedQty: true, receivedQty: true, productName: true, sku: true } },
+      },
+      orderBy: { orderDate: 'desc' },
+    });
+
+    const payments = await this.prisma.supplierPayment.findMany({
+      where: { tenantId, paidAt: dateRange },
+      include: { supplier: { select: { name: true } } },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    const rows = orders.map((o) => ({
+      id: o.id,
+      poNumber: o.poNumber,
+      status: o.status,
+      orderDate: o.orderDate,
+      expectedDate: o.expectedDate,
+      receivedDate: o.receivedDate,
+      supplierId: o.supplierId,
+      supplierName: o.supplier.name,
+      supplierCode: o.supplier.code,
+      subtotal: o.subtotal,
+      taxAmount: o.taxAmount,
+      discountAmount: o.discountAmount,
+      total: o.total,
+      paidAmount: o.paidAmount,
+      outstanding: Math.max(0, o.total - o.paidAmount),
+      itemCount: o.items.length,
+      orderedQty: o.items.reduce((s, i) => s + i.orderedQty, 0),
+      receivedQty: o.items.reduce((s, i) => s + i.receivedQty, 0),
+    }));
+
+    const summary = summarizePurchaseRows(rows);
+    return {
+      summary: {
+        ...summary,
+        paymentsTotal: sumField(payments, (p) => p.amount),
+        paymentCount: payments.length,
+      },
+      rows,
+      payments: payments.map((p) => ({
+        id: p.id,
+        amount: p.amount,
+        method: p.method,
+        paidAt: p.paidAt,
+        supplierName: p.supplier.name,
+        reference: p.reference,
+      })),
+    };
+  }
+
+  async chequeReport(tenantId: string, startDate?: string, endDate?: string) {
+    const where: {
+      tenantId: string;
+      createdAt?: { gte: Date; lte: Date };
+    } = { tenantId };
+    if (startDate && endDate) {
+      where.createdAt = {
+        gte: dayjs(startDate).startOf('day').toDate(),
+        lte: dayjs(endDate).endOf('day').toDate(),
+      };
+    }
+
+    const rows = await this.prisma.cheque.findMany({
+      where,
+      include: { bankAccount: { select: { name: true, code: true } } },
+      orderBy: [{ dueDate: 'asc' }, { createdAt: 'desc' }],
+    });
+
+    const mapped = rows.map((c) => ({
+      id: c.id,
+      chequeNumber: c.chequeNumber,
+      direction: c.direction,
+      status: c.status,
+      amount: c.amount,
+      bankName: c.bankName,
+      partyName: c.partyName,
+      partyType: c.partyType,
+      issueDate: c.issueDate,
+      dueDate: c.dueDate,
+      clearedAt: c.clearedAt,
+      bankAccount: c.bankAccount,
+    }));
+
+    return {
+      summary: summarizeChequeRows(mapped),
+      rows: mapped,
+    };
+  }
+
+  async commissionReport(tenantId: string, startDate: string, endDate: string, branchId?: string) {
+    const dateRange = {
+      gte: dayjs(startDate).startOf('day').toDate(),
+      lte: dayjs(endDate).endOf('day').toDate(),
+    };
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        tenantId,
+        invoiceDate: dateRange,
+        status: { not: 'CANCELLED' },
+        helperCommission: { gt: 0 },
+        ...(branchId ? { branchId } : {}),
+      },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        invoiceDate: true,
+        total: true,
+        helperEmployeeId: true,
+        helperName: true,
+        helperCommission: true,
+        cashier: { select: { firstName: true, lastName: true } },
+        branch: { select: { name: true } },
+      },
+      orderBy: { invoiceDate: 'desc' },
+    });
+
+    const byHelper = new Map<string, {
+      helperKey: string;
+      helperEmployeeId: string | null;
+      helperName: string;
+      salesCount: number;
+      salesTotal: number;
+      commissionTotal: number;
+    }>();
+
+    for (const s of sales) {
+      const key = s.helperEmployeeId || s.helperName || 'unknown';
+      const cur = byHelper.get(key) ?? {
+        helperKey: key,
+        helperEmployeeId: s.helperEmployeeId,
+        helperName: s.helperName || 'Unknown helper',
+        salesCount: 0,
+        salesTotal: 0,
+        commissionTotal: 0,
+      };
+      cur.salesCount += 1;
+      cur.salesTotal += s.total;
+      cur.commissionTotal += s.helperCommission;
+      byHelper.set(key, cur);
+    }
+
+    const rows = Array.from(byHelper.values()).sort((a, b) => b.commissionTotal - a.commissionTotal);
+    return {
+      summary: summarizeCommissionRows(rows),
+      rows,
+      sales: sales.map((s) => ({
+        id: s.id,
+        invoiceNumber: s.invoiceNumber,
+        invoiceDate: s.invoiceDate,
+        total: s.total,
+        helperName: s.helperName,
+        helperCommission: s.helperCommission,
+        cashierName: s.cashier ? `${s.cashier.firstName} ${s.cashier.lastName ?? ''}`.trim() : null,
+        branchName: s.branch?.name ?? null,
+      })),
+    };
   }
 
   async supplierPerformanceReport(tenantId: string) {
@@ -413,6 +712,21 @@ export class ReportsController {
     return this.reportsService.stockMovementReport(user.tenantId, start, end);
   }
 
+  @Get('expiry')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Batch expiry report (near-expiry and expired lots)' })
+  expiryReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('branchId') branchId?: string,
+    @Query('withinDays') withinDays?: string,
+  ) {
+    return this.reportsService.expiryReport(
+      user.tenantId,
+      branchId || user.branchId || undefined,
+      withinDays ? parseInt(withinDays, 10) : 90,
+    );
+  }
+
   @Get('customers')
   @RequirePermissions('reports:read')
   @ApiOperation({ summary: 'Customer report' })
@@ -460,6 +774,41 @@ export class ReportsController {
   @ApiOperation({ summary: 'Sales performance by branch' })
   branchReport(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
     return this.reportsService.branchReport(user.tenantId, start, end);
+  }
+
+  @Get('purchases')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Purchase order & supplier payment report' })
+  purchaseReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') start: string,
+    @Query('endDate') end: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.reportsService.purchaseReport(user.tenantId, start, end, branchId || user.branchId || undefined);
+  }
+
+  @Get('cheques')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Cheque status and due-date report' })
+  chequeReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') start?: string,
+    @Query('endDate') end?: string,
+  ) {
+    return this.reportsService.chequeReport(user.tenantId, start, end);
+  }
+
+  @Get('commission')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Helper commission report' })
+  commissionReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') start: string,
+    @Query('endDate') end: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.reportsService.commissionReport(user.tenantId, start, end, branchId || user.branchId || undefined);
   }
 
   @Get('supplier-performance')

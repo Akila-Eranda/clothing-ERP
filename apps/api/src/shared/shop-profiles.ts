@@ -49,7 +49,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.CLOTHING]: {
     type: ShopType.CLOTHING,
     label: 'Clothing Shop',
-    labelSi: 'ඇඳුම් කඩය',
+    labelSi: 'Apparel, fashion, boutiques',
     emoji: '👕',
     description: 'Apparel, fashion, boutiques — sizes, colors, hang tags',
     defaultCategories: ["Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear'],

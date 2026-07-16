@@ -74,7 +74,7 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
-        sans: ["var(--font-sans)", ...fontFamily.sans],
+        sans: ["var(--font-sans)", "system-ui", "-apple-system", "Segoe UI", ...fontFamily.sans],
         mono: ["var(--font-mono)", ...fontFamily.mono],
       },
       backgroundImage: {

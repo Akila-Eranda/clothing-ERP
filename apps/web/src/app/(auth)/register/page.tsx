@@ -278,7 +278,7 @@ export default function RegisterPage() {
                           >
                             <span className="text-xl">{p.emoji}</span>
                             <p className="text-sm font-semibold mt-1">{p.label}</p>
-                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{p.labelSi}</p>
+                            <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">{p.description}</p>
                           </button>
                         ))}
                       </div>

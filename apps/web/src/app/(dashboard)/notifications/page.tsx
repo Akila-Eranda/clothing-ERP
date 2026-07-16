@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell, AlertTriangle, CheckCircle, Info, Zap, Check, RefreshCw,
 } from "lucide-react";
@@ -30,11 +31,21 @@ interface PaginatedResponse<T> {
 }
 
 const TYPE_CFG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
-  LOW_STOCK: { icon: AlertTriangle, color: "text-amber-500",  bg: "bg-amber-500/10"  },
-  NEW_SALE:  { icon: CheckCircle,   color: "text-emerald-500",bg: "bg-emerald-500/10"},
-  INFO:      { icon: Info,          color: "text-blue-500",   bg: "bg-blue-500/10"   },
-  WARNING:   { icon: AlertTriangle, color: "text-amber-500",  bg: "bg-amber-500/10"  },
-  ERROR:     { icon: Zap,           color: "text-red-500",    bg: "bg-red-500/10"    },
+  LOW_STOCK:      { icon: AlertTriangle, color: "text-amber-500",   bg: "bg-amber-500/10" },
+  REORDER:        { icon: AlertTriangle, color: "text-orange-500",  bg: "bg-orange-500/10" },
+  EXPIRY_ALERT:   { icon: AlertTriangle, color: "text-red-500",     bg: "bg-red-500/10" },
+  PAYMENT_DUE:    { icon: Zap,           color: "text-violet-500",  bg: "bg-violet-500/10" },
+  SUPPLIER_DUE:   { icon: Zap,           color: "text-fuchsia-500", bg: "bg-fuchsia-500/10" },
+  CHEQUE_DUE:     { icon: Zap,           color: "text-sky-500",     bg: "bg-sky-500/10" },
+  GRN_PENDING:    { icon: Info,          color: "text-blue-500",    bg: "bg-blue-500/10" },
+  PO_PENDING:     { icon: Info,          color: "text-indigo-500",  bg: "bg-indigo-500/10" },
+  DAILY_SUMMARY:  { icon: CheckCircle,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  NEW_SALE:       { icon: CheckCircle,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
+  BIRTHDAY_REMINDER: { icon: Bell,       color: "text-pink-500",    bg: "bg-pink-500/10" },
+  INFO:           { icon: Info,          color: "text-blue-500",    bg: "bg-blue-500/10" },
+  WARNING:        { icon: AlertTriangle, color: "text-amber-500",   bg: "bg-amber-500/10" },
+  ERROR:          { icon: Zap,           color: "text-red-500",     bg: "bg-red-500/10" },
+  SYSTEM_ALERT:   { icon: Zap,           color: "text-red-500",     bg: "bg-red-500/10" },
 };
 const DEFAULT_CFG = { icon: Bell, color: "text-muted-foreground", bg: "bg-muted/50" };
 
@@ -52,6 +63,7 @@ function timeAgo(dateStr: string) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function NotificationsPage() {
+  const router = useRouter();
   const [items, setItems]         = useState<UserNotification[]>([]);
   const [loading, setLoading]     = useState(true);
   const [filter, setFilter]       = useState<"all" | "unread">("all");
@@ -144,7 +156,10 @@ export default function NotificationsPage() {
             return (
               <div key={un.id}
                 className={`flex items-start gap-3 p-4 rounded-xl border transition-all cursor-pointer hover:shadow-sm ${!un.isRead ? "bg-primary/5 border-primary/20" : "bg-card border-border"}`}
-                onClick={() => markRead(un)}>
+                onClick={() => {
+                  void markRead(un);
+                  if (notif.link) router.push(notif.link);
+                }}>
                 <div className={`h-8 w-8 rounded-lg ${cfg.bg} flex items-center justify-center shrink-0 mt-0.5`}>
                   <Icon className={`h-4 w-4 ${cfg.color}`} />
                 </div>

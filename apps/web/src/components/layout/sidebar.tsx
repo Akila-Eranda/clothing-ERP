@@ -10,7 +10,7 @@ import {
   Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
-  Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog,
+  Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -49,6 +49,10 @@ function useNavGroups(): NavGroup[] {
     { label: L["/categories"], href: "/categories", icon: Layers },
     ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
     { label: L["/inventory"], href: "/inventory", icon: Warehouse },
+    { label: L["/warehouse"] ?? "Warehouse", href: "/warehouse", icon: Building2 },
+    ...(hasShopModule(profile, "expiry") || hasShopModule(profile, "batch")
+      ? [{ label: L["/inventory/expiry"], href: "/inventory/expiry", icon: CalendarClock }]
+      : []),
     ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
     ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
     ...(hasShopModule(profile, "workshop") ? [{ label: L["/job-cards"], href: "/job-cards", icon: ClipboardList }] : []),
@@ -73,7 +77,10 @@ function useNavGroups(): NavGroup[] {
   return [
     {
       title: S.overview,
-      items: [{ label: L["/dashboard"], href: "/dashboard", icon: LayoutDashboard }],
+      items: [
+        { label: L["/dashboard"], href: "/dashboard", icon: LayoutDashboard },
+        { label: L["/notifications"] ?? "Notifications", href: "/notifications", icon: Bell },
+      ],
     },
     { title: S.sales, items: salesItems },
     { title: S.products, items: productItems },
@@ -82,12 +89,16 @@ function useNavGroups(): NavGroup[] {
       items: [
         { label: L["/suppliers"], href: "/suppliers", icon: Truck },
         { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
+        { label: L["/purchases/procurement"] ?? "Procurement Hub", href: "/purchases/procurement", icon: ClipboardList },
       ],
     },
     {
       title: S.finance,
       items: [
         { label: L["/accounting"], href: "/accounting", icon: Wallet },
+        { label: L["/accounting/finance"] ?? "Finance Hub", href: "/accounting/finance", icon: Landmark },
+        { label: L["/accounting/credit"] ?? "Customer Credit", href: "/accounting/credit", icon: UserCheck },
+        { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
         { label: L["/cash"], href: "/cash", icon: Banknote, badge: "NEW" },
         { label: L["/expenses"], href: "/expenses", icon: TrendingDown },
         { label: L["/analytics"], href: "/analytics", icon: BarChart3 },
@@ -149,10 +160,10 @@ export function Sidebar() {
   /* ── theme-aware palette ── */
   const bg       = isDark ? "#0f172a" : "#ffffff";
   const border   = isDark ? "#1e293b" : "#e5e7eb";
-  const textMut  = isDark ? "rgba(255,255,255,0.55)" : "#000000";
-  const textFull = isDark ? "#ffffff" : "#000000";
+  const textMut  = isDark ? "rgba(255,255,255,0.72)" : "#374151";
+  const textFull = isDark ? "#ffffff" : "#111827";
   const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
-  const sectLbl  = isDark ? "rgba(255,255,255,0.28)" : "#000000";
+  const sectLbl  = isDark ? "rgba(255,255,255,0.5)" : "#6b7280";
 
   /* ── single nav item renderer ── */
   const renderItem = (item: NavItem, groupIdx: number) => {
@@ -166,7 +177,7 @@ export function Sidebar() {
         onClick={closeMobile}
         className={cn(
           "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
+          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 px-3 w-full",
         )}
         style={isActive
           ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
@@ -182,7 +193,7 @@ export function Sidebar() {
         {!sidebarCollapsed && (
           <>
             <span
-              className={cn("truncate flex-1 text-[15px] leading-none", isActive ? "font-semibold text-indigo-600" : "font-medium")}
+              className={cn("flex-1 text-[14px] leading-snug", isActive ? "font-semibold text-indigo-600" : "font-medium")}
               style={!isActive && !isDark ? { color: "#000000" } : undefined}
               title={item.label}
             >
@@ -198,7 +209,7 @@ export function Sidebar() {
         onClick={() => { item.action?.(); closeMobile(); }}
         className={cn(
           "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none cursor-pointer",
-          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "h-11 px-3 w-full",
+          sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 px-3 w-full",
         )}
         style={{ color: textMut }}
         onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
@@ -208,7 +219,7 @@ export function Sidebar() {
         {!sidebarCollapsed && (
           <>
             <span
-              className="truncate flex-1 text-[15px] leading-none font-medium"
+              className="flex-1 text-[14px] leading-snug font-medium"
               style={!isDark ? { color: "#000000" } : undefined}
               title={item.label}
             >
@@ -250,7 +261,7 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <motion.aside
         initial={false}
-        animate={{ width: sidebarCollapsed ? 68 : 248 }}
+        animate={{ width: sidebarCollapsed ? 68 : 260 }}
         transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex h-screen flex-col shrink-0 overflow-hidden"
         style={{ background: bg, borderRight: `1px solid ${border}` }}
@@ -281,9 +292,9 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold leading-tight truncate" style={{ color: textFull }}>{shopName}</p>
-                <p className="text-[11px] font-medium truncate mt-0.5" style={{ color: textMut }}>{profile.label}</p>
-                <p className="text-xs font-semibold mt-0.5 truncate" style={{ color: "#6366f1" }}>{planLabel}</p>
+                <p className="text-[15px] font-bold leading-snug" style={{ color: textFull }}>{shopName}</p>
+                <p className="text-[11px] font-medium leading-snug mt-0.5" style={{ color: textMut }}>{profile.label}</p>
+                <p className="text-xs font-semibold leading-snug mt-0.5" style={{ color: "#6366f1" }}>{planLabel}</p>
               </div>
               <button
                 type="button"
@@ -319,7 +330,7 @@ export function Sidebar() {
             {navGroups.map((group, gi) => (
               <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                 {!sidebarCollapsed && (
-                  <p className="px-3 mb-1 text-[11px] font-semibold tracking-wider uppercase select-none truncate"
+                  <p className="px-3 mb-1.5 text-xs font-semibold leading-snug select-none"
                     style={{ color: sectLbl }}>
                     {group.title}
                   </p>

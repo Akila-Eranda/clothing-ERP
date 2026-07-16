@@ -51,7 +51,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.CLOTHING]: {
     type: ShopType.CLOTHING,
     label: 'Clothing Shop',
-    labelSi: 'ඇඳුම් කඩය',
+    labelSi: 'Apparel, fashion, boutiques',
     emoji: '👕',
     description: 'Apparel, fashion, boutiques — sizes, colors, hang tags',
     defaultCategories: ["Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear'],
@@ -67,7 +67,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.GROCERY]: {
     type: ShopType.GROCERY,
     label: 'Grocery Shop',
-    labelSi: 'සිල්ලර කඩය',
+    labelSi: 'Supermarket, mini-mart, convenience',
     emoji: '🛒',
     description: 'Supermarket, mini-mart — weight, volume, expiry tracking',
     defaultCategories: ['Fresh Produce', 'Dairy & Eggs', 'Beverages', 'Snacks', 'Frozen Foods', 'Household'],
@@ -83,7 +83,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.HARDWARE]: {
     type: ShopType.HARDWARE,
     label: 'Hardware Shop',
-    labelSi: 'Hardware කඩය',
+    labelSi: 'Tools, plumbing, electrical',
     emoji: '🔧',
     description: 'Tools, plumbing, electrical — specs, SKU, bulk items',
     defaultCategories: ['Tools', 'Electrical', 'Plumbing', 'Paint', 'Building Materials', 'Safety Gear'],
@@ -99,7 +99,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.AGRICULTURE]: {
     type: ShopType.AGRICULTURE,
     label: 'Agriculture Shop',
-    labelSi: 'කෘෂිකර්ම කඩය',
+    labelSi: 'Seeds, fertilizer, equipment',
     emoji: '🌾',
     description: 'Seeds, fertilizer, equipment — grade, batch, season',
     defaultCategories: ['Seeds', 'Fertilizer', 'Pesticides', 'Equipment', 'Animal Feed', 'Irrigation'],
@@ -115,7 +115,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.SPARE_PARTS]: {
     type: ShopType.SPARE_PARTS,
     label: 'Spare Parts Shop',
-    labelSi: 'Spare Parts කඩය',
+    labelSi: 'Auto parts & vehicle compatibility',
     emoji: '🚗',
     description: 'Auto spare parts — vehicle compatibility, warranty, quotations',
     defaultCategories: ['Engine Parts', 'Brakes & Suspension', 'Filters', 'Electrical', 'Body Parts', 'Lubricants', 'Accessories'],
@@ -131,7 +131,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.TIRE_SHOP]: {
     type: ShopType.TIRE_SHOP,
     label: 'Tyre Shop',
-    labelSi: 'Tyre Shop',
+    labelSi: 'Tyres, rims & workshop services',
     emoji: '🛞',
     description: 'Tyres & rims — fitment, workshop services, job cards, fleet',
     defaultCategories: ['Passenger Tyres', 'SUV & 4x4 Tyres', 'Commercial Tyres', 'Rims & Wheels', 'Accessories'],
@@ -148,7 +148,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.GENERAL]: {
     type: ShopType.GENERAL,
     label: 'General Shop',
-    labelSi: 'සාමාන්‍ය කඩය',
+    labelSi: 'General mixed retail',
     emoji: '🏪',
     description: 'General retail — mixed products, simple variants, POS & inventory',
     defaultCategories: ['General Merchandise', 'Electronics', 'Home & Living', 'Health & Beauty', 'Stationery', 'Other'],

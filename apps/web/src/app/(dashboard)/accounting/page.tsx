@@ -30,7 +30,20 @@ interface Expense {
 }
 interface Account { id: string; code: string; name: string; type: string; balance: number; description?: string | null; }
 interface PLData { month: string; revenue: number; expenses: number; profit: number; }
-interface PLReport { period: { startDate: string; endDate: string }; revenue: { gross: number; returns: number; net: number }; costOfGoodsSold?: number; grossProfit?: number; expenses: { total: number; count: number }; netProfit: number; profitMargin: string; salesCount: number; }
+interface PLReport {
+  period: { startDate: string; endDate: string };
+  revenue: { gross: number; returns: number; net: number; tax?: number; discounts?: number };
+  costOfGoodsSold?: number;
+  grossProfit?: number;
+  grossMarginPct?: number;
+  expenses: { total: number; count: number; byCategory?: { name: string; amount: number }[] };
+  netProfit: number;
+  netMarginPct?: number;
+  profitMargin: string;
+  salesCount: number;
+  paymentsByMethod?: { method: string; amount: number }[];
+  formula?: string;
+}
 interface ExpenseSummary { total: number; byCategory: { name: string; amount: number }[]; byPaymentMethod: { method: string; amount: number }[]; }
 interface TrialBalanceRow { code: string; name: string; type: string; balance: number; }
 interface CashFlowDay { date: string; inflow: number; outflow: number; }
@@ -39,7 +52,7 @@ interface BalanceSheet { assets: { accounts: Account[]; operatingCash: number; t
 interface ARData { total: number; count: number; customers: { id: string; code: string; firstName: string; lastName: string; phone: string; creditBalance: number; creditLimit: number }[]; }
 interface APData { total: number; supplierBalanceTotal: number; purchaseOrderDueTotal: number; suppliers: { id: string; name: string; balance: number }[]; unpaidPurchaseOrders: { poNumber: string; balanceDue: number; supplier: { name: string } }[]; }
 
-const PAY_METHODS = ["CASH","CARD","BANK_TRANSFER","ONLINE","CUSTOMER_CREDIT","CHEQUE","WALLET"];
+const PAY_METHODS = ["CASH","CARD","UPI","BANK_TRANSFER","WALLET","CUSTOMER_CREDIT","CHEQUE"];
 const CATEGORIES  = ["Payroll","Rent","Utilities","Marketing","Operations","Logistics","Assets","Other"];
 const CAT_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#06b6d4","#84cc16","#ec4899"];
 
@@ -786,10 +799,25 @@ export default function AccountingPage() {
                         <div className="flex justify-between text-sm font-bold"><span>Net Revenue</span><span className="text-emerald-600">LKR {formatNumber(pl.revenue.net)}</span></div>
                       </div>
                     </div>
+                    {(pl.costOfGoodsSold != null || pl.grossProfit != null) && (
+                      <div className="mb-5">
+                        <div className="flex items-center gap-2 mb-3"><div className="h-px flex-1 bg-border" /><span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase px-2">Gross Profit</span><div className="h-px flex-1 bg-border" /></div>
+                        <div className="bg-blue-500/5 border border-blue-500/15 rounded-xl p-4 space-y-2">
+                          <div className="flex justify-between text-sm"><span className="text-muted-foreground">Cost of Goods Sold</span><span className="font-semibold">LKR {formatNumber(pl.costOfGoodsSold ?? 0)}</span></div>
+                          <div className="h-px bg-blue-500/20" />
+                          <div className="flex justify-between text-sm font-bold"><span>Gross Profit{pl.grossMarginPct != null ? ` (${pl.grossMarginPct}%)` : ""}</span><span className="text-blue-600">LKR {formatNumber(pl.grossProfit ?? 0)}</span></div>
+                        </div>
+                      </div>
+                    )}
                     <div className="mb-5">
                       <div className="flex items-center gap-2 mb-3"><div className="h-px flex-1 bg-border" /><span className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase px-2">Expenses</span><div className="h-px flex-1 bg-border" /></div>
                       <div className="bg-red-500/5 border border-red-500/15 rounded-xl p-4 space-y-2">
                         <div className="flex justify-between text-sm"><span className="text-muted-foreground">Operating Expenses <span className="ml-1 text-[10px] bg-muted px-1.5 py-0.5 rounded">{pl.expenses.count}</span></span><span className="text-red-500 font-semibold">LKR {formatNumber(pl.expenses.total)}</span></div>
+                        {(pl.expenses.byCategory ?? []).slice(0, 5).map((c) => (
+                          <div key={c.name} className="flex justify-between text-xs text-muted-foreground pl-2">
+                            <span>{c.name}</span><span>LKR {formatNumber(c.amount)}</span>
+                          </div>
+                        ))}
                         <div className="h-px bg-red-500/20" />
                         <div className="flex justify-between text-sm font-bold"><span>Total Expenses</span><span className="text-red-600">LKR {formatNumber(pl.expenses.total)}</span></div>
                       </div>

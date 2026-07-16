@@ -2,10 +2,10 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, Min, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentMethod, PurchaseOrderStatus, StockMovementType } from '@prisma/client';
+import { PaymentMethod, PurchaseOrderStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -15,6 +15,9 @@ import { InventoryService, InventoryModule } from '@/modules/inventory/inventory
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { createLinkedExpense } from '@/shared/expense.helper';
+import { ProcurementService } from './procurement.service';
+import type { GrnLineInput, PrItemInput } from './procurement.service';
+import { PurchaseRequestStatus } from '@prisma/client';
 
 export class CreateSupplierDto {
   @ApiProperty() @IsString() name: string;
@@ -59,6 +62,9 @@ export class ReceiveItemDto {
   @ApiProperty() @IsString() itemId: string;
   @ApiProperty() @IsInt() @Min(0) receivedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }
 
 export class RecordPaymentDto {
@@ -76,6 +82,7 @@ export class SuppliersService {
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly workflowService: WorkflowService,
+    private readonly procurementService: ProcurementService,
   ) {}
 
   async createSupplier(tenantId: string, dto: CreateSupplierDto) {
@@ -298,67 +305,10 @@ export class SuppliersService {
   }
 
   async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
-    const po = await this.prisma.purchaseOrder.findFirst({
-      where: { id: poId, tenantId },
-      include: { items: true },
-    });
-    if (!po) throw new NotFoundException('Purchase order not found');
-    if (po.status === PurchaseOrderStatus.PENDING_APPROVAL || po.status === PurchaseOrderStatus.DRAFT) {
-      throw new BadRequestException('Purchase order must be approved before receiving items');
-    }
-
-    const receiveBranchId = po.branchId || branchId;
-    if (po.branchId && branchId && po.branchId !== branchId) {
-      throw new BadRequestException('Switch to the purchase order branch before receiving goods');
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const poItem = po.items.find((i) => i.id === item.itemId);
-        if (!poItem) throw new BadRequestException(`Invalid line item: ${item.itemId}`);
-        if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
-
-        const nextReceived = poItem.receivedQty + item.receivedQty;
-        if (nextReceived > poItem.orderedQty) {
-          throw new BadRequestException(
-            `Cannot receive ${item.receivedQty} units — only ${poItem.orderedQty - poItem.receivedQty} remaining on this line`,
-          );
-        }
-
-        await tx.purchaseOrderItem.update({
-          where: { id: item.itemId },
-          data: { receivedQty: { increment: item.receivedQty }, rejectedQty: { increment: item.rejectedQty ?? 0 } },
-        });
-
-        if (item.receivedQty > 0) {
-          await this.inventoryService.adjustStock(tenantId, receiveBranchId, userId, {
-            variantId: poItem.variantId,
-            quantity: item.receivedQty,
-            movementType: StockMovementType.PURCHASE,
-            referenceId: poId,
-            referenceType: 'PurchaseOrder',
-          }, tx);
-        }
-      }
-
-      const allReceived = await tx.purchaseOrderItem.findMany({ where: { purchaseId: poId } });
-      const fullyReceived = allReceived.every((i) => i.receivedQty >= i.orderedQty);
-      const anyReceived = allReceived.some((i) => i.receivedQty > 0);
-
-      await tx.purchaseOrder.update({
-        where: { id: poId },
-        data: {
-          status: fullyReceived
-            ? PurchaseOrderStatus.RECEIVED
-            : anyReceived
-              ? PurchaseOrderStatus.PARTIALLY_RECEIVED
-              : po.status,
-          receivedDate: fullyReceived ? new Date() : undefined,
-        },
-      });
-    });
-
-    return this.prisma.purchaseOrder.findUnique({ where: { id: poId }, include: { items: true } });
+    // Phase 3: PO receive creates a formal GoodsReceipt (GRN from PO) + partial receive status
+    const result = await this.procurementService.receiveFromPurchaseOrder(poId, tenantId, branchId, userId, items);
+    // Backward-compatible shape for existing UI, plus grn document
+    return { ...result.purchaseOrder, grn: result.grn };
   }
 
   async getReorderSuggestions(tenantId: string, branchId?: string) {
@@ -505,11 +455,182 @@ export class PurchasesController {
 
 }
 
+// ── Phase 3 Procurement DTOs ──────────────────────────────────────────
+
+export class CreatePurchaseRequestDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiProperty({ type: 'array' }) @IsArray() items: PrItemInput[];
+}
+
+export class ConvertPrDto {
+  @ApiProperty() @IsString() supplierId: string;
+}
+
+export class DirectGrnDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() supplierInvoiceRef?: string;
+  @ApiProperty({ type: 'array' }) @IsArray() lines: GrnLineInput[];
+}
+
+export class QuickGrnLineDto {
+  @ApiProperty() @IsString() variantId: string;
+  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
+}
+
+export class QuickGrnDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiProperty({ type: [QuickGrnLineDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => QuickGrnLineDto)
+  lines: QuickGrnLineDto[];
+}
+
+export class CreateSupplierReturnDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() goodsReceiptId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reason?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiProperty({ type: 'array' }) @IsArray() items: {
+    variantId: string; productName: string; sku: string; quantity: number;
+    unitCost?: number; lotId?: string; batchNumber?: string; reason?: string;
+  }[];
+}
+
+export class CreateSupplierInvoiceDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiProperty() @IsString() invoiceNumber: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() invoiceDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() dueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() goodsReceiptId?: string;
+  @ApiProperty() @IsNumber() @Min(0) subtotal: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() taxAmount?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() post?: boolean;
+}
+
+export class PayInvoiceDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+@ApiTags('Procurement')
+@ApiBearerAuth('access-token')
+@Controller({ path: 'procurement', version: '1' })
+export class ProcurementController {
+  constructor(private readonly procurement: ProcurementService) {}
+
+  // Purchase Requests
+  @Post('purchase-requests')
+  @RequirePermissions('purchases:create')
+  @ApiOperation({ summary: 'Create purchase request' })
+  createPr(@CurrentUser() user: IAuthUser, @Body() dto: CreatePurchaseRequestDto) {
+    return this.procurement.createPurchaseRequest(user.tenantId, user.branchId ?? '', user.id, dto.items, dto.notes);
+  }
+
+  @Get('purchase-requests')
+  @RequirePermissions('purchases:read')
+  listPr(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { status?: PurchaseRequestStatus }) {
+    return this.procurement.listPurchaseRequests(user.tenantId, query);
+  }
+
+  @Get('purchase-requests/:id')
+  @RequirePermissions('purchases:read')
+  getPr(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.procurement.getPurchaseRequest(id, user.tenantId);
+  }
+
+  @Post('purchase-requests/:id/submit-approval')
+  @RequirePermissions('purchases:update')
+  submitPr(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.procurement.submitPurchaseRequest(id, user.tenantId, user.id, user.roles);
+  }
+
+  @Post('purchase-requests/:id/convert')
+  @RequirePermissions('purchases:create')
+  @ApiOperation({ summary: 'Convert approved PR to draft PO' })
+  convertPr(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: ConvertPrDto) {
+    return this.procurement.convertPurchaseRequestToPo(id, user.tenantId, user.branchId ?? '', user.id, dto.supplierId);
+  }
+
+  // GRN
+  @Get('grn')
+  @RequirePermissions('purchases:read')
+  listGrn(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { purchaseId?: string }) {
+    return this.procurement.listGoodsReceipts(user.tenantId, query);
+  }
+
+  @Get('grn/:id')
+  @RequirePermissions('purchases:read')
+  getGrn(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.procurement.getGoodsReceipt(id, user.tenantId);
+  }
+
+  @Post('grn/direct')
+  @RequirePermissions('purchases:create')
+  @ApiOperation({ summary: 'Direct GRN without purchase order' })
+  directGrn(@CurrentUser() user: IAuthUser, @Body() dto: DirectGrnDto) {
+    return this.procurement.createDirectGrn(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Post('grn/quick')
+  @RequirePermissions('purchases:create')
+  @ApiOperation({ summary: 'Quick GRN for cashier / walk-in supplier stock' })
+  quickGrn(@CurrentUser() user: IAuthUser, @Body() dto: QuickGrnDto) {
+    return this.procurement.createQuickGrn(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  // Supplier Returns
+  @Post('supplier-returns')
+  @RequirePermissions('purchases:create')
+  createReturn(@CurrentUser() user: IAuthUser, @Body() dto: CreateSupplierReturnDto) {
+    return this.procurement.createSupplierReturn(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('supplier-returns')
+  @RequirePermissions('purchases:read')
+  listReturns(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto) {
+    return this.procurement.listSupplierReturns(user.tenantId, query);
+  }
+
+  @Post('supplier-returns/:id/post')
+  @RequirePermissions('purchases:update')
+  postReturn(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.procurement.postSupplierReturn(id, user.tenantId, user.id);
+  }
+
+  // Supplier Invoices
+  @Post('supplier-invoices')
+  @RequirePermissions('purchases:create')
+  createInvoice(@CurrentUser() user: IAuthUser, @Body() dto: CreateSupplierInvoiceDto) {
+    return this.procurement.createSupplierInvoice(user.tenantId, user.id, dto);
+  }
+
+  @Get('supplier-invoices')
+  @RequirePermissions('purchases:read')
+  listInvoices(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { supplierId?: string }) {
+    return this.procurement.listSupplierInvoices(user.tenantId, query);
+  }
+
+  @Post('supplier-invoices/:id/pay')
+  @RequirePermissions('purchases:update')
+  payInvoice(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: PayInvoiceDto) {
+    return this.procurement.paySupplierInvoice(id, user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+}
+
 @Module({
   imports: [InventoryModule, WorkflowModule],
-  controllers: [SuppliersController, PurchasesController],
-  providers: [SuppliersService],
-  exports: [SuppliersService],
+  controllers: [SuppliersController, PurchasesController, ProcurementController],
+  providers: [SuppliersService, ProcurementService],
+  exports: [SuppliersService, ProcurementService],
 })
 export class SuppliersModule {}
 

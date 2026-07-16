@@ -21,7 +21,7 @@ import { formatNumber } from "@/lib/utils";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CATEGORIES = ["Payroll", "Rent", "Utilities", "Marketing", "Operations", "Assets", "Logistics", "Maintenance", "Other"];
-const PAY_METHODS = ["CASH", "BANK_TRANSFER", "CREDIT_CARD", "CHEQUE", "ONLINE"];
+const PAY_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "CHEQUE", "UPI", "WALLET"];
 const CAT_COLORS = ["#6366f1", "#f43f5e", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
 // ── Date presets ───────────────────────────────────────────────────────────────

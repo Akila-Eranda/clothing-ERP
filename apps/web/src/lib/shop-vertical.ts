@@ -52,13 +52,19 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/categories': 'Categories',
     '/brands': brandRouteLabel,
     '/inventory': 'Inventory',
+    '/inventory/expiry': 'Expiry Management',
+    '/warehouse': 'Warehouse',
     '/workflows': 'Approval Workflows',
     '/advanced': 'ERP Roadmap',
     '/customers': customersTitle,
     '/suppliers': supplierRouteLabel,
     '/purchases': 'Purchase Orders',
+    '/purchases/procurement': 'Procurement Hub',
     '/hr': 'HR & Payroll',
     '/accounting': 'Accounting',
+    '/accounting/finance': 'Finance Hub',
+    '/accounting/credit': 'Customer Credit',
+    '/calendar': 'Business Calendar',
     '/cash': 'Cash Management',
     '/expenses': 'Expenses',
     '/branches': 'Branches',
@@ -110,11 +116,12 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     '/workflows': 'Workflows',
     '/customers': ws.customerLabel,
     '/purchases': 'Purchases',
+    '/purchases/procurement': 'Procurement Hub',
     '/reports': 'Reports',
     '/promotions': 'Promotions',
     '/brands': brandShort[profile.type] ?? brand.pageTitle,
     '/suppliers': supplierShort[profile.type] ?? supplier.pageTitle,
-    '/vehicles': profile.type === ShopType.SPARE_PARTS || profile.type === ShopType.TIRE_SHOP ? 'Vehicles' : 'Vehicle Compat.',
+    '/vehicles': 'Vehicles',
     '/warranty': 'Warranty',
     '/quotations': 'Quotations',
     '/job-cards': 'Job Cards',
@@ -139,13 +146,17 @@ export function getSidebarSectionTitles(profile: ShopProfile) {
     : 'SALES';
 
   return {
-    overview: 'OVERVIEW',
-    sales,
-    products: product,
-    procurement: 'PROCUREMENT',
-    finance: 'FINANCE',
-    reports: 'REPORTS',
-    hr: 'HR & STAFF',
+    overview: 'Overview',
+    sales: sales === 'SALES & POS' ? 'Sales & POS' : 'Sales',
+    products: product === 'TYRES & STOCK' ? 'Tyres & Stock'
+      : product === 'PARTS & STOCK' ? 'Parts & Stock'
+      : product === 'AGRI PRODUCTS' ? 'Agri Products'
+      : product === 'ITEMS & STOCK' ? 'Items & Stock'
+      : 'Products',
+    procurement: 'Procurement',
+    finance: 'Finance',
+    reports: 'Reports',
+    hr: 'HR & Staff',
   };
 }
 

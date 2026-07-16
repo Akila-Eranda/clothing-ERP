@@ -16,7 +16,8 @@ import type { Customer } from "./add-customer-modal";
 interface SaleItem { id: string; invoiceNumber: string; invoiceDate: string; total: number; status: string; _count: { items: number } }
 interface LoyaltyTxn { id: string; points: number; type: string; description?: string | null; createdAt: string }
 interface WalletTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
-interface CreditTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string }
+interface CreditTxn  { id: string; amount: number; type: string; description?: string | null; createdAt: string; dueDate?: string | null; status?: string; paidAmount?: number }
+
 interface CustomerVehicleRow {
   id: string; registrationNo?: string | null; make?: string | null; model?: string | null;
   year?: number | null; vin?: string | null; notes?: string | null; isPrimary: boolean;
@@ -28,6 +29,7 @@ interface FullCustomer extends Customer {
   loyaltyTxns: LoyaltyTxn[];
   walletTxns: WalletTxn[];
   creditTxns: CreditTxn[];
+  creditDays?: number;
 }
 
 interface Props { customerId: string | null; onClose: () => void; onEdit: (c: Customer) => void; }
@@ -55,6 +57,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const [walletInput, setWalletInput] = useState("");
   const [creditPayInput, setCreditPayInput] = useState("");
   const [creditLimitInput, setCreditLimitInput] = useState("");
+  const [creditDaysInput, setCreditDaysInput] = useState("30");
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -64,6 +67,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       .then((r) => {
         setCustomer(r.data);
         setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
+        setCreditDaysInput(String(r.data.creditDays ?? 30));
       })
       .catch(() => toast.error("Failed to load customer"))
       .finally(() => setLoading(false));
@@ -127,6 +131,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     const r = await api.get<FullCustomer>(`/customers/${customerId}`);
     setCustomer(r.data);
     setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
+    setCreditDaysInput(String(r.data.creditDays ?? 30));
   };
 
   const receiveCreditPayment = async () => {
@@ -152,6 +157,18 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       toast.success("Credit limit updated");
       await reloadCustomer();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to update credit limit"); }
+    finally { setActionLoading(false); }
+  };
+
+  const saveCreditDays = async () => {
+    const days = parseInt(creditDaysInput, 10);
+    if (!customer || isNaN(days) || days < 0) { toast.error("Enter valid credit days"); return; }
+    setActionLoading(true);
+    try {
+      await api.put(`/customers/${customer.id}/credit/days`, { creditDays: days });
+      toast.success("Payment terms updated");
+      await reloadCustomer();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to update credit days"); }
     finally { setActionLoading(false); }
   };
 
@@ -392,6 +409,15 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <Button onClick={saveCreditLimit} disabled={actionLoading} variant="outline" className="shrink-0">Save</Button>
                 </div>
               </div>
+              <div className="rounded-xl border p-3 space-y-2">
+                <p className="text-xs font-semibold">Payment Terms (days)</p>
+                <div className="flex gap-2">
+                  <Input type="number" min={0} step={1} placeholder="e.g. 30" value={creditDaysInput}
+                    onChange={(e) => setCreditDaysInput(e.target.value)} />
+                  <Button onClick={saveCreditDays} disabled={actionLoading} variant="outline" className="shrink-0">Save</Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">Due date = sale date + credit days</p>
+              </div>
               {customer.creditBalance > 0 && (
                 <div className="flex gap-2">
                   <Input type="number" min={0.01} max={customer.creditBalance} step={0.01} placeholder="Payment amount (LKR)…" value={creditPayInput}
@@ -410,7 +436,11 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <div key={txn.id} className="flex items-center justify-between p-2.5 rounded-lg border text-sm">
                     <div>
                       <p className="font-medium text-xs">{txn.description ?? txn.type}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(txn.createdAt).toLocaleDateString("en-LK")}</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {new Date(txn.createdAt).toLocaleDateString("en-LK")}
+                        {txn.dueDate ? ` · Due ${new Date(txn.dueDate).toLocaleDateString("en-LK")}` : ""}
+                        {txn.status ? ` · ${txn.status}` : ""}
+                      </p>
                     </div>
                     <span className={`font-bold text-sm ${txn.type === "PAYMENT" ? "text-emerald-500" : "text-amber-500"}`}>
                       {txn.type === "PAYMENT" ? "-" : "+"}LKR {formatNumber(txn.amount)}

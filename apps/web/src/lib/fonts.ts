@@ -1,11 +1,11 @@
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 
-/** Primary UI font — dashboard, admin, auth, POS chrome */
-export const fontSans = Plus_Jakarta_Sans({
+/** Primary UI font — English-only, full Latin glyph coverage */
+export const fontSans = Inter({
   variable: "--font-sans",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700", "800"],
+  subsets: ["latin", "latin-ext"],
   display: "swap",
+  adjustFontFallback: true,
 });
 
 /** SKUs, codes, invoice numbers */

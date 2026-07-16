@@ -7,7 +7,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, StockMovementType, TransferStatus, CashRegisterStatus, QuotationStatus,
+  WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, PurchaseRequestStatus, StockMovementType, TransferStatus, CashRegisterStatus, QuotationStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -52,6 +52,12 @@ export class WorkflowService {
         steps: [
           { name: 'Manager Review', approverRole: 'BRANCH_MANAGER' },
           { name: 'Finance Approval', approverRole: 'ACCOUNTANT' },
+        ],
+      },
+      purchase_request: {
+        name: 'Purchase Request Approval',
+        steps: [
+          { name: 'Manager Review', approverRole: 'BRANCH_MANAGER' },
         ],
       },
       stock_adjustment: {
@@ -188,6 +194,7 @@ export class WorkflowService {
 
   private readonly catalogKeys = [
     'purchase_order',
+    'purchase_request',
     'stock_adjustment',
     'discount_request',
     'stock_transfer',
@@ -207,6 +214,7 @@ export class WorkflowService {
           status: 'active' as const,
           triggerFrom: {
             purchase_order: 'Purchases → Submit for approval',
+            purchase_request: 'Purchase Requests → Submit for approval',
             stock_adjustment: 'Inventory → Adjust stock (manual)',
             discount_request: 'POS → Manager discount override',
             stock_transfer: 'Inventory → Stock transfer',
@@ -384,6 +392,11 @@ export class WorkflowService {
           where: { id: entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
           data: { status: PurchaseOrderStatus.CONFIRMED },
         });
+      } else if (entityType === 'PurchaseRequest') {
+        await this.prisma.purchaseRequest.updateMany({
+          where: { id: entityId, tenantId, status: PurchaseRequestStatus.PENDING_APPROVAL },
+          data: { status: PurchaseRequestStatus.APPROVED, approvedBy: userId },
+        });
       } else if (entityType === 'StockAdjustment') {
         await this.applyApprovedStockAdjustment(
           tenantId,
@@ -459,6 +472,11 @@ export class WorkflowService {
         await this.prisma.purchaseOrder.updateMany({
           where: { id: entityId, tenantId, status: PurchaseOrderStatus.PENDING_APPROVAL },
           data: { status: PurchaseOrderStatus.DRAFT },
+        });
+      } else if (entityType === 'PurchaseRequest') {
+        await this.prisma.purchaseRequest.updateMany({
+          where: { id: entityId, tenantId, status: PurchaseRequestStatus.PENDING_APPROVAL },
+          data: { status: PurchaseRequestStatus.REJECTED },
         });
       } else if (entityType === 'StockTransfer') {
         await this.prisma.stockTransfer.updateMany({

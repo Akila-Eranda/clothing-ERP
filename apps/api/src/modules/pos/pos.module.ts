@@ -4,11 +4,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNested, IsBoolean, IsObject, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -16,7 +16,9 @@ import { InventoryService } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } from './pos-sale.helpers';
+import { applyGiftVoucherRedeem, computeHelperCommission, generateGiftVoucherCode } from './pos-phase6.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
+import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
 import { nanoid } from 'nanoid';
 import { recordSaleCashMovement, findOpenRegister, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import * as dayjs from 'dayjs';
@@ -67,6 +69,16 @@ export class CreateSaleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() heldBillId?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPartialPayment?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() applyTierDiscount?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() helperEmployeeId?: string;
+}
+
+export class IssueGiftVoucherDto {
+  @ApiProperty() @IsNumber() @Min(1) amount: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() code?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() issuedToName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() issuedToCustomerId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() expiresAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }
 
 export class HoldBillDto {
@@ -121,11 +133,11 @@ export class PosService {
     }
 
     let tierDiscount = 0;
-    let customerRecord: { id: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; tier: import('@prisma/client').CustomerTier } | null = null;
+    let customerRecord: { id: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
     if (dto.customerId) {
       customerRecord = await this.prisma.customer.findFirst({
         where: { id: dto.customerId, tenantId },
-        select: { id: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, tier: true },
+        select: { id: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, creditDays: true, tier: true },
       });
       if (!customerRecord) throw new BadRequestException('Customer not found');
       if (dto.applyTierDiscount !== false) {
@@ -185,6 +197,46 @@ export class PosService {
     const paymentStatus = isPartial ? PaymentStatus.PENDING : PaymentStatus.COMPLETED;
     const paymentMethods = dto.payments.map((p) => p.method);
 
+    let helperEmployeeId: string | undefined;
+    let helperName: string | undefined;
+    let helperCommission = 0;
+    if (dto.helperEmployeeId) {
+      const helper = await this.prisma.employee.findFirst({
+        where: { id: dto.helperEmployeeId, tenantId, isActive: true },
+        select: { id: true, firstName: true, lastName: true, commissionRate: true },
+      });
+      if (!helper) throw new BadRequestException('Helper employee not found');
+      helperEmployeeId = helper.id;
+      helperName = `${helper.firstName} ${helper.lastName}`.trim();
+      helperCommission = computeHelperCommission(amountDue, helper.commissionRate ?? 0);
+    }
+
+    // Pre-validate gift voucher payments
+    const giftPays = dto.payments.filter((p) => p.method === PaymentMethod.GIFT_VOUCHER);
+    const giftUpdates: { id: string; applied: number; remainingBalance: number; status: GiftVoucherStatus }[] = [];
+    for (const gp of giftPays) {
+      const code = (gp.reference ?? '').trim().toUpperCase();
+      if (!code) throw new BadRequestException('Gift voucher code required in payment reference');
+      const voucher = await this.prisma.giftVoucher.findFirst({
+        where: { tenantId, code, status: { in: [GiftVoucherStatus.ACTIVE, GiftVoucherStatus.PARTIALLY_USED] } },
+      });
+      if (!voucher) throw new BadRequestException(`Gift voucher not found: ${code}`);
+      if (voucher.expiresAt && voucher.expiresAt < new Date()) {
+        throw new BadRequestException(`Gift voucher expired: ${code}`);
+      }
+      const redeem = applyGiftVoucherRedeem(voucher.balance, gp.amount, gp.amount);
+      if (!redeem.ok) throw new BadRequestException(redeem.reason);
+      if (Math.abs(redeem.applied - gp.amount) > 0.02) {
+        throw new BadRequestException(`Gift voucher ${code} can only apply LKR ${redeem.applied.toFixed(2)}`);
+      }
+      giftUpdates.push({
+        id: voucher.id,
+        applied: redeem.applied,
+        remainingBalance: redeem.remainingBalance,
+        status: redeem.status as GiftVoucherStatus,
+      });
+    }
+
     const sale = await this.prisma.$transaction(async (tx) => {
       await this.inventoryService.assertSaleStockAvailable(
         tenantId,
@@ -200,6 +252,9 @@ export class PosService {
           branchId,
           customerId: dto.customerId,
           cashierId,
+          helperEmployeeId,
+          helperName,
+          helperCommission,
           invoiceNumber,
           status: SaleStatus.COMPLETED,
           subtotal,
@@ -220,6 +275,7 @@ export class PosService {
             tierDiscount,
             paymentSummary: buildPaymentsSummary(paymentMethods),
             partialBalance: isPartial ? amountDue - totalPaid : 0,
+            helperCommission,
           },
           items: {
             create: dto.items.map((item) => {
@@ -259,6 +315,16 @@ export class PosService {
           customer: true,
         },
       });
+
+      for (const gu of giftUpdates) {
+        await tx.giftVoucher.update({
+          where: { id: gu.id },
+          data: {
+            balance: gu.remainingBalance,
+            status: gu.status,
+          },
+        });
+      }
 
       if (promotionId) {
         await tx.promotion.update({
@@ -303,6 +369,9 @@ export class PosService {
               tenantId,
               amount: creditIncrement,
               type: 'CHARGE',
+              status: 'OPEN',
+              paidAmount: 0,
+              dueDate: computeChargeDueDate(new Date(), customerRecord.creditDays ?? 30),
               description: `POS sale ${invoiceNumber}`,
               referenceId: created.id,
             },
@@ -466,7 +535,7 @@ export class PosService {
         where,
         skip,
         take: limit,
-        include: { customer: true, cashier: true, _count: { select: { items: true } } },
+        include: { customer: true, cashier: true, payments: true, _count: { select: { items: true } } },
         orderBy: { invoiceDate: 'desc' },
       }),
       this.prisma.sale.count({ where }),
@@ -806,6 +875,139 @@ export class PosService {
     });
     return `${prefix}-${date}-${String(count + 1).padStart(4, '0')}`;
   }
+
+  async listHelpers(tenantId: string, branchId?: string) {
+    return this.prisma.employee.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        ...(branchId ? { OR: [{ branchId }, { branchId: null }] } : {}),
+      },
+      select: {
+        id: true,
+        code: true,
+        firstName: true,
+        lastName: true,
+        commissionRate: true,
+        designation: true,
+      },
+      orderBy: { firstName: 'asc' },
+      take: 100,
+    });
+  }
+
+  async issueGiftVoucher(
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: IssueGiftVoucherDto,
+  ) {
+    const code = (dto.code?.trim() || generateGiftVoucherCode()).toUpperCase();
+    const existing = await this.prisma.giftVoucher.findFirst({ where: { tenantId, code } });
+    if (existing) throw new BadRequestException('Voucher code already exists');
+    return this.prisma.giftVoucher.create({
+      data: {
+        tenantId,
+        branchId: branchId || undefined,
+        code,
+        initialAmount: dto.amount,
+        balance: dto.amount,
+        status: GiftVoucherStatus.ACTIVE,
+        issuedToName: dto.issuedToName,
+        issuedToCustomerId: dto.issuedToCustomerId,
+        expiresAt: dto.expiresAt ? new Date(dto.expiresAt) : undefined,
+        notes: dto.notes,
+        createdBy: userId,
+      },
+    });
+  }
+
+  async validateGiftVoucher(tenantId: string, code: string, amountDue = 0) {
+    const voucher = await this.prisma.giftVoucher.findFirst({
+      where: { tenantId, code: code.trim().toUpperCase() },
+    });
+    if (!voucher) return { valid: false, reason: 'Voucher not found' };
+    if (voucher.status === GiftVoucherStatus.CANCELLED || voucher.status === GiftVoucherStatus.REDEEMED) {
+      return { valid: false, reason: `Voucher is ${voucher.status}` };
+    }
+    if (voucher.expiresAt && voucher.expiresAt < new Date()) {
+      return { valid: false, reason: 'Voucher expired' };
+    }
+    if (voucher.balance <= 0) return { valid: false, reason: 'No balance remaining' };
+    const redeem = applyGiftVoucherRedeem(voucher.balance, amountDue > 0 ? amountDue : voucher.balance);
+    return {
+      valid: true,
+      code: voucher.code,
+      balance: voucher.balance,
+      initialAmount: voucher.initialAmount,
+      expiresAt: voucher.expiresAt,
+      maxApplicable: redeem.ok ? redeem.applied : voucher.balance,
+      status: voucher.status,
+    };
+  }
+
+  async listGiftVouchers(tenantId: string, query: { page?: number; limit?: number; status?: string }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 30;
+    const where = {
+      tenantId,
+      ...(query.status && { status: query.status as GiftVoucherStatus }),
+    };
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.giftVoucher.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.giftVoucher.count({ where }),
+    ]);
+    return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
+  }
+
+  async cashierShiftSummary(tenantId: string, branchId: string, cashierId: string, date?: string) {
+    const day = date ? dayjs(date) : dayjs();
+    const range = { gte: day.startOf('day').toDate(), lte: day.endOf('day').toDate() };
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const sales = await this.prisma.sale.findMany({
+      where: {
+        tenantId,
+        branchId: resolvedBranchId,
+        cashierId,
+        invoiceDate: range,
+        status: { not: SaleStatus.CANCELLED },
+      },
+      include: { payments: true, _count: { select: { items: true } } },
+      orderBy: { invoiceDate: 'asc' },
+    });
+    const revenue = sales.reduce((s, x) => s + x.total, 0);
+    const commission = sales.reduce((s, x) => s + (x.helperCommission || 0), 0);
+    const byMethod: Record<string, number> = {};
+    for (const sale of sales) {
+      for (const p of sale.payments) {
+        byMethod[p.method] = (byMethod[p.method] ?? 0) + p.amount;
+      }
+    }
+    const register = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
+    return {
+      date: day.format('YYYY-MM-DD'),
+      cashierId,
+      salesCount: sales.length,
+      itemsSold: sales.reduce((s, x) => s + x._count.items, 0),
+      revenue,
+      helperCommissionTotal: commission,
+      byPaymentMethod: byMethod,
+      sales: sales.map((s) => ({
+        id: s.id,
+        invoiceNumber: s.invoiceNumber,
+        total: s.total,
+        helperName: s.helperName,
+        helperCommission: s.helperCommission,
+        invoiceDate: s.invoiceDate,
+      })),
+      cashRegisterId: register?.id ?? null,
+    };
+  }
 }
 
 @ApiTags('POS')
@@ -906,6 +1108,47 @@ export class PosController {
     @Query('limit') limit?: string,
   ) {
     return this.posService.searchCustomers(user.tenantId, search, parseInt(limit ?? '20', 10) || 20);
+  }
+
+  @Get('helpers')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'List active employees for helper commission attribution' })
+  listHelpers(@CurrentUser() user: IAuthUser) {
+    return this.posService.listHelpers(user.tenantId, user.branchId ?? '');
+  }
+
+  @Get('shift-summary')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Cashier shift / current sales summary' })
+  shiftSummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
+    return this.posService.cashierShiftSummary(user.tenantId, user.branchId ?? '', user.id, date);
+  }
+
+  @Post('gift-vouchers')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Issue a gift voucher' })
+  issueGiftVoucher(@CurrentUser() user: IAuthUser, @Body() dto: IssueGiftVoucherDto) {
+    return this.posService.issueGiftVoucher(user.tenantId, user.branchId ?? '', user.id, dto);
+  }
+
+  @Get('gift-vouchers')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'List gift vouchers' })
+  listGiftVouchers(
+    @CurrentUser() user: IAuthUser,
+    @Query() query: { page?: number; limit?: number; status?: string },
+  ) {
+    return this.posService.listGiftVouchers(user.tenantId, query);
+  }
+
+  @Get('gift-vouchers/validate/:code')
+  @ApiOperation({ summary: 'Validate gift voucher balance for redeem' })
+  validateGiftVoucher(
+    @CurrentUser() user: IAuthUser,
+    @Param('code') code: string,
+    @Query('amount') amount?: string,
+  ) {
+    return this.posService.validateGiftVoucher(user.tenantId, code, parseFloat(amount ?? '0') || 0);
   }
 }
 

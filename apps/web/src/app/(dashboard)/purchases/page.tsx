@@ -23,7 +23,7 @@ const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: Rea
   PENDING_APPROVAL:   { label: "Pending Approval", variant: "warning", icon: Clock },
   CONFIRMED:          { label: "Ordered",  variant: "info",      icon: Clock },
   SENT:               { label: "Ordered",  variant: "info",      icon: Clock },
-  PARTIALLY_RECEIVED: { label: "Ordered",  variant: "info",      icon: Clock },
+  PARTIALLY_RECEIVED: { label: "Partial",  variant: "warning",   icon: Clock },
   RECEIVED:           { label: "Received", variant: "success",   icon: CheckCircle2 },
   CANCELLED:          { label: "Cancelled",variant: "danger",    icon: XCircle },
 };

@@ -2,9 +2,9 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsEnum, IsNumber, IsDateString, IsArray, Min, IsInt, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CustomerTier, Gender } from '@prisma/client';
+import { CustomerTier, Gender, NotificationChannel, CreditReminderStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -12,6 +12,7 @@ import * as dayjs from 'dayjs';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { CustomerCreditService } from './customer-credit.service';
 
 export class CreateCustomerDto {
   @ApiProperty() @IsString() firstName: string;
@@ -26,11 +27,35 @@ export class CreateCustomerDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) creditLimit?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) creditDays?: number;
+}
+
+export class CreateCreditScheduleDto {
+  @ApiProperty() @IsString() customerId: string;
+  @ApiProperty() @IsNumber() @Min(0.01) totalAmount: number;
+  @ApiProperty() @IsInt() @Min(1) installmentCount: number;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(1) intervalDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() chargeTxnId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class CreateCreditReminderDto {
+  @ApiProperty() @IsString() customerId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() title?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() message?: string;
+  @ApiPropertyOptional({ enum: NotificationChannel }) @IsOptional() @IsEnum(NotificationChannel) channel?: NotificationChannel;
+  @ApiPropertyOptional() @IsOptional() @IsString() chargeTxnId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() dueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() sendNow?: boolean;
 }
 
 @Injectable()
 export class CustomersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly credit: CustomerCreditService,
+  ) {}
 
   async create(tenantId: string, dto: CreateCustomerDto) {
     const existing = await this.prisma.customer.findFirst({ where: { tenantId, phone: dto.phone } });
@@ -50,6 +75,7 @@ export class CustomersService {
         address: dto.address, city: dto.city,
         notes: dto.notes, tags: dto.tags ?? [],
         creditLimit: dto.creditLimit ?? 0,
+        creditDays: dto.creditDays ?? 30,
       },
     });
   }
@@ -105,19 +131,7 @@ export class CustomersService {
   }
 
   async receiveCreditPayment(id: string, tenantId: string, amount: number, description: string) {
-    if (amount <= 0) throw new BadRequestException('Amount must be positive');
-    const customer = await this.prisma.customer.findFirst({ where: { id, tenantId } });
-    if (!customer) throw new NotFoundException('Customer not found');
-    if (amount > customer.creditBalance + 0.01) {
-      throw new BadRequestException(`Payment exceeds outstanding balance (LKR ${customer.creditBalance.toFixed(2)})`);
-    }
-    await this.prisma.$transaction([
-      this.prisma.customer.update({ where: { id }, data: { creditBalance: { decrement: amount } } }),
-      this.prisma.customerCreditTransaction.create({
-        data: { customerId: id, tenantId, amount, type: 'PAYMENT', description },
-      }),
-    ]);
-    return { creditBalance: customer.creditBalance - amount, creditLimit: customer.creditLimit };
+    return this.credit.receiveCreditPayment(id, tenantId, amount, description);
   }
 
   async setCreditLimit(id: string, tenantId: string, creditLimit: number) {
@@ -127,6 +141,15 @@ export class CustomersService {
       throw new BadRequestException('Credit limit cannot be less than outstanding balance');
     }
     return this.prisma.customer.update({ where: { id }, data: { creditLimit } });
+  }
+
+  async setCreditDays(id: string, tenantId: string, creditDays: number) {
+    if (creditDays < 0) throw new BadRequestException('creditDays cannot be negative');
+    await this.findOne(id, tenantId);
+    return this.prisma.customer.update({
+      where: { id },
+      data: { creditDays: Math.floor(creditDays) },
+    });
   }
 
   async topUpWallet(id: string, tenantId: string, amount: number, description: string) {
@@ -215,7 +238,10 @@ export class CustomersService {
 @ApiBearerAuth('access-token')
 @Controller({ path: 'customers', version: '1' })
 export class CustomersController {
-  constructor(private readonly customersService: CustomersService) {}
+  constructor(
+    private readonly customersService: CustomersService,
+    private readonly creditService: CustomerCreditService,
+  ) {}
 
   @Post()
   @RequirePermissions('customers:create')
@@ -233,6 +259,68 @@ export class CustomersController {
   @RequirePermissions('customers:read')
   getSegments(@CurrentUser() user: IAuthUser) {
     return this.customersService.getSegments(user.tenantId);
+  }
+
+  @Get('credit/customers')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'List credit customers with due dates' })
+  listCreditCustomers(@CurrentUser() user: IAuthUser) {
+    return this.creditService.listCreditCustomers(user.tenantId);
+  }
+
+  @Get('credit/schedules')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'List payment schedules' })
+  listSchedules(@CurrentUser() user: IAuthUser, @Query('customerId') customerId?: string) {
+    return this.creditService.listSchedules(user.tenantId, customerId);
+  }
+
+  @Post('credit/schedules')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Create installment payment schedule' })
+  createSchedule(@CurrentUser() user: IAuthUser, @Body() dto: CreateCreditScheduleDto) {
+    return this.creditService.createPaymentSchedule(user.tenantId, user.id, dto);
+  }
+
+  @Get('credit/reminders')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'List credit payment reminders' })
+  listReminders(@CurrentUser() user: IAuthUser, @Query('status') status?: CreditReminderStatus) {
+    return this.creditService.listReminders(user.tenantId, status);
+  }
+
+  @Post('credit/reminders')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Create / send credit reminder' })
+  createReminder(@CurrentUser() user: IAuthUser, @Body() dto: CreateCreditReminderDto) {
+    return this.creditService.createReminder(user.tenantId, user.id, dto);
+  }
+
+  @Post('credit/reminders/queue-overdue')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Queue reminders for all overdue credit customers' })
+  queueOverdue(@CurrentUser() user: IAuthUser) {
+    return this.creditService.queueOverdueReminders(user.tenantId, user.id);
+  }
+
+  @Post('credit/reminders/:id/send')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Send a pending credit reminder' })
+  sendReminder(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.creditService.sendReminder(id, user.tenantId, user.id);
+  }
+
+  @Get('credit/collection-report')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'Collection report for date range' })
+  collectionReport(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    const start = startDate ?? dayjs().startOf('month').format('YYYY-MM-DD');
+    const end = endDate ?? dayjs().format('YYYY-MM-DD');
+    return this.creditService.collectionReport(user.tenantId, start, end);
   }
 
   @Get('phone/:phone')
@@ -283,6 +371,13 @@ export class CustomersController {
     return this.customersService.setCreditLimit(id, user.tenantId, body.creditLimit);
   }
 
+  @Put(':id/credit/days')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Set customer credit payment terms (days)' })
+  setCreditDays(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() body: { creditDays: number }) {
+    return this.customersService.setCreditDays(id, user.tenantId, body.creditDays);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermissions('customers:delete')
@@ -293,7 +388,7 @@ export class CustomersController {
 
 @Module({
   controllers: [CustomersController],
-  providers: [CustomersService],
-  exports: [CustomersService],
+  providers: [CustomersService, CustomerCreditService],
+  exports: [CustomersService, CustomerCreditService],
 })
 export class CustomersModule {}

@@ -99,11 +99,17 @@ export default function AnalyticsPage() {
       api.get<BranchRow[]>(`/reports/branches?startDate=${start}&endDate=${end}`),
     ]);
     if (bs.status==="fulfilled") setBest(Array.isArray(bs.value.data) ? bs.value.data : []);
-    if (ca.status==="fulfilled") setCashier(Array.isArray(ca.value.data) ? ca.value.data : []);
+    if (ca.status==="fulfilled") {
+      const d = ca.value.data as CashierRow[] | { rows?: CashierRow[] };
+      setCashier(Array.isArray(d) ? d : Array.isArray(d?.rows) ? d.rows : []);
+    }
     if (pr.status==="fulfilled") setProfit(pr.value.data ?? null);
     if (mo.status==="fulfilled") setMonthly(Array.isArray(mo.value.data) ? mo.value.data : []);
     if (rv.status==="fulfilled") setRevPoints(Array.isArray(rv.value.data) ? rv.value.data : []);
-    if (br.status==="fulfilled") setBranches(Array.isArray(br.value.data) ? br.value.data : []);
+    if (br.status==="fulfilled") {
+      const d = br.value.data as BranchRow[] | { rows?: BranchRow[] };
+      setBranches(Array.isArray(d) ? d : Array.isArray(d?.rows) ? d.rows : []);
+    }
     else toast.error("Some analytics data failed to load");
     setLoading(false);
   }, [range.start, range.end]); // eslint-disable-line

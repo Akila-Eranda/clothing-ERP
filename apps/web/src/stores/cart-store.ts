@@ -72,17 +72,23 @@ export const useCartStore = create<CartStore>()(
 
       addItem: (newItem) =>
         set((state) => {
+          const qtyToAdd = Math.max(1, newItem.quantity || 1);
           const existing = state.items.find((i) => i.variantId === newItem.variantId);
           if (existing) {
             return {
               items: state.items.map((i) =>
                 i.variantId === newItem.variantId
-                  ? { ...i, quantity: Math.min(i.quantity + 1, i.stock) }
+                  ? { ...i, quantity: Math.min(i.quantity + qtyToAdd, i.stock) }
                   : i
               ),
             };
           }
-          return { items: [...state.items, { ...newItem, quantity: 1 }] };
+          return {
+            items: [
+              ...state.items,
+              { ...newItem, quantity: Math.min(qtyToAdd, Math.max(1, newItem.stock || qtyToAdd)) },
+            ],
+          };
         }),
 
       removeItem: (variantId) =>

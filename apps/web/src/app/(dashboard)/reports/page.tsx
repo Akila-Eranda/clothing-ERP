@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Package,
   RefreshCw, Printer, ArrowUpRight, ArrowDownRight, FileText,
@@ -38,6 +39,21 @@ interface Sale        { id: string; invoiceDate: string; total: number; status: 
 interface Customer    { id: string; firstName: string; lastName: string; phone: string; tier: string; totalSpent: number; totalOrders: number; loyaltyPoints: number; lastPurchaseAt: string | null }
 interface InvVariant  { sku: string; costPrice: number; sellingPrice: number; product: { name: string; category?: { name: string } | null } }
 interface InvItem     { id: string; quantity: number; variant: InvVariant }
+interface ExpiryRow {
+  lotId: string;
+  batchNumber: string | null;
+  expiryDate: string | null;
+  daysToExpiry: number | null;
+  status: string;
+  quantity: number;
+  availableQty: number;
+  value: number;
+  sku: string;
+  productName: string;
+  variantName: string;
+  category: string | null;
+  branch: string;
+}
 interface TaxRate     { taxRate: number; _sum: { taxAmount: number; total: number; quantity: number } }
 interface TaxReport   { summary: { total: number; taxAmount: number; subtotal: number; discountAmount: number } | null; count: number; byTaxRate: TaxRate[] }
 interface CashierRow  { cashierName: string; salesCount: number; totalRevenue: number; totalDiscount: number; totalTax: number }
@@ -52,13 +68,26 @@ const TIER_CFG: Record<string, { color: string; bg: string }> = {
   BRONZE:   { color: "text-orange-700", bg: "bg-orange-500/10" },
 };
 const TABS = [
-  { value: "overview",  label: "Overview"  },
-  { value: "sales",     label: "Sales"     },
-  { value: "customers", label: "Customers" },
-  { value: "inventory", label: "Inventory" },
-  { value: "financial", label: "Financial" },
-  { value: "tax",       label: "Tax"       },
+  { value: "overview",    label: "Overview" },
+  { value: "sales",       label: "Sales" },
+  { value: "purchases",   label: "Purchases" },
+  { value: "inventory",   label: "Inventory" },
+  { value: "suppliers",   label: "Suppliers" },
+  { value: "customers",   label: "Customers" },
+  { value: "cashier",     label: "Cashier" },
+  { value: "branches",    label: "Branches" },
+  { value: "tax",         label: "Tax" },
+  { value: "expiry",      label: "Expiry" },
+  { value: "cheques",     label: "Cheques" },
+  { value: "commission",  label: "Commission" },
+  { value: "financial",   label: "Financial" },
 ];
+
+function unwrapRows<T>(data: T[] | { rows?: T[] } | null | undefined): T[] {
+  if (Array.isArray(data)) return data;
+  if (data && Array.isArray(data.rows)) return data.rows;
+  return [];
+}
 
 // ── Date helpers ──────────────────────────────────────────────────────────
 const fmtDate = (d: Date) => d.toISOString().split("T")[0];
@@ -83,9 +112,13 @@ function invUnitCost(v?: InvVariant | null) { return v?.costPrice ?? 0; }
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function ReportsPage() {
+  const searchParams = useSearchParams();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const activeBranchName = useBranchStore((s) => s.activeBranchName);
-  const [activeTab, setActiveTab]   = useState("overview");
+  const initialTab = TABS.some((t) => t.value === searchParams.get("tab"))
+    ? (searchParams.get("tab") as string)
+    : "overview";
+  const [activeTab, setActiveTab]   = useState(initialTab);
   const [range, setRange]           = useState({ label: "This Month", start: monthStart(), end: today() });
   const [loading, setLoading]       = useState(true);
   const [pl,          setPL]        = useState<PLReport | null>(null);
@@ -95,8 +128,17 @@ export default function ReportsPage() {
   const [salesData,   setSalesData] = useState<Sale[]>([]);
   const [customers,   setCusts]     = useState<Customer[]>([]);
   const [inventory,   setInv]       = useState<InvItem[]>([]);
+  const [expiryRows,  setExpiry]    = useState<ExpiryRow[]>([]);
   const [taxReport,   setTax]       = useState<TaxReport | null>(null);
   const [cashiers,    setCashiers]  = useState<CashierRow[]>([]);
+  const [branches,    setBranches]  = useState<{ branchName: string; branchCode: string; salesCount: number; totalRevenue: number; totalTax: number; totalDiscount: number }[]>([]);
+  const [purchases,   setPurchases] = useState<{ poNumber: string; supplierName: string; status: string; total: number; paidAmount: number; outstanding: number; orderDate: string }[]>([]);
+  const [purchaseSum, setPurchaseSum] = useState<{ orderCount: number; total: number; paidAmount: number; outstanding: number; paymentsTotal: number } | null>(null);
+  const [suppliers,   setSuppliers] = useState<{ name: string; phone: string; totalPaid: number; paymentCount: number; _count?: { purchases: number } }[]>([]);
+  const [cheques,     setCheques]   = useState<{ chequeNumber: string; direction: string; status: string; amount: number; partyName: string | null; dueDate: string | null }[]>([]);
+  const [chequeSum,   setChequeSum] = useState<{ count: number; totalAmount: number; overdue: number; dueSoon: number } | null>(null);
+  const [commRows,    setCommRows]  = useState<{ helperName: string; salesCount: number; salesTotal: number; commissionTotal: number }[]>([]);
+  const [commSum,     setCommSum]   = useState<{ helpers: number; salesCount: number; salesTotal: number; commissionTotal: number } | null>(null);
 
   const branchQ = activeBranchId ? `&branchId=${activeBranchId}` : "";
 
@@ -104,26 +146,41 @@ export default function ReportsPage() {
     setLoading(true);
     try {
       const { start, end } = range;
-      const [plR, mplR, cfR, expR, salR, custR, invR, taxR, cashR] = await Promise.all([
+      const [plR, mplR, cfR, expR, salR, custR, invR, taxR, cashR, expLotR, brR, poR, supR, chqR, comR] = await Promise.all([
         api.get<PLReport>    (`/accounting/profit-loss?startDate=${start}&endDate=${end}`),
         api.get<MonthlyPL[]> (`/accounting/monthly-pl?months=12`),
         api.get<CashFlow>    (`/accounting/cash-flow?startDate=${start}&endDate=${end}`),
         api.get<ExpSummary>  (`/accounting/expenses/summary?startDate=${start}&endDate=${end}`),
         api.get<Sale[]>      (`/reports/sales?startDate=${start}&endDate=${end}${branchQ}`),
-        api.get<Customer[]>  (`/reports/customers`),
-        api.get<InvItem[]>   (`/reports/inventory${activeBranchId ? `?branchId=${activeBranchId}` : ""}`),
+        api.get<{ rows?: Customer[] } | Customer[]>(`/reports/customers`),
+        api.get<{ rows?: InvItem[] } | InvItem[]>(`/reports/inventory${activeBranchId ? `?branchId=${activeBranchId}` : ""}`),
         api.get<TaxReport>   (`/reports/tax?startDate=${start}&endDate=${end}${branchQ}`),
-        api.get<CashierRow[]>(`/reports/cashier?startDate=${start}&endDate=${end}${branchQ}`),
+        api.get<{ rows?: CashierRow[] } | CashierRow[]>(`/reports/cashier?startDate=${start}&endDate=${end}${branchQ}`),
+        api.get<{ summary?: unknown; rows?: ExpiryRow[] } | ExpiryRow[]>(`/reports/expiry?withinDays=90${branchQ}`),
+        api.get<{ rows?: { branchName: string; branchCode: string; salesCount: number; totalRevenue: number; totalTax: number; totalDiscount: number }[] }>(`/reports/branches?startDate=${start}&endDate=${end}`),
+        api.get<{ summary?: { orderCount: number; total: number; paidAmount: number; outstanding: number; paymentsTotal: number }; rows?: { poNumber: string; supplierName: string; status: string; total: number; paidAmount: number; outstanding: number; orderDate: string }[] }>(`/reports/purchases?startDate=${start}&endDate=${end}${branchQ}`),
+        api.get<{ rows?: { name: string; phone: string; totalPaid: number; paymentCount: number; _count?: { purchases: number } }[] }>(`/reports/suppliers`),
+        api.get<{ summary?: { count: number; totalAmount: number; overdue: number; dueSoon: number }; rows?: { chequeNumber: string; direction: string; status: string; amount: number; partyName: string | null; dueDate: string | null }[] }>(`/reports/cheques?startDate=${start}&endDate=${end}`),
+        api.get<{ summary?: { helpers: number; salesCount: number; salesTotal: number; commissionTotal: number }; rows?: { helperName: string; salesCount: number; salesTotal: number; commissionTotal: number }[] }>(`/reports/commission?startDate=${start}&endDate=${end}${branchQ}`),
       ]);
       setPL(plR.data);
       setMonthlyPL(Array.isArray(mplR.data) ? mplR.data : []);
       setCashFlow(cfR.data);
       setExpSummary(expR.data);
       setSalesData(Array.isArray(salR.data) ? salR.data : []);
-      setCusts(Array.isArray(custR.data) ? custR.data : []);
-      setInv(Array.isArray(invR.data) ? invR.data : []);
+      setCusts(unwrapRows(custR.data));
+      setInv(unwrapRows(invR.data));
       setTax(taxR.data);
-      setCashiers(Array.isArray(cashR.data) ? cashR.data : []);
+      setCashiers(unwrapRows(cashR.data));
+      setExpiry(unwrapRows(expLotR.data as { rows?: ExpiryRow[] } | ExpiryRow[]));
+      setBranches(unwrapRows(brR.data));
+      setPurchases(unwrapRows(poR.data));
+      setPurchaseSum(poR.data && !Array.isArray(poR.data) ? poR.data.summary ?? null : null);
+      setSuppliers(unwrapRows(supR.data));
+      setCheques(unwrapRows(chqR.data));
+      setChequeSum(chqR.data && !Array.isArray(chqR.data) ? chqR.data.summary ?? null : null);
+      setCommRows(unwrapRows(comR.data));
+      setCommSum(comR.data && !Array.isArray(comR.data) ? comR.data.summary ?? null : null);
     } catch { toast.error("Failed to load report data"); }
     finally { setLoading(false); }
   }, [range.start, range.end, branchQ, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -195,14 +252,14 @@ export default function ReportsPage() {
         {/* Nav */}
         <div className="bg-card border-b sticky top-0 z-10">
           <div className="px-6 flex items-center justify-between h-14">
-            <TabsList className="h-14 bg-transparent p-0 gap-0 rounded-none border-none">
-              <span className="text-sm font-bold mr-5 text-foreground">Reports & Analytics</span>
+            <TabsList className="h-auto min-h-14 bg-transparent p-0 gap-0 rounded-none border-none flex flex-wrap items-center">
+              <span className="text-sm font-bold mr-3 text-foreground py-2">Reports</span>
               {activeBranchName && (
-                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mr-3">{activeBranchName}</span>
+                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full mr-2">{activeBranchName}</span>
               )}
               {TABS.map((t) => (
                 <TabsTrigger key={t.value} value={t.value}
-                  className="h-14 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors">
+                  className="h-10 px-2.5 rounded-none text-xs font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors">
                   {t.label}
                 </TabsTrigger>
               ))}
@@ -674,6 +731,316 @@ export default function ReportsPage() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* ══════════════════════ PURCHASES ══════════════════════ */}
+          <TabsContent value="purchases" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "PO Count", val: purchaseSum?.orderCount ?? purchases.length, curr: false },
+                { label: "PO Total", val: purchaseSum?.total ?? 0, curr: true },
+                { label: "Paid", val: purchaseSum?.paidAmount ?? 0, curr: true },
+                { label: "Outstanding", val: purchaseSum?.outstanding ?? 0, curr: true },
+              ].map((k) => (
+                <Card key={k.label} className="bg-card border shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
+                    <p className="text-xs text-muted-foreground">{k.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardHeader className="pb-0"><CardTitle className="text-sm font-semibold">Purchase Orders</CardTitle></CardHeader>
+              <CardContent className="p-0 mt-3">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["PO", "Supplier", "Date", "Status", "Total", "Paid", "Due"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {purchases.length ? purchases.map((p) => (
+                      <tr key={p.poNumber} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-mono">{p.poNumber}</td>
+                        <td className="px-4 py-2.5 text-xs">{p.supplierName}</td>
+                        <td className="px-4 py-2.5 text-xs">{p.orderDate ? new Date(p.orderDate).toLocaleDateString("en-LK") : "—"}</td>
+                        <td className="px-4 py-2.5 text-[10px] font-semibold">{p.status}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(p.total)}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(p.paidAmount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-amber-600">LKR {formatNumber(p.outstanding)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No purchases in range</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ SUPPLIERS ══════════════════════ */}
+          <TabsContent value="suppliers" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{suppliers.length}</p><p className="text-xs text-muted-foreground">Suppliers</p></CardContent></Card>
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{suppliers.reduce((s, r) => s + (r._count?.purchases ?? 0), 0)}</p><p className="text-xs text-muted-foreground">Purchase orders</p></CardContent></Card>
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">LKR {formatNumber(suppliers.reduce((s, r) => s + r.totalPaid, 0))}</p><p className="text-xs text-muted-foreground">Total paid</p></CardContent></Card>
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Supplier", "Phone", "POs", "Payments", "Paid"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {suppliers.length ? suppliers.map((s) => (
+                      <tr key={s.name + s.phone} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-medium">{s.name}</td>
+                        <td className="px-4 py-2.5 text-xs">{s.phone}</td>
+                        <td className="px-4 py-2.5 text-xs">{s._count?.purchases ?? 0}</td>
+                        <td className="px-4 py-2.5 text-xs">{s.paymentCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(s.totalPaid)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No suppliers</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ CASHIER ══════════════════════ */}
+          <TabsContent value="cashier" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Cashiers", val: cashiers.length },
+                { label: "Sales", val: cashiers.reduce((s, c) => s + c.salesCount, 0) },
+                { label: "Revenue", val: cashiers.reduce((s, c) => s + c.totalRevenue, 0), curr: true },
+                { label: "Tax", val: cashiers.reduce((s, c) => s + c.totalTax, 0), curr: true },
+              ].map((k) => (
+                <Card key={k.label} className="bg-card border shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
+                    <p className="text-xs text-muted-foreground">{k.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Cashier", "Sales", "Revenue", "Discount", "Tax"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {cashiers.length ? cashiers.map((c) => (
+                      <tr key={c.cashierName} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
+                        <td className="px-4 py-2.5 text-xs">{c.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(c.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(c.totalTax)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier sales in range</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ BRANCHES ══════════════════════ */}
+          <TabsContent value="branches" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{branches.length}</p><p className="text-xs text-muted-foreground">Branches with sales</p></CardContent></Card>
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">LKR {formatNumber(branches.reduce((s, b) => s + b.totalRevenue, 0))}</p><p className="text-xs text-muted-foreground">Total revenue</p></CardContent></Card>
+              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{branches.reduce((s, b) => s + b.salesCount, 0)}</p><p className="text-xs text-muted-foreground">Orders</p></CardContent></Card>
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Branch", "Code", "Sales", "Revenue", "Tax", "Discount"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {branches.length ? branches.map((b) => (
+                      <tr key={b.branchName + b.branchCode} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-medium">{b.branchName}</td>
+                        <td className="px-4 py-2.5 text-xs font-mono">{b.branchCode}</td>
+                        <td className="px-4 py-2.5 text-xs">{b.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(b.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(b.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(b.totalDiscount)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No branch sales in range</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ CHEQUES ══════════════════════ */}
+          <TabsContent value="cheques" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Cheques", val: chequeSum?.count ?? cheques.length, curr: false },
+                { label: "Total amount", val: chequeSum?.totalAmount ?? 0, curr: true },
+                { label: "Overdue", val: chequeSum?.overdue ?? 0, curr: true },
+                { label: "Due ≤7d", val: chequeSum?.dueSoon ?? 0, curr: true },
+              ].map((k) => (
+                <Card key={k.label} className="bg-card border shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
+                    <p className="text-xs text-muted-foreground">{k.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Cheque #", "Direction", "Party", "Due", "Status", "Amount"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {cheques.length ? cheques.map((c) => (
+                      <tr key={c.chequeNumber + c.status} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-mono">{c.chequeNumber}</td>
+                        <td className="px-4 py-2.5 text-xs">{c.direction}</td>
+                        <td className="px-4 py-2.5 text-xs">{c.partyName ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs">{c.dueDate ? new Date(c.dueDate).toLocaleDateString("en-LK") : "—"}</td>
+                        <td className="px-4 py-2.5 text-[10px] font-semibold">{c.status}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(c.amount)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No cheques in range</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ COMMISSION ══════════════════════ */}
+          <TabsContent value="commission" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Helpers", val: commSum?.helpers ?? commRows.length, curr: false },
+                { label: "Sales", val: commSum?.salesCount ?? 0, curr: false },
+                { label: "Sales total", val: commSum?.salesTotal ?? 0, curr: true },
+                { label: "Commission", val: commSum?.commissionTotal ?? 0, curr: true },
+              ].map((k) => (
+                <Card key={k.label} className="bg-card border shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
+                    <p className="text-xs text-muted-foreground">{k.label}</p>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardContent className="p-0">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Helper", "Sales", "Sales total", "Commission"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {commRows.length ? commRows.map((r) => (
+                      <tr key={r.helperName} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-medium">{r.helperName}</td>
+                        <td className="px-4 py-2.5 text-xs">{r.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(r.salesTotal)}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-emerald-600">LKR {formatNumber(r.commissionTotal)}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">No helper commission in range</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ══════════════════════ EXPIRY ══════════════════════ */}
+          <TabsContent value="expiry" className="m-0 space-y-5">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "Expired", val: expiryRows.filter((r) => r.status === "EXPIRED").length, bg: "bg-red-500" },
+                { label: "Critical (≤7d)", val: expiryRows.filter((r) => r.status === "CRITICAL").length, bg: "bg-amber-500" },
+                { label: "Warning (≤30d)", val: expiryRows.filter((r) => r.status === "WARNING").length, bg: "bg-orange-500" },
+                { label: "At-risk qty", val: expiryRows.reduce((s, r) => s + r.quantity, 0), bg: "bg-blue-600" },
+              ].map((k) => (
+                <Card key={k.label} className="bg-card border shadow-sm">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className={`${k.bg} rounded-lg p-2 shrink-0`}><AlertTriangle className="h-4 w-4 text-white" /></div>
+                    <div>
+                      <p className="text-lg font-bold">{k.val}</p>
+                      <p className="text-xs text-muted-foreground">{k.label}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <Card className="bg-card border shadow-sm">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold">Batch Expiry Report (90 days)</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Product", "Batch", "Expiry", "Days", "Qty", "Value", "Status"].map((h) => (
+                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {expiryRows.length ? expiryRows.map((r) => (
+                      <tr key={r.lotId} className="hover:bg-muted/50">
+                        <td className="px-4 py-2.5 text-xs font-medium">
+                          {r.productName}
+                          <span className="block text-[10px] text-muted-foreground font-mono">{r.sku}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-mono">{r.batchNumber ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs">{r.expiryDate ? new Date(r.expiryDate).toLocaleDateString("en-LK") : "—"}</td>
+                        <td className="px-4 py-2.5 text-xs">{r.daysToExpiry ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold">{r.quantity}</td>
+                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(r.value)}</td>
+                        <td className="px-4 py-2.5 text-[10px] font-semibold">{r.status}</td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No near-expiry lots (receive stock with batch/expiry on GRN)</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* ══════════════════════ FINANCIAL ══════════════════════ */}

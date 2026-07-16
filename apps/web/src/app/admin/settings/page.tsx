@@ -162,8 +162,6 @@ export default function SettingsPage() {
                     onChange={e => setConfig(c => ({ ...c, defaultLanguage: e.target.value }))}
                   >
                     <option value="en">English</option>
-                    <option value="si">Sinhala</option>
-                    <option value="ta">Tamil</option>
                   </select>
                 </div>
               </div>

@@ -4,7 +4,6 @@ import { ShopType } from '@/lib/shop-profiles';
 
 export interface QuickAction {
   label: string;
-  labelSi: string;
   href?: string;
   pos?: boolean;
   icon: 'pos' | 'product' | 'purchase' | 'inventory' | 'customer' | 'report' | 'barcode';
@@ -13,7 +12,6 @@ export interface QuickAction {
 export interface WorkspaceConfig {
   dashboardTitle: string;
   dashboardSubtitle: string;
-  dashboardSubtitleSi: string;
   customerLabel: string;
   productLabel: string;
   topSellingLabel: string;
@@ -26,16 +24,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.CLOTHING]: {
     dashboardTitle: 'Clothing Dashboard',
     dashboardSubtitle: 'Sizes, colors, brands & fashion retail at a glance',
-    dashboardSubtitleSi: 'ඇඳුම්, sizes, colors — ඔබේ shop එක එක look එකකින්',
     customerLabel: 'Customers',
     productLabel: 'Products',
     topSellingLabel: 'Top Selling Items',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS විවෘත කරන්න', pos: true, icon: 'pos' },
-      { label: 'Add Product', labelSi: 'Product එකක් add කරන්න', href: '/products', icon: 'product' },
-      { label: 'Print Hang Tags', labelSi: 'Hang tags print කරන්න', href: '/purchases', icon: 'barcode' },
-      { label: 'Manage Returns', labelSi: 'Returns manage කරන්න', href: '/returns', icon: 'report' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', href: '/products', icon: 'product' },
+      { label: 'Print Hang Tags', href: '/purchases', icon: 'barcode' },
+      { label: 'Manage Returns', href: '/returns', icon: 'report' },
     ],
     tips: [
       'Use Size + Color variants for every apparel SKU',
@@ -46,16 +43,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.GROCERY]: {
     dashboardTitle: 'Grocery Dashboard',
     dashboardSubtitle: 'Fast billing, expiry tracking & daily profit',
-    dashboardSubtitleSi: 'Fast POS, expiry, stock — සිල්ලර shop එක easy',
     customerLabel: 'Customers',
     productLabel: 'Products',
     topSellingLabel: 'Fast-Moving Items',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Fast POS', labelSi: 'Fast POS', pos: true, icon: 'pos' },
-      { label: 'Add Product', labelSi: 'Product add', href: '/products', icon: 'product' },
-      { label: 'New Purchase', labelSi: 'Purchase order', href: '/purchases/new', icon: 'purchase' },
-      { label: 'Stock Check', labelSi: 'Stock බලන්න', href: '/inventory', icon: 'inventory' },
+      { label: 'Fast POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', href: '/products', icon: 'product' },
+      { label: 'New Purchase', href: '/purchases/new', icon: 'purchase' },
+      { label: 'Stock Check', href: '/inventory', icon: 'inventory' },
     ],
     tips: [
       'Set expiry dates on dairy & frozen items',
@@ -66,16 +62,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.HARDWARE]: {
     dashboardTitle: 'Hardware Dashboard',
     dashboardSubtitle: 'Units, materials, PO & inventory control',
-    dashboardSubtitleSi: 'Tools, units, stock — hardware shop easy manage',
     customerLabel: 'Customers',
     productLabel: 'Items',
     topSellingLabel: 'Top Selling Items',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
-      { label: 'Add Item', labelSi: 'Item add', href: '/products', icon: 'product' },
-      { label: 'Purchase Order', labelSi: 'PO create', href: '/purchases/new', icon: 'purchase' },
-      { label: 'Receive GRN', labelSi: 'GRN receive', href: '/purchases', icon: 'inventory' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Item', href: '/products', icon: 'product' },
+      { label: 'Purchase Order', href: '/purchases/new', icon: 'purchase' },
+      { label: 'Receive GRN', href: '/purchases', icon: 'inventory' },
     ],
     tips: [
       'Track items by meter, feet, kg or piece',
@@ -86,16 +81,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.AGRICULTURE]: {
     dashboardTitle: 'Agriculture Dashboard',
     dashboardSubtitle: 'Seeds, fertilizer, batch & farmer credit',
-    dashboardSubtitleSi: 'Seeds, fertilizer, farmers — agri shop smart manage',
     customerLabel: 'Farmers',
     productLabel: 'Products',
     topSellingLabel: 'Top Agri Products',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
-      { label: 'Add Product', labelSi: 'Product add', href: '/products', icon: 'product' },
-      { label: 'New Purchase', labelSi: 'Stock order', href: '/purchases/new', icon: 'purchase' },
-      { label: 'Farmer Accounts', labelSi: 'Farmers', href: '/customers', icon: 'customer' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', href: '/products', icon: 'product' },
+      { label: 'New Purchase', href: '/purchases/new', icon: 'purchase' },
+      { label: 'Farmer Accounts', href: '/customers', icon: 'customer' },
     ],
     tips: [
       'Track batch & expiry on fertilizer and chemicals',
@@ -106,16 +100,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.SPARE_PARTS]: {
     dashboardTitle: 'Spare Parts Dashboard',
     dashboardSubtitle: 'Vehicle compatibility, warranty, stock & sales',
-    dashboardSubtitleSi: 'Vehicle parts, warranty, stock — spare parts shop easy',
     customerLabel: 'Customers',
     productLabel: 'Parts',
     topSellingLabel: 'Top Selling Parts',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
-      { label: 'Add Part', labelSi: 'Part add', href: '/products', icon: 'product' },
-      { label: 'Vehicle Lookup', labelSi: 'Vehicle search', href: '/vehicles', icon: 'barcode' },
-      { label: 'New Quotation', labelSi: 'Quotation', href: '/quotations', icon: 'report' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Part', href: '/products', icon: 'product' },
+      { label: 'Vehicle Lookup', href: '/vehicles', icon: 'barcode' },
+      { label: 'New Quotation', href: '/quotations', icon: 'report' },
     ],
     tips: [
       'Map parts to vehicle make, model & year for fast lookup',
@@ -126,16 +119,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.TIRE_SHOP]: {
     dashboardTitle: 'Tyre Shop Dashboard',
     dashboardSubtitle: 'Tyre sizes, vehicle fitment, warranty & fleet sales',
-    dashboardSubtitleSi: 'Tyre sizes, vehicle fitment, stock — tyre shop easy manage',
     customerLabel: 'Customers',
     productLabel: 'Tyres',
     topSellingLabel: 'Top Selling Tyres',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
-      { label: 'Add Tyre', labelSi: 'Tyre add', href: '/products', icon: 'product' },
-      { label: 'Vehicle Lookup', labelSi: 'Fitment search', href: '/vehicles', icon: 'barcode' },
-      { label: 'New Quotation', labelSi: 'Fleet quote', href: '/quotations', icon: 'report' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Tyre', href: '/products', icon: 'product' },
+      { label: 'Vehicle Lookup', href: '/vehicles', icon: 'barcode' },
+      { label: 'New Quotation', href: '/quotations', icon: 'report' },
     ],
     tips: [
       'Set tyre size (205/55R16) and season on every SKU',
@@ -146,16 +138,15 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
   [ShopType.GENERAL]: {
     dashboardTitle: 'General Shop Dashboard',
     dashboardSubtitle: 'Mixed retail — products, stock, sales & customers',
-    dashboardSubtitleSi: 'සාමාන්‍ය retail shop — stock, sales, customers easy manage',
     customerLabel: 'Customers',
     productLabel: 'Products',
     topSellingLabel: 'Top Selling Products',
     aiBrand: 'ShopAI™',
     quickActions: [
-      { label: 'Open POS', labelSi: 'POS', pos: true, icon: 'pos' },
-      { label: 'Add Product', labelSi: 'Product add', href: '/products', icon: 'product' },
-      { label: 'New Purchase', labelSi: 'Purchase order', href: '/purchases/new', icon: 'purchase' },
-      { label: 'Stock Check', labelSi: 'Stock බලන්න', href: '/inventory', icon: 'inventory' },
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', href: '/products', icon: 'product' },
+      { label: 'New Purchase', href: '/purchases/new', icon: 'purchase' },
+      { label: 'Stock Check', href: '/inventory', icon: 'inventory' },
     ],
     tips: [
       'Use Size or Variant attributes only when products need them',

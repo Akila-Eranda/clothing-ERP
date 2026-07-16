@@ -50,7 +50,7 @@ export default function FeaturesPage() {
                 <span className="text-3xl">{VERTICAL_ICONS[profile.type]}</span>
                 <div>
                   <h2 className="text-lg font-bold">{profile.label} Management System</h2>
-                  <p className="text-sm text-muted-foreground">{profile.labelSi}</p>
+                  <p className="text-sm text-muted-foreground">{profile.description}</p>
                 </div>
               </div>
               <ShopFeatureList features={getVerticalFeatures(profile.type)} compact />

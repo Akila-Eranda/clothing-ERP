@@ -485,7 +485,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                     >
                       <span className="text-base">{p.emoji}</span>
                       <p className="text-xs font-semibold text-white mt-0.5 leading-tight">{p.label}</p>
-                      <p className="text-[9px] mt-0.5 leading-tight line-clamp-1" style={{color:'rgba(255,255,255,0.4)'}}>{p.labelSi}</p>
+                      <p className="text-[9px] mt-0.5 leading-tight line-clamp-1" style={{color:'rgba(255,255,255,0.4)'}}>{p.description}</p>
                     </button>
                   ))}
                 </div>

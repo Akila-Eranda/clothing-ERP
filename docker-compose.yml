@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fashionerp_secret}
       POSTGRES_DB: ${POSTGRES_DB:-fashionerp}
     ports:
-      - '5433:5432'
+      - '127.0.0.1:5433:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
     command: redis-server --requirepass ${REDIS_PASSWORD:-redis_secret} --maxmemory 256mb --maxmemory-policy noeviction
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
@@ -70,8 +70,9 @@ services:
       UPLOAD_DIR: /app/uploads
       LOCAL_UPLOAD_DIR: /app/uploads
       SSL_PENDING_DIR: /app/uploads/.ssl-pending
-    ports:
-      - '3001:3001'
+    # Internal only — public traffic via nginx
+    expose:
+      - '3001'
     volumes:
       - ./storage:/app/uploads
     healthcheck:
@@ -79,6 +80,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    security_opt:
+      - no-new-privileges:true
 
   web:
     build:
@@ -97,8 +100,18 @@ services:
       NEXT_PUBLIC_ADMIN_HOSTS: admin3.hexalyte.com
       NEXT_PUBLIC_PLATFORM_TENANT: platform
       NODE_ENV: production
-    ports:
-      - '3000:3000'
+    # CRITICAL: do NOT publish 3000 to the internet (RCE/hijack vector)
+    expose:
+      - '3000'
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /app/.next/cache:size=128m,mode=1777,uid=1001,gid=1001
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    pids_limit: 200
 
   nginx:
     image: nginx:alpine
@@ -106,6 +119,7 @@ services:
     restart: unless-stopped
     depends_on:
       - api
+      - web
     ports:
       - '80:80'
       - '443:443'

@@ -81,6 +81,8 @@ enum PaymentMethod {
   CUSTOMER_CREDIT
   LOYALTY_POINTS
   MIXED
+  CHEQUE
+  GIFT_VOUCHER
 }
 
 enum PaymentStatus {
@@ -123,6 +125,41 @@ enum PurchaseOrderStatus {
   CANCELLED
 }
 
+enum PurchaseRequestStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  CONVERTED
+  CANCELLED
+}
+
+enum GoodsReceiptStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum GoodsReceiptSource {
+  FROM_PO
+  DIRECT
+  QUICK
+}
+
+enum SupplierReturnStatus {
+  DRAFT
+  POSTED
+  CANCELLED
+}
+
+enum SupplierInvoiceStatus {
+  DRAFT
+  POSTED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
 enum CustomerTier {
   BRONZE
   SILVER
@@ -140,6 +177,12 @@ enum NotificationType {
   SYSTEM_ALERT
   CUSTOM_CAMPAIGN
   DAILY_SUMMARY
+  REORDER
+  EXPIRY_ALERT
+  SUPPLIER_DUE
+  CHEQUE_DUE
+  GRN_PENDING
+  PO_PENDING
 }
 
 enum NotificationChannel {
@@ -354,9 +397,17 @@ model Tenant {
   suppliers        Supplier[]
   sales            Sale[]
   purchases        PurchaseOrder[]
+  purchaseRequests PurchaseRequest[]
+  goodsReceipts    GoodsReceipt[]
+  supplierReturns  SupplierReturn[]
+  supplierInvoices SupplierInvoice[]
   employees        Employee[]
   accounts         Account[]
   notifications    Notification[]
+  bankAccounts     BankAccount[]
+  cheques          Cheque[]
+  cashBookEntries  CashBookEntry[]
+  bankReconciliations BankReconciliation[]
   auditLogs        AuditLog[]
   promotions       Promotion[]
   warehouses       Warehouse[]
@@ -373,6 +424,12 @@ model Tenant {
   receiptPrintLogs ReceiptPrintLog[]
   cashRegisters    CashRegister[]
   cashMovements    CashMovement[]
+  giftVouchers     GiftVoucher[]
+  creditSchedules  CustomerCreditSchedule[]
+  creditReminders  CustomerCreditReminder[]
+  calendarNotes    CalendarNote[]
+  calendarTasks    CalendarTask[]
+  calendarMeetings CalendarMeeting[]
 
   @@map("tenants")
 }
@@ -441,6 +498,7 @@ model Branch {
   tenant      Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   users       User[]
   inventory   Inventory[]
+  lots        InventoryLot[]
   sales       Sale[]
   employees   Employee[]
   transfers   StockTransfer[]
@@ -725,9 +783,13 @@ model ProductVariant {
 
   product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   inventory     Inventory[]
+  lots          InventoryLot[]
   saleItems     SaleItem[]
   returnItems   ReturnItem[]
   purchaseItems PurchaseOrderItem[]
+  purchaseRequestItems PurchaseRequestItem[]
+  goodsReceiptItems GoodsReceiptItem[]
+  supplierReturnItems SupplierReturnItem[]
   stockMovements InventoryLog[]
   transferItems  StockTransferItem[]
   reservations  InventoryReservation[]
@@ -741,6 +803,7 @@ model ProductVariant {
   @@unique([productId, sku])
   @@index([productId])
   @@index([sku])
+  @@index([barcode])
   @@map("product_variants")
 }
 
@@ -792,8 +855,12 @@ model Warehouse {
   tenant      Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch      Branch     @relation(fields: [branchId], references: [id])
   inventory   Inventory[]
+  lots        InventoryLot[]
+  transfersFrom StockTransfer[] @relation("TransferFromWarehouse")
+  transfersTo   StockTransfer[] @relation("TransferToWarehouse")
 
   @@unique([tenantId, code])
+  @@index([tenantId, branchId])
   @@map("warehouses")
 }
 
@@ -820,9 +887,10 @@ model Inventory {
   warehouse     Warehouse?     @relation(fields: [warehouseId], references: [id])
   variant       ProductVariant @relation(fields: [variantId], references: [id])
 
-  @@unique([branchId, variantId])
+  @@unique([warehouseId, variantId])
   @@index([tenantId])
   @@index([branchId])
+  @@index([branchId, variantId])
   @@index([variantId])
   @@map("inventory")
 }
@@ -843,6 +911,7 @@ model InventoryLog {
   unitCost        Float?
   batchNumber     String?
   expiryDate      DateTime?
+  lotId           String?
   correlationId   String?
   referenceId     String?
   referenceType   String?
@@ -851,6 +920,7 @@ model InventoryLog {
   createdAt       DateTime           @default(now())
 
   variant         ProductVariant     @relation(fields: [variantId], references: [id])
+  lot             InventoryLot?      @relation(fields: [lotId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([branchId])
@@ -858,7 +928,62 @@ model InventoryLog {
   @@index([createdAt])
   @@index([referenceType, referenceId])
   @@index([correlationId])
+  @@index([lotId])
+  @@index([tenantId, createdAt])
   @@map("inventory_logs")
+}
+
+model InventoryLot {
+  id              String    @id @default(cuid())
+  tenantId        String
+  branchId        String
+  warehouseId     String?
+  variantId       String
+  batchNumber     String?
+  expiryDate      DateTime?
+  manufactureDate DateTime?
+  quantity        Int       @default(0)
+  reservedQty     Int       @default(0)
+  unitCost        Float     @default(0)
+  receivedAt      DateTime  @default(now())
+  referenceType   String?
+  referenceId     String?
+  notes           String?
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  branch          Branch                   @relation(fields: [branchId], references: [id])
+  warehouse       Warehouse?               @relation(fields: [warehouseId], references: [id])
+  variant         ProductVariant           @relation(fields: [variantId], references: [id])
+  reservations    InventoryLotReservation[]
+  logs            InventoryLog[]
+
+  @@index([tenantId, branchId, variantId])
+  @@index([tenantId, warehouseId, variantId])
+  @@index([tenantId, expiryDate])
+  @@index([tenantId, branchId, expiryDate])
+  @@index([batchNumber])
+  @@index([variantId])
+  @@map("inventory_lots")
+}
+
+model InventoryLotReservation {
+  id          String                     @id @default(cuid())
+  tenantId    String
+  lotId       String
+  quantity    Int
+  status      InventoryReservationStatus @default(ACTIVE)
+  sourceType  String
+  sourceId    String
+  createdAt   DateTime                   @default(now())
+  releasedAt  DateTime?
+
+  lot         InventoryLot               @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  @@index([lotId, status])
+  @@index([tenantId, sourceType, sourceId])
+  @@map("inventory_lot_reservations")
 }
 
 model InventoryReservation {
@@ -920,6 +1045,8 @@ model StockTransfer {
   tenantId        String
   fromBranchId    String
   toBranchId      String
+  fromWarehouseId String?
+  toWarehouseId   String?
   status          TransferStatus @default(PENDING)
   notes           String?
   requestedBy     String?
@@ -930,9 +1057,13 @@ model StockTransfer {
   updatedAt       DateTime       @updatedAt
 
   fromBranch      Branch         @relation(fields: [fromBranchId], references: [id])
+  fromWarehouse   Warehouse?     @relation("TransferFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse     Warehouse?     @relation("TransferToWarehouse", fields: [toWarehouseId], references: [id])
   items           StockTransferItem[]
 
   @@index([tenantId])
+  @@index([fromWarehouseId])
+  @@index([toWarehouseId])
   @@map("stock_transfers")
 }
 
@@ -946,9 +1077,25 @@ model StockTransferItem {
 
   transfer      StockTransfer    @relation(fields: [transferId], references: [id], onDelete: Cascade)
   variant       ProductVariant   @relation(fields: [variantId], references: [id])
+  lotAllocations StockTransferLot[]
 
   @@index([transferId])
   @@map("stock_transfer_items")
+}
+
+model StockTransferLot {
+  id             String    @id @default(cuid())
+  transferItemId String
+  fromLotId      String?
+  toLotId        String?
+  batchNumber    String?
+  expiryDate     DateTime?
+  quantity       Int
+
+  transferItem   StockTransferItem @relation(fields: [transferItemId], references: [id], onDelete: Cascade)
+
+  @@index([transferItemId])
+  @@map("stock_transfer_lots")
 }
 
 // ============================================================
@@ -975,6 +1122,7 @@ model Customer {
   walletBalance   Float        @default(0)
   creditLimit     Float        @default(0)
   creditBalance   Float        @default(0)
+  creditDays      Int          @default(30)
   totalSpent      Float        @default(0)
   totalOrders     Int          @default(0)
   isActive        Boolean      @default(true)
@@ -993,6 +1141,8 @@ model Customer {
   loyaltyTxns     LoyaltyTransaction[]
   walletTxns      WalletTransaction[]
   creditTxns      CustomerCreditTransaction[]
+  creditSchedules CustomerCreditSchedule[]
+  creditReminders CustomerCreditReminder[]
   vehicles        CustomerVehicle[]
   warrantyClaims  WarrantyClaim[]
   quotations      Quotation[]
@@ -1003,6 +1153,7 @@ model Customer {
   @@unique([tenantId, phone])
   @@index([tenantId])
   @@index([phone])
+  @@index([tenantId, creditBalance])
   @@map("customers")
 }
 
@@ -1368,15 +1519,109 @@ model CustomerCreditTransaction {
   customerId  String
   tenantId    String
   amount      Float
+  paidAmount  Float    @default(0)
   type        String
+  status      String   @default("OPEN")
   description String?
   referenceId String?
+  dueDate     DateTime?
   createdAt   DateTime @default(now())
 
   customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  schedules   CustomerCreditSchedule[]
 
   @@index([customerId])
+  @@index([tenantId])
+  @@index([tenantId, dueDate])
+  @@index([tenantId, status])
   @@map("customer_credit_transactions")
+}
+
+enum CreditScheduleStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum CreditScheduleLineStatus {
+  PENDING
+  PARTIAL
+  PAID
+  OVERDUE
+}
+
+model CustomerCreditSchedule {
+  id               String               @id @default(cuid())
+  tenantId         String
+  customerId       String
+  chargeTxnId      String?
+  totalAmount      Float
+  installmentCount Int
+  intervalDays     Int                  @default(30)
+  startDate        DateTime
+  status           CreditScheduleStatus @default(ACTIVE)
+  notes            String?
+  createdBy        String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  tenant           Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer         Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  chargeTxn        CustomerCreditTransaction? @relation(fields: [chargeTxnId], references: [id])
+  lines            CustomerCreditScheduleLine[]
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@map("customer_credit_schedules")
+}
+
+model CustomerCreditScheduleLine {
+  id          String                   @id @default(cuid())
+  scheduleId  String
+  sequence    Int
+  dueDate     DateTime
+  amount      Float
+  paidAmount  Float                    @default(0)
+  status      CreditScheduleLineStatus @default(PENDING)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+
+  schedule    CustomerCreditSchedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId])
+  @@index([dueDate])
+  @@map("customer_credit_schedule_lines")
+}
+
+enum CreditReminderStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+model CustomerCreditReminder {
+  id            String               @id @default(cuid())
+  tenantId      String
+  customerId    String
+  chargeTxnId   String?
+  scheduleLineId String?
+  channel       NotificationChannel  @default(IN_APP)
+  status        CreditReminderStatus @default(PENDING)
+  dueDate       DateTime?
+  title         String
+  message       String
+  sentAt        DateTime?
+  createdBy     String?
+  createdAt     DateTime             @default(now())
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer      Customer             @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([tenantId, status])
+  @@map("customer_credit_reminders")
 }
 
 // ============================================================
@@ -1407,6 +1652,9 @@ model Sale {
   couponDiscount    Float         @default(0)
   pointsRedeemed    Int           @default(0)
   pointsEarned      Int           @default(0)
+  helperEmployeeId  String?
+  helperName        String?
+  helperCommission  Float         @default(0)
   isReturn          Boolean       @default(false)
   originalSaleId    String?
   terminalId        String?
@@ -1418,6 +1666,7 @@ model Sale {
   branch            Branch        @relation(fields: [branchId], references: [id])
   customer          Customer?     @relation(fields: [customerId], references: [id])
   cashier           User?         @relation("CashierSales", fields: [cashierId], references: [id])
+  helperEmployee    Employee?     @relation("HelperSales", fields: [helperEmployeeId], references: [id])
   items             SaleItem[]
   payments          SalePayment[]
   returns           Return[]
@@ -1427,6 +1676,7 @@ model Sale {
   @@index([branchId])
   @@index([customerId])
   @@index([invoiceDate])
+  @@index([helperEmployeeId])
   @@map("sales")
 }
 
@@ -1452,6 +1702,39 @@ model SaleItem {
 
   @@index([saleId])
   @@map("sale_items")
+}
+
+enum GiftVoucherStatus {
+  ACTIVE
+  PARTIALLY_USED
+  REDEEMED
+  EXPIRED
+  CANCELLED
+}
+
+model GiftVoucher {
+  id                String            @id @default(cuid())
+  tenantId          String
+  branchId          String?
+  code              String
+  initialAmount     Float
+  balance           Float
+  status            GiftVoucherStatus @default(ACTIVE)
+  issuedToName      String?
+  issuedToCustomerId String?
+  issuedBySaleId    String?
+  expiresAt         DateTime?
+  notes             String?
+  createdBy         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("gift_vouchers")
 }
 
 model SalePayment {
@@ -1605,6 +1888,9 @@ model Supplier {
   tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   purchases     PurchaseOrder[]
   payments      SupplierPayment[]
+  goodsReceipts GoodsReceipt[]
+  returns       SupplierReturn[]
+  invoices      SupplierInvoice[]
 
   @@index([tenantId])
   @@map("suppliers")
@@ -1637,6 +1923,10 @@ model PurchaseOrder {
   supplier        Supplier            @relation(fields: [supplierId], references: [id])
   items           PurchaseOrderItem[]
   payments        SupplierPayment[]
+  goodsReceipts   GoodsReceipt[]
+  supplierReturns SupplierReturn[]
+  invoices        SupplierInvoice[]
+  purchaseRequest PurchaseRequest?
 
   @@unique([tenantId, poNumber])
   @@index([tenantId])
@@ -1671,6 +1961,7 @@ model SupplierPayment {
   tenantId    String
   supplierId  String
   purchaseId  String?
+  invoiceId   String?
   amount      Float
   method      PaymentMethod
   reference   String?
@@ -1678,11 +1969,188 @@ model SupplierPayment {
   paidAt      DateTime @default(now())
   createdAt   DateTime @default(now())
 
-  supplier    Supplier       @relation(fields: [supplierId], references: [id])
-  purchase    PurchaseOrder? @relation(fields: [purchaseId], references: [id])
+  supplier    Supplier         @relation(fields: [supplierId], references: [id])
+  purchase    PurchaseOrder?   @relation(fields: [purchaseId], references: [id])
+  invoice     SupplierInvoice? @relation(fields: [invoiceId], references: [id])
 
   @@index([supplierId])
+  @@index([invoiceId])
   @@map("supplier_payments")
+}
+
+model PurchaseRequest {
+  id              String                @id @default(cuid())
+  tenantId        String
+  branchId        String?
+  requestNumber   String
+  status          PurchaseRequestStatus @default(DRAFT)
+  notes           String?
+  createdBy       String?
+  approvedBy      String?
+  convertedPoId   String?               @unique
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  convertedPo     PurchaseOrder?        @relation(fields: [convertedPoId], references: [id])
+  items           PurchaseRequestItem[]
+
+  @@unique([tenantId, requestNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("purchase_requests")
+}
+
+model PurchaseRequestItem {
+  id            String   @id @default(cuid())
+  requestId     String
+  variantId     String
+  productName   String
+  variantName   String
+  sku           String
+  requestedQty  Int
+  unitCostHint  Float    @default(0)
+  notes         String?
+
+  request       PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  variant       ProductVariant  @relation(fields: [variantId], references: [id])
+
+  @@index([requestId])
+  @@map("purchase_request_items")
+}
+
+model GoodsReceipt {
+  id                  String             @id @default(cuid())
+  tenantId            String
+  branchId            String
+  grnNumber           String
+  source              GoodsReceiptSource @default(FROM_PO)
+  status              GoodsReceiptStatus @default(POSTED)
+  purchaseId          String?
+  supplierId          String
+  receivedAt          DateTime           @default(now())
+  receivedBy          String?
+  notes               String?
+  supplierInvoiceRef  String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  tenant              Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchase            PurchaseOrder?     @relation(fields: [purchaseId], references: [id])
+  supplier            Supplier           @relation(fields: [supplierId], references: [id])
+  items               GoodsReceiptItem[]
+  returns             SupplierReturn[]
+  invoices            SupplierInvoice[]
+
+  @@unique([tenantId, grnNumber])
+  @@index([tenantId])
+  @@index([purchaseId])
+  @@index([supplierId])
+  @@map("goods_receipts")
+}
+
+model GoodsReceiptItem {
+  id              String    @id @default(cuid())
+  grnId           String
+  purchaseItemId  String?
+  variantId       String
+  productName     String
+  variantName     String
+  sku             String
+  orderedQty      Int       @default(0)
+  receivedQty     Int
+  rejectedQty     Int       @default(0)
+  unitCost        Float     @default(0)
+  batchNumber     String?
+  expiryDate      DateTime?
+  manufactureDate DateTime?
+  lotId           String?
+
+  grn             GoodsReceipt   @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([grnId])
+  @@index([variantId])
+  @@map("goods_receipt_items")
+}
+
+model SupplierReturn {
+  id              String               @id @default(cuid())
+  tenantId        String
+  branchId        String
+  returnNumber    String
+  supplierId      String
+  purchaseId      String?
+  goodsReceiptId  String?
+  status          SupplierReturnStatus @default(DRAFT)
+  reason          String?
+  notes           String?
+  createdBy       String?
+  postedAt        DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier        Supplier             @relation(fields: [supplierId], references: [id])
+  purchase        PurchaseOrder?       @relation(fields: [purchaseId], references: [id])
+  goodsReceipt    GoodsReceipt?        @relation(fields: [goodsReceiptId], references: [id])
+  items           SupplierReturnItem[]
+
+  @@unique([tenantId, returnNumber])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@map("supplier_returns")
+}
+
+model SupplierReturnItem {
+  id          String   @id @default(cuid())
+  returnId    String
+  variantId   String
+  productName String
+  sku         String
+  quantity    Int
+  unitCost    Float    @default(0)
+  lotId       String?
+  batchNumber String?
+  reason      String?
+
+  returnDoc   SupplierReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([returnId])
+  @@map("supplier_return_items")
+}
+
+model SupplierInvoice {
+  id              String                @id @default(cuid())
+  tenantId        String
+  supplierId      String
+  invoiceNumber   String
+  invoiceDate     DateTime              @default(now())
+  dueDate         DateTime?
+  purchaseId      String?
+  goodsReceiptId  String?
+  subtotal        Float                 @default(0)
+  taxAmount       Float                 @default(0)
+  total           Float                 @default(0)
+  paidAmount      Float                 @default(0)
+  status          SupplierInvoiceStatus @default(DRAFT)
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  tenant          Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier        Supplier              @relation(fields: [supplierId], references: [id])
+  purchase        PurchaseOrder?        @relation(fields: [purchaseId], references: [id])
+  goodsReceipt    GoodsReceipt?         @relation(fields: [goodsReceiptId], references: [id])
+  payments        SupplierPayment[]
+
+  @@unique([tenantId, supplierId, invoiceNumber])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([dueDate])
+  @@map("supplier_invoices")
 }
 
 // ============================================================
@@ -1772,6 +2240,184 @@ model Expense {
 }
 
 // ============================================================
+// BANKING, CHEQUES, CASH BOOK (Phase 5 Finance)
+// ============================================================
+
+enum BankAccountType {
+  CURRENT
+  SAVINGS
+  CASH_IN_HAND
+  PETTY_CASH
+}
+
+enum BankTxnType {
+  DEPOSIT
+  WITHDRAWAL
+  TRANSFER_IN
+  TRANSFER_OUT
+  FEE
+  INTEREST
+  ADJUSTMENT
+  CHEQUE_CLEAR
+}
+
+enum BankTxnStatus {
+  PENDING
+  CLEARED
+  VOID
+}
+
+enum ChequeDirection {
+  RECEIVED
+  ISSUED
+}
+
+enum ChequeStatus {
+  RECEIVED
+  ISSUED
+  DEPOSITED
+  CLEARED
+  BOUNCED
+  CANCELLED
+}
+
+enum BankReconciliationStatus {
+  DRAFT
+  COMPLETED
+  CANCELLED
+}
+
+model BankAccount {
+  id             String          @id @default(cuid())
+  tenantId       String
+  branchId       String?
+  code           String
+  name           String
+  type           BankAccountType @default(CURRENT)
+  bankName       String?
+  accountNumber  String?
+  currency       String          @default("LKR")
+  openingBalance Float           @default(0)
+  currentBalance Float           @default(0)
+  glAccountId    String?
+  isActive       Boolean         @default(true)
+  notes          String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions   BankTransaction[]
+  cheques        Cheque[]
+  reconciliations BankReconciliation[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id            String        @id @default(cuid())
+  tenantId      String
+  bankAccountId String
+  type          BankTxnType
+  status        BankTxnStatus @default(CLEARED)
+  amount        Float
+  txnDate       DateTime      @default(now())
+  valueDate     DateTime?
+  reference     String?
+  description   String?
+  expenseId     String?
+  chequeId      String?
+  reconciliationId String?
+  createdBy     String?
+  createdAt     DateTime      @default(now())
+
+  bankAccount   BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  reconciliation BankReconciliation? @relation(fields: [reconciliationId], references: [id])
+
+  @@index([tenantId, bankAccountId])
+  @@index([txnDate])
+  @@map("bank_transactions")
+}
+
+model Cheque {
+  id            String          @id @default(cuid())
+  tenantId      String
+  direction     ChequeDirection
+  status        ChequeStatus
+  chequeNumber  String
+  bankName      String?
+  amount        Float
+  issueDate     DateTime?
+  dueDate       DateTime?
+  partyType     String?
+  partyId       String?
+  partyName     String?
+  bankAccountId String?
+  notes         String?
+  clearedAt     DateTime?
+  bouncedAt     DateTime?
+  createdBy     String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankAccount   BankAccount?    @relation(fields: [bankAccountId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([dueDate])
+  @@map("cheques")
+}
+
+model BankReconciliation {
+  id                String                    @id @default(cuid())
+  tenantId          String
+  bankAccountId     String
+  statementDate     DateTime
+  statementBalance  Float
+  systemBalance     Float
+  difference        Float                     @default(0)
+  status            BankReconciliationStatus  @default(DRAFT)
+  notes             String?
+  completedAt       DateTime?
+  createdBy         String?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  tenant            Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bankAccount       BankAccount               @relation(fields: [bankAccountId], references: [id])
+  matchedTxns       BankTransaction[]
+
+  @@index([tenantId])
+  @@index([bankAccountId])
+  @@map("bank_reconciliations")
+}
+
+model CashBookEntry {
+  id            String   @id @default(cuid())
+  tenantId      String
+  branchId      String?
+  entryDate     DateTime @default(now())
+  type          String
+  description   String
+  debit         Float    @default(0)
+  credit        Float    @default(0)
+  balanceAfter  Float    @default(0)
+  referenceType String?
+  referenceId   String?
+  paymentMethod PaymentMethod?
+  createdBy     String?
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entryDate])
+  @@index([tenantId, branchId])
+  @@map("cash_book_entries")
+}
+
+// ============================================================
 // HR & EMPLOYEES
 // ============================================================
 
@@ -1794,6 +2440,7 @@ model Employee {
   joiningDate     DateTime
   leavingDate     DateTime?
   basicSalary     Float          @default(0)
+  commissionRate  Float          @default(0)
   bankDetails     Json           @default("{}")
   isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
@@ -1805,6 +2452,7 @@ model Employee {
   payrolls        Payroll[]
   shifts          EmployeeShift[]
   leaveRequests   LeaveRequest[]
+  helperSales     Sale[]       @relation("HelperSales")
 
   @@index([tenantId])
   @@map("employees")
@@ -2191,4 +2839,74 @@ model CashMovement {
   @@index([registerId, createdAt])
   @@index([tenantId, type])
   @@map("cash_movements")
+}
+
+// ============================================================
+// BUSINESS CALENDAR (Phase 8)
+// ============================================================
+
+enum CalendarTaskStatus {
+  OPEN
+  DONE
+  CANCELLED
+}
+
+model CalendarNote {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  date        DateTime
+  title       String
+  body        String?
+  color       String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
+  @@map("calendar_notes")
+}
+
+model CalendarTask {
+  id          String             @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  date        DateTime
+  title       String
+  description String?
+  status      CalendarTaskStatus @default(OPEN)
+  priority    String             @default("NORMAL")
+  assigneeId  String?
+  createdBy   String?
+  completedAt DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@map("calendar_tasks")
+}
+
+model CalendarMeeting {
+  id          String   @id @default(cuid())
+  tenantId    String
+  branchId    String?
+  title       String
+  description String?
+  location    String?
+  startsAt    DateTime
+  endsAt      DateTime?
+  attendees   String[] @default([])
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, startsAt])
+  @@map("calendar_meetings")
 }

@@ -55,6 +55,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
   const [quantity, setQuantity]         = useState("");
   const [batchNumber, setBatchNumber]   = useState("");
   const [expiryDate, setExpiryDate]     = useState("");
+  const [manufactureDate, setManufactureDate] = useState("");
   const [notes, setNotes]               = useState("");
   const [loading, setLoading]           = useState(false);
 
@@ -64,6 +65,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
       setQuantity(item ? String(item.quantity) : "");
       setBatchNumber("");
       setExpiryDate("");
+      setManufactureDate("");
       setNotes("");
     }
   }, [open, item]);
@@ -85,6 +87,7 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
         notes: notes || undefined,
         ...(showBatch && batchNumber ? { batchNumber } : {}),
         ...(showExpiry && expiryDate ? { expiryDate } : {}),
+        ...((showBatch || showExpiry) && manufactureDate ? { manufactureDate } : {}),
       });
       toast.success(
         needsApproval
@@ -182,8 +185,12 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
                   <Input value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} placeholder="e.g. BATCH-2026-001" />
                 </div>
               )}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Manufacturing Date</Label>
+                <Input type="date" value={manufactureDate} onChange={(e) => setManufactureDate(e.target.value)} />
+              </div>
               {showExpiry && (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <Label className="text-xs font-semibold">Expiry Date</Label>
                   <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
                 </div>
