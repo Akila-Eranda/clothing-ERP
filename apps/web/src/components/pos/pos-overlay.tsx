@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,13 +25,18 @@ import { AppLogo } from "@/components/brand/app-logo";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { PosQuantityPopup } from "@/components/pos/pos-quantity-popup";
-import { bypassesWorkflowApproval, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
+import { PosVariantPickerModal } from "@/components/pos/pos-variant-picker-modal";
+import { bypassesWorkflowApproval, canViewAllPosSales, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
 import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
 import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
+import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
+import { PosQuickExpensePanel } from "@/components/pos/pos-quick-expense-panel";
+import { PosPromotionsPanel } from "@/components/pos/pos-promotions-panel";
+import { PosSalesReportPanel } from "@/components/pos/pos-sales-report-panel";
 import {
   readPosQtyPopup, writePosQtyPopup,
   readPosSoundAlerts, writePosSoundAlerts,
@@ -45,7 +50,7 @@ interface POSOverlayProps {
   posOnly?: boolean;
 }
 
-interface ProductItem { variantId: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
 interface ApiCustomerRow {
@@ -94,7 +99,21 @@ interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }, { value:"GIFT_VOUCHER", label:"Voucher", icon: Gift }];
 
-const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"vouchers", label:"Vouchers", icon: Gift }, { id:"quick-grn", label:"Quick GRN", icon: Package }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"warranty", label:"Warranty", icon: Wrench, module: "warranty" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
+const BASE_NAV_ITEMS = [
+  { id:"products", label:"Products", icon: ShoppingBag },
+  { id:"quick-product", label:"New Product", icon: PackagePlus },
+  { id:"customers", label:"Customers", icon: Users },
+  { id:"hold-bills", label:"Hold Bills", icon: PauseCircle },
+  { id:"orders", label:"Orders", icon: FileText },
+  { id:"vouchers", label:"Vouchers", icon: Gift },
+  { id:"quick-grn", label:"Quick GRN", icon: Package },
+  { id:"expenses", label:"Expenses", icon: TrendingDown },
+  { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const },
+  { id:"warranty", label:"Warranty", icon: Wrench, module: "warranty" as const },
+  { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const },
+  { id:"reports", label:"Reports", icon: BarChart2 },
+  { id:"settings", label:"Settings", icon: Settings },
+];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
@@ -182,6 +201,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [soundAlerts, setSoundAlerts] = React.useState(true);
   const [qtyPopupEnabled, setQtyPopupEnabled] = React.useState(false);
   const [qtyPopupProduct, setQtyPopupProduct] = React.useState<ProductItem | null>(null);
+  const [variantPickerName, setVariantPickerName] = React.useState<string | null>(null);
   const [helpers, setHelpers] = React.useState<{ id: string; firstName: string; lastName: string; commissionRate: number }[]>([]);
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
@@ -196,6 +216,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [discountInput, setDiscountInput] = React.useState("");
   const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{ entityId: string; percent: number } | null>(null);
   const adminBypass = bypassesWorkflowApproval(user?.role);
+  const viewAllSales = canViewAllPosSales(user?.role);
   const [showNewCust, setShowNewCust] = React.useState(false);
   const [newCustFirst, setNewCustFirst] = React.useState("");
   const [newCustLast, setNewCustLast] = React.useState("");
@@ -563,9 +584,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
     });
   }, [getVariants, variantCols]);
-  const needsVariantPicker = React.useCallback((n: string) =>
-    variantCols.some((col) => getAttrValues(n, col.field).length > 1),
-  [variantCols, getAttrValues]);
   const findVariant = React.useCallback((n: string, attrs: Record<string, string | null | undefined>) =>
     getVariants(n).find((v) =>
       variantCols.every((col) => {
@@ -659,6 +677,33 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
   const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase().trim();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.barcode&&p.barcode.toLowerCase().includes(q))||(p.barcode&&qBase&&qBase!==q&&p.barcode.toLowerCase().includes(qBase))||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
 
+  const productCards = React.useMemo(() => {
+    const map = new Map<string, { rep: ProductItem; variants: ProductItem[]; totalStock: number; minPrice: number; maxPrice: number }>();
+    for (const p of filteredProducts) {
+      const key = p.productId || p.productName;
+      const existing = map.get(key);
+      if (!existing) {
+        const variants = getVariants(p.productName).filter((v) =>
+          activeCategory === "All" || v.category === activeCategory,
+        );
+        const list = variants.length ? variants : [p];
+        map.set(key, {
+          rep: p,
+          variants: list,
+          totalStock: list.reduce((s, v) => s + v.stock, 0),
+          minPrice: Math.min(...list.map((v) => v.unitPrice)),
+          maxPrice: Math.max(...list.map((v) => v.unitPrice)),
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [filteredProducts, getVariants, activeCategory]);
+
+  const variantPickerVariants = React.useMemo(
+    () => (variantPickerName ? getVariants(variantPickerName) : []),
+    [variantPickerName, getVariants],
+  );
+
   const commitAddProduct = React.useCallback((p: ProductItem, qty = 1) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
     const lineTax = taxRate;
@@ -703,11 +748,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const trimmed = code.trim();
     if (!trimmed) return;
 
-    let found: ProductItem | undefined;
+    type BarcodeLookup = ProductItem & {
+      requiresVariantPick?: boolean;
+      variants?: ProductItem[];
+    };
+
+    let found: BarcodeLookup | undefined;
     for (const key of barcodeLookupCandidates(trimmed)) {
       try {
-        const r = await api.get<ProductItem>(`/pos/barcode/${encodeURIComponent(key)}`);
+        const r = await api.get<BarcodeLookup>(`/pos/barcode/${encodeURIComponent(key)}`);
         const fromApi = r.data;
+        if (fromApi.requiresVariantPick && fromApi.productName) {
+          setSelectedProductName(null);
+          setSelAttrs({});
+          setVariantPickerName(fromApi.productName);
+          setSearch("");
+          setLastScanAt(new Date());
+          setScanFlash(true);
+          setTimeout(() => setScanFlash(false), 500);
+          playPosSound("scan_ok", soundAlerts);
+          return;
+        }
         const cached = products.find((p) => p.variantId === fromApi.variantId);
         found = cached ? { ...cached, ...fromApi, stock: fromApi.stock } : fromApi;
         setProducts((prev) =>
@@ -721,6 +782,24 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
     if (!found) {
       found = findProductByBarcodeCode(trimmed, products);
+      // Shared product barcode may hit several local variants — open picker.
+      if (found) {
+        const siblings = getVariants(found.productName);
+        if (siblings.length > 1) {
+          const codeLower = trimmed.toLowerCase();
+          const exactSku = siblings.find((p) => p.sku.toLowerCase() === codeLower);
+          if (!exactSku) {
+            setSelectedProductName(null);
+            setSelAttrs({});
+            setVariantPickerName(found.productName);
+            setSearch("");
+            setLastScanAt(new Date());
+            playPosSound("scan_ok", soundAlerts);
+            return;
+          }
+          found = exactSku;
+        }
+      }
     }
 
     if (!found) {
@@ -730,23 +809,24 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     setSelectedProductName(null);
     setSelAttrs({});
+    setVariantPickerName(null);
     handleAddProduct(found);
     setLastScanAt(new Date());
     setSearch("");
     setScanFlash(true);
     setTimeout(() => setScanFlash(false), 500);
-  }, [products, handleAddProduct, soundAlerts]);
+  }, [products, handleAddProduct, soundAlerts, getVariants]);
 
   const handleCardClick = React.useCallback((p: ProductItem) => {
-    if (!needsVariantPicker(p.productName)) {
-      handleAddProduct(p);
+    const variants = getVariants(p.productName);
+    if (variants.length <= 1) {
+      handleAddProduct(variants[0] ?? p);
       return;
     }
-    setSelectedProductName(p.productName);
-    const initial: Record<string, string | null> = {};
-    for (const col of variantCols) initial[col.field] = variantFieldValue(p, col.field) ?? null;
-    setSelAttrs(initial);
-  }, [needsVariantPicker, handleAddProduct, variantCols]);
+    setSelectedProductName(null);
+    setSelAttrs({});
+    setVariantPickerName(p.productName);
+  }, [getVariants, handleAddProduct]);
 
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
@@ -759,24 +839,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       void scanAndAddProduct(q);
       return;
     }
-    if (filteredProducts.length === 1) {
-      const p = filteredProducts[0];
-      if (needsVariantPicker(p.productName)) {
-        handleCardClick(p);
-      } else {
-        handleAddProduct(p);
-        setSearch("");
-        setScanFlash(true);
-        setTimeout(() => setScanFlash(false), 500);
-      }
+    if (productCards.length === 1) {
+      handleCardClick(productCards[0].rep);
+      setSearch("");
       return;
     }
-    if (filteredProducts.length > 1) {
-      handleCardClick(filteredProducts[0]);
+    if (productCards.length > 1) {
+      handleCardClick(productCards[0].rep);
       return;
     }
     void scanAndAddProduct(q);
-  }, [search, products, filteredProducts, scanAndAddProduct, handleAddProduct, handleCardClick, needsVariantPicker]);
+  }, [search, products, productCards, scanAndAddProduct, handleCardClick]);
 
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -1069,7 +1142,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [selectedCartIdx, items, getHoldPayload, removeItem, loadHeldBills, loadProducts]);
 
-  React.useEffect(() => { setFocusedProductIdx(-1); }, [search, activeCategory, filteredProducts.length]);
+  React.useEffect(() => { setFocusedProductIdx(-1); }, [search, activeCategory, productCards.length]);
   React.useEffect(() => { setFocusedHeldIdx(0); }, [serverHeldBills.length]);
   React.useEffect(() => { setFocusedCustomerIdx(0); }, [customers.length, inlineCustomers.length, showCustomerSearch]);
 
@@ -1095,7 +1168,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     showShortcuts,
     showCustomerSearch,
     showDayEnd,
-    selectedProductName,
+    selectedProductName: selectedProductName ?? variantPickerName,
     activeNav,
     activePayment,
     itemsLength: items.length,
@@ -1103,7 +1176,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     focusedProductIdx,
     focusedHeldIdx,
     focusedCustomerIdx,
-    filteredProductsLength: filteredProducts.length,
+    filteredProductsLength: productCards.length,
     serverHeldBillsLength: serverHeldBills.length,
     navItems,
     categories,
@@ -1120,7 +1193,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     barcodeTimer,
     setShowShortcuts,
     setCheckoutOpen,
-    setSelectedProductName,
+    setSelectedProductName: (v: string | null) => {
+      setSelectedProductName(v);
+      if (!v) setVariantPickerName(null);
+    },
     setShowCustomerSearch,
     setCustomerSearch,
     setCustomers,
@@ -1158,14 +1234,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     adjustSelectedQty,
     removeSelectedCartItem,
     applyCustomer,
-    getFilteredProduct: (idx: number) => filteredProducts[idx],
+    getFilteredProduct: (idx: number) => productCards[idx]?.rep,
     getHeldBill: (idx: number) => serverHeldBills[idx],
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
     posOpen, pinLocked, checkoutOpen, showShortcuts, showCustomerSearch, showDayEnd,
-    selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
-    focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, filteredProducts, serverHeldBills,
+    selectedProductName, variantPickerName, activeNav, activePayment, items.length, selectedCartIdx,
+    focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
     closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
@@ -1195,21 +1271,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):filteredProducts.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
+          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
             <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
-              {filteredProducts.map((p, pIdx)=>{
-                const varStock=p.stock;const lowStock=varStock>0&&varStock<=5;
+              {productCards.map((card, pIdx)=>{
+                const p = card.rep;
+                const varStock = card.totalStock;
+                const lowStock = varStock > 0 && varStock <= 5;
+                const multi = card.variants.length > 1;
                 const kbFocus = focusedProductIdx === pIdx;
+                const priceLabel = multi && card.minPrice !== card.maxPrice
+                  ? `LKR ${formatNumber(card.minPrice)}–${formatNumber(card.maxPrice)}`
+                  : `LKR ${formatNumber(card.minPrice)}`;
                 return (
-                  <motion.div key={p.variantId} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
+                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName||variantPickerName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
                     <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"#162338":getCardBg(p.color)}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={getCardBg(p.color)} iconClassName="h-10 w-10 text-white/20" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
+                      {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(220,38,38,0.85)",color:"#fff"}}>Out of Stock</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(217,119,6,0.9)",color:"#fff"}}>Low Stock</div>}
-                      <button onClick={e=>{e.stopPropagation();setLiked(s=>{const n=new Set(s);n.has(p.variantId)?n.delete(p.variantId):n.add(p.variantId);return n;});}} className="absolute top-1.5 right-1.5 p-1 rounded-full" style={{background:"rgba(0,0,0,0.3)"}}><Heart className="h-3 w-3" style={{color:liked.has(p.variantId)?"#ef4444":"#fff",fill:liked.has(p.variantId)?"#ef4444":"none"}}/></button>
                       <button onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
-                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p><p className="text-[10px] font-mono mt-0.5 line-clamp-1" style={{color:"#4a6a8a"}}>{p.sku}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p></div>
+                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
                   </motion.div>
                 );
               })}
@@ -1246,7 +1328,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} {profile.defaultUnit}</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
                 </div>
               </div>
-            ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-12 w-12 mb-2 opacity-30"/><p className="text-base font-semibold">Click a product to select variant</p></div>)}
+            ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-12 w-12 mb-2 opacity-30"/><p className="text-base font-semibold">Products with variants open a picker</p></div>)}
           </div>
           <div className="w-80 flex flex-col shrink-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>}</div>
@@ -1255,6 +1337,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         </div>
       </div>
     );
+
+    // QUICK PRODUCT
+    if (activeNav === "quick-product") {
+      return (
+        <PosQuickProductPanel
+          onBack={() => setActiveNav("products")}
+          onCreated={() => {
+            void loadProducts();
+            setActiveNav("products");
+          }}
+        />
+      );
+    }
+
+    // QUICK EXPENSE
+    if (activeNav === "expenses") {
+      return (
+        <PosQuickExpensePanel
+          onBack={() => setActiveNav("products")}
+        />
+      );
+    }
 
     // QUICK GRN
     if (activeNav === "quick-grn") {
@@ -1391,12 +1495,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (activeNav === "orders") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         <div className="flex items-center justify-between shrink-0">
-          <h2 className="text-white font-bold text-base">Current Sales (Today)</h2>
+          <h2 className="text-white font-bold text-base">
+            {viewAllSales ? "Current Sales (Today)" : "My Sales (Today)"}
+          </h2>
           <button onClick={loadOrders} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
             <RefreshCw className={cn("h-3.5 w-3.5",ordersLoading&&"animate-spin")}/>Refresh
           </button>
         </div>
-        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">No sales today</p></div>):(
+        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
           <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
             <table className="w-full text-sm">
               <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
@@ -1882,7 +1988,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3">
-            {([{icon:Monitor,title:"Customer Display",displayLink:true,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;displayLink?:boolean;onClick?:()=>void}[]).map((item,i)=>(
+            {([{icon:Monitor,title:"Customer Display",displayLink:true,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports/sales"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;displayLink?:boolean;onClick?:()=>void}[]).map((item,i)=>(
               item.displayLink
                 ?<a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
                 : item.path
@@ -1894,21 +2000,33 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       );
     }
 
-    // PLACEHOLDER for Discounts, Reports
-    const PLACEHOLDERS: Record<string,{icon:React.ElementType;title:string;desc:string;path:string}> = {
-      "discounts":{icon:Tag,title:"Discounts & Promotions",desc:"Create and manage discount codes, seasonal promotions and bundle offers.",path:"/promotions"},
-      "reports":{icon:BarChart2,title:"Sales Reports",desc:"View detailed sales analytics, revenue trends and product performance charts.",path:"/reports"},
-    };
-    const p=PLACEHOLDERS[activeNav];
-    if(p){const Icon=p.icon;return(
-      <div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}>
-        <div className="rounded-2xl p-6 flex flex-col items-center gap-4 border" style={{background:"#162338",borderColor:"#1e3356",maxWidth:"360px"}}>
-          <div className="h-16 w-16 rounded-2xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Icon className="h-8 w-8" style={{color:"#4f6ef7"}}/></div>
-          <div className="text-center"><h3 className="text-white font-bold text-base mb-1">{p.title}</h3><p className="text-sm leading-relaxed" style={{color:"#6a8ab8"}}>{p.desc}</p></div>
-          <a href={p.path} target="_blank" rel="noreferrer" className="flex items-center gap-2 px-4 h-9 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Open in Dashboard<ExternalLink className="h-3.5 w-3.5"/></a>
-        </div>
-      </div>
-    );}
+    // DISCOUNTS & PROMOTIONS
+    if (activeNav === "discounts") {
+      return (
+        <PosPromotionsPanel
+          cartSubtotal={subtotal()}
+          canManage={adminBypass}
+          onBack={() => setActiveNav("products")}
+          onApplyCoupon={(code, discountAmt) => {
+            onCouponChange(code, discountAmt);
+            setCheckoutOpen(true);
+            setActiveNav("products");
+          }}
+        />
+      );
+    }
+
+    // SALES REPORT
+    if (activeNav === "reports") {
+      return (
+        <PosSalesReportPanel
+          viewAll={viewAllSales}
+          onBack={() => setActiveNav("products")}
+          onOpenSale={(id) => void reprintSale(id)}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -1932,6 +2050,18 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               const p = qtyPopupProduct;
               setQtyPopupProduct(null);
               commitAddProduct(p, qty);
+            }}
+          />
+        )}
+
+        {variantPickerName && (
+          <PosVariantPickerModal
+            productName={variantPickerName}
+            variants={variantPickerVariants}
+            onClose={() => setVariantPickerName(null)}
+            onSelect={(v) => {
+              setVariantPickerName(null);
+              handleAddProduct(v as ProductItem);
             }}
           />
         )}

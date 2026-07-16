@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import {
   Info, Layers, DollarSign, ImageIcon, Tag, Settings2,
   CheckCircle2, Plus, Trash2, X, Loader2, Sparkles, Package,
-  Zap, List, ChevronDown,
+  Zap, ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -44,6 +44,20 @@ export interface Product {
   category?: { id: string; name: string; slug: string } | null;
   brand?:    { id: string; name: string; slug: string } | null;
   _count: { variants: number };
+  variants?: {
+    id: string;
+    sku: string;
+    name: string;
+    barcode?: string | null;
+    sellingPrice: number;
+    costPrice: number;
+    mrp: number;
+    size?: string | null;
+    color?: string | null;
+    material?: string | null;
+    style?: string | null;
+    isActive: boolean;
+  }[];
 }
 
 interface VariantAttr { name: string; values: string[]; input: string; }
@@ -144,7 +158,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const [again, setAgain]           = useState(false);
   const [done, setDone]             = useState<Set<TabId>>(new Set());
   const [editSystemTags, setEditSystemTags] = useState<string[]>([]);
-  const [listView, setListView] = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [supplierPick, setSupplierPick] = useState("");
 
@@ -195,7 +208,6 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       setForm(buildInitialForm());
     }
     setTab("basic"); setDone(new Set());
-    setListView(false);
     setVariantRows([]);
     setSupplierPick("");
   }, [editProduct, open]);
@@ -210,28 +222,51 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   };
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
 
-  const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
+  const buildRows = (combos: string[][], attrs: VariantAttr[], prev: VariantRow[] = []): VariantRow[] => {
     const validAttrs = attrs.filter((a) => a.values.length > 0);
-    return combos.map((combo) => ({
-      key: combo.join("|"),
-      sku: genSku(form.name, combo),
-      name: combo.join(" / "),
-      ...applyVariantCombo(shopProfile, validAttrs, combo),
-      sellingPrice: form.sellingPrice,
-      costPrice: form.costPrice,
-      mrp: form.mrp,
-      active: true,
-    }));
+    return combos.map((combo) => {
+      const key = combo.join("|");
+      const old = prev.find((p) => p.key === key);
+      return {
+        key,
+        sku: old?.sku ?? genSku(form.name, combo),
+        name: combo.join(" / "),
+        ...applyVariantCombo(shopProfile, validAttrs, combo),
+        sellingPrice: old?.sellingPrice ?? form.sellingPrice,
+        costPrice: old?.costPrice ?? form.costPrice,
+        mrp: old?.mrp ?? form.mrp,
+        active: old?.active ?? true,
+      };
+    });
   };
 
-  const openListView = () => {
-    const combos = cartesian(form.attributes);
-    if (!combos.length) {
-      toast.error("Add attribute values first");
+  const syncVariantRows = React.useCallback((attrs: VariantAttr[] = form.attributes) => {
+    const combos = cartesian(attrs);
+    if (!form.hasVariants || combos.length === 0) {
+      setVariantRows([]);
       return;
     }
-    setVariantRows(buildRows(combos, form.attributes));
-    setListView(true);
+    setVariantRows((prev) => buildRows(combos, attrs, prev));
+  }, [form.hasVariants, form.attributes, form.name, form.sellingPrice, form.costPrice, form.mrp, shopProfile]);
+
+  useEffect(() => {
+    if (!open || !form.hasVariants) return;
+    syncVariantRows();
+  }, [open, form.hasVariants, form.attributes, form.name, syncVariantRows]);
+
+  const applyBasePricesToAll = () => {
+    if (!form.sellingPrice && !form.costPrice && !form.mrp) {
+      toast.error("Set base prices in the Pricing tab first");
+      setTab("pricing");
+      return;
+    }
+    setVariantRows((rows) => rows.map((r) => ({
+      ...r,
+      sellingPrice: form.sellingPrice || r.sellingPrice,
+      costPrice: form.costPrice || r.costPrice,
+      mrp: form.mrp || r.mrp,
+    })));
+    toast.success("Base prices applied to all variants");
   };
 
   const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
@@ -255,7 +290,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     const validAttrs = form.attributes.filter((a) => a.values.length > 0);
     const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
     const variants = form.hasVariants
-      ? (listView && variantRows.length > 0
+      ? (variantRows.length > 0
         ? variantRows
           .filter((r) => r.active)
           .map((r) => ({
@@ -530,260 +565,183 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const renderVariants = () => {
     const allVariants = cartesian(form.attributes);
     const validAttrs  = form.attributes.filter((a) => a.values.length > 0);
-    const a0 = validAttrs[0];
-    const a1 = validAttrs[1];
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-lg font-bold">Variants</h3>
-            <p className="text-sm text-muted-foreground">Add product variants like {variantHint} and generate SKUs</p>
+            <p className="text-sm text-muted-foreground">Add {variantHint}, then set selling price for each variant</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-muted-foreground">Manage Variants</span>
-            <Switch checked={form.hasVariants} onCheckedChange={(v) => set("hasVariants", v)} />
+            <Switch
+              checked={form.hasVariants}
+              onCheckedChange={(v) => {
+                set("hasVariants", v);
+                if (!v) setVariantRows([]);
+              }}
+            />
           </div>
         </div>
 
         {form.hasVariants ? (
-          listView ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">{variantRows.length} variants</p>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setListView(false)}>
-                    <ChevronDown className="h-3 w-3 rotate-90" /> Back to Grid
-                  </Button>
-                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setVariantRows(buildRows(cartesian(form.attributes), form.attributes))}>
-                    <Zap className="h-3 w-3" /> Regenerate
-                  </Button>
-                </div>
+          <div className="space-y-5">
+            <div className="rounded-xl border p-4 space-y-4 bg-card">
+              <div>
+                <h4 className="font-semibold text-sm">1. Select Variant Attributes</h4>
+                <p className="text-xs text-muted-foreground mt-0.5">Choose attributes that best describe your product</p>
               </div>
-              <div className="rounded-xl border overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
-                      <tr>
-                        <th className="px-3 py-2.5 text-left w-8">#</th>
-                        <th className="px-3 py-2.5 text-left">SKU</th>
-                        <th className="px-3 py-2.5 text-left">Variant</th>
-                        <th className="px-3 py-2.5 text-right">Selling</th>
-                        <th className="px-3 py-2.5 text-right">Cost</th>
-                        <th className="px-3 py-2.5 text-right">MRP</th>
-                        <th className="px-3 py-2.5 text-center">Active</th>
-                        <th className="px-2 py-2.5 w-6"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {variantRows.map((row, idx) => (
-                        <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
-                          <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
-                          <td className="px-3 py-2">
-                            <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)} className="h-7 text-xs font-mono w-28" />
-                          </td>
-                          <td className="px-3 py-2 font-medium">{row.name}</td>
-                          <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                          <td className="px-3 py-2"><Input type="number" value={row.costPrice} onChange={(e) => updateRow(row.key, "costPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                          <td className="px-3 py-2"><Input type="number" value={row.mrp} onChange={(e) => updateRow(row.key, "mrp", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
-                          <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} /></td>
-                          <td className="px-2 py-2">
-                            <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : (
-          <div className="grid grid-cols-3 gap-5">
-            <div className="col-span-2 space-y-4">
-              {/* 1. Select Variant Attributes */}
-              <div className="rounded-xl border p-4 space-y-4 bg-card">
-                <div>
-                  <h4 className="font-semibold text-sm">1. Select Variant Attributes</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">Choose attributes that best describe your product</p>
-                </div>
 
-                {form.attributes.map((attr, i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Input value={attr.name} className="w-24 h-7 text-xs font-semibold border-0 bg-transparent px-0 focus-visible:ring-0"
-                        onChange={(e) => { const a = [...form.attributes]; a[i] = { ...a[i], name: e.target.value }; set("attributes", a); }}
-                        placeholder="Attribute" />
-                      <div className="flex items-center gap-0.5">
-                        <button className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                          onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
-                          <Trash2 className="h-3.5 w-3.5" />
+              {form.attributes.map((attr, i) => (
+                <div key={i} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Input value={attr.name} className="w-24 h-7 text-xs font-semibold border-0 bg-transparent px-0 focus-visible:ring-0"
+                      onChange={(e) => { const a = [...form.attributes]; a[i] = { ...a[i], name: e.target.value }; set("attributes", a); }}
+                      placeholder="Attribute" />
+                    <button type="button" className="p-1.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      onClick={() => set("attributes", form.attributes.filter((_, j) => j !== i))}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[42px] bg-background cursor-text"
+                    onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
+                    {attr.values.map((v, vi) => {
+                      const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
+                      return (
+                        <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
+                          {hex && <span className="h-3.5 w-3.5 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
+                          {v}
+                          <button type="button" className="hover:text-destructive ml-0.5" onClick={(e) => {
+                            e.stopPropagation();
+                            const a = form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) });
+                            set("attributes", a);
+                          }}><X className="h-3 w-3" /></button>
+                        </Badge>
+                      );
+                    })}
+                    <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
+                      placeholder={`Add ${attr.name}…`}
+                      value={attr.input}
+                      onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }}
+                    />
+                    <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </div>
+                  {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
+                    <div className="flex flex-wrap gap-1 pt-1">
+                      {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
+                        <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
+                            attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
+                          }`}>
+                          {preset}
                         </button>
-                      </div>
-                    </div>
-                    {/* Tag input row */}
-                    <div className="flex flex-wrap gap-1.5 items-center border rounded-lg p-2 min-h-[42px] bg-background cursor-text"
-                      onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
-                      {attr.values.map((v, vi) => {
-                        const hex = isColorVariantAttr(shopProfile, attr.name) ? getColorHex(v) : null;
-                        return (
-                          <Badge key={vi} variant="secondary" className="gap-1 pl-1.5 pr-1 h-6 items-center">
-                            {hex && <span className="h-3.5 w-3.5 rounded-full border border-border/60 shrink-0" style={{ backgroundColor: hex }} />}
-                            {v}
-                            <button className="hover:text-destructive ml-0.5" onClick={(e) => {
-                              e.stopPropagation();
-                              const a = form.attributes.map((x, j) => j !== i ? x : { ...x, values: x.values.filter((_, k) => k !== vi) });
-                              set("attributes", a);
-                            }}><X className="h-3 w-3" /></button>
-                          </Badge>
-                        );
-                      })}
-                      <input className="flex-1 min-w-[80px] outline-none text-sm bg-transparent placeholder:text-muted-foreground"
-                        placeholder={`Add ${attr.name}…`}
-                        value={attr.input}
-                        onChange={(e) => { const a = form.attributes.map((x, j) => j !== i ? x : { ...x, input: e.target.value }); set("attributes", a); }}
-                        onKeyDown={(e) => { if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addAttrValue(i); } }}
-                      />
-                      <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
-                    </div>
-                    {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).length > 0 && (
-                      <div className="flex flex-wrap gap-1 pt-1">
-                        {(findVariantAttrDef(shopProfile, attr.name)?.presets ?? []).map((preset) => (
-                          <button key={preset} type="button" onClick={() => togglePreset(i, preset)}
-                            className={`text-[10px] px-2 py-0.5 rounded-full border transition-colors ${
-                              attr.values.includes(preset) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted"
-                            }`}>
-                            {preset}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <div className="flex items-center justify-between">
-                  <div className="flex gap-2">
-                    {form.attributes.length < shopProfile.variantAttributes.length && (
-                    <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => {
-                      const next = nextVariantAttributeName(shopProfile, form.attributes);
-                      if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
-                    }}>
-                      <Plus className="h-3.5 w-3.5" /> Add Attribute
-                    </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
-                      <Zap className="h-3.5 w-3.5" /> Fill {variantHint} presets
-                    </Button>
-                  </div>
-                  <span className="text-xs text-muted-foreground font-medium">
-                    Total Variants: <span className="font-bold text-primary">{allVariants.length}</span>
-                  </span>
-                </div>
-              </div>
-
-              {/* 2. Variant Preview */}
-              {allVariants.length > 0 && (
-                <div className="rounded-xl border p-4 space-y-3 bg-card">
-                  <div>
-                    <h4 className="font-semibold text-sm">2. Variant Preview</h4>
-                    <p className="text-xs text-muted-foreground mt-0.5">Preview all variants combination</p>
-                  </div>
-
-                  {a0 && a1 ? (
-                    <div className="overflow-auto rounded-lg border">
-                      <table className="w-full text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-muted/40">
-                            <th className="border-b border-r px-3 py-2 text-left text-muted-foreground font-medium">
-                              {a0.name}&nbsp;\&nbsp;{a1.name}
-                            </th>
-                            {a1.values.map((v) => {
-                              const hex = isColorVariantAttr(shopProfile, a1.name) ? getColorHex(v) : null;
-                              return (
-                                <th key={v} className="border-b border-r last:border-r-0 px-3 py-2 text-center font-medium">
-                                  <div className="flex flex-col items-center gap-1">
-                                    {hex && <span className="h-6 w-6 rounded-full border border-border/60 block" style={{ backgroundColor: hex }} />}
-                                    {v}
-                                  </div>
-                                </th>
-                              );
-                            })}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {a0.values.map((row) => (
-                            <tr key={row} className="hover:bg-muted/20 transition-colors">
-                              <td className="border-r px-3 py-2.5 bg-muted/20 font-semibold">{row}</td>
-                              {a1.values.map((col) => (
-                                <td key={col} className="border-r last:border-r-0 px-3 py-2.5 text-center font-mono text-[11px] text-muted-foreground">
-                                  {genSku(form.name, [row, col])}
-                                </td>
-                              ))}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      {allVariants.slice(0, 12).map((combo, i) => (
-                        <div key={i} className="flex items-center gap-3 px-3 py-1.5 rounded-lg bg-muted/30 text-xs">
-                          <span className="font-mono text-primary">{genSku(form.name, combo)}</span>
-                          <span className="text-muted-foreground">{combo.join(" / ")}</span>
-                        </div>
                       ))}
-                      {allVariants.length > 12 && <p className="text-xs text-muted-foreground pl-1">+{allVariants.length - 12} more variants</p>}
                     </div>
                   )}
-
-                  <div className="flex items-center justify-between pt-1">
-                    <label className="flex items-center gap-2 cursor-default">
-                      <input type="checkbox" defaultChecked readOnly className="h-3.5 w-3.5 accent-primary" />
-                      <span className="text-xs text-muted-foreground">Auto generate SKUs</span>
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={openListView}>
-                        <List className="h-3 w-3" /> Edit in List View
-                      </Button>
-                      <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
-                        onClick={() => set("attributes", form.attributes.map((a) => ({ ...a, values: [], input: "" })))}>
-                        <Trash2 className="h-3 w-3" /> Clear All
-                      </Button>
-                    </div>
-                  </div>
                 </div>
-              )}
+              ))}
+
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex gap-2">
+                  {form.attributes.length < shopProfile.variantAttributes.length && (
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8" onClick={() => {
+                    const next = nextVariantAttributeName(shopProfile, form.attributes);
+                    if (next) set("attributes", [...form.attributes, { name: next, values: [], input: "" }]);
+                  }}>
+                    <Plus className="h-3.5 w-3.5" /> Add Attribute
+                  </Button>
+                  )}
+                  <Button variant="outline" size="sm" className="gap-1.5 h-8 border-primary/40 text-primary hover:bg-primary/5" onClick={autoGenerate}>
+                    <Zap className="h-3.5 w-3.5" /> Fill {variantHint} presets
+                  </Button>
+                </div>
+                <span className="text-xs text-muted-foreground font-medium">
+                  Total Variants: <span className="font-bold text-primary">{allVariants.length}</span>
+                </span>
+              </div>
             </div>
 
-            {/* Variant Summary */}
-            <div className="rounded-xl border p-4 bg-card h-fit space-y-3">
-              <h4 className="font-semibold text-sm">Variant Summary</h4>
-              <div className="space-y-2.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Attributes</span>
-                  <span className="font-medium">{validAttrs.length}</span>
-                </div>
-                {validAttrs.map((a, i) => (
-                  <div key={i} className="flex justify-between text-xs pl-2">
-                    <span className="text-muted-foreground">{a.name}</span>
-                    <span className="font-medium text-right max-w-[130px] truncate">
-                      {a.values.length}&nbsp;({a.values.join(", ")})
-                    </span>
+            {variantRows.length > 0 && (
+              <div className="rounded-xl border p-4 space-y-3 bg-card">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h4 className="font-semibold text-sm">2. Set price for each variant</h4>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Enter selling / cost / MRP per variant. Use Pricing tab for the default base price.
+                    </p>
                   </div>
-                ))}
-                <div className="border-t pt-2.5 flex justify-between">
-                  <span className="text-muted-foreground">Total Variants</span>
-                  <span className="font-bold text-primary text-base">{allVariants.length}</span>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={applyBasePricesToAll}>
+                      <DollarSign className="h-3.5 w-3.5" /> Apply base price to all
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" className="h-8 text-xs gap-1.5" onClick={() => syncVariantRows()}>
+                      <Zap className="h-3.5 w-3.5" /> Refresh rows
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-xl border overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2.5 text-left w-8">#</th>
+                          <th className="px-3 py-2.5 text-left">SKU</th>
+                          <th className="px-3 py-2.5 text-left">Variant</th>
+                          <th className="px-3 py-2.5 text-right">Selling (LKR)</th>
+                          <th className="px-3 py-2.5 text-right">Cost (LKR)</th>
+                          <th className="px-3 py-2.5 text-right">MRP (LKR)</th>
+                          <th className="px-3 py-2.5 text-center">Active</th>
+                          <th className="px-2 py-2.5 w-6"></th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {variantRows.map((row, idx) => (
+                          <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
+                            <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                            <td className="px-3 py-2">
+                              <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)} className="h-8 text-xs font-mono w-28" />
+                            </td>
+                            <td className="px-3 py-2 font-medium whitespace-nowrap">{row.name}</td>
+                            <td className="px-3 py-2">
+                              <Input type="number" min="0" step="0.01" value={row.sellingPrice}
+                                onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)}
+                                className="h-8 text-xs text-right w-24 font-semibold" placeholder="0.00" />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input type="number" min="0" step="0.01" value={row.costPrice}
+                                onChange={(e) => updateRow(row.key, "costPrice", e.target.value)}
+                                className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                            </td>
+                            <td className="px-3 py-2">
+                              <Input type="number" min="0" step="0.01" value={row.mrp}
+                                onChange={(e) => updateRow(row.key, "mrp", e.target.value)}
+                                className="h-8 text-xs text-right w-24" placeholder="0.00" />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} />
+                            </td>
+                            <td className="px-2 py-2">
+                              <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
+                                className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-              {allVariants.length > 0 && (
-                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Open list view to set separate pricing per variant.</p>
-                </div>
-              )}
-            </div>
+            )}
+
+            {form.hasVariants && allVariants.length === 0 && (
+              <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                Add attribute values (e.g. S, M, L) to generate variants and set prices.
+              </div>
+            )}
           </div>
-          )
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Layers className="h-12 w-12 mb-3 opacity-20" />
@@ -799,7 +757,11 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-bold">Pricing</h3>
-        <p className="text-sm text-muted-foreground">Set selling price, cost price, and tax rates</p>
+        <p className="text-sm text-muted-foreground">
+          {form.hasVariants
+            ? "Base price for new variants. Override each variant under the Variants tab."
+            : "Set selling price, cost price, and tax rates"}
+        </p>
       </div>
       <div className="grid grid-cols-2 gap-5">
         <div className="rounded-xl border p-5 space-y-4 bg-card">

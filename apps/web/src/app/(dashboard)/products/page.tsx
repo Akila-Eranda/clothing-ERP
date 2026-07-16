@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw, Printer, Tag } from "lucide-react";
+import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,28 +18,90 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 
-// ── Status helpers ────────────────────────────────────────────────────────
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
-  ACTIVE:        "success",
-  DRAFT:         "warning",
-  INACTIVE:      "secondary",
-  OUT_OF_STOCK:  "danger",
+  ACTIVE: "success",
+  DRAFT: "warning",
+  INACTIVE: "secondary",
+  OUT_OF_STOCK: "danger",
 };
 
-// ── CSV helpers ───────────────────────────────────────────────────────────
+type ProductListRow = {
+  rowKey: string;
+  productId: string;
+  productName: string;
+  variantId?: string;
+  variantName: string;
+  sku: string;
+  barcode: string;
+  sellingPrice: number;
+  costPrice: number;
+  mrp: number;
+  status: string;
+  brandName?: string;
+  categoryName?: string;
+  isVariant: boolean;
+  product: Product;
+};
+
 const CSV_HEADERS = ["name", "sellingPrice", "costPrice", "mrp", "taxRate", "description", "tags", "status"];
 
-function printLabels(products: Product[], brandName: string) {
+function flattenProducts(products: Product[]): ProductListRow[] {
+  const rows: ProductListRow[] = [];
+  for (const p of products) {
+    const variants = (p.variants ?? []).filter((v) => v.isActive !== false);
+    if (variants.length > 0) {
+      for (const v of variants) {
+        rows.push({
+          rowKey: `${p.id}:${v.id}`,
+          productId: p.id,
+          productName: p.name,
+          variantId: v.id,
+          variantName: v.name || "Default",
+          sku: v.sku || p.sku,
+          barcode: v.barcode || p.barcode || p.sku,
+          sellingPrice: v.sellingPrice,
+          costPrice: v.costPrice,
+          mrp: v.mrp,
+          status: p.status,
+          brandName: p.brand?.name,
+          categoryName: p.category?.name,
+          isVariant: true,
+          product: p,
+        });
+      }
+    } else {
+      rows.push({
+        rowKey: p.id,
+        productId: p.id,
+        productName: p.name,
+        variantName: "—",
+        sku: p.sku,
+        barcode: p.barcode || p.sku,
+        sellingPrice: p.sellingPrice,
+        costPrice: p.costPrice,
+        mrp: p.mrp,
+        status: p.status,
+        brandName: p.brand?.name,
+        categoryName: p.category?.name,
+        isVariant: false,
+        product: p,
+      });
+    }
+  }
+  return rows;
+}
+
+function printLabels(rows: ProductListRow[], brandName: string) {
   const w = window.open("", "_blank", "width=900,height=700,scrollbars=yes");
   if (!w) { alert("Allow popups to print labels"); return; }
-  const labels = products.slice(0, 200).map(p => ({
-    name: p.name,
-    variant: "",
-    sku: p.sku,
-    barcode: p.barcode ?? p.sku,
-    price: p.sellingPrice,
+  const labels = rows.slice(0, 200).map((r) => ({
+    name: r.productName,
+    variant: r.isVariant ? r.variantName : "",
+    sku: r.sku,
+    barcode: r.barcode,
+    price: r.sellingPrice,
   }));
-  const html = labels.map(l => `
+  const html = labels.map((l) => `
     <div class="label">
       <div class="brand">${brandName}</div>
       <div class="pname">${l.name}</div>
@@ -85,12 +147,12 @@ async function parseCsvAndImport(
       await api.post("/products", {
         name: obj.name,
         sellingPrice: parseFloat(obj.sellingprice || obj["selling price"] || "0"),
-        costPrice:    parseFloat(obj.costprice    || obj["cost price"]    || "0"),
-        mrp:          parseFloat(obj.mrp          || "0"),
-        taxRate:      parseFloat(obj.taxrate      || "18"),
-        description:  obj.description || undefined,
-        tags:         obj.tags ? obj.tags.split("|").filter(Boolean) : [],
-        status:       (obj.status?.toUpperCase() as "ACTIVE" | "DRAFT") || "DRAFT",
+        costPrice: parseFloat(obj.costprice || obj["cost price"] || "0"),
+        mrp: parseFloat(obj.mrp || "0"),
+        taxRate: parseFloat(obj.taxrate || "18"),
+        description: obj.description || undefined,
+        tags: obj.tags ? obj.tags.split("|").filter(Boolean) : [],
+        status: (obj.status?.toUpperCase() as "ACTIVE" | "DRAFT") || "DRAFT",
       });
       success++;
     } catch { failed++; }
@@ -99,15 +161,14 @@ async function parseCsvAndImport(
   return { success, failed };
 }
 
-// ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
-  onView:   (p: Product) => void,
-  onEdit:   (p: Product) => void,
+  onView: (p: Product) => void,
+  onEdit: (p: Product) => void,
   onDelete: (p: Product) => void,
-): ColumnDef<Product>[] {
+): ColumnDef<ProductListRow>[] {
   return [
     {
-      accessorKey: "name",
+      accessorKey: "productName",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
@@ -115,10 +176,21 @@ function buildColumns(
             <Package className="h-4 w-4 text-muted-foreground/40" />
           </div>
           <div>
-            <p className="text-sm font-medium">{row.original.name}</p>
-            <p className="text-xs text-muted-foreground">{row.original.brand?.name ?? "—"}</p>
+            <p className="text-sm font-medium">{row.original.productName}</p>
+            <p className="text-xs text-muted-foreground">{row.original.brandName ?? "—"}</p>
           </div>
         </div>
+      ),
+    },
+    {
+      accessorKey: "variantName",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Variant" />,
+      cell: ({ row }) => (
+        row.original.isVariant ? (
+          <Badge variant="secondary" className="text-[10px]">{row.original.variantName}</Badge>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )
       ),
     },
     {
@@ -127,23 +199,21 @@ function buildColumns(
       cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.sku}</span>,
     },
     {
+      accessorKey: "barcode",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Barcode" />,
+      cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.barcode || "—"}</span>,
+    },
+    {
       id: "category",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
       cell: ({ row }) => (
-        <Badge variant="secondary" className="text-[10px]">{row.original.category?.name ?? "—"}</Badge>
+        <Badge variant="secondary" className="text-[10px]">{row.original.categoryName ?? "—"}</Badge>
       ),
     },
     {
       accessorKey: "sellingPrice",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Price" />,
-      cell: ({ row }) => <span className="text-sm font-semibold">LKR {row.original.sellingPrice.toFixed(2)}</span>,
-    },
-    {
-      id: "variants",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Variants" />,
-      cell: ({ row }) => (
-        <span className="text-sm text-muted-foreground">{row.original._count.variants}</span>
-      ),
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Selling" />,
+      cell: ({ row }) => <span className="text-sm font-semibold text-blue-600">LKR {row.original.sellingPrice.toFixed(2)}</span>,
     },
     {
       accessorKey: "status",
@@ -158,27 +228,26 @@ function buildColumns(
       id: "actions",
       cell: ({ row }) => (
         <TableActionsRow
-          showAction={  { action: () => onView(row.original) }}
-          editAction={  { action: () => onEdit(row.original) }}
-          deleteAction={ { action: () => onDelete(row.original) }}
+          showAction={{ action: () => onView(row.original.product) }}
+          editAction={{ action: () => onEdit(row.original.product) }}
+          deleteAction={{ action: () => onDelete(row.original.product) }}
         />
       ),
     },
   ];
 }
 
-// ── Page ─────────────────────────────────────────────────────────────────
 export default function ProductsPage() {
   const router = useRouter();
   const { profile, workspace } = useShopWorkspace();
   const { settings: receiptSettings } = useReceiptSettings();
   const routeLabels = getRouteLabels(workspace, profile);
-  const printLabel = routeLabels.printTags ?? 'Print Labels';
+  const printLabel = routeLabels.printTags ?? "Print Tags";
   const brandName = receiptSettings.shopName || APP_NAME;
-  const [products, setProducts]     = useState<Product[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [importing, setImporting]   = useState(false);
-  const importRef                   = useRef<HTMLInputElement>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
 
   const fetch = useCallback(async () => {
     setLoading(true);
@@ -190,6 +259,8 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  const listRows = useMemo(() => flattenProducts(products), [products]);
 
   const handleDelete = async (p: Product) => {
     if (!window.confirm(`Delete "${p.name}"? This cannot be undone.`)) return;
@@ -215,17 +286,16 @@ export default function ProductsPage() {
     finally { setImporting(false); }
   };
 
-  // Stats
-  const total    = products.length;
-  const active   = products.filter((p) => p.status === "ACTIVE").length;
-  const drafts   = products.filter((p) => p.status === "DRAFT").length;
+  const total = products.length;
+  const active = products.filter((p) => p.status === "ACTIVE").length;
+  const drafts = products.filter((p) => p.status === "DRAFT").length;
   const inactive = products.filter((p) => p.status === "INACTIVE" || p.status === "OUT_OF_STOCK").length;
 
   const STATS = [
-    { label: `Total ${workspace.productLabel}`, value: total,    icon: Package,   color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Active",           value: active,   icon: TrendingUp,color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Drafts",           value: drafts,   icon: FileText,  color: "text-amber-500",   bg: "bg-amber-500/10" },
-    { label: "Inactive / OOS",   value: inactive, icon: Archive,   color: "text-rose-500",    bg: "bg-rose-500/10" },
+    { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Active", value: active, icon: TrendingUp, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "Drafts", value: drafts, icon: FileText, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "Inactive / OOS", value: inactive, icon: Archive, color: "text-rose-500", bg: "bg-rose-500/10" },
   ];
 
   const columns = buildColumns(
@@ -236,11 +306,12 @@ export default function ProductsPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">{workspace.productLabel}</h1>
-          <p className="text-sm text-muted-foreground">Manage your {workspace.productLabel.toLowerCase()} catalog and variants</p>
+          <p className="text-sm text-muted-foreground">
+            Each variant shows as its own row · same product barcode · separate selling prices
+          </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => fetch()} className="gap-1.5">
@@ -249,7 +320,7 @@ export default function ProductsPage() {
           <Button variant="outline" size="sm" onClick={() => exportToCsv(products)} className="gap-1.5" disabled={!products.length}>
             <Download className="h-3.5 w-3.5" /> Export CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printLabels(products, brandName)} className="gap-1.5" disabled={!products.length}>
+          <Button variant="outline" size="sm" onClick={() => printLabels(listRows, brandName)} className="gap-1.5" disabled={!listRows.length}>
             <Tag className="h-3.5 w-3.5" /> {printLabel}
           </Button>
           <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
@@ -257,12 +328,11 @@ export default function ProductsPage() {
           </Button>
           <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
           <Button size="sm" className="gap-1.5" onClick={() => router.push("/products/new")}>
-            <Plus className="h-3.5 w-3.5" /> Add {workspace.productLabel.replace(/s$/, '')}
+            <Plus className="h-3.5 w-3.5" /> Add New
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map((s) => (
           <Card key={s.label}>
@@ -274,36 +344,29 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      {/* Table */}
       <ClientSideTable
-        data={products}
+        data={listRows}
         columns={columns}
-        pageCount={Math.ceil(products.length / 10)}
+        pageCount={Math.ceil(listRows.length / 10) || 1}
         searchableColumns={[
-          { id: "name", title: "Product" },
-          { id: "sku",  title: "SKU" },
+          { id: "productName", title: "Product" },
+          { id: "variantName", title: "Variant" },
+          { id: "sku", title: "SKU" },
+          { id: "barcode", title: "Barcode" },
         ]}
         filterableColumns={[
           {
             id: "status",
             title: "Status",
             options: [
-              { label: "Active",       value: "ACTIVE" },
-              { label: "Draft",        value: "DRAFT" },
-              { label: "Inactive",     value: "INACTIVE" },
-              { label: "Out of Stock", value: "OUT_OF_STOCK" },
+              { value: "ACTIVE", label: "Active" },
+              { value: "DRAFT", label: "Draft" },
+              { value: "INACTIVE", label: "Inactive" },
             ],
           },
         ]}
-        isShowExportButtons={{ isShow: true, fileName: "products-export" }}
+        isShowExportButtons={{ isShow: true, fileName: "products-variants" }}
       />
-
-      {/* Import CSV template hint */}
-      <p className="text-[11px] text-muted-foreground">
-        CSV import format: <span className="font-mono">{CSV_HEADERS.join(", ")}</span>
-        {" "}— tags separated by <span className="font-mono">|</span>, status: ACTIVE or DRAFT
-      </p>
-
     </div>
   );
 }

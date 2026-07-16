@@ -6,6 +6,18 @@ export function bypassesWorkflowApproval(role?: string | null): boolean {
   return r === 'super_admin' || r === 'tenant_admin';
 }
 
+/** Managers/admins see all POS bills; cashiers see only their own. */
+export function canViewAllPosSales(role?: string | null): boolean {
+  const r = normalizeRole(role);
+  return [
+    'super_admin',
+    'tenant_admin',
+    'branch_manager',
+    'accountant',
+    'inventory_manager',
+  ].includes(r);
+}
+
 /** Cart discount above this % requires manager workflow approval (non-admin). */
 export const DISCOUNT_APPROVAL_THRESHOLD_PCT = 10;
 

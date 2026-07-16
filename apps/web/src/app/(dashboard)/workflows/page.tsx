@@ -50,7 +50,7 @@ const GUIDE = [
   { key: "quotation", title: "Quotation", steps: "Draft → Manager → Admin → Sent to customer", href: "/quotations" },
   { key: "discount_request", title: "Discount Request", steps: "Cashier request → Manager approval", href: "/pos" },
   { key: "stock_adjustment", title: "Stock Adjustment", steps: "Request → Inventory manager approval", href: "/inventory" },
-  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Manager review → Admin approval", href: "/inventory" },
+  { key: "stock_transfer", title: "Stock Transfer", steps: "Request → Manager review → Admin approval", href: "/inventory/transfers" },
   { key: "cash_variance", title: "Cash Variance", steps: "POS close → Manager approves drawer variance", href: "/cash?tab=variance" },
 ];
 
@@ -77,7 +77,7 @@ function entityLink(task: WorkflowTask): string | null {
   if (task.instance.entityType === "PurchaseOrder") return `/purchases/${task.instance.entityId}`;
   if (task.instance.entityType === "Quotation" || key === "quotation") return "/quotations";
   if (key === "cash_variance" || task.instance.entityType === "CashRegister") return "/cash?tab=variance";
-  if (key === "stock_transfer") return "/inventory";
+  if (key === "stock_transfer") return "/inventory/transfers";
   if (key === "stock_adjustment") return "/inventory";
   if (key === "discount_request") return "/pos";
   return null;

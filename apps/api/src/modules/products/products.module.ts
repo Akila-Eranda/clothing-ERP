@@ -64,6 +64,13 @@ export class ProductsController {
     return this.productsService.seedVariants(user.tenantId);
   }
 
+  @Post('sync-shared-barcodes')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Copy product barcode onto all variants (shared barcode, per-variant prices)' })
+  syncSharedBarcodes(@CurrentUser() user: IAuthUser) {
+    return this.productsService.syncSharedBarcodes(user.tenantId);
+  }
+
   @Post(':id/variants')
   @RequirePermissions('products:update')
   @ApiOperation({ summary: 'Add variants to existing product' })

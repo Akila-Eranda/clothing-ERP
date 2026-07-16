@@ -49,15 +49,51 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
   "/products": "Products",
   "/categories": "Categories",
   "/brands": "Brands",
-  "/inventory": "Inventory",
+  "/inventory": "Stock Levels",
+  "/inventory/ledger": "Inventory Ledger",
+  "/inventory/abc": "ABC Analysis",
+  "/inventory/dead-stock": "Dead Stock",
+  "/inventory/aging": "Stock Aging",
+  "/inventory/transfers": "Stock Transfers",
+  "/inventory/expiry": "Expiry Dashboard",
+  "/inventory/expiry/near": "Near Expiry",
+  "/inventory/expiry/expired": "Expired",
+  "/inventory/expiry/lots": "All Active Lots",
+  "/inventory/expiry/transactions": "Batch Transactions",
+  "/inventory/expiry/reconcile": "Reconciliation",
   "/customers": "Customers & CRM",
   "/suppliers": "Suppliers",
   "/purchases": "Purchase Orders",
-  "/hr": "HR & Payroll",
-  "/accounting": "Accounting",
+  "/hr": "Employees",
+  "/hr/attendance": "Attendance",
+  "/hr/payroll": "Payroll",
+  "/hr/leaves": "Leaves",
+  "/accounting": "Accounting Dashboard",
+  "/accounting/transactions": "Transactions",
+  "/accounting/accounts": "Chart of Accounts",
+  "/accounting/banking": "Banking",
+  "/accounting/reports": "Accounting Reports",
+  "/accounting/settings": "Accounting Settings",
+  "/accounting/credit": "Credit Customers",
+  "/accounting/credit/schedules": "Schedules",
+  "/accounting/credit/reminders": "Reminders",
+  "/accounting/credit/collections": "Collections",
+  "/accounting/finance": "Finance Hub",
   "/expenses": "Expenses",
   "/branches": "Branches",
-  "/reports": "Reports & Analytics",
+  "/reports": "Reports Overview",
+  "/reports/sales": "Sales Reports",
+  "/reports/purchases": "Purchase Reports",
+  "/reports/inventory": "Inventory Reports",
+  "/reports/suppliers": "Supplier Reports",
+  "/reports/customers": "Customer Reports",
+  "/reports/cashier": "Cashier Reports",
+  "/reports/branches": "Branch Reports",
+  "/reports/tax": "Tax Reports",
+  "/reports/expiry": "Expiry Reports",
+  "/reports/cheques": "Cheque Reports",
+  "/reports/commission": "Commission Reports",
+  "/reports/financial": "Financial Reports",
   "/promotions": "Promotions & Offers",
   "/notifications": "Notifications",
   "/settings": "Settings",
@@ -128,6 +164,14 @@ export function Header() {
   const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
 
+  const crumbLabel = (index: number) => {
+    const fullPath = "/" + breadcrumbs.slice(0, index + 1).join("/");
+    const crumb = breadcrumbs[index];
+    return routeLabels[fullPath]
+      || routeLabels["/" + crumb]
+      || crumb.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-white dark:bg-background/80 backdrop-blur-xl px-6 shrink-0">
       {/* Mobile menu toggle */}
@@ -146,16 +190,16 @@ export function Header() {
           <AppLogo variant="sidebar" theme="auto" />
         </Link>
         {breadcrumbs.map((crumb, i) => (
-          <React.Fragment key={crumb}>
+          <React.Fragment key={`${crumb}-${i}`}>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 hidden sm:block shrink-0" />
             <span
               className={
                 i === breadcrumbs.length - 1
-                  ? "font-semibold text-foreground"
-                  : "text-muted-foreground hidden sm:block"
+                  ? "font-semibold text-foreground truncate"
+                  : "text-muted-foreground hidden sm:block truncate"
               }
             >
-              {routeLabels["/" + crumb] || crumb}
+              {crumbLabel(i)}
             </span>
           </React.Fragment>
         ))}

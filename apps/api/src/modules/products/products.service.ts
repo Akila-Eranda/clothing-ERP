@@ -19,6 +19,8 @@ export class CreateVariantDto {
   @ApiPropertyOptional() @IsOptional() @IsString() material?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() style?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() dotCode?: string;
+  @ApiPropertyOptional({ description: 'Optional; defaults to product barcode (shared across variants)' })
+  @IsOptional() @IsString() barcode?: string;
   @ApiProperty() @IsNumber() @Min(0) sellingPrice: number;
   @ApiProperty() @IsNumber() @Min(0) costPrice: number;
   @ApiProperty() @IsNumber() @Min(0) mrp: number;
@@ -189,6 +191,9 @@ export class ProductsService {
       slug = `${baseSlug}-${suffix++}`;
     }
 
+    // One product barcode shared by all variants; prices stay per-variant.
+    const sharedBarcode = (dto.barcode?.trim() || this.generateEAN13());
+
     const product = await this.prisma.product.create({
       data: {
         tenantId,
@@ -209,7 +214,7 @@ export class ProductsService {
         tags: dto.tags ?? [],
         hasVariants: dto.hasVariants ?? true,
         trackInventory: dto.trackInventory ?? true,
-        barcode: dto.barcode,
+        barcode: sharedBarcode,
         oemNumber: dto.oemNumber,
         modelNumber: dto.modelNumber,
         loadIndex: dto.loadIndex,
@@ -238,7 +243,7 @@ export class ProductsService {
           costPrice: v.costPrice,
           mrp: v.mrp,
           sortOrder: i,
-          barcode: this.generateEAN13(),
+          barcode: v.barcode?.trim() || sharedBarcode,
         })),
         skipDuplicates: true,
       });
@@ -251,7 +256,7 @@ export class ProductsService {
           sellingPrice: dto.sellingPrice,
           costPrice: dto.costPrice,
           mrp: dto.mrp,
-          barcode: this.generateEAN13(),
+          barcode: sharedBarcode,
         },
       });
     }
@@ -291,7 +296,7 @@ export class ProductsService {
       );
     }
 
-    return product;
+    return this.findOne(product.id, tenantId);
   }
 
   async findAll(tenantId: string, query: PaginationDto & { categoryId?: string; status?: ProductStatus }) {
@@ -304,7 +309,20 @@ export class ProductsService {
         OR: [
           { name: { contains: query.search, mode: 'insensitive' as const } },
           { sku: { contains: query.search, mode: 'insensitive' as const } },
+          { barcode: { contains: query.search, mode: 'insensitive' as const } },
           { tags: { has: query.search } },
+          {
+            variants: {
+              some: {
+                isActive: true,
+                OR: [
+                  { sku: { contains: query.search, mode: 'insensitive' as const } },
+                  { barcode: { contains: query.search, mode: 'insensitive' as const } },
+                  { name: { contains: query.search, mode: 'insensitive' as const } },
+                ],
+              },
+            },
+          },
         ],
       }),
     };
@@ -319,6 +337,24 @@ export class ProductsService {
           category: true,
           brand: true,
           _count: { select: { variants: true } },
+          variants: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              sku: true,
+              name: true,
+              barcode: true,
+              sellingPrice: true,
+              costPrice: true,
+              mrp: true,
+              size: true,
+              color: true,
+              material: true,
+              style: true,
+              isActive: true,
+            },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          },
         },
       }),
       this.prisma.product.count({ where }),
@@ -361,6 +397,22 @@ export class ProductsService {
     }
     if (dto.name) data.slug = this.generateSlug(dto.name);
     await this.prisma.product.update({ where: { id }, data });
+
+    // Keep product barcode shared across all variants when product barcode changes.
+    if (typeof data.barcode === 'string' || data.barcode === null) {
+      const shared = typeof data.barcode === 'string' ? data.barcode.trim() || null : null;
+      await this.prisma.productVariant.updateMany({
+        where: { productId: id },
+        data: { barcode: shared },
+      });
+    }
+
+    const productBarcode = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: { barcode: true },
+    });
+    const sharedBarcode = productBarcode?.barcode ?? null;
+
     if (Array.isArray(variants) && variants.length > 0) {
       for (const v of variants as (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[]) {
         if (v.id) {
@@ -377,6 +429,7 @@ export class ProductsService {
               ...(v.costPrice    !== undefined && { costPrice:    v.costPrice }),
               ...(v.mrp          !== undefined && { mrp:          v.mrp }),
               ...(v.isActive     !== undefined && { isActive:     v.isActive }),
+              ...(v.barcode      !== undefined && { barcode:      v.barcode?.trim() || sharedBarcode }),
             },
           });
         } else {
@@ -392,6 +445,7 @@ export class ProductsService {
               sellingPrice: v.sellingPrice ?? 0,
               costPrice:    v.costPrice    ?? 0,
               mrp:          v.mrp          ?? 0,
+              barcode:      v.barcode?.trim() || sharedBarcode,
               sortOrder:    0,
             },
           });
@@ -412,7 +466,14 @@ export class ProductsService {
   }
 
   async addVariants(productId: string, tenantId: string, variants: CreateVariantDto[]) {
-    await this.findOne(productId, tenantId);
+    const product = await this.findOne(productId, tenantId);
+    const sharedBarcode = product.barcode ?? this.generateEAN13();
+    if (!product.barcode) {
+      await this.prisma.product.update({
+        where: { id: productId },
+        data: { barcode: sharedBarcode },
+      });
+    }
     await this.prisma.productVariant.createMany({
       data: variants.map((v, i) => ({
         productId,
@@ -426,7 +487,7 @@ export class ProductsService {
         costPrice: v.costPrice,
         mrp: v.mrp,
         sortOrder: i,
-        barcode: this.generateEAN13(),
+        barcode: v.barcode?.trim() || sharedBarcode,
       })),
     });
     return this.findOne(productId, tenantId);
@@ -444,6 +505,13 @@ export class ProductsService {
 
     let seeded = 0;
     for (const p of orphans) {
+      const sharedBarcode = p.barcode ?? this.generateEAN13();
+      if (!p.barcode) {
+        await this.prisma.product.update({
+          where: { id: p.id },
+          data: { barcode: sharedBarcode },
+        });
+      }
       const variant = await this.prisma.productVariant.create({
         data: {
           productId: p.id,
@@ -452,7 +520,7 @@ export class ProductsService {
           sellingPrice: p.sellingPrice,
           costPrice: p.costPrice,
           mrp: p.mrp,
-          barcode: this.generateEAN13(),
+          barcode: sharedBarcode,
         },
       });
       if (branchIds.length) {
@@ -475,6 +543,45 @@ export class ProductsService {
       seeded++;
     }
     return { seeded, message: `Created default variant + inventory for ${seeded} products` };
+  }
+
+  /** Copy each product's barcode onto all its variants (shared barcode model). */
+  async syncSharedBarcodes(tenantId: string) {
+    const products = await this.prisma.product.findMany({
+      where: { tenantId },
+      select: {
+        id: true,
+        barcode: true,
+        variants: { select: { id: true, barcode: true }, take: 1, orderBy: { sortOrder: 'asc' } },
+      },
+    });
+
+    let productsUpdated = 0;
+    let variantsUpdated = 0;
+
+    for (const p of products) {
+      let shared = p.barcode?.trim() || null;
+      if (!shared) {
+        shared = p.variants[0]?.barcode?.trim() || this.generateEAN13();
+        await this.prisma.product.update({
+          where: { id: p.id },
+          data: { barcode: shared },
+        });
+        productsUpdated += 1;
+      }
+      const res = await this.prisma.productVariant.updateMany({
+        where: { productId: p.id },
+        data: { barcode: shared },
+      });
+      variantsUpdated += res.count;
+    }
+
+    return {
+      products: products.length,
+      productsUpdated,
+      variantsUpdated,
+      message: `Synced shared barcode onto ${variantsUpdated} variants across ${products.length} products`,
+    };
   }
 
   async bulkUpdateStatus(ids: string[], tenantId: string, status: ProductStatus) {

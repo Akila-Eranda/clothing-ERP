@@ -21,6 +21,7 @@ import { assertCreditAvailable } from '@/modules/customers/customer-credit.helpe
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
 import { nanoid } from 'nanoid';
 import { recordSaleCashMovement, findOpenRegister, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
+import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
 import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
@@ -508,7 +509,12 @@ export class PosService {
     });
   }
 
-  async getSales(tenantId: string, branchId: string, query: { page?: number; limit?: number; search?: string; date?: string }) {
+  async getSales(
+    tenantId: string,
+    branchId: string,
+    query: { page?: number; limit?: number; search?: string; date?: string },
+    opts?: { cashierId?: string; scopeAll?: boolean },
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const page  = parseInt(String(query.page  ?? 1),  10);
     const limit = parseInt(String(query.limit ?? 20), 10);
@@ -516,6 +522,7 @@ export class PosService {
     const where = {
       tenantId,
       branchId: resolvedBranchId,
+      ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
       ...(query.search && {
         OR: [
           { invoiceNumber: { contains: query.search, mode: 'insensitive' as const } },
@@ -544,9 +551,13 @@ export class PosService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
-  async getSaleById(id: string, tenantId: string) {
+  async getSaleById(id: string, tenantId: string, opts?: { cashierId?: string; scopeAll?: boolean }) {
     const sale = await this.prisma.sale.findFirst({
-      where: { id, tenantId },
+      where: {
+        id,
+        tenantId,
+        ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+      },
       include: {
         items: { include: { variant: { include: { product: true } } } },
         payments: true,
@@ -582,28 +593,44 @@ export class PosService {
     });
   }
 
-  async getHeldBills(tenantId: string, branchId: string) {
+  async getHeldBills(tenantId: string, branchId: string, opts?: { cashierId?: string; scopeAll?: boolean }) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     return this.prisma.heldBill.findMany({
-      where: { tenantId, branchId: resolvedBranchId },
+      where: {
+        tenantId,
+        branchId: resolvedBranchId,
+        ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async deleteHeldBill(id: string, tenantId: string) {
-    const bill = await this.prisma.heldBill.findFirst({ where: { id, tenantId } });
+  async deleteHeldBill(id: string, tenantId: string, opts?: { cashierId?: string; scopeAll?: boolean }) {
+    const bill = await this.prisma.heldBill.findFirst({
+      where: {
+        id,
+        tenantId,
+        ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+      },
+    });
     if (!bill) throw new NotFoundException('Held bill not found');
     await this.inventoryService.releaseReservations(tenantId, 'HELD_BILL', id);
     return this.prisma.heldBill.delete({ where: { id } });
   }
 
-  async getDailySummary(tenantId: string, branchId: string, date?: string) {
+  async getDailySummary(
+    tenantId: string,
+    branchId: string,
+    date?: string,
+    opts?: { cashierId?: string; scopeAll?: boolean },
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const targetDate = date ? dayjs(date) : dayjs();
     const where = {
       tenantId,
       branchId: resolvedBranchId,
       status: SaleStatus.COMPLETED,
+      ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
       invoiceDate: {
         gte: targetDate.startOf('day').toDate(),
         lte: targetDate.endOf('day').toDate(),
@@ -632,6 +659,7 @@ export class PosService {
           tenantId,
           branchId: resolvedBranchId,
           status: SaleStatus.COMPLETED,
+          ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
           invoiceDate: {
             gte: targetDate.startOf('day').toDate(),
             lte: targetDate.endOf('day').toDate(),
@@ -694,6 +722,49 @@ export class PosService {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const scale = this.parseScaleBarcode(code.trim());
     const keys = this.barcodeLookupKeys(code);
+
+    type VariantRow = Awaited<ReturnType<typeof this.prisma.productVariant.findMany>>[number] & {
+      product: {
+        name: string;
+        barcode: string | null;
+        taxRate: number | null;
+        images: string[];
+        category: { name?: string } | null;
+      };
+      inventory: { quantity: number; reservedQty: number }[];
+    };
+
+    const mapVariant = (variant: VariantRow) => {
+      const stock = Math.max(
+        0,
+        (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0),
+      );
+      const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
+      const unitPrice = scale && scale.asPrice >= 1 ? scale.asPrice : variant.sellingPrice;
+      const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
+        ? scale.asWeightKg
+        : undefined;
+      return {
+        variantId: variant.id,
+        productId: variant.productId,
+        productName: variant.product.name,
+        variantName: variant.name,
+        sku: variant.sku,
+        barcode: effectiveBarcode,
+        unitPrice,
+        costPrice: variant.costPrice,
+        taxRate: variant.product.taxRate ?? 0,
+        color: variant.color,
+        size: variant.size,
+        material: variant.material ?? undefined,
+        style: variant.style ?? undefined,
+        category: variant.product.category?.name ?? 'Other',
+        stock,
+        imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
+        ...(scale ? { isScaleBarcode: true, scaleQty, embeddedValue: scale.embeddedValue } : {}),
+      };
+    };
+
     for (const key of keys) {
       const variants = await this.prisma.productVariant.findMany({
         where: {
@@ -712,8 +783,65 @@ export class PosService {
           product: { include: { category: true } },
           inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
         },
-      });
+      }) as VariantRow[];
       if (variants.length === 0) continue;
+
+      const keyLower = key.toLowerCase();
+      const exactSku = variants.filter((v) => v.sku.toLowerCase() === keyLower);
+      if (exactSku.length === 1) return mapVariant(exactSku[0]);
+
+      const exactVariantBarcode = variants.filter(
+        (v) => (v.barcode ?? '').toLowerCase() === keyLower,
+      );
+      if (exactVariantBarcode.length === 1) return mapVariant(exactVariantBarcode[0]);
+
+      const byProduct = new Map<string, VariantRow[]>();
+      for (const v of variants) {
+        const list = byProduct.get(v.productId) ?? [];
+        list.push(v);
+        byProduct.set(v.productId, list);
+      }
+
+      let multiGroup = [...byProduct.values()].find((list) => list.length > 1);
+
+      // Shared product barcode: one hit, but product has other variants — open picker.
+      if (!multiGroup && byProduct.size === 1) {
+        const only = [...byProduct.values()][0];
+        if (only.length === 1) {
+          const matchedViaSharedBarcode =
+            (only[0].product.barcode ?? '').toLowerCase() === keyLower ||
+            (only[0].barcode ?? '').toLowerCase() === keyLower;
+          if (matchedViaSharedBarcode) {
+            const siblings = await this.prisma.productVariant.findMany({
+              where: {
+                productId: only[0].productId,
+                isActive: true,
+                product: { tenantId, status: 'ACTIVE' },
+              },
+              include: {
+                product: { include: { category: true } },
+                inventory: {
+                  where: { branchId: resolvedBranchId },
+                  select: { quantity: true, reservedQty: true },
+                  take: 1,
+                },
+              },
+              orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+            }) as VariantRow[];
+            if (siblings.length > 1) multiGroup = siblings;
+          }
+        }
+      }
+
+      if (multiGroup && multiGroup.length > 1) {
+        const options = multiGroup.map(mapVariant).sort((a, b) => b.stock - a.stock);
+        const primary = options.find((o) => o.stock > 0) ?? options[0];
+        return {
+          ...primary,
+          requiresVariantPick: true,
+          variants: options,
+        };
+      }
 
       const ranked = variants
         .map((variant) => ({
@@ -725,27 +853,7 @@ export class PosService {
         }))
         .sort((a, b) => b.stock - a.stock);
 
-      const variant = (ranked.find((row) => row.stock > 0) ?? ranked[0]).variant;
-      const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
-      const basePrice = variant.sellingPrice;
-      // Prefer embedded price when scale barcode and value looks like currency (>= 1.00)
-      const unitPrice = scale && scale.asPrice >= 1
-        ? scale.asPrice
-        : basePrice;
-      const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
-        ? scale.asWeightKg
-        : undefined;
-      return {
-        variantId: variant.id, productName: variant.product.name, variantName: variant.name,
-        sku: variant.sku, barcode: effectiveBarcode, unitPrice,
-        costPrice: variant.costPrice, taxRate: variant.product.taxRate ?? 0,
-        color: variant.color, size: variant.size, material: variant.material ?? undefined,
-        style: variant.style ?? undefined,
-        category: (variant.product.category as { name?: string } | null)?.name ?? 'Other',
-        stock: Math.max(0, (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0)),
-        imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
-        ...(scale ? { isScaleBarcode: true, scaleQty, embeddedValue: scale.embeddedValue } : {}),
-      };
+      return mapVariant((ranked.find((row) => row.stock > 0) ?? ranked[0]).variant);
     }
     throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
   }
@@ -887,6 +995,7 @@ export class PosService {
                 { barcode: { contains: search, mode: 'insensitive' } },
                 { name: { contains: search, mode: 'insensitive' } },
                 { product: { name: { contains: search, mode: 'insensitive' } } },
+                { product: { barcode: { contains: search, mode: 'insensitive' } } },
               ],
             }
           : {}),
@@ -921,6 +1030,7 @@ export class PosService {
       return {
         assignment: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined,
         variantId:   v.id,
+        productId:   v.productId,
         productName: v.product.name,
         variantName: v.name,
         sku:         v.sku,
@@ -1223,16 +1333,24 @@ export class PosController {
 
   @Get('sales')
   @RequirePermissions('sales:read')
-  @ApiOperation({ summary: 'List sales for branch' })
+  @ApiOperation({ summary: 'List sales for branch (cashiers see own bills only)' })
   getSales(@CurrentUser() user: IAuthUser, @Query() query: { page?: number; limit?: number; search?: string; date?: string }) {
-    return this.posService.getSales(user.tenantId, user.branchId ?? '', query);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.posService.getSales(user.tenantId, user.branchId ?? '', query, {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Get('sales/:id')
   @RequirePermissions('sales:read')
-  @ApiOperation({ summary: 'Get sale details' })
+  @ApiOperation({ summary: 'Get sale details (cashiers: own sales only)' })
   getSaleById(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.posService.getSaleById(id, user.tenantId);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.posService.getSaleById(id, user.tenantId, {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Post('hold')
@@ -1242,23 +1360,35 @@ export class PosController {
   }
 
   @Get('hold')
-  @ApiOperation({ summary: 'Get held bills' })
+  @ApiOperation({ summary: 'Get held bills (cashiers: own holds only)' })
   getHeldBills(@CurrentUser() user: IAuthUser) {
-    return this.posService.getHeldBills(user.tenantId, user.branchId ?? '');
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.posService.getHeldBills(user.tenantId, user.branchId ?? '', {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Delete('hold/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete held bill' })
+  @ApiOperation({ summary: 'Delete held bill (cashiers: own holds only)' })
   deleteHeldBill(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.posService.deleteHeldBill(id, user.tenantId);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.posService.deleteHeldBill(id, user.tenantId, {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Get('summary')
   @RequirePermissions('sales:read')
-  @ApiOperation({ summary: 'Get daily sales summary' })
+  @ApiOperation({ summary: 'Get daily sales summary (cashiers: own sales only)' })
   getDailySummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
-    return this.posService.getDailySummary(user.tenantId, user.branchId ?? '', date);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.posService.getDailySummary(user.tenantId, user.branchId ?? '', date, {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Get('products')

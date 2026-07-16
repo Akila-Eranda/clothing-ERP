@@ -8,10 +8,10 @@ import { useTheme } from "next-themes";
 import {
   LayoutDashboard, ShoppingCart, History, RotateCcw, Users,
   Package, Layers, Bookmark, Warehouse, Truck, ShoppingBag,
-  Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
+  Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -34,6 +34,8 @@ interface NavItem {
   badge?: string;
   action?: () => void;
   children?: NavItem[];
+  /** Extra path prefixes excluded when deciding if this item owns the current URL */
+  peerHrefs?: string[];
 }
 interface NavGroup { title: string; items: NavItem[] }
 
@@ -48,7 +50,10 @@ function pathMatches(pathname: string, href?: string, peerHrefs: string[] = []) 
 }
 
 function itemOrChildActive(pathname: string, item: NavItem): boolean {
-  const peerHrefs = (item.children ?? []).map((c) => c.href).filter(Boolean) as string[];
+  const peerHrefs = [
+    ...((item.children ?? []).map((c) => c.href).filter(Boolean) as string[]),
+    ...(item.peerHrefs ?? []),
+  ];
   if (pathMatches(pathname, item.href, peerHrefs)) return true;
   return !!item.children?.some((c) => pathMatches(pathname, c.href, peerHrefs));
 }
@@ -63,13 +68,42 @@ function useNavGroups(): NavGroup[] {
   const S = getSidebarSectionTitles(profile);
 
   const inventoryChildren: NavItem[] = [
+    { label: L["/inventory"] ?? "Stock Levels", href: "/inventory", icon: Warehouse },
+    { label: L["/inventory/ledger"] ?? "Inventory Ledger", href: "/inventory/ledger", icon: ScrollText },
+    { label: L["/inventory/abc"] ?? "ABC Analysis", href: "/inventory/abc", icon: BarChart3 },
+    { label: L["/inventory/dead-stock"] ?? "Dead Stock", href: "/inventory/dead-stock", icon: Skull },
+    { label: L["/inventory/aging"] ?? "Stock Aging", href: "/inventory/aging", icon: Clock3 },
+    { label: L["/inventory/transfers"] ?? "Stock Transfers", href: "/inventory/transfers", icon: ArrowLeftRight },
+  ];
+
+  const expiryChildren: NavItem[] = [
+    { label: L["/inventory/expiry"] ?? "Dashboard", href: "/inventory/expiry", icon: CalendarClock },
+    { label: L["/inventory/expiry/near"] ?? "Near Expiry", href: "/inventory/expiry/near", icon: AlertTriangle },
+    { label: L["/inventory/expiry/expired"] ?? "Expired", href: "/inventory/expiry/expired", icon: Skull },
+    { label: L["/inventory/expiry/lots"] ?? "All Active Lots", href: "/inventory/expiry/lots", icon: List },
+    { label: L["/inventory/expiry/transactions"] ?? "Batch Transactions", href: "/inventory/expiry/transactions", icon: ScrollText },
+    { label: L["/inventory/expiry/reconcile"] ?? "Reconciliation", href: "/inventory/expiry/reconcile", icon: Scale },
+  ];
+
+  const productItems: NavItem[] = [
     { label: L["/products"], href: "/products", icon: Package },
     { label: L["/categories"], href: "/categories", icon: Layers },
     ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
-    { label: L["/inventory"], href: "/inventory", icon: Warehouse },
+    {
+      label: "Inventory",
+      icon: Warehouse,
+      href: "/inventory",
+      peerHrefs: ["/inventory/expiry"],
+      children: inventoryChildren,
+    },
     { label: L["/warehouse"] ?? "Warehouse", href: "/warehouse", icon: Building2 },
     ...(hasShopModule(profile, "expiry") || hasShopModule(profile, "batch")
-      ? [{ label: L["/inventory/expiry"], href: "/inventory/expiry", icon: CalendarClock }]
+      ? [{
+          label: "Expiry Management",
+          icon: CalendarClock,
+          href: "/inventory/expiry",
+          children: expiryChildren,
+        }]
       : []),
     ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
     ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
@@ -79,14 +113,22 @@ function useNavGroups(): NavGroup[] {
     ...(!skipWorkflows ? [{ label: L["/workflows"], href: "/workflows", icon: GitBranch }] : []),
   ];
 
-  const productItems: NavItem[] = [
-    {
-      label: L["/inventory"],
-      icon: Warehouse,
-      href: "/inventory",
-      children: inventoryChildren,
-    },
+  const accountingChildren: NavItem[] = [
+    { label: L["/accounting"] ?? "Dashboard", href: "/accounting", icon: LayoutDashboard },
+    { label: L["/accounting/transactions"] ?? "Transactions", href: "/accounting/transactions", icon: Activity },
+    { label: L["/accounting/accounts"] ?? "Chart of Accounts", href: "/accounting/accounts", icon: BookOpen },
+    { label: L["/accounting/banking"] ?? "Banking", href: "/accounting/banking", icon: Landmark },
+    { label: L["/accounting/reports"] ?? "Reports", href: "/accounting/reports", icon: FileBarChart },
+    { label: L["/accounting/settings"] ?? "Settings", href: "/accounting/settings", icon: Settings },
   ];
+
+  const accountingItem: NavItem = {
+    label: "Accounting",
+    icon: Wallet,
+    href: "/accounting",
+    peerHrefs: ["/accounting/finance", "/accounting/credit"],
+    children: accountingChildren,
+  };
 
   const financeHubChildren: NavItem[] = [
     { label: L["/accounting/finance/payable"] ?? "Payable", href: "/accounting/finance/payable", icon: Scale },
@@ -113,7 +155,26 @@ function useNavGroups(): NavGroup[] {
   ];
 
   const reportItems: NavItem[] = [
-    { label: L["/reports"], href: "/reports", icon: FileBarChart },
+    {
+      label: "Reports & Analytics",
+      icon: FileBarChart,
+      href: "/reports",
+      children: [
+        { label: L["/reports"] ?? "Overview", href: "/reports", icon: LayoutDashboard },
+        { label: L["/reports/sales"] ?? "Sales", href: "/reports/sales", icon: ShoppingCart },
+        { label: L["/reports/purchases"] ?? "Purchases", href: "/reports/purchases", icon: ShoppingBag },
+        { label: L["/reports/inventory"] ?? "Inventory", href: "/reports/inventory", icon: Package },
+        { label: L["/reports/suppliers"] ?? "Suppliers", href: "/reports/suppliers", icon: Truck },
+        { label: L["/reports/customers"] ?? "Customers", href: "/reports/customers", icon: Users },
+        { label: L["/reports/cashier"] ?? "Cashier", href: "/reports/cashier", icon: UserCheck },
+        { label: L["/reports/branches"] ?? "Branches", href: "/reports/branches", icon: Building2 },
+        { label: L["/reports/tax"] ?? "Tax", href: "/reports/tax", icon: Scale },
+        { label: L["/reports/expiry"] ?? "Expiry", href: "/reports/expiry", icon: CalendarClock },
+        { label: L["/reports/cheques"] ?? "Cheques", href: "/reports/cheques", icon: FileCheck },
+        { label: L["/reports/commission"] ?? "Commission", href: "/reports/commission", icon: Banknote },
+        { label: L["/reports/financial"] ?? "Financial", href: "/reports/financial", icon: Wallet },
+      ],
+    },
     ...(hasShopModule(profile, "promotions") ? [{ label: L["/promotions"], href: "/promotions", icon: Zap }] : []),
   ];
 
@@ -138,9 +199,19 @@ function useNavGroups(): NavGroup[] {
     {
       title: S.finance,
       items: [
-        { label: L["/accounting"], href: "/accounting", icon: Wallet },
+        accountingItem,
         financeHubItem,
-        { label: L["/accounting/credit"] ?? "Customer Credit", href: "/accounting/credit", icon: UserCheck },
+        {
+          label: "Customer Credit",
+          icon: UserCheck,
+          href: "/accounting/credit",
+          children: [
+            { label: L["/accounting/credit"] ?? "Credit Customers", href: "/accounting/credit", icon: Users },
+            { label: L["/accounting/credit/schedules"] ?? "Schedules", href: "/accounting/credit/schedules", icon: CalendarClock },
+            { label: L["/accounting/credit/reminders"] ?? "Reminders", href: "/accounting/credit/reminders", icon: Bell },
+            { label: L["/accounting/credit/collections"] ?? "Collections", href: "/accounting/credit/collections", icon: FileBarChart },
+          ],
+        },
         { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
         { label: L["/cash"], href: "/cash", icon: Banknote, badge: "NEW" },
         { label: L["/expenses"], href: "/expenses", icon: TrendingDown },
@@ -152,7 +223,17 @@ function useNavGroups(): NavGroup[] {
     {
       title: S.hr,
       items: [
-        { label: L["/hr"], href: "/hr", icon: UserCog },
+        {
+          label: "HR & Payroll",
+          icon: UserCog,
+          href: "/hr",
+          children: [
+            { label: L["/hr"] ?? "Employees", href: "/hr", icon: Users },
+            { label: L["/hr/attendance"] ?? "Attendance", href: "/hr/attendance", icon: Clock },
+            { label: L["/hr/payroll"] ?? "Payroll", href: "/hr/payroll", icon: Banknote },
+            { label: L["/hr/leaves"] ?? "Leaves", href: "/hr/leaves", icon: CalendarDays },
+          ],
+        },
         { label: L["/branches"], href: "/branches", icon: Building2 },
         { label: L["/users"], href: "/users", icon: KeyRound },
       ],
@@ -291,17 +372,21 @@ export function Sidebar() {
   };
 
   /* ── single nav item renderer (supports dropdown children) ── */
-  const renderItem = (item: NavItem, groupIdx: number, groupTitle: string) => {
+  const renderItem = (item: NavItem, groupIdx: number, groupTitle: string, groupPeers: string[] = []) => {
     const key = `${groupIdx}-${item.label}`;
     const menuKey = `${groupTitle}-${item.label}`;
     const hasChildren = !!item.children?.length;
 
     if (!hasChildren) {
-      return renderLeaf(item, key);
+      return renderLeaf(item, key, false, [...groupPeers, ...(item.peerHrefs ?? [])]);
     }
 
-    const peerHrefs = item.children!.map((c) => c.href).filter(Boolean) as string[];
-    const childActive = itemOrChildActive(pathname, item);
+    const peerHrefs = [
+      ...item.children!.map((c) => c.href).filter(Boolean) as string[],
+      ...(item.peerHrefs ?? []),
+      ...groupPeers,
+    ];
+    const childActive = itemOrChildActive(pathname, { ...item, peerHrefs });
     const open = openMenus[menuKey] ?? childActive;
     const Icon = item.icon;
 
@@ -478,7 +563,18 @@ export function Sidebar() {
                   </p>
                 )}
                 <div className="space-y-0.5">
-                  {group.items.map((item, ii) => renderItem(item, gi * 100 + ii, group.title))}
+                  {group.items.map((item, ii) => {
+                    const groupPeers = group.items.flatMap((sib) => {
+                      const hrefs: string[] = [];
+                      if (sib.href) hrefs.push(sib.href);
+                      for (const c of sib.children ?? []) {
+                        if (c.href) hrefs.push(c.href);
+                      }
+                      if (sib.peerHrefs) hrefs.push(...sib.peerHrefs);
+                      return hrefs;
+                    });
+                    return renderItem(item, gi * 100 + ii, group.title, groupPeers);
+                  })}
                 </div>
               </div>
             ))}

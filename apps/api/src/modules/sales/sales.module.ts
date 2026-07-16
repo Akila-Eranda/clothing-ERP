@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
+import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
 import * as dayjs from 'dayjs';
 
 @Injectable()
@@ -15,12 +16,14 @@ export class SalesService {
   async findAll(tenantId: string, query: {
     page?: number; limit?: number; branchId?: string;
     startDate?: string; endDate?: string; customerId?: string; search?: string;
+    cashierId?: string; scopeAll?: boolean;
   }) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
     const where = {
       tenantId,
       ...(query.branchId && { branchId: query.branchId }),
       ...(query.customerId && { customerId: query.customerId }),
+      ...(!query.scopeAll && query.cashierId ? { cashierId: query.cashierId } : {}),
       ...(query.startDate && query.endDate && {
         invoiceDate: {
           gte: dayjs(query.startDate).startOf('day').toDate(),
@@ -47,14 +50,20 @@ export class SalesService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
-  async findOne(id: string, tenantId: string) {
-    return this.prisma.sale.findFirstOrThrow({
-      where: { id, tenantId },
+  async findOne(id: string, tenantId: string, opts?: { cashierId?: string; scopeAll?: boolean }) {
+    const sale = await this.prisma.sale.findFirst({
+      where: {
+        id,
+        tenantId,
+        ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+      },
       include: {
         items: { include: { variant: { include: { product: true } } } },
         payments: true, customer: true, branch: true, cashier: true,
       },
     });
+    if (!sale) throw new NotFoundException('Sale not found');
+    return sale;
   }
 
   async getSalesByCustomer(customerId: string, tenantId: string) {
@@ -103,7 +112,12 @@ export class SalesController {
     page?: number; limit?: number; branchId?: string;
     startDate?: string; endDate?: string; customerId?: string; search?: string;
   }) {
-    return this.salesService.findAll(user.tenantId, query);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.salesService.findAll(user.tenantId, {
+      ...query,
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 
   @Get('top-products')
@@ -124,7 +138,11 @@ export class SalesController {
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Get sale by ID' })
   findOne(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    return this.salesService.findOne(id, user.tenantId);
+    const scopeAll = canViewAllPosSales(user.roles ?? []);
+    return this.salesService.findOne(id, user.tenantId, {
+      cashierId: user.id,
+      scopeAll,
+    });
   }
 }
 
