@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, Trash2, X, Loader2, Package, ArrowLeft, Search, Check,
+  Plus, Trash2, Loader2, Package, ArrowLeft, Search, Check,
   Scale, Boxes, Package2, Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile } from "@/lib/use-shop-profile";
@@ -93,24 +92,33 @@ function sanitizePrice(value: string) {
 }
 
 function Section({
+  step,
   title,
   subtitle,
   children,
   action,
 }: {
+  step?: string;
   title: string;
   subtitle?: string;
   children: React.ReactNode;
   action?: React.ReactNode;
 }) {
   return (
-    <section className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3 bg-slate-50/50">
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-slate-900 tracking-tight">{title}</h2>
-          {subtitle ? <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p> : null}
+    <section className="bg-background border rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 bg-muted/30">
+        <div className="flex items-start gap-3 min-w-0">
+          {step ? (
+            <span className="mt-0.5 h-6 min-w-6 px-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-bold tabular-nums flex items-center justify-center shrink-0">
+              {step}
+            </span>
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground tracking-tight">{title}</h2>
+            {subtitle ? <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{subtitle}</p> : null}
+          </div>
         </div>
-        {action}
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
       <div className="p-5 space-y-4">{children}</div>
     </section>
@@ -132,12 +140,87 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label className="text-xs font-semibold text-slate-700">
+      <Label className="text-xs font-medium text-muted-foreground">
         {label}
-        {required ? <span className="text-red-500 ml-0.5">*</span> : null}
+        {required ? <span className="text-destructive ml-0.5">*</span> : null}
       </Label>
       {children}
-      {hint ? <p className="text-[11px] text-slate-400">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-muted-foreground/80 leading-snug">{hint}</p> : null}
+    </div>
+  );
+}
+
+function ChoiceCard({
+  selected,
+  onClick,
+  icon: Icon,
+  title,
+  hint,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  icon?: React.ElementType;
+  title: string;
+  hint: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-xl border p-3.5 text-left transition-all h-full",
+        selected
+          ? "border-primary bg-primary/10 shadow-sm"
+          : "border-border bg-card hover:border-primary/40 hover:bg-muted/30",
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {Icon ? (
+          <span
+            className={cn(
+              "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 border",
+              selected
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted/50 text-muted-foreground border-transparent",
+            )}
+          >
+            <Icon className="h-4 w-4" />
+          </span>
+        ) : null}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <span
+              className={cn(
+                "h-4 w-4 rounded-full border-2 shrink-0",
+                selected ? "border-primary bg-primary" : "border-muted-foreground/40",
+              )}
+            />
+          </div>
+          <p className="text-[11px] mt-1 leading-snug text-muted-foreground">{hint}</p>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function SidebarCard({
+  title,
+  children,
+  className,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("bg-background border rounded-2xl shadow-sm overflow-hidden", className)}>
+      {title ? (
+        <div className="px-4 py-3 border-b bg-muted/30">
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        </div>
+      ) : null}
+      <div className="p-4 space-y-3">{children}</div>
     </div>
   );
 }
@@ -184,17 +267,17 @@ function SearchableBrandSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full h-10 px-3 rounded-lg border border-slate-200 bg-white text-sm text-left flex items-center justify-between gap-2 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-200"
+        className="w-full h-10 px-3 rounded-lg border bg-background text-sm text-left flex items-center justify-between gap-2 hover:border-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring"
       >
-        <span className={selected ? "text-slate-900 truncate" : "text-slate-400"}>
+        <span className={selected ? "text-foreground truncate" : "text-muted-foreground"}>
           {selected?.name ?? "Search or create brand…"}
         </span>
-        <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+        <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
       </button>
       {open ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full rounded-xl border bg-background shadow-lg overflow-hidden">
             <div className="p-2 border-b">
               <Input
                 autoFocus
@@ -209,7 +292,7 @@ function SearchableBrandSelect({
                 <button
                   key={b.id}
                   type="button"
-                  className="w-full px-3 py-2 text-sm text-left hover:bg-slate-50 flex items-center justify-between gap-2"
+                  className="w-full px-3 py-2 text-sm text-left hover:bg-muted/50 flex items-center justify-between gap-2"
                   onClick={() => {
                     onChange(b.id);
                     setOpen(false);
@@ -217,11 +300,11 @@ function SearchableBrandSelect({
                   }}
                 >
                   <span>{b.name}</span>
-                  {b.id === value ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : null}
+                  {b.id === value ? <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" /> : null}
                 </button>
               ))}
               {filtered.length === 0 && !q.trim() ? (
-                <p className="px-3 py-3 text-xs text-slate-400">No brands yet</p>
+                <p className="px-3 py-3 text-xs text-muted-foreground">No brands yet</p>
               ) : null}
             </div>
             {q.trim() && !exact ? (
@@ -229,7 +312,7 @@ function SearchableBrandSelect({
                 type="button"
                 disabled={creating}
                 onClick={createBrand}
-                className="w-full border-t px-3 py-2.5 text-sm text-left text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 font-medium"
+                className="w-full border-t px-3 py-2.5 text-sm text-left text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 flex items-center gap-2 font-medium"
               >
                 {creating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Create brand “{q.trim()}”
@@ -628,68 +711,50 @@ export function GroceryProductForm() {
       (!supplierSearch.trim() || s.name.toLowerCase().includes(supplierSearch.trim().toLowerCase())),
   );
 
-  return (
-    <div className="h-full flex flex-col bg-slate-50/80">
-      {/* Top bar */}
-      <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between shrink-0">
+return (
+    <div className="h-full flex flex-col bg-muted/30">
+      <div className="bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
         <button
           type="button"
           onClick={() => router.push("/products")}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors font-medium"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium"
         >
-          <ArrowLeft className="h-4 w-4" /> Back to Products
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Back to Products</span>
+          <span className="sm:hidden">Back</span>
         </button>
-        <div className="text-center">
-          <h1 className="text-base font-semibold text-slate-900">New Product</h1>
-          <p className="text-[11px] text-slate-500">Grocery · Enterprise product master</p>
+        <div className="text-center min-w-0">
+          <h1 className="text-base font-semibold text-foreground">New Product</h1>
+          <p className="text-[11px] text-muted-foreground truncate">Grocery product master</p>
         </div>
-        <div className="w-36" />
+        <Button size="sm" className="gap-1.5 h-9 shrink-0" disabled={loading} onClick={() => submit("ACTIVE")}>
+          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+          <span className="hidden sm:inline">Save</span>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="p-5 lg:p-6 grid grid-cols-1 xl:grid-cols-[1fr_300px] gap-5 items-start max-w-[1600px] mx-auto w-full">
-          {/* LEFT */}
+        <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_300px] gap-5 lg:gap-6 items-start w-full">
           <div className="space-y-5 min-w-0">
-            {/* Product type */}
-            <Section title="Product Type" subtitle="Controls variants, barcode and weighing behaviour">
+            <Section step="1" title="Product Type" subtitle="Choose how this product is sold in POS">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {PRODUCT_TYPES.map((t) => {
-                  const Icon = t.icon;
-                  const selected = productType === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setProductType(t.id)}
-                      className={cn(
-                        "rounded-xl border p-4 text-left transition-all",
-                        selected
-                          ? "border-slate-900 bg-slate-900 text-white shadow-md"
-                          : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50",
-                      )}
-                    >
-                      <Icon className={cn("h-5 w-5 mb-2", selected ? "text-white" : "text-slate-600")} />
-                      <p className="text-sm font-semibold">{t.title}</p>
-                      <p className={cn("text-[11px] mt-1 leading-snug", selected ? "text-slate-300" : "text-slate-500")}>
-                        {t.hint}
-                      </p>
-                    </button>
-                  );
-                })}
+                {PRODUCT_TYPES.map((t) => (
+                  <ChoiceCard
+                    key={t.id}
+                    selected={productType === t.id}
+                    onClick={() => setProductType(t.id)}
+                    icon={t.icon}
+                    title={t.title}
+                    hint={t.hint}
+                  />
+                ))}
               </div>
             </Section>
 
-            {/* General */}
-            <Section title="01 · General Information" subtitle="Core product identity for POS and purchasing">
+            <Section step="2" title="General Information" subtitle="Name, brand, category and identity">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Product Name" required className="sm:col-span-2">
-                  <Input
-                    placeholder="e.g. Samba Rice"
-                    value={name}
-                    maxLength={120}
-                    onChange={(e) => setName(e.target.value)}
-                    className="h-10"
-                  />
+                  <Input placeholder="e.g. Samba Rice" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Brand" required>
                   <SearchableBrandSelect
@@ -699,252 +764,120 @@ export function GroceryProductForm() {
                     onCreated={(b) => setBrands((prev) => [...prev, b].sort((a, c) => a.name.localeCompare(c.name)))}
                   />
                 </Field>
-                <Field label="Category" required>
-                  <Select
-                    value={categoryId || undefined}
-                    onValueChange={(v) => {
-                      setCategoryId(v);
-                      setSubCategoryId("");
-                    }}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.length === 0 ? (
-                        <SelectItem value="_none" disabled>
-                          No categories found
-                        </SelectItem>
-                      ) : (
-                        categories.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field label="Sub Category" hint={subCategories.length === 0 ? "Optional — add subcategories under Categories" : undefined}>
-                  <Select
-                    value={subCategoryId || "_none"}
-                    onValueChange={(v) => setSubCategoryId(v === "_none" ? "" : v)}
-                    disabled={!categoryId}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Select sub category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">None</SelectItem>
-                      {subCategories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
                 <Field label="Unit" required>
                   <Select value={unit} onValueChange={setUnit} disabled={isWeighted}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {shopProfile.units.map((u) => (
-                        <SelectItem key={u} value={u}>
-                          {u}
-                        </SelectItem>
-                      ))}
+                      {shopProfile.units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Category" required>
+                  <Select value={categoryId || undefined} onValueChange={(v) => { setCategoryId(v); setSubCategoryId(""); }}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.length === 0
+                        ? <SelectItem value="_none" disabled>No categories found</SelectItem>
+                        : categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Sub Category">
+                  <Select value={subCategoryId || "_none"} onValueChange={(v) => setSubCategoryId(v === "_none" ? "" : v)} disabled={!categoryId}>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">None</SelectItem>
+                      {subCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
                 {!isWeighted ? (
-                  <Field
-                    label="Barcode"
-                    hint={hasVariants && barcodeMode === "SHARED" ? "Shared across all variants" : hasVariants ? "Product-level barcode (optional)" : undefined}
-                  >
-                    <Input
-                      placeholder="Scan or enter barcode"
-                      value={barcode}
-                      onChange={(e) => setBarcode(e.target.value)}
-                      className="h-10 font-mono text-sm"
-                    />
+                  <Field label="Barcode" hint={hasVariants && barcodeMode === "SHARED" ? "Shared across all variants" : undefined}>
+                    <Input placeholder="Scan or enter barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="h-10 font-mono text-sm" />
                   </Field>
                 ) : (
-                  <Field label="Barcode" hint="Not required for weighted / loose products">
-                    <Input disabled placeholder="Not required" className="h-10 bg-slate-50" />
+                  <Field label="Barcode" hint="Not required for weighted products">
+                    <Input disabled placeholder="Not required" className="h-10 bg-muted/40" />
                   </Field>
                 )}
-                <Field label="SKU" hint="Optional reference — system generates SKUs for stock units">
-                  <Input
-                    placeholder="e.g. RICE-SAMBA"
-                    value={skuHint}
-                    onChange={(e) => setSkuHint(e.target.value)}
-                    className="h-10 font-mono text-sm"
-                  />
+                <Field label="SKU" hint="Optional — leave blank to auto-generate">
+                  <Input placeholder="e.g. RICE-SAMBA" value={skuHint} onChange={(e) => setSkuHint(e.target.value)} className="h-10 font-mono text-sm" />
                 </Field>
-                <Field label="Batch Number" hint="Optional batch / lot reference">
-                  <Input
-                    placeholder="e.g. BATCH-2026-001"
-                    value={batchNumber}
-                    onChange={(e) => setBatchNumber(e.target.value)}
-                    className="h-10"
-                  />
+                <Field label="Batch Number" className="sm:col-span-2 sm:max-w-sm">
+                  <Input placeholder="Optional batch / lot" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Description" className="sm:col-span-2">
-                  <Textarea
-                    rows={3}
-                    placeholder="Short product description for staff…"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
+                  <Textarea rows={3} placeholder="Short description for staff…" value={description} onChange={(e) => setDescription(e.target.value)} />
                 </Field>
-                <Field label="Product Image" className="sm:col-span-2" hint="First image is used as cover">
+                <Field label="Product Image" className="sm:col-span-2" hint="First image is the cover">
                   <ProductImageUpload images={images} onChange={setImages} disabled={loading} />
                 </Field>
               </div>
             </Section>
 
-            {/* Barcode mode — variants only */}
             {hasVariants ? (
-              <Section title="Barcode Mode" subtitle="Default is Unique Barcode per variant">
+              <Section step="3" title="Barcode Mode" subtitle="Default is Unique Barcode per variant">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {(
-                    [
-                      {
-                        id: "UNIQUE" as const,
-                        title: "Unique Barcode",
-                        hint: "Separate barcode for every variant (recommended)",
-                      },
-                      {
-                        id: "SHARED" as const,
-                        title: "Shared Barcode",
-                        hint: "One barcode for all variants of this product",
-                      },
-                    ] as const
-                  ).map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setBarcodeMode(m.id)}
-                      className={cn(
-                        "rounded-xl border px-4 py-3 text-left transition-all",
-                        barcodeMode === m.id
-                          ? "border-emerald-600 bg-emerald-50 ring-1 ring-emerald-600/30"
-                          : "border-slate-200 hover:bg-slate-50",
-                      )}
-                    >
-                      <p className="text-sm font-semibold text-slate-900">{m.title}</p>
-                      <p className="text-[11px] text-slate-500 mt-0.5">{m.hint}</p>
-                    </button>
-                  ))}
+                  <ChoiceCard selected={barcodeMode === "UNIQUE"} onClick={() => setBarcodeMode("UNIQUE")} title="Unique Barcode" hint="Separate barcode for every variant (recommended)" />
+                  <ChoiceCard selected={barcodeMode === "SHARED"} onClick={() => setBarcodeMode("SHARED")} title="Shared Barcode" hint="One barcode for all variants of this product" />
                 </div>
               </Section>
             ) : null}
 
-            {/* Pricing */}
             <Section
+              step={hasVariants ? "4" : "3"}
               title="Pricing"
-              subtitle={
-                isWeighted
-                  ? "Price per kg · LKR"
-                  : hasVariants
-                    ? "Base costs · set selling prices on each variant"
-                    : "Buying, selling and margin · LKR"
-              }
+              subtitle={isWeighted ? "Price per kg · LKR" : hasVariants ? "Base buying cost — selling prices on each variant" : "Buying, selling and margin · LKR"}
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Buying Price" required={!hasVariants}>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(sanitizePrice(e.target.value))}
-                    className="h-10"
-                  />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={costPrice} onChange={(e) => setCostPrice(sanitizePrice(e.target.value))} className="h-10" />
                 </Field>
                 <Field label={isWeighted ? "Selling Price / Kg" : "Selling Price"} required={!hasVariants}>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(sanitizePrice(e.target.value))}
-                    className="h-10"
-                    disabled={hasVariants}
-                  />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={sellingPrice} onChange={(e) => setSellingPrice(sanitizePrice(e.target.value))} className="h-10" disabled={hasVariants} />
                 </Field>
                 <Field label="Wholesale Price">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    value={wholesalePrice}
-                    onChange={(e) => setWholesalePrice(sanitizePrice(e.target.value))}
-                    className="h-10"
-                  />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={wholesalePrice} onChange={(e) => setWholesalePrice(sanitizePrice(e.target.value))} className="h-10" />
                 </Field>
                 <Field label="MRP" required={!hasVariants && !isWeighted}>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    placeholder="0.00"
-                    value={mrp}
-                    onChange={(e) => setMrp(sanitizePrice(e.target.value))}
-                    className="h-10"
-                    disabled={hasVariants}
-                  />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={mrp} onChange={(e) => setMrp(sanitizePrice(e.target.value))} className="h-10" disabled={hasVariants} />
                 </Field>
                 <Field label="Tax Rate">
                   <Select value={taxRate} onValueChange={setTaxRate}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {["0", "5", "12", "18", "28"].map((t) => (
-                        <SelectItem key={t} value={t}>
-                          {t}%
-                        </SelectItem>
-                      ))}
+                      {["0", "5", "12", "18", "28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Profit Margin" hint="Auto-calculated from buying & selling">
-                  <div className="h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-emerald-700 tabular-nums">{profitMargin.pct}%</span>
-                    <span className="text-slate-500 tabular-nums">
-                      LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}
-                    </span>
+                <Field label="Profit Margin" hint="Auto from buying & selling">
+                  <div className="h-10 rounded-lg border bg-muted/40 px-3 flex items-center justify-between text-sm">
+                    <span className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
+                    <span className="text-muted-foreground tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
                   </div>
                 </Field>
               </div>
               {hasVariants ? (
-                <p className="text-xs text-slate-500 rounded-lg bg-slate-50 border border-dashed border-slate-200 px-3 py-2">
-                  Selling price and MRP on the main form are disabled — enter them on each variant row.
+                <p className="text-xs text-muted-foreground rounded-lg bg-muted/40 border border-dashed px-3 py-2">
+                  Selling price and MRP are set on each variant row below.
                 </p>
               ) : null}
             </Section>
 
-            {/* Weighted extras */}
             {isWeighted ? (
-              <Section title="Weight Sale Settings" subtitle="Loose / scale-sold items">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
+              <Section step="4" title="Weight Sale Settings" subtitle="Loose / scale-sold items">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
                     <div>
                       <p className="text-sm font-medium">Allow Decimal Selling</p>
-                      <p className="text-[11px] text-slate-500">Sell fractions of a kg (e.g. 0.350)</p>
+                      <p className="text-[11px] text-muted-foreground">e.g. 0.350 kg</p>
                     </div>
                     <Switch checked={allowDecimalSelling} onCheckedChange={setAllowDecimalSelling} />
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
+                  <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
                     <div>
-                      <p className="text-sm font-medium">Weight Scale Integration Ready</p>
-                      <p className="text-[11px] text-slate-500">Mark for POS scale workflows</p>
+                      <p className="text-sm font-medium">Weight Scale Ready</p>
+                      <p className="text-[11px] text-muted-foreground">POS scale workflows</p>
                     </div>
                     <Switch checked={weightScaleReady} onCheckedChange={setWeightScaleReady} />
                   </div>
@@ -952,122 +885,55 @@ export function GroceryProductForm() {
               </Section>
             ) : null}
 
-            {/* Variants */}
             {hasVariants ? (
               <Section
+                step="5"
                 title="Variants"
-                subtitle="Example: Araliya Samba Rice — 1kg · 5kg · 10kg"
+                subtitle="Pack sizes — e.g. 1kg · 5kg · 10kg"
                 action={
                   <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>
-                    <Plus className="h-3.5 w-3.5" /> Add variant
+                    <Plus className="h-3.5 w-3.5" /> Add
                   </Button>
                 }
               >
-                <div className="flex flex-wrap gap-1.5 mb-1">
+                <div className="flex flex-wrap gap-1.5">
                   {["250g", "500g", "1kg", "2kg", "5kg", "10kg"].map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => addVariantRow(p)}
-                      className="text-[11px] px-2.5 py-1 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                    >
+                    <button key={p} type="button" onClick={() => addVariantRow(p)} className="text-[11px] px-2.5 py-1 rounded-full border bg-card hover:bg-muted/50 text-muted-foreground hover:text-foreground">
                       + {p}
                     </button>
                   ))}
                 </div>
-                <div className="rounded-xl border border-slate-200 overflow-hidden">
+                <div className="rounded-xl border overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-slate-50 border-b border-slate-200">
-                        <tr className="text-[10px] uppercase tracking-wide text-slate-500">
-                          <th className="px-3 py-2.5 text-left">Variant Name</th>
-                          <th className="px-3 py-2.5 text-left">Weight / Size</th>
-                          <th className="px-3 py-2.5 text-left">SKU</th>
-                          <th className="px-3 py-2.5 text-left">Barcode</th>
-                          <th className="px-3 py-2.5 text-right">Buying</th>
-                          <th className="px-3 py-2.5 text-right">Selling</th>
-                          <th className="px-3 py-2.5 text-right">MRP</th>
-                          <th className="px-3 py-2.5 text-center">Status</th>
+                      <thead className="bg-muted/40 border-b">
+                        <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                          <th className="px-3 py-2.5 text-left font-medium">Variant</th>
+                          <th className="px-3 py-2.5 text-left font-medium">Weight</th>
+                          <th className="px-3 py-2.5 text-left font-medium">SKU</th>
+                          <th className="px-3 py-2.5 text-left font-medium">Barcode</th>
+                          <th className="px-3 py-2.5 text-right font-medium">Buying</th>
+                          <th className="px-3 py-2.5 text-right font-medium">Selling</th>
+                          <th className="px-3 py-2.5 text-right font-medium">MRP</th>
+                          <th className="px-3 py-2.5 text-center font-medium">On</th>
                           <th className="px-2 py-2.5 w-10" />
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y">
                         {variantRows.map((row) => (
-                          <tr key={row.key} className={!row.active ? "opacity-45 bg-slate-50/50" : "hover:bg-slate-50/40"}>
+                          <tr key={row.key} className={!row.active ? "opacity-45 bg-muted/20" : "hover:bg-muted/20"}>
+                            <td className="px-3 py-2"><Input value={row.name} onChange={(e) => updateVariant(row.key, "name", e.target.value)} className="h-9 text-sm" placeholder="Name" /></td>
+                            <td className="px-3 py-2"><Input value={row.size} onChange={(e) => updateVariant(row.key, "size", e.target.value)} className="h-9 text-xs" placeholder="5kg" /></td>
+                            <td className="px-3 py-2"><Input value={row.sku} onChange={(e) => updateVariant(row.key, "sku", e.target.value)} className="h-9 text-xs font-mono" /></td>
                             <td className="px-3 py-2">
-                              <Input
-                                value={row.name}
-                                onChange={(e) => updateVariant(row.key, "name", e.target.value)}
-                                className="h-9 text-sm"
-                                placeholder="e.g. Samba 5kg"
-                              />
+                              <Input value={row.barcode} onChange={(e) => updateVariant(row.key, "barcode", e.target.value)} disabled={barcodeMode === "SHARED"} className="h-9 text-xs font-mono" placeholder={barcodeMode === "SHARED" ? "Shared" : "Unique"} />
                             </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={row.size}
-                                onChange={(e) => updateVariant(row.key, "size", e.target.value)}
-                                className="h-9 text-xs"
-                                placeholder="5kg"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={row.sku}
-                                onChange={(e) => updateVariant(row.key, "sku", e.target.value)}
-                                className="h-9 text-xs font-mono"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                value={row.barcode}
-                                onChange={(e) => updateVariant(row.key, "barcode", e.target.value)}
-                                disabled={barcodeMode === "SHARED"}
-                                className="h-9 text-xs font-mono"
-                                placeholder={barcodeMode === "SHARED" ? "Shared" : "Unique"}
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={row.costPrice}
-                                onChange={(e) => updateVariant(row.key, "costPrice", e.target.value)}
-                                className="h-9 text-sm text-right tabular-nums"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={row.sellingPrice}
-                                onChange={(e) => updateVariant(row.key, "sellingPrice", e.target.value)}
-                                className="h-9 text-sm text-right font-semibold tabular-nums"
-                              />
-                            </td>
-                            <td className="px-3 py-2">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={row.mrp}
-                                onChange={(e) => updateVariant(row.key, "mrp", e.target.value)}
-                                className="h-9 text-sm text-right tabular-nums"
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Switch
-                                checked={row.active}
-                                onCheckedChange={(v) => updateVariant(row.key, "active", v)}
-                              />
-                            </td>
+                            <td className="px-3 py-2"><Input type="number" min={0} step="0.01" value={row.costPrice} onChange={(e) => updateVariant(row.key, "costPrice", e.target.value)} className="h-9 text-sm text-right tabular-nums" /></td>
+                            <td className="px-3 py-2"><Input type="number" min={0} step="0.01" value={row.sellingPrice} onChange={(e) => updateVariant(row.key, "sellingPrice", e.target.value)} className="h-9 text-sm text-right font-semibold tabular-nums" /></td>
+                            <td className="px-3 py-2"><Input type="number" min={0} step="0.01" value={row.mrp} onChange={(e) => updateVariant(row.key, "mrp", e.target.value)} className="h-9 text-sm text-right tabular-nums" /></td>
+                            <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateVariant(row.key, "active", v)} /></td>
                             <td className="px-2 py-2">
-                              <button
-                                type="button"
-                                onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))}
-                                className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600"
-                              >
+                              <button type="button" onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </td>
@@ -1076,85 +942,47 @@ export function GroceryProductForm() {
                       </tbody>
                     </table>
                   </div>
-                  {variantRows.length === 0 ? (
-                    <div className="py-10 text-center text-sm text-slate-400">No variants — add pack sizes above</div>
-                  ) : null}
+                  {variantRows.length === 0 ? <div className="py-10 text-center text-sm text-muted-foreground">No variants — add pack sizes above</div> : null}
                 </div>
               </Section>
             ) : null}
 
-            {/* Inventory */}
-            <Section title="Inventory" subtitle="Stock controls for supermarket operations">
+            <Section step={hasVariants ? "6" : isWeighted ? "5" : "4"} title="Inventory" subtitle="Opening stock and reorder controls">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Field label="Opening Stock" hint="Saved to inventory quantity on create">
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.001"
-                    placeholder="0"
-                    value={openingStock}
-                    onChange={(e) => setOpeningStock(e.target.value)}
-                    className="h-10"
-                  />
+                <Field label="Opening Stock" hint="Saved to inventory on create">
+                  <Input type="number" min={0} step="0.001" placeholder="0" value={openingStock} onChange={(e) => setOpeningStock(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Reorder Level">
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={reorderLevel}
-                    onChange={(e) => setReorderLevel(e.target.value)}
-                    className="h-10"
-                  />
+                  <Input type="number" min={0} placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Minimum Stock">
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={minStock}
-                    onChange={(e) => setMinStock(e.target.value)}
-                    className="h-10"
-                  />
+                  <Input type="number" min={0} placeholder="0" value={minStock} onChange={(e) => setMinStock(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Maximum Stock">
-                  <Input
-                    type="number"
-                    min={0}
-                    placeholder="0"
-                    value={maxStock}
-                    onChange={(e) => setMaxStock(e.target.value)}
-                    className="h-10"
-                  />
+                  <Input type="number" min={0} placeholder="0" value={maxStock} onChange={(e) => setMaxStock(e.target.value)} className="h-10" />
                 </Field>
                 <Field label="Warehouse">
                   <Select value={warehouseId || "_none"} onValueChange={(v) => setWarehouseId(v === "_none" ? "" : v)}>
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Default warehouse" />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-10"><SelectValue placeholder="Default warehouse" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">Default / auto</SelectItem>
-                      {warehouses.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>
-                          {w.name}
-                        </SelectItem>
-                      ))}
+                      {warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
                   <div>
                     <p className="text-sm font-medium">Track Inventory</p>
-                    <p className="text-[11px] text-slate-500">Monitor stock at branch level</p>
+                    <p className="text-[11px] text-muted-foreground">Monitor stock by branch</p>
                   </div>
                   <Switch checked={trackInventory} onCheckedChange={setTrackInventory} />
                 </div>
-                <div className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3">
+                <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
                   <div>
                     <p className="text-sm font-medium">Allow Negative Stock</p>
-                    <p className="text-[11px] text-slate-500">POS preference (stored with product)</p>
+                    <p className="text-[11px] text-muted-foreground">POS preference</p>
                   </div>
                   <Switch checked={allowNegative} onCheckedChange={setAllowNegative} />
                 </div>
@@ -1172,141 +1000,59 @@ export function GroceryProductForm() {
               ) : null}
             </Section>
 
-            {/* Suppliers */}
-            <Section
-              title="Suppliers"
-              subtitle="Assigned suppliers appear when creating purchase orders for that supplier"
-            >
+            <Section step={hasVariants ? "7" : isWeighted ? "6" : "5"} title="Suppliers" subtitle="Linked suppliers appear on Purchase Orders">
               <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input
-                    className="h-10 pl-9"
-                    placeholder="Search suppliers…"
-                    value={supplierSearch}
-                    onChange={(e) => setSupplierSearch(e.target.value)}
-                  />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input className="h-10 pl-9" placeholder="Search suppliers…" value={supplierSearch} onChange={(e) => setSupplierSearch(e.target.value)} />
                 </div>
                 <Select value={supplierPick || undefined} onValueChange={setSupplierPick}>
-                  <SelectTrigger className="h-10 sm:w-64">
-                    <SelectValue placeholder="Select supplier…" />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-10 sm:w-56"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>
-                    {availableSuppliers.length === 0 ? (
-                      <SelectItem value="_none" disabled>
-                        No suppliers available
-                      </SelectItem>
-                    ) : (
-                      availableSuppliers.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    {availableSuppliers.length === 0
+                      ? <SelectItem value="_none" disabled>No suppliers available</SelectItem>
+                      : availableSuppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Button type="button" variant="outline" className="h-10 gap-1.5" disabled={!supplierPick} onClick={addSupplier}>
                   <Plus className="h-4 w-4" /> Add
                 </Button>
               </div>
-
-              <div className="rounded-xl border border-slate-200 overflow-hidden">
+              <div className="rounded-xl border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-slate-50 border-b">
-                      <tr className="text-[10px] uppercase tracking-wide text-slate-500">
-                        <th className="px-3 py-2.5 text-left">Supplier</th>
-                        <th className="px-3 py-2.5 text-center">Default</th>
-                        <th className="px-3 py-2.5 text-right">Buying Price</th>
-                        <th className="px-3 py-2.5 text-right">Lead Time (days)</th>
-                        <th className="px-3 py-2.5 text-right">Min Order Qty</th>
-                        <th className="px-3 py-2.5 text-center">Status</th>
+                    <thead className="bg-muted/40 border-b">
+                      <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                        <th className="px-3 py-2.5 text-left font-medium">Supplier</th>
+                        <th className="px-3 py-2.5 text-center font-medium">Default</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Buying</th>
+                        <th className="px-3 py-2.5 text-right font-medium">Lead (days)</th>
+                        <th className="px-3 py-2.5 text-right font-medium">MOQ</th>
+                        <th className="px-3 py-2.5 text-center font-medium">On</th>
                         <th className="px-2 py-2.5 w-10" />
                       </tr>
                     </thead>
                     <tbody className="divide-y">
                       {supplierRows.map((row) => (
-                        <tr key={row.supplierId} className={!row.active ? "opacity-50" : undefined}>
-                          <td className="px-3 py-2 font-medium text-slate-800">
-                            {suppliers.find((s) => s.id === row.supplierId)?.name ?? row.supplierId}
+                        <tr key={row.supplierId} className={!row.active ? "opacity-50" : "hover:bg-muted/20"}>
+                          <td className="px-3 py-2 font-medium text-foreground">{suppliers.find((s) => s.id === row.supplierId)?.name ?? row.supplierId}</td>
+                          <td className="px-3 py-2 text-center">
+                            <input type="radio" name="defaultSupplier" checked={row.isDefault} onChange={() => setSupplierRows((rows) => rows.map((r) => ({ ...r, isDefault: r.supplierId === row.supplierId })))} className="accent-primary" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min={0} step="0.01" value={row.buyingPrice} onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.supplierId === row.supplierId ? { ...r, buyingPrice: sanitizePrice(e.target.value) } : r))} className="h-9 text-right tabular-nums" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min={0} value={row.leadTime} onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.supplierId === row.supplierId ? { ...r, leadTime: e.target.value } : r))} className="h-9 text-right" />
+                          </td>
+                          <td className="px-3 py-2">
+                            <Input type="number" min={0} value={row.moq} onChange={(e) => setSupplierRows((rows) => rows.map((r) => r.supplierId === row.supplierId ? { ...r, moq: e.target.value } : r))} className="h-9 text-right" />
                           </td>
                           <td className="px-3 py-2 text-center">
-                            <input
-                              type="radio"
-                              name="defaultSupplier"
-                              checked={row.isDefault}
-                              onChange={() =>
-                                setSupplierRows((rows) =>
-                                  rows.map((r) => ({ ...r, isDefault: r.supplierId === row.supplierId })),
-                                )
-                              }
-                              className="accent-slate-900"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={row.buyingPrice}
-                              onChange={(e) =>
-                                setSupplierRows((rows) =>
-                                  rows.map((r) =>
-                                    r.supplierId === row.supplierId
-                                      ? { ...r, buyingPrice: sanitizePrice(e.target.value) }
-                                      : r,
-                                  ),
-                                )
-                              }
-                              className="h-9 text-right tabular-nums"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={row.leadTime}
-                              onChange={(e) =>
-                                setSupplierRows((rows) =>
-                                  rows.map((r) =>
-                                    r.supplierId === row.supplierId ? { ...r, leadTime: e.target.value } : r,
-                                  ),
-                                )
-                              }
-                              className="h-9 text-right"
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <Input
-                              type="number"
-                              min={0}
-                              value={row.moq}
-                              onChange={(e) =>
-                                setSupplierRows((rows) =>
-                                  rows.map((r) =>
-                                    r.supplierId === row.supplierId ? { ...r, moq: e.target.value } : r,
-                                  ),
-                                )
-                              }
-                              className="h-9 text-right"
-                            />
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <Switch
-                              checked={row.active}
-                              onCheckedChange={(v) =>
-                                setSupplierRows((rows) =>
-                                  rows.map((r) => (r.supplierId === row.supplierId ? { ...r, active: v } : r)),
-                                )
-                              }
-                            />
+                            <Switch checked={row.active} onCheckedChange={(v) => setSupplierRows((rows) => rows.map((r) => r.supplierId === row.supplierId ? { ...r, active: v } : r))} />
                           </td>
                           <td className="px-2 py-2">
-                            <button
-                              type="button"
-                              onClick={() => setSupplierRows((rows) => rows.filter((r) => r.supplierId !== row.supplierId))}
-                              className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600"
-                            >
+                            <button type="button" onClick={() => setSupplierRows((rows) => rows.filter((r) => r.supplierId !== row.supplierId))} className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
                               <Trash2 className="h-3.5 w-3.5" />
                             </button>
                           </td>
@@ -1315,99 +1061,78 @@ export function GroceryProductForm() {
                     </tbody>
                   </table>
                 </div>
-                {supplierRows.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-slate-400">No suppliers assigned yet</div>
-                ) : null}
+                {supplierRows.length === 0 ? <div className="py-8 text-center text-sm text-muted-foreground">No suppliers assigned yet</div> : null}
               </div>
             </Section>
           </div>
 
-          {/* RIGHT SIDEBAR */}
-          <aside className="space-y-4 xl:sticky xl:top-6">
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b bg-slate-50/80">
-                <h3 className="text-sm font-semibold text-slate-900">Product Summary</h3>
-              </div>
-              <div className="p-4 space-y-2.5 text-sm">
-                {(
-                  [
-                    ["Product Name", name || "—"],
-                    ["Brand", brandName || "—"],
-                    ["Category", categoryName || "—"],
-                    ["Sub Category", subCategoryName || "—"],
-                    ["Type", PRODUCT_TYPES.find((t) => t.id === productType)?.title ?? productType],
-                    ["Barcode", isWeighted ? "N/A (weighted)" : barcode || "—"],
-                    ["SKU", skuHint || "Auto"],
-                    ["Unit", unit],
-                    ["Variants", hasVariants ? String(activeVariants.length) : "—"],
-                    ["Suppliers", String(supplierRows.filter((s) => s.active).length)],
-                    ["Status", statusActive ? "Active" : "Inactive / Draft"],
-                  ] as const
-                ).map(([label, val]) => (
-                  <div key={label} className="flex justify-between gap-3">
-                    <span className="text-slate-500 shrink-0 text-xs">{label}</span>
-                    <span className="font-medium text-right text-slate-900 text-xs truncate max-w-[160px]">{val}</span>
+          <aside className="space-y-4 lg:sticky lg:top-4">
+            <SidebarCard title="Product Summary">
+              <div className="space-y-2.5">
+                {([
+                  ["Name", name || "—"],
+                  ["Brand", brandName || "—"],
+                  ["Category", categoryName || "—"],
+                  ["Sub Category", subCategoryName || "—"],
+                  ["Type", PRODUCT_TYPES.find((t) => t.id === productType)?.title ?? productType],
+                  ["Barcode", isWeighted ? "N/A" : barcode || "—"],
+                  ["SKU", skuHint || "Auto"],
+                  ["Unit", unit],
+                  ["Variants", hasVariants ? String(activeVariants.length) : "—"],
+                  ["Suppliers", String(supplierRows.filter((s) => s.active).length)],
+                  ["Status", statusActive ? "Active" : "Draft"],
+                ] as const).map(([label, val]) => (
+                  <div key={label} className="flex justify-between gap-3 text-xs">
+                    <span className="text-muted-foreground shrink-0">{label}</span>
+                    <span className="font-medium text-right text-foreground truncate max-w-[150px]">{val}</span>
                   </div>
                 ))}
               </div>
-            </div>
+            </SidebarCard>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-3">
-              <h3 className="text-sm font-semibold text-slate-900 border-b pb-2">Status</h3>
-              <div className="flex items-center justify-between">
+            <SidebarCard title="Status & Availability">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Active</p>
-                  <p className="text-[11px] text-slate-500">Visible in POS & catalogue</p>
+                  <p className="text-[11px] text-muted-foreground">Visible in POS</p>
                 </div>
                 <Switch checked={statusActive} onCheckedChange={setStatusActive} />
               </div>
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium">Track Inventory</p>
-                  <p className="text-[11px] text-slate-500">Stock monitoring</p>
+                  <p className="text-[11px] text-muted-foreground">Stock monitoring</p>
                 </div>
                 <Switch checked={trackInventory} onCheckedChange={setTrackInventory} />
               </div>
               {trackInventory ? (
-                <div className="rounded-lg bg-slate-50 border border-slate-100 px-3 py-2 text-[11px] text-slate-600">
-                  Branch availability:{" "}
-                  <span className="font-semibold text-slate-900">
-                    {branchScope === "ALL" ? "All Branches" : "Single Branch"}
-                  </span>
+                <div className="rounded-lg bg-muted/40 border px-3 py-2 text-[11px] text-muted-foreground">
+                  Branches: <span className="font-semibold text-foreground">{branchScope === "ALL" ? "All Branches" : "Single Branch"}</span>
                 </div>
               ) : null}
-            </div>
+            </SidebarCard>
 
-            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 space-y-2.5">
+            <SidebarCard>
               <Button className="w-full gap-2 h-10" disabled={loading} onClick={() => submit("ACTIVE")}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Product
               </Button>
-              <Button
-                variant="outline"
-                className="w-full gap-2 h-10"
-                disabled={loading}
-                onClick={() => submit("ADD_ANOTHER")}
-              >
+              <Button variant="outline" className="w-full gap-2 h-10" disabled={loading} onClick={() => submit("ADD_ANOTHER")}>
                 <Plus className="h-4 w-4" />
                 Save & Add Another
               </Button>
               <Button variant="secondary" className="w-full h-10" disabled={loading} onClick={() => submit("DRAFT")}>
                 Save Draft
               </Button>
-              <Button
-                variant="ghost"
-                className="w-full h-10 text-slate-500"
-                onClick={() => router.push("/products")}
-              >
+              <Button variant="ghost" className="w-full h-9 text-muted-foreground" onClick={() => router.push("/products")}>
                 Cancel
               </Button>
-            </div>
+            </SidebarCard>
 
-            <div className="rounded-xl border border-dashed border-slate-200 bg-white/60 px-3 py-2.5 text-[11px] text-slate-500 leading-relaxed">
-              <Package className="h-3.5 w-3.5 inline mr-1 text-slate-400" />
-              Supplier mapping uses existing assignments — products show only for linked suppliers on Purchase Orders.
-            </div>
+            <p className="text-[11px] text-muted-foreground leading-relaxed px-1">
+              <Package className="h-3.5 w-3.5 inline mr-1 opacity-70" />
+              Assigned suppliers only see this product when creating a PO.
+            </p>
           </aside>
         </div>
       </div>
