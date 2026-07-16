@@ -731,7 +731,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
   const singular = workspace.productLabel.replace(/s$/i, '') || 'Product';
   const tips: Record<ShopType, string> = {
     [ShopType.CLOTHING]: 'Use Size + Color variants for apparel. Print hang tags after receiving stock.',
-    [ShopType.GROCERY]: 'Set unit (kg, L, pack) and expiry date for perishable items.',
+    [ShopType.GROCERY]: 'Set unit (kg, L) and expiry date for perishable items. Assign a brand when adding products.',
     [ShopType.HARDWARE]: 'Track by unit (pcs, meter, box) and use Material variants for fittings.',
     [ShopType.AGRICULTURE]: 'Record batch number and grade for seeds, fertilizer and feed.',
     [ShopType.SPARE_PARTS]: 'Set OEM number, part type and warranty months. Map to compatible vehicles.',

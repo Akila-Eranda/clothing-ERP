@@ -38,6 +38,8 @@ type LineItem = {
   quantity: number;
   unitCost: number;
   stock: number;
+  expiryDate: string;
+  batchNumber: string;
 };
 
 interface Props {
@@ -144,6 +146,8 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
           quantity: 1,
           unitCost: cost,
           stock: v.stock,
+          expiryDate: "",
+          batchNumber: "",
         },
       ]);
       toast.success(`Added ${v.productName}`);
@@ -233,6 +237,11 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
       toast.error("Check quantities and costs");
       return;
     }
+    const missingExp = items.find((i) => !i.expiryDate.trim());
+    if (missingExp) {
+      toast.error(`Expiry date required for ${missingExp.productName}`);
+      return;
+    }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
       const ok = window.confirm(
@@ -249,6 +258,8 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
           variantId: i.variantId,
           quantity: i.quantity,
           unitCost: i.unitCost,
+          expiryDate: i.expiryDate,
+          ...(i.batchNumber.trim() ? { batchNumber: i.batchNumber.trim() } : {}),
         })),
       });
       toast.success(`GRN posted: ${res.data?.grnNumber ?? "OK"}`);
@@ -270,7 +281,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
         if (e.target === e.currentTarget && !loading) onClose();
       }}
     >
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-3xl border overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-4xl border overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
           <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
@@ -448,6 +459,8 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                         <th className="px-3 py-2 text-right font-semibold w-20">Stock</th>
                         <th className="px-3 py-2 text-right font-semibold w-24">Qty</th>
                         <th className="px-3 py-2 text-right font-semibold w-28">Unit Cost</th>
+                        <th className="px-3 py-2 text-left font-semibold w-36">Expiry *</th>
+                        <th className="px-3 py-2 text-left font-semibold w-28">Batch</th>
                         <th className="px-3 py-2 text-right font-semibold w-28">Total</th>
                         <th className="px-3 py-2 w-10" />
                       </tr>
@@ -488,6 +501,26 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                               className="w-28 text-right text-sm border rounded-lg px-2 py-1.5 bg-background tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="date"
+                              value={item.expiryDate}
+                              onChange={(e) => updateLine(idx, "expiryDate", e.target.value)}
+                              className={`w-36 text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring ${
+                                !item.expiryDate ? "border-destructive/60" : ""
+                              }`}
+                              required
+                            />
+                          </td>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="text"
+                              value={item.batchNumber}
+                              placeholder="Optional"
+                              onChange={(e) => updateLine(idx, "batchNumber", e.target.value)}
+                              className="w-28 text-sm border rounded-lg px-2 py-1.5 bg-background font-mono focus:outline-none focus:ring-2 focus:ring-ring"
+                            />
+                          </td>
                           <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-emerald-700">
                             {(item.quantity * item.unitCost).toLocaleString("en-LK", {
                               minimumFractionDigits: 2,
@@ -522,7 +555,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              This posts stock immediately. To receive against a purchase order, open the PO and use{" "}
+              Expiry date is required on every line. Stock posts to inventory lots for FEFO. To receive against a PO, open it and use{" "}
               <span className="font-medium text-foreground">Receive Items</span>.
             </p>
           </div>

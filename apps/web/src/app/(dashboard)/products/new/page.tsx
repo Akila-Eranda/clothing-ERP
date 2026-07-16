@@ -26,6 +26,7 @@ import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags } from "@/lib/product-tags";
+import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 
 // â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 interface Category { id: string; name: string; }
@@ -90,10 +91,6 @@ function cartesian(attrs: VariantAttr[]): string[][] {
     [[]]
   );
 }
-function genSku(name: string, combo: string[]): string {
-  const b = name ? name.replace(/\s+/g, "").slice(0, 3).toUpperCase() : "PRD";
-  return [b, ...combo.map((v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase())].join("-");
-}
 
 // â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AddProductPage() {
@@ -143,12 +140,15 @@ export default function AddProductPage() {
 
   const buildRows = (combos: string[][], attrs: VariantAttr[], prev: VariantRow[] = []): VariantRow[] => {
     const validAttrs = attrs.filter((a) => a.values.length > 0);
+    const used = new Set<string>();
     return combos.map((combo) => {
       const key = combo.join("|");
       const old = prev.find((p) => p.key === key);
+      const sku = uniqueSku(old?.sku ?? genSku(form.name, combo), used);
+      used.add(sku);
       return {
         key,
-        sku: old?.sku ?? genSku(form.name, combo),
+        sku,
         name: combo.join(" / "),
         ...applyVariantCombo(shopProfile, validAttrs, combo),
         sellingPrice: old?.sellingPrice ?? form.sellingPrice,
@@ -198,7 +198,8 @@ export default function AddProductPage() {
         && variantCols[0].field === field
       ) {
         updated.name = next;
-        updated.sku = genSku(form.name || "PRD", [next]);
+        const used = rows.filter((x) => x.key !== key).map((x) => x.sku);
+        updated.sku = uniqueSku(genSku(form.name || "PRD", [next]), used);
       }
       return updated;
     }));
@@ -212,9 +213,10 @@ export default function AddProductPage() {
       form.attributes.length ? form.attributes : [{ name: primary?.label ?? "Variant", values: [label], input: "" }],
       [label],
     );
+    const usedSkus = variantRows.map((r) => r.sku);
     const row: VariantRow = {
       key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
-      sku: genSku(form.name || "PRD", [label]),
+      sku: uniqueSku(genSku(form.name || "PRD", [label]), usedSkus),
       name: label,
       ...comboFields,
       sellingPrice: form.sellingPrice,
@@ -261,22 +263,22 @@ export default function AddProductPage() {
     let variants: Record<string, unknown>[] = [];
     if (form.hasVariants) {
       if (variantRows.length > 0) {
-        variants = activeRows.map((r) => ({
+        variants = ensureUniqueVariantSkus(activeRows.map((r) => ({
           sku: r.sku, name: r.name,
           size: r.size, color: r.color, material: r.material, style: r.style,
           sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
           costPrice:    parseFloat(r.costPrice)    || derivedCost    || 0,
           mrp:          parseFloat(r.mrp)          || derivedMrp    || 0,
-        }));
+        })));
       } else {
         const validAttrs = form.attributes.filter((a) => a.values.length > 0);
-        variants = (validAttrs.length > 0 ? cartesian(form.attributes) : []).map((combo) => ({
+        variants = ensureUniqueVariantSkus((validAttrs.length > 0 ? cartesian(form.attributes) : []).map((combo) => ({
           sku: genSku(form.name, combo), name: combo.join(" / "),
           ...applyVariantCombo(shopProfile, validAttrs, combo),
           sellingPrice: derivedSelling,
           costPrice:    derivedCost,
           mrp:          derivedMrp,
-        }));
+        })));
       }
     }
     const extraTags = buildProductTags({
@@ -388,14 +390,18 @@ export default function AddProductPage() {
                   </SelectContent>
                 </Select>
               </div>
-              {formCopy.showBrand && (
+              {formCopy.showBrand && !form.hasVariants && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Brand</Label>
-                <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
+                <Select
+                  value={form.brandId || undefined}
+                  onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+                >
                   <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_none">No brand</SelectItem>
                     {brands.length === 0
-                      ? <SelectItem value="_none" disabled>No brands found</SelectItem>
+                      ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
                       : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>

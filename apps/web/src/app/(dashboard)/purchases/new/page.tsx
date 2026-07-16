@@ -485,7 +485,7 @@ export default function CreatePOPage() {
     <div className="min-h-screen bg-muted/20 pb-32 sm:pb-28">
       {/* Header */}
       <div className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-3 py-3 sm:px-6 sm:py-3.5">
+        <div className="mx-auto flex w-full items-center gap-3 px-3 py-3 sm:px-6 sm:py-3.5">
           <Button
             type="button"
             variant="outline"
@@ -523,7 +523,7 @@ export default function CreatePOPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-6">
+      <div className="mx-auto w-full space-y-4 px-3 py-4 sm:space-y-5 sm:px-6 sm:py-6">
         {grnPrefillLoading && (
           <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">Loading GRN details…</div>
         )}
@@ -1148,7 +1148,7 @@ export default function CreatePOPage() {
 
       {/* Footer */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-3">
+        <div className="mx-auto flex w-full flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:px-6 sm:py-3">
           <div className="flex items-center justify-between gap-2 sm:justify-start">
             <div className="md:hidden">
               <p className="text-[10px] text-muted-foreground">Total</p>

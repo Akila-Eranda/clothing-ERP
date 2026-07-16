@@ -20,6 +20,7 @@ import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
+import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -76,10 +77,6 @@ function cartesian(attrs: VariantAttr[]): string[][] {
     (acc, a) => acc.flatMap((prev) => a.values.map((v) => [...prev, v])),
     [[]]
   );
-}
-function genSku(name: string, combo: string[]): string {
-  const b = name ? name.replace(/\s+/g, "").slice(0, 3).toUpperCase() : "PRD";
-  return [b, ...combo.map((v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase())].join("-");
 }
 const COLOR_HEX: Record<string, string> = {
   black: "#1a1a1a", white: "#f5f5f5", red: "#ef4444", blue: "#3b82f6",
@@ -206,9 +203,12 @@ export default function EditProductPage() {
 
   const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
     const validAttrs = attrs.filter((a) => a.values.length > 0);
+    const used = new Set(variantRows.map((r) => r.sku));
     return combos.map((combo) => {
+      const sku = uniqueSku(genSku(form.name, combo), used);
+      used.add(sku);
       const row: VariantRow = {
-        key: combo.join("|"), sku: genSku(form.name, combo), name: combo.join(" / "),
+        key: combo.join("|"), sku, name: combo.join(" / "),
         sellingPrice: form.sellingPrice, costPrice: form.costPrice, mrp: form.mrp, active: true,
       };
       validAttrs.forEach((attr, idx) => {
@@ -275,7 +275,7 @@ export default function EditProductPage() {
 
     let variants: Record<string, unknown>[] | undefined = undefined;
     if (form.hasVariants && variantRows.length > 0) {
-      variants = variantRows.map((r) => ({
+      variants = ensureUniqueVariantSkus(variantRows.map((r) => ({
         id:           r.id,
         sku:          r.sku,
         name:         r.name,
@@ -287,7 +287,7 @@ export default function EditProductPage() {
         costPrice:    parseFloat(r.costPrice)    || derivedCost    || 0,
         mrp:          parseFloat(r.mrp)          || derivedMrp    || 0,
         isActive:     r.active,
-      }));
+      })));
     }
 
     const savedTags = buildProductTags({
@@ -385,17 +385,23 @@ export default function EditProductPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {!form.hasVariants && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Brand</Label>
-                <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
+                <Select
+                  value={form.brandId || undefined}
+                  onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+                >
                   <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="_none">No brand</SelectItem>
                     {brands.length === 0
-                      ? <SelectItem value="_none" disabled>No brands found</SelectItem>
+                      ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
                       : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              )}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">HSN / SAC Code</Label>
                 <Input placeholder="e.g. 6109" value={form.hsn} onChange={(e) => set("hsn", e.target.value)} />
@@ -559,7 +565,7 @@ export default function EditProductPage() {
                       const label = `Variant ${variantRows.length + 1}`;
                       setVariantRows((r) => [...r, {
                         key: `${Date.now()}`,
-                        sku: genSku(form.name || "PRD", [label]),
+                        sku: uniqueSku(genSku(form.name || "PRD", [label]), r.map((x) => x.sku)),
                         name: label,
                         sellingPrice: form.sellingPrice,
                         costPrice: form.costPrice,

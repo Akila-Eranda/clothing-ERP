@@ -71,10 +71,9 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     defaultCategories: ['Fresh Produce', 'Dairy & Eggs', 'Beverages', 'Snacks', 'Frozen Foods', 'Household'],
     variantAttributes: [
       { name: 'Weight', presets: ['250g', '500g', '1kg', '2kg', '5kg'], mapsTo: 'size' },
-      { name: 'Pack', presets: ['Single', '6-Pack', '12-Pack', 'Carton'], mapsTo: 'style' },
     ],
     defaultUnit: 'kg',
-    units: ['pcs', 'kg', 'g', 'L', 'ml', 'pack'],
+    units: ['pcs', 'kg', 'g', 'L', 'ml'],
     modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false },
     labelTemplates: ['sticker', 'shelf'],
   },

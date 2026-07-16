@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   AlertTriangle, Package, TrendingDown, BarChart3, RefreshCw, ShoppingBag,
-  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban,
+  Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +71,109 @@ interface AbcRow {
   cumulativePct: number;
 }
 
+interface AgingDetail {
+  name: string;
+  ageDays: number;
+  qty: number;
+}
+
+function gradeBadge(grade: string) {
+  if (grade === "A") return "bg-emerald-500/15 text-emerald-700 border-emerald-500/25";
+  if (grade === "B") return "bg-amber-500/15 text-amber-700 border-amber-500/25";
+  return "bg-slate-500/15 text-slate-700 border-slate-500/25";
+}
+
+function ageBucket(days: number) {
+  if (days <= 30) return "0-30";
+  if (days <= 60) return "31-60";
+  if (days <= 90) return "61-90";
+  return "90+";
+}
+
+const ABC_COLUMNS: ColumnDef<AbcRow>[] = [
+  {
+    accessorKey: "grade",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Grade" />,
+    cell: ({ row }) => (
+      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${gradeBadge(row.original.grade)}`}>
+        {row.original.grade}
+      </span>
+    ),
+    filterFn: (row, _id, value: string[]) => !value?.length || value.includes(row.original.grade),
+  },
+  {
+    accessorKey: "sku",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
+    cell: ({ row }) => <span className="font-mono text-xs">{row.original.sku}</span>,
+  },
+  {
+    accessorKey: "name",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+    cell: ({ row }) => <span className="text-sm font-medium">{row.original.name}</span>,
+  },
+  {
+    accessorKey: "quantity",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" />,
+    cell: ({ row }) => <span className="tabular-nums font-semibold">{row.original.quantity}</span>,
+  },
+  {
+    accessorKey: "revenue",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Revenue" />,
+    cell: ({ row }) => <span className="text-sm font-semibold tabular-nums">LKR {formatNumber(row.original.revenue)}</span>,
+  },
+  {
+    accessorKey: "cumulativePct",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Cumulative %" />,
+    cell: ({ row }) => (
+      <div className="flex items-center gap-2 min-w-[120px]">
+        <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full ${row.original.grade === "A" ? "bg-emerald-500" : row.original.grade === "B" ? "bg-amber-500" : "bg-slate-400"}`}
+            style={{ width: `${Math.min(100, row.original.cumulativePct)}%` }}
+          />
+        </div>
+        <span className="text-xs tabular-nums text-muted-foreground w-10 text-right">{row.original.cumulativePct}%</span>
+      </div>
+    ),
+  },
+];
+
+const AGING_COLUMNS: ColumnDef<AgingDetail & { bucket: string }>[] = [
+  {
+    accessorKey: "name",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+    cell: ({ row }) => <span className="text-sm font-medium">{row.original.name}</span>,
+  },
+  {
+    accessorKey: "ageDays",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Age (days)" />,
+    cell: ({ row }) => {
+      const d = row.original.ageDays;
+      const color = d > 90 ? "text-red-600" : d > 60 ? "text-amber-600" : d > 30 ? "text-blue-600" : "text-emerald-600";
+      return <span className={`font-semibold tabular-nums ${color}`}>{d}</span>;
+    },
+  },
+  {
+    accessorKey: "bucket",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Bucket" />,
+    cell: ({ row }) => {
+      const b = row.original.bucket;
+      const cls =
+        b === "90+" ? "bg-red-500/10 text-red-700 border-red-500/20"
+          : b === "61-90" ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
+            : b === "31-60" ? "bg-blue-500/10 text-blue-700 border-blue-500/20"
+              : "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+      return <span className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold ${cls}`}>{b} days</span>;
+    },
+    filterFn: (row, _id, value: string[]) => !value?.length || value.includes(row.original.bucket),
+  },
+  {
+    accessorKey: "qty",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" />,
+    cell: ({ row }) => <span className="font-semibold tabular-nums">{row.original.qty}</span>,
+  },
+];
+
 interface StockTransferRow {
   id: string;
   fromBranchId: string;
@@ -91,12 +194,161 @@ interface StockTransferRow {
   workflow?: WorkflowInstanceLike | null;
 }
 
-const TRANSFER_STATUS: Record<StockTransferRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "danger" }> = {
+const TRANSFER_STATUS: Record<StockTransferRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "danger" | "info" }> = {
   PENDING: { label: "Pending", variant: "warning" },
-  IN_TRANSIT: { label: "In Transit", variant: "secondary" },
+  IN_TRANSIT: { label: "In Transit", variant: "info" },
   RECEIVED: { label: "Received", variant: "success" },
   CANCELLED: { label: "Cancelled", variant: "danger" },
 };
+
+function buildTransferColumns(opts: {
+  userId?: string;
+  userRole?: string;
+  branchScopeId?: string;
+  transferActionId: string | null;
+  onDispatch: (id: string) => void;
+  onReceive: (id: string) => void;
+  onCancel: (id: string) => void;
+  onApprove: (taskId: string) => void;
+  onReject: (taskId: string) => void;
+}): ColumnDef<StockTransferRow>[] {
+  return [
+    {
+      id: "date",
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleString("en-LK", {
+            day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
+          })}
+        </span>
+      ),
+    },
+    {
+      id: "from",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="From" />,
+      accessorFn: (r) => r.fromBranch?.name ?? "",
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.fromBranch?.name ?? "—"}</span>,
+    },
+    {
+      id: "to",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="To" />,
+      accessorFn: (r) => r.toBranch?.name ?? "",
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.toBranch?.name ?? "—"}</span>,
+    },
+    {
+      id: "items",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
+      cell: ({ row }) => {
+        const t = row.original;
+        const summary = t.items
+          .map((i) => `${i.variant?.product?.name ?? "Item"} ×${i.requestedQty}`)
+          .slice(0, 2)
+          .join(", ");
+        return (
+          <div className="max-w-[220px]">
+            <p className="text-sm truncate">{summary || "—"}</p>
+            <p className="text-[10px] text-muted-foreground">
+              {t.items.length} line{t.items.length === 1 ? "" : "s"}
+              {t.items.length > 2 ? ` · +${t.items.length - 2} more` : ""}
+            </p>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => {
+        const t = row.original;
+        const st = TRANSFER_STATUS[t.status];
+        const showPendingApproval = t.status === "PENDING" && t.workflow?.status === "IN_PROGRESS";
+        return (
+          <div>
+            <Badge variant={st.variant} className="text-[10px] gap-1">
+              {t.status === "IN_TRANSIT" && <Truck className="h-2.5 w-2.5" />}
+              {t.status === "RECEIVED" && <CheckCircle2 className="h-2.5 w-2.5" />}
+              {t.status === "PENDING" && <Clock className="h-2.5 w-2.5" />}
+              {t.status === "CANCELLED" && <Ban className="h-2.5 w-2.5" />}
+              {st.label}
+            </Badge>
+            {showPendingApproval && (
+              <p className="text-[10px] text-amber-600 mt-1 font-medium">Awaiting approval</p>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, _id, value: string[]) => !value?.length || value.includes(row.original.status),
+    },
+    {
+      id: "approval",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Approval" />,
+      cell: ({ row }) => {
+        const t = row.original;
+        const wfActing = !!(opts.transferActionId && t.workflow?.tasks?.some((task) => task.id === opts.transferActionId));
+        if (t.status === "PENDING" && t.workflow) {
+          return (
+            <TransferApprovalActions
+              instance={t.workflow}
+              userId={opts.userId}
+              userRole={opts.userRole}
+              requestedBy={t.requestedBy}
+              acting={wfActing}
+              onApprove={opts.onApprove}
+              onReject={opts.onReject}
+            />
+          );
+        }
+        if (t.workflow?.status === "APPROVED") {
+          return <span className="text-xs font-medium text-emerald-600">Approved</span>;
+        }
+        if (t.workflow?.status === "REJECTED") {
+          return <span className="text-xs font-medium text-red-600">Rejected</span>;
+        }
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const t = row.original;
+        const approved = isTransferWorkflowApproved(t.workflow);
+        const canDispatch = t.status === "PENDING" && approved && (!opts.branchScopeId || t.fromBranchId === opts.branchScopeId);
+        const canReceive = t.status === "IN_TRANSIT" && (!opts.branchScopeId || t.toBranchId === opts.branchScopeId);
+        const canCancel = t.status === "PENDING" && (!opts.branchScopeId || t.fromBranchId === opts.branchScopeId);
+        const acting = opts.transferActionId === t.id;
+        if (!canDispatch && !canReceive && !canCancel) {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
+        return (
+          <div className="flex gap-1.5 flex-wrap justify-end">
+            {canDispatch && (
+              <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" disabled={acting}
+                onClick={() => opts.onDispatch(t.id)}>
+                {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Truck className="h-3.5 w-3.5" />}
+                Dispatch
+              </Button>
+            )}
+            {canReceive && (
+              <Button size="sm" className="h-8 text-xs gap-1.5" disabled={acting}
+                onClick={() => opts.onReceive(t.id)}>
+                {acting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+                Receive
+              </Button>
+            )}
+            {canCancel && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs gap-1.5 text-red-600 hover:text-red-700" disabled={acting}
+                onClick={() => opts.onCancel(t.id)}>
+                <Ban className="h-3.5 w-3.5" /> Cancel
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+}
 
 function getStockStatus(qty: number) {
   if (qty === 0) return "out_of_stock";
@@ -330,17 +582,56 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     { showBatch, showExpiry, variantCols },
   );
 
+  const transferColumns = buildTransferColumns({
+    userId: user?.id,
+    userRole: user?.role,
+    branchScopeId,
+    transferActionId,
+    onDispatch: (id) => updateTransferStatus(id, "IN_TRANSIT"),
+    onReceive: (id) => updateTransferStatus(id, "RECEIVED"),
+    onCancel: (id) => updateTransferStatus(id, "CANCELLED"),
+    onApprove: (taskId) => actOnTransferWorkflow(taskId, "approve"),
+    onReject: (taskId) => actOnTransferWorkflow(taskId, "reject"),
+  });
+
   const lowCount = stock.filter((i) => i.quantity > 0 && i.quantity <= 5).length;
   const outCount = stock.filter((i) => i.quantity === 0).length;
+  const transferPending = transfers.filter((t) => t.status === "PENDING").length;
+  const transferInTransit = transfers.filter((t) => t.status === "IN_TRANSIT").length;
+  const transferReceived = transfers.filter((t) => t.status === "RECEIVED").length;
+  const transferCancelled = transfers.filter((t) => t.status === "CANCELLED").length;
+
+  const abcA = abc.filter((r) => r.grade === "A").length;
+  const abcB = abc.filter((r) => r.grade === "B").length;
+  const abcC = abc.filter((r) => r.grade === "C").length;
+  const abcRevenue = abc.reduce((s, r) => s + (r.revenue || 0), 0);
+
+  const agingRows = (aging?.details ?? []).map((d) => ({
+    ...d,
+    bucket: ageBucket(d.ageDays),
+  }));
+  const agingBucketStats = [
+    { label: "0–30 days", key: "0-30", value: aging?.buckets?.["0-30"] ?? aging?.buckets?.["0–30"] ?? agingRows.filter((r) => r.bucket === "0-30").reduce((s, r) => s + r.qty, 0), icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+    { label: "31–60 days", key: "31-60", value: aging?.buckets?.["31-60"] ?? aging?.buckets?.["31–60"] ?? agingRows.filter((r) => r.bucket === "31-60").reduce((s, r) => s + r.qty, 0), icon: Clock, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "61–90 days", key: "61-90", value: aging?.buckets?.["61-90"] ?? aging?.buckets?.["61–90"] ?? agingRows.filter((r) => r.bucket === "61-90").reduce((s, r) => s + r.qty, 0), icon: AlertTriangle, color: "text-amber-500", bg: "bg-amber-500/10" },
+    { label: "90+ days", key: "90+", value: aging?.buckets?.["90+"] ?? aging?.buckets?.["90+"] ?? agingRows.filter((r) => r.bucket === "90+").reduce((s, r) => s + r.qty, 0), icon: TrendingDown, color: "text-red-500", bg: "bg-red-500/10" },
+  ];
+
+  const sectionSubtitle =
+    section === "transfers"
+      ? "Move stock between branches — approval required before dispatch"
+      : section === "abc"
+        ? "Classify SKUs by revenue — A: top 80%, B: next 15%, C: remaining 5%"
+        : section === "aging"
+          ? "How long inventory has been sitting without movement"
+          : `${profile.label} · ${workspace.productLabel} · ${meta.description}`;
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">{meta.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {profile.label} · {workspace.productLabel} · {meta.description}
-          </p>
+          <p className="text-sm text-muted-foreground">{sectionSubtitle}</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={fetchData} className="gap-1.5">
@@ -367,7 +658,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           )}
           {section === "transfers" && (
             <Button size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
-              <ArrowLeftRight className="h-3.5 w-3.5" /> New Transfer
+              <Plus className="h-3.5 w-3.5" /> New Transfer
             </Button>
           )}
         </div>
@@ -456,28 +747,48 @@ export function InventoryHub({ section }: { section: InventorySection }) {
       )}
 
       {section === "abc" && (
-        <Card>
-          <CardContent className="p-4">
-            <p className="text-sm text-muted-foreground mb-3">ABC classification by revenue contribution — A: top 80%, B: next 15%, C: remaining 5%</p>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead><tr className="border-b">{["Grade", "SKU", "Product", "Qty", "Revenue", "Cumulative %"].map((h) => <th key={h} className="text-left py-2 px-2 text-xs text-muted-foreground">{h}</th>)}</tr></thead>
-                <tbody className="divide-y">
-                  {abc.slice(0, 50).map((row, i) => (
-                    <tr key={i}>
-                      <td className="py-2 px-2"><Badge className={row.grade === "A" ? "bg-emerald-500" : row.grade === "B" ? "bg-amber-500" : "bg-muted-foreground"}>{row.grade}</Badge></td>
-                      <td className="py-2 px-2 font-mono text-xs">{row.sku}</td>
-                      <td className="py-2 px-2 text-xs">{row.name}</td>
-                      <td className="py-2 px-2">{row.quantity}</td>
-                      <td className="py-2 px-2 font-semibold">LKR {formatNumber(row.revenue)}</td>
-                      <td className="py-2 px-2">{row.cumulativePct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {[
+              { label: "Grade A", value: abcA, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+              { label: "Grade B", value: abcB, icon: BarChart3, color: "text-amber-500", bg: "bg-amber-500/10" },
+              { label: "Grade C", value: abcC, icon: Package, color: "text-slate-500", bg: "bg-slate-500/10" },
+              { label: "Total Revenue", value: `LKR ${formatNumber(abcRevenue)}`, icon: TrendingDown, color: "text-blue-500", bg: "bg-blue-500/10" },
+            ].map((s) => (
+              <Card key={s.label}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
+                  <div>
+                    <p className="text-xl font-bold truncate">{s.value}</p>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <ClientSideTable
+            data={abc}
+            columns={ABC_COLUMNS}
+            pageCount={Math.max(1, Math.ceil(abc.length / 10))}
+            searchableColumns={[
+              { id: "sku", title: "SKU" },
+              { id: "name", title: "Product" },
+            ]}
+            filterableColumns={[
+              {
+                id: "grade",
+                title: "Grade",
+                options: [
+                  { label: "A", value: "A" },
+                  { label: "B", value: "B" },
+                  { label: "C", value: "C" },
+                ],
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "abc-analysis-export" }}
+          />
+        </>
       )}
 
       {section === "dead" && (
@@ -501,134 +812,87 @@ export function InventoryHub({ section }: { section: InventorySection }) {
       )}
 
       {section === "aging" && (
-        <Card>
-          <CardContent className="p-4">
-            {aging ? (
-              <>
-                <div className="grid grid-cols-4 gap-3 mb-4">
-                  {Object.entries(aging.buckets).map(([bucket, qty]) => (
-                    <div key={bucket} className="rounded-xl border p-3 text-center">
-                      <p className="text-2xl font-bold">{qty}</p>
-                      <p className="text-xs text-muted-foreground">{bucket} days</p>
-                    </div>
-                  ))}
-                </div>
-                <div className="space-y-1.5">
-                  {aging.details.slice(0, 20).map((d, i) => (
-                    <div key={i} className="flex justify-between text-sm py-1.5 border-b last:border-0">
-                      <span className="truncate">{d.name}</span>
-                      <span className="text-muted-foreground shrink-0 ml-2">{d.ageDays}d · qty {d.qty}</span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <p className="text-center py-8 text-muted-foreground">No aging data</p>
-            )}
-          </CardContent>
-        </Card>
+        <>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {agingBucketStats.map((s) => (
+              <Card key={s.key}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
+                  <div>
+                    <p className="text-xl font-bold">{s.value}</p>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <ClientSideTable
+            data={agingRows}
+            columns={AGING_COLUMNS}
+            pageCount={Math.max(1, Math.ceil(agingRows.length / 10))}
+            searchableColumns={[{ id: "name", title: "Product" }]}
+            filterableColumns={[
+              {
+                id: "bucket",
+                title: "Bucket",
+                options: [
+                  { label: "0–30 days", value: "0-30" },
+                  { label: "31–60 days", value: "31-60" },
+                  { label: "61–90 days", value: "61-90" },
+                  { label: "90+ days", value: "90+" },
+                ],
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "stock-aging-export" }}
+          />
+        </>
       )}
 
       {section === "transfers" && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Move stock between branches — manager/admin approval required before dispatch.
-          </p>
-          <Card>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/40 border-b">
-                    <tr>
-                      {["Date", "From", "To", "Items", "Status", "Approval", "Actions"].map((h) => (
-                        <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold uppercase text-muted-foreground">{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {transfers.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                          No stock transfers yet. Create one to move inventory between branches.
-                        </td>
-                      </tr>
-                    ) : transfers.map((t) => {
-                      const st = TRANSFER_STATUS[t.status];
-                      const itemSummary = t.items
-                        .map((i) => `${i.variant?.product?.name ?? "Item"} ×${i.requestedQty}`)
-                        .slice(0, 2)
-                        .join(", ");
-                      const approved = isTransferWorkflowApproved(t.workflow);
-                      const canDispatch = t.status === "PENDING" && approved && (!branchScopeId || t.fromBranchId === branchScopeId);
-                      const canReceive = t.status === "IN_TRANSIT" && (!branchScopeId || t.toBranchId === branchScopeId);
-                      const canCancel = t.status === "PENDING" && (!branchScopeId || t.fromBranchId === branchScopeId);
-                      const acting = transferActionId === t.id;
-                      const wfActing = !!(transferActionId && t.workflow?.tasks?.some((task) => task.id === transferActionId));
-                      const showPendingApproval = t.status === "PENDING" && t.workflow?.status === "IN_PROGRESS";
-                      return (
-                        <tr key={t.id} className="hover:bg-muted/20">
-                          <td className="px-3 py-2.5 text-xs whitespace-nowrap">{new Date(t.createdAt).toLocaleString()}</td>
-                          <td className="px-3 py-2.5 text-xs font-medium">{t.fromBranch?.name ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-xs font-medium">{t.toBranch?.name ?? "—"}</td>
-                          <td className="px-3 py-2.5 text-xs text-muted-foreground max-w-[200px]">
-                            {itemSummary}{t.items.length > 2 ? ` +${t.items.length - 2} more` : ""}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <Badge variant={st.variant} className="text-[9px]">{st.label}</Badge>
-                            {showPendingApproval && (
-                              <p className="text-[9px] text-amber-600 mt-1">Awaiting approval</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5 align-top">
-                            {t.status === "PENDING" && t.workflow ? (
-                              <TransferApprovalActions
-                                instance={t.workflow}
-                                userId={user?.id}
-                                userRole={user?.role}
-                                requestedBy={t.requestedBy}
-                                acting={wfActing}
-                                onApprove={(taskId) => actOnTransferWorkflow(taskId, "approve")}
-                                onReject={(taskId) => actOnTransferWorkflow(taskId, "reject")}
-                              />
-                            ) : t.workflow?.status === "APPROVED" ? (
-                              <span className="text-[10px] text-emerald-600 font-medium">Approved</span>
-                            ) : (
-                              <span className="text-[10px] text-muted-foreground">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            <div className="flex gap-1.5 flex-wrap">
-                              {canDispatch && (
-                                <Button size="sm" variant="outline" className="h-7 text-[10px] gap-1" disabled={acting}
-                                  onClick={() => updateTransferStatus(t.id, "IN_TRANSIT")}>
-                                  {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Truck className="h-3 w-3" />}
-                                  Dispatch
-                                </Button>
-                              )}
-                              {canReceive && (
-                                <Button size="sm" className="h-7 text-[10px] gap-1" disabled={acting}
-                                  onClick={() => updateTransferStatus(t.id, "RECEIVED")}>
-                                  {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
-                                  Receive
-                                </Button>
-                              )}
-                              {canCancel && (
-                                <Button size="sm" variant="ghost" className="h-7 text-[10px] gap-1 text-red-500" disabled={acting}
-                                  onClick={() => updateTransferStatus(t.id, "CANCELLED")}>
-                                  <Ban className="h-3 w-3" /> Cancel
-                                </Button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            {[
+              { label: "Pending", value: transferPending, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10" },
+              { label: "In Transit", value: transferInTransit, icon: Truck, color: "text-blue-500", bg: "bg-blue-500/10" },
+              { label: "Received", value: transferReceived, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+              { label: "Cancelled", value: transferCancelled, icon: Ban, color: "text-red-500", bg: "bg-red-500/10" },
+            ].map((s) => (
+              <Card key={s.label}>
+                <CardContent className="p-4 flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
+                  <div>
+                    <p className="text-xl font-bold">{s.value}</p>
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <ClientSideTable
+            data={transfers}
+            columns={transferColumns}
+            pageCount={Math.max(1, Math.ceil(transfers.length / 10))}
+            searchableColumns={[
+              { id: "from", title: "From branch" },
+              { id: "to", title: "To branch" },
+            ]}
+            filterableColumns={[
+              {
+                id: "status",
+                title: "Status",
+                options: [
+                  { label: "Pending", value: "PENDING" },
+                  { label: "In Transit", value: "IN_TRANSIT" },
+                  { label: "Received", value: "RECEIVED" },
+                  { label: "Cancelled", value: "CANCELLED" },
+                ],
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "stock-transfers-export" }}
+          />
+        </>
       )}
 
       <StockAdjustModal open={adjustOpen} onClose={() => setAdjustOpen(false)} onAdjusted={fetchData} item={adjustItem} />

@@ -76,6 +76,8 @@ export default function ProcurementHubPage() {
   const [qgSku, setQgSku] = useState("");
   const [qgQty, setQgQty] = useState("1");
   const [qgCost, setQgCost] = useState("");
+  const [qgExpiry, setQgExpiry] = useState("");
+  const [qgBatch, setQgBatch] = useState("");
   const [qgVariant, setQgVariant] = useState<VariantOpt | null>(null);
   const [qgBusy, setQgBusy] = useState(false);
 
@@ -153,14 +155,21 @@ export default function ProcurementHubPage() {
     const qty = parseInt(qgQty, 10);
     const cost = parseFloat(qgCost);
     if (!qty || qty < 1 || isNaN(cost)) { toast.error("Enter valid qty and cost"); return; }
+    if (!qgExpiry.trim()) { toast.error("Expiry date is required"); return; }
     setQgBusy(true);
     try {
       const res = await api.post<{ grnNumber: string }>("/procurement/grn/quick", {
         supplierId: qgSupplier,
-        lines: [{ variantId: qgVariant.id, quantity: qty, unitCost: cost }],
+        lines: [{
+          variantId: qgVariant.id,
+          quantity: qty,
+          unitCost: cost,
+          expiryDate: qgExpiry,
+          ...(qgBatch.trim() ? { batchNumber: qgBatch.trim() } : {}),
+        }],
       });
       toast.success(`Quick GRN posted: ${(res.data as { grnNumber?: string })?.grnNumber ?? "OK"}`);
-      setQgSku(""); setQgVariant(null); setQgQty("1"); setQgCost("");
+      setQgSku(""); setQgVariant(null); setQgQty("1"); setQgCost(""); setQgExpiry(""); setQgBatch("");
       load();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Quick GRN failed");
@@ -615,6 +624,14 @@ export default function ProcurementHubPage() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold">Unit Cost</label>
                   <Input type="number" min={0} value={qgCost} onChange={(e) => setQgCost(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Expiry Date <span className="text-destructive">*</span></label>
+                  <Input type="date" value={qgExpiry} onChange={(e) => setQgExpiry(e.target.value)} className="h-9" />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold">Batch #</label>
+                  <Input value={qgBatch} onChange={(e) => setQgBatch(e.target.value)} placeholder="Optional" className="h-9 font-mono" />
                 </div>
               </div>
               <Button onClick={submitQuickGrn} disabled={qgBusy} className="gap-1.5 w-full">

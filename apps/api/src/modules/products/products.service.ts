@@ -229,10 +229,22 @@ export class ProductsService {
     });
 
     if (dto.variants?.length) {
+      const usedSkus = new Set<string>();
+      const uniquify = (raw: string, index: number) => {
+        const base = (raw || `VAR-${index + 1}`).trim() || `VAR-${index + 1}`;
+        let sku = base;
+        let n = 2;
+        while (usedSkus.has(sku)) {
+          sku = `${base}-${n++}`;
+        }
+        usedSkus.add(sku);
+        return sku;
+      };
+
       await this.prisma.productVariant.createMany({
         data: dto.variants.map((v, i) => ({
           productId: product.id,
-          sku: v.sku,
+          sku: uniquify(v.sku, i),
           name: v.name,
           size: v.size,
           color: v.color,
@@ -245,7 +257,6 @@ export class ProductsService {
           sortOrder: i,
           barcode: v.barcode?.trim() || sharedBarcode,
         })),
-        skipDuplicates: true,
       });
     } else {
       await this.prisma.productVariant.create({
@@ -422,8 +433,21 @@ export class ProductsService {
     const sharedBarcode = productBarcode?.barcode ?? null;
 
     if (Array.isArray(variants) && variants.length > 0) {
+      const existingSkus = await this.prisma.productVariant.findMany({
+        where: { productId: id },
+        select: { id: true, sku: true },
+      });
+      const usedSkus = new Set(existingSkus.map((e) => e.sku));
+
       for (const v of variants as (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[]) {
         if (v.id) {
+          if (v.sku !== undefined) {
+            const other = existingSkus.find((e) => e.sku === v.sku && e.id !== v.id);
+            if (other) {
+              throw new BadRequestException(`Variant SKU already exists on this product: ${v.sku}`);
+            }
+            usedSkus.add(v.sku);
+          }
           await this.prisma.productVariant.update({
             where: { id: v.id },
             data: {
@@ -441,10 +465,15 @@ export class ProductsService {
             },
           });
         } else {
+          const base = (v.sku || v.name || 'VAR').trim() || 'VAR';
+          let sku = base;
+          let n = 2;
+          while (usedSkus.has(sku)) sku = `${base}-${n++}`;
+          usedSkus.add(sku);
           await this.prisma.productVariant.create({
             data: {
               productId:    id,
-              sku:          v.sku!,
+              sku,
               name:         v.name!,
               size:         v.size,
               color:        v.color,

@@ -197,12 +197,12 @@ export default function ProductDetailPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-2xl font-bold">{product.name}</h1>
                   <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                    product.status === "ACTIVE"   ? "bg-emerald-500/10 text-emerald-600 border border-emerald-200" :
-                    product.status === "DRAFT"    ? "bg-amber-500/10 text-amber-600 border border-amber-200" :
-                                                    "bg-slate-100 text-slate-500 border border-slate-200"
+                    product.status === "ACTIVE"   ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20" :
+                    product.status === "DRAFT"    ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20" :
+                                                    "bg-muted text-muted-foreground border border-border"
                   }`}>{product.status}</span>
                   {product.isFeatured && (
-                    <span className="text-xs bg-yellow-100 text-yellow-700 border border-yellow-200 px-2.5 py-0.5 rounded-full font-semibold">
+                    <span className="text-xs bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border border-yellow-500/20 px-2.5 py-0.5 rounded-full font-semibold">
                       ★ Featured
                     </span>
                   )}
@@ -214,17 +214,17 @@ export default function ProductDetailPage() {
 
                 <div className="flex flex-wrap gap-2">
                   {product.category && (
-                    <span className="flex items-center gap-1.5 text-xs bg-blue-50 border border-blue-100 text-blue-700 rounded-lg px-2.5 py-1">
+                    <span className="flex items-center gap-1.5 text-xs bg-blue-500/10 border border-blue-500/20 text-blue-700 dark:text-blue-400 rounded-lg px-2.5 py-1">
                       <Tag className="h-3 w-3" /> {product.category.name}
                     </span>
                   )}
                   {product.brand && (
-                    <span className="flex items-center gap-1.5 text-xs bg-purple-50 border border-purple-100 text-purple-700 rounded-lg px-2.5 py-1">
+                    <span className="flex items-center gap-1.5 text-xs bg-purple-500/10 border border-purple-500/20 text-purple-700 dark:text-purple-400 rounded-lg px-2.5 py-1">
                       <BarChart2 className="h-3 w-3" /> {product.brand.name}
                     </span>
                   )}
                   {profile.modules.collections && product.collections.map((c) => (
-                    <span key={c.collection.id} className="flex items-center gap-1.5 text-xs bg-orange-50 border border-orange-100 text-orange-700 rounded-lg px-2.5 py-1">
+                    <span key={c.collection.id} className="flex items-center gap-1.5 text-xs bg-orange-500/10 border border-orange-500/20 text-orange-700 dark:text-orange-400 rounded-lg px-2.5 py-1">
                       <Layers className="h-3 w-3" /> {c.collection.name}
                     </span>
                   ))}
@@ -254,13 +254,13 @@ export default function ProductDetailPage() {
           {/* Quick stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {[
-              { label: "Total Stock",    value: `${totalStock} pcs`,   icon: Package,     color: "text-blue-600",    bg: "bg-blue-50 border-blue-100" },
-              { label: "Available",      value: `${availStock} pcs`,   icon: CheckCircle2,color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
-              { label: "Reserved",       value: `${reservedStock} pcs`,icon: Box,         color: "text-violet-600",  bg: "bg-violet-50 border-violet-100" },
-              { label: "Gross Margin",   value: `${margin.toFixed(1)}%`,icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-50 border-emerald-100" },
+              { label: "Total Stock",    value: `${totalStock} pcs`,     icon: Package,      color: "text-blue-600 dark:text-blue-400",       iconBg: "bg-blue-500/10" },
+              { label: "Available",      value: `${availStock} pcs`,     icon: CheckCircle2, color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
+              { label: "Reserved",       value: `${reservedStock} pcs`,  icon: Box,          color: "text-violet-600 dark:text-violet-400",   iconBg: "bg-violet-500/10" },
+              { label: "Gross Margin",   value: `${margin.toFixed(1)}%`, icon: TrendingUp,   color: "text-emerald-600 dark:text-emerald-400", iconBg: "bg-emerald-500/10" },
             ].map((s) => (
-              <div key={s.label} className={`rounded-xl border p-4 flex items-center gap-3 ${s.bg} bg-background`}>
-                <div className={`p-2 rounded-lg bg-background/70`}>
+              <div key={s.label} className="rounded-xl border border-border bg-background p-4 flex items-center gap-3 shadow-sm">
+                <div className={`p-2 rounded-lg ${s.iconBg}`}>
                   <s.icon className={`h-4 w-4 ${s.color}`} />
                 </div>
                 <div>
@@ -313,15 +313,15 @@ export default function ProductDetailPage() {
                             );
                           })}
                           <td className="px-3 py-3 text-xs">{fmt(v.costPrice)}</td>
-                          <td className="px-3 py-3 text-xs font-semibold text-blue-600">{fmt(v.sellingPrice)}</td>
+                          <td className="px-3 py-3 text-xs font-semibold text-blue-600 dark:text-blue-400">{fmt(v.sellingPrice)}</td>
                           <td className="px-3 py-3 text-xs text-muted-foreground">{fmt(v.mrp)}</td>
-                          <td className="px-3 py-3 text-xs font-semibold text-emerald-600">{vMargin}%</td>
+                          <td className="px-3 py-3 text-xs font-semibold text-emerald-600 dark:text-emerald-400">{vMargin}%</td>
                           <td className="px-3 py-3">
-                            <span className={`font-bold text-sm ${vStock > 0 ? "text-emerald-600" : "text-red-500"}`}>{vStock}</span>
+                            <span className={`font-bold text-sm ${vStock > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400"}`}>{vStock}</span>
                           </td>
                           <td className="px-3 py-3">
                             {v.isActive
-                              ? <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Active</span>
+                              ? <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400 font-medium"><CheckCircle2 className="h-3.5 w-3.5" />Active</span>
                               : <span className="flex items-center gap-1 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Inactive</span>}
                           </td>
                         </tr>
@@ -356,15 +356,15 @@ export default function ProductDetailPage() {
                       <tr key={b.name} className="hover:bg-muted/10">
                         <td className="px-6 py-3 font-medium">{b.name}</td>
                         <td className="px-6 py-3 text-right font-semibold">{b.qty}</td>
-                        <td className="px-6 py-3 text-right text-violet-600">{b.reserved}</td>
-                        <td className="px-6 py-3 text-right font-bold text-emerald-600">{b.qty - b.reserved}</td>
+                        <td className="px-6 py-3 text-right text-violet-600 dark:text-violet-400">{b.reserved}</td>
+                        <td className="px-6 py-3 text-right font-bold text-emerald-600 dark:text-emerald-400">{b.qty - b.reserved}</td>
                       </tr>
                     ))}
                     <tr className="border-t-2 bg-muted/20 font-bold text-sm">
                       <td className="px-6 py-3">Total</td>
                       <td className="px-6 py-3 text-right">{totalStock}</td>
-                      <td className="px-6 py-3 text-right text-violet-600">{reservedStock}</td>
-                      <td className="px-6 py-3 text-right text-emerald-600">{availStock}</td>
+                      <td className="px-6 py-3 text-right text-violet-600 dark:text-violet-400">{reservedStock}</td>
+                      <td className="px-6 py-3 text-right text-emerald-600 dark:text-emerald-400">{availStock}</td>
                     </tr>
                   </>
                 )}
@@ -382,7 +382,7 @@ export default function ProductDetailPage() {
           <div className="bg-background border rounded-2xl p-5 shadow-sm space-y-0">
             <h3 className="font-semibold text-sm border-b pb-3 mb-1">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h3>
             <InfoRow label="Cost Price"    value={`LKR ${fmt(product.costPrice)}`} />
-            <InfoRow label="Selling Price" value={<span className="text-blue-600 font-bold">LKR {fmt(product.sellingPrice)}</span>} />
+            <InfoRow label="Selling Price" value={<span className="text-blue-600 dark:text-blue-400 font-bold">LKR {fmt(product.sellingPrice)}</span>} />
             <InfoRow label="MRP"           value={`LKR ${fmt(product.mrp)}`} />
             {product.taxRate > 0 && (
               <InfoRow label={`Tax (${product.taxRate}%)`} value={`LKR ${fmt(product.sellingPrice * product.taxRate / 100)}`} />
@@ -391,7 +391,7 @@ export default function ProductDetailPage() {
               <span className="font-semibold">Final Price</span>
               <span className="text-lg font-bold text-primary">LKR {fmt(finalPrice)}</span>
             </div>
-            <div className="mt-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900 p-3 flex justify-between">
+            <div className="mt-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 flex justify-between">
               <div>
                 <p className="text-[10px] text-emerald-700 dark:text-emerald-400">Profit</p>
                 <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">LKR {fmt(profit)}</p>
@@ -425,7 +425,7 @@ export default function ProductDetailPage() {
             ].map(({ label, value, ok }) => (
               <div key={label} className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
-                <span className={`font-semibold ${ok ? "text-emerald-600" : "text-muted-foreground"}`}>{value}</span>
+                <span className={`font-semibold ${ok ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>{value}</span>
               </div>
             ))}
           </div>

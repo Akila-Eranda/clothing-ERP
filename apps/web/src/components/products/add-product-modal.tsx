@@ -24,6 +24,7 @@ import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
+import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
@@ -122,11 +123,6 @@ const TABS = [
 ] as const;
 type TabId = typeof TABS[number]["id"];
 
-function genSku(name: string, combo: string[]): string {
-  const b = name ? name.replace(/\s+/g, "").slice(0, 3).toUpperCase() : "PRD";
-  return [b, ...combo.map((v) => v.replace(/\s+/g, "").slice(0, 3).toUpperCase())].join("-");
-}
-
 // ── Component ─────────────────────────────────────────────────────────────
 interface Props { open: boolean; onClose: () => void; onCreated?: () => void; editProduct?: Product; }
 
@@ -222,7 +218,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     );
     setVariantRows((r) => [...r, {
       key: `${label}|${Date.now()}|${Math.random().toString(36).slice(2, 7)}`,
-      sku: genSku(form.name || "PRD", [label]),
+      sku: uniqueSku(genSku(form.name || "PRD", [label]), r.map((x) => x.sku)),
       name: label,
       ...comboFields,
       sellingPrice: form.sellingPrice,
@@ -278,20 +274,22 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
     setLoading(true);
     const variants = form.hasVariants
-      ? variantRows
-          .filter((r) => r.active)
-          .map((r) => ({
-            sku: r.sku,
-            name: r.name,
-            size: r.size,
-            color: r.color,
-            material: r.material,
-            style: r.style,
-            sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
-            costPrice: parseFloat(r.costPrice) || derivedCost || 0,
-            mrp: parseFloat(r.mrp) || derivedMrp || 0,
-            taxRate: parseFloat(form.taxRate) || 18,
-          }))
+      ? ensureUniqueVariantSkus(
+          variantRows
+            .filter((r) => r.active)
+            .map((r) => ({
+              sku: r.sku,
+              name: r.name,
+              size: r.size,
+              color: r.color,
+              material: r.material,
+              style: r.style,
+              sellingPrice: parseFloat(r.sellingPrice) || derivedSelling || 0,
+              costPrice: parseFloat(r.costPrice) || derivedCost || 0,
+              mrp: parseFloat(r.mrp) || derivedMrp || 0,
+              taxRate: parseFloat(form.taxRate) || 18,
+            })),
+        )
       : [];
     const extraTags = buildProductTags({
       tags: form.tags,
@@ -384,14 +382,18 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
             </SelectContent>
           </Select>
         </div>
-        {formCopy.showBrand && (
+        {formCopy.showBrand && !form.hasVariants && (
         <div className="space-y-1.5">
           <Label className="text-xs font-semibold">Brand</Label>
-          <Select value={form.brandId} onValueChange={(v) => set("brandId", v)}>
+          <Select
+            value={form.brandId || undefined}
+            onValueChange={(v) => set("brandId", v === "_none" ? "" : v)}
+          >
             <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
             <SelectContent>
+              <SelectItem value="_none">No brand</SelectItem>
               {brands.length === 0
-                ? <SelectItem value="_none" disabled>No brands found</SelectItem>
+                ? <SelectItem value="_empty" disabled>No brands yet — add under Brands</SelectItem>
                 : brands.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
             </SelectContent>
           </Select>

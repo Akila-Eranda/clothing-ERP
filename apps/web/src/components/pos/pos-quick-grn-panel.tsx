@@ -79,6 +79,8 @@ export function PosQuickGrnPanel({
   const [productsLoading, setProductsLoading] = React.useState(false);
   const [supplierProducts, setSupplierProducts] = React.useState<SupplierProduct[]>([]);
   const [lineCosts, setLineCosts] = React.useState<Record<string, string>>({});
+  const [lineExpiries, setLineExpiries] = React.useState<Record<string, string>>({});
+  const [lineBatches, setLineBatches] = React.useState<Record<string, string>>({});
   const [openPos, setOpenPos] = React.useState<OpenPo[]>([]);
 
   const cartByVariant = React.useMemo(
@@ -181,6 +183,11 @@ export function PosQuickGrnPanel({
       toast.error("Enter buying price for all lines");
       return;
     }
+    const missingExp = grnLines.find((l) => !String(lineExpiries[l.variantId] ?? "").trim());
+    if (missingExp) {
+      toast.error(`Expiry date required for ${missingExp.productName}`);
+      return;
+    }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
       const ok = window.confirm(
@@ -198,6 +205,10 @@ export function PosQuickGrnPanel({
           variantId: l.variantId,
           quantity: l.quantity,
           unitCost: l.unitCost,
+          expiryDate: lineExpiries[l.variantId],
+          ...(lineBatches[l.variantId]?.trim()
+            ? { batchNumber: lineBatches[l.variantId].trim() }
+            : {}),
         })),
       });
       const grnNo = res.data?.grnNumber ?? res.data?.id ?? "GRN";
@@ -206,6 +217,8 @@ export function PosQuickGrnPanel({
       setSupplierId("");
       setSupplierProducts([]);
       setLineCosts({});
+      setLineExpiries({});
+      setLineBatches({});
       onPosted();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Quick GRN failed");
@@ -416,7 +429,7 @@ export function PosQuickGrnPanel({
                           <Trash2 className="h-3.5 w-3.5" style={{ color: "#ef4444" }} />
                         </button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
                           <label className="text-[9px] block mb-0.5" style={{ color: "#6a8ab8" }}>Qty</label>
                           <Input
@@ -438,10 +451,28 @@ export function PosQuickGrnPanel({
                             className="h-8 text-xs bg-[#1a2b4a] border-[#1e3356] text-white"
                           />
                         </div>
-                        <div className="text-right flex flex-col justify-end">
-                          <p className="text-[9px]" style={{ color: "#6a8ab8" }}>Line</p>
-                          <p className="text-xs font-bold text-white tabular-nums">LKR {formatNumber(l.lineTotal)}</p>
+                        <div>
+                          <label className="text-[9px] block mb-0.5" style={{ color: "#fbbf24" }}>Expiry *</label>
+                          <Input
+                            type="date"
+                            value={lineExpiries[l.variantId] ?? ""}
+                            onChange={(e) => setLineExpiries((prev) => ({ ...prev, [l.variantId]: e.target.value }))}
+                            className="h-8 text-xs bg-[#1a2b4a] border-[#1e3356] text-white"
+                          />
                         </div>
+                        <div>
+                          <label className="text-[9px] block mb-0.5" style={{ color: "#6a8ab8" }}>Batch</label>
+                          <Input
+                            value={lineBatches[l.variantId] ?? ""}
+                            onChange={(e) => setLineBatches((prev) => ({ ...prev, [l.variantId]: e.target.value }))}
+                            placeholder="Optional"
+                            className="h-8 text-xs bg-[#1a2b4a] border-[#1e3356] text-white font-mono"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[9px]" style={{ color: "#6a8ab8" }}>Line total</p>
+                        <p className="text-xs font-bold text-white tabular-nums">LKR {formatNumber(l.lineTotal)}</p>
                       </div>
                       {l.product?.stockDecreased && (
                         <p className="text-[9px] flex items-center gap-1" style={{ color: "#fbbf24" }}>

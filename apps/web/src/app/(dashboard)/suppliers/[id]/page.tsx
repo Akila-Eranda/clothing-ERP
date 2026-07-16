@@ -88,6 +88,7 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
 const PAY_METHODS = [
   { value: "CASH",          label: "Cash" },
   { value: "BANK_TRANSFER", label: "Bank Transfer" },
+  { value: "CHEQUE",        label: "Cheque" },
   { value: "UPI",           label: "UPI" },
   { value: "CARD",          label: "Card" },
   { value: "WALLET",        label: "Wallet" },
@@ -109,7 +110,17 @@ function PaymentModal({
   const [selected,   setSelected]   = useState<Set<string>>(new Set());
   const [reference,  setReference]  = useState("");
   const [notes,      setNotes]      = useState("");
+  const [chequeDueDate, setChequeDueDate] = useState("");
+  const [chequeBankName, setChequeBankName] = useState("");
+  const [chequeBankAccountId, setChequeBankAccountId] = useState("");
+  const [banks, setBanks] = useState<{ id: string; code: string; name: string }[]>([]);
   const [loading,    setLoading]    = useState(false);
+
+  useEffect(() => {
+    api.get<{ id: string; code: string; name: string }[]>("/accounting/bank-accounts")
+      .then((res) => setBanks(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setBanks([]));
+  }, []);
 
   const unpaidPOs = purchases.filter((p) => p.total > p.paidAmount);
   const totalDue  = unpaidPOs.reduce((s, p) => s + (p.total - p.paidAmount), 0);
@@ -133,21 +144,33 @@ function PaymentModal({
 
   const submit = async () => {
     if (selectedDue <= 0 && selected.size === 0) { toast.error("Select at least one purchase order"); return; }
+    if (selected.size === 0) {
+      toast.error("Select at least one purchase order");
+      return;
+    }
+    if (method === "CHEQUE" && !reference.trim()) {
+      toast.error("Cheque number is required");
+      return;
+    }
     setLoading(true);
     try {
-      if (selected.size === 0) {
-        toast.error("Select at least one purchase order");
-        return;
-      }
       const selectedPOs = unpaidPOs.filter((p) => selected.has(p.id));
-      for (const po of selectedPOs) {
+      for (let i = 0; i < selectedPOs.length; i++) {
+        const po = selectedPOs[i];
         const due = po.total - po.paidAmount;
+        const isCheque = method === "CHEQUE";
         await api.post(`/suppliers/${supplierId}/payments`, {
           amount:     due,
           method,
           purchaseId: po.id,
           reference:  reference || undefined,
           notes:      notes     || undefined,
+          chequeNumber: isCheque ? reference.trim() : undefined,
+          chequeDueDate: isCheque && chequeDueDate ? chequeDueDate : undefined,
+          chequeBankName: isCheque && chequeBankName ? chequeBankName : undefined,
+          chequeBankAccountId: isCheque && chequeBankAccountId ? chequeBankAccountId : undefined,
+          registerCheque: isCheque && i === 0,
+          chequeAmount: isCheque && i === 0 ? selectedDue : undefined,
         });
       }
       toast.success(
@@ -263,9 +286,46 @@ function PaymentModal({
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Reference / Cheque No.</Label>
-            <Input placeholder="e.g. CHQ-001 or TXN-12345" value={reference} onChange={(e) => setReference(e.target.value)} />
+            <Label className="text-xs font-semibold">
+              {method === "CHEQUE" ? (
+                <>Cheque No. <span className="text-destructive">*</span></>
+              ) : (
+                "Reference / Cheque No."
+              )}
+            </Label>
+            <Input
+              placeholder={method === "CHEQUE" ? "e.g. CHQ-001" : "e.g. CHQ-001 or TXN-12345"}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+            />
           </div>
+
+          {method === "CHEQUE" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Cheque due date</Label>
+                <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Cheque bank</Label>
+                <Input placeholder="Bank name" value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs font-semibold">Company bank account</Label>
+                <Select value={chequeBankAccountId || undefined} onValueChange={setChequeBankAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
+                  <SelectContent>
+                    {banks.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.code} · {b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Cheque is registered in Accounting → Cheques as Issued (supplier).
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Notes</Label>

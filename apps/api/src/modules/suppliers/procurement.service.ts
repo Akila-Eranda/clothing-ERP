@@ -283,6 +283,15 @@ export class ProcurementService {
     const effectiveLines = lines.filter((l) => l.receivedQty > 0 || (l.rejectedQty ?? 0) > 0);
     if (!effectiveLines.length) throw new BadRequestException('Enter at least one received quantity');
 
+    const missingExpiry = effectiveLines.find(
+      (l) => l.receivedQty > 0 && !String(l.expiryDate ?? '').trim(),
+    );
+    if (missingExpiry) {
+      throw new BadRequestException(
+        `Expiry date is required for every received product (missing on ${missingExpiry.sku || missingExpiry.productName || 'a line'})`,
+      );
+    }
+
     const grnNumber = await this.nextNumber(tenantId, 'GRN', 'grn');
 
     const grn = await this.prisma.$transaction(async (tx) => {

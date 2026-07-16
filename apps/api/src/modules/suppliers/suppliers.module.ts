@@ -5,7 +5,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { PaymentMethod, PurchaseOrderStatus } from '@prisma/client';
+import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -65,6 +65,7 @@ export class ReceiveItemDto {
   @ApiProperty() @IsInt() @Min(0) receivedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
+  /** Required when receivedQty > 0 (enforced in GRN post). */
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }
@@ -76,6 +77,14 @@ export class RecordPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() paidAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
+  /** When false, skip creating a Cheque row (e.g. extra PO lines under one cheque). Default true for CHEQUE. */
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() registerCheque?: boolean;
+  /** Override cheque face amount when one cheque covers multiple PO payments. */
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0.01) chequeAmount?: number;
 }
 
 export class AssignSupplierProductDto {
@@ -318,6 +327,10 @@ export class SuppliersService {
     if (dto.amount <= 0) {
       throw new BadRequestException('Payment amount must be positive');
     }
+    const chequeNumber = (dto.chequeNumber ?? dto.reference)?.trim();
+    if (dto.method === PaymentMethod.CHEQUE && !chequeNumber) {
+      throw new BadRequestException('Cheque number is required for cheque payments');
+    }
     return this.prisma.$transaction(async (tx) => {
       let poNumber: string | undefined;
       if (dto.purchaseId) {
@@ -341,7 +354,7 @@ export class SuppliersService {
           purchaseId: dto.purchaseId || undefined,
           amount: dto.amount,
           method: dto.method,
-          reference: dto.reference,
+          reference: dto.reference ?? chequeNumber,
           notes: dto.notes,
           paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
         },
@@ -351,6 +364,30 @@ export class SuppliersService {
         await tx.purchaseOrder.update({
           where: { id: dto.purchaseId },
           data: { paidAmount: { increment: dto.amount } },
+        });
+      }
+
+      if (dto.method === PaymentMethod.CHEQUE && dto.registerCheque !== false) {
+        await tx.cheque.create({
+          data: {
+            tenantId,
+            direction: ChequeDirection.ISSUED,
+            status: ChequeStatus.ISSUED,
+            chequeNumber: chequeNumber!,
+            amount: dto.chequeAmount && dto.chequeAmount > 0 ? dto.chequeAmount : dto.amount,
+            bankName: dto.chequeBankName?.trim() || undefined,
+            dueDate: dto.chequeDueDate ? new Date(dto.chequeDueDate) : undefined,
+            partyType: 'SUPPLIER',
+            partyId: supplierId,
+            partyName: supplier.name,
+            bankAccountId: dto.chequeBankAccountId || undefined,
+            notes: dto.notes
+              ? `Supplier payment: ${dto.notes}`
+              : poNumber
+                ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
+                : `Supplier payment — ${supplier.name}`,
+            createdBy: userId,
+          },
         });
       }
 
@@ -639,8 +676,8 @@ export class QuickGrnLineDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiProperty() @IsInt() @Min(1) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiProperty() @IsString() expiryDate: string;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }
 
