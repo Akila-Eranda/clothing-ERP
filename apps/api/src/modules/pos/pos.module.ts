@@ -718,7 +718,7 @@ export class PosService {
     };
   }
 
-  async lookupBarcode(tenantId: string, branchId: string, code: string) {
+  async lookupBarcode(tenantId: string, branchId: string, code: string, supplierId?: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const scale = this.parseScaleBarcode(code.trim());
     const keys = this.barcodeLookupKeys(code);
@@ -730,20 +730,27 @@ export class PosService {
         taxRate: number | null;
         images: string[];
         category: { name?: string } | null;
+        brand: { name?: string } | null;
       };
       inventory: { quantity: number; reservedQty: number }[];
+      supplierAssignments?: Array<{
+        supplierId: string;
+        supplierProductCode: string | null;
+        leadTimeDays: number | null;
+        lastBuyingPrice: number | null;
+      }>;
     };
 
     const mapVariant = (variant: VariantRow) => {
-      const stock = Math.max(
-        0,
-        (variant.inventory[0]?.quantity ?? 0) - (variant.inventory[0]?.reservedQty ?? 0),
-      );
+      const onHand = variant.inventory[0]?.quantity ?? 0;
+      const reserved = variant.inventory[0]?.reservedQty ?? 0;
+      const available = Math.max(0, onHand - reserved);
       const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
       const unitPrice = scale && scale.asPrice >= 1 ? scale.asPrice : variant.sellingPrice;
       const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
         ? scale.asWeightKg
         : undefined;
+      const assignment = Array.isArray(variant.supplierAssignments) ? variant.supplierAssignments[0] : undefined;
       return {
         variantId: variant.id,
         productId: variant.productId,
@@ -752,6 +759,7 @@ export class PosService {
         sku: variant.sku,
         barcode: effectiveBarcode,
         unitPrice,
+        sellingPrice: variant.sellingPrice,
         costPrice: variant.costPrice,
         mrp: variant.mrp,
         taxRate: variant.product.taxRate ?? 0,
@@ -760,8 +768,16 @@ export class PosService {
         material: variant.material ?? undefined,
         style: variant.style ?? undefined,
         category: variant.product.category?.name ?? 'Other',
-        stock,
+        brand: variant.product.brand?.name ?? null,
+        stock: available,
+        currentStock: onHand,
+        reservedStock: reserved,
+        availableStock: available,
         imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
+        supplierId: assignment?.supplierId ?? null,
+        supplierProductCode: assignment?.supplierProductCode ?? null,
+        leadTimeDays: assignment?.leadTimeDays ?? null,
+        lastBuyingPrice: assignment?.lastBuyingPrice ?? null,
         ...(scale ? { isScaleBarcode: true, scaleQty, embeddedValue: scale.embeddedValue } : {}),
       };
     };
@@ -781,7 +797,7 @@ export class PosService {
           ],
         },
         include: {
-          product: { include: { category: true } },
+          product: { include: { category: true, brand: true } },
           inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
         },
       }) as VariantRow[];
@@ -789,12 +805,16 @@ export class PosService {
 
       const keyLower = key.toLowerCase();
       const exactSku = variants.filter((v) => v.sku.toLowerCase() === keyLower);
-      if (exactSku.length === 1) return mapVariant(exactSku[0]);
+      if (exactSku.length === 1) {
+        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(exactSku[0]), supplierId);
+      }
 
       const exactVariantBarcode = variants.filter(
         (v) => (v.barcode ?? '').toLowerCase() === keyLower,
       );
-      if (exactVariantBarcode.length === 1) return mapVariant(exactVariantBarcode[0]);
+      if (exactVariantBarcode.length === 1) {
+        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(exactVariantBarcode[0]), supplierId);
+      }
 
       const byProduct = new Map<string, VariantRow[]>();
       for (const v of variants) {
@@ -820,7 +840,7 @@ export class PosService {
                 product: { tenantId, status: 'ACTIVE' },
               },
               include: {
-                product: { include: { category: true } },
+                product: { include: { category: true, brand: true } },
                 inventory: {
                   where: { branchId: resolvedBranchId },
                   select: { quantity: true, reservedQty: true },
@@ -854,9 +874,52 @@ export class PosService {
         }))
         .sort((a, b) => b.stock - a.stock);
 
-      return mapVariant((ranked.find((row) => row.stock > 0) ?? ranked[0]).variant);
+      const picked = mapVariant((ranked.find((row) => row.stock > 0) ?? ranked[0]).variant);
+      return this.enrichBarcodeResult(tenantId, resolvedBranchId, picked, supplierId);
     }
     throw new NotFoundException(`No product found for barcode/SKU: ${code}`);
+  }
+
+  private async enrichBarcodeResult(
+    tenantId: string,
+    branchId: string,
+    result: Record<string, unknown> & { variantId: string; stock: number; requiresVariantPick?: boolean },
+    supplierId?: string,
+  ) {
+    if (!supplierId || result.requiresVariantPick) return result;
+
+    const assignment = await this.prisma.supplierProductAssignment.findFirst({
+      where: { tenantId, supplierId, variantId: result.variantId },
+      select: {
+        supplierId: true,
+        supplierProductCode: true,
+        leadTimeDays: true,
+        lastBuyingPrice: true,
+        minOrderQty: true,
+        isPreferred: true,
+      },
+    });
+
+    const insights = await this.attachSupplierPurchaseInsights(
+      tenantId,
+      branchId,
+      supplierId,
+      [{ variantId: result.variantId, stock: result.stock }],
+    );
+    const insight = insights.get(result.variantId);
+
+    return {
+      ...result,
+      supplierId: assignment?.supplierId ?? supplierId,
+      supplierProductCode: assignment?.supplierProductCode ?? null,
+      leadTimeDays: assignment?.leadTimeDays ?? null,
+      lastBuyingPrice: assignment?.lastBuyingPrice ?? result.lastBuyingPrice ?? null,
+      minOrderQty: assignment?.minOrderQty ?? null,
+      lastPurchaseDate: insight?.lastPurchaseDate ?? null,
+      lastPurchaseQty: insight?.lastPurchaseQty ?? null,
+      soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
+      stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
+    };
   }
 
   async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
@@ -971,6 +1034,42 @@ export class PosService {
       });
     }
 
+    // Fallback: last purchase order line when no GRN exists for this supplier/variant
+    const missing = rows.filter((r) => !insights.get(r.variantId)?.lastPurchaseDate).map((r) => r.variantId);
+    if (missing.length) {
+      const poItems = await this.prisma.purchaseOrderItem.findMany({
+        where: {
+          variantId: { in: missing },
+          orderedQty: { gt: 0 },
+          purchase: {
+            tenantId,
+            supplierId,
+            status: { notIn: ['CANCELLED'] },
+          },
+        },
+        include: {
+          purchase: { select: { orderDate: true, createdAt: true } },
+        },
+        orderBy: [{ purchase: { orderDate: 'desc' } }, { purchase: { createdAt: 'desc' } }],
+      });
+      const lastPoByVariant = new Map<string, (typeof poItems)[number]>();
+      for (const item of poItems) {
+        if (!lastPoByVariant.has(item.variantId)) lastPoByVariant.set(item.variantId, item);
+      }
+      for (const variantId of missing) {
+        const lastPo = lastPoByVariant.get(variantId);
+        if (!lastPo) continue;
+        const date = lastPo.purchase.orderDate ?? lastPo.purchase.createdAt;
+        insights.set(variantId, {
+          lastPurchaseDate: date.toISOString(),
+          lastPurchaseQty: lastPo.orderedQty,
+          stockAtLastPurchase: null,
+          soldAfterLastPurchase: null,
+          stockDecreased: false,
+        });
+      }
+    }
+
     return insights;
   }
 
@@ -997,12 +1096,30 @@ export class PosService {
                 { name: { contains: search, mode: 'insensitive' } },
                 { product: { name: { contains: search, mode: 'insensitive' } } },
                 { product: { barcode: { contains: search, mode: 'insensitive' } } },
+                ...(opts?.supplierId
+                  ? [{
+                      supplierAssignments: {
+                        some: {
+                          tenantId,
+                          supplierId: opts.supplierId,
+                          supplierProductCode: { contains: search, mode: 'insensitive' as const },
+                        },
+                      },
+                    }]
+                  : [{
+                      supplierAssignments: {
+                        some: {
+                          tenantId,
+                          supplierProductCode: { contains: search, mode: 'insensitive' as const },
+                        },
+                      },
+                    }]),
               ],
             }
           : {}),
       },
       include: {
-        product: { include: { category: true } },
+        product: { include: { category: true, brand: true } },
         supplierAssignments: opts?.supplierId
           ? {
               where: { tenantId, supplierId: opts.supplierId },
@@ -1012,6 +1129,8 @@ export class PosService {
                 leadTimeDays: true,
                 lastBuyingPrice: true,
                 isPreferred: true,
+                minOrderQty: true,
+                isActive: true,
               },
               take: 1,
             }
@@ -1027,36 +1146,48 @@ export class PosService {
     });
 
     const mapped = variants.map((v) => {
-      const stock = Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0));
+      const onHand = v.inventory[0]?.quantity ?? 0;
+      const reserved = v.inventory[0]?.reservedQty ?? 0;
+      const available = Math.max(0, onHand - reserved);
+      const assignment = Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined;
       return {
-        assignment: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined,
+        assignment,
         variantId:   v.id,
         productId:   v.productId,
         productName: v.product.name,
         variantName: v.name,
         sku:         v.sku,
         unitPrice:   v.sellingPrice,
+        sellingPrice: v.sellingPrice,
         costPrice:   v.costPrice,
         mrp:         v.mrp,
         taxRate:     v.product.taxRate ?? 0,
         category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
+        brand:       (v.product.brand as { name?: string } | null)?.name ?? null,
         color:       v.color ?? undefined,
         size:        v.size  ?? undefined,
         material:    v.material ?? undefined,
         style:       v.style ?? undefined,
-        stock,
+        /** Available to sell (on hand − reserved) — kept as `stock` for POS compatibility */
+        stock: available,
+        currentStock: onHand,
+        reservedStock: reserved,
+        availableStock: available,
         imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
         barcode:     v.barcode ?? v.product.barcode ?? undefined,
         warrantyMonths: v.product.warrantyMonths ?? null,
-        supplierId: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierId ?? null : null,
-        supplierProductCode: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierProductCode ?? null : null,
-        leadTimeDays: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.leadTimeDays ?? null : null,
-        lastBuyingPrice: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.lastBuyingPrice ?? null : null,
-        isPreferredSupplier: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.isPreferred ?? null : null,
+        supplierId: assignment?.supplierId ?? null,
+        supplierProductCode: assignment?.supplierProductCode ?? null,
+        leadTimeDays: assignment?.leadTimeDays ?? null,
+        lastBuyingPrice: assignment?.lastBuyingPrice ?? null,
+        minOrderQty: assignment?.minOrderQty ?? null,
+        isPreferredSupplier: assignment?.isPreferred ?? null,
       };
     });
 
-    if (!opts?.supplierId) return mapped;
+    if (!opts?.supplierId) {
+      return mapped.map(({ assignment: _a, ...rest }) => rest);
+    }
 
     const insights = await this.attachSupplierPurchaseInsights(
       tenantId,
@@ -1065,7 +1196,7 @@ export class PosService {
       mapped.map((m) => ({ variantId: m.variantId, stock: m.stock })),
     );
 
-    return mapped.map((m) => {
+    return mapped.map(({ assignment: _a, ...m }) => {
       const insight = insights.get(m.variantId);
       return {
         ...m,
@@ -1417,8 +1548,12 @@ export class PosController {
 
   @Get('barcode/:code')
   @ApiOperation({ summary: 'Lookup variant by barcode or SKU' })
-  lookupBarcode(@CurrentUser() user: IAuthUser, @Param('code') code: string) {
-    return this.posService.lookupBarcode(user.tenantId, user.branchId ?? '', code);
+  lookupBarcode(
+    @CurrentUser() user: IAuthUser,
+    @Param('code') code: string,
+    @Query('supplierId') supplierId?: string,
+  ) {
+    return this.posService.lookupBarcode(user.tenantId, user.branchId ?? '', code, supplierId);
   }
 
   @Post('returns')

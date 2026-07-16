@@ -144,7 +144,12 @@ export class SuppliersService {
       },
     });
     if (!supplier) throw new NotFoundException('Supplier not found');
-    return supplier;
+    const lastPo = supplier.purchases[0];
+    return {
+      ...supplier,
+      lastPurchaseDate: lastPo?.orderDate ?? lastPo?.createdAt ?? null,
+      outstandingBalance: supplier.balance,
+    };
   }
 
   async updateSupplier(id: string, tenantId: string, dto: Partial<CreateSupplierDto>) {

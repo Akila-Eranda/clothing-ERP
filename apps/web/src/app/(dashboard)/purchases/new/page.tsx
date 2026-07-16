@@ -1,19 +1,31 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Package, Plus, Printer, Search, ScanLine, Trash2 } from "lucide-react";
+import { ArrowLeft, FileText, Package, Plus, Printer, Search, ScanLine, Trash2, Building2, Warehouse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
+import { cn } from "@/lib/utils";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Supplier {
-  id: string; name: string; phone?: string | null; email?: string | null;
-  address?: string | null; city?: string | null; contactPerson?: string | null;
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  city?: string | null;
+  contactPerson?: string | null;
+  creditDays?: number | null;
+  creditLimit?: number | null;
+  balance?: number | null;
+  lastPurchaseDate?: string | null;
 }
 interface VariantOpt {
   variantId: string;
@@ -23,7 +35,6 @@ interface VariantOpt {
   barcode?: string;
   size?: string | null;
   color?: string | null;
-  // Optional fields may be returned by /pos/products depending on backend phase.
   imageUrl?: string | null;
   sellingPrice?: number | null;
   unitPrice?: number | null;
@@ -38,7 +49,8 @@ interface VariantOpt {
   lastBuyingPrice?: number | null;
   supplierId?: string | null;
   supplierProductCode?: string | null;
-
+  category?: string | null;
+  brand?: string | null;
   costPrice: number;
   taxRate?: number;
   stock: number;
@@ -61,13 +73,86 @@ function calcItem(i: LineItem) {
   return { line, taxable, tax, total: taxable + tax };
 }
 
+function fmtMoney(n: number) {
+  return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(iso?: string | null) {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("en-LK", { year: "numeric", month: "short", day: "numeric" });
+  } catch {
+    return "—";
+  }
+}
+
+function dash<T>(v: T | null | undefined, format?: (x: T) => string): string {
+  if (v === null || v === undefined || v === "") return "—";
+  return format ? format(v) : String(v);
+}
+
 const PAYMENT_TERMS = ["Immediate", "15 Days", "30 Days", "45 Days", "60 Days", "90 Days"];
+
+function SectionCard({
+  step,
+  title,
+  subtitle,
+  children,
+  action,
+}: {
+  step?: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-2xl border bg-background shadow-sm overflow-hidden">
+      <div className="flex items-start justify-between gap-3 border-b bg-muted/30 px-4 py-3.5 sm:px-5">
+        <div className="flex items-start gap-3 min-w-0">
+          {step ? (
+            <span className="mt-0.5 h-6 min-w-6 px-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
+              {step}
+            </span>
+          ) : null}
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+            {subtitle ? <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p> : null}
+          </div>
+        </div>
+        {action}
+      </div>
+      <div className="p-4 sm:p-5 space-y-4">{children}</div>
+    </section>
+  );
+}
+
+function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
+      <div className="border-b bg-muted/30 px-4 py-3">
+        <h3 className="text-sm font-semibold">{title}</h3>
+      </div>
+      <div className="p-4 space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3 text-sm">
+      <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+      <span className="font-medium text-right text-xs truncate max-w-[160px]">{value}</span>
+    </div>
+  );
+}
 
 // ── Page ───────────────────────────────────────────────────────────────────
 export default function CreatePOPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuthStore();
+  const activeBranchName = useBranchStore((s) => s.activeBranchName);
   const adminBypass = bypassesWorkflowApproval(user?.role);
 
   const [suppliers,    setSuppliers]    = useState<Supplier[]>([]);
@@ -80,32 +165,92 @@ export default function CreatePOPage() {
   const [notes,        setNotes]        = useState("");
   const [items,        setItems]        = useState<LineItem[]>([]);
   const [saving,       setSaving]       = useState(false);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [fromGrnId, setFromGrnId] = useState<string | null>(null);
   const [fromGrnNumber, setFromGrnNumber] = useState<string | null>(null);
   const [grnPrefillLoading, setGrnPrefillLoading] = useState(false);
 
-  // item search
-  const [searchQ,      setSearchQ]      = useState<string[]>([]);   // per-row search query
+  const [searchQ,      setSearchQ]      = useState<string[]>([]);
   const [searchOpen,   setSearchOpen]   = useState<number | null>(null);
 
-  // Large product search + row selection (UI-only).
   const [productSearchQ, setProductSearchQ] = useState("");
   const [productSearchOpen, setProductSearchOpen] = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState(0);
   const [selectedRowIdx, setSelectedRowIdx] = useState<number | null>(null);
+
+  const productSearchRef = useRef<HTMLInputElement>(null);
+  const qtyInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const costInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
+  const supplierSelectRef = useRef<HTMLSelectElement>(null);
+
+  const loadSupplierCatalog = useCallback(async (sid: string) => {
+    if (!sid) {
+      setAllVariants([]);
+      return;
+    }
+    setLoadingProducts(true);
+    try {
+      const res = await api.get<VariantOpt[]>(`/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`);
+      setAllVariants(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setAllVariants([]);
+      toast.error("Failed to load supplier products");
+    } finally {
+      setLoadingProducts(false);
+    }
+  }, []);
+
+  const loadSupplierDetail = useCallback(async (sid: string) => {
+    try {
+      const res = await api.get<Supplier & {
+        creditDays?: number;
+        creditLimit?: number;
+        balance?: number;
+        outstandingBalance?: number;
+        lastPurchaseDate?: string | null;
+        purchases?: { orderDate?: string; createdAt?: string }[];
+      }>(`/suppliers/${sid}`);
+      const s = res.data;
+      const lastPo = s.purchases?.[0];
+      setSupplier({
+        id: s.id,
+        name: s.name,
+        phone: s.phone,
+        email: s.email,
+        address: s.address,
+        city: s.city,
+        contactPerson: s.contactPerson,
+        creditDays: s.creditDays ?? null,
+        creditLimit: s.creditLimit ?? null,
+        balance: s.outstandingBalance ?? s.balance ?? null,
+        lastPurchaseDate: s.lastPurchaseDate ?? lastPo?.orderDate ?? lastPo?.createdAt ?? null,
+      });
+    } catch {
+      // keep list-level supplier if detail fails
+    }
+  }, []);
 
   useEffect(() => {
     api.get<{ data: Supplier[] }>("/suppliers?limit=200").then((r) =>
       setSuppliers(r.data?.data ?? (r.data as unknown as Supplier[]) ?? [])
     ).catch(() => {});
-    api.get<VariantOpt[]>("/pos/products").then((r) =>
-      setAllVariants(Array.isArray(r.data) ? r.data : [])
-    ).catch(() => {});
   }, []);
 
   const handleSupplierChange = useCallback((id: string) => {
     setSupplierId(id);
-    setSupplier(suppliers.find((s) => s.id === id) ?? null);
-  }, [suppliers]);
+    const fromList = suppliers.find((s) => s.id === id) ?? null;
+    setSupplier(fromList);
+    setProductSearchQ("");
+    setProductSearchOpen(false);
+    setSearchHighlight(0);
+    if (id) {
+      void loadSupplierDetail(id);
+      void loadSupplierCatalog(id);
+      window.setTimeout(() => productSearchRef.current?.focus(), 50);
+    } else {
+      setAllVariants([]);
+    }
+  }, [suppliers, loadSupplierDetail, loadSupplierCatalog]);
 
   // Prefill supplier from ?supplier=
   useEffect(() => {
@@ -172,6 +317,8 @@ export default function CreatePOPage() {
           }));
         setItems(lines);
         setSearchQ(lines.map(() => ""));
+        void loadSupplierDetail(g.supplier.id);
+        void loadSupplierCatalog(g.supplier.id);
         toast.success(`Loaded ${g.grnNumber} — review & create PO`);
       })
       .catch((e: unknown) => {
@@ -183,7 +330,7 @@ export default function CreatePOPage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams, router]);
+  }, [searchParams, router, loadSupplierDetail, loadSupplierCatalog]);
 
   // Keep supplier object in sync when suppliers load after GRN prefill
   useEffect(() => {
@@ -268,8 +415,9 @@ export default function CreatePOPage() {
   };
 
   const filteredVariants = (q: string) => {
+    if (!supplierId) return [];
     const base = (() => {
-      if (!q) return allVariants.slice(0, 30);
+      if (!q) return allVariants.slice(0, 40);
       const lq = q.toLowerCase();
       return allVariants.filter((v) =>
         v.productName.toLowerCase().includes(lq)
@@ -277,17 +425,18 @@ export default function CreatePOPage() {
         || v.variantName.toLowerCase().includes(lq)
         || (v.barcode?.toLowerCase().includes(lq) ?? false)
         || (v.supplierProductCode?.toLowerCase().includes(lq) ?? false)
+        || (v.category?.toLowerCase().includes(lq) ?? false)
+        || (v.brand?.toLowerCase().includes(lq) ?? false)
       );
     })();
 
-    // If backend includes supplier linkage per variant, filter accordingly.
-    // If not present, keep original behavior (don't hide products).
+    // Catalog is already supplier-scoped via /pos/products?supplierId=
     const supplierFiltered =
-      supplierId && base.some((v) => v.supplierId)
-        ? base.filter((v) => (v.supplierId ? v.supplierId === supplierId : false))
+      base.some((v) => v.supplierId)
+        ? base.filter((v) => !v.supplierId || v.supplierId === supplierId)
         : base;
 
-    return supplierFiltered.slice(0, 20);
+    return supplierFiltered.slice(0, 25);
   };
 
   const resolveVariantByCode = async (code: string): Promise<VariantOpt | null> => {
@@ -307,7 +456,10 @@ export default function CreatePOPage() {
         size?: string;
         color?: string;
         imageUrl?: string | null;
+        brand?: string | null;
+        category?: string | null;
         sellingPrice?: number | null;
+        currentStock?: number | null;
         availableStock?: number | null;
         reservedStock?: number | null;
         leadTimeDays?: number | null;
@@ -317,7 +469,9 @@ export default function CreatePOPage() {
         lastBuyingPrice?: number | null;
         supplierId?: string | null;
         supplierProductCode?: string | null;
-      }>(`/pos/barcode/${encodeURIComponent(trimmed)}`);
+      }>(`/pos/barcode/${encodeURIComponent(trimmed)}`, {
+        params: supplierId ? { supplierId } : undefined,
+      });
       const d = res.data;
       return {
         variantId: d.variantId,
@@ -330,7 +484,10 @@ export default function CreatePOPage() {
         size: d.size,
         color: d.color,
         imageUrl: d.imageUrl ?? undefined,
+        brand: d.brand ?? undefined,
+        category: d.category ?? undefined,
         sellingPrice: d.sellingPrice ?? undefined,
+        currentStock: d.currentStock ?? undefined,
         availableStock: d.availableStock ?? undefined,
         reservedStock: d.reservedStock ?? undefined,
         leadTimeDays: d.leadTimeDays ?? undefined,
@@ -376,6 +533,21 @@ export default function CreatePOPage() {
   };
 
   const addVariantToItems = (v: VariantOpt) => {
+    if (!supplierId) {
+      toast.error("Select a supplier first");
+      return;
+    }
+    const existingIdx = items.findIndex((i) => i.variantId === v.variantId);
+    if (existingIdx >= 0) {
+      setItems((p) => p.map((it, i) => i === existingIdx ? { ...it, orderedQty: it.orderedQty + 1 } : it));
+      setSelectedRowIdx(existingIdx);
+      setProductSearchOpen(false);
+      setProductSearchQ("");
+      window.setTimeout(() => qtyInputRefs.current[existingIdx]?.focus(), 30);
+      toast.message("Qty increased for existing line");
+      return;
+    }
+
     const newIdx = items.length;
     setItems((p) => [
       ...p,
@@ -389,7 +561,7 @@ export default function CreatePOPage() {
         barcode: v.barcode ?? undefined,
         imageUrl: v.imageUrl ?? undefined,
         orderedQty: 1,
-        unitCost: v.costPrice,
+        unitCost: v.lastBuyingPrice ?? v.costPrice,
         discount: 0,
         taxRate: v.taxRate ?? 0,
       },
@@ -397,30 +569,56 @@ export default function CreatePOPage() {
     setSearchQ((p) => [...p, ""]);
     setSearchOpen(null);
     setSelectedRowIdx(newIdx);
-
-    // Close big search UI.
     setProductSearchOpen(false);
     setProductSearchQ("");
+    setSearchHighlight(0);
+    window.setTimeout(() => qtyInputRefs.current[newIdx]?.focus(), 40);
   };
 
   const handleBigSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Escape") {
       setProductSearchOpen(false);
+      setSearchHighlight(0);
       return;
     }
+
+    const matches = filteredVariants(productSearchQ);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setProductSearchOpen(true);
+      setSearchHighlight((h) => Math.min(h + 1, Math.max(matches.length - 1, 0)));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSearchHighlight((h) => Math.max(h - 1, 0));
+      return;
+    }
+
     if (e.key !== "Enter") return;
     e.preventDefault();
 
+    if (!supplierId) {
+      toast.error("Select a supplier first");
+      supplierSelectRef.current?.focus();
+      return;
+    }
+
     const q = (productSearchQ ?? "").trim();
     if (!q) return;
-    const matches = filteredVariants(q);
+
     if (matches.length) {
-      addVariantToItems(matches[0]);
+      const pick = matches[Math.min(searchHighlight, matches.length - 1)] ?? matches[0];
+      addVariantToItems(pick);
       return;
     }
 
     const resolved = await resolveVariantByCode(q);
     if (resolved) {
+      if (resolved.supplierId && resolved.supplierId !== supplierId) {
+        toast.error("Product is not assigned to this supplier");
+        return;
+      }
       toast.success(`Added ${resolved.productName}`);
       addVariantToItems(resolved);
     } else {
@@ -438,8 +636,16 @@ export default function CreatePOPage() {
   // ── Submit ─────────────────────────────────────────────────────────────
   const submit = async (submitForApproval: boolean) => {
     if (!supplierId) { toast.error("Please select a supplier"); return; }
-    if (!items.length) { toast.error("Add at least one item"); return; }
+    if (!items.length) { toast.error("Add at least one product"); return; }
     if (items.some((i) => !i.variantId)) { toast.error("All rows must have a product selected"); return; }
+    if (items.some((i) => !i.orderedQty || i.orderedQty <= 0)) {
+      toast.error("Quantity must be greater than zero");
+      return;
+    }
+    if (items.some((i) => i.unitCost === null || i.unitCost === undefined || Number.isNaN(i.unitCost))) {
+      toast.error("Buying price is required on all lines");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -474,18 +680,18 @@ export default function CreatePOPage() {
     finally { setSaving(false); }
   };
 
-  const fmt = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmt = fmtMoney;
 
   const selectedItem = selectedRowIdx !== null ? items[selectedRowIdx] : null;
   const selectedVariant = selectedItem ? variantById.get(selectedItem.variantId) : undefined;
-  const bigMatches = productSearchOpen ? filteredVariants(productSearchQ).slice(0, 15) : [];
+  const bigMatches = productSearchOpen ? filteredVariants(productSearchQ) : [];
   const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="min-h-screen bg-muted/20 pb-32 sm:pb-28">
+    <div className="min-h-screen bg-muted/30 pb-32 sm:pb-28">
       {/* Header */}
       <div className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="mx-auto flex w-full items-center gap-3 px-3 py-3 sm:px-6 sm:py-3.5">
+        <div className="mx-auto flex w-full items-center gap-3 px-3 py-3 sm:px-6">
           <Button
             type="button"
             variant="outline"
@@ -499,20 +705,21 @@ export default function CreatePOPage() {
           </Button>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-base font-bold sm:text-lg">
-              {fromGrnId ? "Create PO from GRN" : "Create Purchase Order"}
+              {fromGrnId ? "Create PO from GRN" : "Purchase Order"}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              <span className="rounded-full border bg-muted/50 px-2 py-0.5 font-mono text-[10px] text-muted-foreground sm:text-xs">
-                Auto PO #
-              </span>
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold sm:text-xs ${
-                  fromGrnId
-                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700"
-                    : "border-amber-500/20 bg-amber-500/10 text-amber-700"
-                }`}
-              >
+            <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+              <span className="rounded-full border bg-muted/50 px-2 py-0.5 font-mono">PO Number · Auto</span>
+              <Badge variant="secondary" className={cn(
+                "rounded-full text-[10px]",
+                fromGrnId ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20" : "bg-amber-500/10 text-amber-700 border-amber-500/20",
+              )}>
                 {fromGrnId ? "From GRN" : "Draft"}
+              </Badge>
+              <span className="tabular-nums">{todayIso}</span>
+              <span className="hidden sm:inline">·</span>
+              <span className="inline-flex items-center gap-1">
+                <Building2 className="h-3 w-3" />
+                {activeBranchName || "Current branch"}
               </span>
             </div>
           </div>
@@ -528,9 +735,9 @@ export default function CreatePOPage() {
           <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">Loading GRN details…</div>
         )}
         {fromGrnId && fromGrnNumber && !grnPrefillLoading && (
-          <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+          <div className="flex flex-col gap-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300 sm:text-xs">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-800 dark:text-emerald-300">
                 Stock already posted
               </p>
               <p className="mt-0.5 text-sm">
@@ -544,19 +751,13 @@ export default function CreatePOPage() {
         )}
 
         <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px] xl:gap-5">
-          {/* Main */}
           <div className="min-w-0 space-y-4 sm:space-y-5">
-            {/* Supplier */}
-            <section className="space-y-4 rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
-              <div>
-                <h2 className="text-sm font-semibold">1. Supplier & terms</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">Who you are ordering from</p>
-              </div>
-
+            <SectionCard step="1" title="Supplier Information" subtitle="Who you are ordering from">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-                  <label className="text-xs font-semibold text-muted-foreground">Supplier *</label>
+                  <label className="text-xs font-medium text-muted-foreground">Supplier *</label>
                   <select
+                    ref={supplierSelectRef}
                     value={supplierId}
                     onChange={(e) => handleSupplierChange(e.target.value)}
                     className="h-10 w-full rounded-lg border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -566,23 +767,13 @@ export default function CreatePOPage() {
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                   </select>
-                  {supplier && (
-                    <div className="rounded-lg border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                      <p className="font-semibold text-foreground">{supplier.name}</p>
-                      <p className="mt-0.5 truncate">
-                        {[supplier.contactPerson, supplier.phone, supplier.email].filter(Boolean).join(" · ") || "—"}
-                      </p>
-                    </div>
-                  )}
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Expected delivery</label>
+                  <label className="text-xs font-medium text-muted-foreground">Expected Delivery</label>
                   <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className="h-10" />
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Payment terms</label>
+                  <label className="text-xs font-medium text-muted-foreground">Payment Terms</label>
                   <select
                     value={paymentTerms}
                     onChange={(e) => setPaymentTerms(e.target.value)}
@@ -591,19 +782,16 @@ export default function CreatePOPage() {
                     {PAYMENT_TERMS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Reference</label>
+                  <label className="text-xs font-medium text-muted-foreground">Reference Number</label>
                   <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="REF-…" className="h-10" />
                 </div>
-
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Currency</label>
+                  <label className="text-xs font-medium text-muted-foreground">Currency</label>
                   <Input value="LKR" disabled className="h-10 bg-muted/40" />
                 </div>
-
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                  <label className="text-xs font-semibold text-muted-foreground">Notes</label>
+                  <label className="text-xs font-medium text-muted-foreground">Notes</label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -613,58 +801,73 @@ export default function CreatePOPage() {
                   />
                 </div>
               </div>
-            </section>
 
-            {/* Items */}
-            <section className="overflow-hidden rounded-2xl border bg-background shadow-sm">
-              <div className="flex flex-col gap-3 border-b bg-muted/15 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold">2. Purchase items</h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Search or scan, then set qty & cost</p>
+              {supplier ? (
+                <div className="grid grid-cols-2 gap-2 rounded-xl border bg-muted/20 p-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {[
+                    ["Supplier Name", supplier.name],
+                    ["Phone", dash(supplier.phone)],
+                    ["Email", dash(supplier.email)],
+                    ["Credit Period", supplier.creditDays != null ? `${supplier.creditDays} days` : "—"],
+                    ["Outstanding", supplier.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"],
+                    ["Credit Limit", supplier.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"],
+                    ["Last Purchase", fmtDate(supplier.lastPurchaseDate)],
+                  ].map(([label, value]) => (
+                    <div key={label} className="min-w-0 rounded-lg border bg-background/80 px-2.5 py-2">
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                      <p className="mt-0.5 truncate text-xs font-semibold">{value}</p>
+                    </div>
+                  ))}
                 </div>
-                <div className="flex items-center gap-2">
-                  {items.length > 0 && (
-                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
-                      {items.length} · qty {totalQty}
-                    </span>
-                  )}
-                  <Button size="sm" onClick={addRow} disabled={saving} className="gap-1.5">
-                    <Plus className="h-4 w-4" /> Add row
-                  </Button>
-                </div>
-              </div>
+              ) : null}
+            </SectionCard>
 
-              {/* Search */}
-              <div className="relative border-b px-3 py-3 sm:px-5">
-                <Search className="pointer-events-none absolute left-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground sm:left-8" />
-                <ScanLine className="pointer-events-none absolute right-6 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70 sm:right-8" />
+            <SectionCard
+              step="2"
+              title="Purchase Items"
+              subtitle={supplierId ? (loadingProducts ? "Loading supplier catalog…" : `${allVariants.length} products available for this supplier`) : "Select a supplier to search products"}
+              action={
+                <Button size="sm" onClick={addRow} disabled={saving || !supplierId} className="gap-1.5 h-8">
+                  <Plus className="h-3.5 w-3.5" /> Add row
+                </Button>
+              }
+            >
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <ScanLine className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                 <input
+                  ref={productSearchRef}
                   value={productSearchQ}
+                  disabled={!supplierId || loadingProducts}
                   onChange={(e) => {
                     setProductSearchQ(e.target.value);
                     setProductSearchOpen(true);
+                    setSearchHighlight(0);
                   }}
                   onFocus={() => setProductSearchOpen(true)}
                   onKeyDown={handleBigSearchKeyDown}
-                  placeholder="Search name, SKU, barcode… Enter to add"
-                  className="h-11 w-full rounded-xl border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  placeholder={supplierId ? "Search name, SKU, barcode, supplier code… Enter to add" : "Select supplier first"}
+                  className="h-12 w-full rounded-xl border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
                 />
-                {productSearchOpen && productSearchQ.trim() && (
-                  <div className="absolute left-3 right-3 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl sm:left-5 sm:right-5">
-                    <div className="max-h-64 overflow-y-auto">
+                {productSearchOpen && supplierId && (
+                  <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl">
+                    <div className="max-h-80 overflow-y-auto">
                       {bigMatches.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                          No match — press Enter to scan barcode/SKU
+                          {productSearchQ.trim() ? "No match — press Enter to scan barcode/SKU" : "Type to search supplier products"}
                         </p>
                       ) : (
-                        bigMatches.map((v) => (
+                        bigMatches.map((v, i) => (
                           <button
                             key={v.variantId}
                             type="button"
                             onClick={() => addVariantToItems(v)}
-                            className="flex w-full items-center gap-3 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50 sm:px-4"
+                            className={cn(
+                              "flex w-full items-start gap-3 border-b px-3 py-2.5 text-left last:border-0 sm:px-4",
+                              i === searchHighlight ? "bg-primary/10" : "hover:bg-muted/50",
+                            )}
                           >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
                               {v.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={v.imageUrl} alt={v.productName} className="h-full w-full object-cover" />
@@ -674,14 +877,21 @@ export default function CreatePOPage() {
                             </div>
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">{v.productName}</p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                <span className="font-mono">{v.sku}</span>
+                              <p className="truncate text-[11px] text-muted-foreground">
+                                {dash(v.brand)} · {dash(v.category)}
                                 {v.variantName ? ` · ${v.variantName}` : ""}
                               </p>
+                              <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
+                                SKU {v.sku}
+                                {v.barcode ? ` · ${v.barcode}` : ""}
+                                {v.supplierProductCode ? ` · SPC ${v.supplierProductCode}` : ""}
+                              </p>
                             </div>
-                            <div className="shrink-0 text-right">
-                              <p className="text-xs font-semibold tabular-nums">LKR {v.costPrice.toLocaleString()}</p>
-                              <p className="text-[10px] tabular-nums text-muted-foreground">Stock {v.stock}</p>
+                            <div className="shrink-0 text-right text-[11px]">
+                              <p className="font-semibold tabular-nums">LKR {fmt(v.lastBuyingPrice ?? v.costPrice)}</p>
+                              <p className="text-muted-foreground tabular-nums">Stock {v.stock}</p>
+                              <p className="text-muted-foreground">{fmtDate(v.lastPurchaseDate)}</p>
+                              <p className="text-muted-foreground">Last qty {dash(v.lastPurchaseQty)}</p>
                             </div>
                           </button>
                         ))
@@ -857,16 +1067,19 @@ export default function CreatePOPage() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[860px] text-sm">
+              <div className="hidden overflow-x-auto lg:block -mx-4 sm:-mx-5 border-t">
+                <table className="w-full min-w-[1100px] text-sm">
                   <thead className="border-b bg-muted/40">
-                    <tr className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       <th className="px-4 py-3 text-left font-semibold">Product</th>
                       <th className="px-3 py-3 text-right font-semibold">Stock</th>
-                      <th className="px-3 py-3 text-right font-semibold">Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold">Last PO</th>
+                      <th className="px-3 py-3 text-right font-semibold">Last Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold">Sold After</th>
+                      <th className="px-3 py-3 text-right font-semibold">Order Qty</th>
                       <th className="px-3 py-3 text-right font-semibold">Buying</th>
-                      <th className="px-3 py-3 text-right font-semibold">Disc</th>
-                      <th className="px-3 py-3 text-right font-semibold">Tax %</th>
+                      <th className="px-3 py-3 text-right font-semibold">Discount</th>
+                      <th className="px-3 py-3 text-right font-semibold">Tax</th>
                       <th className="px-3 py-3 text-right font-semibold">Total</th>
                       <th className="w-12 px-2 py-3" />
                     </tr>
@@ -973,22 +1186,40 @@ export default function CreatePOPage() {
                             )}
                           </td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums">{stock ?? "—"}</td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground">{fmtDate(v?.lastPurchaseDate)}</td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground">{dash(v?.lastPurchaseQty)}</td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground">{dash(v?.soldAfterLastPurchase)}</td>
                           <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
+                              ref={(el) => { qtyInputRefs.current[idx] = el; }}
                               type="number"
                               min={1}
                               value={item.orderedQty}
                               onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  costInputRefs.current[idx]?.focus();
+                                }
+                              }}
                               className="h-9 w-[4.5rem] rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
                           <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
+                              ref={(el) => { costInputRefs.current[idx] = el; }}
                               type="number"
                               min={0}
                               step="0.01"
                               value={item.unitCost}
                               onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  productSearchRef.current?.focus();
+                                  setProductSearchOpen(true);
+                                }
+                              }}
                               className="h-9 w-24 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
@@ -1065,7 +1296,7 @@ export default function CreatePOPage() {
                   </div>
                 </div>
               )}
-            </section>
+            </SectionCard>
 
             {/* Selected details — mobile/tablet only (sidebar on xl) */}
             <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm xl:hidden sm:p-5">
@@ -1083,39 +1314,34 @@ export default function CreatePOPage() {
             </section>
           </div>
 
-          {/* Sidebar */}
           <aside className="space-y-4 xl:sticky xl:top-24">
-            <div className="rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
-              <h3 className="text-sm font-semibold">Summary</h3>
-              <div className="mt-3 space-y-2.5 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Products</span>
-                  <span className="font-semibold tabular-nums">{items.length}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Quantity</span>
-                  <span className="font-semibold tabular-nums">{totalQty}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="font-semibold tabular-nums">LKR {fmt(subtotal)}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Discount</span>
-                  <span className="font-semibold tabular-nums text-emerald-600">− LKR {fmt(totalDisc)}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Tax</span>
-                  <span className="font-semibold tabular-nums">LKR {fmt(totalTax)}</span>
-                </div>
-                <div className="flex justify-between gap-3 border-t pt-2.5">
-                  <span className="font-bold">Grand total</span>
-                  <span className="font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</span>
-                </div>
+            <SidebarBlock title="Summary">
+              <MetaRow label="Products" value={items.length} />
+              <MetaRow label="Total Quantity" value={totalQty} />
+              <MetaRow label="Subtotal" value={`LKR ${fmt(subtotal)}`} />
+              <MetaRow label="Discount" value={<span className="text-emerald-600">− LKR {fmt(totalDisc)}</span>} />
+              <MetaRow label="Tax" value={`LKR ${fmt(totalTax)}`} />
+              <div className="flex justify-between gap-3 border-t pt-2.5 text-sm">
+                <span className="font-bold">Grand Total</span>
+                <span className="font-bold tabular-nums text-primary">LKR {fmt(grandTotal)}</span>
               </div>
-            </div>
+            </SidebarBlock>
 
-            <div className="hidden rounded-2xl border bg-background p-4 shadow-sm xl:block sm:p-5">
+            <SidebarBlock title="Supplier Summary">
+              <MetaRow label="Supplier" value={supplier?.name ?? "—"} />
+              <MetaRow label="Outstanding" value={supplier?.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"} />
+              <MetaRow label="Credit Limit" value={supplier?.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"} />
+              <MetaRow label="Last Purchase" value={fmtDate(supplier?.lastPurchaseDate)} />
+            </SidebarBlock>
+
+            <SidebarBlock title="Order Information">
+              <MetaRow label="Created By" value={user?.name ?? "—"} />
+              <MetaRow label="Date" value={todayIso} />
+              <MetaRow label="Branch" value={activeBranchName || "—"} />
+              <MetaRow label="Warehouse" value={<span className="inline-flex items-center gap-1"><Warehouse className="h-3 w-3" />Default</span>} />
+            </SidebarBlock>
+
+            <div className="hidden rounded-2xl border bg-background p-4 shadow-sm xl:block">
               <h3 className="text-sm font-semibold">Selected product</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">Click a table row</p>
               <div className="mt-3">
@@ -1126,20 +1352,6 @@ export default function CreatePOPage() {
                 ) : (
                   <SelectedProductPanel item={selectedItem} variant={selectedVariant} supplierName={supplier?.name} compact />
                 )}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border bg-background p-4 shadow-sm sm:p-5">
-              <h3 className="text-sm font-semibold">Order info</h3>
-              <div className="mt-3 space-y-2 text-sm">
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Created by</span>
-                  <span className="truncate font-semibold">{user?.name ?? "—"}</span>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">Date</span>
-                  <span className="font-semibold tabular-nums">{todayIso}</span>
-                </div>
               </div>
             </div>
           </aside>
@@ -1165,7 +1377,7 @@ export default function CreatePOPage() {
                 disabled={saving || !supplierId || items.length === 0}
                 className="hidden sm:inline-flex"
               >
-                Save draft
+                Save Draft
               </Button>
             </div>
           </div>
@@ -1187,7 +1399,7 @@ export default function CreatePOPage() {
               className="hidden gap-1.5 md:inline-flex"
             >
               <Printer className="h-4 w-4" />
-              Print
+              Print Preview
             </Button>
             {fromGrnId ? (
               <Button
@@ -1207,14 +1419,14 @@ export default function CreatePOPage() {
                 className="flex-1 gap-1.5 sm:flex-none"
               >
                 <FileText className="h-4 w-4" />
-                Create PO
+                Create Purchase Order
               </Button>
             )}
           </div>
         </div>
       </div>
 
-      {(searchOpen !== null || (productSearchOpen && productSearchQ.trim())) && (
+      {(searchOpen !== null || (productSearchOpen && supplierId)) && (
         <div
           className="fixed inset-0 z-40"
           onClick={() => {
@@ -1239,17 +1451,22 @@ function SelectedProductPanel({
   compact?: boolean;
 }) {
   const rows: [string, string | number][] = [
+    ["Brand", dash(variant?.brand)],
+    ["Category", dash(variant?.category)],
     ["Barcode", variant?.barcode ?? item.barcode ?? "—"],
-    ["Stock", variant?.stock ?? "—"],
-    ["Available", variant?.availableStock ?? "—"],
-    ["Reserved", variant?.reservedStock ?? "—"],
-    ["Last PO", variant?.lastPurchaseDate ?? "—"],
-    ["Last qty", variant?.lastPurchaseQty ?? "—"],
-    ["Sold after", variant?.soldAfterLastPurchase ?? "—"],
-    ["Last cost", variant?.lastBuyingPrice ?? "—"],
-    ["Selling", variant?.sellingPrice ?? variant?.unitPrice ?? "—"],
+    ["SKU", item.sku || "—"],
+    ["Current Stock", variant?.stock ?? "—"],
+    ["Reserved Stock", variant?.reservedStock ?? "—"],
+    ["Available Stock", variant?.availableStock ?? (variant?.stock != null ? variant.stock : "—")],
+    ["Last Purchase Date", fmtDate(variant?.lastPurchaseDate)],
+    ["Last Purchase Qty", dash(variant?.lastPurchaseQty)],
+    ["Last Buying Price", variant?.lastBuyingPrice != null ? `LKR ${fmtMoney(variant.lastBuyingPrice)}` : "—"],
+    ["Current Buying", `LKR ${fmtMoney(item.unitCost)}`],
+    ["Selling Price", variant?.sellingPrice != null || variant?.unitPrice != null
+      ? `LKR ${fmtMoney(Number(variant.sellingPrice ?? variant.unitPrice))}`
+      : "—"],
     ["Supplier", supplierName ?? "—"],
-    ["Lead days", variant?.leadTimeDays ?? "—"],
+    ["Lead Time", variant?.leadTimeDays != null ? `${variant.leadTimeDays} days` : "—"],
   ];
 
   return (
@@ -1277,6 +1494,7 @@ function SelectedProductPanel({
           </div>
         ))}
       </div>
+      <p className="text-[10px] text-muted-foreground">Read only · values from supplier catalog</p>
     </div>
   );
 }
