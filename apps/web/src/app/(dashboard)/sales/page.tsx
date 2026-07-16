@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { TrendingUp, ShoppingCart, DollarSign, RotateCcw, RefreshCw, Eye, X, Package, Loader2, User, CalendarDays, CreditCard } from "lucide-react";
+import {
+  TrendingUp, ShoppingCart, DollarSign, RotateCcw, RefreshCw, X, Package, Loader2,
+  User, CalendarDays, CreditCard, Hash, CheckCircle2, Wallet, ClipboardList, type LucideIcon,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { formatNumber } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
@@ -14,22 +16,26 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
   id: string; invoiceNumber: string; invoiceDate: string;
   status: string; total: number; paymentMethod: string;
+  paymentStatus?: string;
   subtotal: number; taxAmount: number; discountAmount: number;
   amountPaid: number; changeDue: number;
+  notes?: string | null;
   customer?: { id: string; name: string; phone: string } | null;
   cashier?: { firstName: string; lastName: string } | null;
   _count?: { items: number };
   items?: SaleItem[];
-  payments?: { method: string; amount: number }[];
+  payments?: { id?: string; method: string; amount: number; reference?: string | null; processedAt?: string }[];
 }
 interface SaleItem {
   id: string; productName: string; variantName: string;
   sku: string; quantity: number; unitPrice: number; total: number;
+  discount?: number; taxAmount?: number;
 }
 interface Summary {
   totalSales: number; totalRevenue: number;
@@ -37,80 +43,331 @@ interface Summary {
   byPaymentMethod: Record<string, number>;
 }
 
-// ── Sale detail modal ────────────────────────────────────────────────────
-function SaleDetailModal({ saleId, onClose }: { saleId: string; onClose: () => void }) {
+function fmtMoney(n: number) {
+  return `LKR ${formatNumber(n)}`;
+}
+function fmtDate(d?: string | null) {
+  if (!d) return "—";
+  return new Date(d).toLocaleDateString("en-LK", { year: "numeric", month: "short", day: "2-digit" });
+}
+function fmtDateTime(d?: string | null) {
+  if (!d) return "—";
+  return new Date(d).toLocaleString("en-LK", {
+    year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function paymentLabel(sale: Sale): { label: string; paid: boolean; className: string } {
+  const remaining = Math.max(0, (sale.total ?? 0) - (sale.amountPaid ?? 0));
+  const status = (sale.paymentStatus ?? "").toUpperCase();
+  if (status === "PENDING" || remaining > 0.009) {
+    return { label: remaining > 0 && (sale.amountPaid ?? 0) > 0 ? "Partial" : "Unpaid", paid: false, className: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
+  if (status === "REFUNDED" || sale.status === "REFUNDED") {
+    return { label: "Refunded", paid: false, className: "bg-rose-50 text-rose-700 border-rose-200" };
+  }
+  return { label: "Paid", paid: true, className: "bg-emerald-50 text-emerald-700 border-emerald-200" };
+}
+
+function statusBadgeClass(status: string) {
+  const s = status?.toUpperCase();
+  if (s === "COMPLETED") return "bg-emerald-50 text-emerald-700 border-emerald-200";
+  if (s === "REFUNDED") return "bg-rose-50 text-rose-700 border-rose-200";
+  if (s === "PENDING") return "bg-amber-50 text-amber-700 border-amber-200";
+  return "bg-slate-50 text-slate-700 border-slate-200";
+}
+
+// ── Sale detail modal (PO-details layout) ─────────────────────────────────
+function SaleDetailModal({
+  saleId,
+  onClose,
+  onReturn,
+}: {
+  saleId: string;
+  onClose: () => void;
+  onReturn: (invoiceNumber: string) => void;
+}) {
   const [sale, setSale] = useState<Sale | null>(null);
   const [loading, setLoading] = useState(true);
+  const { settings: receiptSettings } = useReceiptSettings();
 
   useEffect(() => {
+    setLoading(true);
     api.get<Sale>(`/pos/sales/${saleId}`)
       .then((r) => setSale(r.data))
       .catch(() => toast.error("Failed to load sale"))
       .finally(() => setLoading(false));
   }, [saleId]);
 
+  const items = sale?.items ?? [];
+  const payments = sale?.payments?.length
+    ? sale.payments
+    : sale
+      ? [{ method: sale.paymentMethod, amount: sale.amountPaid || sale.total }]
+      : [];
+  const pay = sale ? paymentLabel(sale) : null;
+  const remaining = sale ? Math.max(0, sale.total - (sale.amountPaid || 0)) : 0;
+  const customerName = sale?.customer?.name ?? "Walk-in Customer";
+  const shopLabel = receiptSettings.shopName || "Sales";
+
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-          <div>
-            <h2 className="font-bold text-base">{sale?.invoiceNumber ?? "Loading…"}</h2>
-            <p className="text-xs text-muted-foreground">{sale ? new Date(sale.invoiceDate).toLocaleString("en-LK") : ""}</p>
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b shrink-0">
+          <div className="min-w-0">
+            <h2 className="font-bold text-lg sm:text-xl tracking-tight">
+              Sales Details
+              {sale ? (
+                <span className="font-semibold text-foreground/80">
+                  {" "}( Invoice : {sale.invoiceNumber} )
+                </span>
+              ) : null}
+            </h2>
+            <p className="text-sm text-muted-foreground mt-0.5 truncate">
+              {loading ? "Loading…" : sale?.customer?.name ?? shopLabel}
+            </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+          <div className="flex items-center gap-2 shrink-0">
+            {sale && pay && (
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${pay.className}`}>
+                {pay.label}
+              </span>
+            )}
+            {sale && (
+              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold uppercase ${statusBadgeClass(sale.status)}`}>
+                {sale.status}
+              </span>
+            )}
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-        ) : sale ? (
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {/* Customer / Cashier */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 rounded-xl border bg-muted/10">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><User className="h-3 w-3" />Customer</div>
-                <p className="text-sm font-semibold">{sale.customer?.name ?? "Walk-in"}</p>
-                {sale.customer?.phone && <p className="text-xs text-muted-foreground">{sale.customer.phone}</p>}
-              </div>
-              <div className="p-3 rounded-xl border bg-muted/10">
-                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1"><CreditCard className="h-3 w-3" />Payment</div>
-                <p className="text-sm font-semibold capitalize">{sale.paymentMethod?.toLowerCase()}</p>
-                {sale.cashier && <p className="text-xs text-muted-foreground">{sale.cashier.firstName} {sale.cashier.lastName}</p>}
-              </div>
-            </div>
+          <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : !sale ? (
+          <div className="flex justify-center py-16 text-sm text-muted-foreground">Sale not found</div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4">
+              <div className="flex flex-col lg:flex-row gap-4 lg:gap-5">
+                {/* Main column */}
+                <div className="flex-1 min-w-0 space-y-4">
+                  {/* Metadata */}
+                  <div className="grid sm:grid-cols-2 gap-x-8 gap-y-2.5 text-sm">
+                    <MetaRow icon={CalendarDays} label="Invoice date" value={fmtDateTime(sale.invoiceDate)} />
+                    <MetaRow icon={User} label="Customer" value={customerName} />
+                    <MetaRow icon={Hash} label="Invoice number" value={sale.invoiceNumber} mono />
+                    <MetaRow icon={CreditCard} label="Payment method" value={(sale.paymentMethod || "—").toLowerCase()} capitalize />
+                    <MetaRow icon={CheckCircle2} label="Status" value={sale.status} />
+                    <MetaRow
+                      icon={User}
+                      label="Cashier"
+                      value={sale.cashier ? `${sale.cashier.firstName} ${sale.cashier.lastName}` : "—"}
+                    />
+                    <MetaRow icon={Wallet} label="Payment status" value={pay?.label ?? "—"} />
+                    <MetaRow icon={Package} label="Items" value={String(items.length)} />
+                  </div>
 
-            {/* Items */}
-            {sale.items && sale.items.length > 0 && (
-              <div className="rounded-xl border overflow-hidden">
-                <div className="bg-muted/30 px-3 py-2 text-xs font-semibold text-muted-foreground">Items ({sale.items.length})</div>
-                {sale.items.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between px-3 py-2.5 border-t text-sm">
-                    <div>
-                      <p className="font-medium text-xs">{item.productName}</p>
-                      <p className="text-[10px] text-muted-foreground">{item.variantName} · {item.sku}</p>
+                  {/* Items table */}
+                  <div className="rounded-xl border overflow-hidden">
+                    <div className="bg-blue-600 text-white px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between">
+                      <span>Items ({items.length})</span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs font-semibold">LKR {formatNumber(item.total)}</p>
-                      <p className="text-[10px] text-muted-foreground">x{item.quantity} @ LKR {formatNumber(item.unitPrice)}</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/30 text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-semibold w-10">#</th>
+                            <th className="px-3 py-2 text-left font-semibold">Product</th>
+                            <th className="px-3 py-2 text-right font-semibold">Qty</th>
+                            <th className="px-3 py-2 text-right font-semibold">Unit price</th>
+                            <th className="px-3 py-2 text-right font-semibold">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {items.length === 0 ? (
+                            <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground text-xs">No items</td></tr>
+                          ) : items.map((item, i) => (
+                            <tr key={item.id} className="border-b last:border-0">
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
+                              <td className="px-3 py-2.5">
+                                <p className="font-semibold text-sm leading-tight">{item.productName}</p>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  {[item.sku, item.variantName].filter(Boolean).join(" · ")}
+                                </p>
+                              </td>
+                              <td className="px-3 py-2.5 text-right tabular-nums">{item.quantity}</td>
+                              <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(item.unitPrice)}</td>
+                              <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(item.total)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
 
-            {/* Totals */}
-            <div className="rounded-xl border bg-muted/10 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span>LKR {formatNumber(sale.subtotal)}</span></div>
-              {sale.discountAmount > 0 && <div className="flex justify-between text-emerald-500"><span>Discount</span><span>-LKR {formatNumber(sale.discountAmount)}</span></div>}
-              <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>LKR {formatNumber(sale.taxAmount)}</span></div>
-              <div className="flex justify-between font-bold text-base border-t pt-1.5 mt-1.5">
-                <span>Total</span><span className="text-primary">LKR {formatNumber(sale.total)}</span>
+                  {/* Payments section (GRN analog) */}
+                  <div className="rounded-xl border overflow-hidden">
+                    <div className="bg-emerald-600 text-white px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between gap-2">
+                      <span className="inline-flex items-center gap-1.5">
+                        <ClipboardList className="h-3.5 w-3.5" />
+                        Payments
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border border-white/30 ${
+                        pay?.paid ? "bg-white/20" : "bg-rose-500/80"
+                      }`}>
+                        {pay?.label?.toUpperCase() ?? "—"}
+                      </span>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-3 px-3.5 py-2.5 border-b bg-muted/20 text-xs">
+                      <div>
+                        <p className="text-muted-foreground">Invoice</p>
+                        <p className="font-mono font-semibold mt-0.5">{sale.invoiceNumber}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Paid date</p>
+                        <p className="font-semibold mt-0.5">{fmtDate(sale.invoiceDate)}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Paid / Total</p>
+                        <p className="font-semibold mt-0.5">{fmtMoney(sale.amountPaid || 0)} / {fmtMoney(sale.total)}</p>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-muted/30 text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-3 py-2 text-left font-semibold w-10">#</th>
+                            <th className="px-3 py-2 text-left font-semibold">Method</th>
+                            <th className="px-3 py-2 text-left font-semibold">Reference</th>
+                            <th className="px-3 py-2 text-right font-semibold">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {payments.map((p, i) => (
+                            <tr key={p.id ?? `${p.method}-${i}`} className="border-b last:border-0">
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
+                              <td className="px-3 py-2.5 capitalize font-medium">{(p.method || "—").toLowerCase()}</td>
+                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{p.reference || "—"}</td>
+                              <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(p.amount)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Note */}
+                  <div className="rounded-xl border px-3.5 py-3">
+                    <p className="text-xs font-semibold text-muted-foreground mb-1">Sale note:</p>
+                    <p className="text-sm text-foreground/80 min-h-[1.25rem]">{sale.notes?.trim() || "—"}</p>
+                  </div>
+                </div>
+
+                {/* Right sidebar totals */}
+                <div className="w-full lg:w-64 shrink-0 space-y-3">
+                  <div className="rounded-xl border p-3.5 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Quick totals</p>
+                      <span className="text-[10px] font-semibold text-muted-foreground">LKR</span>
+                    </div>
+                    <TotRow label="Subtotal" value={fmtMoney(sale.subtotal)} />
+                    {sale.discountAmount > 0 && <TotRow label="Discount" value={`-${fmtMoney(sale.discountAmount)}`} muted />}
+                    <TotRow label="Tax" value={fmtMoney(sale.taxAmount)} />
+                    <div className="border-t pt-2 space-y-2">
+                      <TotRow label="Total payable" value={fmtMoney(sale.total)} bold />
+                      <TotRow label="Total paid" value={fmtMoney(sale.amountPaid || 0)} />
+                      <TotRow label="Total remaining" value={fmtMoney(remaining)} accent={!pay?.paid} />
+                      {sale.changeDue > 0 && <TotRow label="Change due" value={fmtMoney(sale.changeDue)} muted />}
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border p-3.5 space-y-2.5 text-sm">
+                    <TotRow label="Subtotal" value={fmtMoney(sale.subtotal)} />
+                    <TotRow label="Tax" value={fmtMoney(sale.taxAmount)} />
+                    <TotRow label="Total payable" value={fmtMoney(sale.total)} bold />
+                    <TotRow label="Total paid" value={fmtMoney(sale.amountPaid || 0)} />
+                    <TotRow label="Total remaining" value={fmtMoney(remaining)} />
+                    <div className="border-t pt-2 text-xs text-muted-foreground">
+                      Invoice <span className="font-mono font-semibold text-foreground">{sale.invoiceNumber}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              {sale.changeDue > 0 && <div className="flex justify-between text-emerald-500 text-xs"><span>Change</span><span>LKR {formatNumber(sale.changeDue)}</span></div>}
             </div>
-          </div>
-        ) : null}
+
+            {/* Footer */}
+            <div className="shrink-0 border-t px-5 sm:px-6 py-3 flex flex-wrap items-center justify-end gap-2 bg-muted/10">
+              {sale.status !== "REFUNDED" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  onClick={() => onReturn(sale.invoiceNumber)}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" /> Process return
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function MetaRow({
+  icon: Icon,
+  label,
+  value,
+  mono,
+  capitalize,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  mono?: boolean;
+  capitalize?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2.5 min-w-0">
+      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+      <div className="min-w-0">
+        <p className="text-[11px] text-muted-foreground leading-none">{label}</p>
+        <p className={`text-sm font-medium mt-0.5 truncate ${mono ? "font-mono text-xs" : ""} ${capitalize ? "capitalize" : ""}`}>
+          {value}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function TotRow({
+  label,
+  value,
+  bold,
+  muted,
+  accent,
+}: {
+  label: string;
+  value: string;
+  bold?: boolean;
+  muted?: boolean;
+  accent?: boolean;
+}) {
+  return (
+    <div className={`flex items-center justify-between gap-3 text-sm ${bold ? "font-bold" : ""} ${muted ? "text-emerald-600" : ""} ${accent ? "text-rose-600 font-semibold" : ""}`}>
+      <span className={bold || accent ? "" : "text-muted-foreground"}>{label}</span>
+      <span className="tabular-nums whitespace-nowrap">{value}</span>
     </div>
   );
 }
@@ -288,7 +545,16 @@ export default function SalesPage() {
       />
 
       {/* Sale detail modal */}
-      {viewId && <SaleDetailModal saleId={viewId} onClose={() => setViewId(null)} />}
+      {viewId && (
+        <SaleDetailModal
+          saleId={viewId}
+          onClose={() => setViewId(null)}
+          onReturn={(invoiceNumber) => {
+            setViewId(null);
+            router.push(`/returns?invoice=${invoiceNumber}`);
+          }}
+        />
+      )}
     </div>
   );
 }
