@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronRight, Pencil, Phone, Mail, MapPin,
-  Package, CreditCard, Star, Calendar, TrendingUp, X, Loader2, Banknote,
+  Package, CreditCard, Star, Calendar, TrendingUp, X, Loader2, Banknote, Search, Trash2, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +40,26 @@ interface SupplierDetail {
   createdAt: string; updatedAt: string;
   purchases: PurchaseOrder[];
   payments: SupplierPayment[];
+}
+interface VariantOpt {
+  variantId: string;
+  productName: string;
+  variantName: string;
+  sku: string;
+  costPrice: number;
+}
+interface SupplierAssignment {
+  id: string;
+  variantId: string;
+  supplierProductCode?: string | null;
+  leadTimeDays?: number | null;
+  lastBuyingPrice?: number | null;
+  variant: {
+    id: string;
+    name: string;
+    sku: string;
+    product: { id: string; name: string };
+  };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -284,11 +304,19 @@ export default function SupplierDetailPage() {
   const [supplier, setSupplier]     = useState<SupplierDetail | null>(null);
   const [loading, setLoading]       = useState(true);
   const [payOpen, setPayOpen]       = useState(false);
+  const [assignments, setAssignments] = useState<SupplierAssignment[]>([]);
+  const [search, setSearch] = useState("");
+  const [searchRows, setSearchRows] = useState<VariantOpt[]>([]);
+  const [assignBusyId, setAssignBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get<SupplierDetail>(`/suppliers/${id}`);
+      const [res, assigned] = await Promise.all([
+        api.get<SupplierDetail>(`/suppliers/${id}`),
+        api.get<SupplierAssignment[]>(`/suppliers/${id}/products`),
+      ]);
       setSupplier(res.data);
+      setAssignments(Array.isArray(assigned.data) ? assigned.data : []);
     } catch {
       toast.error(`Failed to load ${copy.singular.toLowerCase()}`);
       router.push("/suppliers");
@@ -296,6 +324,51 @@ export default function SupplierDetailPage() {
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
+
+  const searchProducts = async () => {
+    const q = search.trim();
+    if (!q) {
+      setSearchRows([]);
+      return;
+    }
+    try {
+      const res = await api.get<VariantOpt[]>(`/pos/products?search=${encodeURIComponent(q)}&limit=25`);
+      setSearchRows(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      toast.error("Failed to search products");
+    }
+  };
+
+  const assignVariant = async (v: VariantOpt) => {
+    setAssignBusyId(v.variantId);
+    try {
+      await api.post(`/suppliers/${id}/products`, {
+        variantId: v.variantId,
+        lastBuyingPrice: v.costPrice,
+      });
+      toast.success("Product assigned to supplier");
+      await load();
+      setSearch("");
+      setSearchRows([]);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Assign failed");
+    } finally {
+      setAssignBusyId(null);
+    }
+  };
+
+  const unassignVariant = async (variantId: string) => {
+    setAssignBusyId(variantId);
+    try {
+      await api.delete(`/suppliers/${id}/products/${variantId}`);
+      toast.success("Product unassigned");
+      await load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Unassign failed");
+    } finally {
+      setAssignBusyId(null);
+    }
+  };
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -496,6 +569,99 @@ export default function SupplierDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Assigned Products */}
+          <div className="bg-background border rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-5 py-3.5 border-b">
+              <h3 className="font-semibold text-sm">Assigned Products</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Search and assign products for this supplier.
+              </p>
+            </div>
+            <div className="p-4 space-y-3 border-b bg-muted/10">
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && searchProducts()}
+                    placeholder="Search by product name / SKU / barcode"
+                    className="pl-8 h-9"
+                  />
+                </div>
+                <Button size="sm" onClick={searchProducts}>
+                  Search
+                </Button>
+              </div>
+              {searchRows.length > 0 && (
+                <div className="max-h-56 overflow-auto border rounded-xl bg-background">
+                  {searchRows.map((v) => {
+                    const already = assignments.some((a) => a.variantId === v.variantId);
+                    return (
+                      <div key={v.variantId} className="px-3 py-2.5 border-b last:border-0 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{v.productName}</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate">{v.sku} · {v.variantName}</p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={already ? "outline" : "default"}
+                          disabled={already || assignBusyId === v.variantId}
+                          onClick={() => assignVariant(v)}
+                          className="gap-1.5"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          {already ? "Assigned" : "Assign"}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            {assignments.length === 0 ? (
+              <div className="py-10 text-center text-sm text-muted-foreground">No assigned products yet</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">Product</th>
+                      <th className="px-4 py-2.5 text-left">SKU</th>
+                      <th className="px-4 py-2.5 text-right">Lead Time</th>
+                      <th className="px-4 py-2.5 text-right">Last Buying</th>
+                      <th className="px-4 py-2.5 text-right"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {assignments.map((a) => (
+                      <tr key={a.id} className="hover:bg-muted/10">
+                        <td className="px-4 py-2.5">
+                          <p className="text-sm font-medium">{a.variant.product.name}</p>
+                          <p className="text-xs text-muted-foreground">{a.variant.name}</p>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-mono">{a.variant.sku}</td>
+                        <td className="px-4 py-2.5 text-right text-xs">{a.leadTimeDays ?? "-"}</td>
+                        <td className="px-4 py-2.5 text-right text-xs">{a.lastBuyingPrice != null ? `LKR ${fmt(a.lastBuyingPrice)}` : "-"}</td>
+                        <td className="px-4 py-2.5 text-right">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-red-600 hover:text-red-700"
+                            disabled={assignBusyId === a.variantId}
+                            onClick={() => unassignVariant(a.variantId)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
         </div>
         {/* ══ END LEFT ══ */}
