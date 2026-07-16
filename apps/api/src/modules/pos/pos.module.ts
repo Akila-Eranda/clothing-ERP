@@ -769,6 +769,102 @@ export class PosService {
     return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
   }
 
+  private async attachSupplierPurchaseInsights(
+    tenantId: string,
+    branchId: string,
+    supplierId: string,
+    rows: Array<{ variantId: string; stock: number }>,
+  ) {
+    const variantIds = rows.map((r) => r.variantId);
+    if (!variantIds.length) return new Map<string, {
+      lastPurchaseDate: string | null;
+      lastPurchaseQty: number | null;
+      stockAtLastPurchase: number | null;
+      soldAfterLastPurchase: number | null;
+      stockDecreased: boolean;
+    }>();
+
+    const grnItems = await this.prisma.goodsReceiptItem.findMany({
+      where: {
+        variantId: { in: variantIds },
+        receivedQty: { gt: 0 },
+        goodsReceipt: { tenantId, supplierId, branchId },
+      },
+      include: {
+        goodsReceipt: { select: { id: true, receivedAt: true } },
+      },
+      orderBy: { goodsReceipt: { receivedAt: 'desc' } },
+    });
+
+    const lastByVariant = new Map<string, typeof grnItems[number]>();
+    for (const item of grnItems) {
+      if (!lastByVariant.has(item.variantId)) lastByVariant.set(item.variantId, item);
+    }
+
+    const grnIds = [...new Set([...lastByVariant.values()].map((i) => i.goodsReceipt.id))];
+    const purchaseLogs = grnIds.length
+      ? await this.prisma.inventoryLog.findMany({
+          where: {
+            tenantId,
+            branchId,
+            variantId: { in: variantIds },
+            movementType: StockMovementType.PURCHASE,
+            referenceType: 'GoodsReceipt',
+            referenceId: { in: grnIds },
+          },
+          select: {
+            variantId: true,
+            referenceId: true,
+            quantityAfter: true,
+          },
+        })
+      : [];
+    const stockAfterByVariantGrn = new Map<string, number>();
+    for (const log of purchaseLogs) {
+      const key = `${log.variantId}:${log.referenceId}`;
+      if (!stockAfterByVariantGrn.has(key)) {
+        stockAfterByVariantGrn.set(key, log.quantityAfter);
+      }
+    }
+
+    const insights = new Map<string, {
+      lastPurchaseDate: string | null;
+      lastPurchaseQty: number | null;
+      stockAtLastPurchase: number | null;
+      soldAfterLastPurchase: number | null;
+      stockDecreased: boolean;
+    }>();
+
+    for (const row of rows) {
+      const last = lastByVariant.get(row.variantId);
+      if (!last) {
+        insights.set(row.variantId, {
+          lastPurchaseDate: null,
+          lastPurchaseQty: null,
+          stockAtLastPurchase: null,
+          soldAfterLastPurchase: null,
+          stockDecreased: false,
+        });
+        continue;
+      }
+
+      const stockAtLastPurchase = stockAfterByVariantGrn.get(`${row.variantId}:${last.goodsReceipt.id}`) ?? null;
+      const soldAfterLastPurchase = stockAtLastPurchase != null
+        ? Math.max(0, stockAtLastPurchase - row.stock)
+        : null;
+
+      insights.set(row.variantId, {
+        lastPurchaseDate: last.goodsReceipt.receivedAt.toISOString(),
+        lastPurchaseQty: last.receivedQty,
+        stockAtLastPurchase,
+        soldAfterLastPurchase,
+        stockDecreased: stockAtLastPurchase != null && row.stock < stockAtLastPurchase,
+      });
+    }
+
+    return insights;
+  }
+
   async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number; supplierId?: string }) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const take = Math.min(Math.max(opts?.limit ?? 1500, 1), 2000);
@@ -820,30 +916,54 @@ export class PosService {
       take,
     });
 
-    return variants.map((v) => ({
-      assignment: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined,
-      variantId:   v.id,
-      productName: v.product.name,
-      variantName: v.name,
-      sku:         v.sku,
-      unitPrice:   v.sellingPrice,
-      costPrice:   v.costPrice,
-      taxRate:     v.product.taxRate ?? 0,
-      category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
-      color:       v.color ?? undefined,
-      size:        v.size  ?? undefined,
-      material:    v.material ?? undefined,
-      style:       v.style ?? undefined,
-      stock:       Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0)),
-      imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
-      barcode:     v.barcode ?? v.product.barcode ?? undefined,
-      warrantyMonths: v.product.warrantyMonths ?? null,
-      supplierId: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierId ?? null : null,
-      supplierProductCode: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierProductCode ?? null : null,
-      leadTimeDays: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.leadTimeDays ?? null : null,
-      lastBuyingPrice: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.lastBuyingPrice ?? null : null,
-      isPreferredSupplier: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.isPreferred ?? null : null,
-    }));
+    const mapped = variants.map((v) => {
+      const stock = Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0));
+      return {
+        assignment: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined,
+        variantId:   v.id,
+        productName: v.product.name,
+        variantName: v.name,
+        sku:         v.sku,
+        unitPrice:   v.sellingPrice,
+        costPrice:   v.costPrice,
+        taxRate:     v.product.taxRate ?? 0,
+        category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
+        color:       v.color ?? undefined,
+        size:        v.size  ?? undefined,
+        material:    v.material ?? undefined,
+        style:       v.style ?? undefined,
+        stock,
+        imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
+        barcode:     v.barcode ?? v.product.barcode ?? undefined,
+        warrantyMonths: v.product.warrantyMonths ?? null,
+        supplierId: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierId ?? null : null,
+        supplierProductCode: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.supplierProductCode ?? null : null,
+        leadTimeDays: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.leadTimeDays ?? null : null,
+        lastBuyingPrice: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.lastBuyingPrice ?? null : null,
+        isPreferredSupplier: Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0]?.isPreferred ?? null : null,
+      };
+    });
+
+    if (!opts?.supplierId) return mapped;
+
+    const insights = await this.attachSupplierPurchaseInsights(
+      tenantId,
+      resolvedBranchId,
+      opts.supplierId,
+      mapped.map((m) => ({ variantId: m.variantId, stock: m.stock })),
+    );
+
+    return mapped.map((m) => {
+      const insight = insights.get(m.variantId);
+      return {
+        ...m,
+        lastPurchaseDate: insight?.lastPurchaseDate ?? null,
+        lastPurchaseQty: insight?.lastPurchaseQty ?? null,
+        stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
+        soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
+        stockDecreased: insight?.stockDecreased ?? false,
+      };
+    });
   }
 
   async closeDaySession(tenantId: string, branchId: string, cashierId: string, notes?: string) {

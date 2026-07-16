@@ -51,6 +51,8 @@ export class CreatePurchaseOrderDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() paymentTerms?: string;
+  @ApiPropertyOptional({ description: 'Link an existing Quick/Direct GRN (stock already posted)' })
+  @IsOptional() @IsString() fromGrnId?: string;
   @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
 }
 
@@ -158,7 +160,30 @@ export class SuppliersService {
     const subtotal   = itemsData.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
     const discountAmount = itemsData.reduce((s, i) => s + i.discount, 0);
     const taxAmount  = itemsData.reduce((s, i) => s + i.taxAmount, 0);
-    return this.prisma.purchaseOrder.create({
+
+    let grnToLink: {
+      id: string;
+      grnNumber: string;
+      supplierId: string;
+      receivedAt: Date;
+      purchaseId: string | null;
+      items: { id: string; variantId: string }[];
+    } | null = null;
+
+    if (dto.fromGrnId) {
+      const grn = await this.prisma.goodsReceipt.findFirst({
+        where: { id: dto.fromGrnId, tenantId },
+        include: { items: { select: { id: true, variantId: true } } },
+      });
+      if (!grn) throw new NotFoundException('GRN not found');
+      if (grn.purchaseId) throw new BadRequestException('This GRN is already linked to a purchase order');
+      if (grn.supplierId !== dto.supplierId) {
+        throw new BadRequestException('PO supplier must match the GRN supplier');
+      }
+      grnToLink = grn;
+    }
+
+    const po = await this.prisma.purchaseOrder.create({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: {
         tenantId, branchId, supplierId: dto.supplierId,
@@ -168,9 +193,42 @@ export class SuppliersService {
         notes: dto.notes, reference: dto.reference, paymentTerms: dto.paymentTerms,
         createdBy: userId,
         items: { create: itemsData },
+        ...(grnToLink
+          ? {
+              status: PurchaseOrderStatus.RECEIVED,
+              receivedDate: grnToLink.receivedAt,
+            }
+          : {}),
       } as any,
       include: { items: true, supplier: true },
     });
+
+    if (grnToLink) {
+      await this.prisma.$transaction(async (tx) => {
+        for (const pi of po.items) {
+          await tx.purchaseOrderItem.update({
+            where: { id: pi.id },
+            data: { receivedQty: pi.orderedQty },
+          });
+        }
+        await tx.goodsReceipt.update({
+          where: { id: grnToLink!.id },
+          data: { purchaseId: po.id },
+        });
+        for (const gi of grnToLink!.items) {
+          const match = po.items.find((pi) => pi.variantId === gi.variantId);
+          if (match) {
+            await tx.goodsReceiptItem.update({
+              where: { id: gi.id },
+              data: { purchaseItemId: match.id },
+            });
+          }
+        }
+      });
+      return this.findOnePO(po.id, tenantId);
+    }
+
+    return po;
   }
 
   async findAllPOs(tenantId: string, query: PaginationDto & { status?: PurchaseOrderStatus }) {

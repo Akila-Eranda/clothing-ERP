@@ -78,11 +78,31 @@ export default function ProductDetailPage() {
   const [imgIdx,  setImgIdx]  = useState(0);
 
   const load = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await api.get<ProductDetail>(`/products/${id}`);
-      setProduct(res.data);
-    } catch { toast.error("Failed to load product"); }
-    finally { setLoading(false); }
+      const data = res.data;
+      // Normalize optional arrays so UI never crashes on partial payloads
+      setProduct(
+        data
+          ? {
+              ...data,
+              images: data.images ?? [],
+              tags: data.tags ?? [],
+              collections: data.collections ?? [],
+              variants: (data.variants ?? []).map((v) => ({
+                ...v,
+                inventory: v.inventory ?? [],
+              })),
+            }
+          : null,
+      );
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to load product");
+      setProduct(null);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -102,17 +122,18 @@ export default function ProductDetailPage() {
   );
 
   // ── Derived ────────────────────────────────────────────────────────────
-  const totalStock    = product.variants.reduce((s, v) => s + v.inventory.reduce((a, i) => a + i.quantity, 0), 0);
-  const reservedStock = product.variants.reduce((s, v) => s + v.inventory.reduce((a, i) => a + i.reservedQty, 0), 0);
+  const totalStock    = product.variants.reduce((s, v) => s + (v.inventory ?? []).reduce((a, i) => a + i.quantity, 0), 0);
+  const reservedStock = product.variants.reduce((s, v) => s + (v.inventory ?? []).reduce((a, i) => a + i.reservedQty, 0), 0);
   const availStock    = totalStock - reservedStock;
   const profit        = product.sellingPrice - product.costPrice;
   const margin        = product.sellingPrice > 0 ? (profit / product.sellingPrice) * 100 : 0;
   const finalPrice    = product.sellingPrice * (1 + product.taxRate / 100);
 
-  // branch aggregation
+  // branch aggregation — skip rows missing branch (legacy / corrupt inventory)
   const branchMap = new Map<string, { name: string; qty: number; reserved: number }>();
   product.variants.forEach((v) =>
-    v.inventory.forEach((inv) => {
+    (v.inventory ?? []).forEach((inv) => {
+      if (!inv?.branch?.id) return;
       const e = branchMap.get(inv.branch.id);
       if (e) { e.qty += inv.quantity; e.reserved += inv.reservedQty; }
       else    branchMap.set(inv.branch.id, { name: inv.branch.name, qty: inv.quantity, reserved: inv.reservedQty });
@@ -271,7 +292,7 @@ export default function ProductDetailPage() {
                   </thead>
                   <tbody className="divide-y">
                     {product.variants.map((v) => {
-                      const vStock  = v.inventory.reduce((a, i) => a + i.quantity, 0);
+                      const vStock  = (v.inventory ?? []).reduce((a, i) => a + i.quantity, 0);
                       const vProfit = v.sellingPrice - v.costPrice;
                       const vMargin = v.sellingPrice > 0 ? (vProfit / v.sellingPrice * 100).toFixed(1) : "0.0";
                       return (

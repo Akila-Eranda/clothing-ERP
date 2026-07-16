@@ -673,6 +673,23 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ×${qty}  (Stock: ${p.stock})`, { duration: 900 });
   }, [addItem, profile, taxRate, soundAlerts]);
 
+  const handleAddGrnItem = React.useCallback((p: {
+    variantId: string; productName: string; variantName: string; sku: string; costPrice: number;
+  }, qty = 1) => {
+    addItem({
+      variantId: p.variantId,
+      productName: p.productName,
+      variantName: p.variantName,
+      sku: p.sku,
+      unitPrice: p.costPrice,
+      quantity: qty,
+      stock: 999999,
+      discountAmount: 0,
+      discountType: "percentage",
+      taxRate: 0,
+    });
+  }, [addItem]);
+
   const handleAddProduct = React.useCallback((p: ProductItem) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
     if (qtyPopupEnabled) {
@@ -1244,10 +1261,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return (
         <PosQuickGrnPanel
           items={items as unknown as Array<{ variantId: string; productName: string; variantName: string; sku: string; quantity: number }>}
-          products={products.map((p) => ({ variantId: p.variantId, costPrice: p.costPrice }))}
           onBack={() => {
             setActiveNav("products");
           }}
+          onClearCart={clearCart}
+          onAddGrnItem={handleAddGrnItem}
+          onUpdateQuantity={updateQuantity}
+          onRemoveItem={removeItem}
           onPosted={() => {
             clearCart();
             setSelectedCartIdx(-1);

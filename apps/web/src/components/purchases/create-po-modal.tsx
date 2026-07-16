@@ -242,8 +242,6 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                             <p className="text-[10px] text-muted-foreground font-mono">{v.sku}</p>
                             <div className="flex gap-2 mt-0.5">
                               <span className="text-[10px] text-muted-foreground">Stock: <strong>{v.stock}</strong></span>
-                              {v.color && <span className="text-[10px] text-muted-foreground">{v.color}</span>}
-                              {v.size && <span className="text-[10px] text-muted-foreground">{v.size}</span>}
                             </div>
                           </div>
                           {added

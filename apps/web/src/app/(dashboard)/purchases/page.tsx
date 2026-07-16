@@ -125,23 +125,12 @@ export default function PurchasesPage() {
   const [pos, setPos]             = useState<PurchaseOrder[]>([]);
   const [loading, setLoading]     = useState(true);
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
-  const [reorder, setReorder]     = useState<{ variantId: string; productName: string; sku: string; branchName: string; currentQty: number; reorderPoint: number; suggestedOrderQty: number }[]>([]);
-  const [supplierPerf, setSupplierPerf] = useState<{ supplierName: string; orderCount: number; totalSpend: number; onTimeRate: number | null; avgLeadDays: number | null }[]>([]);
-  const [priceHistory, setPriceHistory] = useState<{ productName: string; supplierName: string; unitCost: number; poNumber: string; orderDate: string }[]>([]);
 
   const fetchPOs = useCallback(async () => {
     setLoading(true);
     try {
-      const [res, reorderRes, perfRes, histRes] = await Promise.all([
-        api.get<{ data: PurchaseOrder[] }>("/purchases?limit=200"),
-        api.get<typeof reorder>("/purchases/reorder-suggestions"),
-        api.get<typeof supplierPerf>("/reports/supplier-performance"),
-        api.get<typeof priceHistory>("/reports/supplier-price-history?limit=8"),
-      ]);
+      const res = await api.get<{ data: PurchaseOrder[] }>("/purchases?limit=200");
       setPos(res.data?.data ?? (res.data as unknown as PurchaseOrder[]) ?? []);
-      setReorder(Array.isArray(reorderRes.data) ? reorderRes.data : []);
-      setSupplierPerf(Array.isArray(perfRes.data) ? perfRes.data.slice(0, 5) : []);
-      setPriceHistory(Array.isArray(histRes.data) ? histRes.data : []);
     } catch { toast.error("Failed to load purchase orders"); }
     finally { setLoading(false); }
   }, []);
@@ -168,7 +157,6 @@ export default function PurchasesPage() {
   const pending  = pos.filter((p) => p.status === "DRAFT" || p.status === "PENDING_APPROVAL").length;
   const ordered  = pos.filter((p) => ["CONFIRMED","SENT","PARTIALLY_RECEIVED"].includes(p.status)).length;
   const received = pos.filter((p) => p.status === "RECEIVED").length;
-  const totalValue = pos.filter((p) => p.status !== "CANCELLED").reduce((s, p) => s + p.total, 0);
 
   const STATS = [
     { label: "Total POs",   value: total,                                   icon: ShoppingBag,   color: "text-blue-500",    bg: "bg-blue-500/10" },
@@ -186,7 +174,7 @@ export default function PurchasesPage() {
         <div>
           <h1 className="text-2xl font-bold">{routeLabels["/purchases"]}</h1>
           <p className="text-sm text-muted-foreground">
-            {profile.emoji} {profile.label} — create & track supplier purchase orders
+            {profile.emoji} {profile.label} — recommended: Create PO → Confirm → Receive (GRN)
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -195,13 +183,33 @@ export default function PurchasesPage() {
           </Button>
           <Button variant="outline" size="sm" asChild className="gap-1.5">
             <Link href="/purchases/grn">
-              <PackageCheck className="h-3.5 w-3.5" /> GRN
+              <PackageCheck className="h-3.5 w-3.5" /> GRN History
             </Link>
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
-            <Plus className="h-3.5 w-3.5" /> New PO
+            <Plus className="h-3.5 w-3.5" /> New Purchase Order
           </Button>
         </div>
+      </div>
+
+      {/* Recommended flow */}
+      <div className="rounded-xl border bg-blue-50/60 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900 p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Recommended purchase flow</p>
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium text-muted-foreground flex-wrap">
+            {["1. New PO", "→ 2. Mark Ordered", "→ 3. Receive Items", "→ 4. GRN + Stock"].map((s) => (
+              <span key={s} className="bg-background/80 px-2.5 py-1 rounded-full border text-foreground/80">{s}</span>
+            ))}
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground max-w-xs">
+          Use <span className="font-semibold text-foreground">Quick GRN</span> only for walk-in cash purchases without a PO.
+          {ordered > 0 && (
+            <span className="block mt-1 text-amber-700 dark:text-amber-400 font-medium">
+              {ordered} PO(s) waiting to receive — use Receive Items on the row.
+            </span>
+          )}
+        </p>
       </div>
 
       {/* Stats */}
@@ -215,68 +223,6 @@ export default function PurchasesPage() {
           </Card>
         ))}
       </div>
-
-      {/* Total value banner */}
-      <div className="rounded-xl border bg-card p-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs text-muted-foreground">Total Purchase Value</p>
-          <p className="text-2xl font-black mt-0.5">LKR {totalValue.toLocaleString("en-LK", { maximumFractionDigits: 0 })}</p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-muted-foreground">PO Workflow</p>
-          <div className="flex items-center gap-1.5 mt-1 text-xs font-medium text-muted-foreground">
-            {["Draft / Pending", "→ Approval", "→ Ordered", "→ GRN"].map((s) => (
-              <span key={s} className="bg-muted/50 px-2 py-0.5 rounded-full">{s}</span>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {(reorder.length > 0 || supplierPerf.length > 0 || priceHistory.length > 0) && (
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold mb-2">Auto Reorder Suggestions</p>
-              {reorder.length === 0 ? <p className="text-xs text-muted-foreground">All stock levels OK</p> : (
-                <div className="space-y-2 max-h-40 overflow-y-auto">
-                  {reorder.slice(0, 6).map((r) => (
-                    <div key={`${r.variantId}-${r.branchName}`} className="flex justify-between text-xs border-b pb-1">
-                      <span className="truncate flex-1">{r.productName}</span>
-                      <span className="text-amber-600 font-semibold shrink-0 ml-2">Order {r.suggestedOrderQty}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold mb-2">Supplier Performance</p>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {supplierPerf.map((s) => (
-                  <div key={s.supplierName} className="flex justify-between text-xs border-b pb-1">
-                    <span className="truncate flex-1">{s.supplierName}</span>
-                    <span className="text-muted-foreground shrink-0 ml-2">{s.onTimeRate ?? 0}% on-time</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <p className="text-sm font-semibold mb-2">Supplier Price History</p>
-              <div className="space-y-2 max-h-40 overflow-y-auto">
-                {priceHistory.map((h, i) => (
-                  <div key={`${h.poNumber}-${i}`} className="flex justify-between text-xs border-b pb-1">
-                    <span className="truncate flex-1">{h.productName}</span>
-                    <span className="font-mono shrink-0 ml-2">LKR {h.unitCost.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Table */}
       <ClientSideTable

@@ -473,7 +473,7 @@ export default function ProcurementHubPage() {
         <div>
           <h1 className="text-2xl font-bold">Procurement</h1>
           <p className="text-sm text-muted-foreground">
-            {profile.label} · Purchase requests, GRN, returns & supplier invoices
+            {profile.label} · Recommended: PO → Receive → Invoice → Pay
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -487,6 +487,18 @@ export default function ProcurementHubPage() {
             <Plus className="h-3.5 w-3.5" /> New PO
           </Button>
         </div>
+      </div>
+
+      <div className="rounded-xl border bg-blue-50/60 dark:bg-blue-950/20 border-blue-200/60 dark:border-blue-900 p-4">
+        <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">Best purchase path</p>
+        <div className="flex items-center gap-1.5 mt-1.5 text-xs font-medium flex-wrap">
+          {["New PO", "→ Confirm", "→ Receive (GRN)", "→ Invoice", "→ Pay"].map((s) => (
+            <span key={s} className="bg-background/80 px-2.5 py-1 rounded-full border">{s}</span>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground mt-2">
+          Quick GRN is for walk-in cash only. If a PO already exists, receive against that PO.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
@@ -509,7 +521,7 @@ export default function ProcurementHubPage() {
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="requests">Purchase Requests</TabsTrigger>
           <TabsTrigger value="grn">GRN Documents</TabsTrigger>
-          <TabsTrigger value="quick">Quick GRN</TabsTrigger>
+          <TabsTrigger value="quick">Quick GRN (exception)</TabsTrigger>
           <TabsTrigger value="returns">Supplier Returns</TabsTrigger>
           <TabsTrigger value="invoices">Supplier Invoices</TabsTrigger>
         </TabsList>
@@ -563,9 +575,9 @@ export default function ProcurementHubPage() {
                   <Zap className="h-4 w-4 text-amber-500" />
                 </div>
                 <div>
-                  <h2 className="font-semibold text-sm">Quick GRN (Cashier)</h2>
+                  <h2 className="font-semibold text-sm">Quick GRN (exception)</h2>
                   <p className="text-xs text-muted-foreground">
-                    Walk-in purchase — posts stock immediately without a PO
+                    Walk-in cash only — if open PO exists, use Purchases → Receive Items instead
                   </p>
                 </div>
               </div>
