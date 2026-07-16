@@ -1,14 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, CalendarClock, FileBarChart, Package, RefreshCw, Loader2, Scale, ShieldCheck,
+  AlertTriangle, CalendarClock, CheckCircle2, Clock, FileBarChart, Loader2,
+  Package, RefreshCw, Scale, ShieldCheck, Skull, TrendingDown,
 } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClientSideTable } from "@/components/table/client-side-table";
+import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -95,6 +98,205 @@ function bucketBadge(bucket: string | null, days: number | null) {
   return <Badge variant="outline" className="text-[10px]">OK</Badge>;
 }
 
+function buildLotColumns(): ColumnDef<LotRow>[] {
+  return [
+    {
+      id: "product",
+      accessorFn: (r) => r.variant.product.name,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-medium">{row.original.variant.product.name}</p>
+          <p className="text-xs text-muted-foreground">{row.original.variant.name}</p>
+        </div>
+      ),
+    },
+    {
+      id: "sku",
+      accessorFn: (r) => r.variant.sku,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.variant.sku}</span>,
+    },
+    {
+      id: "batch",
+      accessorFn: (r) => r.batchNumber ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Batch" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.batchNumber ?? "—"}</span>,
+    },
+    {
+      id: "mfd",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="MFD" />,
+      cell: ({ row }) => (
+        <span className="text-xs">
+          {row.original.manufactureDate
+            ? new Date(row.original.manufactureDate).toLocaleDateString("en-LK")
+            : "—"}
+        </span>
+      ),
+    },
+    {
+      id: "expiry",
+      accessorFn: (r) => r.expiryDate ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Expiry" />,
+      cell: ({ row }) => {
+        const lot = row.original;
+        return (
+          <div>
+            <p className="text-xs">
+              {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString("en-LK") : "—"}
+            </p>
+            {lot.daysToExpiry != null && (
+              <p className="text-[10px] text-muted-foreground">
+                {lot.daysToExpiry < 0
+                  ? `${Math.abs(lot.daysToExpiry)}d overdue`
+                  : `${lot.daysToExpiry}d left`}
+              </p>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      id: "qty",
+      accessorKey: "quantity",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Qty" />,
+      cell: ({ row }) => <span className="font-bold text-sm">{row.original.quantity}</span>,
+    },
+    {
+      id: "avail",
+      accessorKey: "availableQty",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
+      cell: ({ row }) => (
+        <span className="font-semibold text-emerald-600">{row.original.availableQty}</span>
+      ),
+    },
+    {
+      id: "value",
+      accessorFn: (r) => r.value ?? r.quantity * (r.unitCost || 0),
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Value" />,
+      cell: ({ row }) => (
+        <span className="text-xs">
+          LKR {formatNumber(row.original.value ?? row.original.quantity * (row.original.unitCost || 0))}
+        </span>
+      ),
+    },
+    {
+      id: "status",
+      accessorFn: (r) => r.expiryBucket ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => bucketBadge(row.original.expiryBucket, row.original.daysToExpiry),
+    },
+  ];
+}
+
+function buildTxnColumns(): ColumnDef<BatchTxn>[] {
+  return [
+    {
+      id: "when",
+      accessorKey: "createdAt",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="When" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {new Date(row.original.createdAt).toLocaleString("en-LK")}
+        </span>
+      ),
+    },
+    {
+      id: "product",
+      accessorFn: (r) => r.variant.product.name,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-sm font-medium">{row.original.variant.product.name}</p>
+          <p className="font-mono text-[10px] text-muted-foreground">{row.original.variant.sku}</p>
+        </div>
+      ),
+    },
+    {
+      id: "type",
+      accessorKey: "movementType",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+      cell: ({ row }) => (
+        <Badge variant="secondary" className="text-[9px]">{row.original.movementType}</Badge>
+      ),
+    },
+    {
+      id: "qty",
+      accessorKey: "quantityChange",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Qty Δ" />,
+      cell: ({ row }) => {
+        const q = row.original.quantityChange;
+        return (
+          <span className={`font-bold text-sm ${q < 0 ? "text-red-600" : "text-emerald-600"}`}>
+            {q > 0 ? `+${q}` : q}
+          </span>
+        );
+      },
+    },
+    {
+      id: "batch",
+      accessorFn: (r) => r.batchNumber ?? r.lot?.batchNumber ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Batch" />,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs">
+          {row.original.batchNumber ?? row.original.lot?.batchNumber ?? "—"}
+        </span>
+      ),
+    },
+    {
+      id: "notes",
+      accessorKey: "notes",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Notes" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground max-w-[160px] truncate block">
+          {row.original.notes ?? "—"}
+        </span>
+      ),
+    },
+  ];
+}
+
+function buildReconcileColumns(): ColumnDef<ReconcileRow>[] {
+  return [
+    {
+      id: "name",
+      accessorFn: (r) => r.name ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.name ?? "—"}</span>,
+    },
+    {
+      id: "sku",
+      accessorFn: (r) => r.sku ?? "",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
+      cell: ({ row }) => <span className="font-mono text-xs">{row.original.sku ?? "—"}</span>,
+    },
+    {
+      id: "onHand",
+      accessorKey: "inventoryQty",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="On Hand" />,
+      cell: ({ row }) => <span className="font-bold text-sm">{row.original.inventoryQty}</span>,
+    },
+    {
+      id: "lotQty",
+      accessorKey: "lotQty",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Lot Qty" />,
+      cell: ({ row }) => <span className="text-sm">{row.original.lotQty}</span>,
+    },
+    {
+      id: "delta",
+      accessorKey: "delta",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Δ" />,
+      cell: ({ row }) => <span className="font-semibold text-sm">{row.original.delta}</span>,
+    },
+    {
+      id: "status",
+      accessorKey: "status",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => <Badge variant="warning" className="text-[10px]">{row.original.status}</Badge>,
+    },
+  ];
+}
+
 export default function ExpiryDashboardPage() {
   const router = useRouter();
   const { profile } = useShopWorkspace();
@@ -106,7 +308,10 @@ export default function ExpiryDashboardPage() {
   const [txns, setTxns] = useState<BatchTxn[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [batchFilter, setBatchFilter] = useState("");
+
+  const lotColumns = useMemo(() => buildLotColumns(), []);
+  const txnColumns = useMemo(() => buildTxnColumns(), []);
+  const reconcileColumns = useMemo(() => buildReconcileColumns(), []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -156,92 +361,111 @@ export default function ExpiryDashboardPage() {
     );
   }
 
-  const filtered = batchFilter
-    ? lots.filter((l) => (l.batchNumber ?? "").toLowerCase().includes(batchFilter.toLowerCase())
-      || l.variant.sku.toLowerCase().includes(batchFilter.toLowerCase())
-      || l.variant.product.name.toLowerCase().includes(batchFilter.toLowerCase()))
-    : lots;
-
   const nearRows = dash?.nearExpiry
     ?? (dash?.urgent ?? []).filter((l) => (l.daysToExpiry ?? 0) >= 0);
   const expiredRows = dash?.expiredLots
     ?? (dash?.urgent ?? []).filter((l) => (l.daysToExpiry ?? 0) < 0);
 
+  const STATS = [
+    {
+      label: "Expired Qty",
+      value: formatNumber(dash?.summary.expired.qty ?? 0),
+      sub: `${dash?.summary.expired.lots ?? 0} lots`,
+      icon: Skull,
+      color: "text-red-500",
+      bg: "bg-red-500/10",
+    },
+    {
+      label: "Near Expiry (≤7d)",
+      value: formatNumber(dash?.summary.within7Days.qty ?? 0),
+      sub: `${dash?.summary.within7Days.lots ?? 0} lots`,
+      icon: AlertTriangle,
+      color: "text-amber-500",
+      bg: "bg-amber-500/10",
+    },
+    {
+      label: "8–30 Days",
+      value: formatNumber(dash?.summary.within30Days.qty ?? 0),
+      sub: `${dash?.summary.within30Days.lots ?? 0} lots`,
+      icon: Clock,
+      color: "text-orange-500",
+      bg: "bg-orange-500/10",
+    },
+    {
+      label: "Matched SKUs",
+      value: reconcile?.summary.matched ?? 0,
+      sub: `${reconcile?.summary.totalSkus ?? 0} total`,
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+      bg: "bg-emerald-500/10",
+    },
+  ];
+
+  const lotSearch = [
+    { id: "product", title: "Product" },
+    { id: "sku", title: "SKU" },
+    { id: "batch", title: "Batch" },
+  ];
+
   return (
-    <div className="p-6 space-y-6 max-w-[1400px] mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h1 className="text-2xl font-bold">Expiry Management</h1>
           <p className="text-sm text-muted-foreground">
-            Near expiry · expired · FEFO sales · POS block expired · batch reports
-            {reconcile?.summary?.strategy ? ` · strategy: ${reconcile.summary.strategy}` : ""}
+            {profile.label} · Near expiry, FEFO sales, POS block expired
+            {reconcile?.summary?.strategy ? ` · ${reconcile.summary.strategy}` : ""}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
           <Button variant="outline" size="sm" onClick={() => router.push("/reports?tab=expiry")} className="gap-1.5">
             <FileBarChart className="h-3.5 w-3.5" /> Expiry Reports
           </Button>
           <Button variant="outline" size="sm" onClick={() => router.push("/inventory")} className="gap-1.5">
             <Package className="h-3.5 w-3.5" /> Inventory
           </Button>
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
         </div>
       </div>
 
       {dash?.policy && (
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant={dash.policy.posBlockExpired ? "default" : "warning"} className="gap-1">
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={dash.policy.posBlockExpired ? "default" : "warning"} className="gap-1 text-[10px]">
             <ShieldCheck className="h-3 w-3" />
             POS Block Expired: {dash.policy.posBlockExpired ? "ON" : "OFF"}
           </Badge>
-          <Badge variant="outline">
+          <Badge variant="outline" className="text-[10px]">
             Allocation: {dash.policy.lotAllocation}
-            {dash.policy.fefoSales ? " (FEFO sales)" : ""}
+            {dash.policy.fefoSales ? " · FEFO sales" : ""}
           </Badge>
+          {dash.summary.expired.value != null && (
+            <Badge variant="outline" className="text-[10px] gap-1">
+              <TrendingDown className="h-3 w-3" />
+              Expired value LKR {formatNumber(dash.summary.expired.value)}
+            </Badge>
+          )}
+          {dash.summary.nearExpiryValue != null && (
+            <Badge variant="outline" className="text-[10px]">
+              Near-expiry value LKR {formatNumber(dash.summary.nearExpiryValue)}
+            </Badge>
+          )}
         </div>
       )}
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {[
-          {
-            label: "Expired",
-            value: dash?.summary.expired.qty ?? 0,
-            sub: `${dash?.summary.expired.lots ?? 0} lots${dash?.summary.expired.value != null ? ` · LKR ${formatNumber(dash.summary.expired.value)}` : ""}`,
-            tone: "text-red-600",
-            bg: "bg-red-500/10",
-          },
-          {
-            label: "Near expiry (≤7d)",
-            value: dash?.summary.within7Days.qty ?? 0,
-            sub: `${dash?.summary.within7Days.lots ?? 0} lots`,
-            tone: "text-amber-600",
-            bg: "bg-amber-500/10",
-          },
-          {
-            label: "8–30 days",
-            value: dash?.summary.within30Days.qty ?? 0,
-            sub: `${dash?.summary.within30Days.lots ?? 0} lots${dash?.summary.nearExpiryValue != null ? ` · LKR ${formatNumber(dash.summary.nearExpiryValue)}` : ""}`,
-            tone: "text-orange-600",
-            bg: "bg-orange-500/10",
-          },
-          {
-            label: "Matched SKUs",
-            value: reconcile?.summary.matched ?? 0,
-            sub: `${reconcile?.summary.totalSkus ?? 0} total`,
-            tone: "text-emerald-600",
-            bg: "bg-emerald-500/10",
-          },
-        ].map((s) => (
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {STATS.map((s) => (
           <Card key={s.label}>
-            <CardContent className="p-4">
-              <div className={`inline-flex p-2 rounded-lg ${s.bg} mb-2`}>
-                <AlertTriangle className={`h-4 w-4 ${s.tone}`} />
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`p-2.5 rounded-xl ${s.bg}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
               </div>
-              <p className={`text-2xl font-bold ${s.tone}`}>{formatNumber(s.value)}</p>
-              <p className="text-xs font-medium">{s.label}</p>
-              <p className="text-[10px] text-muted-foreground">{s.sub}</p>
+              <div>
+                <p className="text-xl font-bold leading-tight">{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+                <p className="text-[10px] text-muted-foreground">{s.sub}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -259,189 +483,148 @@ export default function ExpiryDashboardPage() {
 
         <TabsContent value="dashboard" className="mt-4">
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (dash?.urgent?.length ?? 0) === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">No lots expiring within 30 days.</p>
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           ) : (
-            <LotTable rows={dash!.urgent} />
+            <ClientSideTable
+              data={dash?.urgent ?? []}
+              columns={lotColumns}
+              pageCount={Math.ceil((dash?.urgent?.length ?? 0) / 10) || 1}
+              searchableColumns={lotSearch}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "expiry-urgent" }}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="near" className="mt-4">
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : nearRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">No near-expiry lots in the next 30 days.</p>
-          ) : (
-            <LotTable rows={nearRows} />
-          )}
-        </TabsContent>
-
-        <TabsContent value="expired" className="mt-4">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : expiredRows.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">No expired lots on hand.</p>
-          ) : (
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Expired stock is blocked at POS when Block Expired is ON. Use Damage / adjustment to dispose.
-              </p>
-              <LotTable rows={expiredRows} />
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
+          ) : (
+            <ClientSideTable
+              data={nearRows}
+              columns={lotColumns}
+              pageCount={Math.ceil(nearRows.length / 10) || 1}
+              searchableColumns={lotSearch}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "expiry-near" }}
+            />
           )}
         </TabsContent>
 
-        <TabsContent value="all" className="mt-4 space-y-3">
-          <Input
-            placeholder="Filter by batch, SKU, or product…"
-            value={batchFilter}
-            onChange={(e) => setBatchFilter(e.target.value)}
-            className="max-w-sm h-9"
-          />
+        <TabsContent value="expired" className="mt-4 space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Expired stock is blocked at POS when Block Expired is ON. Use Damage / adjustment to dispose.
+          </p>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
           ) : (
-            <LotTable rows={filtered} />
+            <ClientSideTable
+              data={expiredRows}
+              columns={lotColumns}
+              pageCount={Math.ceil(expiredRows.length / 10) || 1}
+              searchableColumns={lotSearch}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "expiry-expired" }}
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="all" className="mt-4">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ClientSideTable
+              data={lots}
+              columns={lotColumns}
+              pageCount={Math.ceil(lots.length / 10) || 1}
+              searchableColumns={lotSearch}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "expiry-lots" }}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="ledger" className="mt-4">
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="rounded-xl border overflow-hidden">
-              <table className="w-full text-sm">
-                <thead className="bg-muted/40">
-                  <tr>
-                    {["When", "Product", "Type", "Qty Δ", "Batch", "Notes"].map((h) => (
-                      <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {txns.length === 0 ? (
-                    <tr><td colSpan={6} className="px-3 py-8 text-center text-muted-foreground text-sm">No batch transactions yet</td></tr>
-                  ) : txns.map((t) => (
-                    <tr key={t.id} className="border-t">
-                      <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(t.createdAt).toLocaleString("en-LK")}
-                      </td>
-                      <td className="px-3 py-2.5 text-xs">
-                        <p className="font-medium">{t.variant.product.name}</p>
-                        <p className="font-mono text-[10px] text-muted-foreground">{t.variant.sku}</p>
-                      </td>
-                      <td className="px-3 py-2.5 text-xs font-semibold">{t.movementType}</td>
-                      <td className={`px-3 py-2.5 text-xs font-bold ${t.quantityChange < 0 ? "text-red-600" : "text-emerald-600"}`}>
-                        {t.quantityChange > 0 ? `+${t.quantityChange}` : t.quantityChange}
-                      </td>
-                      <td className="px-3 py-2.5 font-mono text-xs">{t.batchNumber ?? t.lot?.batchNumber ?? "—"}</td>
-                      <td className="px-3 py-2.5 text-[10px] text-muted-foreground">{t.notes ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
+          ) : (
+            <ClientSideTable
+              data={txns}
+              columns={txnColumns}
+              pageCount={Math.ceil(txns.length / 10) || 1}
+              searchableColumns={[
+                { id: "product", title: "Product" },
+                { id: "batch", title: "Batch" },
+                { id: "type", title: "Type" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "batch-transactions" }}
+            />
           )}
         </TabsContent>
 
         <TabsContent value="reconcile" className="mt-4 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-muted-foreground">
-              Compare branch on-hand vs sum of lot quantities. LOT_SHORT / NO_LOTS can be synced into an UNLOTTED-SYNC lot without changing on-hand.
+              Compare branch on-hand vs lot quantities. LOT_SHORT / NO_LOTS can be synced into an UNLOTTED-SYNC lot.
             </p>
             <Button size="sm" onClick={syncUnlotted} disabled={syncing} className="gap-1.5">
               {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scale className="h-3.5 w-3.5" />}
               Sync Unlotted → Lots
             </Button>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
-              { label: "Matched", val: reconcile?.summary.matched ?? 0 },
-              { label: "Lot short", val: reconcile?.summary.lotShort ?? 0 },
-              { label: "Lot over", val: reconcile?.summary.lotOver ?? 0 },
-              { label: "No lots", val: reconcile?.summary.noLots ?? 0 },
-            ].map((k) => (
-              <Card key={k.label}>
-                <CardContent className="p-3">
-                  <p className="text-xl font-bold">{k.val}</p>
-                  <p className="text-[10px] text-muted-foreground">{k.label}</p>
+              { label: "Matched", value: reconcile?.summary.matched ?? 0, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+              { label: "Lot Short", value: reconcile?.summary.lotShort ?? 0, icon: TrendingDown, color: "text-amber-500", bg: "bg-amber-500/10" },
+              { label: "Lot Over", value: reconcile?.summary.lotOver ?? 0, icon: AlertTriangle, color: "text-orange-500", bg: "bg-orange-500/10" },
+              { label: "No Lots", value: reconcile?.summary.noLots ?? 0, icon: Package, color: "text-red-500", bg: "bg-red-500/10" },
+            ].map((s) => (
+              <Card key={s.label}>
+                <CardContent className="p-3 flex items-center gap-2.5">
+                  <div className={`p-2 rounded-lg ${s.bg}`}>
+                    <s.icon className={`h-4 w-4 ${s.color}`} />
+                  </div>
+                  <div>
+                    <p className="text-lg font-bold leading-tight">{s.value}</p>
+                    <p className="text-[10px] text-muted-foreground">{s.label}</p>
+                  </div>
                 </CardContent>
               </Card>
             ))}
           </div>
-          <div className="rounded-xl border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/40">
-                <tr>
-                  {["Product", "SKU", "On hand", "Lot qty", "Δ", "Status"].map((h) => (
-                    <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(reconcile?.mismatches ?? []).length === 0 ? (
-                  <tr><td colSpan={6} className="px-3 py-8 text-center text-sm text-emerald-600 font-medium">All SKUs reconciled</td></tr>
-                ) : (reconcile?.mismatches ?? []).map((r) => (
-                  <tr key={`${r.branchId}:${r.variantId}`} className="border-t">
-                    <td className="px-3 py-2.5 text-xs font-medium">{r.name ?? "—"}</td>
-                    <td className="px-3 py-2.5 font-mono text-xs">{r.sku ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-xs font-bold">{r.inventoryQty}</td>
-                    <td className="px-3 py-2.5 text-xs">{r.lotQty}</td>
-                    <td className="px-3 py-2.5 text-xs font-semibold">{r.delta}</td>
-                    <td className="px-3 py-2.5"><Badge variant="warning" className="text-[10px]">{r.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ClientSideTable
+              data={reconcile?.mismatches ?? []}
+              columns={reconcileColumns}
+              pageCount={Math.ceil((reconcile?.mismatches?.length ?? 0) / 10) || 1}
+              searchableColumns={[
+                { id: "name", title: "Product" },
+                { id: "sku", title: "SKU" },
+                { id: "status", title: "Status" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "lot-reconcile" }}
+            />
+          )}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function LotTable({ rows }: { rows: LotRow[] }) {
-  return (
-    <div className="rounded-xl border overflow-hidden">
-      <table className="w-full text-sm">
-        <thead className="bg-muted/40">
-          <tr>
-            {["Product", "SKU", "Batch", "MFD", "Expiry", "Qty", "Avail", "Value", "Status"].map((h) => (
-              <th key={h} className="text-left px-3 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((lot) => (
-            <tr key={lot.id} className="border-t">
-              <td className="px-3 py-2.5">
-                <p className="font-medium text-xs">{lot.variant.product.name}</p>
-                <p className="text-[10px] text-muted-foreground">{lot.variant.name}</p>
-              </td>
-              <td className="px-3 py-2.5 font-mono text-xs">{lot.variant.sku}</td>
-              <td className="px-3 py-2.5 font-mono text-xs">{lot.batchNumber ?? "—"}</td>
-              <td className="px-3 py-2.5 text-xs">
-                {lot.manufactureDate ? new Date(lot.manufactureDate).toLocaleDateString("en-LK") : "—"}
-              </td>
-              <td className="px-3 py-2.5 text-xs">
-                {lot.expiryDate ? new Date(lot.expiryDate).toLocaleDateString("en-LK") : "—"}
-                {lot.daysToExpiry != null && (
-                  <span className="block text-[10px] text-muted-foreground">
-                    {lot.daysToExpiry < 0 ? `${Math.abs(lot.daysToExpiry)}d overdue` : `${lot.daysToExpiry}d left`}
-                  </span>
-                )}
-              </td>
-              <td className="px-3 py-2.5 font-bold">{lot.quantity}</td>
-              <td className="px-3 py-2.5 text-emerald-600 font-semibold">{lot.availableQty}</td>
-              <td className="px-3 py-2.5 text-xs">
-                LKR {formatNumber(lot.value ?? lot.quantity * (lot.unitCost || 0))}
-              </td>
-              <td className="px-3 py-2.5">{bucketBadge(lot.expiryBucket, lot.daysToExpiry)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
