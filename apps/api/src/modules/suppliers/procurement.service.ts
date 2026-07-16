@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
+  ChequeDirection,
+  ChequeStatus,
   GoodsReceiptSource,
   GoodsReceiptStatus,
   PaymentMethod,
@@ -713,7 +715,16 @@ export class ProcurementService {
     tenantId: string,
     branchId: string,
     userId: string,
-    dto: { amount: number; method: PaymentMethod; reference?: string; notes?: string },
+    dto: {
+      amount: number;
+      method: PaymentMethod;
+      reference?: string;
+      notes?: string;
+      chequeNumber?: string;
+      chequeDueDate?: string;
+      chequeBankName?: string;
+      chequeBankAccountId?: string;
+    },
   ) {
     const inv = await this.prisma.supplierInvoice.findFirst({
       where: { id: invoiceId, tenantId },
@@ -725,6 +736,9 @@ export class ProcurementService {
     }
 
     const next = applyInvoicePayment(inv.total, inv.paidAmount, dto.amount);
+    if (dto.method === PaymentMethod.CHEQUE && !dto.chequeNumber?.trim()) {
+      throw new BadRequestException('Cheque number is required for cheque payments');
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.supplierPayment.create({
@@ -756,6 +770,26 @@ export class ProcurementService {
         where: { id: inv.supplierId },
         data: { balance: { decrement: dto.amount } },
       });
+
+      if (dto.method === PaymentMethod.CHEQUE) {
+        await tx.cheque.create({
+          data: {
+            tenantId,
+            direction: ChequeDirection.ISSUED,
+            status: ChequeStatus.ISSUED,
+            chequeNumber: dto.chequeNumber!.trim(),
+            amount: dto.amount,
+            bankName: dto.chequeBankName?.trim() || undefined,
+            dueDate: dto.chequeDueDate ? new Date(dto.chequeDueDate) : undefined,
+            partyType: 'SUPPLIER',
+            partyId: inv.supplierId,
+            partyName: inv.supplier.name,
+            bankAccountId: dto.chequeBankAccountId,
+            notes: dto.notes ? `Supplier invoice payment: ${dto.notes}` : `Supplier invoice ${inv.invoiceNumber}`,
+            createdBy: userId,
+          },
+        });
+      }
 
       await createLinkedExpense(tx, {
         tenantId,

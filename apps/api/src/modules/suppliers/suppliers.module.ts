@@ -519,6 +519,10 @@ export class PayInvoiceDto {
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
 }
 
 @ApiTags('Procurement')

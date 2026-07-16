@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown, BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -132,7 +132,7 @@ function useNavGroups(): NavGroup[] {
       items: [
         { label: L["/suppliers"], href: "/suppliers", icon: Truck },
         { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
-        { label: L["/purchases/procurement"] ?? "Procurement Hub", href: "/purchases/procurement", icon: ClipboardList },
+        { label: L["/purchases/grn"] ?? "GRN", href: "/purchases/grn", icon: PackageCheck },
       ],
     },
     {

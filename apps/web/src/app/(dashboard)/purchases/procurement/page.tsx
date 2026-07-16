@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ClipboardList, FileText, Loader2, PackageCheck, Plus, RefreshCw, RotateCcw, Send, ShoppingBag, Zap,
+  ClipboardList, FileText, Loader2, PackageCheck, Plus, RefreshCw, RotateCcw, Send, ShoppingBag, Wallet, Zap,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ type InvoiceRow = {
 
 type Supplier = { id: string; name: string };
 type VariantOpt = { id: string; sku: string; name: string; costPrice: number; product: { name: string } };
+type BankAccount = { id: string; name: string; code: string };
 
 export default function ProcurementHubPage() {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function ProcurementHubPage() {
   const [returns, setReturns] = useState<ReturnRow[]>([]);
   const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [banks, setBanks] = useState<BankAccount[]>([]);
 
   const [qgSupplier, setQgSupplier] = useState("");
   const [qgSku, setQgSku] = useState("");
@@ -81,22 +83,33 @@ export default function ProcurementHubPage() {
   const [invNumber, setInvNumber] = useState("");
   const [invTotal, setInvTotal] = useState("");
   const [invBusy, setInvBusy] = useState(false);
+  const [payInvoiceId, setPayInvoiceId] = useState("");
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("CASH");
+  const [payReference, setPayReference] = useState("");
+  const [payNotes, setPayNotes] = useState("");
+  const [payChequeDueDate, setPayChequeDueDate] = useState("");
+  const [payChequeBankName, setPayChequeBankName] = useState("");
+  const [payChequeBankAccountId, setPayChequeBankAccountId] = useState("");
+  const [payBusy, setPayBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [prR, grnR, retR, invR, supR] = await Promise.all([
+      const [prR, grnR, retR, invR, supR, bankR] = await Promise.all([
         api.get<{ data: PrRow[] }>("/procurement/purchase-requests?limit=50"),
         api.get<{ data: GrnRow[] }>("/procurement/grn?limit=50"),
         api.get<{ data: ReturnRow[] }>("/procurement/supplier-returns?limit=50"),
         api.get<{ data: InvoiceRow[] }>("/procurement/supplier-invoices?limit=50"),
         api.get<{ data: Supplier[] }>("/suppliers?limit=100"),
+        api.get<BankAccount[]>("/accounting/bank-accounts"),
       ]);
       setPrs(prR.data?.data ?? []);
       setGrns(grnR.data?.data ?? []);
       setReturns(retR.data?.data ?? []);
       setInvoices(invR.data?.data ?? []);
       setSuppliers(supR.data?.data ?? []);
+      setBanks(Array.isArray(bankR.data) ? bankR.data : []);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load procurement data");
     } finally {
@@ -176,6 +189,41 @@ export default function ProcurementHubPage() {
       toast.error((e as Error).message ?? "Invoice create failed");
     } finally {
       setInvBusy(false);
+    }
+  };
+
+  const submitInvoicePayment = async () => {
+    if (!payInvoiceId) { toast.error("Select an invoice"); return; }
+    const amount = parseFloat(payAmount);
+    if (isNaN(amount) || amount <= 0) { toast.error("Enter valid payment amount"); return; }
+    if (payMethod === "CHEQUE" && !payReference.trim()) {
+      toast.error("Cheque number required");
+      return;
+    }
+    setPayBusy(true);
+    try {
+      await api.post(`/procurement/supplier-invoices/${payInvoiceId}/pay`, {
+        amount,
+        method: payMethod,
+        reference: payReference || undefined,
+        notes: payNotes || undefined,
+        chequeNumber: payMethod === "CHEQUE" ? payReference : undefined,
+        chequeDueDate: payMethod === "CHEQUE" && payChequeDueDate ? payChequeDueDate : undefined,
+        chequeBankName: payMethod === "CHEQUE" && payChequeBankName ? payChequeBankName : undefined,
+        chequeBankAccountId: payMethod === "CHEQUE" && payChequeBankAccountId ? payChequeBankAccountId : undefined,
+      });
+      toast.success("Supplier payment recorded");
+      setPayAmount("");
+      setPayReference("");
+      setPayNotes("");
+      setPayChequeDueDate("");
+      setPayChequeBankName("");
+      setPayChequeBankAccountId("");
+      load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Invoice payment failed");
+    } finally {
+      setPayBusy(false);
     }
   };
 
@@ -388,6 +436,28 @@ export default function ProcurementHubPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
     },
+    {
+      id: "actions",
+      header: () => <span className="sr-only">Actions</span>,
+      cell: ({ row }) => {
+        const due = Math.max(0, row.original.total - row.original.paidAmount);
+        if (due <= 0.01) return <span className="text-xs text-muted-foreground">Settled</span>;
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1"
+            onClick={() => {
+              setPayInvoiceId(row.original.id);
+              setPayAmount(due.toFixed(2));
+            }}
+          >
+            <Wallet className="h-3 w-3" />
+            Pay
+          </Button>
+        );
+      },
+    },
   ], []);
 
   const STATS = [
@@ -589,6 +659,79 @@ export default function ProcurementHubPage() {
                 {invBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
                 Post Invoice
               </Button>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4 grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Invoice</label>
+                <select
+                  className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                  value={payInvoiceId}
+                  onChange={(e) => setPayInvoiceId(e.target.value)}
+                >
+                  <option value="">Select invoice…</option>
+                  {invoices.map((inv) => {
+                    const due = inv.total - inv.paidAmount;
+                    return (
+                      <option key={inv.id} value={inv.id}>
+                        {inv.invoiceNumber} · {inv.supplier?.name ?? "Supplier"} · Due {formatNumber(Math.max(0, due))}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Amount</label>
+                <Input type="number" min="0.01" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Method</label>
+                <select
+                  className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                  value={payMethod}
+                  onChange={(e) => setPayMethod(e.target.value)}
+                >
+                  <option value="CASH">Cash</option>
+                  <option value="BANK_TRANSFER">Bank Transfer</option>
+                  <option value="CHEQUE">Cheque</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">{payMethod === "CHEQUE" ? "Cheque #" : "Reference"}</label>
+                <Input value={payReference} onChange={(e) => setPayReference(e.target.value)} className="h-9" />
+              </div>
+              <Button onClick={submitInvoicePayment} disabled={payBusy} className="h-9 gap-1.5">
+                {payBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+                Pay Invoice
+              </Button>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Notes</label>
+                <Input value={payNotes} onChange={(e) => setPayNotes(e.target.value)} className="h-9" />
+              </div>
+              {payMethod === "CHEQUE" && (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Cheque due date</label>
+                    <Input type="date" value={payChequeDueDate} onChange={(e) => setPayChequeDueDate(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Cheque bank</label>
+                    <Input value={payChequeBankName} onChange={(e) => setPayChequeBankName(e.target.value)} className="h-9" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Company bank account</label>
+                    <select
+                      className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                      value={payChequeBankAccountId}
+                      onChange={(e) => setPayChequeBankAccountId(e.target.value)}
+                    >
+                      <option value="">Select account…</option>
+                      {banks.map((b) => <option key={b.id} value={b.id}>{b.code} · {b.name}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
           {loading ? (

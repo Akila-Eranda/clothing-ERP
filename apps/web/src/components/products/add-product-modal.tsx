@@ -46,6 +46,19 @@ export interface Product {
 }
 
 interface VariantAttr { name: string; values: string[]; input: string; }
+interface VariantRow {
+  key: string;
+  sku: string;
+  name: string;
+  size?: string;
+  color?: string;
+  material?: string;
+  style?: string;
+  sellingPrice: string;
+  costPrice: string;
+  mrp: string;
+  active: boolean;
+}
 
 interface Form {
   name: string; barcode: string; description: string; shortDesc: string;
@@ -127,6 +140,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const [again, setAgain]           = useState(false);
   const [done, setDone]             = useState<Set<TabId>>(new Set());
   const [editSystemTags, setEditSystemTags] = useState<string[]>([]);
+  const [listView, setListView] = useState(false);
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -168,6 +183,8 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       setForm(buildInitialForm());
     }
     setTab("basic"); setDone(new Set());
+    setListView(false);
+    setVariantRows([]);
   }, [editProduct, open]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -179,6 +196,33 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     }));
   };
   const mark = (t: TabId) => setDone((p) => new Set([...p, t]));
+
+  const buildRows = (combos: string[][], attrs: VariantAttr[]): VariantRow[] => {
+    const validAttrs = attrs.filter((a) => a.values.length > 0);
+    return combos.map((combo) => ({
+      key: combo.join("|"),
+      sku: genSku(form.name, combo),
+      name: combo.join(" / "),
+      ...applyVariantCombo(shopProfile, validAttrs, combo),
+      sellingPrice: form.sellingPrice,
+      costPrice: form.costPrice,
+      mrp: form.mrp,
+      active: true,
+    }));
+  };
+
+  const openListView = () => {
+    const combos = cartesian(form.attributes);
+    if (!combos.length) {
+      toast.error("Add attribute values first");
+      return;
+    }
+    setVariantRows(buildRows(combos, form.attributes));
+    setListView(true);
+  };
+
+  const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
+    setVariantRows((rows) => rows.map((r) => r.key === key ? { ...r, [field]: value } : r));
 
   const handleClose = () => {
     setForm(buildInitialForm()); setTab("basic"); setDone(new Set()); onClose();
@@ -197,15 +241,32 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     setLoading(true);
     const validAttrs = form.attributes.filter((a) => a.values.length > 0);
     const variantCombos = form.hasVariants && validAttrs.length > 0 ? cartesian(form.attributes) : [];
-    const variants = variantCombos.map((combo) => ({
-      sku: genSku(form.name, combo),
-      name: combo.join(" / "),
-      ...applyVariantCombo(shopProfile, validAttrs, combo),
-      sellingPrice: parseFloat(form.sellingPrice) || 0,
-      costPrice: parseFloat(form.costPrice) || 0,
-      mrp: parseFloat(form.mrp) || 0,
-      taxRate: parseFloat(form.taxRate) || 18,
-    }));
+    const variants = form.hasVariants
+      ? (listView && variantRows.length > 0
+        ? variantRows
+          .filter((r) => r.active)
+          .map((r) => ({
+            sku: r.sku,
+            name: r.name,
+            size: r.size,
+            color: r.color,
+            material: r.material,
+            style: r.style,
+            sellingPrice: parseFloat(r.sellingPrice) || parseFloat(form.sellingPrice) || 0,
+            costPrice: parseFloat(r.costPrice) || parseFloat(form.costPrice) || 0,
+            mrp: parseFloat(r.mrp) || parseFloat(form.mrp) || 0,
+            taxRate: parseFloat(form.taxRate) || 18,
+          }))
+        : variantCombos.map((combo) => ({
+          sku: genSku(form.name, combo),
+          name: combo.join(" / "),
+          ...applyVariantCombo(shopProfile, validAttrs, combo),
+          sellingPrice: parseFloat(form.sellingPrice) || 0,
+          costPrice: parseFloat(form.costPrice) || 0,
+          mrp: parseFloat(form.mrp) || 0,
+          taxRate: parseFloat(form.taxRate) || 18,
+        })))
+      : [];
     const extraTags = buildProductTags({
       tags: form.tags,
       tagInput: form.tagInput,
@@ -430,6 +491,59 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         </div>
 
         {form.hasVariants ? (
+          listView ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">{variantRows.length} variants</p>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setListView(false)}>
+                    <ChevronDown className="h-3 w-3 rotate-90" /> Back to Grid
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setVariantRows(buildRows(cartesian(form.attributes), form.attributes))}>
+                    <Zap className="h-3 w-3" /> Regenerate
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-xl border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/30 border-b text-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-3 py-2.5 text-left w-8">#</th>
+                        <th className="px-3 py-2.5 text-left">SKU</th>
+                        <th className="px-3 py-2.5 text-left">Variant</th>
+                        <th className="px-3 py-2.5 text-right">Selling</th>
+                        <th className="px-3 py-2.5 text-right">Cost</th>
+                        <th className="px-3 py-2.5 text-right">MRP</th>
+                        <th className="px-3 py-2.5 text-center">Active</th>
+                        <th className="px-2 py-2.5 w-6"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                      {variantRows.map((row, idx) => (
+                        <tr key={row.key} className={`hover:bg-muted/10 ${!row.active ? "opacity-40" : ""}`}>
+                          <td className="px-3 py-2 text-muted-foreground">{idx + 1}</td>
+                          <td className="px-3 py-2">
+                            <Input value={row.sku} onChange={(e) => updateRow(row.key, "sku", e.target.value)} className="h-7 text-xs font-mono w-28" />
+                          </td>
+                          <td className="px-3 py-2 font-medium">{row.name}</td>
+                          <td className="px-3 py-2"><Input type="number" value={row.sellingPrice} onChange={(e) => updateRow(row.key, "sellingPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
+                          <td className="px-3 py-2"><Input type="number" value={row.costPrice} onChange={(e) => updateRow(row.key, "costPrice", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
+                          <td className="px-3 py-2"><Input type="number" value={row.mrp} onChange={(e) => updateRow(row.key, "mrp", e.target.value)} className="h-7 text-xs text-right w-20" /></td>
+                          <td className="px-3 py-2 text-center"><Switch checked={row.active} onCheckedChange={(v) => updateRow(row.key, "active", v)} /></td>
+                          <td className="px-2 py-2">
+                            <button onClick={() => setVariantRows((r) => r.filter((x) => x.key !== row.key))} className="p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="grid grid-cols-3 gap-5">
             <div className="col-span-2 space-y-4">
               {/* 1. Select Variant Attributes */}
@@ -573,7 +687,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
                       <span className="text-xs text-muted-foreground">Auto generate SKUs</span>
                     </label>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5">
+                      <Button variant="outline" size="sm" className="h-7 text-xs gap-1.5" onClick={openListView}>
                         <List className="h-3 w-3" /> Edit in List View
                       </Button>
                       <Button variant="ghost" size="sm" className="h-7 text-xs gap-1 text-destructive hover:text-destructive"
@@ -609,11 +723,12 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
               </div>
               {allVariants.length > 0 && (
                 <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-xs text-emerald-600 dark:text-emerald-400">All variants will be created with default pricing &amp; inventory.</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400">Open list view to set separate pricing per variant.</p>
                 </div>
               )}
             </div>
           </div>
+          )
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
             <Layers className="h-12 w-12 mb-3 opacity-20" />

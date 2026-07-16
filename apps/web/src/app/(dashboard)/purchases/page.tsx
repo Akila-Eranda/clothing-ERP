@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ShoppingBag, Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, Truck } from "lucide-react";
+import { ShoppingBag, Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, Truck, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/receive-items-modal";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 
@@ -185,12 +186,17 @@ export default function PurchasesPage() {
         <div>
           <h1 className="text-2xl font-bold">{routeLabels["/purchases"]}</h1>
           <p className="text-sm text-muted-foreground">
-            {profile.emoji} {profile.label} — supplier orders, GRN & {routeLabels.printTags?.toLowerCase() ?? "labels"}
+            {profile.emoji} {profile.label} — create & track supplier purchase orders
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={fetchPOs} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button variant="outline" size="sm" asChild className="gap-1.5">
+            <Link href="/purchases/grn">
+              <PackageCheck className="h-3.5 w-3.5" /> GRN
+            </Link>
           </Button>
           <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
             <Plus className="h-3.5 w-3.5" /> New PO
