@@ -54,6 +54,9 @@ export class CreateProductDto {
   @ApiPropertyOptional({ type: [CreateVariantDto] })
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => CreateVariantDto)
   variants?: CreateVariantDto[];
+  @ApiPropertyOptional({ type: [String], description: 'Optional supplier ids to assign with created variants' })
+  @IsOptional() @IsArray() @IsString({ each: true })
+  supplierIds?: string[];
   @ApiPropertyOptional({ enum: ['ALL', 'SINGLE'], default: 'ALL', description: 'ALL = stock in every branch; SINGLE = one branch only' })
   @IsOptional() @IsIn(['ALL', 'SINGLE'])
   branchScope?: 'ALL' | 'SINGLE';
@@ -257,6 +260,27 @@ export class ProductsService {
       where: { productId: product.id },
       select: { id: true },
     });
+
+    if (dto.supplierIds?.length && createdVariants.length) {
+      const uniqueSupplierIds = Array.from(new Set(dto.supplierIds.filter(Boolean)));
+      const validSuppliers = await this.prisma.supplier.findMany({
+        where: { tenantId, id: { in: uniqueSupplierIds } },
+        select: { id: true },
+      });
+      if (validSuppliers.length !== uniqueSupplierIds.length) {
+        throw new BadRequestException('One or more suppliers are invalid');
+      }
+      await this.prisma.supplierProductAssignment.createMany({
+        data: validSuppliers.flatMap((s) =>
+          createdVariants.map((v) => ({
+            tenantId,
+            supplierId: s.id,
+            variantId: v.id,
+          })),
+        ),
+        skipDuplicates: true,
+      });
+    }
 
     if (dto.trackInventory !== false && createdVariants.length) {
       await this.seedVariantInventory(

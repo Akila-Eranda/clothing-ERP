@@ -30,6 +30,7 @@ import { ProductImageUpload } from "@/components/products/product-image-upload";
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; slug: string; }
 interface Brand    { id: string; name: string; slug: string; }
+interface SupplierOpt { id: string; name: string; }
 
 export interface Product {
   id: string; name: string; slug: string; sku: string;
@@ -73,6 +74,7 @@ interface Form {
   images: string[];
   branchScope: ProductBranchScope;
   branchId: string;
+  supplierIds: string[];
 }
 
 const buildInitialForm = (): Form => {
@@ -92,6 +94,7 @@ const buildInitialForm = (): Form => {
     images: [],
     branchScope: "ALL",
     branchId: "",
+    supplierIds: [],
   };
 };
 
@@ -136,16 +139,24 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
   const [form, setForm]             = useState<Form>(INITIAL);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
+  const [suppliers, setSuppliers]   = useState<SupplierOpt[]>([]);
   const [loading, setLoading]       = useState(false);
   const [again, setAgain]           = useState(false);
   const [done, setDone]             = useState<Set<TabId>>(new Set());
   const [editSystemTags, setEditSystemTags] = useState<string[]>([]);
   const [listView, setListView] = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+  const [supplierPick, setSupplierPick] = useState("");
 
   useEffect(() => {
     if (!open) return;
     api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => toast.error("Failed to load categories"));
+    api.get<{ data: SupplierOpt[] } | SupplierOpt[]>("/suppliers?limit=200")
+      .then((r) => {
+        const payload = r.data as { data?: SupplierOpt[] } | SupplierOpt[];
+        setSuppliers(Array.isArray(payload) ? payload : (payload.data ?? []));
+      })
+      .catch(() => toast.error("Failed to load suppliers"));
     if (formCopy.showBrand) {
       api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
     }
@@ -177,6 +188,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         images: editProduct.images ?? [],
         branchScope: "ALL",
         branchId: "",
+        supplierIds: [],
       });
     } else {
       setEditSystemTags([]);
@@ -185,6 +197,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
     setTab("basic"); setDone(new Set());
     setListView(false);
     setVariantRows([]);
+    setSupplierPick("");
   }, [editProduct, open]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
@@ -300,6 +313,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       seoDescription: form.seoDescription || undefined,
       images: form.images.length > 0 ? form.images : undefined,
       variants: variants.length > 0 ? variants : undefined,
+      supplierIds: !editProduct && form.supplierIds.length > 0 ? form.supplierIds : undefined,
     };
     try {
       if (editProduct) {
@@ -385,6 +399,47 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           <Label className="text-xs font-semibold">HSN / SAC Code</Label>
           <Input placeholder="Enter HSN/SAC code" value={form.hsn} onChange={(e) => set("hsn", e.target.value)} />
         </div>
+      </div>
+      <div className="rounded-xl border p-4 bg-card space-y-3">
+        <div>
+          <h4 className="font-semibold text-sm">Assign Suppliers</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">Assign this product to one or more suppliers.</p>
+        </div>
+        <div className="flex gap-2">
+          <Select value={supplierPick} onValueChange={setSupplierPick}>
+            <SelectTrigger className="h-9">
+              <SelectValue placeholder="Select supplier" />
+            </SelectTrigger>
+            <SelectContent>
+              {suppliers.length === 0
+                ? <SelectItem value="_none" disabled>No suppliers found</SelectItem>
+                : suppliers.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (!supplierPick || form.supplierIds.includes(supplierPick)) return;
+              set("supplierIds", [...form.supplierIds, supplierPick]);
+              setSupplierPick("");
+            }}
+          >
+            Add
+          </Button>
+        </div>
+        {form.supplierIds.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {form.supplierIds.map((sid) => (
+              <Badge key={sid} variant="secondary" className="gap-1 pl-2 pr-1 h-6">
+                {suppliers.find((s) => s.id === sid)?.name ?? sid}
+                <button type="button" onClick={() => set("supplierIds", form.supplierIds.filter((x) => x !== sid))}>
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+        )}
       </div>
       {showUnit && (
         <div className="grid grid-cols-3 gap-4">
