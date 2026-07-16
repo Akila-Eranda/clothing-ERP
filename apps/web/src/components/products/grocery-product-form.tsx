@@ -21,10 +21,6 @@ import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { useBranchStore } from "@/stores/branch-store";
 import {
   buildProductTags,
-  DEFAULT_GROCERY_META,
-  type BarcodeMode,
-  type GroceryMeta,
-  type GroceryProductType,
 } from "@/lib/product-tags";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 import { cn } from "@/lib/utils";
@@ -59,6 +55,8 @@ interface SupplierRow {
   isDefault: boolean;
 }
 
+type GroceryProductType = "STANDARD" | "VARIANT" | "WEIGHTED";
+type BarcodeMode = "SHARED" | "UNIQUE";
 type SaveMode = "ACTIVE" | "DRAFT" | "ADD_ANOTHER";
 
 const PRODUCT_TYPES: {
@@ -455,35 +453,6 @@ export function GroceryProductForm() {
     setSupplierRows([]);
   }, [shopProfile.defaultUnit]);
 
-  const buildGroceryMeta = (): GroceryMeta => {
-    const supplierMeta: GroceryMeta["supplierMeta"] = {};
-    for (const s of supplierRows) {
-      supplierMeta[s.supplierId] = {
-        buyingPrice: s.buyingPrice,
-        leadTime: s.leadTime,
-        moq: s.moq,
-        active: s.active,
-      };
-    }
-    return {
-      ...DEFAULT_GROCERY_META,
-      productType,
-      barcodeMode,
-      wholesalePrice,
-      openingStock,
-      reorderLevel,
-      minStock,
-      maxStock,
-      warehouseId,
-      allowNegative,
-      allowDecimalSelling: isWeighted ? allowDecimalSelling : false,
-      weightScaleReady: isWeighted ? weightScaleReady : false,
-      defaultSupplierId: supplierRows.find((s) => s.isDefault)?.supplierId ?? "",
-      skuHint,
-      supplierMeta,
-    };
-  };
-
   const validate = (): boolean => {
     if (!name.trim()) {
       toast.error("Product name is required");
@@ -584,18 +553,23 @@ export function GroceryProductForm() {
       );
     }
 
-    const groceryMeta = buildGroceryMeta();
     const tags = buildProductTags({
       tags: [],
       unit,
       batchNumber,
-      showUnit: true,
+      showUnit: false, // unit saved on product.unit column
       showExpiry: false,
       showBatch: !!batchNumber,
-      groceryMeta,
     });
 
-    const supplierIds = supplierRows.filter((s) => s.active).map((s) => s.supplierId);
+    const suppliersPayload = supplierRows.map((s) => ({
+      supplierId: s.supplierId,
+      buyingPrice: s.buyingPrice ? parseFloat(s.buyingPrice) : undefined,
+      leadTimeDays: s.leadTime ? parseInt(s.leadTime, 10) || 0 : undefined,
+      minOrderQty: s.moq ? parseFloat(s.moq) : undefined,
+      isPreferred: s.isDefault,
+      isActive: s.active,
+    }));
 
     try {
       await api.post("/products", {
@@ -603,20 +577,33 @@ export function GroceryProductForm() {
         description: description || undefined,
         categoryId: resolvedCategoryId,
         brandId,
+        sku: skuHint.trim() || undefined,
         barcode: isWeighted ? undefined : barcode || undefined,
         sellingPrice: parseFloat(sellingPrice) || derivedSelling,
         costPrice: parseFloat(costPrice) || derivedCost,
-        mrp: parseFloat(mrp) || derivedMrp,
+        mrp: parseFloat(mrp) || derivedMrp || derivedSelling,
+        wholesalePrice: wholesalePrice ? parseFloat(wholesalePrice) : 0,
         taxRate: parseFloat(taxRate) || 0,
         status,
         tags,
+        productKind: productType,
+        barcodeMode,
+        unit,
         hasVariants,
         trackInventory,
+        allowNegativeStock: allowNegative,
+        allowDecimalSelling: isWeighted ? allowDecimalSelling : false,
+        weightScaleReady: isWeighted ? weightScaleReady : false,
+        openingStock: openingStock ? parseFloat(openingStock) : 0,
+        reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) || 0 : undefined,
+        minStock: minStock ? parseInt(minStock, 10) || 0 : undefined,
+        maxStock: maxStock ? parseInt(maxStock, 10) || 0 : undefined,
+        warehouseId: warehouseId || undefined,
         branchScope: trackInventory ? branchScope : undefined,
         branchId: trackInventory && branchScope === "SINGLE" ? branchId : undefined,
         images: images.length > 0 ? images : undefined,
         variants: variants.length > 0 ? variants : undefined,
-        supplierIds: supplierIds.length > 0 ? supplierIds : undefined,
+        suppliers: suppliersPayload.length > 0 ? suppliersPayload : undefined,
       });
 
       const label =
@@ -1099,7 +1086,7 @@ export function GroceryProductForm() {
             {/* Inventory */}
             <Section title="Inventory" subtitle="Stock controls for supermarket operations">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Field label="Opening Stock" hint="Saved with product preferences (adjust stock via GRN / inventory)">
+                <Field label="Opening Stock" hint="Saved to inventory quantity on create">
                   <Input
                     type="number"
                     min={0}

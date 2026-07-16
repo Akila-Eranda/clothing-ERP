@@ -4,7 +4,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ProductStatus, TubeType } from '@prisma/client';
+import { BarcodeMode, ProductKind, ProductStatus, TubeType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -27,6 +27,15 @@ export class CreateVariantDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
 }
 
+export class SupplierAssignmentDto {
+  @ApiProperty() @IsString() supplierId: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) buyingPrice?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) leadTimeDays?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) minOrderQty?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isPreferred?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+}
+
 export class CreateProductDto {
   @ApiProperty() @IsString() name: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
@@ -34,16 +43,30 @@ export class CreateProductDto {
   @ApiPropertyOptional() @IsOptional() @IsString() categoryId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() brandId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() hsn?: string;
+  @ApiPropertyOptional({ description: 'Optional product SKU override (must be unique per tenant)' })
+  @IsOptional() @IsString() sku?: string;
   @ApiProperty() @IsNumber() @Min(0) sellingPrice: number;
   @ApiProperty() @IsNumber() @Min(0) costPrice: number;
   @ApiProperty() @IsNumber() @Min(0) mrp: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) wholesalePrice?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
   @ApiPropertyOptional({ enum: ProductStatus }) @IsOptional() @IsEnum(ProductStatus) status?: ProductStatus;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() images?: string[];
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @ApiPropertyOptional() @IsOptional() @IsBoolean() hasVariants?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() trackInventory?: boolean;
+  @ApiPropertyOptional({ enum: ProductKind }) @IsOptional() @IsEnum(ProductKind) productKind?: ProductKind;
+  @ApiPropertyOptional({ enum: BarcodeMode }) @IsOptional() @IsEnum(BarcodeMode) barcodeMode?: BarcodeMode;
+  @ApiPropertyOptional() @IsOptional() @IsString() unit?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() allowNegativeStock?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() allowDecimalSelling?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() weightScaleReady?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() barcode?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) openingStock?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) reorderLevel?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) minStock?: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) maxStock?: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() warehouseId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() oemNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() modelNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() loadIndex?: string;
@@ -59,6 +82,9 @@ export class CreateProductDto {
   @ApiPropertyOptional({ type: [String], description: 'Optional supplier ids to assign with created variants' })
   @IsOptional() @IsArray() @IsString({ each: true })
   supplierIds?: string[];
+  @ApiPropertyOptional({ type: [SupplierAssignmentDto], description: 'Rich supplier assignments (preferred over supplierIds)' })
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => SupplierAssignmentDto)
+  suppliers?: SupplierAssignmentDto[];
   @ApiPropertyOptional({ enum: ['ALL', 'SINGLE'], default: 'ALL', description: 'ALL = stock in every branch; SINGLE = one branch only' })
   @IsOptional() @IsIn(['ALL', 'SINGLE'])
   branchScope?: 'ALL' | 'SINGLE';
@@ -147,16 +173,49 @@ export class ProductsService {
     variantIds: string[],
     branchScope: 'ALL' | 'SINGLE' = 'ALL',
     branchId?: string,
+    opts?: {
+      openingStock?: number;
+      reorderLevel?: number;
+      minStock?: number;
+      maxStock?: number;
+      warehouseId?: string;
+    },
   ) {
     if (!variantIds.length) return;
 
     const branchIds = await this.resolveInventoryBranchIds(tenantId, branchScope, branchId);
     if (!branchIds.length) return;
 
+    const openingQty = Math.max(0, Math.round(opts?.openingStock ?? 0));
+    const reorderPoint = Math.max(0, Math.round(opts?.reorderLevel ?? 5));
+    const minStockLevel = Math.max(0, Math.round(opts?.minStock ?? 0));
+    const maxStockLevel = Math.max(0, Math.round(opts?.maxStock ?? 0));
+
     const warehouseByBranch = new Map<string, string>();
     for (const bid of branchIds) {
+      if (opts?.warehouseId) {
+        const wh = await this.prisma.warehouse.findFirst({
+          where: { id: opts.warehouseId, tenantId, branchId: bid, isActive: true },
+          select: { id: true },
+        });
+        if (wh) {
+          warehouseByBranch.set(bid, wh.id);
+          continue;
+        }
+      }
       const warehouse = await this.ensureDefaultWarehouse(tenantId, bid);
       warehouseByBranch.set(bid, warehouse.id);
+    }
+
+    // Prefer explicit warehouse for SINGLE/ALL when provided and valid for any branch
+    if (opts?.warehouseId && warehouseByBranch.size === 0) {
+      const wh = await this.prisma.warehouse.findFirst({
+        where: { id: opts.warehouseId, tenantId, isActive: true },
+        select: { id: true, branchId: true },
+      });
+      if (wh && branchIds.includes(wh.branchId)) {
+        warehouseByBranch.set(wh.branchId, wh.id);
+      }
     }
 
     await this.prisma.inventory.createMany({
@@ -166,11 +225,86 @@ export class ProductsService {
           branchId: bid,
           variantId,
           warehouseId: warehouseByBranch.get(bid)!,
-          quantity: 0,
+          quantity: openingQty,
+          reorderPoint,
+          minStockLevel,
+          maxStockLevel,
         })),
       ),
       skipDuplicates: true,
     });
+
+    // If rows already existed (skipDuplicates), still apply stock prefs
+    if (openingQty > 0 || opts?.reorderLevel != null || opts?.minStock != null || opts?.maxStock != null) {
+      await this.prisma.inventory.updateMany({
+        where: { tenantId, variantId: { in: variantIds }, branchId: { in: branchIds } },
+        data: {
+          ...(opts?.openingStock != null ? { quantity: openingQty } : {}),
+          ...(opts?.reorderLevel != null ? { reorderPoint } : {}),
+          ...(opts?.minStock != null ? { minStockLevel } : {}),
+          ...(opts?.maxStock != null ? { maxStockLevel } : {}),
+        },
+      });
+    }
+  }
+
+  private resolveProductKind(dto: CreateProductDto): ProductKind {
+    if (dto.productKind) return dto.productKind;
+    if (dto.hasVariants) return ProductKind.VARIANT;
+    return ProductKind.STANDARD;
+  }
+
+  private async upsertSupplierAssignments(
+    tenantId: string,
+    variantIds: string[],
+    dto: CreateProductDto,
+  ) {
+    if (!variantIds.length) return;
+
+    const rich = (dto.suppliers ?? []).filter((s) => s?.supplierId);
+    const plainIds = Array.from(new Set((dto.supplierIds ?? []).filter(Boolean)));
+
+    if (!rich.length && !plainIds.length) return;
+
+    const supplierIds = rich.length
+      ? Array.from(new Set(rich.map((s) => s.supplierId)))
+      : plainIds;
+
+    const validSuppliers = await this.prisma.supplier.findMany({
+      where: { tenantId, id: { in: supplierIds } },
+      select: { id: true },
+    });
+    if (validSuppliers.length !== supplierIds.length) {
+      throw new BadRequestException('One or more suppliers are invalid');
+    }
+
+    const byId = new Map(rich.map((s) => [s.supplierId, s]));
+
+    for (const supplierId of supplierIds) {
+      const meta = byId.get(supplierId);
+      for (const variantId of variantIds) {
+        await this.prisma.supplierProductAssignment.upsert({
+          where: { supplierId_variantId: { supplierId, variantId } },
+          create: {
+            tenantId,
+            supplierId,
+            variantId,
+            lastBuyingPrice: meta?.buyingPrice ?? null,
+            leadTimeDays: meta?.leadTimeDays ?? null,
+            minOrderQty: meta?.minOrderQty ?? null,
+            isPreferred: meta?.isPreferred ?? false,
+            isActive: meta?.isActive ?? true,
+          },
+          update: {
+            ...(meta?.buyingPrice !== undefined ? { lastBuyingPrice: meta.buyingPrice } : {}),
+            ...(meta?.leadTimeDays !== undefined ? { leadTimeDays: meta.leadTimeDays } : {}),
+            ...(meta?.minOrderQty !== undefined ? { minOrderQty: meta.minOrderQty } : {}),
+            ...(meta?.isPreferred !== undefined ? { isPreferred: meta.isPreferred } : {}),
+            ...(meta?.isActive !== undefined ? { isActive: meta.isActive } : {}),
+          },
+        });
+      }
+    }
   }
 
   // ── Products ─────────────────────────────────────────────
@@ -183,7 +317,11 @@ export class ProductsService {
       }
     }
     const baseSlug = this.generateSlug(dto.name);
-    const sku = `PRD-${nanoid(8).toUpperCase()}`;
+    let sku = dto.sku?.trim() || `PRD-${nanoid(8).toUpperCase()}`;
+    if (dto.sku?.trim()) {
+      const clash = await this.prisma.product.findFirst({ where: { tenantId, sku } });
+      if (clash) throw new BadRequestException(`SKU already exists: ${sku}`);
+    }
 
     let slug = baseSlug;
     let suffix = 1;
@@ -191,8 +329,16 @@ export class ProductsService {
       slug = `${baseSlug}-${suffix++}`;
     }
 
-    // One product barcode shared by all variants; prices stay per-variant.
-    const sharedBarcode = (dto.barcode?.trim() || this.generateEAN13());
+    const productKind = this.resolveProductKind(dto);
+    const barcodeMode = dto.barcodeMode ?? BarcodeMode.UNIQUE;
+    const hasVariants = productKind === ProductKind.VARIANT ? true : (dto.hasVariants ?? false);
+    const isWeighted = productKind === ProductKind.WEIGHTED;
+
+    // Weighted: barcode optional. Otherwise generate EAN if missing.
+    const barcodeTrim = dto.barcode?.trim() || '';
+    const sharedBarcode = isWeighted
+      ? (barcodeTrim || null)
+      : (barcodeTrim || this.generateEAN13());
 
     const product = await this.prisma.product.create({
       data: {
@@ -208,12 +354,19 @@ export class ProductsService {
         sellingPrice: dto.sellingPrice,
         costPrice: dto.costPrice,
         mrp: dto.mrp,
+        wholesalePrice: dto.wholesalePrice ?? 0,
         taxRate: dto.taxRate ?? 18,
         status: dto.status ?? ProductStatus.DRAFT,
         images: dto.images ?? [],
         tags: dto.tags ?? [],
-        hasVariants: dto.hasVariants ?? true,
+        hasVariants,
         trackInventory: dto.trackInventory ?? true,
+        productKind,
+        barcodeMode,
+        unit: dto.unit || null,
+        allowNegativeStock: dto.allowNegativeStock ?? false,
+        allowDecimalSelling: dto.allowDecimalSelling ?? isWeighted,
+        weightScaleReady: dto.weightScaleReady ?? isWeighted,
         barcode: sharedBarcode,
         oemNumber: dto.oemNumber,
         modelNumber: dto.modelNumber,
@@ -228,17 +381,17 @@ export class ProductsService {
       include: { category: true, brand: true, _count: { select: { variants: true } } },
     });
 
-    if (dto.variants?.length) {
+    if (dto.variants?.length && hasVariants) {
       const usedSkus = new Set<string>();
       const uniquify = (raw: string, index: number) => {
         const base = (raw || `VAR-${index + 1}`).trim() || `VAR-${index + 1}`;
-        let sku = base;
+        let next = base;
         let n = 2;
-        while (usedSkus.has(sku)) {
-          sku = `${base}-${n++}`;
+        while (usedSkus.has(next)) {
+          next = `${base}-${n++}`;
         }
-        usedSkus.add(sku);
-        return sku;
+        usedSkus.add(next);
+        return next;
       };
 
       await this.prisma.productVariant.createMany({
@@ -255,7 +408,10 @@ export class ProductsService {
           costPrice: v.costPrice,
           mrp: v.mrp,
           sortOrder: i,
-          barcode: v.barcode?.trim() || sharedBarcode,
+          barcode:
+            barcodeMode === BarcodeMode.SHARED
+              ? sharedBarcode
+              : (v.barcode?.trim() || null),
         })),
       });
     } else {
@@ -277,26 +433,7 @@ export class ProductsService {
       select: { id: true },
     });
 
-    if (dto.supplierIds?.length && createdVariants.length) {
-      const uniqueSupplierIds = Array.from(new Set(dto.supplierIds.filter(Boolean)));
-      const validSuppliers = await this.prisma.supplier.findMany({
-        where: { tenantId, id: { in: uniqueSupplierIds } },
-        select: { id: true },
-      });
-      if (validSuppliers.length !== uniqueSupplierIds.length) {
-        throw new BadRequestException('One or more suppliers are invalid');
-      }
-      await this.prisma.supplierProductAssignment.createMany({
-        data: validSuppliers.flatMap((s) =>
-          createdVariants.map((v) => ({
-            tenantId,
-            supplierId: s.id,
-            variantId: v.id,
-          })),
-        ),
-        skipDuplicates: true,
-      });
-    }
+    await this.upsertSupplierAssignments(tenantId, createdVariants.map((v) => v.id), dto);
 
     if (dto.trackInventory !== false && createdVariants.length) {
       await this.seedVariantInventory(
@@ -304,6 +441,13 @@ export class ProductsService {
         createdVariants.map((v) => v.id),
         dto.branchScope ?? 'ALL',
         dto.branchId,
+        {
+          openingStock: dto.openingStock,
+          reorderLevel: dto.reorderLevel,
+          minStock: dto.minStock,
+          maxStock: dto.maxStock,
+          warehouseId: dto.warehouseId,
+        },
       );
     }
 
@@ -401,36 +545,56 @@ export class ProductsService {
 
   async update(id: string, tenantId: string, dto: Partial<CreateProductDto> & { variants?: (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[] }) {
     await this.findOne(id, tenantId);
-    const { variants, branchScope: _bs, branchId: _bi, supplierIds, ...rest } = dto as Record<string, unknown> & {
+    const {
+      variants,
+      branchScope: _bs,
+      branchId: _bi,
+      supplierIds,
+      suppliers,
+      openingStock: _os,
+      reorderLevel: _rl,
+      minStock: _ms,
+      maxStock: _xs,
+      warehouseId: _wh,
+      ...rest
+    } = dto as Record<string, unknown> & {
       supplierIds?: string[];
+      suppliers?: SupplierAssignmentDto[];
     };
     const allowed = [
       'name', 'description', 'shortDesc', 'categoryId', 'brandId', 'hsn', 'barcode',
-      'sellingPrice', 'costPrice', 'mrp', 'taxRate', 'status', 'images', 'tags',
-      'hasVariants', 'trackInventory', 'oemNumber', 'modelNumber', 'loadIndex', 'speedRating', 'tubeType', 'pattern', 'warrantyMonths',
+      'sellingPrice', 'costPrice', 'mrp', 'wholesalePrice', 'taxRate', 'status', 'images', 'tags',
+      'hasVariants', 'trackInventory', 'productKind', 'barcodeMode', 'unit',
+      'allowNegativeStock', 'allowDecimalSelling', 'weightScaleReady',
+      'oemNumber', 'modelNumber', 'loadIndex', 'speedRating', 'tubeType', 'pattern', 'warrantyMonths',
       'seoTitle', 'seoDescription',
     ] as const;
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (rest[key] !== undefined) data[key] = rest[key];
     }
+    if (dto.productKind === ProductKind.VARIANT) data.hasVariants = true;
+    if (dto.productKind === ProductKind.STANDARD || dto.productKind === ProductKind.WEIGHTED) {
+      data.hasVariants = false;
+    }
     if (dto.name) data.slug = this.generateSlug(dto.name);
     await this.prisma.product.update({ where: { id }, data });
 
-    // Keep product barcode shared across all variants when product barcode changes.
-    if (typeof data.barcode === 'string' || data.barcode === null) {
+    const productRow = await this.prisma.product.findFirst({
+      where: { id, tenantId },
+      select: { barcode: true, barcodeMode: true },
+    });
+    const sharedBarcode = productRow?.barcode ?? null;
+    const barcodeMode = productRow?.barcodeMode ?? BarcodeMode.UNIQUE;
+
+    // Only push product barcode onto all variants in SHARED mode
+    if (barcodeMode === BarcodeMode.SHARED && (typeof data.barcode === 'string' || data.barcode === null)) {
       const shared = typeof data.barcode === 'string' ? data.barcode.trim() || null : null;
       await this.prisma.productVariant.updateMany({
         where: { productId: id },
         data: { barcode: shared },
       });
     }
-
-    const productBarcode = await this.prisma.product.findFirst({
-      where: { id, tenantId },
-      select: { barcode: true },
-    });
-    const sharedBarcode = productBarcode?.barcode ?? null;
 
     if (Array.isArray(variants) && variants.length > 0) {
       const existingSkus = await this.prisma.productVariant.findMany({
@@ -461,7 +625,12 @@ export class ProductsService {
               ...(v.costPrice    !== undefined && { costPrice:    v.costPrice }),
               ...(v.mrp          !== undefined && { mrp:          v.mrp }),
               ...(v.isActive     !== undefined && { isActive:     v.isActive }),
-              ...(v.barcode      !== undefined && { barcode:      v.barcode?.trim() || sharedBarcode }),
+              ...(v.barcode !== undefined && {
+                barcode:
+                  barcodeMode === BarcodeMode.SHARED
+                    ? sharedBarcode
+                    : (v.barcode?.trim() || sharedBarcode),
+              }),
             },
           });
         } else {
@@ -482,7 +651,10 @@ export class ProductsService {
               sellingPrice: v.sellingPrice ?? 0,
               costPrice:    v.costPrice    ?? 0,
               mrp:          v.mrp          ?? 0,
-              barcode:      v.barcode?.trim() || sharedBarcode,
+              barcode:
+                barcodeMode === BarcodeMode.SHARED
+                  ? sharedBarcode
+                  : (v.barcode?.trim() || sharedBarcode),
               sortOrder:    0,
             },
           });
@@ -490,38 +662,29 @@ export class ProductsService {
       }
     }
 
-    if (Array.isArray(supplierIds)) {
-      const uniqueSupplierIds = Array.from(new Set(supplierIds.filter(Boolean)));
+    if (Array.isArray(suppliers) || Array.isArray(supplierIds)) {
       const productVariants = await this.prisma.productVariant.findMany({
         where: { productId: id },
         select: { id: true },
       });
       const variantIds = productVariants.map((v) => v.id);
       if (variantIds.length) {
-        if (uniqueSupplierIds.length) {
-          const validSuppliers = await this.prisma.supplier.findMany({
-            where: { tenantId, id: { in: uniqueSupplierIds } },
-            select: { id: true },
-          });
-          if (validSuppliers.length !== uniqueSupplierIds.length) {
-            throw new BadRequestException('One or more suppliers are invalid');
-          }
+        const nextIds = Array.isArray(suppliers)
+          ? Array.from(new Set(suppliers.map((s) => s.supplierId).filter(Boolean)))
+          : Array.from(new Set((supplierIds ?? []).filter(Boolean)));
+
+        if (nextIds.length) {
           await this.prisma.supplierProductAssignment.deleteMany({
             where: {
               tenantId,
               variantId: { in: variantIds },
-              supplierId: { notIn: uniqueSupplierIds },
+              supplierId: { notIn: nextIds },
             },
           });
-          await this.prisma.supplierProductAssignment.createMany({
-            data: validSuppliers.flatMap((s) =>
-              variantIds.map((variantId) => ({
-                tenantId,
-                supplierId: s.id,
-                variantId,
-              })),
-            ),
-            skipDuplicates: true,
+          await this.upsertSupplierAssignments(tenantId, variantIds, {
+            ...(dto as CreateProductDto),
+            supplierIds: nextIds,
+            suppliers: Array.isArray(suppliers) ? suppliers : undefined,
           });
         } else {
           await this.prisma.supplierProductAssignment.deleteMany({

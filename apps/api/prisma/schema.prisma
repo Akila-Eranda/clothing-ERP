@@ -51,6 +51,17 @@ enum ProductStatus {
   OUT_OF_STOCK
 }
 
+enum ProductKind {
+  STANDARD
+  VARIANT
+  WEIGHTED
+}
+
+enum BarcodeMode {
+  SHARED
+  UNIQUE
+}
+
 enum StockMovementType {
   PURCHASE
   SALE
@@ -727,6 +738,13 @@ model Product {
   costPrice       Float         @default(0)
   sellingPrice    Float         @default(0)
   mrp             Float         @default(0)
+  wholesalePrice  Float         @default(0)
+  unit            String?
+  productKind     ProductKind   @default(STANDARD)
+  barcodeMode     BarcodeMode   @default(UNIQUE)
+  allowNegativeStock Boolean    @default(false)
+  allowDecimalSelling Boolean   @default(false)
+  weightScaleReady Boolean      @default(false)
   status          ProductStatus @default(DRAFT)
   images          String[]      @default([])
   tags            String[]      @default([])
@@ -758,6 +776,7 @@ model Product {
   @@unique([tenantId, sku])
   @@index([tenantId])
   @@index([status])
+  @@index([tenantId, productKind])
   @@map("products")
 }
 
@@ -1907,7 +1926,9 @@ model SupplierProductAssignment {
   supplierProductCode String?
   leadTimeDays      Int?
   lastBuyingPrice   Float?
+  minOrderQty       Float?
   isPreferred       Boolean  @default(false)
+  isActive          Boolean  @default(true)
   notes             String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
