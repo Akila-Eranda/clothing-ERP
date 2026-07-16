@@ -31,6 +31,7 @@ import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
 import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
+import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import {
   readPosQtyPopup, writePosQtyPopup,
   readPosSoundAlerts, writePosSoundAlerts,
@@ -93,7 +94,7 @@ interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData
 
 const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }, { value:"GIFT_VOUCHER", label:"Voucher", icon: Gift }];
 
-const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"vouchers", label:"Vouchers", icon: Gift }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"warranty", label:"Warranty", icon: Wrench, module: "warranty" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
+const BASE_NAV_ITEMS = [{ id:"products", label:"Products", icon: ShoppingBag }, { id:"customers", label:"Customers", icon: Users }, { id:"hold-bills", label:"Hold Bills", icon: PauseCircle }, { id:"orders", label:"Orders", icon: FileText }, { id:"vouchers", label:"Vouchers", icon: Gift }, { id:"quick-grn", label:"Quick GRN", icon: Package }, { id:"returns", label:"Returns", icon: RotateCcw, module: "returns" as const }, { id:"warranty", label:"Warranty", icon: Wrench, module: "warranty" as const }, { id:"discounts", label:"Discounts", icon: Tag, module: "promotions" as const }, { id:"reports", label:"Reports", icon: BarChart2 }, { id:"settings", label:"Settings", icon: Settings }];
 const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
 function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
@@ -271,6 +272,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       .then((r) => setPayState((s) => ({ ...s, currency: r.data?.currency ?? "LKR" })))
       .catch(() => {});
   }, [posOpen]);
+
+  React.useEffect(() => {
+    if (activeNav === "quick-grn") setCheckoutOpen(false);
+  }, [activeNav]);
 
   const patchPayState = React.useCallback((patch: Partial<PosPaymentState>) => {
     setPayState((s) => ({ ...s, ...patch }));
@@ -1233,6 +1238,40 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         </div>
       </div>
     );
+
+    // QUICK GRN
+    if (activeNav === "quick-grn") {
+      return (
+        <PosQuickGrnPanel
+          items={items as unknown as Array<{ variantId: string; productName: string; variantName: string; sku: string; quantity: number }>}
+          products={products.map((p) => ({ variantId: p.variantId, costPrice: p.costPrice }))}
+          onBack={() => {
+            setActiveNav("products");
+          }}
+          onPosted={() => {
+            clearCart();
+            setSelectedCartIdx(-1);
+            setCheckoutOpen(false);
+            setLastAddedVariantId(undefined);
+            setThankYouSale(null);
+            setCartNotes("");
+            setDiscountInput("");
+            setPendingDiscountApproval(null);
+            setPayState({
+              splitMode: false,
+              paymentLines: [{ method: "CASH", amount: "" }],
+              allowPartial: false,
+              couponCode: "",
+              couponDiscount: 0,
+              tierDiscountPct: 0,
+              currency: payState.currency,
+            });
+            setActiveNav("products");
+            void loadProducts();
+          }}
+        />
+      );
+    }
 
     // CUSTOMERS
     if (activeNav === "customers") return (
