@@ -362,17 +362,7 @@ export class WarehouseService {
       take: 100,
     });
 
-    const toBranchIds = [...new Set(transfers.map((t) => t.toBranchId))];
-    const toBranches = await this.prisma.branch.findMany({
-      where: { id: { in: toBranchIds } },
-      select: { id: true, name: true, code: true },
-    });
-    const toMap = new Map(toBranches.map((b) => [b.id, b]));
-
-    return transfers.map((t) => ({
-      ...t,
-      toBranch: toMap.get(t.toBranchId) ?? null,
-    }));
+    return this.inventory.enrichTransfers(transfers);
   }
 }
 

@@ -19,6 +19,7 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 type CreditCustomer = {
   id: string; code?: string | null; firstName: string; lastName?: string | null;
   phone: string; creditLimit: number; creditBalance: number; creditDays: number;
+  walletBalance?: number;
   available: number; utilizationPct: number; nextDueDate?: string | null;
   daysPastDue: number; isOverdue: boolean;
 };
@@ -70,6 +71,15 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
   const [schAmount, setSchAmount] = useState("");
   const [schCount, setSchCount] = useState("3");
   const [schBusy, setSchBusy] = useState(false);
+
+  const [payCustomer, setPayCustomer] = useState<CreditCustomer | null>(null);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("CASH");
+  const [payChequeNumber, setPayChequeNumber] = useState("");
+  const [payChequeBank, setPayChequeBank] = useState("");
+  const [payChequeDue, setPayChequeDue] = useState("");
+  const [payFromWallet, setPayFromWallet] = useState(false);
+  const [payBusy, setPayBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -133,6 +143,74 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
     }
   };
 
+  const openSettle = (c: CreditCustomer) => {
+    setPayCustomer(c);
+    setPayAmount(c.creditBalance > 0 ? String(c.creditBalance) : "");
+    setPayMethod("CASH");
+    setPayChequeNumber("");
+    setPayChequeBank("");
+    setPayChequeDue("");
+    setPayFromWallet(false);
+  };
+
+  const submitSettle = async () => {
+    if (!payCustomer) return;
+    const amt = parseFloat(payAmount);
+    if (isNaN(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (payFromWallet && amt > (payCustomer.walletBalance ?? 0) + 0.01) {
+      toast.error("Amount exceeds wallet advance");
+      return;
+    }
+    if (!payFromWallet && payMethod === "CHEQUE" && !payChequeNumber.trim()) {
+      toast.error("Cheque number is required");
+      return;
+    }
+    setPayBusy(true);
+    try {
+      const res = await api.post<{
+        appliedToCredit?: number;
+        advanceToWallet?: number;
+        creditBalance?: number;
+        walletBalance?: number;
+      }>(`/customers/${payCustomer.id}/credit/payment`, {
+        amount: amt,
+        description: payFromWallet ? "Credit settled from wallet advance" : "Credit payment received",
+        paymentMethod: payFromWallet ? "WALLET" : payMethod,
+        applyFromWallet: payFromWallet,
+        ...(!payFromWallet && payMethod === "CHEQUE"
+          ? {
+              chequeNumber: payChequeNumber.trim(),
+              chequeBankName: payChequeBank.trim() || undefined,
+              chequeDueDate: payChequeDue || undefined,
+            }
+          : {}),
+      });
+      const applied = res.data?.appliedToCredit ?? amt;
+      const advance = res.data?.advanceToWallet ?? 0;
+      if (advance > 0) {
+        toast.success(`Settled LKR ${formatNumber(applied)} · Advance LKR ${formatNumber(advance)} → wallet`);
+      } else {
+        toast.success(`Settled LKR ${formatNumber(applied)}`);
+      }
+      setPayCustomer(null);
+      load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Payment failed");
+    } finally {
+      setPayBusy(false);
+    }
+  };
+
+  const cancelSchedule = async (id: string) => {
+    try {
+      await api.post(`/customers/credit/schedules/${id}/cancel`, {});
+      toast.success("Schedule cancelled");
+      load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Cancel failed");
+    }
+  };
+
   const customerColumns = useMemo<ColumnDef<CreditCustomer>[]>(() => [
     {
       id: "customer",
@@ -151,6 +229,16 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
       cell: ({ row }) => (
         <span className="text-sm font-medium tabular-nums">LKR {formatNumber(row.original.creditBalance)}</span>
+      ),
+    },
+    {
+      id: "advance",
+      accessorFn: (c) => c.walletBalance ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Advance" />,
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground tabular-nums">
+          LKR {formatNumber(row.original.walletBalance ?? 0)}
+        </span>
       ),
     },
     {
@@ -191,12 +279,23 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
     {
       id: "actions",
       header: () => <span className="sr-only">Actions</span>,
-      cell: ({ row }) =>
-        row.original.creditBalance > 0 ? (
-          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => sendReminder(row.original.id)}>
-            <Bell className="h-3 w-3" /> Remind
-          </Button>
-        ) : null,
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <div className="flex gap-1.5 justify-end">
+            {(c.creditBalance > 0 || (c.walletBalance ?? 0) > 0) && (
+              <Button size="sm" className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700" onClick={() => openSettle(c)}>
+                <Wallet className="h-3 w-3" /> Settle
+              </Button>
+            )}
+            {c.creditBalance > 0 && (
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => sendReminder(c.id)}>
+                <Bell className="h-3 w-3" /> Remind
+              </Button>
+            )}
+          </div>
+        );
+      },
     },
   ], []);
 
@@ -400,7 +499,12 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                   <select
                     className="h-9 w-full rounded-md border bg-background px-3 text-sm"
                     value={schCustomerId}
-                    onChange={(e) => setSchCustomerId(e.target.value)}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setSchCustomerId(id);
+                      const c = customers.find((x) => x.id === id);
+                      if (c?.creditBalance) setSchAmount(String(c.creditBalance));
+                    }}
                   >
                     <option value="">Select customer</option>
                     {customers.filter((c) => c.creditBalance > 0).map((c) => (
@@ -437,7 +541,14 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                         {s.installmentCount} installments · LKR {formatNumber(s.totalAmount)}
                       </p>
                     </div>
-                    <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">{s.status}</Badge>
+                      {s.status === "ACTIVE" && (
+                        <Button size="sm" variant="ghost" className="h-7 text-xs text-destructive" onClick={() => cancelSchedule(s.id)}>
+                          Cancel
+                        </Button>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {s.lines.map((l) => (
@@ -523,6 +634,116 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
           </div>
         </div>
         )}
+
+      {payCustomer && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !payBusy) setPayCustomer(null);
+          }}
+        >
+          <div className="bg-background rounded-2xl shadow-2xl w-full max-w-md border overflow-hidden">
+            <div className="px-5 py-4 border-b">
+              <h2 className="text-base font-bold">Settle / Advance</h2>
+              <p className="text-xs text-muted-foreground">
+                {payCustomer.firstName} {payCustomer.lastName} · Outstanding LKR {formatNumber(payCustomer.creditBalance)}
+                {(payCustomer.walletBalance ?? 0) > 0
+                  ? ` · Wallet LKR ${formatNumber(payCustomer.walletBalance ?? 0)}`
+                  : ""}
+              </p>
+            </div>
+            <div className="p-5 space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold">Amount (LKR)</label>
+                <Input
+                  type="number"
+                  min={0.01}
+                  step={0.01}
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="h-9"
+                />
+                <p className="text-[10px] text-muted-foreground">
+                  Overpay settles AR first; excess becomes wallet advance for future sales.
+                </p>
+              </div>
+              <label className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={payFromWallet}
+                  onChange={(e) => {
+                    setPayFromWallet(e.target.checked);
+                    if (e.target.checked) {
+                      const max = Math.min(payCustomer.creditBalance, payCustomer.walletBalance ?? 0);
+                      setPayAmount(max > 0 ? String(max) : "");
+                    }
+                  }}
+                  disabled={(payCustomer.walletBalance ?? 0) <= 0 || payCustomer.creditBalance <= 0}
+                />
+                Apply from wallet advance
+              </label>
+              {!payFromWallet && (
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold">Method</label>
+                  <select
+                    className="h-9 w-full rounded-md border bg-background px-3 text-sm"
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="BANK_TRANSFER">Bank transfer</option>
+                    <option value="UPI">UPI</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                </div>
+              )}
+              {!payFromWallet && payMethod === "CHEQUE" && (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold">Cheque number *</label>
+                    <Input
+                      className="h-9"
+                      value={payChequeNumber}
+                      onChange={(e) => setPayChequeNumber(e.target.value)}
+                      placeholder="Cheque #"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Cheque bank</label>
+                      <Input
+                        className="h-9"
+                        value={payChequeBank}
+                        onChange={(e) => setPayChequeBank(e.target.value)}
+                        placeholder="e.g. BOC"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold">Due date</label>
+                      <Input
+                        type="date"
+                        className="h-9"
+                        value={payChequeDue}
+                        onChange={(e) => setPayChequeDue(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+              <Button variant="outline" size="sm" disabled={payBusy} onClick={() => setPayCustomer(null)}>
+                Cancel
+              </Button>
+              <Button size="sm" disabled={payBusy} onClick={submitSettle} className="gap-1.5 bg-amber-600 hover:bg-amber-700">
+                {payBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

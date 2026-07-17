@@ -13,6 +13,7 @@ const PAY_OPTIONS = [
   { value: "CASH", label: "Cash" },
   { value: "CARD", label: "Card" },
   { value: "UPI", label: "UPI" },
+  { value: "CHEQUE", label: "Cheque" },
   { value: "WALLET", label: "Wallet" },
   { value: "CUSTOMER_CREDIT", label: "Credit" },
 ] as const;
@@ -20,6 +21,7 @@ const PAY_OPTIONS = [
 export interface PaymentLine {
   method: string;
   amount: string;
+  reference?: string;
 }
 
 export interface PosPaymentState {
@@ -153,23 +155,34 @@ export function PosPaymentPanel({
       {state.splitMode ? (
         <div className="space-y-1.5">
           {state.paymentLines.map((line, idx) => (
-            <div key={idx} className="flex gap-1.5 items-center">
-              <select value={line.method} onChange={(e) => updateLine(idx, { method: e.target.value })}
-                className="h-8 rounded-lg text-xs px-2 text-white outline-none"
-                style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}>
-                {PAY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-              <Input type="number" min="0" value={line.amount}
-                onChange={(e) => updateLine(idx, { amount: e.target.value })}
-                placeholder="Amount"
-                className="h-8 text-xs text-white flex-1"
-                style={{ background: "#1a2b4a", borderColor: "#1e3356" }} />
-              {state.paymentLines.length > 1 && (
-                <button type="button" onClick={() => removeLine(idx)} className="p-1.5 rounded hover:bg-white/10">
-                  <Trash2 className="h-3.5 w-3.5" style={{ color: "#ef4444" }} />
-                </button>
+            <div key={idx} className="space-y-1">
+              <div className="flex gap-1.5 items-center">
+                <select value={line.method} onChange={(e) => updateLine(idx, { method: e.target.value })}
+                  className="h-8 rounded-lg text-xs px-2 text-white outline-none"
+                  style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}>
+                  {PAY_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+                <Input type="number" min="0" value={line.amount}
+                  onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                  placeholder="Amount"
+                  className="h-8 text-xs text-white flex-1"
+                  style={{ background: "#1a2b4a", borderColor: "#1e3356" }} />
+                {state.paymentLines.length > 1 && (
+                  <button type="button" onClick={() => removeLine(idx)} className="p-1.5 rounded hover:bg-white/10">
+                    <Trash2 className="h-3.5 w-3.5" style={{ color: "#ef4444" }} />
+                  </button>
+                )}
+              </div>
+              {line.method === "CHEQUE" && (
+                <Input
+                  value={line.reference ?? ""}
+                  onChange={(e) => updateLine(idx, { reference: e.target.value })}
+                  placeholder="Cheque number"
+                  className="h-8 text-xs text-white"
+                  style={{ background: "#1a2b4a", borderColor: "#1e3356" }}
+                />
               )}
             </div>
           ))}
@@ -214,12 +227,23 @@ export function buildCheckoutPayments(
   activePayment: string,
   numpad: string,
   totalAmt: number,
-): { method: string; amount: number }[] {
+  chequeNumber?: string,
+): { method: string; amount: number; reference?: string }[] {
   if (state.splitMode) {
     return state.paymentLines
-      .map((l) => ({ method: l.method, amount: parseFloat(l.amount) || 0 }))
+      .map((l) => ({
+        method: l.method,
+        amount: parseFloat(l.amount) || 0,
+        ...(l.method === "CHEQUE" && l.reference?.trim()
+          ? { reference: l.reference.trim() }
+          : {}),
+      }))
       .filter((p) => p.amount > 0);
   }
   const cashAmt = activePayment === "CASH" && numpad ? parseFloat(numpad) : totalAmt;
-  return [{ method: activePayment, amount: cashAmt || totalAmt }];
+  const amount = cashAmt || totalAmt;
+  if (activePayment === "CHEQUE") {
+    return [{ method: "CHEQUE", amount, reference: chequeNumber?.trim() || undefined }];
+  }
+  return [{ method: activePayment, amount }];
 }

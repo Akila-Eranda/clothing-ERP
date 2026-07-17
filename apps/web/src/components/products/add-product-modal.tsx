@@ -25,39 +25,13 @@ import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
+import { type Product } from "@/lib/product-types";
 
-// ── Types ─────────────────────────────────────────────────────────────────
+export type { Product };
+
 interface Category { id: string; name: string; slug: string; }
 interface Brand    { id: string; name: string; slug: string; }
 interface SupplierOpt { id: string; name: string; }
-
-export interface Product {
-  id: string; name: string; slug: string; sku: string;
-  barcode?: string | null; description?: string | null; shortDesc?: string | null;
-  categoryId?: string | null; brandId?: string | null; hsn?: string | null;
-  taxRate: number; costPrice: number; sellingPrice: number; mrp: number;
-  status: string; images: string[]; tags: string[];
-  hasVariants: boolean; trackInventory: boolean; isFeatured: boolean;
-  seoTitle?: string | null; seoDescription?: string | null;
-  createdAt: string; updatedAt: string;
-  category?: { id: string; name: string; slug: string } | null;
-  brand?:    { id: string; name: string; slug: string } | null;
-  _count: { variants: number };
-  variants?: {
-    id: string;
-    sku: string;
-    name: string;
-    barcode?: string | null;
-    sellingPrice: number;
-    costPrice: number;
-    mrp: number;
-    size?: string | null;
-    color?: string | null;
-    material?: string | null;
-    style?: string | null;
-    isActive: boolean;
-  }[];
-}
 
 interface VariantAttr { name: string; values: string[]; input: string; }
 interface VariantRow {

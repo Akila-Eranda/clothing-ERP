@@ -16,7 +16,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/utils";
-import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 
 type PrRow = {
   id: string;
@@ -64,6 +64,8 @@ type BankAccount = { id: string; name: string; code: string };
 export default function ProcurementHubPage() {
   const router = useRouter();
   const { profile } = useShopWorkspace();
+  const showExpiry = hasExpiryTracking(profile);
+  const showBatch = hasBatchTracking(profile);
   const [loading, setLoading] = useState(true);
   const [prs, setPrs] = useState<PrRow[]>([]);
   const [grns, setGrns] = useState<GrnRow[]>([]);
@@ -155,7 +157,7 @@ export default function ProcurementHubPage() {
     const qty = parseInt(qgQty, 10);
     const cost = parseFloat(qgCost);
     if (!qty || qty < 1 || isNaN(cost)) { toast.error("Enter valid qty and cost"); return; }
-    if (!qgExpiry.trim()) { toast.error("Expiry date is required"); return; }
+    if (showExpiry && !qgExpiry.trim()) { toast.error("Expiry date is required"); return; }
     setQgBusy(true);
     try {
       const res = await api.post<{ grnNumber: string }>("/procurement/grn/quick", {
@@ -164,8 +166,8 @@ export default function ProcurementHubPage() {
           variantId: qgVariant.id,
           quantity: qty,
           unitCost: cost,
-          expiryDate: qgExpiry,
-          ...(qgBatch.trim() ? { batchNumber: qgBatch.trim() } : {}),
+          ...(showExpiry && qgExpiry ? { expiryDate: qgExpiry } : {}),
+          ...(showBatch && qgBatch.trim() ? { batchNumber: qgBatch.trim() } : {}),
         }],
       });
       toast.success(`Quick GRN posted: ${(res.data as { grnNumber?: string })?.grnNumber ?? "OK"}`);
@@ -625,14 +627,18 @@ export default function ProcurementHubPage() {
                   <label className="text-xs font-semibold">Unit Cost</label>
                   <Input type="number" min={0} value={qgCost} onChange={(e) => setQgCost(e.target.value)} className="h-9" />
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold">Expiry Date <span className="text-destructive">*</span></label>
-                  <Input type="date" value={qgExpiry} onChange={(e) => setQgExpiry(e.target.value)} className="h-9" />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold">Batch #</label>
-                  <Input value={qgBatch} onChange={(e) => setQgBatch(e.target.value)} placeholder="Optional" className="h-9 font-mono" />
-                </div>
+                {showExpiry && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Expiry Date <span className="text-destructive">*</span></label>
+                    <Input type="date" value={qgExpiry} onChange={(e) => setQgExpiry(e.target.value)} className="h-9" />
+                  </div>
+                )}
+                {showBatch && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold">Batch #</label>
+                    <Input value={qgBatch} onChange={(e) => setQgBatch(e.target.value)} placeholder="Optional" className="h-9 font-mono" />
+                  </div>
+                )}
               </div>
               <Button onClick={submitQuickGrn} disabled={qgBusy} className="gap-1.5 w-full">
                 {qgBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}

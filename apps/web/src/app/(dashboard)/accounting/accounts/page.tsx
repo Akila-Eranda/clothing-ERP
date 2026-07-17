@@ -1,7 +1,7 @@
 "use client";
 
-import { AccountingHub } from "@/components/accounting/accounting-hub";
+import { ChartOfAccountsHub } from "@/components/accounting/chart-of-accounts-hub";
 
-export default function AccountingAccountsPage() {
-  return <AccountingHub section="accounts" />;
+export default function ChartOfAccountsPage() {
+  return <ChartOfAccountsHub />;
 }

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { useShopProfile, hasBatchTracking } from "@/lib/use-shop-profile";
+import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 
 export interface POItem {
   id: string;
@@ -53,6 +53,7 @@ interface Props {
 export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
   const profile = useShopProfile();
   const showBatch = hasBatchTracking(profile);
+  const showExpiry = hasExpiryTracking(profile);
   const [rows, setRows] = useState<ReceiveRow[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -77,10 +78,12 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     const hasAny = rows.some((r) => r.receivedQty > 0 || r.rejectedQty > 0);
     if (!hasAny) { toast.error("Enter at least one received quantity"); return; }
 
-    const missing = rows.find((r) => r.receivedQty > 0 && !r.expiryDate.trim());
-    if (missing) {
-      toast.error("Expiry date is required for every product you receive");
-      return;
+    if (showExpiry) {
+      const missing = rows.find((r) => r.receivedQty > 0 && !r.expiryDate.trim());
+      if (missing) {
+        toast.error("Expiry date is required for every product you receive");
+        return;
+      }
     }
 
     setLoading(true);
@@ -90,9 +93,13 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           itemId: r.itemId,
           receivedQty: r.receivedQty,
           rejectedQty: r.rejectedQty,
-          expiryDate: r.receivedQty > 0 ? r.expiryDate : undefined,
+          ...(showExpiry && r.receivedQty > 0 && r.expiryDate
+            ? { expiryDate: r.expiryDate }
+            : {}),
           ...(showBatch && r.batchNumber ? { batchNumber: r.batchNumber } : {}),
-          ...(r.manufactureDate ? { manufactureDate: r.manufactureDate } : {}),
+          ...((showBatch || showExpiry) && r.manufactureDate
+            ? { manufactureDate: r.manufactureDate }
+            : {}),
         })),
       });
       toast.success("Items received — GRN posted & inventory updated");
@@ -119,7 +126,8 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
   const headers = ["Product / SKU", "Ordered", "Already", "Receive", "Reject"];
   if (showBatch) headers.push("Batch");
-  headers.push("MFD", "Expiry *");
+  if (showExpiry) headers.push("MFD", "Expiry *");
+  else if (showBatch) headers.push("MFD");
 
   return (
     <div
@@ -140,7 +148,9 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               <span className="font-mono">{po.poNumber}</span> · {po.supplier.name}
-              {" · Expiry required on every received line (FEFO lots)"}
+              {showExpiry
+                ? " · Expiry required on every received line (FEFO lots)"
+                : ""}
             </p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0">
@@ -162,7 +172,8 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                 {(po.items ?? []).map((item, idx) => {
                   const remaining = item.orderedQty - item.receivedQty;
                   const fullyReceived = remaining <= 0;
-                  const needsExpiry = (rows[idx]?.receivedQty ?? 0) > 0 && !rows[idx]?.expiryDate;
+                  const needsExpiry =
+                    showExpiry && (rows[idx]?.receivedQty ?? 0) > 0 && !rows[idx]?.expiryDate;
                   return (
                     <tr key={item.id} className={`border-t ${fullyReceived ? "opacity-50" : ""}`}>
                       <td className="px-3 py-2.5">
@@ -206,26 +217,30 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                           />
                         </td>
                       )}
-                      <td className="px-3 py-2.5 w-36">
-                        <Input
-                          type="date"
-                          title="Manufacturing date"
-                          value={rows[idx]?.manufactureDate ?? ""}
-                          disabled={fullyReceived}
-                          className="h-7 text-xs px-2 w-36"
-                          onChange={(e) => update(idx, "manufactureDate", e.target.value)}
-                        />
-                      </td>
-                      <td className="px-3 py-2.5 w-36">
-                        <Input
-                          type="date"
-                          value={rows[idx]?.expiryDate ?? ""}
-                          disabled={fullyReceived}
-                          className={`h-7 text-xs px-2 w-36 ${needsExpiry ? "border-destructive ring-1 ring-destructive/40" : ""}`}
-                          onChange={(e) => update(idx, "expiryDate", e.target.value)}
-                          required
-                        />
-                      </td>
+                      {(showBatch || showExpiry) && (
+                        <td className="px-3 py-2.5 w-36">
+                          <Input
+                            type="date"
+                            title="Manufacturing date"
+                            value={rows[idx]?.manufactureDate ?? ""}
+                            disabled={fullyReceived}
+                            className="h-7 text-xs px-2 w-36"
+                            onChange={(e) => update(idx, "manufactureDate", e.target.value)}
+                          />
+                        </td>
+                      )}
+                      {showExpiry && (
+                        <td className="px-3 py-2.5 w-36">
+                          <Input
+                            type="date"
+                            value={rows[idx]?.expiryDate ?? ""}
+                            disabled={fullyReceived}
+                            className={`h-7 text-xs px-2 w-36 ${needsExpiry ? "border-destructive ring-1 ring-destructive/40" : ""}`}
+                            onChange={(e) => update(idx, "expiryDate", e.target.value)}
+                            required
+                          />
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -233,10 +248,12 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
             </table>
           </div>
 
-          <div className="mt-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
-            <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-            Expiry is mandatory on every received product. Stock is posted to inventory lots and POS sells by FEFO (earliest expiry first).
-          </div>
+          {showExpiry && (
+            <div className="mt-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
+              <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              Expiry is mandatory on every received product. Stock is posted to inventory lots and POS sells by FEFO (earliest expiry first).
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">

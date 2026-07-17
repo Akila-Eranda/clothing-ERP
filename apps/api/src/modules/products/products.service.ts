@@ -332,7 +332,7 @@ export class ProductsService {
     if (tenant) {
       const count = await this.prisma.product.count({ where: { tenantId } });
       if (count >= tenant.maxProducts) {
-        throw new Error(`Product limit reached (${tenant.maxProducts}). Upgrade your plan.`);
+        throw new BadRequestException(`Product limit reached (${tenant.maxProducts}). Upgrade your plan.`);
       }
     }
     const baseSlug = this.generateSlug(dto.name);
@@ -627,9 +627,11 @@ export class ProductsService {
         select: { id: true, sku: true },
       });
       const usedSkus = new Set(existingSkus.map((e) => e.sku));
+      const keptIds = new Set<string>();
 
       for (const v of variants as (Partial<CreateVariantDto> & { id?: string; isActive?: boolean })[]) {
         if (v.id) {
+          keptIds.add(v.id);
           if (v.sku !== undefined) {
             const other = existingSkus.find((e) => e.sku === v.sku && e.id !== v.id);
             if (other) {
@@ -664,7 +666,7 @@ export class ProductsService {
           let n = 2;
           while (usedSkus.has(sku)) sku = `${base}-${n++}`;
           usedSkus.add(sku);
-          await this.prisma.productVariant.create({
+          const created = await this.prisma.productVariant.create({
             data: {
               productId:    id,
               sku,
@@ -683,7 +685,17 @@ export class ProductsService {
               sortOrder:    0,
             },
           });
+          keptIds.add(created.id);
         }
+      }
+
+      // Soft-remove variants dropped from the edit form (keep history / inventory FKs)
+      const droppedIds = existingSkus.map((e) => e.id).filter((vid) => !keptIds.has(vid));
+      if (droppedIds.length) {
+        await this.prisma.productVariant.updateMany({
+          where: { productId: id, id: { in: droppedIds } },
+          data: { isActive: false },
+        });
       }
     }
 
@@ -877,6 +889,8 @@ export class ProductsService {
   }
 
   async removeCategory(id: string, tenantId: string) {
+    const existing = await this.prisma.category.findFirst({ where: { id, tenantId } });
+    if (!existing) throw new NotFoundException('Category not found');
     return this.prisma.category.delete({ where: { id } });
   }
 

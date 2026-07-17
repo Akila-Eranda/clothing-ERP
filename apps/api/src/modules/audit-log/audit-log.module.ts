@@ -1,7 +1,9 @@
-import { Module } from '@nestjs/common';
-import { Controller, Get, Query, Injectable } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { Module, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Injectable, Req } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OnEvent } from '@nestjs/event-emitter';
+import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Request } from 'express';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -9,6 +11,12 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import * as dayjs from 'dayjs';
+import {
+  AUDIT_ACTIONS,
+  AUDIT_ACTION_LIST,
+  normalizeClientAuditAction,
+  sanitizeAuditData,
+} from './audit.helper';
 
 export interface AuditLogPayload {
   tenantId: string;
@@ -20,6 +28,27 @@ export interface AuditLogPayload {
   newData?: object;
   ipAddress?: string;
   userAgent?: string;
+}
+
+class ClientAuditEventDto {
+  @ApiProperty({ enum: ['PRINT', 'EXPORT'] })
+  @IsIn(['PRINT', 'EXPORT', 'print', 'export'])
+  action: string;
+
+  @ApiProperty({ example: 'financial_report' })
+  @IsString()
+  @MaxLength(120)
+  resource: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  resourceId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -37,18 +66,28 @@ export class AuditLogService {
   async findAll(tenantId: string, query: {
     page?: number; limit?: number; userId?: string;
     resource?: string; action?: string; startDate?: string; endDate?: string;
+    search?: string;
   }) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
+    const search = query.search?.trim();
     const where = {
       tenantId,
       ...(query.userId && { userId: query.userId }),
-      ...(query.resource && { resource: query.resource }),
+      ...(query.resource && { resource: { contains: query.resource, mode: 'insensitive' as const } }),
       ...(query.action && { action: { contains: query.action, mode: 'insensitive' as const } }),
       ...(query.startDate && query.endDate && {
         createdAt: {
           gte: dayjs(query.startDate).startOf('day').toDate(),
           lte: dayjs(query.endDate).endOf('day').toDate(),
         },
+      }),
+      ...(search && {
+        OR: [
+          { action: { contains: search, mode: 'insensitive' as const } },
+          { resource: { contains: search, mode: 'insensitive' as const } },
+          { resourceId: { contains: search, mode: 'insensitive' as const } },
+          { ipAddress: { contains: search, mode: 'insensitive' as const } },
+        ],
       }),
     };
     const [data, total] = await this.prisma.$transaction([
@@ -150,15 +189,89 @@ export class AuditLogService {
     );
   }
 
+  /** Summary counts by Sprint-12 action for the tenant (dashboard chips). */
+  async getActionSummary(tenantId: string, days = 30) {
+    const since = dayjs().subtract(days, 'day').startOf('day').toDate();
+    const rows = await this.prisma.auditLog.groupBy({
+      by: ['action'],
+      where: { tenantId, createdAt: { gte: since } },
+      _count: { _all: true },
+    });
+    const byAction: Record<string, number> = {};
+    for (const a of AUDIT_ACTION_LIST) byAction[a] = 0;
+    for (const row of rows) {
+      const key = row.action.toUpperCase();
+      byAction[key] = (byAction[key] ?? 0) + row._count._all;
+    }
+    return { days, total: rows.reduce((s, r) => s + r._count._all, 0), byAction };
+  }
+
+  async logClientEvent(
+    user: IAuthUser,
+    dto: ClientAuditEventDto,
+    ip?: string,
+    userAgent?: string,
+  ) {
+    const action = normalizeClientAuditAction(dto.action);
+    if (!action) {
+      throw new BadRequestException('Client audit action must be PRINT or EXPORT');
+    }
+    return this.log({
+      tenantId: user.tenantId,
+      userId: user.id,
+      action,
+      resource: dto.resource,
+      resourceId: dto.resourceId,
+      newData: sanitizeAuditData(dto.metadata ?? {}),
+      ipAddress: ip,
+      userAgent,
+    });
+  }
+
   @OnEvent('auth.login')
-  async onAuthLogin(payload: { userId: string; tenantId: string; ip?: string }) {
-    await this.logActivity(payload.userId, 'LOGIN', 'User signed in', {}, payload.ip);
+  async onAuthLogin(payload: { userId: string; tenantId: string; ip?: string; userAgent?: string }) {
+    await this.logActivity(payload.userId, AUDIT_ACTIONS.LOGIN, 'User signed in', {}, payload.ip);
     await this.log({
       tenantId: payload.tenantId,
       userId: payload.userId,
-      action: 'LOGIN',
+      action: AUDIT_ACTIONS.LOGIN,
       resource: 'Auth',
       ipAddress: payload.ip,
+      userAgent: payload.userAgent,
+    });
+  }
+
+  @OnEvent('auth.logout')
+  async onAuthLogout(payload: { userId: string; tenantId: string; ip?: string; userAgent?: string }) {
+    await this.logActivity(payload.userId, AUDIT_ACTIONS.LOGOUT, 'User signed out', {}, payload.ip);
+    await this.log({
+      tenantId: payload.tenantId,
+      userId: payload.userId,
+      action: AUDIT_ACTIONS.LOGOUT,
+      resource: 'Auth',
+      ipAddress: payload.ip,
+      userAgent: payload.userAgent,
+    });
+  }
+
+  @OnEvent('auth.login.failed')
+  async onAuthLoginFailed(payload: {
+    tenantId?: string;
+    userId?: string;
+    email?: string;
+    ip?: string;
+    userAgent?: string;
+    reason?: string;
+  }) {
+    if (!payload.tenantId) return;
+    await this.log({
+      tenantId: payload.tenantId,
+      userId: payload.userId,
+      action: AUDIT_ACTIONS.LOGIN_FAILED,
+      resource: 'Auth',
+      newData: sanitizeAuditData({ email: payload.email, reason: payload.reason }),
+      ipAddress: payload.ip,
+      userAgent: payload.userAgent,
     });
   }
 
@@ -166,7 +279,7 @@ export class AuditLogService {
   async onSaleCompleted(payload: { saleId: string; tenantId: string; branchId: string; total: number }) {
     await this.log({
       tenantId: payload.tenantId,
-      action: 'CREATE',
+      action: AUDIT_ACTIONS.CREATE,
       resource: 'Sale',
       resourceId: payload.saleId,
       newData: { total: payload.total, branchId: payload.branchId },
@@ -181,6 +294,44 @@ export class AuditLogService {
       action: 'DAY_END',
       resource: 'POS',
       newData: { branchId: payload.branchId, totalRevenue: payload.totalRevenue },
+    });
+  }
+
+  @OnEvent('workflow.approved')
+  async onWorkflowApproved(payload: {
+    tenantId: string;
+    userId: string;
+    taskId: string;
+    entityType: string;
+    entityId: string;
+    final?: boolean;
+  }) {
+    await this.log({
+      tenantId: payload.tenantId,
+      userId: payload.userId,
+      action: AUDIT_ACTIONS.APPROVE,
+      resource: payload.entityType || 'Workflow',
+      resourceId: payload.entityId || payload.taskId,
+      newData: { taskId: payload.taskId, final: payload.final ?? false },
+    });
+  }
+
+  @OnEvent('workflow.rejected')
+  async onWorkflowRejected(payload: {
+    tenantId: string;
+    userId: string;
+    taskId: string;
+    entityType: string;
+    entityId: string;
+    comment?: string;
+  }) {
+    await this.log({
+      tenantId: payload.tenantId,
+      userId: payload.userId,
+      action: AUDIT_ACTIONS.REJECT,
+      resource: payload.entityType || 'Workflow',
+      resourceId: payload.entityId || payload.taskId,
+      newData: { taskId: payload.taskId, comment: payload.comment },
     });
   }
 }
@@ -208,6 +359,19 @@ export class AuditLogController {
     });
   }
 
+  @Get('summary')
+  @RequirePermissions('users:read')
+  @ApiOperation({ summary: 'Audit action summary for tenant (Sprint 12)' })
+  summary(
+    @CurrentUser() user: IAuthUser,
+    @Query('days') days?: string,
+  ) {
+    return this.auditLogService.getActionSummary(
+      user.tenantId,
+      days ? parseInt(days, 10) : 30,
+    );
+  }
+
   @Get()
   @RequirePermissions('users:read')
   @ApiOperation({ summary: 'Get audit logs (admin)' })
@@ -220,12 +384,28 @@ export class AuditLogController {
     @Query('action') action?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('search') search?: string,
   ) {
     return this.auditLogService.findAll(user.tenantId, {
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 50,
-      userId, resource, action, startDate, endDate,
+      userId, resource, action, startDate, endDate, search,
     });
+  }
+
+  @Post('client-event')
+  @ApiOperation({ summary: 'Record client-side PRINT / EXPORT audit events' })
+  clientEvent(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: ClientAuditEventDto,
+    @Req() req: Request,
+  ) {
+    return this.auditLogService.logClientEvent(
+      user,
+      dto,
+      req.ip,
+      req.headers['user-agent'],
+    );
   }
 
   @Get('login-history')

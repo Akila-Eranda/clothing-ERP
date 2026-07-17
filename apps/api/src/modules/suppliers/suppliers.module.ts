@@ -6,6 +6,7 @@ import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDa
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ChequeDirection, ChequeStatus, PaymentMethod, PurchaseOrderStatus, PurchaseRequestStatus, SupplierLedgerEntryType } from '@prisma/client';
+import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -16,6 +17,7 @@ import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.mod
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { createLinkedExpense } from '@/shared/expense.helper';
 import { ProcurementService } from './procurement.service';
+import { SupplierApService } from './supplier-ap.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
 import {
   assertSupplierCreditLimit,
@@ -456,11 +458,15 @@ export class SuppliersService {
             partyId: supplierId,
             partyName: supplier.name,
             bankAccountId: dto.chequeBankAccountId || undefined,
-            notes: dto.notes
-              ? `Supplier payment: ${dto.notes}`
-              : poNumber
-                ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
-                : `Supplier payment — ${supplier.name}`,
+            notes: chequeSourceNotes(
+              'SupplierPayment',
+              payment.id,
+              dto.notes
+                ? `Supplier payment: ${dto.notes}`
+                : poNumber
+                  ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
+                  : `Supplier payment — ${supplier.name}`,
+            ),
             createdBy: userId,
           },
         });
@@ -607,7 +613,10 @@ export class SuppliersService {
 @ApiBearerAuth('access-token')
 @Controller({ path: 'suppliers', version: '1' })
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) {}
+  constructor(
+    private readonly suppliersService: SuppliersService,
+    private readonly apService: SupplierApService,
+  ) {}
 
   @Post()
   @RequirePermissions('suppliers:create')
@@ -619,6 +628,124 @@ export class SuppliersController {
   @RequirePermissions('suppliers:read')
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto) {
     return this.suppliersService.findAllSuppliers(user.tenantId, query);
+  }
+
+  // ── Sprint 6 AP ───────────────────────────────────────────────────
+
+  @Get('ap/dashboard')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'AP dashboard KPIs + aging' })
+  apDashboard(@CurrentUser() user: IAuthUser, @Query('asOfDate') asOfDate?: string) {
+    return this.apService.getApDashboard(user.tenantId, asOfDate);
+  }
+
+  @Get('ap/payments')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List supplier payments in date range' })
+  apPayments(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.apService.listPayments(user.tenantId, {
+      startDate,
+      endDate,
+      supplierId,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Get('ap/bills')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List supplier bills / invoices' })
+  apBills(
+    @CurrentUser() user: IAuthUser,
+    @Query('supplierId') supplierId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.apService.listBills(
+      user.tenantId,
+      supplierId,
+      limit ? parseInt(limit, 10) : 50,
+    );
+  }
+
+  @Get('ap/debit-notes')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List supplier debit notes' })
+  apDebitNotes(@CurrentUser() user: IAuthUser, @Query('supplierId') supplierId?: string) {
+    return this.apService.listDebitNotes(user.tenantId, supplierId);
+  }
+
+  @Get(':id/ap/ledger')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'Supplier AP ledger' })
+  apLedger(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.apService.getSupplierLedger(id, user.tenantId, startDate, endDate);
+  }
+
+  @Get(':id/ap/statement')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'Supplier statement (printable)' })
+  apStatement(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.apService.getSupplierStatement(id, user.tenantId, startDate, endDate);
+  }
+
+  @Post(':id/ap/payment')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Receive AP payment (FIFO across bills/POs)' })
+  apPayment(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      amount: number;
+      method?: string;
+      reference?: string;
+      notes?: string;
+      invoiceId?: string;
+      purchaseId?: string;
+      paidAt?: string;
+    },
+  ) {
+    return this.apService.receivePayment(
+      id,
+      user.tenantId,
+      user.branchId ?? '',
+      user.id,
+      body,
+    );
+  }
+
+  @Post(':id/ap/debit-notes')
+  @RequirePermissions('suppliers:update')
+  @ApiOperation({ summary: 'Issue supplier debit note against AP' })
+  apDebitNote(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body()
+    body: {
+      amount: number;
+      reason?: string;
+      invoiceId?: string;
+      purchaseId?: string;
+      noteDate?: string;
+      referenceId?: string;
+    },
+  ) {
+    return this.apService.createDebitNote(id, user.tenantId, user.id, body);
   }
 
   @Get(':id')
@@ -918,8 +1045,8 @@ export class ProcurementController {
 @Module({
   imports: [InventoryModule, WorkflowModule],
   controllers: [SuppliersController, PurchasesController, ProcurementController],
-  providers: [SuppliersService, ProcurementService],
-  exports: [SuppliersService, ProcurementService],
+  providers: [SuppliersService, ProcurementService, SupplierApService],
+  exports: [SuppliersService, ProcurementService, SupplierApService],
 })
 export class SuppliersModule {}
 

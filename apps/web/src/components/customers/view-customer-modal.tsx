@@ -137,14 +137,42 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const receiveCreditPayment = async () => {
     const amt = parseFloat(creditPayInput);
     if (!customer || isNaN(amt) || amt <= 0) return;
-    if (amt > customer.creditBalance) { toast.error("Amount exceeds outstanding credit"); return; }
     setActionLoading(true);
     try {
-      await api.post(`/customers/${customer.id}/credit/payment`, { amount: amt, description: "Credit payment received" });
-      toast.success(`LKR ${amt} credit payment received`);
+      const res = await api.post<{
+        appliedToCredit?: number;
+        advanceToWallet?: number;
+      }>(`/customers/${customer.id}/credit/payment`, {
+        amount: amt,
+        description: "Credit payment received",
+        paymentMethod: "CASH",
+      });
+      const applied = res.data?.appliedToCredit ?? Math.min(amt, customer.creditBalance);
+      const advance = res.data?.advanceToWallet ?? 0;
+      if (advance > 0) {
+        toast.success(`Settled LKR ${applied} · Advance LKR ${advance} → wallet`);
+      } else {
+        toast.success(`LKR ${applied} credit payment received`);
+      }
       setCreditPayInput("");
       await reloadCustomer();
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to record payment"); }
+    finally { setActionLoading(false); }
+  };
+
+  const applyWalletToCredit = async () => {
+    if (!customer || customer.creditBalance <= 0 || customer.walletBalance <= 0) return;
+    const amt = Math.min(customer.creditBalance, customer.walletBalance);
+    setActionLoading(true);
+    try {
+      await api.post(`/customers/${customer.id}/credit/payment`, {
+        amount: amt,
+        description: "Credit settled from wallet advance",
+        applyFromWallet: true,
+      });
+      toast.success(`Applied LKR ${amt} from wallet to credit`);
+      await reloadCustomer();
+    } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to apply wallet"); }
     finally { setActionLoading(false); }
   };
 
@@ -418,16 +446,29 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 </div>
                 <p className="text-[10px] text-muted-foreground">Due date = sale date + credit days</p>
               </div>
-              {customer.creditBalance > 0 && (
-                <div className="flex gap-2">
-                  <Input type="number" min={0.01} max={customer.creditBalance} step={0.01} placeholder="Payment amount (LKR)…" value={creditPayInput}
+              <div className="flex gap-2">
+                  <Input type="number" min={0.01} step={0.01} placeholder="Payment / advance (LKR)…" value={creditPayInput}
                     onChange={(e) => setCreditPayInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && receiveCreditPayment()} />
                   <Button onClick={receiveCreditPayment} disabled={actionLoading || !creditPayInput} className="gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-700">
                     {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Receive
                   </Button>
                 </div>
+              {customer.creditBalance > 0 && customer.walletBalance > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={actionLoading}
+                  onClick={applyWalletToCredit}
+                  className="w-full gap-1.5"
+                >
+                  <Wallet className="h-3.5 w-3.5" />
+                  Apply wallet advance to credit (LKR {formatNumber(Math.min(customer.creditBalance, customer.walletBalance))})
+                </Button>
               )}
+              <p className="text-[10px] text-muted-foreground">
+                Overpay settles outstanding first; excess goes to wallet as prepaid advance.
+              </p>
               <div className="space-y-2">
                 {(customer.creditTxns ?? []).length === 0 && (
                   <p className="text-center text-muted-foreground py-6 text-sm">No credit transactions yet</p>

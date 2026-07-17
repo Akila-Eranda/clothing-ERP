@@ -18,7 +18,7 @@ export interface Customer {
   gender?: string | null; dateOfBirth?: string | null; anniversary?: string | null;
   address?: string | null; city?: string | null;
   tier: string; loyaltyPoints: number; walletBalance: number;
-  creditLimit: number; creditBalance: number;
+  creditLimit: number; creditBalance: number; creditDays?: number;
   totalSpent: number; totalOrders: number;
   isActive: boolean; referralCode?: string | null;
   notes?: string | null; tags: string[];
@@ -30,13 +30,13 @@ interface Form {
   firstName: string; lastName: string; phone: string; email: string;
   gender: string; dateOfBirth: string; anniversary: string;
   address: string; city: string; notes: string;
-  tags: string[]; tagInput: string; creditLimit: string;
+  tags: string[]; tagInput: string; creditLimit: string; creditDays: string;
 }
 
 const INIT: Form = {
   firstName: "", lastName: "", phone: "", email: "",
   gender: "", dateOfBirth: "", anniversary: "",
-  address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "",
+  address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "", creditDays: "30",
 };
 
 interface Props { open: boolean; onClose: () => void; onSaved: () => void; editCustomer?: Customer; }
@@ -65,6 +65,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         address: editCustomer.address ?? "", city: editCustomer.city ?? "",
         notes: editCustomer.notes ?? "", tags: editCustomer.tags ?? [], tagInput: "",
         creditLimit: editCustomer.creditLimit > 0 ? String(editCustomer.creditLimit) : "",
+        creditDays: String(editCustomer.creditDays ?? 30),
       });
     } else { setForm(INIT); }
   }, [open, editCustomer]);
@@ -90,6 +91,12 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         setLoading(false);
         return;
       }
+      const creditDays = form.creditDays.trim() ? parseInt(form.creditDays, 10) : undefined;
+      if (creditDays !== undefined && (isNaN(creditDays) || creditDays < 0)) {
+        toast.error("Credit days must be a valid non-negative number");
+        setLoading(false);
+        return;
+      }
       const payload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName || undefined,
@@ -103,6 +110,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         notes: form.notes || undefined,
         tags: form.tags,
         ...(creditLimit !== undefined ? { creditLimit } : {}),
+        ...(creditDays !== undefined ? { creditDays } : {}),
       };
       if (editCustomer) {
         await api.put(`/customers/${editCustomer.id}`, payload);
@@ -184,9 +192,14 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
           <Field label="Notes">
             <Textarea rows={2} placeholder="Internal notes…" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
           </Field>
-          <Field label="Credit Limit (LKR)">
-            <Input type="number" min="0" step="0.01" placeholder="0 = no credit sales" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Credit Limit (LKR)">
+              <Input type="number" min="0" step="0.01" placeholder="0 = no credit sales" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
+            </Field>
+            <Field label="Credit Days">
+              <Input type="number" min="0" step="1" placeholder="30" value={form.creditDays} onChange={(e) => set("creditDays", e.target.value)} />
+            </Field>
+          </div>
           <Field label="Tags">
             <div className="flex gap-1.5">
               <Input placeholder="Add tag…" value={form.tagInput} onChange={(e) => set("tagInput", e.target.value)}

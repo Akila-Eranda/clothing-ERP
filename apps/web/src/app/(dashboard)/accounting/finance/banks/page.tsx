@@ -1,11 +1,7 @@
 "use client";
 
-import { BanksSection, FinancePageShell } from "@/components/accounting/finance-hub";
+import { CashBankHub } from "@/components/accounting/cash-bank-hub";
 
 export default function BanksPage() {
-  return (
-    <FinancePageShell title="Banks" subtitle="Bank accounts & current balances">
-      <BanksSection />
-    </FinancePageShell>
-  );
+  return <CashBankHub initialTab="bank" />;
 }

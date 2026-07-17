@@ -29,7 +29,7 @@ interface Expense {
   categoryId?: string | null; paymentMethod: string; reference?: string | null;
   createdAt: string;
 }
-interface Account { id: string; code: string; name: string; type: string; balance: number; description?: string | null; }
+interface Account { id: string; code: string; name: string; type: string; balance: number; description?: string | null; parentId?: string | null; children?: Account[]; openingBalance?: number; }
 interface PLData { month: string; revenue: number; expenses: number; profit: number; }
 interface PLReport {
   period: { startDate: string; endDate: string };
@@ -73,13 +73,31 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
   const [category, setCategory]   = useState(edit?.categoryId ?? "");
   const [method, setMethod]       = useState(edit?.paymentMethod ?? "CASH");
   const [reference, setReference] = useState(edit?.reference ?? "");
+  const [chequeDue, setChequeDue] = useState("");
+  const [chequeBank, setChequeBank] = useState("");
   const [saving, setSaving]       = useState(false);
 
   const save = async () => {
     if (!amount || !description || !date) { toast.error("Fill required fields"); return; }
+    if (method === "CHEQUE" && !edit && !(reference || "").trim()) {
+      toast.error("Cheque number required (use Reference field)");
+      return;
+    }
     setSaving(true);
     try {
-      const payload = { amount: parseFloat(amount), description, date, categoryId: category || null, paymentMethod: method, reference: reference || null };
+      const payload: Record<string, unknown> = {
+        amount: parseFloat(amount),
+        description,
+        date,
+        categoryId: category || null,
+        paymentMethod: method,
+        reference: reference || null,
+      };
+      if (!edit && method === "CHEQUE") {
+        payload.chequeNumber = reference.trim();
+        payload.chequeDueDate = chequeDue || undefined;
+        payload.chequeBankName = chequeBank.trim() || undefined;
+      }
       if (edit) { await api.put(`/accounting/expenses/${edit.id}`, payload); toast.success("Expense updated"); }
       else       { await api.post("/accounting/expenses", payload);           toast.success("Expense recorded"); }
       onSaved(); onClose();
@@ -126,9 +144,25 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-semibold">Reference</Label>
-            <Input placeholder="Invoice or receipt number…" value={reference} onChange={(e) => setReference(e.target.value)} />
+            <Label className="text-xs font-semibold">{method === "CHEQUE" ? "Cheque number *" : "Reference"}</Label>
+            <Input
+              placeholder={method === "CHEQUE" ? "Cheque number…" : "Invoice or receipt number…"}
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+            />
           </div>
+          {method === "CHEQUE" && !edit && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Cheque bank</Label>
+                <Input placeholder="e.g. BOC" value={chequeBank} onChange={(e) => setChequeBank(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Due date</Label>
+                <Input type="date" value={chequeDue} onChange={(e) => setChequeDue(e.target.value)} />
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
@@ -208,8 +242,13 @@ function JournalModal({ accounts, onClose, onSaved }: { accounts: Account[]; onC
     if (!validLines.length) { toast.error("Add at least one valid line"); return; }
     setSaving(true);
     try {
-      await api.post("/accounting/journal-entries", { description: desc, date, lines: validLines.map((l) => ({ ...l, amount: parseFloat(l.amount) })) });
-      toast.success("Journal entry posted");
+      await api.post("/accounting/journal-entries", {
+        description: desc,
+        date,
+        action: "POST",
+        lines: validLines.map((l) => ({ ...l, amount: parseFloat(l.amount) })),
+      });
+      toast.success("Journal entry saved");
       onSaved(); onClose();
     } catch { toast.error("Failed to post journal entry"); }
     finally { setSaving(false); }
@@ -359,9 +398,12 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
         results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<{ data: T }>).value.data : null;
 
       const expRes = ok<{ data: Expense[] }>(0);
-      const accRes = ok<Account[]>(1);
+      const accRes = ok<{ data?: Account[] } | Account[]>(1);
       if (expRes) setExpenses((expRes?.data ?? expRes ?? []) as Expense[]);
-      if (accRes) setAccounts(Array.isArray(accRes) ? accRes : []);
+      if (accRes) {
+        const tree = Array.isArray(accRes) ? accRes : (accRes.data ?? []);
+        setAccounts(Array.isArray(tree) ? tree : []);
+      }
       const pl = ok<PLReport>(2); if (pl) setPlReport(pl);
       const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number }>(3); if (cf) setCashFlow(cf as any);
       const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal((je?.data ?? []) as JournalEntry[]);
@@ -664,7 +706,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                   {[
                     { icon: Scale,      label: "Chart of\nAccounts",   fn: () => go("accounts") },
                     { icon: BookOpen,   label: "Journal\nEntry",       fn: () => setAddJournalOpen(true) },
-                    { icon: CreditCard, label: "Bank\nReconciliation", fn: () => {} },
+                    { icon: CreditCard, label: "Bank\nReconciliation", fn: () => router.push("/accounting/finance/reconciliation") },
                     { icon: FileText,   label: "Trial\nBalance",       fn: () => go("reports") },
                     { icon: TrendingUp, label: "Profit &\nLoss",       fn: () => go("reports") },
                     { icon: Building2,  label: "Balance\nSheet",       fn: () => go("reports") },

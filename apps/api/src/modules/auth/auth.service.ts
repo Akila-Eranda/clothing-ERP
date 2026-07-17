@@ -81,12 +81,29 @@ export class AuthService {
     });
 
     if (!user) {
+      if (tenantId) {
+        this.eventEmitter.emit('auth.login.failed', {
+          tenantId,
+          email: dto.email.toLowerCase(),
+          ip,
+          userAgent,
+          reason: 'unknown_user',
+        });
+      }
       throw new UnauthorizedException('Invalid credentials');
     }
 
     // ── Lockout check ────────────────────────────────────────
     if (user.lockedUntil && user.lockedUntil > new Date()) {
       const remaining = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 60000);
+      this.eventEmitter.emit('auth.login.failed', {
+        tenantId: user.tenantId,
+        userId: user.id,
+        email: user.email,
+        ip,
+        userAgent,
+        reason: 'locked',
+      });
       throw new ForbiddenException(
         `Account locked. Try again in ${remaining} minutes.`,
       );
@@ -94,6 +111,14 @@ export class AuthService {
 
     // ── Status check ─────────────────────────────────────────
     if (user.status === UserStatus.INACTIVE || user.status === UserStatus.SUSPENDED) {
+      this.eventEmitter.emit('auth.login.failed', {
+        tenantId: user.tenantId,
+        userId: user.id,
+        email: user.email,
+        ip,
+        userAgent,
+        reason: 'disabled',
+      });
       throw new ForbiddenException('Account is disabled. Contact support.');
     }
 
@@ -110,6 +135,15 @@ export class AuthService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: { loginAttempts: attempts, ...(lockedUntil && { lockedUntil }) },
+      });
+
+      this.eventEmitter.emit('auth.login.failed', {
+        tenantId: user.tenantId,
+        userId: user.id,
+        email: user.email,
+        ip,
+        userAgent,
+        reason: 'invalid_password',
       });
 
       throw new UnauthorizedException('Invalid credentials');
@@ -129,6 +163,14 @@ export class AuthService {
         window: 2,
       });
       if (!isValid) {
+        this.eventEmitter.emit('auth.login.failed', {
+          tenantId: user.tenantId,
+          userId: user.id,
+          email: user.email,
+          ip,
+          userAgent,
+          reason: 'invalid_2fa',
+        });
         throw new UnauthorizedException('Invalid 2FA code');
       }
     }
@@ -166,7 +208,12 @@ export class AuthService {
       },
     });
 
-    this.eventEmitter.emit('auth.login', { userId: user.id, tenantId: user.tenantId, ip });
+    this.eventEmitter.emit('auth.login', {
+      userId: user.id,
+      tenantId: user.tenantId,
+      ip,
+      userAgent,
+    });
 
     return {
       user: {
@@ -290,7 +337,13 @@ export class AuthService {
   }
 
   // ── Logout ────────────────────────────────────────────────
-  async logout(userId: string, accessToken: string): Promise<void> {
+  async logout(
+    userId: string,
+    accessToken: string,
+    tenantId?: string,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<void> {
     await Promise.all([
       this.prisma.session.updateMany({
         where: { userId, token: accessToken },
@@ -301,7 +354,9 @@ export class AuthService {
         data: { isRevoked: true },
       }),
     ]);
-    this.eventEmitter.emit('auth.logout', { userId });
+    if (tenantId) {
+      this.eventEmitter.emit('auth.logout', { userId, tenantId, ip, userAgent });
+    }
   }
 
   // ── Forgot Password ───────────────────────────────────────

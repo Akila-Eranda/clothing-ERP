@@ -15,6 +15,8 @@ import { PaginationDto } from '@/common/dto/pagination.dto';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { recordRefundCashMovement } from '@/shared/cash-register.helper';
 import { PaymentMethod } from '@prisma/client';
+import { CustomersModule } from '@/modules/customers/customers.module';
+import { CustomerCreditService } from '@/modules/customers/customer-credit.service';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
@@ -46,6 +48,7 @@ export class ReturnsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
+    private readonly creditService: CustomerCreditService,
   ) {}
 
   async create(tenantId: string, branchId: string, userId: string, dto: CreateReturnDto) {
@@ -114,6 +117,15 @@ export class ReturnsService {
         ret.id,
         ret.returnNumber,
         refundAmount,
+      );
+    }
+
+    if (refundAmount > 0) {
+      await this.creditService.reverseCreditForSaleReturn(
+        tenantId,
+        sale.id,
+        refundAmount,
+        `Return ${ret.returnNumber} credit reversal`,
       );
     }
 
@@ -284,7 +296,7 @@ export class ReturnsController {
 }
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, CustomersModule],
   controllers: [ReturnsController],
   providers: [ReturnsService],
   exports: [ReturnsService],

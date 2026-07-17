@@ -3,9 +3,7 @@
 import * as React from "react";
 import { toast } from "sonner";
 import type { HeldBillData } from "@/stores/cart-store";
-import { PRODUCT_GRID_COLS } from "./pos-shortcuts";
-
-const PAY_METHODS = ["CASH", "CARD", "UPI", "WALLET", "CUSTOMER_CREDIT"] as const;
+import { POS_PAY_METHODS, PRODUCT_GRID_COLS } from "./pos-shortcuts";
 
 export type PosProductItem = {
   variantId: string;
@@ -50,7 +48,9 @@ export interface PosKeyboardContext {
   checkoutOpen: boolean;
   showShortcuts: boolean;
   showCustomerSearch: boolean;
+  showHeldBills: boolean;
   showDayEnd: boolean;
+  qtyPopupOpen: boolean;
   selectedProductName: string | null;
   activeNav: string;
   activePayment: string;
@@ -78,6 +78,7 @@ export interface PosKeyboardContext {
   setCheckoutOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setSelectedProductName: React.Dispatch<React.SetStateAction<string | null>>;
   setShowCustomerSearch: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowHeldBills: React.Dispatch<React.SetStateAction<boolean>>;
   setCustomerSearch: React.Dispatch<React.SetStateAction<string>>;
   setCustomers: React.Dispatch<React.SetStateAction<PosCustomerRow[]>>;
   setActiveNav: React.Dispatch<React.SetStateAction<string>>;
@@ -99,7 +100,7 @@ export interface PosKeyboardContext {
   handleAddProduct: (p: PosProductItem) => void;
   handleCardClick: (p: PosProductItem) => void;
   handleNumpad: (key: string) => void;
-  handleCheckout: () => void;
+  handleCheckout: (forceMethod?: string) => void | Promise<void>;
   handleHoldBill: () => void;
   handleRestoreHeldBill: (bill: PosHeldBill) => void;
   handleDeleteHeldBill: (id: string) => void;
@@ -113,6 +114,8 @@ export interface PosKeyboardContext {
   removeItem: (variantId: string) => void;
   adjustSelectedQty: (delta: number) => void;
   removeSelectedCartItem: () => void;
+  openQtyEditForSelected: () => void;
+  closeQtyPopup: () => void;
   applyCustomer: (c: PosCustomerRow) => void;
   getFilteredProduct: (idx: number) => PosProductItem | undefined;
   getHeldBill: (idx: number) => PosHeldBill | undefined;
@@ -127,10 +130,41 @@ function isInputFocused() {
   return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
 }
 
+function anyModalOpen(ctx: PosKeyboardContext) {
+  return (
+    ctx.checkoutOpen
+    || ctx.showCustomerSearch
+    || ctx.showHeldBills
+    || ctx.showShortcuts
+    || ctx.showDayEnd
+    || ctx.qtyPopupOpen
+    || !!ctx.selectedProductName
+  );
+}
+
+function navigateToNavItem(ctx: PosKeyboardContext, id: string) {
+  if (id === "hold-bills") {
+    ctx.setShowHeldBills(true);
+    ctx.setActiveNav("products");
+    return;
+  }
+  if (id === "customers") {
+    ctx.setShowCustomerSearch(false);
+  }
+  ctx.setActiveNav(id);
+}
+
 function cycleNav(ctx: PosKeyboardContext, delta: number) {
   const idx = ctx.navItems.findIndex((n) => n.id === ctx.activeNav);
   const next = (idx + delta + ctx.navItems.length) % ctx.navItems.length;
-  ctx.setActiveNav(ctx.navItems[next].id);
+  navigateToNavItem(ctx, ctx.navItems[next].id);
+}
+
+function cyclePayment(ctx: PosKeyboardContext, delta: number) {
+  const i = POS_PAY_METHODS.indexOf(ctx.activePayment as (typeof POS_PAY_METHODS)[number]);
+  const base = i < 0 ? 0 : i;
+  const next = (base + delta + POS_PAY_METHODS.length) % POS_PAY_METHODS.length;
+  ctx.setActivePayment(POS_PAY_METHODS[next]);
 }
 
 export function usePosKeyboard(ctx: PosKeyboardContext) {
@@ -188,23 +222,61 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
 
       if (e.key === "Escape") {
+        e.preventDefault();
+        if (ctx.qtyPopupOpen) { ctx.closeQtyPopup(); return; }
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
+        if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }
         if (ctx.showCustomerSearch) {
           ctx.setShowCustomerSearch(false);
           ctx.setCustomerSearch("");
           ctx.setCustomers([]);
+          ctx.setShowNewCust(false);
           return;
         }
         ctx.closePos();
         return;
       }
 
+      // Search results: arrow navigate + keep typing in the barcode box
+      if (document.activeElement === ctx.searchRef.current && !ctx.checkoutOpen && !ctx.showCustomerSearch && !ctx.showHeldBills && !ctx.qtyPopupOpen) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          ctx.setFocusedProductIdx((i) => Math.min(ctx.filteredProductsLength - 1, Math.max(0, i) + 1));
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          ctx.setFocusedProductIdx((i) => Math.max(0, (i < 0 ? 0 : i) - 1));
+          return;
+        }
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        ctx.setActiveNav("products");
+        ctx.searchRef.current?.focus();
+        ctx.searchRef.current?.select();
+        return;
+      }
+
+      // Instant Pay Cash — works from cart or checkout
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && ctx.itemsLength > 0 && !inInput) {
+        e.preventDefault();
+        void ctx.handleCheckout("CASH");
+        return;
+      }
+      if (e.key === "F9" && e.shiftKey && ctx.itemsLength > 0) {
+        e.preventDefault();
+        void ctx.handleCheckout("CASH");
+        return;
+      }
+
       if (ctx.showCustomerSearch && !inInput) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          ctx.setFocusedCustomerIdx((i) => Math.min(ctx.customerModalListLength - 1, i + 1));
+          ctx.setFocusedCustomerIdx((i) => Math.min(Math.max(0, ctx.customerModalListLength - 1), i + 1));
           return;
         }
         if (e.key === "ArrowUp") {
@@ -215,12 +287,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (e.key === "Enter" && ctx.focusedCustomerIdx >= 0) {
           e.preventDefault();
           const c = ctx.getCustomerModalItem(ctx.focusedCustomerIdx);
-          if (c) {
-            ctx.applyCustomer(c);
-            ctx.setShowCustomerSearch(false);
-            ctx.setCustomerSearch("");
-            ctx.setCustomers([]);
-          }
+          if (c) ctx.applyCustomer(c);
           return;
         }
       }
@@ -238,10 +305,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (ctx.activeNav === "hold-bills" && !inInput && !ctx.checkoutOpen) {
+      if (ctx.showHeldBills && !inInput && !ctx.checkoutOpen) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
-          ctx.setFocusedHeldIdx((i) => Math.min(ctx.serverHeldBillsLength - 1, i + 1));
+          ctx.setFocusedHeldIdx((i) => Math.min(Math.max(0, ctx.serverHeldBillsLength - 1), i + 1));
           return;
         }
         if (e.key === "ArrowUp") {
@@ -252,7 +319,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (e.key === "Enter" && ctx.focusedHeldIdx >= 0) {
           e.preventDefault();
           const bill = ctx.getHeldBill(ctx.focusedHeldIdx);
-          if (bill) ctx.handleRestoreHeldBill(bill);
+          if (bill) {
+            ctx.handleRestoreHeldBill(bill);
+            ctx.setShowHeldBills(false);
+          }
           return;
         }
         if (e.key === "Delete" && ctx.focusedHeldIdx >= 0) {
@@ -269,57 +339,94 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
 
       if (inInput) return;
 
-      if (e.altKey && /^[1-9]$/.test(e.key)) {
+      if (e.altKey && /^[1-9]$/.test(e.key) && !ctx.checkoutOpen) {
         e.preventDefault();
         const idx = parseInt(e.key, 10) - 1;
-        if (ctx.navItems[idx]) ctx.setActiveNav(ctx.navItems[idx].id);
+        if (ctx.navItems[idx]) navigateToNavItem(ctx, ctx.navItems[idx].id);
         return;
       }
 
-      if (e.key === "ArrowLeft" && !e.ctrlKey && !e.shiftKey && !ctx.checkoutOpen) {
-        e.preventDefault();
-        cycleNav(ctx, -1);
-        return;
-      }
-      if (e.key === "ArrowRight" && !e.ctrlKey && !e.shiftKey && !ctx.checkoutOpen) {
-        e.preventDefault();
-        cycleNav(ctx, 1);
-        return;
+      if (!anyModalOpen(ctx)) {
+        if (e.key === "ArrowLeft" && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          cycleNav(ctx, -1);
+          return;
+        }
+        if (e.key === "ArrowRight" && !e.ctrlKey && !e.shiftKey) {
+          e.preventDefault();
+          cycleNav(ctx, 1);
+          return;
+        }
       }
 
       const key = e.key.toLowerCase();
+
+      // Letter shortcuts for full POS tools
       if (key === "p") { e.preventDefault(); ctx.setActiveNav("products"); setTimeout(() => ctx.searchRef.current?.focus(), 50); return; }
-      if (key === "c") { e.preventDefault(); if (ctx.itemsLength > 0) ctx.setCheckoutOpen(true); else toast.info("Cart is empty"); return; }
+      if (key === "c") { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
+      if (key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
       if (key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
-      if (key === "h") { e.preventDefault(); ctx.setActiveNav("hold-bills"); return; }
-      if (key === "u") { e.preventDefault(); ctx.setActiveNav("customers"); return; }
+      if (key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
+      if (key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }
       if (key === "o") { e.preventDefault(); ctx.setActiveNav("orders"); return; }
+      if (key === "v") { e.preventDefault(); ctx.setActiveNav("vouchers"); return; }
+      if (key === "b" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); ctx.setActiveNav("quick-grn"); return; }
+      if (key === "e") { e.preventDefault(); ctx.setActiveNav("expenses"); return; }
+      if (key === "w") { e.preventDefault(); ctx.setActiveNav("warranty"); return; }
+      if (key === "m") { e.preventDefault(); ctx.setActiveNav("discounts"); return; }
+      if (key === "t") { e.preventDefault(); ctx.setActiveNav("reports"); return; }
       if (key === "g") { e.preventDefault(); ctx.setActiveNav("settings"); return; }
-      if (key === "n" && ctx.activeNav === "customers") { e.preventDefault(); ctx.setShowNewCust(true); return; }
-      if (key === "x" && ctx.itemsLength >= 0) { e.preventDefault(); ctx.setCustomer(null); toast.info("Customer removed from bill"); return; }
+      if (key === "n" && (ctx.showCustomerSearch || ctx.activeNav === "customers")) { e.preventDefault(); ctx.setShowNewCust(true); return; }
+      if (key === "x") { e.preventDefault(); ctx.setCustomer(null); toast.info("Customer removed from bill"); return; }
       if (key === "d") { e.preventDefault(); ctx.discountInputRef.current?.focus(); return; }
       if (key === "s") { e.preventDefault(); void ctx.handleSplitBill(); return; }
       if (key === "/" || ((e.ctrlKey || e.metaKey) && key === "f")) { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.setActiveNav("products"); return; }
 
-      if (key === "[" && ctx.activeNav === "products") {
+      if (key === "[" && ctx.activeNav === "products" && !anyModalOpen(ctx)) {
         e.preventDefault();
         const idx = ctx.categories.indexOf(ctx.activeCategory);
         ctx.setActiveCategory(ctx.categories[Math.max(0, idx - 1)] ?? "All");
         return;
       }
-      if (key === "]" && ctx.activeNav === "products") {
+      if (key === "]" && ctx.activeNav === "products" && !anyModalOpen(ctx)) {
         e.preventDefault();
         const idx = ctx.categories.indexOf(ctx.activeCategory);
         ctx.setActiveCategory(ctx.categories[Math.min(ctx.categories.length - 1, idx + 1)] ?? "All");
         return;
       }
 
-      if (e.key === "F2") { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.setActiveNav("products"); return; }
-      if (e.key === "F3") { e.preventDefault(); if (ctx.itemsLength > 0) void ctx.handleHoldBill(); return; }
-      if (e.key === "F4") { e.preventDefault(); ctx.setShowCustomerSearch(true); ctx.setFocusedCustomerIdx(0); return; }
-      if (e.key === "F5") { e.preventDefault(); void ctx.loadProducts(); return; }
-      if (e.key === "F6") { e.preventDefault(); ctx.setActiveNav("returns"); return; }
+      if (e.key === "F2") { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.searchRef.current?.select(); ctx.setActiveNav("products"); return; }
+      if (e.key === "F3") { e.preventDefault(); if (ctx.itemsLength > 0) void ctx.handleHoldBill(); else toast.info("Cart is empty"); return; }
+      if (e.key === "F4") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }
+      if (e.key === "F5") { e.preventDefault(); ctx.discountInputRef.current?.focus(); return; }
+      if (e.key === "F6") {
+        e.preventDefault();
+        if (ctx.selectedCartIdx < 0) { toast.info("Select a cart line first (↑↓)"); return; }
+        ctx.openQtyEditForSelected();
+        return;
+      }
       if (e.key === "F7") {
+        e.preventDefault();
+        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
+        ctx.setActivePayment("CASH");
+        ctx.setCheckoutOpen(true);
+        return;
+      }
+      if (e.key === "F8") {
+        e.preventDefault();
+        ctx.setShowHeldBills(true);
+        ctx.setFocusedHeldIdx(0);
+        ctx.setActiveNav("products");
+        return;
+      }
+      if (e.key === "F9" && !e.shiftKey) {
+        e.preventDefault();
+        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
+        if (!ctx.checkoutOpen) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); return; }
+        void ctx.handleCheckout();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "c") {
         e.preventDefault();
         if (ctx.itemsLength === 0) { toast.info("Cart is already empty"); return; }
         if (window.confirm("Clear all items from the cart?")) {
@@ -328,20 +435,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           ctx.setCheckoutOpen(false);
           toast.success("Cart cleared");
         }
-        return;
-      }
-      if (e.key === "F8") {
-        e.preventDefault();
-        const bill = ctx.getHeldBill(0);
-        if (bill) ctx.handleRestoreHeldBill(bill);
-        else toast.info("No held bills");
-        return;
-      }
-      if (e.key === "F9") {
-        e.preventDefault();
-        if (ctx.itemsLength === 0) return;
-        if (!ctx.checkoutOpen) { ctx.setCheckoutOpen(true); return; }
-        void ctx.handleCheckout();
         return;
       }
       if (e.key === "F10") { e.preventDefault(); void ctx.handleThermalPrint(); return; }
@@ -357,24 +450,41 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (ctx.checkoutOpen) {
         if (e.key === "Tab" && e.shiftKey) {
           e.preventDefault();
-          const i = PAY_METHODS.indexOf(ctx.activePayment as typeof PAY_METHODS[number]);
-          ctx.setActivePayment(PAY_METHODS[(i - 1 + PAY_METHODS.length) % PAY_METHODS.length]);
+          cyclePayment(ctx, -1);
           return;
         }
         if (e.key === "Tab") {
           e.preventDefault();
-          const i = PAY_METHODS.indexOf(ctx.activePayment as typeof PAY_METHODS[number]);
-          ctx.setActivePayment(PAY_METHODS[(i + 1) % PAY_METHODS.length]);
+          cyclePayment(ctx, 1);
           return;
         }
-        if (/^[1-5]$/.test(e.key)) {
+        // Cash tendered numpad takes priority over 1–7 payment shortcuts
+        if (ctx.activePayment === "CASH") {
+          if (/^\d$/.test(e.key)) {
+            e.preventDefault();
+            ctx.handleNumpad(e.key);
+            return;
+          }
+          if (e.key === "." || e.key === "Decimal" || e.code === "NumpadDecimal") {
+            e.preventDefault();
+            ctx.handleNumpad(".");
+            return;
+          }
+          if (e.key === "Backspace" || e.key === "Delete") {
+            e.preventDefault();
+            ctx.handleNumpad("DEL");
+            return;
+          }
+        }
+        // Alt+1…7 always switches method; bare 1–7 only when not entering cash
+        if ((e.altKey || ctx.activePayment !== "CASH") && /^[1-7]$/.test(e.key)) {
           e.preventDefault();
-          ctx.setActivePayment(PAY_METHODS[parseInt(e.key, 10) - 1]);
+          ctx.setActivePayment(POS_PAY_METHODS[parseInt(e.key, 10) - 1]);
           return;
         }
       }
 
-      if (ctx.activeNav === "products" && !ctx.checkoutOpen && !ctx.selectedProductName && e.ctrlKey) {
+      if (ctx.activeNav === "products" && !ctx.checkoutOpen && !ctx.selectedProductName && !ctx.showCustomerSearch && !ctx.showHeldBills && e.ctrlKey) {
         if (e.key === "ArrowRight") {
           e.preventDefault();
           ctx.setFocusedProductIdx((i) => Math.min(ctx.filteredProductsLength - 1, Math.max(0, i) + 1));
@@ -404,29 +514,23 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
 
       if (e.key === "Enter") {
-        if (ctx.activeNav === "products" && ctx.focusedProductIdx >= 0 && !ctx.checkoutOpen) {
+        if (ctx.activeNav === "products" && ctx.focusedProductIdx >= 0 && !ctx.checkoutOpen && !ctx.showCustomerSearch && !ctx.showHeldBills) {
           e.preventDefault();
           const p = ctx.getFilteredProduct(ctx.focusedProductIdx);
           if (p) ctx.handleCardClick(p);
           return;
         }
-        if (ctx.activeNav === "customers" && ctx.focusedCustomerIdx >= 0) {
+        if (ctx.activeNav === "customers" && ctx.focusedCustomerIdx >= 0 && !ctx.showCustomerSearch) {
           e.preventDefault();
           const c = ctx.getInlineCustomer(ctx.focusedCustomerIdx);
           if (c) ctx.applyCustomer(c);
           return;
         }
         if (ctx.itemsLength === 0) return;
-        if (!ctx.checkoutOpen) { e.preventDefault(); ctx.setCheckoutOpen(true); return; }
+        if (!ctx.checkoutOpen) { e.preventDefault(); ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); return; }
         e.preventDefault();
         void ctx.handleCheckout();
         return;
-      }
-
-      if (ctx.activePayment === "CASH" && ctx.checkoutOpen) {
-        if (/^\d$/.test(e.key)) { ctx.handleNumpad(e.key); return; }
-        if (e.key === ".") { ctx.handleNumpad("."); return; }
-        if (e.key === "Backspace") { ctx.handleNumpad("DEL"); return; }
       }
 
       if (e.key === "ArrowDown" && e.ctrlKey) {
@@ -439,7 +543,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         ctx.setSelectedCartIdx((i) => Math.max(0, i - 1));
         return;
       }
-      if (!e.ctrlKey && !ctx.checkoutOpen && ctx.itemsLength > 0 && ctx.activeNav === "products") {
+      if (!e.ctrlKey && !anyModalOpen(ctx) && ctx.itemsLength > 0 && ctx.activeNav === "products") {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setSelectedCartIdx((i) => Math.min(ctx.itemsLength - 1, i < 0 ? 0 : i + 1));
@@ -452,7 +556,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (!e.ctrlKey && !ctx.checkoutOpen && ctx.itemsLength > 0 && ctx.activeNav !== "products" && ctx.activeNav !== "hold-bills") {
+      if (!e.ctrlKey && !anyModalOpen(ctx) && ctx.itemsLength > 0 && ctx.activeNav !== "products") {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setSelectedCartIdx((i) => Math.min(ctx.itemsLength - 1, i < 0 ? 0 : i + 1));
@@ -473,7 +577,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         ctx.adjustSelectedQty(-1);
         return;
       }
-      if (e.key === "Delete" && ctx.selectedCartIdx >= 0) {
+      if (e.key === "Delete" && ctx.selectedCartIdx >= 0 && !ctx.showHeldBills) {
         ctx.removeSelectedCartItem();
         return;
       }

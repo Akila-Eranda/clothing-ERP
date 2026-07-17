@@ -546,16 +546,6 @@ export function HrHub({ section }: { section: HrSection }) {
 
   useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
 
-  useEffect(() => {
-    if (section === "attendance") {
-      if (attnView === "daily") void fetchAttendance();
-      else void fetchMonthlySummary();
-    }
-    if (section === "payroll") void fetchPayrolls();
-    if (section === "leaves") void fetchLeaves();
-  }, [section, attnView, fetchAttendance, fetchMonthlySummary, fetchPayrolls, fetchLeaves]);
-
-
   const handleDeactivate = async (emp: Employee) => {
     if (!window.confirm(`Deactivate ${emp.firstName}?`)) return;
     try { await api.delete(`/hr/employees/${emp.id}`); toast.success("Employee deactivated"); fetchEmployees(); }
@@ -606,6 +596,15 @@ export function HrHub({ section }: { section: HrSection }) {
     } catch { toast.error("Failed to load payroll"); }
     finally { setPayLoading(false); }
   }, [payMonth, payYear]);
+
+  useEffect(() => {
+    if (section === "attendance") {
+      if (attnView === "daily") void fetchAttendance();
+      else void fetchMonthlySummary();
+    }
+    if (section === "payroll") void fetchPayrolls();
+    if (section === "leaves") void fetchLeaves();
+  }, [section, attnView, fetchAttendance, fetchMonthlySummary, fetchPayrolls, fetchLeaves]);
 
   const saveAttendance = async () => {
     const rows = Object.entries(attnMap).map(([employeeId, status]) => ({ employeeId, status }));

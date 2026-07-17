@@ -41,7 +41,6 @@ const MOVEMENT_TYPES = [
   { value: "PURCHASE",   label: "Purchase / Restock", icon: Plus,        desc: "Add stock from purchase" },
   { value: "RETURN",     label: "Customer Return",    icon: Plus,        desc: "Add stock from return" },
   { value: "SALE",       label: "Sale Correction",    icon: Minus,       desc: "Deduct stock (correction)" },
-  { value: "TRANSFER_OUT", label: "Transfer Out",     icon: Minus,       desc: "Move stock to another branch" },
   { value: "DAMAGE",     label: "Damage / Write-off", icon: Minus,       desc: "Remove damaged stock" },
 ];
 

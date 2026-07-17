@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -114,36 +114,42 @@ function useNavGroups(): NavGroup[] {
   ];
 
   const accountingChildren: NavItem[] = [
-    { label: L["/accounting"] ?? "Dashboard", href: "/accounting", icon: LayoutDashboard },
-    { label: L["/accounting/transactions"] ?? "Transactions", href: "/accounting/transactions", icon: Activity },
-    { label: L["/accounting/accounts"] ?? "Chart of Accounts", href: "/accounting/accounts", icon: BookOpen },
-    { label: L["/accounting/banking"] ?? "Banking", href: "/accounting/banking", icon: Landmark },
-    { label: L["/accounting/reports"] ?? "Reports", href: "/accounting/reports", icon: FileBarChart },
+    { label: L["/accounting"] ?? "Overview", href: "/accounting", icon: BookOpen },
+    { label: L["/accounting/accounts"] ?? "Chart of Accounts", href: "/accounting/accounts", icon: List },
+    { label: L["/accounting/journals"] ?? "GL Journals", href: "/accounting/journals", icon: ScrollText },
+    { label: L["/accounting/reports"] ?? "Financial Reports", href: "/accounting/reports", icon: BarChart3 },
+    { label: L["/accounting/ar-ap"] ?? "AR / AP", href: "/accounting/ar-ap", icon: Users },
+    { label: L["/accounting/cash-bank"] ?? "Cash & Bank", href: "/accounting/cash-bank", icon: Landmark },
+    { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
+    { label: L["/accounting/vat"] ?? "VAT / Tax", href: "/accounting/vat", icon: FileText },
+    { label: L["/accounting/petty-cash"] ?? "Petty Cash", href: "/accounting/petty-cash", icon: Wallet },
+    { label: L["/accounting/payroll"] ?? "Payroll", href: "/accounting/payroll", icon: UserCheck },
+    { label: L["/accounting/periods"] ?? "Periods", href: "/accounting/periods", icon: CalendarDays },
+    { label: L["/accounting/audit"] ?? "Audit Trail", href: "/accounting/audit", icon: Shield },
     { label: L["/accounting/settings"] ?? "Settings", href: "/accounting/settings", icon: Settings },
   ];
 
   const accountingItem: NavItem = {
     label: "Accounting",
-    icon: Wallet,
+    icon: BookOpen,
     href: "/accounting",
-    peerHrefs: ["/accounting/finance", "/accounting/credit"],
+    peerHrefs: [
+      "/accounting/finance",
+      "/accounting/credit",
+      "/accounting/journals",
+      "/accounting/ar-ap",
+      "/accounting/cash-bank",
+      "/accounting/finance/cheques",
+      "/accounting/vat",
+      "/accounting/petty-cash",
+      "/accounting/payroll",
+      "/accounting/periods",
+      "/accounting/audit",
+      "/accounting/transactions",
+      "/accounting/accounts",
+      "/accounting/banking",
+    ],
     children: accountingChildren,
-  };
-
-  const financeHubChildren: NavItem[] = [
-    { label: L["/accounting/finance/payable"] ?? "Payable", href: "/accounting/finance/payable", icon: Scale },
-    { label: L["/accounting/finance/receivable"] ?? "Receivable", href: "/accounting/finance/receivable", icon: Wallet },
-    { label: L["/accounting/finance/cash-book"] ?? "Cash Book", href: "/accounting/finance/cash-book", icon: BookOpen },
-    { label: L["/accounting/finance/banks"] ?? "Banks", href: "/accounting/finance/banks", icon: Landmark },
-    { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
-    { label: L["/accounting/finance/reconciliation"] ?? "Reconciliation", href: "/accounting/finance/reconciliation", icon: Building2 },
-  ];
-
-  const financeHubItem: NavItem = {
-    label: L["/accounting/finance"] ?? "Finance Hub",
-    icon: Landmark,
-    href: "/accounting/finance",
-    children: financeHubChildren,
   };
 
   const salesItems: NavItem[] = [
@@ -200,20 +206,8 @@ function useNavGroups(): NavGroup[] {
       title: S.finance,
       items: [
         accountingItem,
-        financeHubItem,
-        {
-          label: "Customer Credit",
-          icon: UserCheck,
-          href: "/accounting/credit",
-          children: [
-            { label: L["/accounting/credit"] ?? "Credit Customers", href: "/accounting/credit", icon: Users },
-            { label: L["/accounting/credit/schedules"] ?? "Schedules", href: "/accounting/credit/schedules", icon: CalendarClock },
-            { label: L["/accounting/credit/reminders"] ?? "Reminders", href: "/accounting/credit/reminders", icon: Bell },
-            { label: L["/accounting/credit/collections"] ?? "Collections", href: "/accounting/credit/collections", icon: FileBarChart },
-          ],
-        },
         { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
-        { label: L["/cash"], href: "/cash", icon: Banknote, badge: "NEW" },
+        { label: L["/cash"] ?? "Cash Registers", href: "/cash", icon: Banknote },
         { label: L["/expenses"], href: "/expenses", icon: TrendingDown },
         { label: L["/analytics"], href: "/analytics", icon: BarChart3 },
         { label: L["/advanced"], href: "/advanced", icon: Zap },

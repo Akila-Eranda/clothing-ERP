@@ -12,7 +12,8 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { type Product } from "@/components/products/add-product-modal";
+import { parseApiList } from "@/lib/parse-api-list";
+import { type Product } from "@/lib/product-types";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
@@ -120,7 +121,7 @@ function exportToCsv(products: Product[]) {
     `"${p.name.replace(/"/g, '""')}"`,
     p.sellingPrice, p.costPrice, p.mrp, p.taxRate,
     `"${(p.description ?? "").replace(/"/g, '""')}"`,
-    `"${p.tags.join("|")}"`,
+    `"${(p.tags ?? []).join("|")}"`,
     p.status,
   ].join(","));
   const csv = [CSV_HEADERS.join(","), ...rows].join("\n");
@@ -253,7 +254,7 @@ export default function ProductsPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: Product[] }>("/products?limit=500");
-      setProducts(res.data?.data ?? (res.data as unknown as Product[]) ?? []);
+      setProducts(parseApiList<Product>(res.data));
     } catch { toast.error("Failed to load products"); }
     finally { setLoading(false); }
   }, []);

@@ -186,6 +186,20 @@ export const api = {
   delete: <T>(path: string, init?: RequestInit)                   => request<T>(path, { method: 'DELETE', ...init }),
 };
 
+/** Phase 06 Sprint 12 — client-side PRINT / EXPORT beacon (fire-and-forget safe). */
+export async function logClientAuditEvent(payload: {
+  action: 'PRINT' | 'EXPORT';
+  resource: string;
+  resourceId?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await api.post('/audit-logs/client-event', payload);
+  } catch {
+    // never block UX on audit beacon
+  }
+}
+
 // ── Auth API ─────────────────────────────────────────────────────────────
 export interface LoginResponse {
   accessToken: string;

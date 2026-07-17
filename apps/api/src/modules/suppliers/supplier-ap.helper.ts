@@ -235,3 +235,82 @@ export async function assertSupplierCreditLimit(
     );
   }
 }
+
+export function roundAp(n: number) {
+  return round2(n);
+}
+
+/** FIFO allocate a payment/debit across open AP lines (invoices first by due date, then POs). */
+export function allocateApPaymentFifo(
+  lines: SupplierApLine[],
+  paymentAmount: number,
+): { lineId: string; source: 'PO' | 'INVOICE'; applied: number }[] {
+  const pay = round2(paymentAmount);
+  if (pay <= 0) return [];
+  const sorted = [...lines]
+    .filter((l) => l.amount > 0.009)
+    .sort((a, b) => {
+      // Invoices before POs, then oldest due
+      if (a.source !== b.source) return a.source === 'INVOICE' ? -1 : 1;
+      return a.dueDate.getTime() - b.dueDate.getTime();
+    });
+
+  let left = pay;
+  const out: { lineId: string; source: 'PO' | 'INVOICE'; applied: number }[] = [];
+  for (const l of sorted) {
+    if (left <= 0.009) break;
+    const applied = round2(Math.min(l.amount, left));
+    left = round2(left - applied);
+    out.push({ lineId: l.id, source: l.source, applied });
+  }
+  return out;
+}
+
+export type SupplierLedgerRow = {
+  id: string;
+  entryType: string;
+  amount: number;
+  balanceAfter: number;
+  createdAt: Date;
+  notes?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+};
+
+/** Statement window from ledger rows (uses balanceAfter). */
+export function buildSupplierStatementFromLedger(
+  rows: SupplierLedgerRow[],
+  range?: { from?: Date; to?: Date },
+): {
+  opening: number;
+  closing: number;
+  entries: (SupplierLedgerRow & { debit: number; credit: number })[];
+} {
+  const sorted = [...rows].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  let opening = 0;
+  let openingSet = !range?.from;
+  const entries: (SupplierLedgerRow & { debit: number; credit: number })[] = [];
+  let lastBefore: number | null = null;
+
+  for (const r of sorted) {
+    if (range?.to && r.createdAt.getTime() > range.to.getTime()) break;
+
+    if (range?.from && r.createdAt.getTime() < range.from.getTime()) {
+      lastBefore = r.balanceAfter;
+      continue;
+    }
+
+    if (range?.from && !openingSet) {
+      opening = lastBefore ?? 0;
+      openingSet = true;
+    }
+
+    const debit = r.amount > 0 ? round2(r.amount) : 0;
+    const credit = r.amount < 0 ? round2(Math.abs(r.amount)) : 0;
+    entries.push({ ...r, debit, credit });
+  }
+
+  if (!openingSet) opening = lastBefore ?? 0;
+  const closing = entries.length ? entries[entries.length - 1].balanceAfter : opening;
+  return { opening: round2(opening), closing: round2(closing), entries };
+}

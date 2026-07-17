@@ -1,7 +1,7 @@
 "use client";
 
-import { AccountingHub } from "@/components/accounting/accounting-hub";
+import { AccountingSettingsHub } from "@/components/accounting/accounting-settings-hub";
 
 export default function AccountingSettingsPage() {
-  return <AccountingHub section="settings" />;
+  return <AccountingSettingsHub />;
 }

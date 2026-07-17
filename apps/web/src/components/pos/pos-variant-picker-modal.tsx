@@ -21,6 +21,14 @@ export type PosVariantOption = {
   imageUrl?: string;
 };
 
+const LOW_STOCK_AT = 5;
+
+function stockTone(stock: number) {
+  if (stock <= 0) return { label: "Out of Stock", bg: "rgba(220,38,38,0.9)", text: "#fff", pill: "#dc2626" };
+  if (stock <= LOW_STOCK_AT) return { label: "Low Stock", bg: "rgba(217,119,6,0.9)", text: "#fff", pill: "#d97706" };
+  return { label: "Available", bg: "rgba(22,163,74,0.2)", text: "#4ade80", pill: "#16a34a" };
+}
+
 export function PosVariantPickerModal({
   productName,
   variants,
@@ -33,14 +41,51 @@ export function PosVariantPickerModal({
   onClose: () => void;
 }) {
   const { profile } = useShopWorkspace();
+  const [focusIdx, setFocusIdx] = React.useState(() => {
+    const firstIn = variants.findIndex((v) => v.stock > 0);
+    return firstIn >= 0 ? firstIn : 0;
+  });
+
+  React.useEffect(() => {
+    const firstIn = variants.findIndex((v) => v.stock > 0);
+    setFocusIdx(firstIn >= 0 ? firstIn : 0);
+  }, [variants]);
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusIdx((i) => Math.min(variants.length - 1, i + 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusIdx((i) => Math.max(0, i - 1));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const v = variants[focusIdx];
+        if (v && v.stock > 0) onSelect(v);
+        return;
+      }
+      if (/^[1-9]$/.test(e.key)) {
+        const idx = parseInt(e.key, 10) - 1;
+        const v = variants[idx];
+        if (v && v.stock > 0) {
+          e.preventDefault();
+          onSelect(v);
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, onSelect, variants, focusIdx]);
 
   return (
     <div
@@ -56,7 +101,7 @@ export function PosVariantPickerModal({
           <div className="min-w-0">
             <p className="text-white font-bold text-sm truncate">{productName}</p>
             <p className="text-[11px]" style={{ color: "#6a8ab8" }}>
-              Select a variant · {variants.length} options · prices may differ
+              Select variant · ↑↓ Enter · Esc · {variants.length} options
             </p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
@@ -65,39 +110,64 @@ export function PosVariantPickerModal({
         </div>
 
         <div className="overflow-y-auto flex-1 p-2 space-y-1.5">
-          {variants.map((v) => {
+          {variants.map((v, idx) => {
             const out = v.stock <= 0;
+            const tone = stockTone(v.stock);
+            const focused = focusIdx === idx;
             return (
               <button
                 key={v.variantId}
                 type="button"
                 disabled={out}
+                onMouseEnter={() => setFocusIdx(idx)}
                 onClick={() => onSelect(v)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:border-blue-500/50"
-                style={{ background: "#162338", borderColor: "#1e3356" }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: focused ? "rgba(79,110,247,0.18)" : "#162338",
+                  borderColor: focused ? "#4f6ef7" : "#1e3356",
+                  boxShadow: focused ? "0 0 0 1px rgba(79,110,247,0.45)" : "none",
+                }}
               >
                 <div
-                  className="h-11 w-11 rounded-lg flex items-center justify-center shrink-0"
+                  className="h-12 w-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
                   style={{ background: "rgba(79,110,247,0.12)" }}
                 >
-                  <Package className="h-5 w-5" style={{ color: "#4f6ef7" }} />
+                  {v.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={v.imageUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <Package className="h-5 w-5" style={{ color: "#4f6ef7" }} />
+                  )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-semibold truncate">
-                    {variantDisplayLabel(v, profile) || v.variantName}
-                  </p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <p className="text-white text-sm font-semibold truncate">
+                      {variantDisplayLabel(v, profile) || v.variantName}
+                    </p>
+                    {(out || v.stock <= LOW_STOCK_AT) && (
+                      <span
+                        className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0"
+                        style={{ background: tone.bg, color: tone.text }}
+                      >
+                        {tone.label}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[10px] font-mono truncate" style={{ color: "#6a8ab8" }}>
-                    {v.sku}
-                    {v.barcode ? ` · ${v.barcode}` : ""}
+                    {v.barcode || v.sku}
+                    {v.barcode && v.sku !== v.barcode ? ` · ${v.sku}` : ""}
                   </p>
-                  <p className="text-[10px] mt-0.5" style={{ color: out ? "#ef4444" : "#6a8ab8" }}>
-                    Stock: {v.stock}{out ? " · Out of stock" : ""}
+                  <p className="text-[10px] mt-0.5 font-semibold" style={{ color: tone.pill }}>
+                    Stock: {v.stock}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-bold" style={{ color: "#4f6ef7" }}>
                     LKR {formatNumber(v.unitPrice)}
                   </p>
+                  {idx < 9 && (
+                    <p className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a" }}>{idx + 1}</p>
+                  )}
                 </div>
               </button>
             );

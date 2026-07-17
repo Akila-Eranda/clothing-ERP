@@ -1,11 +1,8 @@
 "use client";
 
-import { FinancePageShell, ReceivableSection } from "@/components/accounting/finance-hub";
+import { ArReceivableHub } from "@/components/accounting/ar-receivable-hub";
 
+/** Sprint 5 — Accounts Receivable */
 export default function ReceivablePage() {
-  return (
-    <FinancePageShell title="Receivable" subtitle="Customer credit balances & AR aging">
-      <ReceivableSection />
-    </FinancePageShell>
-  );
+  return <ArReceivableHub initialTab="dashboard" />;
 }

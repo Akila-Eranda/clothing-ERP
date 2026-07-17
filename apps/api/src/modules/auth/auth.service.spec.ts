@@ -14,6 +14,11 @@ const mockPrisma = {
     update: jest.fn(),
     create: jest.fn(),
   },
+  tenant: {
+    findUnique: jest.fn().mockResolvedValue({ settings: {} }),
+    findFirst: jest.fn(),
+    update: jest.fn(),
+  },
   refreshToken: {
     create: jest.fn(),
     findFirst: jest.fn(),
@@ -77,15 +82,20 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException if password is wrong', async () => {
       mockPrisma.user.findFirst.mockResolvedValue({
         id: 'user-1',
+        tenantId: 'tenant-1',
         email: loginDto.email,
         passwordHash: await bcrypt.hash('different-password', 10),
         status: 'ACTIVE',
         lockedUntil: null,
-        failedLoginAttempts: 0,
+        loginAttempts: 0,
         twoFactorEnabled: false,
         roles: [{ role: { name: 'Admin', type: 'TENANT_ADMIN', permissions: [] } }],
       });
       await expect(service.login(loginDto, '127.0.0.1', 'test-agent')).rejects.toThrow(UnauthorizedException);
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'auth.login.failed',
+        expect.objectContaining({ reason: 'invalid_password' }),
+      );
     });
 
     it('should return tokens for valid credentials', async () => {
@@ -99,14 +109,25 @@ describe('AuthService', () => {
         passwordHash,
         status: 'ACTIVE',
         lockedUntil: null,
-        failedLoginAttempts: 0,
+        loginAttempts: 0,
         twoFactorEnabled: false,
+        emailVerified: true,
+        branchId: null,
         roles: [{ role: { name: 'Admin', type: 'TENANT_ADMIN', permissions: [{ permission: { action: 'read', resource: 'products' } }] } }],
       });
       mockPrisma.user.update.mockResolvedValue({});
       mockPrisma.refreshToken.create.mockResolvedValue({ token: 'refresh-token' });
       mockPrisma.session.create.mockResolvedValue({});
       mockPrisma.activityLog.create.mockResolvedValue({});
+      mockPrisma.tenant.findUnique.mockImplementation(async (args: { where: { id?: string; subdomain?: string } }) => {
+        if (args.where.subdomain) return { settings: {} };
+        return {
+          id: tenantId,
+          status: 'ACTIVE',
+          plan: 'PROFESSIONAL',
+          trialEndsAt: null,
+        };
+      });
 
       const result = await service.login(loginDto, '127.0.0.1', 'test-agent');
 
@@ -115,6 +136,10 @@ describe('AuthService', () => {
       if ('user' in result) {
         expect(result.user.email).toBe(loginDto.email);
       }
+      expect(mockEventEmitter.emit).toHaveBeenCalledWith(
+        'auth.login',
+        expect.objectContaining({ userId: 'user-1', tenantId }),
+      );
     });
   });
 
@@ -123,9 +148,10 @@ describe('AuthService', () => {
       mockPrisma.refreshToken.updateMany.mockResolvedValue({ count: 1 });
       mockPrisma.session.deleteMany.mockResolvedValue({ count: 1 });
 
-      await service.logout('user-1', 'refresh-token-1');
+      await service.logout('user-1', 'refresh-token-1', 'tenant-1');
 
       expect(mockPrisma.refreshToken.updateMany).toHaveBeenCalled();
+      expect(mockPrisma.session.updateMany).toHaveBeenCalled();
     });
   });
 });

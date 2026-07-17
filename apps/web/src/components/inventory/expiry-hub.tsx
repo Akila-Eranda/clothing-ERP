@@ -11,11 +11,17 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { useRouter } from "next/navigation";
+import {
+  LotActionModal,
+  type LotActionMode,
+  type LotActionTarget,
+} from "@/components/inventory/lot-action-modal";
 
 export type ExpirySection = "dashboard" | "near" | "expired" | "lots" | "transactions" | "reconcile";
 
@@ -95,6 +101,20 @@ interface BatchTxn {
   lot?: { batchNumber: string | null; manufactureDate: string | null } | null;
 }
 
+function unwrapLots(payload: unknown): LotRow[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload as LotRow[];
+  const nested = payload as { data?: LotRow[] };
+  return Array.isArray(nested.data) ? nested.data : [];
+}
+
+function unwrapList<T>(payload: unknown): T[] {
+  if (!payload) return [];
+  if (Array.isArray(payload)) return payload as T[];
+  const nested = payload as { data?: T[] };
+  return Array.isArray(nested.data) ? nested.data : [];
+}
+
 function bucketBadge(bucket: string | null, days: number | null) {
   if (bucket === "expired" || (days != null && days < 0)) {
     return <Badge variant="danger" className="text-[10px]">Expired</Badge>;
@@ -108,7 +128,7 @@ function bucketBadge(bucket: string | null, days: number | null) {
   return <Badge variant="outline" className="text-[10px]">OK</Badge>;
 }
 
-function buildLotColumns(): ColumnDef<LotRow>[] {
+function buildLotColumns(onAction: (lot: LotRow, mode: LotActionMode) => void): ColumnDef<LotRow>[] {
   return [
     {
       id: "product",
@@ -195,6 +215,24 @@ function buildLotColumns(): ColumnDef<LotRow>[] {
       accessorFn: (r) => r.expiryBucket ?? "",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => bucketBadge(row.original.expiryBucket, row.original.daysToExpiry),
+    },
+    {
+      id: "actions",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const lot = row.original;
+        const canDispose = lot.availableQty > 0;
+        return (
+          <TableActionsRow
+            dropMoreActions={[
+              ...(canDispose
+                ? [{ text: "Dispose", function: () => onAction(lot, "dispose") }]
+                : []),
+              { text: "Adjust qty", function: () => onAction(lot, "adjust") },
+            ]}
+          />
+        );
+      },
     },
   ];
 }
@@ -315,33 +353,57 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
   const meta = SECTION_META[section];
   const [dash, setDash] = useState<ExpiryDashboard | null>(null);
   const [lots, setLots] = useState<LotRow[]>([]);
+  const [nearLots, setNearLots] = useState<LotRow[]>([]);
+  const [expiredLots, setExpiredLots] = useState<LotRow[]>([]);
+  const [nearDays, setNearDays] = useState(30);
   const [reconcile, setReconcile] = useState<{ summary: ReconcileSummary; mismatches: ReconcileRow[] } | null>(null);
   const [txns, setTxns] = useState<BatchTxn[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [actionOpen, setActionOpen] = useState(false);
+  const [actionMode, setActionMode] = useState<LotActionMode>("dispose");
+  const [actionLot, setActionLot] = useState<LotActionTarget | null>(null);
 
-  const lotColumns = useMemo(() => buildLotColumns(), []);
+  const openLotAction = useCallback((lot: LotRow, mode: LotActionMode) => {
+    setActionLot(lot);
+    setActionMode(mode);
+    setActionOpen(true);
+  }, []);
+
+  const lotColumns = useMemo(() => buildLotColumns(openLotAction), [openLotAction]);
   const txnColumns = useMemo(() => buildTxnColumns(), []);
   const reconcileColumns = useMemo(() => buildReconcileColumns(), []);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (section === "dashboard" || section === "near" || section === "expired") {
+      if (section === "dashboard") {
+        const [dashRes, recRes] = await Promise.all([
+          api.get<ExpiryDashboard>("/inventory/lots/expiry-dashboard"),
+          api.get<{ summary: ReconcileSummary; mismatches: ReconcileRow[] }>("/inventory/lots/reconcile"),
+        ]);
+        setDash(dashRes.data ?? null);
+        setReconcile(recRes.data ?? null);
+      }
+      if (section === "near") {
+        const nearRes = await api.get(`/inventory/lots?expiringWithinDays=${nearDays}&limit=500`);
+        setNearLots(unwrapLots(nearRes.data));
         const dashRes = await api.get<ExpiryDashboard>("/inventory/lots/expiry-dashboard");
         setDash(dashRes.data ?? null);
-        if (section === "dashboard") {
-          const recRes = await api.get<{ summary: ReconcileSummary; mismatches: ReconcileRow[] }>("/inventory/lots/reconcile");
-          setReconcile(recRes.data ?? null);
-        }
+      }
+      if (section === "expired") {
+        const expRes = await api.get("/inventory/lots?expiredOnly=true&limit=500");
+        setExpiredLots(unwrapLots(expRes.data));
+        const dashRes = await api.get<ExpiryDashboard>("/inventory/lots/expiry-dashboard");
+        setDash(dashRes.data ?? null);
       }
       if (section === "lots") {
-        const lotsRes = await api.get<{ data: LotRow[] }>("/inventory/lots?limit=200");
-        setLots(lotsRes.data?.data ?? (Array.isArray(lotsRes.data) ? lotsRes.data as unknown as LotRow[] : []));
+        const lotsRes = await api.get("/inventory/lots?limit=500");
+        setLots(unwrapLots(lotsRes.data));
       }
       if (section === "transactions") {
-        const txnRes = await api.get<{ data: BatchTxn[] }>("/inventory/lots/transactions?limit=100");
-        setTxns(txnRes.data?.data ?? (Array.isArray(txnRes.data) ? txnRes.data as unknown as BatchTxn[] : []));
+        const txnRes = await api.get("/inventory/lots/transactions?limit=200");
+        setTxns(unwrapList<BatchTxn>(txnRes.data));
       }
       if (section === "reconcile") {
         const recRes = await api.get<{ summary: ReconcileSummary; mismatches: ReconcileRow[] }>("/inventory/lots/reconcile");
@@ -352,7 +414,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
     } finally {
       setLoading(false);
     }
-  }, [section]);
+  }, [section, nearDays]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -382,11 +444,6 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
     );
   }
 
-  const nearRows = dash?.nearExpiry
-    ?? (dash?.urgent ?? []).filter((l) => (l.daysToExpiry ?? 0) >= 0);
-  const expiredRows = dash?.expiredLots
-    ?? (dash?.urgent ?? []).filter((l) => (l.daysToExpiry ?? 0) < 0);
-
   const showSummaryStats = section === "dashboard";
   const STATS = [
     {
@@ -396,6 +453,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       icon: Skull,
       color: "text-red-500",
       bg: "bg-red-500/10",
+      href: "/inventory/expiry/expired",
     },
     {
       label: "Near Expiry (≤7d)",
@@ -404,6 +462,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       icon: AlertTriangle,
       color: "text-amber-500",
       bg: "bg-amber-500/10",
+      href: "/inventory/expiry/near",
     },
     {
       label: "8–30 Days",
@@ -412,6 +471,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       icon: Clock,
       color: "text-orange-500",
       bg: "bg-orange-500/10",
+      href: "/inventory/expiry/near",
     },
     {
       label: "Matched SKUs",
@@ -420,6 +480,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       icon: CheckCircle2,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
+      href: "/inventory/expiry/reconcile",
     },
   ];
 
@@ -440,6 +501,22 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
+          {section === "near" && (
+            <div className="flex rounded-lg border overflow-hidden">
+              {[7, 30, 90].map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setNearDays(d)}
+                  className={`px-3 h-8 text-xs font-semibold transition-colors ${
+                    nearDays === d ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                  }`}
+                >
+                  ≤{d}d
+                </button>
+              ))}
+            </div>
+          )}
           <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
@@ -479,7 +556,11 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       {showSummaryStats && (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           {STATS.map((s) => (
-            <Card key={s.label}>
+            <Card
+              key={s.label}
+              className="cursor-pointer transition-colors hover:border-primary/40"
+              onClick={() => router.push(s.href)}
+            >
               <CardContent className="p-4 flex items-center gap-3">
                 <div className={`p-2.5 rounded-xl ${s.bg}`}>
                   <s.icon className={`h-5 w-5 ${s.color}`} />
@@ -513,26 +594,9 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       )}
 
       {section === "near" && (
-        loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <ClientSideTable
-            data={nearRows}
-            columns={lotColumns}
-            pageCount={Math.ceil(nearRows.length / 10) || 1}
-            searchableColumns={lotSearch}
-            filterableColumns={[]}
-            isShowExportButtons={{ isShow: true, fileName: "expiry-near" }}
-          />
-        )
-      )}
-
-      {section === "expired" && (
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Expired stock is blocked at POS when Block Expired is ON. Use Damage / adjustment to dispose.
+            Showing lots expiring within {nearDays} days. Dispose write-offs or adjust quantities from Actions.
           </p>
           {loading ? (
             <div className="flex justify-center py-12">
@@ -540,9 +604,31 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             </div>
           ) : (
             <ClientSideTable
-              data={expiredRows}
+              data={nearLots}
               columns={lotColumns}
-              pageCount={Math.ceil(expiredRows.length / 10) || 1}
+              pageCount={Math.ceil(nearLots.length / 10) || 1}
+              searchableColumns={lotSearch}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "expiry-near" }}
+            />
+          )}
+        </div>
+      )}
+
+      {section === "expired" && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Expired stock is blocked at POS when Block Expired is ON. Use Dispose to write off as Damage.
+          </p>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ClientSideTable
+              data={expiredLots}
+              columns={lotColumns}
+              pageCount={Math.ceil(expiredLots.length / 10) || 1}
               searchableColumns={lotSearch}
               filterableColumns={[]}
               isShowExportButtons={{ isShow: true, fileName: "expiry-expired" }}
@@ -642,6 +728,14 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           )}
         </div>
       )}
+
+      <LotActionModal
+        open={actionOpen}
+        mode={actionMode}
+        lot={actionLot}
+        onClose={() => setActionOpen(false)}
+        onDone={load}
+      />
     </div>
   );
 }

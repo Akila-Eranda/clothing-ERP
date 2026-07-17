@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef, Inject } from '@nestjs/common';
 import {
   Controller, Get, Post, Put, Body, Param, Query,
 } from '@nestjs/common';
@@ -85,6 +85,7 @@ export class InventoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    @Inject(forwardRef(() => WorkflowService))
     private readonly workflowService: WorkflowService,
   ) {}
 
@@ -173,7 +174,6 @@ export class InventoryService {
     const where = {
       tenantId,
       ...(branchId && { branchId }),
-      ...(query.lowStock === true && { quantity: { lte: 5 } }),
       ...(query.search && {
         variant: {
           OR: [
@@ -183,6 +183,24 @@ export class InventoryService {
         },
       }),
     };
+
+    // Low stock: quantity <= reorderPoint (fallback threshold 5 when reorderPoint unset)
+    if (query.lowStock === true) {
+      const all = await this.prisma.inventory.findMany({
+        where,
+        include: {
+          variant: { include: { product: { include: { category: true } } } },
+        },
+        orderBy: { quantity: 'asc' },
+      });
+      const low = all.filter((r) => {
+        const threshold = r.reorderPoint > 0 ? r.reorderPoint : 5;
+        return r.quantity <= threshold;
+      });
+      const page = low.slice(skip, skip + take);
+      const enriched = await this.enrichStockLotMeta(tenantId, branchId, page);
+      return paginate(enriched, low.length, query.page ?? 1, query.limit ?? 20);
+    }
 
     const [data, total] = await this.prisma.$transaction([
       this.prisma.inventory.findMany({
@@ -197,6 +215,13 @@ export class InventoryService {
       this.prisma.inventory.count({ where }),
     ]);
 
+    const enriched = await this.enrichStockLotMeta(tenantId, branchId, data);
+    return paginate(enriched, total, query.page ?? 1, query.limit ?? 20);
+  }
+
+  private async enrichStockLotMeta<
+    T extends { variantId: string },
+  >(tenantId: string, branchId: string, data: T[]) {
     const variantIds = data.map((row) => row.variantId);
     const lotMeta = new Map<string, { batchNumber: string | null; expiryDate: Date | null; lotCount: number }>();
     if (variantIds.length) {
@@ -225,7 +250,7 @@ export class InventoryService {
       }
     }
 
-    const enriched = data.map((row) => {
+    return data.map((row) => {
       const meta = lotMeta.get(row.variantId);
       return {
         ...row,
@@ -234,21 +259,24 @@ export class InventoryService {
         activeLotCount: meta?.lotCount ?? 0,
       };
     });
-
-    return paginate(enriched, total, query.page ?? 1, query.limit ?? 20);
   }
 
   async getLowStock(tenantId: string, branchId: string) {
-    return this.prisma.inventory.findMany({
+    const rows = await this.prisma.inventory.findMany({
       where: {
         tenantId,
         ...(branchId && { branchId }),
-        quantity: { lte: 5 },
       },
       include: { variant: { include: { product: true } } },
       orderBy: { quantity: 'asc' },
-      take: 100,
+      take: 500,
     });
+    return rows
+      .filter((r) => {
+        const threshold = r.reorderPoint > 0 ? r.reorderPoint : 5;
+        return r.quantity <= threshold;
+      })
+      .slice(0, 100);
   }
 
   async requestAdjustmentApproval(
@@ -633,7 +661,7 @@ export class InventoryService {
     const { skip, take } = getPaginationArgs(query?.page, query?.limit);
     const where = {
       tenantId,
-      branchId,
+      ...(branchId && { branchId }),
       ...(variantId && { variantId }),
       NOT: { notes: 'LOT_ALLOCATION' },
     };
@@ -752,7 +780,11 @@ export class InventoryService {
 
     const execute = async (c: Prisma.TransactionClient) => {
       for (const r of reservations) {
+        // Prefer the warehouse that holds this reservation's stock (default branch warehouse)
+        const warehouseId = await this.resolveWarehouseId(tenantId, r.branchId);
         const inv = await c.inventory.findFirst({
+          where: { tenantId, warehouseId, variantId: r.variantId },
+        }) ?? await c.inventory.findFirst({
           where: { tenantId, branchId: r.branchId, variantId: r.variantId },
         });
         if (inv) {
@@ -939,7 +971,7 @@ export class InventoryService {
     return branch?.id ?? '';
   }
 
-  private async enrichTransfers<T extends { id: string; toBranchId: string }>(transfers: T[]) {
+  async enrichTransfers<T extends { id: string; toBranchId: string }>(transfers: T[]) {
     const toBranchIds = [...new Set(transfers.map((t) => t.toBranchId))];
     const toBranches = toBranchIds.length
       ? await this.prisma.branch.findMany({
@@ -1007,6 +1039,7 @@ export class InventoryService {
         toWarehouseId,
         notes: dto.notes,
         requestedBy: userId,
+        ...(bypassesWorkflowApproval(userRoles) ? { approvedBy: userId } : {}),
         items: {
           create: dto.items.map((item) => ({
             variantId: item.variantId,
@@ -1024,20 +1057,22 @@ export class InventoryService {
 
     const [enriched] = await this.enrichTransfers([transfer]);
 
-    await this.workflowService.start(tenantId, userId, {
-      key: 'stock_transfer',
-      entityType: 'StockTransfer',
-      entityId: transfer.id,
-      metadata: {
-        reference: `TRF-${transfer.id.slice(0, 8).toUpperCase()}`,
-        fromBranchId: effectiveFrom,
-        toBranchId,
-        fromWarehouseId,
-        toWarehouseId,
-        toBranchName: toBranch.name,
-        itemCount: dto.items.length,
-      },
-    });
+    if (!bypassesWorkflowApproval(userRoles)) {
+      await this.workflowService.start(tenantId, userId, {
+        key: 'stock_transfer',
+        entityType: 'StockTransfer',
+        entityId: transfer.id,
+        metadata: {
+          reference: `TRF-${transfer.id.slice(0, 8).toUpperCase()}`,
+          fromBranchId: effectiveFrom,
+          toBranchId,
+          fromWarehouseId,
+          toWarehouseId,
+          toBranchName: toBranch.name,
+          itemCount: dto.items.length,
+        },
+      });
+    }
 
     return enriched;
   }
@@ -1059,9 +1094,9 @@ export class InventoryService {
     return this.enrichTransfers(transfers);
   }
 
-  async updateTransferStatus(id: string, status: TransferStatus, userId: string, userRoles: string[] = []) {
-    const transfer = await this.prisma.stockTransfer.findUnique({
-      where: { id },
+  async updateTransferStatus(id: string, tenantId: string, status: TransferStatus, userId: string, userRoles: string[] = []) {
+    const transfer = await this.prisma.stockTransfer.findFirst({
+      where: { id, tenantId },
       include: { items: { include: { variant: true } } },
     });
     if (!transfer) throw new NotFoundException('Transfer not found');
@@ -1097,10 +1132,15 @@ export class InventoryService {
           },
         },
       });
+      // Admin-created transfers skip workflow (approvedBy set); otherwise require APPROVED
+      const adminApproved = !!transfer.approvedBy && !wf;
       if (wf && wf.status !== WorkflowStatus.APPROVED) {
         if (wf.status === WorkflowStatus.REJECTED) {
           throw new BadRequestException('Transfer was rejected — create a new transfer request');
         }
+        throw new BadRequestException('Transfer must be approved before dispatch');
+      }
+      if (!wf && !adminApproved && !bypassesWorkflowApproval(userRoles)) {
         throw new BadRequestException('Transfer must be approved before dispatch');
       }
 
@@ -1487,6 +1527,7 @@ export class InventoryService {
 
   /**
    * Inventory reconciliation: branch Inventory.quantity vs sum(InventoryLot.quantity).
+   * Aggregates multi-warehouse inventory rows per branch+variant before compare.
    * MATCHED | LOT_SHORT (unlotted) | LOT_OVER (integrity) | NO_LOTS
    */
   async reconcileLots(tenantId: string, branchId: string) {
@@ -1496,11 +1537,42 @@ export class InventoryService {
       select: {
         variantId: true,
         branchId: true,
+        warehouseId: true,
         quantity: true,
         reservedQty: true,
         variant: { select: { sku: true, name: true, product: { select: { name: true } } } },
       },
     });
+
+    // Aggregate multi-warehouse rows to branch:variant grain (lots are still branch-scoped)
+    const aggregated = new Map<string, {
+      variantId: string;
+      branchId: string;
+      quantity: number;
+      reservedQty: number;
+      warehouseId: string;
+      sku: string;
+      name: string;
+    }>();
+    for (const r of inventoryRows) {
+      const key = `${r.branchId}:${r.variantId}`;
+      const cur = aggregated.get(key);
+      if (cur) {
+        cur.quantity += r.quantity;
+        cur.reservedQty += r.reservedQty;
+      } else {
+        aggregated.set(key, {
+          variantId: r.variantId,
+          branchId: r.branchId,
+          quantity: r.quantity,
+          reservedQty: r.reservedQty,
+          warehouseId: r.warehouseId,
+          sku: r.variant.sku,
+          name: `${r.variant.product.name} — ${r.variant.name}`,
+        });
+      }
+    }
+    const aggregatedRows = [...aggregated.values()];
 
     const lotAgg = await this.prisma.inventoryLot.groupBy({
       by: ['branchId', 'variantId'],
@@ -1513,7 +1585,7 @@ export class InventoryService {
     });
 
     const base = reconcileLotTotals(
-      inventoryRows.map((r) => ({
+      aggregatedRows.map((r) => ({
         variantId: r.variantId,
         branchId: r.branchId,
         quantity: r.quantity,
@@ -1528,18 +1600,15 @@ export class InventoryService {
     );
 
     const variantMeta = new Map(
-      inventoryRows.map((r) => [
+      aggregatedRows.map((r) => [
         `${r.branchId}:${r.variantId}`,
-        {
-          sku: r.variant.sku,
-          name: `${r.variant.product.name} — ${r.variant.name}`,
-        },
+        { sku: r.sku, name: r.name, warehouseId: r.warehouseId },
       ]),
     );
 
     const rows = base.map((row) => ({
       ...row,
-      ...(variantMeta.get(`${row.branchId}:${row.variantId}`) ?? { sku: null, name: null }),
+      ...(variantMeta.get(`${row.branchId}:${row.variantId}`) ?? { sku: null, name: null, warehouseId: null }),
     }));
 
     const summary = {
@@ -1570,6 +1639,9 @@ export class InventoryService {
 
     const created: { variantId: string; quantity: number; lotId: string }[] = [];
     for (const row of toSync) {
+      const warehouseId =
+        (row as { warehouseId?: string | null }).warehouseId
+        || await this.resolveWarehouseId(tenantId, row.branchId);
       const lot = await this.prisma.$transaction(async (tx) => {
         return addToLot(tx, {
           tenantId,
@@ -1580,6 +1652,7 @@ export class InventoryService {
           notes: `Reconciliation sync by ${userId}`,
           referenceType: 'Reconciliation',
           referenceId: row.variantId,
+          warehouseId,
         });
       });
       if (lot) {
@@ -1602,8 +1675,7 @@ export class InventoryService {
       }
     }
 
-    const after = await this.reconcileLots(tenantId, branchId);
-    return { synced: created.length, created, reconciliation: after.summary };
+    return { synced: created.length, lots: created, report: await this.reconcileLots(tenantId, branchId) };
   }
 }
 
@@ -1789,12 +1861,12 @@ export class InventoryController {
     @Param('id') id: string,
     @Body('status') status: TransferStatus,
   ) {
-    return this.inventoryService.updateTransferStatus(id, status, user.id, user.roles);
+    return this.inventoryService.updateTransferStatus(id, user.tenantId, status, user.id, user.roles);
   }
 }
 
 @Module({
-  imports: [WorkflowModule],
+  imports: [forwardRef(() => WorkflowModule)],
   controllers: [InventoryController],
   providers: [InventoryService],
   exports: [InventoryService],

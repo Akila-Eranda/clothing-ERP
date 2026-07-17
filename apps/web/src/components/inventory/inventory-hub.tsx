@@ -488,7 +488,6 @@ export function InventoryHub({ section }: { section: InventorySection }) {
   const [adjustItem, setAdjustItem] = useState<InventoryItem | null>(null);
   const [poOpen, setPoOpen] = useState(false);
   const [prefillVariant, setPrefillVariant] = useState<string | undefined>();
-  const [cycleLoading, setCycleLoading] = useState(false);
   const [transfers, setTransfers] = useState<StockTransferRow[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferActionId, setTransferActionId] = useState<string | null>(null);
@@ -563,19 +562,6 @@ export function InventoryHub({ section }: { section: InventorySection }) {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const startCycleCount = async () => {
-    setCycleLoading(true);
-    try {
-      await api.post("/inventory/cycle-count", { notes: "Manual cycle count" });
-      toast.success("Cycle count session started");
-      fetchData();
-    } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Failed to start cycle count");
-    } finally {
-      setCycleLoading(false);
-    }
-  };
-
   const columns = buildStockColumns(
     (item) => { setAdjustItem(item); setAdjustOpen(true); },
     (item) => { setPrefillVariant(item.variantId); setPoOpen(true); },
@@ -594,7 +580,10 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     onReject: (taskId) => actOnTransferWorkflow(taskId, "reject"),
   });
 
-  const lowCount = stock.filter((i) => i.quantity > 0 && i.quantity <= 5).length;
+  const lowCount = stock.filter((i) => {
+    const threshold = (i.reorderPoint != null && i.reorderPoint > 0) ? i.reorderPoint : 5;
+    return i.quantity > 0 && i.quantity <= threshold;
+  }).length;
   const outCount = stock.filter((i) => i.quantity === 0).length;
   const transferPending = transfers.filter((t) => t.status === "PENDING").length;
   const transferInTransit = transfers.filter((t) => t.status === "IN_TRANSIT").length;
@@ -650,9 +639,8 @@ export function InventoryHub({ section }: { section: InventorySection }) {
                   <Clock className="h-3.5 w-3.5" /> Expiry Dashboard
                 </Button>
               )}
-              <Button size="sm" onClick={startCycleCount} disabled={cycleLoading} className="gap-1.5">
-                {cycleLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />}
-                Start Cycle Count
+              <Button variant="outline" size="sm" onClick={() => router.push("/warehouse")} className="gap-1.5">
+                <Layers className="h-3.5 w-3.5" /> Warehouses
               </Button>
             </>
           )}

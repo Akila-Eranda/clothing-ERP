@@ -34,6 +34,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { ChequesHub } from "@/components/accounting/cheques-hub";
 
 type AgingBuckets = Record<string, { count: number; amount: number }>;
 
@@ -963,72 +964,7 @@ export function BanksSection() {
 }
 
 export function ChequesSection() {
-  const {
-    chDir, setChDir, chNum, setChNum, chAmt, setChAmt, chParty, setChParty,
-    chBankId, setChBankId, chBusy, createCheque, banks, cheques, chequeColumns,
-  } = useFinanceHub();
-
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Register cheque</h3>
-          <div className="grid sm:grid-cols-5 gap-3 items-end">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Direction</label>
-              <Select value={chDir} onValueChange={setChDir}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RECEIVED">Received</SelectItem>
-                  <SelectItem value="ISSUED">Issued</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Cheque #</label>
-              <Input value={chNum} onChange={(e) => setChNum(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Amount</label>
-              <Input type="number" value={chAmt} onChange={(e) => setChAmt(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Party</label>
-              <Input value={chParty} onChange={(e) => setChParty(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Bank</label>
-              <Select value={chBankId || "_none"} onValueChange={(v) => setChBankId(v === "_none" ? "" : v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Bank account" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">No bank</SelectItem>
-                  {banks.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <Button size="sm" onClick={createCheque} disabled={chBusy} className="gap-1.5">
-            {chBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCheck className="h-3.5 w-3.5" />}
-            Register
-          </Button>
-        </CardContent>
-      </Card>
-      <ClientSideTable
-        data={cheques}
-        columns={chequeColumns}
-        pageCount={Math.ceil(cheques.length / 10) || 1}
-        searchableColumns={[
-          { id: "cheque", title: "Cheque" },
-          { id: "party", title: "Party" },
-          { id: "status", title: "Status" },
-        ]}
-        filterableColumns={[]}
-        isShowExportButtons={{ isShow: true, fileName: "cheques" }}
-      />
-    </div>
-  );
+  return <ChequesHub />;
 }
 
 export function ReconciliationSection() {

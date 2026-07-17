@@ -1,3 +1,5 @@
+import { BadRequestException } from '@nestjs/common';
+
 /** Pure finance helpers — unit-tested for report accuracy. */
 
 export type AgingBucket = 'current' | '1_30' | '31_60' | '61_90' | '90_plus';
@@ -115,3 +117,87 @@ export function chequeClearEffect(
   // Received cheques increase bank when cleared; issued decrease
   return { bankDelta: direction === 'RECEIVED' ? round2(amount) : round2(-amount) };
 }
+
+/** Valid cheque status transitions (direction-aware). */
+export function assertChequeStatusTransition(
+  direction: 'RECEIVED' | 'ISSUED',
+  from: string,
+  to: string,
+): void {
+  if (from === to) return;
+  const terminal = new Set(['CLEARED', 'BOUNCED', 'CANCELLED']);
+  if (terminal.has(from) && to !== 'BOUNCED') {
+    // Allow bounce after clear (reversal path); otherwise block
+    if (!(from === 'CLEARED' && to === 'BOUNCED')) {
+      throw new BadRequestException(`Cannot change cheque from ${from} to ${to}`);
+    }
+  }
+
+  const allowed: Record<string, string[]> = direction === 'RECEIVED'
+    ? {
+        RECEIVED: ['DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED'],
+        DEPOSITED: ['CLEARED', 'BOUNCED', 'CANCELLED'],
+        CLEARED: ['BOUNCED'],
+        BOUNCED: [],
+        CANCELLED: [],
+        ISSUED: [], // invalid for received
+      }
+    : {
+        ISSUED: ['DEPOSITED', 'CLEARED', 'BOUNCED', 'CANCELLED'],
+        DEPOSITED: ['CLEARED', 'BOUNCED', 'CANCELLED'],
+        CLEARED: ['BOUNCED'],
+        BOUNCED: [],
+        CANCELLED: [],
+        RECEIVED: [],
+      };
+
+  const next = allowed[from] ?? [];
+  if (!next.includes(to)) {
+    throw new BadRequestException(`Invalid cheque status change: ${from} → ${to}`);
+  }
+}
+
+/** Build notes that preserve source linkage for the Cheques hub. */
+export function chequeSourceNotes(
+  sourceType: string,
+  sourceId: string,
+  extra?: string | null,
+): string {
+  const tag = `[source:${sourceType}:${sourceId}]`;
+  return extra?.trim() ? `${tag} ${extra.trim()}` : tag;
+}
+
+/** Bank book running balance (inflows increase). */
+export function bankBookRunningBalance(
+  opening: number,
+  entries: { amount: number; inflow: boolean }[],
+): { balances: number[]; closing: number } {
+  let bal = opening;
+  const balances: number[] = [];
+  for (const e of entries) {
+    bal = round2(bal + (e.inflow ? e.amount : -e.amount));
+    balances.push(bal);
+  }
+  return { balances, closing: bal };
+}
+
+export function assertDistinctTransferAccounts(fromAccountId: string, toAccountId: string): void {
+  if (!fromAccountId || !toAccountId) {
+    throw new BadRequestException('Both source and destination accounts are required');
+  }
+  if (fromAccountId === toAccountId) {
+    throw new BadRequestException('Cannot transfer to the same account');
+  }
+}
+
+export function isBankInflowType(type: string): boolean {
+  return ['DEPOSIT', 'TRANSFER_IN', 'INTEREST', 'CHEQUE_CLEAR'].includes(type);
+}
+
+/** Signed bank balance delta for a cleared txn (CHEQUE_CLEAR direction handled separately). */
+export function bankTxnBalanceDelta(type: string, amount: number): number {
+  if (type === 'CHEQUE_CLEAR') return 0; // direction-aware elsewhere
+  const inflow = ['DEPOSIT', 'TRANSFER_IN', 'INTEREST'].includes(type);
+  return inflow ? round2(amount) : round2(-amount);
+}
+

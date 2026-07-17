@@ -110,11 +110,50 @@ export class CustomersService {
         loyaltyTxns: { orderBy: { createdAt: 'desc' }, take: 10 },
         walletTxns: { orderBy: { createdAt: 'desc' }, take: 10 },
         creditTxns: { orderBy: { createdAt: 'desc' }, take: 20 },
-        sales: { orderBy: { invoiceDate: 'desc' }, take: 10, include: { _count: { select: { items: true } } } },
+        sales: {
+          where: { isReturn: false },
+          orderBy: { invoiceDate: 'desc' },
+          take: 20,
+          include: {
+            _count: { select: { items: true } },
+            items: {
+              select: {
+                productName: true,
+                variantName: true,
+                quantity: true,
+                total: true,
+                variantId: true,
+              },
+            },
+          },
+        },
       },
     });
     if (!customer) throw new NotFoundException('Customer not found');
-    return customer;
+
+    const productMap = new Map<string, { productName: string; qty: number; spent: number; variantId: string }>();
+    for (const sale of customer.sales) {
+      for (const item of sale.items) {
+        const key = item.variantId || item.productName;
+        const prev = productMap.get(key);
+        if (prev) {
+          prev.qty += item.quantity;
+          prev.spent += item.total;
+        } else {
+          productMap.set(key, {
+            productName: item.productName,
+            qty: item.quantity,
+            spent: item.total,
+            variantId: item.variantId,
+          });
+        }
+      }
+    }
+    const topProducts = [...productMap.values()]
+      .sort((a, b) => b.qty - a.qty || b.spent - a.spent)
+      .slice(0, 8);
+
+    return { ...customer, topProducts };
   }
 
   async findByPhone(phone: string, tenantId: string) {
@@ -130,8 +169,22 @@ export class CustomersService {
     return this.prisma.customer.update({ where: { id }, data: data as object });
   }
 
-  async receiveCreditPayment(id: string, tenantId: string, amount: number, description: string) {
-    return this.credit.receiveCreditPayment(id, tenantId, amount, description);
+  async receiveCreditPayment(
+    id: string,
+    tenantId: string,
+    amount: number,
+    description: string,
+    opts?: {
+      paymentMethod?: string;
+      branchId?: string;
+      userId?: string;
+      applyFromWallet?: boolean;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
+    },
+  ) {
+    return this.credit.receiveCreditPayment(id, tenantId, amount, description, opts);
   }
 
   async setCreditLimit(id: string, tenantId: string, creditLimit: number) {
@@ -282,6 +335,13 @@ export class CustomersController {
     return this.creditService.createPaymentSchedule(user.tenantId, user.id, dto);
   }
 
+  @Post('credit/schedules/:id/cancel')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Cancel an active installment schedule' })
+  cancelSchedule(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.creditService.cancelSchedule(id, user.tenantId);
+  }
+
   @Get('credit/reminders')
   @RequirePermissions('customers:read')
   @ApiOperation({ summary: 'List credit payment reminders' })
@@ -323,10 +383,87 @@ export class CustomersController {
     return this.creditService.collectionReport(user.tenantId, start, end);
   }
 
+  @Get('credit/ar-dashboard')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'AR receivable dashboard KPIs + aging' })
+  arDashboard(@CurrentUser() user: IAuthUser, @Query('asOfDate') asOfDate?: string) {
+    return this.creditService.getArDashboard(user.tenantId, asOfDate);
+  }
+
+  @Get('credit/payments')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'List customer credit payments in date range' })
+  listCreditPayments(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('customerId') customerId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.creditService.listPayments(user.tenantId, {
+      startDate,
+      endDate,
+      customerId,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
   @Get('phone/:phone')
   @ApiOperation({ summary: 'Find customer by phone (POS lookup)' })
   findByPhone(@CurrentUser() user: IAuthUser, @Param('phone') phone: string) {
     return this.customersService.findByPhone(phone, user.tenantId);
+  }
+
+  @Get(':id/credit/ledger')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'Customer AR ledger with running balance' })
+  customerLedger(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.creditService.getCustomerLedger(id, user.tenantId, startDate, endDate);
+  }
+
+  @Get(':id/credit/statement')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'Customer statement (printable AR statement)' })
+  customerStatement(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.creditService.getCustomerStatement(id, user.tenantId, startDate, endDate);
+  }
+
+  @Get(':id/credit/transactions')
+  @RequirePermissions('customers:read')
+  @ApiOperation({ summary: 'List customer credit transactions (charges/payments/notes)' })
+  customerCreditTxns(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.creditService.listCustomerCreditTransactions(id, user.tenantId, {
+      type,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
+  }
+
+  @Post(':id/credit/credit-notes')
+  @RequirePermissions('customers:update')
+  @ApiOperation({ summary: 'Issue manual credit note against AR' })
+  createCreditNote(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() body: { amount: number; description?: string; referenceId?: string },
+  ) {
+    return this.creditService.createCreditNote(id, user.tenantId, body);
   }
 
   @Get(':id')
@@ -355,13 +492,35 @@ export class CustomersController {
 
   @Post(':id/credit/payment')
   @RequirePermissions('customers:update')
-  @ApiOperation({ summary: 'Receive payment against customer credit balance' })
+  @ApiOperation({ summary: 'Receive payment against customer credit (overpay → wallet advance)' })
   receiveCreditPayment(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body() body: { amount: number; description?: string },
+    @Body() body: {
+      amount: number;
+      description?: string;
+      paymentMethod?: string;
+      applyFromWallet?: boolean;
+      chequeNumber?: string;
+      chequeBankName?: string;
+      chequeDueDate?: string;
+    },
   ) {
-    return this.customersService.receiveCreditPayment(id, user.tenantId, body.amount, body.description ?? 'Credit payment received');
+    return this.customersService.receiveCreditPayment(
+      id,
+      user.tenantId,
+      body.amount,
+      body.description ?? 'Credit payment received',
+      {
+        paymentMethod: body.paymentMethod,
+        applyFromWallet: body.applyFromWallet,
+        branchId: user.branchId,
+        userId: user.id,
+        chequeNumber: body.chequeNumber,
+        chequeBankName: body.chequeBankName,
+        chequeDueDate: body.chequeDueDate,
+      },
+    );
   }
 
   @Put(':id/credit/limit')

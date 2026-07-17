@@ -1,7 +1,8 @@
 "use client";
 
-import { AccountingHub } from "@/components/accounting/accounting-hub";
+import { FinancialReportsHub } from "@/components/accounting/financial-reports-hub";
 
+/** Sprint 11 — Financial Reports */
 export default function AccountingReportsPage() {
-  return <AccountingHub section="reports" />;
+  return <FinancialReportsHub />;
 }

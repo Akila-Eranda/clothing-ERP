@@ -5,6 +5,9 @@ import {
   classifyAging,
   computeProfitLoss,
   bankReconDifference,
+  bankBookRunningBalance,
+  bankTxnBalanceDelta,
+  assertDistinctTransferAccounts,
   round2,
 } from './finance.helper';
 
@@ -84,6 +87,17 @@ describe('Phase 5 Finance — report accuracy', () => {
     it('applies cheque clear direction to bank delta', () => {
       expect(chequeClearEffect('RECEIVED', 2500).bankDelta).toBe(2500);
       expect(chequeClearEffect('ISSUED', 2500).bankDelta).toBe(-2500);
+    });
+
+    it('tracks bank book running balance and transfer rules', () => {
+      const { closing } = bankBookRunningBalance(10000, [
+        { amount: 2000, inflow: true },
+        { amount: 500, inflow: false },
+      ]);
+      expect(closing).toBe(11500);
+      expect(bankTxnBalanceDelta('DEPOSIT', 100)).toBe(100);
+      expect(bankTxnBalanceDelta('WITHDRAWAL', 40)).toBe(-40);
+      expect(() => assertDistinctTransferAccounts('a', 'a')).toThrow(/same account/);
     });
   });
 });

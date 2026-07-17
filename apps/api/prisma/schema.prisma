@@ -178,6 +178,13 @@ enum SupplierLedgerEntryType {
   RETURN
   ADJUSTMENT
   SYNC
+  DEBIT_NOTE
+}
+
+enum SupplierDebitNoteStatus {
+  DRAFT
+  POSTED
+  CANCELLED
 }
 
 enum CustomerTier {
@@ -218,12 +225,31 @@ enum JournalEntryType {
   CREDIT
 }
 
+enum JournalEntryStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  VOID
+}
+
 enum AccountType {
   ASSET
   LIABILITY
   EQUITY
   REVENUE
   EXPENSE
+}
+
+enum FiscalYearStatus {
+  OPEN
+  CLOSED
+}
+
+enum AccountingPeriodStatus {
+  OPEN
+  CLOSED
+  LOCKED
 }
 
 enum AttendanceStatus {
@@ -423,8 +449,22 @@ model Tenant {
   supplierInvoices SupplierInvoice[]
   supplierProductAssignments SupplierProductAssignment[]
   supplierLedgerEntries SupplierLedgerEntry[]
+  supplierDebitNotes SupplierDebitNote[]
+  taxRates           TaxRate[]
+  vatReturns         VatReturn[]
+  pettyCashFunds     PettyCashFund[]
+  expenseClaims      ExpenseClaim[]
+  reimbursements     Reimbursement[]
+  fixedAssetCategories FixedAssetCategory[]
+  fixedAssets        FixedAsset[]
+  payrollSettings    PayrollSetting?
+  payrollComponents  PayrollComponent[]
+  payrollRuns        PayrollRun[]
+  payslips           Payslip[]
   employees        Employee[]
   accounts         Account[]
+  fiscalYears      FiscalYear[]
+  accountingPeriods AccountingPeriod[]
   notifications    Notification[]
   bankAccounts     BankAccount[]
   cheques          Cheque[]
@@ -452,6 +492,8 @@ model Tenant {
   calendarNotes    CalendarNote[]
   calendarTasks    CalendarTask[]
   calendarMeetings CalendarMeeting[]
+  documentNumberSeries DocumentNumberSeries[]
+  accountingPreference AccountingPreference?
 
   @@map("tenants")
 }
@@ -1924,6 +1966,7 @@ model Supplier {
   invoices      SupplierInvoice[]
   productAssignments SupplierProductAssignment[]
   ledgerEntries SupplierLedgerEntry[]
+  debitNotes    SupplierDebitNote[]
 
   @@index([tenantId])
   @@map("suppliers")
@@ -2224,6 +2267,7 @@ model SupplierInvoice {
   purchase        PurchaseOrder?        @relation(fields: [purchaseId], references: [id])
   goodsReceipt    GoodsReceipt?         @relation(fields: [goodsReceiptId], references: [id])
   payments        SupplierPayment[]
+  debitNotes      SupplierDebitNote[]
 
   @@unique([tenantId, supplierId, invoiceNumber])
   @@index([tenantId])
@@ -2232,23 +2276,394 @@ model SupplierInvoice {
   @@map("supplier_invoices")
 }
 
+model SupplierDebitNote {
+  id            String                  @id @default(cuid())
+  tenantId      String
+  supplierId    String
+  noteNumber    String
+  noteDate      DateTime                @default(now())
+  amount        Float
+  appliedAmount Float                   @default(0)
+  status        SupplierDebitNoteStatus @default(POSTED)
+  reason        String?
+  referenceType String?
+  referenceId   String?
+  invoiceId     String?
+  purchaseId    String?
+  createdBy     String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  tenant        Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  supplier      Supplier                @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  invoice       SupplierInvoice?        @relation(fields: [invoiceId], references: [id])
+
+  @@unique([tenantId, noteNumber])
+  @@index([tenantId, supplierId])
+  @@index([supplierId])
+  @@map("supplier_debit_notes")
+}
+
+// ============================================================
+// VAT & TAX (Sprint 7)
+// ============================================================
+
+enum TaxDirection {
+  OUTPUT
+  INPUT
+  BOTH
+}
+
+enum VatReturnStatus {
+  DRAFT
+  SUBMITTED
+  FILED
+  CANCELLED
+}
+
+model TaxRate {
+  id                String       @id @default(cuid())
+  tenantId          String
+  code              String
+  name              String
+  rate              Float
+  direction         TaxDirection @default(BOTH)
+  isDefault         Boolean      @default(false)
+  isActive          Boolean      @default(true)
+  isInclusive       Boolean      @default(false)
+  description       String?
+  outputGlAccountId String?
+  inputGlAccountId  String?
+  effectiveFrom     DateTime?
+  effectiveTo       DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("tax_rates")
+}
+
+model VatReturn {
+  id             String          @id @default(cuid())
+  tenantId       String
+  periodStart    DateTime
+  periodEnd      DateTime
+  status         VatReturnStatus @default(DRAFT)
+  outputVat      Float           @default(0)
+  inputVat       Float           @default(0)
+  netVat         Float           @default(0)
+  salesNet       Float           @default(0)
+  purchasesNet   Float           @default(0)
+  salesGross     Float           @default(0)
+  purchasesGross Float           @default(0)
+  journalEntryId String?
+  notes          String?
+  filedAt        DateTime?
+  filedBy        String?
+  createdBy      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, periodStart, periodEnd])
+  @@index([tenantId, status])
+  @@map("vat_returns")
+}
+
+// ============================================================
+// PETTY CASH (Sprint 8)
+// ============================================================
+
+enum PettyCashTxnType {
+  OPENING
+  DISBURSEMENT
+  REPLENISHMENT
+  ADJUSTMENT
+}
+
+enum ExpenseClaimStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REIMBURSED
+  CANCELLED
+}
+
+enum ReimbursementStatus {
+  PAID
+  VOID
+}
+
+model PettyCashFund {
+  id              String   @id @default(cuid())
+  tenantId        String
+  branchId        String?
+  code            String
+  name            String
+  floatAmount     Float    @default(0)
+  currentBalance  Float    @default(0)
+  glAccountId     String?
+  bankAccountId   String?
+  isActive        Boolean  @default(true)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  transactions    PettyCashTransaction[]
+  claims          ExpenseClaim[]
+  reimbursements  Reimbursement[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@map("petty_cash_funds")
+}
+
+model PettyCashTransaction {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  fundId             String
+  type               PettyCashTxnType
+  txnDate            DateTime         @default(now())
+  amount             Float
+  description        String
+  category           String?
+  expenseGlAccountId String?
+  receiptRef         String?
+  claimId            String?
+  reimbursementId    String?
+  journalEntryId     String?
+  balanceAfter       Float            @default(0)
+  createdBy          String?
+  createdAt          DateTime         @default(now())
+
+  fund               PettyCashFund    @relation(fields: [fundId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, fundId])
+  @@index([tenantId, txnDate])
+  @@index([fundId, txnDate])
+  @@map("petty_cash_transactions")
+}
+
+model ExpenseClaim {
+  id                 String             @id @default(cuid())
+  tenantId           String
+  fundId             String?
+  branchId           String?
+  claimantName       String
+  employeeId         String?
+  claimDate          DateTime           @default(now())
+  description        String
+  amount             Float
+  category           String?
+  expenseGlAccountId String?
+  receiptRef         String?
+  status             ExpenseClaimStatus @default(DRAFT)
+  notes              String?
+  rejectionReason    String?
+  approvedBy         String?
+  approvedAt         DateTime?
+  createdBy          String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fund               PettyCashFund?     @relation(fields: [fundId], references: [id])
+  reimbursement      Reimbursement?
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, claimDate])
+  @@map("expense_claims")
+}
+
+model Reimbursement {
+  id                  String               @id @default(cuid())
+  tenantId            String
+  claimId             String               @unique
+  fundId              String?
+  amount              Float
+  payDate             DateTime             @default(now())
+  payFromBankAccountId String?
+  reference           String?
+  notes               String?
+  status              ReimbursementStatus  @default(PAID)
+  journalEntryId      String?
+  createdBy           String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  claim               ExpenseClaim         @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  fund                PettyCashFund?       @relation(fields: [fundId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, payDate])
+  @@map("reimbursements")
+}
+
+// ============================================================
+// FIXED ASSETS (Sprint 9)
+// ============================================================
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  DECLINING_BALANCE
+  NONE
+}
+
+enum FixedAssetStatus {
+  ACTIVE
+  FULLY_DEPRECIATED
+  DISPOSED
+}
+
+enum FixedAssetTxnType {
+  ACQUISITION
+  DEPRECIATION
+  DISPOSAL
+  TRANSFER
+  ADJUSTMENT
+}
+
+model FixedAssetCategory {
+  id                    String             @id @default(cuid())
+  tenantId              String
+  code                  String
+  name                  String
+  usefulLifeMonths      Int                @default(60)
+  residualValuePct      Float              @default(0)
+  method                DepreciationMethod @default(STRAIGHT_LINE)
+  decliningRate         Float?
+  assetGlAccountId      String?
+  accumDepGlAccountId   String?
+  depExpenseGlAccountId String?
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assets                FixedAsset[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("fixed_asset_categories")
+}
+
+model FixedAsset {
+  id                    String             @id @default(cuid())
+  tenantId              String
+  branchId              String?
+  categoryId            String?
+  code                  String
+  name                  String
+  description           String?
+  status                FixedAssetStatus   @default(ACTIVE)
+  acquisitionDate       DateTime
+  cost                  Float
+  residualValue         Float              @default(0)
+  usefulLifeMonths      Int                @default(60)
+  method                DepreciationMethod @default(STRAIGHT_LINE)
+  decliningRate         Float?
+  accumulatedDep        Float              @default(0)
+  bookValue             Float
+  location              String?
+  serialNumber          String?
+  vendorName            String?
+  assetGlAccountId      String?
+  accumDepGlAccountId   String?
+  depExpenseGlAccountId String?
+  disposedAt            DateTime?
+  disposalProceeds      Float?
+  disposalNotes         String?
+  createdBy             String?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category              FixedAssetCategory? @relation(fields: [categoryId], references: [id])
+  depreciations         FixedAssetDepreciation[]
+  transactions          FixedAssetTransaction[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, branchId])
+  @@map("fixed_assets")
+}
+
+model FixedAssetDepreciation {
+  id             String     @id @default(cuid())
+  tenantId       String
+  assetId        String
+  periodLabel    String
+  periodStart    DateTime
+  periodEnd      DateTime
+  amount         Float
+  accumAfter     Float
+  bookValueAfter Float
+  journalEntryId String?
+  postedAt       DateTime   @default(now())
+  createdBy      String?
+
+  asset          FixedAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, periodLabel])
+  @@index([tenantId, periodStart])
+  @@index([assetId])
+  @@map("fixed_asset_depreciations")
+}
+
+model FixedAssetTransaction {
+  id             String            @id @default(cuid())
+  tenantId       String
+  assetId        String
+  type           FixedAssetTxnType
+  txnDate        DateTime          @default(now())
+  amount         Float?
+  description    String
+  fromBranchId   String?
+  toBranchId     String?
+  fromLocation   String?
+  toLocation     String?
+  journalEntryId String?
+  createdBy      String?
+  createdAt      DateTime          @default(now())
+
+  asset          FixedAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, assetId])
+  @@index([tenantId, txnDate])
+  @@map("fixed_asset_transactions")
+}
+
 // ============================================================
 // ACCOUNTING
 // ============================================================
 
 model Account {
-  id          String      @id @default(cuid())
-  tenantId    String
-  parentId    String?
-  code        String
-  name        String
-  type        AccountType
-  description String?
-  isSystem    Boolean     @default(false)
-  isActive    Boolean     @default(true)
-  balance     Float       @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                  String      @id @default(cuid())
+  tenantId            String
+  parentId            String?
+  code                String
+  name                String
+  type                AccountType
+  description         String?
+  isSystem            Boolean     @default(false)
+  isActive            Boolean     @default(true)
+  balance             Float       @default(0)
+  openingBalance      Float       @default(0)
+  openingBalanceDate  DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 
   tenant      Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   parent      Account?      @relation("AccountHierarchy", fields: [parentId], references: [id])
@@ -2258,27 +2673,89 @@ model Account {
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, type])
+  @@index([tenantId, parentId])
   @@map("accounts")
 }
 
+model FiscalYear {
+  id              String           @id @default(cuid())
+  tenantId        String
+  name            String
+  startDate       DateTime
+  endDate         DateTime
+  status          FiscalYearStatus @default(OPEN)
+  isCurrent       Boolean          @default(false)
+  closedAt        DateTime?
+  closedBy        String?
+  closingNotes    String?
+  retainedEarningsAccountId String?
+  createdBy       String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periods         AccountingPeriod[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@index([tenantId, isCurrent])
+  @@map("fiscal_years")
+}
+
+model AccountingPeriod {
+  id            String                  @id @default(cuid())
+  tenantId      String
+  fiscalYearId  String
+  name          String
+  sequence      Int
+  startDate     DateTime
+  endDate       DateTime
+  status        AccountingPeriodStatus  @default(OPEN)
+  closedAt      DateTime?
+  closedBy      String?
+  reopenedAt    DateTime?
+  reopenedBy    String?
+  notes         String?
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+
+  tenant        Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  fiscalYear    FiscalYear @relation(fields: [fiscalYearId], references: [id], onDelete: Cascade)
+
+  @@unique([fiscalYearId, sequence])
+  @@index([tenantId, status])
+  @@index([tenantId, startDate, endDate])
+  @@map("accounting_periods")
+}
+
 model JournalEntry {
-  id          String   @id @default(cuid())
+  id          String             @id @default(cuid())
   tenantId    String
   branchId    String?
   entryNumber String
   description String
   referenceId String?
   referenceType String?
-  date        DateTime @default(now())
-  isPosted    Boolean  @default(false)
+  date        DateTime           @default(now())
+  status      JournalEntryStatus @default(DRAFT)
+  isPosted    Boolean            @default(false)
+  approvedBy  String?
+  approvedAt  DateTime?
+  postedAt    DateTime?
+  voidedBy    String?
+  voidedAt    DateTime?
+  voidReason  String?
   createdBy   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   lines       JournalLine[]
 
   @@unique([tenantId, entryNumber])
   @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, date])
   @@map("journal_entries")
 }
 
@@ -2521,6 +2998,9 @@ model Employee {
   basicSalary     Float          @default(0)
   commissionRate  Float          @default(0)
   bankDetails     Json           @default("{}")
+  epfNumber       String?
+  etfNumber       String?
+  nicNumber       String?
   isActive        Boolean        @default(true)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
@@ -2529,6 +3009,7 @@ model Employee {
   branch          Branch?      @relation(fields: [branchId], references: [id])
   attendances     Attendance[]
   payrolls        Payroll[]
+  payslips        Payslip[]
   shifts          EmployeeShift[]
   leaveRequests   LeaveRequest[]
   helperSales     Sale[]       @relation("HelperSales")
@@ -2555,10 +3036,200 @@ model Attendance {
   @@map("attendances")
 }
 
+// ============================================================
+// PAYROLL (Sprint 10)
+// ============================================================
+
+enum PayrollComponentType {
+  ALLOWANCE
+  DEDUCTION
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  PAID
+  CANCELLED
+}
+
+enum PayrollEntryStatus {
+  DRAFT
+  CALCULATED
+  PAID
+  CANCELLED
+}
+
+model PayrollSetting {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique
+  epfEmployeeRate       Float    @default(8)
+  epfEmployerRate       Float    @default(12)
+  etfEmployerRate       Float    @default(3)
+  epfWageCap            Float?
+  salaryExpenseGlId     String?
+  epfExpenseGlId        String?
+  etfExpenseGlId        String?
+  epfPayableGlId        String?
+  etfPayableGlId        String?
+  bankGlId              String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  tenant                Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payroll_settings")
+}
+
+// ── Phase 06 Sprint 13 — Accounting Settings ─────────────────────────────
+
+enum NumberSeriesResetPolicy {
+  NEVER
+  YEARLY
+  MONTHLY
+  DAILY
+}
+
+model DocumentNumberSeries {
+  id             String                  @id @default(cuid())
+  tenantId       String
+  key            String
+  name           String
+  prefix         String
+  includeYear    Boolean                 @default(true)
+  includeMonth   Boolean                 @default(false)
+  padLength      Int                     @default(5)
+  resetPolicy    NumberSeriesResetPolicy @default(YEARLY)
+  nextValue      Int                     @default(1)
+  lastResetKey   String?
+  isActive       Boolean                 @default(true)
+  description    String?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@map("document_number_series")
+}
+
+model AccountingPreference {
+  id                        String   @id @default(cuid())
+  tenantId                  String   @unique
+  requireJournalApproval    Boolean  @default(true)
+  allowPostDraft            Boolean  @default(false)
+  blockPostingClosedPeriod  Boolean  @default(true)
+  fiscalYearStartMonth      Int      @default(1)
+  decimalPlaces             Int      @default(2)
+  defaultCashAccountId      String?
+  defaultArAccountId        String?
+  defaultApAccountId        String?
+  defaultSalesAccountId     String?
+  defaultPurchaseAccountId  String?
+  defaultRetainedEarningsId String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("accounting_preferences")
+}
+
+model PayrollComponent {
+  id              String               @id @default(cuid())
+  tenantId        String
+  code            String
+  name            String
+  type            PayrollComponentType
+  isEpfApplicable Boolean              @default(true)
+  isPercent       Boolean              @default(false)
+  defaultAmount   Float                @default(0)
+  percentOfBasic  Float?
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  tenant          Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@map("payroll_components")
+}
+
+model PayrollRun {
+  id                String           @id @default(cuid())
+  tenantId          String
+  month             Int
+  year              Int
+  periodLabel       String
+  status            PayrollRunStatus @default(DRAFT)
+  employeeCount     Int              @default(0)
+  totalGross        Float            @default(0)
+  totalAllowances   Float            @default(0)
+  totalDeductions   Float            @default(0)
+  totalEpfEmployee  Float            @default(0)
+  totalEpfEmployer  Float            @default(0)
+  totalEtf          Float            @default(0)
+  totalNet          Float            @default(0)
+  journalEntryId    String?
+  notes             String?
+  approvedAt        DateTime?
+  paidAt            DateTime?
+  createdBy         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  tenant            Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  entries           Payroll[]
+
+  @@unique([tenantId, month, year])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@map("payroll_runs")
+}
+
+model PayrollLine {
+  id          String               @id @default(cuid())
+  payrollId   String
+  type        PayrollComponentType
+  code        String
+  name        String
+  amount      Float
+  componentId String?
+
+  payroll     Payroll              @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  @@index([payrollId])
+  @@map("payroll_lines")
+}
+
+model Payslip {
+  id            String   @id @default(cuid())
+  tenantId      String
+  payrollId     String   @unique
+  employeeId    String
+  payslipNumber String
+  periodLabel   String
+  issuedAt      DateTime @default(now())
+  snapshot      Json     @default("{}")
+  createdAt     DateTime @default(now())
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payroll       Payroll  @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, periodLabel])
+  @@index([employeeId])
+  @@map("payslips")
+}
+
 model Payroll {
   id              String   @id @default(cuid())
   employeeId      String
   tenantId        String
+  payrollRunId    String?
   month           Int
   year            Int
   basicSalary     Float
@@ -2566,17 +3237,30 @@ model Payroll {
   deductions      Float    @default(0)
   bonus           Float    @default(0)
   commission      Float    @default(0)
+  grossSalary     Float    @default(0)
+  epfWage         Float    @default(0)
+  epfEmployee     Float    @default(0)
+  epfEmployer     Float    @default(0)
+  etfEmployer     Float    @default(0)
   netSalary       Float
+  status          PayrollEntryStatus @default(DRAFT)
   isPaid          Boolean  @default(false)
   paidAt          DateTime?
   paymentMethod   String?
+  journalEntryId  String?
+  payslipNumber   String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  payrollRun      PayrollRun? @relation(fields: [payrollRunId], references: [id])
+  lines           PayrollLine[]
+  payslip         Payslip?
 
   @@unique([employeeId, month, year])
   @@index([employeeId])
+  @@index([tenantId, month, year])
+  @@index([payrollRunId])
   @@map("payrolls")
 }
 
@@ -2739,6 +3423,9 @@ model AuditLog {
   @@index([tenantId])
   @@index([userId])
   @@index([createdAt])
+  @@index([tenantId, action])
+  @@index([tenantId, resource])
+  @@index([tenantId, createdAt])
   @@map("audit_logs")
 }
 

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, Smartphone, Wallet, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -90,14 +90,22 @@ function formatSaleCustomerName(customer?: SaleCustomer | null): string {
   return full || customer.phone || "Walk-in";
 }
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; savings?: number; cashTendered?: number; }
-interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; time: Date; }
+interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; qty: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; paymentMethod?: string; customer?: SaleCustomer | null; _count?: { items: number }; payments?: { method: string }[]; }
+interface CustomerBillRow { id: string; invoiceNumber: string; invoiceDate: string; total: number; status: string; _count?: { items: number } }
+interface CustomerTopProduct { productName: string; qty: number; spent: number; variantId: string }
+interface CustomerInsight {
+  sales: CustomerBillRow[];
+  topProducts: CustomerTopProduct[];
+  totalOrders?: number;
+  totalSpent?: number;
+}
 interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
 interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: SaleCustomer | null; items: SaleItemDetail[]; }
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
 
-const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }, { value:"GIFT_VOUCHER", label:"Voucher", icon: Gift }];
+const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"UPI", label:"UPI", icon: Smartphone }, { value:"CHEQUE", label:"Cheque", icon: FileCheck }, { value:"WALLET", label:"Wallet", icon: Wallet }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }, { value:"GIFT_VOUCHER", label:"Voucher", icon: Gift }];
 
 const BASE_NAV_ITEMS = [
   { id:"products", label:"Products", icon: ShoppingBag },
@@ -177,6 +185,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [checkoutOpen, setCheckoutOpen] = React.useState(false);
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [showCustomerSearch, setShowCustomerSearch] = React.useState(false);
+  const [showHeldBills, setShowHeldBills] = React.useState(false);
   const [customerSearch, setCustomerSearch] = React.useState("");
   const [customers, setCustomers] = React.useState<CustomerItem[]>([]);
   const [customerLoading, setCustomerLoading] = React.useState(false);
@@ -201,10 +210,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [soundAlerts, setSoundAlerts] = React.useState(true);
   const [qtyPopupEnabled, setQtyPopupEnabled] = React.useState(false);
   const [qtyPopupProduct, setQtyPopupProduct] = React.useState<ProductItem | null>(null);
+  const [editingCartQtyIdx, setEditingCartQtyIdx] = React.useState<number | null>(null);
+  const [editingCartQtyRaw, setEditingCartQtyRaw] = React.useState("");
+  const cashPanelRef = React.useRef<HTMLDivElement>(null);
   const [variantPickerName, setVariantPickerName] = React.useState<string | null>(null);
   const [helpers, setHelpers] = React.useState<{ id: string; firstName: string; lastName: string; commissionRate: number }[]>([]);
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
+  const [chequeNumber, setChequeNumber] = React.useState("");
   const [voucherIssueAmt, setVoucherIssueAmt] = React.useState("");
   const [voucherIssueName, setVoucherIssueName] = React.useState("");
   const [voucherBusy, setVoucherBusy] = React.useState(false);
@@ -212,6 +225,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [inlineCustomerSearch, setInlineCustomerSearch] = React.useState("");
   const [inlineCustomers, setInlineCustomers] = React.useState<CustomerItem[]>([]);
   const [inlineCustLoading, setInlineCustLoading] = React.useState(false);
+  const [customerInsight, setCustomerInsight] = React.useState<CustomerInsight | null>(null);
+  const [customerInsightLoading, setCustomerInsightLoading] = React.useState(false);
+  const [previewCustomerId, setPreviewCustomerId] = React.useState<string | null>(null);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
   const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{ entityId: string; percent: number } | null>(null);
@@ -413,6 +429,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
   React.useEffect(() => { if (items.length === 0) setCheckoutOpen(false); }, [items.length]);
+  React.useEffect(() => {
+    if (!checkoutOpen) return;
+    const el = document.activeElement as HTMLElement | null;
+    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
+      el.blur();
+    }
+    // Cashier speed: cash numpad is ready for keyboard digits immediately after F7/F9
+    if (activePayment === "CASH") {
+      requestAnimationFrame(() => cashPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
+    }
+  }, [checkoutOpen, activePayment]);
 
   const loadProducts = React.useCallback(async () => {
     setLoading(true);
@@ -674,8 +701,39 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     [items, discount, discountType, payState.couponDiscount, tierDiscountAmt, taxRate],
   );
   const changeAmt = numpad ? Math.max(0, parseFloat(numpad) - totalAmt) : 0;
-  const popularItems = React.useMemo(()=>products.slice(0,5),[products]);
-  const filteredProducts = React.useMemo(()=>products.filter(p=>{const q=search.toLowerCase().trim();const qBase=q.replace(/\d{3}$/,"");return (!q||p.productName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||(p.barcode&&p.barcode.toLowerCase().includes(q))||(p.barcode&&qBase&&qBase!==q&&p.barcode.toLowerCase().includes(qBase))||(qBase&&qBase!==q&&p.sku.toLowerCase().includes(qBase))||p.variantName.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q)||p.material?.toLowerCase().includes(q)||p.style?.toLowerCase().includes(q))&&(activeCategory==="All"||p.category===activeCategory);}),[products,search,activeCategory]);
+  const popularItems = React.useMemo(() => {
+    const freq = new Map<string, number>();
+    for (const s of recentScans) freq.set(s.variantId, (freq.get(s.variantId) ?? 0) + 2);
+    for (const id of liked) freq.set(id, (freq.get(id) ?? 0) + 3);
+    const scored = [...products].map((p) => ({ p, score: freq.get(p.variantId) ?? 0 }));
+    scored.sort((a, b) => b.score - a.score || a.p.productName.localeCompare(b.p.productName));
+    const top = scored.filter((s) => s.score > 0).slice(0, 5).map((s) => s.p);
+    if (top.length >= 5) return top;
+    const seen = new Set(top.map((p) => p.variantId));
+    for (const p of products) {
+      if (seen.has(p.variantId)) continue;
+      top.push(p);
+      if (top.length >= 5) break;
+    }
+    return top;
+  }, [products, recentScans, liked]);
+  const filteredProducts = React.useMemo(() => products.filter((p) => {
+    const q = search.toLowerCase().trim();
+    const qBase = q.replace(/\d{3}$/, "");
+    const matchesQ = !q
+      || p.productName.toLowerCase().includes(q)
+      || p.sku.toLowerCase().includes(q)
+      || (p.barcode && p.barcode.toLowerCase().includes(q))
+      || (p.barcode && qBase && qBase !== q && p.barcode.toLowerCase().includes(qBase))
+      || (qBase && qBase !== q && p.sku.toLowerCase().includes(qBase))
+      || p.variantName.toLowerCase().includes(q)
+      || p.category?.toLowerCase().includes(q)
+      || p.color?.toLowerCase().includes(q)
+      || p.size?.toLowerCase().includes(q)
+      || p.material?.toLowerCase().includes(q)
+      || p.style?.toLowerCase().includes(q);
+    return matchesQ && (activeCategory === "All" || p.category === activeCategory);
+  }), [products, search, activeCategory]);
 
   const productCards = React.useMemo(() => {
     const map = new Map<string, { rep: ProductItem; variants: ProductItem[]; totalStock: number; minPrice: number; maxPrice: number }>();
@@ -704,7 +762,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     [variantPickerName, getVariants],
   );
 
-  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1) => {
+  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean }) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
     const lineTax = taxRate;
     addItem({
@@ -714,9 +772,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       image: p.imageUrl,
     });
     setLastAddedVariantId(p.variantId);
-    setRecentScans(prev => [{ id: Date.now().toString(), variantId: p.variantId, name: p.productName, variant: variantDisplayLabel(p, profile), price: p.unitPrice, time: new Date() }, ...prev].slice(0, 8));
+    setRecentScans((prev) => [{
+      id: Date.now().toString(),
+      variantId: p.variantId,
+      name: p.productName,
+      variant: variantDisplayLabel(p, profile),
+      price: p.unitPrice,
+      qty,
+      time: new Date(),
+    }, ...prev].slice(0, 8));
     playPosSound("scan_ok", soundAlerts);
-    toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ×${qty}  (Stock: ${p.stock})`, { duration: 900 });
+    toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ×${qty}`, { duration: 700 });
+    if (opts?.keepSearchFocus !== false) {
+      requestAnimationFrame(() => {
+        searchRef.current?.focus();
+      });
+    }
   }, [addItem, profile, taxRate, soundAlerts]);
 
   const handleAddGrnItem = React.useCallback((p: {
@@ -736,13 +807,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     });
   }, [addItem]);
 
-  const handleAddProduct = React.useCallback((p: ProductItem) => {
+  const handleAddProduct = React.useCallback((p: ProductItem, opts?: { fromScan?: boolean }) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
-    if (qtyPopupEnabled) {
+    // Barcode scan never shows qty popup — supermarket speed
+    if (qtyPopupEnabled && !opts?.fromScan) {
       setQtyPopupProduct(p);
       return;
     }
-    commitAddProduct(p, 1);
+    commitAddProduct(p, 1, { keepSearchFocus: true });
   }, [qtyPopupEnabled, commitAddProduct, soundAlerts]);
 
   const scanAndAddProduct = React.useCallback(async (code: string) => {
@@ -789,7 +861,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         if (siblings.length > 1) {
           const codeLower = trimmed.toLowerCase();
           const exactSku = siblings.find((p) => p.sku.toLowerCase() === codeLower);
-          if (!exactSku) {
+          const exactBarcode = siblings.find((p) => p.barcode?.toLowerCase() === codeLower);
+          if (!exactSku && !exactBarcode) {
             setSelectedProductName(null);
             setSelAttrs({});
             setVariantPickerName(found.productName);
@@ -798,7 +871,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             playPosSound("scan_ok", soundAlerts);
             return;
           }
-          found = exactSku;
+          found = exactSku ?? exactBarcode ?? found;
         }
       }
     }
@@ -806,12 +879,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (!found) {
       playPosSound("scan_fail", soundAlerts);
       toast.error(`Barcode/SKU not found: ${trimmed}`);
+      requestAnimationFrame(() => searchRef.current?.focus());
       return;
     }
     setSelectedProductName(null);
     setSelAttrs({});
     setVariantPickerName(null);
-    handleAddProduct(found);
+    handleAddProduct(found, { fromScan: true });
     setLastScanAt(new Date());
     setSearch("");
     setScanFlash(true);
@@ -840,17 +914,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       void scanAndAddProduct(q);
       return;
     }
-    if (productCards.length === 1) {
-      handleCardClick(productCards[0].rep);
-      setSearch("");
+    if (productCards.length === 0) {
+      void scanAndAddProduct(q);
       return;
     }
-    if (productCards.length > 1) {
-      handleCardClick(productCards[0].rep);
-      return;
-    }
-    void scanAndAddProduct(q);
-  }, [search, products, productCards, scanAndAddProduct, handleCardClick]);
+    const idx = focusedProductIdx >= 0 && focusedProductIdx < productCards.length
+      ? focusedProductIdx
+      : 0;
+    handleCardClick(productCards[idx].rep);
+    setSearch("");
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }, [search, products, productCards, focusedProductIdx, scanAndAddProduct, handleCardClick]);
 
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -962,19 +1036,38 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     }
   }, [receiptSettings, buildReceiptHtml]);
 
-  const handleCheckout = React.useCallback(async()=>{
+  const openCustomerPopup = React.useCallback(() => {
+    setShowHeldBills(false);
+    setShowCustomerSearch(false);
+    setCustomerSearch("");
+    setShowNewCust(false);
+    setFocusedCustomerIdx(0);
+    setActiveNav("customers");
+  }, []);
+
+  const openHeldBillsPopup = React.useCallback(() => {
+    setActiveNav("products");
+    setShowCustomerSearch(false);
+    setShowHeldBills(true);
+    void loadHeldBills();
+  }, [loadHeldBills]);
+
+  const handleCheckout = React.useCallback(async (forceMethod?: string) => {
     if(!items.length||checkoutLoading)return;
     if (pendingDiscountApproval) {
       toast.error("Waiting for manager discount approval — cannot checkout yet");
       return;
     }
-    const payments = buildCheckoutPayments(payState, activePayment, numpad, totalAmt);
-    if (activePayment === "WALLET" && !payState.splitMode) {
+    const payMethod = forceMethod ?? activePayment;
+    if (forceMethod) setActivePayment(forceMethod);
+    const tenderPad = forceMethod === "CASH" ? "" : numpad;
+    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber);
+    if (payMethod === "WALLET" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for wallet payment"); return; }
       payments.length = 0;
       payments.push({ method: "WALLET", amount: totalAmt });
     }
-    if (activePayment === "CUSTOMER_CREDIT" && !payState.splitMode) {
+    if (payMethod === "CUSTOMER_CREDIT" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for credit payment"); return; }
       const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
       if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
@@ -982,7 +1075,16 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       payments.length = 0;
       payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
     }
-    if (activePayment === "GIFT_VOUCHER" && !payState.splitMode) {
+    if (payMethod === "CHEQUE" && !payState.splitMode) {
+      if (!chequeNumber.trim()) { toast.error("Enter cheque number"); return; }
+      payments.length = 0;
+      payments.push({ method: "CHEQUE", amount: totalAmt, reference: chequeNumber.trim() });
+    }
+    if (payState.splitMode) {
+      const missingCheque = payments.some((p) => p.method === "CHEQUE" && !(p as { reference?: string }).reference);
+      if (missingCheque) { toast.error("Enter cheque number on CHEQUE payment lines"); return; }
+    }
+    if (payMethod === "GIFT_VOUCHER" && !payState.splitMode) {
       if (!giftVoucherCode.trim()) { toast.error("Enter gift voucher code"); return; }
       try {
         const vr = await api.get<{ valid: boolean; reason?: string; maxApplicable?: number; balance?: number }>(
@@ -1002,12 +1104,12 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       }
     }
     if (!payState.splitMode && !payState.allowPartial) {
-      if (activePayment === "CASH" && numpad && parseFloat(numpad) < totalAmt) {
+      if (payMethod === "CASH" && tenderPad && parseFloat(tenderPad) < totalAmt) {
         toast.error("Cash tendered less than total");
         return;
       }
       const paid = payments.reduce((s, p) => s + p.amount, 0);
-      if (paid + 0.01 < totalAmt && activePayment !== "CASH") {
+      if (paid + 0.01 < totalAmt && payMethod !== "CASH") {
         toast.error("Payment amount is less than total");
         return;
       }
@@ -1015,6 +1117,18 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     if (payments.length === 0 || payments.every((p) => p.amount <= 0)) {
       toast.error("Enter payment amount");
       return;
+    }
+    const paidCheck = payments.reduce((s, p) => s + p.amount, 0);
+    const isPartialBill = paidCheck + 0.01 < totalAmt;
+    if ((payState.allowPartial || isPartialBill) && isPartialBill) {
+      if (!customer?.id) {
+        toast.error("Select a customer — unpaid balance goes on credit account");
+        return;
+      }
+      if ((customer.creditLimit ?? 0) <= 0) {
+        toast.error("Customer has no credit limit — set a limit or collect full payment");
+        return;
+      }
     }
     setCheckoutLoading(true);
     try {
@@ -1041,7 +1155,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
         tax: taxAmount(),
         customerName: customer?.name,
         paymentMethod: payments.map((p) => p.method).join(" + "),
-        cashTendered: activePayment === "CASH" && numpad ? parseFloat(numpad) : undefined,
+        cashTendered: payMethod === "CASH" && tenderPad ? parseFloat(tenderPad) : undefined,
         savings: items.reduce((sum, i) => {
           const mrp = i.mrp && i.mrp > i.unitPrice ? i.mrp : i.unitPrice;
           return sum + Math.max(0, (mrp - i.unitPrice) * i.quantity);
@@ -1058,15 +1172,13 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       });
       setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
-      setHelperEmployeeId(""); setGiftVoucherCode("");
+      setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber("");
+      setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
-      setActiveNav("products");setTimeout(()=>searchRef.current?.focus(),100);
+      setActiveNav("products");
       playPosSound("sale_ok", soundAlerts);
-      await loadHeldBills();
-      await loadProducts();
-      void loadTodayStats();
-      void refreshPrinterStatus();
-      if (receiptSettings.autoPrintAfterSale) {
+      // Always print receipt after sale (cashier workflow). Print server / thermal often kicks cash drawer on cash.
+      {
         const receipt: SaleReceipt = {
           invoiceNumber: s.invoiceNumber,
           total: s.total,
@@ -1084,18 +1196,24 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           savings: saleSnapshot.savings,
           cashTendered: saleSnapshot.cashTendered,
         };
-        executeReceiptPrint({
+        void executeReceiptPrint({
           html: buildReceiptHtml(receipt),
           printType: "SALE",
           invoiceNumber: s.invoiceNumber,
-          settings: receiptSettings,
+          settings: { ...receiptSettings, autoPrintAfterSale: true },
           title: `Receipt ${s.invoiceNumber}`,
         }).catch((e) => toast.error((e as Error).message ?? "Receipt print failed"));
       }
+      // Reset for next sale immediately — do not block scanner on product reload
+      setTimeout(() => searchRef.current?.focus(), 80);
+      void loadHeldBills();
+      void loadProducts();
+      void loadTodayStats();
+      void refreshPrinterStatus();
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -1111,6 +1229,31 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     }
   }, [items, totalAmt, receiptSettings, user, refreshPrinterStatus]);
 
+  const loadCustomerInsight = React.useCallback(async (customerId: string) => {
+    if (!customerId) { setCustomerInsight(null); setPreviewCustomerId(null); return; }
+    setPreviewCustomerId(customerId);
+    setCustomerInsightLoading(true);
+    try {
+      const res = await api.get<{
+        sales?: CustomerBillRow[];
+        topProducts?: CustomerTopProduct[];
+        totalOrders?: number;
+        totalSpent?: number;
+      }>(`/customers/${customerId}`);
+      const data = res.data;
+      setCustomerInsight({
+        sales: Array.isArray(data.sales) ? data.sales : [],
+        topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+        totalOrders: data.totalOrders,
+        totalSpent: data.totalSpent,
+      });
+    } catch {
+      setCustomerInsight({ sales: [], topProducts: [] });
+    } finally {
+      setCustomerInsightLoading(false);
+    }
+  }, []);
+
   const applyCustomer = React.useCallback((c: CustomerItem) => {
     if (!c?.id) { toast.error("Invalid customer — try again"); return; }
     setCustomer({
@@ -1121,8 +1264,13 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       creditLimit: c.creditLimit, outstandingBalance: c.creditBalance,
       isActive: true, createdAt: new Date(),
     });
+    setShowCustomerSearch(false);
+    setCustomerSearch("");
+    setCustomers([]);
+    setShowNewCust(false);
+    void loadCustomerInsight(c.id);
     toast.success(`${c.name} added to bill`);
-  }, [setCustomer]);
+  }, [setCustomer, loadCustomerInsight]);
 
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
@@ -1132,7 +1280,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       const c = res.data;
       const item: CustomerItem = mapApiCustomer(c);
       applyCustomer(item);
-      setShowNewCust(false); setNewCustFirst(""); setNewCustLast(""); setNewCustPhone(""); setNewCustEmail("");
+      setNewCustFirst(""); setNewCustLast(""); setNewCustPhone(""); setNewCustEmail("");
       setInlineCustomerSearch(""); setInlineCustomers([]);
     } catch(e:unknown){ toast.error((e as Error).message??"Failed to register customer"); }
     finally { setNewCustSaving(false); }
@@ -1183,13 +1331,25 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     }
   }, [selectedCartIdx, items, removeItem]);
 
+  const openQtyEditForSelected = React.useCallback(() => {
+    if (selectedCartIdx < 0) return;
+    const it = items[selectedCartIdx];
+    if (!it) return;
+    setEditingCartQtyIdx(selectedCartIdx);
+    setEditingCartQtyRaw(String(it.quantity));
+  }, [selectedCartIdx, items]);
+
+  const closeQtyPopup = React.useCallback(() => setQtyPopupProduct(null), []);
+
   const keyboardCtx = React.useMemo(() => ({
     posOpen,
     pinLocked,
     checkoutOpen,
     showShortcuts,
     showCustomerSearch,
+    showHeldBills,
     showDayEnd,
+    qtyPopupOpen: !!qtyPopupProduct,
     selectedProductName: selectedProductName ?? variantPickerName,
     activeNav,
     activePayment,
@@ -1220,6 +1380,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       if (!v) setVariantPickerName(null);
     },
     setShowCustomerSearch,
+    setShowHeldBills,
     setCustomerSearch,
     setCustomers,
     setActiveNav,
@@ -1255,21 +1416,27 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     removeItem,
     adjustSelectedQty,
     removeSelectedCartItem,
+    openQtyEditForSelected,
+    closeQtyPopup,
     applyCustomer,
     getFilteredProduct: (idx: number) => productCards[idx]?.rep,
     getHeldBill: (idx: number) => serverHeldBills[idx],
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
-    posOpen, pinLocked, checkoutOpen, showShortcuts, showCustomerSearch, showDayEnd,
-    selectedProductName, variantPickerName, activeNav, activePayment, items.length, selectedCartIdx,
+    posOpen, pinLocked, checkoutOpen, showShortcuts, showCustomerSearch, showHeldBills, showDayEnd,
+    qtyPopupProduct, selectedProductName, variantPickerName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
     closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
-    updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, applyCustomer,
+    updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
   ]);
+
+  React.useEffect(() => {
+    if (activeNav === "hold-bills") openHeldBillsPopup();
+  }, [activeNav, openHeldBillsPopup]);
 
   usePosKeyboard(keyboardCtx);
 
@@ -1279,6 +1446,11 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       return () => clearTimeout(t);
     }
   }, [posOpen, pinLocked]);
+
+  React.useEffect(() => {
+    if (activeNav !== "customers") return;
+    if (customer?.id) void loadCustomerInsight(customer.id);
+  }, [activeNav, customer?.id, loadCustomerInsight]);
 
   //  Center content per nav 
   const renderCenter = () => {
@@ -1322,8 +1494,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
         </div>
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
           <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
-            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>handleCardClick(p)} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
+            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col border-r" style={{borderColor:"#1e3356"}}>
             {selectedProductName&&activeVariant?(
@@ -1354,7 +1526,28 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           </div>
           <div className="w-80 flex flex-col shrink-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>}</div>
-            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>(<div key={s.id} className="flex items-center gap-3 px-3 py-2.5 border-b" style={{borderColor:"#1a2b3a"}}><Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{s.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{s.variant}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span></div>))}</div>
+            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>{
+              const product = products.find((p) => p.variantId === s.variantId);
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => { if (product) handleAddProduct(product); else toast.info("Product not in catalog cache — scan again"); }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 border-b hover:bg-white/5 transition-colors text-left"
+                  style={{borderColor:"#1a2b3a"}}
+                >
+                  <Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-sm font-bold truncate">{s.name}</p>
+                    <p className="text-xs truncate" style={{color:"#6a8ab8"}}>{s.variant} · ×{s.qty}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-sm font-bold block" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span>
+                    <span className="text-[10px]" style={{color:"#4a6a8a"}}>{s.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                  </div>
+                </button>
+              );
+            })}</div>
           </div>
         </div>
       </div>
@@ -1420,7 +1613,9 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     }
 
     // CUSTOMERS
-    if (activeNav === "customers") return (
+    if (activeNav === "customers") {
+      const insightCustomer = customer ?? inlineCustomers.find((c) => c.id === previewCustomerId) ?? null;
+      return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         {/* Search bar + Register button */}
         <div className="flex items-center gap-2 shrink-0">
@@ -1453,8 +1648,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}>
             <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div>
             <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Selected</span>
-            <button onClick={()=>setCustomer(null)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>On bill</span>
+            <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
           </div>
         ) : (
           <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border border-dashed" style={{borderColor:"#1e3356",background:"#162338"}}>
@@ -1462,32 +1657,98 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
             <p className="text-sm flex-1" style={{color:"#6a8ab8"}}>No {workspace.customerLabel.toLowerCase()} on bill — tap <span className="font-bold text-white">Select</span> below</p>
           </div>
         )}
-        {/* Search results */}
-        <div className="flex-1 overflow-y-auto">
-          {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
-          {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
-            <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"#4a6a8a"}}>
-              <AlertCircle className="h-8 w-8 opacity-30"/>
-              <p className="text-sm">No customers found</p>
-              <button onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(inlineCustomerSearch.trim()))setNewCustPhone(inlineCustomerSearch.trim());setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
-            </div>
-          )}
-          <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))"}}>
-            {inlineCustomers.map((c, cIdx)=>(
-              <div key={c.id} role="button" tabIndex={0}
-                onClick={() => { setFocusedCustomerIdx(cIdx); applyCustomer(c); }}
-                onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
-                className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
-                style={{background:focusedCustomerIdx===cIdx?"rgba(79,110,247,0.12)":"#162338",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx?"#4f6ef7":"#1e3356",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
-                <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
-                <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
+        {/* List + insight */}
+        <div className="flex-1 min-h-0 grid gap-3" style={{gridTemplateColumns:"minmax(260px,1fr) minmax(280px,1.1fr)"}}>
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-2" style={{borderColor:"#1e3356",background:"#0f1f3a"}}>
+            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
+            {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
+              <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"#4a6a8a"}}>
+                <AlertCircle className="h-8 w-8 opacity-30"/>
+                <p className="text-sm">No customers found</p>
+                <button onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(inlineCustomerSearch.trim()))setNewCustPhone(inlineCustomerSearch.trim());setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
               </div>
-            ))}
+            )}
+            <div className="space-y-2">
+              {inlineCustomers.map((c, cIdx)=>(
+                <div key={c.id} role="button" tabIndex={0}
+                  onClick={() => { setFocusedCustomerIdx(cIdx); void loadCustomerInsight(c.id); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
+                  className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
+                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(79,110,247,0.12)":"#162338",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"#4f6ef7":"#1e3356",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
+                  <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-3 flex flex-col gap-3" style={{borderColor:"#1e3356",background:"#0f1f3a"}}>
+            {!previewCustomerId && !customer ? (
+              <div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}>
+                <FileText className="h-12 w-12 mb-2 opacity-20"/>
+                <p className="text-sm font-medium">Customer history</p>
+                <p className="text-xs mt-1 text-center opacity-70">Tap a customer to preview bills & top products, then Select to add to bill</p>
+              </div>
+            ) : customerInsightLoading ? (
+              <div className="flex items-center justify-center flex-1"><Loader2 className="h-7 w-7 animate-spin" style={{color:"#4f6ef7"}}/></div>
+            ) : (
+              <>
+                <div className="shrink-0">
+                  <p className="text-white text-sm font-bold truncate">{insightCustomer?.name ?? "Customer"}</p>
+                  <p className="text-xs" style={{color:"#6a8ab8"}}>
+                    {typeof customerInsight?.totalOrders === "number" ? `${customerInsight.totalOrders} orders` : `${customerInsight?.sales.length ?? 0} recent bills`}
+                    {typeof customerInsight?.totalSpent === "number" ? ` · LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-3.5 w-3.5" style={{color:"#4f6ef7"}}/>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Previous bills</p>
+                  </div>
+                  {(customerInsight?.sales.length ?? 0) === 0 ? (
+                    <p className="text-xs py-3 text-center" style={{color:"#4a6a8a"}}>No previous bills</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {customerInsight!.sales.slice(0, 10).map((sale) => (
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:"#162338",border:"1px solid #1e3356"}}>
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono font-bold truncate" style={{color:"#4f6ef7"}}>{sale.invoiceNumber}</p>
+                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items</p>
+                          </div>
+                          <p className="text-xs font-bold font-mono text-white shrink-0">LKR {formatNumber(sale.total)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-3.5 w-3.5" style={{color:"#10b981"}}/>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Top products</p>
+                  </div>
+                  {(customerInsight?.topProducts.length ?? 0) === 0 ? (
+                    <p className="text-xs py-3 text-center" style={{color:"#4a6a8a"}}>No purchase history yet</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {customerInsight!.topProducts.map((p, idx) => (
+                        <div key={`${p.variantId}-${idx}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{background:"#162338",border:"1px solid #1e3356"}}>
+                          <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-white font-semibold truncate">{p.productName}</p>
+                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{p.qty} sold · LKR {formatNumber(p.spent)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
-    );
+      );
+    }
 
     // HOLD BILLS
     if (activeNav === "hold-bills") return (
@@ -2083,7 +2344,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
             onClose={() => setVariantPickerName(null)}
             onSelect={(v) => {
               setVariantPickerName(null);
-              handleAddProduct(v as ProductItem);
+              // One-click add — never open qty popup from variant picker
+              commitAddProduct(v as ProductItem, 1, { keepSearchFocus: true });
             }}
           />
         )}
@@ -2137,13 +2399,13 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode or search product..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode · search name / SKU / category..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}}},{label:"Recent Bills",key:"",icon:Receipt,onClick:()=>setActiveNav("orders")},{label: customer ? customer.name : "Select Customer", key:"F4",icon:Users,onClick:()=>{setActiveNav("customers");setShowCustomerSearch(false);}}].map((btn,i)=>(
-              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[160px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"#1a2b4a",color:i===2&&customer?"#fff":"#a0b4d4",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Select customer"):undefined}>
-                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2&&customer ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
+            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCustomerPopup()}].map((btn,i)=>(
+              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"#1a2b4a",color:i===2&&customer?"#fff":"#a0b4d4",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
+                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
           </div>
@@ -2153,7 +2415,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               <Receipt className="h-3.5 w-3.5"/>
               {taxRate > 0 ? `Tax ${taxRate}%` : "No Tax"}
             </button>
-            {serverHeldBills.length>0&&<button onClick={()=>setActiveNav("hold-bills")} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
+            {serverHeldBills.length>0&&<button onClick={openHeldBillsPopup} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
             <a
               href={getCustomerDisplayUrl()}
               target={CUSTOMER_DISPLAY_WINDOW_NAME}
@@ -2180,12 +2442,16 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               {navItems.map((item, navIdx)=>{
                 const active=activeNav===item.id;
                 return (
-                  <button key={item.id} onClick={()=>setActiveNav(item.id)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
+                  <button key={item.id} onClick={()=>{
+                    if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
+                    setActiveNav(item.id);
+                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"#6a8ab8"}}/>
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
-                    {navIdx<9&&!(item.id==="products"&&itemCount()>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{navIdx+1}</span>}
+                    {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#f59e0b",color:"#fff"}}>{serverHeldBills.length}</span>}
+                    {navIdx<9&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{navIdx+1}</span>}
                   </button>
                 );
               })}
@@ -2207,23 +2473,16 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           {/* CART PANEL */}
           <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-              <span className="text-white font-bold text-lg">{checkoutOpen ? "Checkout" : `Cart (${itemCount()} Items)`}</span>
+              <span className="text-white font-bold text-lg">Cart ({itemCount()} Items)</span>
               <div className="flex items-center gap-2">
-                {checkoutOpen && (
-                  <button onClick={() => setCheckoutOpen(false)} className="text-xs font-semibold px-2.5 py-1 rounded-lg transition-colors hover:bg-white/10" style={{color:"#6a8ab8"}}>
-                    ← Back to Cart
-                  </button>
-                )}
-                {!checkoutOpen && (
-                  <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
-                )}
+                <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
               </div>
             </div>
             {/* Customer on bill — always visible */}
             <div className="px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
               <button
                 type="button"
-                onClick={() => setActiveNav("customers")}
+                onClick={openCustomerPopup}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-white/5 text-left"
                 style={{
                   background: customer ? "rgba(79,110,247,0.1)" : "#162338",
@@ -2241,7 +2500,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5" style={{ color: "#6a8ab8" }}>{workspace.customerLabel}</p>
                   <p className="text-sm font-bold truncate leading-tight" style={{ color: customer ? "#fff" : "#6a8ab8" }}>
-                    {customer ? customer.name : "Select"}
+                    {customer ? customer.name : "Walk-In Customer"}
                   </p>
                   {customer?.phone && (
                     <p className="text-[10px] truncate mt-0.5" style={{ color: "#6a8ab8" }}>{customer.phone}</p>
@@ -2250,7 +2509,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 {customer ? (
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); setCustomer(null); toast.info("Customer removed from bill"); }}
+                    onClick={(e) => { e.stopPropagation(); setCustomer(null); setCustomerInsight(null); setPreviewCustomerId(null); toast.info("Customer removed from bill"); }}
                     className="p-1.5 rounded-lg hover:bg-white/10 shrink-0"
                     title="Remove customer"
                   >
@@ -2261,30 +2520,82 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 )}
               </button>
             </div>
-            {!checkoutOpen && (
-              <>
-                <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto min-h-0">
                   {items.length===0?(
-                    <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Add products to begin</p></div>
+                    <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Scan barcode to begin</p></div>
                   ):(
                     <div className="p-3 space-y-2">
-                      <AnimatePresence>{items.map((item,idx)=>(
+                      <AnimatePresence>{items.map((item,idx)=>{
+                        const lineSub = item.unitPrice * item.quantity;
+                        const lineDisc = item.discountType === "percentage"
+                          ? lineSub * ((item.discountAmount || 0) / 100)
+                          : (item.discountAmount || 0);
+                        const afterDisc = Math.max(0, lineSub - lineDisc);
+                        const lineTax = afterDisc * ((item.taxRate || 0) / 100);
+                        const lineTotal = afterDisc + lineTax;
+                        const editing = editingCartQtyIdx === idx;
+                        return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
-                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-12 w-12 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(item.variantName)} iconClassName="h-6 w-6 text-white/20" />
-                          <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{item.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p></div>
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
-                            <span className="text-white text-sm font-bold w-7 text-center">{item.quantity}</span>
-                            <button onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-12 w-12 rounded-lg shrink-0 overflow-hidden mt-0.5" fallbackBg={getCardBg(item.variantName)} iconClassName="h-6 w-6 text-white/20" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-sm font-semibold truncate">{item.productName}</p>
+                            <p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p>
+                            <p className="text-[10px] mt-0.5 tabular-nums" style={{color:"#4a6a8a"}}>
+                              @ LKR {formatNumber(item.unitPrice)}
+                              {lineDisc > 0 ? ` · Disc ${formatNumber(lineDisc)}` : ""}
+                              {(item.taxRate || 0) > 0 ? ` · Tax ${formatNumber(lineTax)}` : ""}
+                            </p>
                           </div>
-                          <div className="text-right shrink-0 w-24 group">
-                            <p className="text-white text-sm font-bold">LKR {formatNumber(item.unitPrice*item.quantity)}</p>
-                            <button onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
+                          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
+                            {editing ? (
+                              <input
+                                autoFocus
+                                value={editingCartQtyRaw}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
+                                onBlur={() => {
+                                  const n = parseInt(editingCartQtyRaw, 10);
+                                  if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
+                                  setEditingCartQtyIdx(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingCartQtyIdx(null);
+                                  }
+                                }}
+                                className="w-10 h-7 rounded text-center text-sm font-bold text-white outline-none"
+                                style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
+                              />
+                            ) : (
+                              <span
+                                title="Double-click to edit"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCartQtyIdx(idx);
+                                  setEditingCartQtyRaw(String(item.quantity));
+                                }}
+                                className="text-white text-sm font-bold w-7 text-center select-none"
+                              >
+                                {item.quantity}
+                              </span>
+                            )}
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                          </div>
+                          <div className="text-right shrink-0 w-24 group pt-0.5">
+                            <p className="text-white text-sm font-bold">LKR {formatNumber(lineTotal)}</p>
+                            <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
                           </div>
                         </motion.div>
-                      ))}</AnimatePresence>
+                        );
+                      })}</AnimatePresence>
                     </div>
                   )}
                 </div>
@@ -2317,17 +2628,41 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     </div>
                     <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
-                  <div className="p-3">
-                    <button onClick={() => setCheckoutOpen(true)} disabled={items.length === 0} className="w-full h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>
-                      <ChevronRight className="h-5 w-5"/>
-                      Checkout
-                      <span className="text-xs opacity-70 font-mono">(Enter / F9)</span>
+                  <div className="p-3 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => void handleCheckout("CASH")}
+                      disabled={items.length === 0 || checkoutLoading || !!pendingDiscountApproval}
+                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      style={{background:"linear-gradient(135deg,#10b981,#059669)"}}
+                    >
+                      {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />}
+                      Pay Cash
+                      <span className="text-[10px] opacity-70 font-mono">⌃↵</span>
+                    </button>
+                    <button
+                      onClick={() => { setActivePayment("CASH"); setCheckoutOpen(true); }}
+                      disabled={items.length === 0}
+                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
+                      style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}
+                    >
+                      <ChevronRight className="h-4 w-4"/>
+                      Pay / Card
+                      <span className="text-[10px] opacity-70 font-mono">F9</span>
                     </button>
                   </div>
                 </div>
-              </>
-            )}
             {checkoutOpen && (
+              <div className="fixed inset-0 z-[115] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
+              <div className="w-full max-w-lg max-h-[90vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}} onClick={e=>e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                  <div>
+                    <h2 className="text-white font-bold text-base">Checkout</h2>
+                    <p className="text-xs" style={{color:"#6a8ab8"}}>LKR {formatNumber(totalAmt)} · {itemCount()} items</p>
+                  </div>
+                  <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                    <X className="h-4 w-4" style={{color:"#6a8ab8"}}/>
+                  </button>
+                </div>
               <div className="flex-1 overflow-y-auto flex flex-col min-h-0">
                 <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"#1e3356"}}>
                   <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
@@ -2398,6 +2733,15 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
                   />
                 )}
+                {activePayment==="CHEQUE"&&(
+                  <input
+                    value={chequeNumber}
+                    onChange={(e)=>setChequeNumber(e.target.value)}
+                    placeholder="Cheque number"
+                    className="w-full h-10 px-3 rounded-xl text-sm text-white outline-none font-mono"
+                    style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                  />
+                )}
                 {helpers.length > 0 && (
                   <div className="flex items-center gap-2">
                     <UserCheck className="h-4 w-4 shrink-0" style={{color:"#6a8ab8"}}/>
@@ -2415,8 +2759,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   </div>
                 )}
                 {activePayment==="CASH"&&(
-                  <div className="px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+                  <div ref={cashPanelRef} className="px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><span className="text-[10px] font-mono" style={{color:"#4a6a8a"}}>Type amount · F9 confirm</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
                     <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                     <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
@@ -2438,12 +2782,14 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
                     Split Bill
                   </button>
-                  <button onClick={handleCheckout} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                  <button onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
                     {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                     Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                   </button>
                   <button onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}}><Printer className="h-5 w-5" style={{color:"#6a8ab8"}}/></button>
                 </div>
+              </div>
+              </div>
               </div>
             )}
           </div>
@@ -2580,18 +2926,46 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 
         {/* CUSTOMER SEARCH MODAL */}
         <AnimatePresence>{showCustomerSearch&&(
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>{setShowCustomerSearch(false);setCustomerSearch("");}}>
-            <motion.div initial={{scale:0.95,y:12}} animate={{scale:1,y:0}} exit={{scale:0.95,y:12}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-md overflow-hidden" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>{setShowCustomerSearch(false);setCustomerSearch("");setShowNewCust(false);}}>
+            <motion.div initial={{scale:0.95,y:12}} animate={{scale:1,y:0}} exit={{scale:0.95,y:12}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-lg overflow-hidden" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
               <div className="flex items-center gap-2 p-3 border-b" style={{borderColor:"#1e3356"}}>
                 <Users className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>
-                <input autoFocus value={customerSearch} onChange={e=>setCustomerSearch(e.target.value)} placeholder="Search customer by name or phone..." className="flex-1 h-9 px-2 text-sm text-white outline-none rounded-lg" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
-                <button onClick={()=>{setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+                <input autoFocus value={customerSearch} onChange={e=>{setCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="flex-1 h-9 px-2 text-sm text-white outline-none rounded-lg" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <button type="button" onClick={()=>setShowNewCust((s)=>!s)} className="h-9 px-3 rounded-lg text-xs font-bold text-white shrink-0" style={{background:showNewCust?"#162338":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none"}}>
+                  {showNewCust ? "Cancel" : "New"}
+                </button>
+                <button onClick={()=>{setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);setShowNewCust(false);}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
               </div>
-              <div className="max-h-64 overflow-y-auto p-1.5">
+              {showNewCust && (
+                <div className="p-3 border-b space-y-2" style={{borderColor:"#1e3356",background:"#162338"}}>
+                  <div className="grid grid-cols-2 gap-2">
+                    <input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="First name *" className="h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                    <input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Last name" className="h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                    <input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="Phone *" className="h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                    <input value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="Email" className="h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                  </div>
+                  <button onClick={() => void saveNewCustomer()} disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()} className="w-full h-9 rounded-xl text-sm font-bold text-white disabled:opacity-40" style={{background:"#4f6ef7"}}>
+                    {newCustSaving ? "Saving…" : "Save & add to bill"}
+                  </button>
+                </div>
+              )}
+              {customer && (
+                <div className="px-3 py-2 border-b flex items-center gap-2" style={{borderColor:"#1e3356",background:"rgba(16,185,129,0.08)"}}>
+                  <Check className="h-3.5 w-3.5" style={{color:"#10b981"}}/>
+                  <span className="text-xs text-white font-semibold flex-1 truncate">{customer.name} on bill</span>
+                  <button type="button" onClick={()=>{setCustomer(null);toast.info("Customer removed");}} className="text-[10px] font-bold px-2 py-1 rounded-lg" style={{color:"#ef4444",background:"rgba(239,68,68,0.12)"}}>Remove</button>
+                </div>
+              )}
+              <div className="max-h-72 overflow-y-auto p-1.5">
                 {customerLoading&&<div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin" style={{color:"#4f6ef7"}}/></div>}
-                {!customerLoading&&customers.length===0&&!customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>Type to search or pick from recent customers below</p>}
-                {!customerLoading&&customers.length===0&&customerSearch&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>No customers found</p>}
-                {customers.map((c, cIdx)=>(<button key={c.id} onClick={()=>{applyCustomer(c);setShowCustomerSearch(false);setCustomerSearch("");setCustomers([]);}} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left" style={{background:focusedCustomerIdx===cIdx?"rgba(79,110,247,0.12)":"transparent",outline:focusedCustomerIdx===cIdx?"1px solid #4f6ef7":"none"}}>
+                {!customerLoading&&customers.length===0&&!customerSearch&&!showNewCust&&<p className="text-center py-6 text-sm" style={{color:"#4a6a8a"}}>Type to search, or register a new customer</p>}
+                {!customerLoading&&customers.length===0&&customerSearch&&(
+                  <div className="text-center py-6 space-y-2">
+                    <p className="text-sm" style={{color:"#4a6a8a"}}>No customers found</p>
+                    <button type="button" onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(customerSearch.trim()))setNewCustPhone(customerSearch.trim());}} className="text-xs font-bold px-3 h-8 rounded-lg text-white" style={{background:"#4f6ef7"}}>Register new</button>
+                  </div>
+                )}
+                {customers.map((c, cIdx)=>(<button key={c.id} onClick={()=>{applyCustomer(c);}} className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-colors text-left" style={{background:focusedCustomerIdx===cIdx?"rgba(79,110,247,0.12)":"transparent",outline:focusedCustomerIdx===cIdx?"1px solid #4f6ef7":"none"}}>
                   <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
                   <div className="flex-1 min-w-0"><p className="text-white text-sm font-medium">{c.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{c.phone}</p></div>
                   <div className="flex items-center gap-1 shrink-0"><Star className="h-3 w-3 text-amber-400"/><span className="text-xs capitalize" style={{color:"#f59e0b"}}>{c.tier}</span></div>
@@ -2601,18 +2975,84 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           </motion.div>
         )}</AnimatePresence>
 
+        {/* HELD BILLS MODAL */}
+        <AnimatePresence>{showHeldBills&&(
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>setShowHeldBills(false)}>
+            <motion.div initial={{scale:0.95,y:12}} animate={{scale:1,y:0}} exit={{scale:0.95,y:12}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                <div className="flex items-center gap-2">
+                  <PauseCircle className="h-4 w-4" style={{color:"#f59e0b"}}/>
+                  <h2 className="text-white font-bold text-sm">Held Bills ({serverHeldBills.length})</h2>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={()=>void loadHeldBills()} className="h-8 px-3 rounded-lg text-xs font-semibold border" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+                    <RefreshCw className={cn("h-3.5 w-3.5 inline mr-1",holdsLoading&&"animate-spin")}/>Refresh
+                  </button>
+                  <button onClick={()=>{if(items.length>0){void handleHoldBill();setShowHeldBills(false);}else toast.info("Cart is empty");}} className="h-8 px-3 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>
+                    Hold current
+                  </button>
+                  <button onClick={()=>setShowHeldBills(false)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                {holdsLoading?(<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(
+                  <div className="flex flex-col items-center justify-center py-12" style={{color:"#4a6a8a"}}>
+                    <PauseCircle className="h-12 w-12 mb-2 opacity-20"/>
+                    <p className="text-sm">No bills on hold</p>
+                    <p className="text-xs mt-1">Press F3 to hold the current cart</p>
+                  </div>
+                ):(
+                  <div className="grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))"}}>
+                    {serverHeldBills.map((bill,idx)=>{
+                      const billItems = bill.data?.items ?? [];
+                      const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
+                      const kbFocus = focusedHeldIdx === idx;
+                      return (
+                        <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"#162338",borderColor:kbFocus?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p>
+                              <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} · {billItems.length} item(s)</p>
+                            </div>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span>
+                          </div>
+                          {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
+                          <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{billItems.length-3} more</p>}</div>
+                          <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"#1e3356"}}>
+                            <span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span>
+                            <div className="flex gap-2">
+                              <button onClick={()=>void handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button>
+                              <button onClick={()=>{void handleRestoreHeldBill(bill);setShowHeldBills(false);}} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white" style={{background:"#10b981"}}>Restore</button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
         {/* SHORTCUTS */}
         <AnimatePresence>{showShortcuts&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>setShowShortcuts(false)}>
-            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-lg p-4 max-h-[85vh] overflow-y-auto" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-              <div className="flex items-center justify-between mb-4 sticky top-0" style={{background:"#0f1f3a"}}><div className="flex items-center gap-2"><Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/><span className="text-white font-bold text-sm">Keyboard Shortcuts — full POS control</span></div><button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
-              <div className="space-y-4">
+            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl p-5 max-h-[88vh] overflow-y-auto" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+              <div className="flex items-center justify-between mb-4 sticky top-0 z-10 pb-2" style={{background:"#0f1f3a"}}>
+                <div className="flex items-center gap-2">
+                  <Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/>
+                  <span className="text-white font-bold text-sm">Keyboard — full POS</span>
+                </div>
+                <button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+              </div>
+              <div className="grid sm:grid-cols-2 gap-5">
                 {POS_SHORTCUT_SECTIONS.map((section) => (
                   <div key={section.title}>
                     <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{color:"#6a8ab8"}}>{section.title}</p>
                     <div className="space-y-1">
                       {section.items.map(([k, d]) => (
-                        <div key={k} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 gap-3">
+                        <div key={`${section.title}-${k}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 gap-3">
                           <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5 shrink-0" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
                           <span className="text-xs text-right flex-1" style={{color:"#94a3b8"}}>{d}</span>
                         </div>
@@ -2621,6 +3061,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   </div>
                 ))}
               </div>
+              <p className="text-[10px] mt-4 text-center" style={{color:"#4a6a8a"}}>Tip: Ctrl+Enter = Pay Cash instantly · F9 = checkout popup</p>
             </motion.div>
           </motion.div>
         )}</AnimatePresence>

@@ -2,39 +2,52 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  AlertTriangle, ArrowRightLeft, Building2, CheckCircle2, Loader2, Package, Plus, RefreshCw, Warehouse,
+  AlertTriangle,
+  ArrowRightLeft,
+  Building2,
+  CheckCircle2,
+  Clock,
+  Loader2,
+  MapPin,
+  Package,
+  Plus,
+  RefreshCw,
+  Star,
+  Truck,
+  Warehouse,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { useAuthStore } from "@/stores/auth-store";
+import {
+  isTransferWorkflowApproved,
+  type WorkflowInstanceLike,
+} from "@/lib/workflow-access";
+import { TransferApprovalActions } from "@/components/inventory/transfer-approval-actions";
+import {
+  AddWarehouseModal,
+  type WarehouseRecord,
+} from "@/components/warehouse/add-warehouse-modal";
+import { WarehouseTransferModal } from "@/components/warehouse/warehouse-transfer-modal";
 
-interface WarehouseRow {
-  id: string;
-  name: string;
-  code: string;
-  address?: string | null;
-  isDefault: boolean;
-  branchId: string;
-  branch?: { id: string; name: string; code: string };
-  _count?: { inventory: number };
-  summary?: {
-    skuCount: number;
-    onHandQty: number;
-    availableQty: number;
-    stockValue: number;
-    lowStockSkus: number;
-  };
-}
+type WarehouseSection = "locations" | "stock" | "transfers";
+
+const SECTION_META: Record<WarehouseSection, { title: string; description: string }> = {
+  locations: { title: "Locations", description: "Warehouse locations for the active branch" },
+  stock: { title: "Warehouse Stock", description: "On-hand quantities by warehouse location" },
+  transfers: { title: "Transfers", description: "Move stock between warehouse locations" },
+};
 
 interface Dashboard {
   totals: {
@@ -46,7 +59,7 @@ interface Dashboard {
     lowStockSkus: number;
     openTransfers: number;
   };
-  warehouses: WarehouseRow[];
+  warehouses: WarehouseRecord[];
 }
 
 interface StockRow {
@@ -56,7 +69,8 @@ interface StockRow {
   availableQty: number;
   value: number;
   avgCost: number;
-  variant: { sku: string; name: string; product: { name: string } };
+  variantId?: string;
+  variant: { id?: string; sku: string; name: string; product: { name: string } };
 }
 
 interface TransferRow {
@@ -64,31 +78,42 @@ interface TransferRow {
   status: string;
   createdAt: string;
   notes?: string | null;
+  requestedBy?: string | null;
+  fromBranchId?: string;
+  toBranchId?: string;
   fromBranch?: { name: string; code: string } | null;
   toBranch?: { name: string; code: string } | null;
   fromWarehouse?: { name: string; code: string } | null;
   toWarehouse?: { name: string; code: string } | null;
   items: { requestedQty: number; variant: { sku: string; product: { name: string } } }[];
+  workflow?: WorkflowInstanceLike | null;
 }
+
+const TRANSFER_STATUS: Record<string, { label: string; variant: "warning" | "info" | "success" | "secondary" | "danger" }> = {
+  PENDING: { label: "Pending", variant: "warning" },
+  IN_TRANSIT: { label: "In Transit", variant: "info" },
+  RECEIVED: { label: "Received", variant: "success" },
+  CANCELLED: { label: "Cancelled", variant: "secondary" },
+};
 
 export default function WarehousePage() {
   const { profile } = useShopWorkspace();
+  const { user } = useAuthStore();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
+
+  const [section, setSection] = useState<WarehouseSection>("locations");
   const [dash, setDash] = useState<Dashboard | null>(null);
-  const [warehouses, setWarehouses] = useState<WarehouseRow[]>([]);
-  const [selected, setSelected] = useState<string>("");
+  const [warehouses, setWarehouses] = useState<WarehouseRecord[]>([]);
+  const [selected, setSelected] = useState("");
   const [stock, setStock] = useState<StockRow[]>([]);
   const [transfers, setTransfers] = useState<TransferRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [stockLoading, setStockLoading] = useState(false);
-  const [showCreate, setShowCreate] = useState(false);
-  const [showTransfer, setShowTransfer] = useState(false);
-  const [name, setName] = useState("");
-  const [code, setCode] = useState("");
-  const [fromWh, setFromWh] = useState("");
-  const [toWh, setToWh] = useState("");
-  const [variantId, setVariantId] = useState("");
-  const [qty, setQty] = useState("1");
+  const [transferActionId, setTransferActionId] = useState<string | null>(null);
+
+  const [addOpen, setAddOpen] = useState(false);
+  const [editWh, setEditWh] = useState<WarehouseRecord | undefined>();
+  const [transferOpen, setTransferOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -96,13 +121,13 @@ export default function WarehousePage() {
       const q = activeBranchId ? `?branchId=${activeBranchId}` : "";
       const [dashRes, listRes, trRes] = await Promise.all([
         api.get<Dashboard>(`/warehouses/dashboard${q}`),
-        api.get<WarehouseRow[]>(`/warehouses${q}`),
+        api.get<WarehouseRecord[]>(`/warehouses${q}`),
         api.get<TransferRow[]>(`/warehouses/transfers${q}`),
       ]);
       setDash(dashRes.data ?? null);
       const list = Array.isArray(listRes.data) ? listRes.data : [];
       setWarehouses(list);
-      setSelected((prev) => prev || list[0]?.id || "");
+      setSelected((prev) => (prev && list.some((w) => w.id === prev) ? prev : list[0]?.id || ""));
       setTransfers(Array.isArray(trRes.data) ? trRes.data : []);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load warehouses");
@@ -112,7 +137,10 @@ export default function WarehousePage() {
   }, [activeBranchId]);
 
   const loadStock = useCallback(async (warehouseId: string) => {
-    if (!warehouseId) return;
+    if (!warehouseId) {
+      setStock([]);
+      return;
+    }
     setStockLoading(true);
     try {
       const res = await api.get<StockRow[]>(`/warehouses/${warehouseId}/stock`);
@@ -124,64 +152,173 @@ export default function WarehousePage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
-  useEffect(() => { if (selected) loadStock(selected); }, [selected, loadStock]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    if (section === "stock" && selected) void loadStock(selected);
+  }, [section, selected, loadStock]);
 
-  const createWarehouse = async () => {
-    if (!activeBranchId) {
-      toast.error("Select a branch first");
+  const handleDelete = async (w: WarehouseRecord) => {
+    if (w.isDefault) {
+      toast.error("Cannot delete the default warehouse");
       return;
     }
-    if (!name.trim() || !code.trim()) {
-      toast.error("Name and code are required");
-      return;
-    }
+    if (!window.confirm(`Delete "${w.name}"? This cannot be undone.`)) return;
     try {
-      await api.post("/warehouses", {
-        branchId: activeBranchId,
-        name: name.trim(),
-        code: code.trim().toUpperCase(),
-      });
-      toast.success("Warehouse created");
-      setShowCreate(false);
-      setName("");
-      setCode("");
+      await api.delete(`/warehouses/${w.id}`);
+      toast.success(`"${w.name}" deleted`);
       await load();
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Create failed");
-    }
-  };
-
-  const createTransfer = async () => {
-    if (!fromWh || !toWh || !variantId.trim() || !qty) {
-      toast.error("From, to, variant, and qty are required");
-      return;
-    }
-    try {
-      await api.post("/warehouses/transfers", {
-        fromWarehouseId: fromWh,
-        toWarehouseId: toWh,
-        items: [{ variantId: variantId.trim(), requestedQty: parseInt(qty, 10) }],
-      });
-      toast.success("Transfer created (pending approval)");
-      setShowTransfer(false);
-      setVariantId("");
-      setQty("1");
-      await load();
-    } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Transfer failed");
+      toast.error((e as Error).message ?? "Delete failed");
     }
   };
 
   const updateTransfer = async (id: string, status: string) => {
+    setTransferActionId(id);
     try {
       await api.put(`/inventory/transfers/${id}/status`, { status });
-      toast.success(`Transfer ${status.toLowerCase().replace("_", " ")}`);
+      toast.success(
+        status === "IN_TRANSIT" ? "Transfer dispatched" :
+        status === "RECEIVED" ? "Transfer received" : `Transfer ${status.toLowerCase()}`,
+      );
       await load();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Update failed");
+    } finally {
+      setTransferActionId(null);
     }
   };
+
+  const actOnTransferWorkflow = async (taskId: string, action: "approve" | "reject") => {
+    setTransferActionId(taskId);
+    try {
+      await api.put(`/workflows/tasks/${taskId}/${action}`, {});
+      toast.success(action === "approve" ? "Transfer approved" : "Transfer rejected");
+      await load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? `Failed to ${action} transfer`);
+    } finally {
+      setTransferActionId(null);
+    }
+  };
+
+  const warehouseColumns = useMemo<ColumnDef<WarehouseRecord>[]>(() => [
+    {
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Warehouse" />,
+      cell: ({ row }) => {
+        const w = row.original;
+        return (
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Warehouse className="h-4 w-4 text-primary" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-semibold">{w.name}</p>
+                {w.isDefault && (
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
+                    <Star className="h-2 w-2" />Default
+                  </span>
+                )}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-mono">{w.code}</p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      id: "branch",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <Building2 className="h-3 w-3 shrink-0" />
+          {row.original.branch?.name ?? "—"}
+        </div>
+      ),
+    },
+    {
+      id: "address",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Address" />,
+      cell: ({ row }) =>
+        row.original.address ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground max-w-[200px]">
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">{row.original.address}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: "onHand",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="On Hand" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold tabular-nums">
+          {formatNumber(row.original.summary?.onHandQty ?? 0)}
+        </span>
+      ),
+    },
+    {
+      id: "available",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
+      cell: ({ row }) => (
+        <span className="text-sm font-semibold text-emerald-600 tabular-nums">
+          {formatNumber(row.original.summary?.availableQty ?? 0)}
+        </span>
+      ),
+    },
+    {
+      id: "value",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Stock Value" />,
+      cell: ({ row }) => (
+        <span className="text-xs tabular-nums">
+          LKR {formatNumber(row.original.summary?.stockValue ?? 0)}
+        </span>
+      ),
+    },
+    {
+      id: "low",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Low Stock" />,
+      cell: ({ row }) => {
+        const n = row.original.summary?.lowStockSkus ?? 0;
+        return n > 0 ? (
+          <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
+            <AlertTriangle className="h-3 w-3" />{n}
+          </span>
+        ) : (
+          <span className="text-xs text-muted-foreground">0</span>
+        );
+      },
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => (
+        <TableActionsRow
+          editAction={{
+            action: () => {
+              setEditWh(row.original);
+              setAddOpen(true);
+            },
+          }}
+          deleteAction={
+            row.original.isDefault
+              ? undefined
+              : { action: () => handleDelete(row.original) }
+          }
+          dropMoreActions={[
+            {
+              text: "View stock",
+              function: () => {
+                setSelected(row.original.id);
+                setSection("stock");
+              },
+            },
+          ]}
+        />
+      ),
+    },
+  ], []);
 
   const stockColumns = useMemo<ColumnDef<StockRow>[]>(() => [
     {
@@ -199,39 +336,34 @@ export default function WarehousePage() {
       id: "sku",
       accessorFn: (r) => r.variant.sku,
       header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
-      cell: ({ row }) => <span className="font-mono text-xs">{row.original.variant.sku}</span>,
+      cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.variant.sku}</span>,
     },
     {
-      id: "qty",
       accessorKey: "quantity",
       header: ({ column }) => <DataTableColumnHeader column={column} title="On Hand" />,
-      cell: ({ row }) => <span className="font-bold text-sm">{row.original.quantity}</span>,
+      cell: ({ row }) => <span className="font-bold text-sm tabular-nums">{row.original.quantity}</span>,
     },
     {
-      id: "reserved",
       accessorKey: "reservedQty",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Reserved" />,
-      cell: ({ row }) => <span className="text-sm">{row.original.reservedQty}</span>,
+      cell: ({ row }) => <span className="text-sm tabular-nums text-violet-600">{row.original.reservedQty}</span>,
     },
     {
-      id: "avail",
       accessorKey: "availableQty",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Available" />,
       cell: ({ row }) => (
-        <span className="font-semibold text-emerald-600">{row.original.availableQty}</span>
+        <span className="font-semibold text-emerald-600 tabular-nums">{row.original.availableQty}</span>
       ),
     },
     {
-      id: "value",
       accessorKey: "value",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Value" />,
-      cell: ({ row }) => <span className="text-xs">LKR {formatNumber(row.original.value)}</span>,
+      cell: ({ row }) => <span className="text-xs tabular-nums">LKR {formatNumber(row.original.value)}</span>,
     },
   ], []);
 
   const transferColumns = useMemo<ColumnDef<TransferRow>[]>(() => [
     {
-      id: "when",
       accessorKey: "createdAt",
       header: ({ column }) => <DataTableColumnHeader column={column} title="When" />,
       cell: ({ row }) => (
@@ -260,36 +392,89 @@ export default function WarehousePage() {
       cell: ({ row }) => <span className="text-sm">{row.original.items?.length ?? 0} SKU(s)</span>,
     },
     {
-      id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => {
+        const conf = TRANSFER_STATUS[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
+        const showPendingApproval = row.original.status === "PENDING" && row.original.workflow?.status === "IN_PROGRESS";
+        return (
+          <div>
+            <Badge variant={conf.variant} className="text-[10px] gap-1">
+              {row.original.status === "IN_TRANSIT" && <Truck className="h-2.5 w-2.5" />}
+              {row.original.status === "RECEIVED" && <CheckCircle2 className="h-2.5 w-2.5" />}
+              {row.original.status === "PENDING" && <Clock className="h-2.5 w-2.5" />}
+              {conf.label}
+            </Badge>
+            {showPendingApproval && (
+              <p className="text-[10px] text-amber-600 mt-1 font-medium">Awaiting approval</p>
+            )}
+          </div>
+        );
+      },
+      filterFn: (row, _id, value: string[]) => !value?.length || value.includes(row.original.status),
+    },
+    {
+      id: "approval",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Approval" />,
+      cell: ({ row }) => {
+        const t = row.original;
+        const wfActing = !!(transferActionId && t.workflow?.tasks?.some((task) => task.id === transferActionId));
+        if (t.status === "PENDING" && t.workflow) {
+          return (
+            <TransferApprovalActions
+              instance={t.workflow}
+              userId={user?.id}
+              userRole={user?.role}
+              requestedBy={t.requestedBy}
+              acting={wfActing}
+              onApprove={(taskId) => void actOnTransferWorkflow(taskId, "approve")}
+              onReject={(taskId) => void actOnTransferWorkflow(taskId, "reject")}
+            />
+          );
+        }
+        if (t.workflow?.status === "APPROVED" || (!t.workflow && t.status === "PENDING")) {
+          return <span className="text-xs font-medium text-emerald-600">Approved</span>;
+        }
+        if (t.workflow?.status === "REJECTED") {
+          return <span className="text-xs font-medium text-red-600">Rejected</span>;
+        }
+        return <span className="text-xs text-muted-foreground">—</span>;
+      },
     },
     {
       id: "actions",
-      header: () => <span className="sr-only">Actions</span>,
       cell: ({ row }) => {
         const t = row.original;
+        const approved = isTransferWorkflowApproved(t.workflow);
+        const canDispatch = t.status === "PENDING" && approved;
+        const canReceive = t.status === "IN_TRANSIT";
+        const acting = transferActionId === t.id;
+        if (!canDispatch && !canReceive) {
+          return <span className="text-xs text-muted-foreground">—</span>;
+        }
         return (
-          <div className="flex gap-1">
-            {t.status === "PENDING" && (
-              <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => updateTransfer(t.id, "IN_TRANSIT")}>
-                Dispatch
+          <div className="flex gap-1.5">
+            {canDispatch && (
+              <Button size="sm" variant="outline" className="h-7 text-xs gap-1" disabled={acting} onClick={() => void updateTransfer(t.id, "IN_TRANSIT")}>
+                {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Truck className="h-3 w-3" />} Dispatch
               </Button>
             )}
-            {t.status === "IN_TRANSIT" && (
-              <Button size="sm" className="h-7 text-[10px]" onClick={() => updateTransfer(t.id, "RECEIVED")}>
-                Receive
+            {canReceive && (
+              <Button size="sm" className="h-7 text-xs gap-1" disabled={acting} onClick={() => void updateTransfer(t.id, "RECEIVED")}>
+                {acting ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />} Receive
               </Button>
             )}
           </div>
         );
       },
     },
-  ], []);
+  ], [transferActionId, user?.id, user?.role]);
+
+  const locationRows = dash?.warehouses?.length ? dash.warehouses : warehouses;
+  const lowStockTotal = dash?.totals.lowStockSkus ?? 0;
 
   const STATS = [
-    { label: "Warehouses", value: dash?.totals.warehouses ?? 0, icon: Warehouse, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: "Warehouses", value: dash?.totals.warehouses ?? warehouses.length, icon: Warehouse, color: "text-blue-500", bg: "bg-blue-500/10" },
     { label: "On Hand Qty", value: formatNumber(dash?.totals.onHandQty ?? 0), icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
     { label: "Stock Value", value: `LKR ${formatNumber(dash?.totals.stockValue ?? 0)}`, icon: CheckCircle2, color: "text-indigo-500", bg: "bg-indigo-500/10" },
     { label: "Open Transfers", value: dash?.totals.openTransfers ?? 0, icon: ArrowRightLeft, color: "text-amber-500", bg: "bg-amber-500/10" },
@@ -297,72 +482,35 @@ export default function WarehousePage() {
 
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Warehouse</h1>
+          <h1 className="text-2xl font-bold">{SECTION_META[section].title}</h1>
           <p className="text-sm text-muted-foreground">
-            {profile.label} · Multi-warehouse locations, stock & transfers
+            {profile.label} · {SECTION_META[section].description}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => void load()} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setShowTransfer((v) => !v)} className="gap-1.5">
+          <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5" disabled={warehouses.length < 2}>
             <ArrowRightLeft className="h-3.5 w-3.5" /> Transfer
           </Button>
-          <Button size="sm" onClick={() => setShowCreate((v) => !v)} className="gap-1.5">
+          <Button
+            size="sm"
+            className="gap-1.5"
+            onClick={() => {
+              setEditWh(undefined);
+              setAddOpen(true);
+            }}
+          >
             <Plus className="h-3.5 w-3.5" /> Add Warehouse
           </Button>
         </div>
       </div>
 
-      {showCreate && (
-        <Card>
-          <CardContent className="p-4 flex flex-wrap gap-3 items-end">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 w-48" placeholder="Backroom" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Code</label>
-              <Input value={code} onChange={(e) => setCode(e.target.value)} className="h-9 w-32" placeholder="BACK" />
-            </div>
-            <Button size="sm" onClick={createWarehouse}>Create</Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {showTransfer && (
-        <Card>
-          <CardContent className="p-4 flex flex-wrap gap-3 items-end">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">From</label>
-              <select className="h-9 rounded-md border px-2 text-sm bg-background" value={fromWh} onChange={(e) => setFromWh(e.target.value)}>
-                <option value="">Select…</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">To</label>
-              <select className="h-9 rounded-md border px-2 text-sm bg-background" value={toWh} onChange={(e) => setToWh(e.target.value)}>
-                <option value="">Select…</option>
-                {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Variant ID</label>
-              <Input value={variantId} onChange={(e) => setVariantId(e.target.value)} className="h-9 w-56" placeholder="variant cuid" />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold">Qty</label>
-              <Input type="number" min={1} value={qty} onChange={(e) => setQty(e.target.value)} className="h-9 w-20" />
-            </div>
-            <Button size="sm" onClick={createTransfer}>Create Transfer</Button>
-          </CardContent>
-        </Card>
-      )}
-
+      {/* Stats */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
         {STATS.map((s) => (
           <Card key={s.label}>
@@ -379,75 +527,86 @@ export default function WarehousePage() {
         ))}
       </div>
 
-      <Tabs defaultValue="dashboard">
-        <TabsList className="flex-wrap h-auto">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="stock">Warehouse Stock</TabsTrigger>
-          <TabsTrigger value="transfers">Transfers</TabsTrigger>
-        </TabsList>
+      {lowStockTotal > 0 && (
+        <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          {lowStockTotal} SKU(s) are below reorder level across warehouses
+        </div>
+      )}
 
-        <TabsContent value="dashboard" className="mt-4">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {(dash?.warehouses ?? warehouses).map((w) => (
-                <Card
-                  key={w.id}
-                  className={`cursor-pointer transition ${selected === w.id ? "ring-2 ring-indigo-500" : ""}`}
-                  onClick={() => setSelected(w.id)}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <div className="p-2 rounded-xl bg-blue-500/10">
-                          <Building2 className="h-4 w-4 text-blue-500" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm">{w.name}</p>
-                          <p className="text-[10px] font-mono text-muted-foreground">{w.code} · {w.branch?.name}</p>
-                        </div>
-                      </div>
-                      {w.isDefault && <Badge className="text-[10px]">Default</Badge>}
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t">
-                      <div className="pt-2">
-                        <p className="text-sm font-bold">{formatNumber(w.summary?.onHandQty ?? 0)}</p>
-                        <p className="text-[10px] text-muted-foreground">On hand</p>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-sm font-bold text-emerald-600">{formatNumber(w.summary?.availableQty ?? 0)}</p>
-                        <p className="text-[10px] text-muted-foreground">Avail</p>
-                      </div>
-                      <div className="pt-2">
-                        <p className="text-sm font-bold flex items-center justify-center gap-1">
-                          {(w.summary?.lowStockSkus ?? 0) > 0 && <AlertTriangle className="h-3 w-3 text-amber-500" />}
-                          {w.summary?.lowStockSkus ?? 0}
-                        </p>
-                        <p className="text-[10px] text-muted-foreground">Low</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </TabsContent>
+      {/* Section toggle — same pattern as HR / Inventory */}
+      <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-muted/30">
+        {([
+          { id: "locations" as const, label: "Locations" },
+          { id: "stock" as const, label: "Stock" },
+          { id: "transfers" as const, label: "Transfers" },
+        ]).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setSection(tab.id)}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              section === tab.id
+                ? "bg-background shadow text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        <TabsContent value="stock" className="mt-4 space-y-3">
-          <div className="flex flex-wrap gap-2 items-center">
-            <select
-              className="h-9 rounded-md border px-2 text-sm bg-background"
-              value={selected}
-              onChange={(e) => setSelected(e.target.value)}
+      {/* Locations */}
+      {section === "locations" && (
+        loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <ClientSideTable
+            data={locationRows}
+            columns={warehouseColumns}
+            pageCount={Math.ceil(locationRows.length / 10) || 1}
+            searchableColumns={[
+              { id: "name", title: "Warehouse" },
+            ]}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "warehouses" }}
+          />
+        )
+      )}
+
+      {/* Stock */}
+      {section === "stock" && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={selected} onValueChange={setSelected}>
+              <SelectTrigger className="w-64 h-9">
+                <SelectValue placeholder="Select warehouse…" />
+              </SelectTrigger>
+              <SelectContent>
+                {warehouses.map((w) => (
+                  <SelectItem key={w.id} value={w.id}>
+                    {w.name} ({w.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={!selected || stockLoading}
+              onClick={() => selected && void loadStock(selected)}
             >
-              {warehouses.map((w) => (
-                <option key={w.id} value={w.id}>{w.name} ({w.code})</option>
-              ))}
-            </select>
+              <RefreshCw className={`h-3.5 w-3.5 ${stockLoading ? "animate-spin" : ""}`} /> Load
+            </Button>
           </div>
           {stockLoading ? (
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : warehouses.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground border rounded-xl">
+              <Warehouse className="h-8 w-8 mx-auto mb-2 opacity-30" />
+              <p>No warehouses yet — add one to track stock by location</p>
+            </div>
           ) : (
             <ClientSideTable
               data={stock}
@@ -461,26 +620,52 @@ export default function WarehousePage() {
               isShowExportButtons={{ isShow: true, fileName: "warehouse-stock" }}
             />
           )}
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="transfers" className="mt-4">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <ClientSideTable
-              data={transfers}
-              columns={transferColumns}
-              pageCount={Math.ceil(transfers.length / 10) || 1}
-              searchableColumns={[
-                { id: "route", title: "Route" },
-                { id: "status", title: "Status" },
-              ]}
-              filterableColumns={[]}
-              isShowExportButtons={{ isShow: true, fileName: "warehouse-transfers" }}
-            />
-          )}
-        </TabsContent>
-      </Tabs>
+      {/* Transfers */}
+      {section === "transfers" && (
+        loading ? (
+          <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        ) : (
+          <ClientSideTable
+            data={transfers}
+            columns={transferColumns}
+            pageCount={Math.ceil(transfers.length / 10) || 1}
+            searchableColumns={[
+              { id: "route", title: "Route" },
+              { id: "status", title: "Status" },
+            ]}
+            filterableColumns={[
+              {
+                id: "status",
+                title: "Status",
+                options: [
+                  { value: "PENDING", label: "Pending" },
+                  { value: "IN_TRANSIT", label: "In Transit" },
+                  { value: "RECEIVED", label: "Received" },
+                ],
+              },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "warehouse-transfers" }}
+          />
+        )
+      )}
+
+      <AddWarehouseModal
+        open={addOpen}
+        onClose={() => { setAddOpen(false); setEditWh(undefined); }}
+        onSaved={() => void load()}
+        branchId={activeBranchId}
+        editWarehouse={editWh}
+      />
+      <WarehouseTransferModal
+        open={transferOpen}
+        onClose={() => setTransferOpen(false)}
+        onCreated={() => void load()}
+        warehouses={warehouses}
+        defaultFromId={selected || warehouses[0]?.id}
+      />
     </div>
   );
 }

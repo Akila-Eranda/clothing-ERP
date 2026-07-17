@@ -45,6 +45,8 @@ export function PosQuickExpensePanel({
   const [categoryId, setCategoryId] = React.useState("Operations");
   const [method, setMethod] = React.useState("CASH");
   const [reference, setReference] = React.useState("");
+  const [chequeDue, setChequeDue] = React.useState("");
+  const [chequeBank, setChequeBank] = React.useState("");
   const [recent, setRecent] = React.useState<ExpenseRow[]>([]);
 
   const loadRecent = React.useCallback(async () => {
@@ -70,6 +72,10 @@ export function PosQuickExpensePanel({
       toast.error("Description required");
       return;
     }
+    if (method === "CHEQUE" && !reference.trim()) {
+      toast.error("Enter cheque number in Reference");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -80,11 +86,20 @@ export function PosQuickExpensePanel({
         categoryId: categoryId || undefined,
         paymentMethod: method,
         reference: reference.trim() || undefined,
+        ...(method === "CHEQUE"
+          ? {
+              chequeNumber: reference.trim(),
+              chequeDueDate: chequeDue || undefined,
+              chequeBankName: chequeBank.trim() || undefined,
+            }
+          : {}),
       });
       toast.success(`Expense recorded: LKR ${formatNumber(amt)}`);
       setAmount("");
       setDescription("");
       setReference("");
+      setChequeDue("");
+      setChequeBank("");
       setDate(today);
       setCategoryId("Operations");
       setMethod("CASH");
@@ -197,15 +212,42 @@ export function PosQuickExpensePanel({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Reference</label>
+            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>
+              {method === "CHEQUE" ? "Cheque number *" : "Reference"}
+            </label>
             <Input
               value={reference}
               onChange={(e) => setReference(e.target.value)}
-              placeholder="Optional receipt / cheque no."
+              placeholder={method === "CHEQUE" ? "Cheque number" : "Optional receipt / cheque no."}
               className="h-10 rounded-xl border-0 text-white"
               style={fieldStyle}
             />
           </div>
+
+          {method === "CHEQUE" && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Cheque bank</label>
+                <Input
+                  value={chequeBank}
+                  onChange={(e) => setChequeBank(e.target.value)}
+                  placeholder="e.g. BOC"
+                  className="h-10 rounded-xl border-0 text-white"
+                  style={fieldStyle}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date</label>
+                <Input
+                  type="date"
+                  value={chequeDue}
+                  onChange={(e) => setChequeDue(e.target.value)}
+                  className="h-10 rounded-xl border-0 text-white"
+                  style={fieldStyle}
+                />
+              </div>
+            </div>
+          )}
 
           <Button
             onClick={() => void submit()}

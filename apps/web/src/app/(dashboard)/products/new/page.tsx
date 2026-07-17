@@ -274,6 +274,7 @@ function StandardAddProductPage() {
     });
     if (form.branchScope === "SINGLE" && !form.branchId) {
       toast.error("Select a branch or choose All Branches");
+      setLoading(false);
       return;
     }
     try {

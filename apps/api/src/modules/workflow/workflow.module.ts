@@ -1,11 +1,12 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef, Inject } from '@nestjs/common';
 import {
   Controller, Get, Post, Put, Body, Param, Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { IsString, IsOptional, IsEnum, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, IsBoolean, IsArray } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   WorkflowStatus, WorkflowTaskStatus, PurchaseOrderStatus, PurchaseRequestStatus, StockMovementType, TransferStatus, CashRegisterStatus, QuotationStatus,
 } from '@prisma/client';
@@ -15,6 +16,7 @@ import { RequireAnyPermissions, RequirePermissions } from '@/common/decorators/p
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { assertCanActOnWorkflowTask, canUserActOnWorkflowTask } from '@/shared/workflow-approval.helper';
 import { randomUUID } from 'crypto';
+import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 
 export class StartWorkflowDto {
   @ApiProperty() @IsString() key: string;
@@ -27,6 +29,22 @@ export class ActOnTaskDto {
   @ApiPropertyOptional() @IsOptional() @IsString() comment?: string;
 }
 
+export class UpdateWorkflowStepDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() approverRole?: string | null;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() stepOrder?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isRequired?: boolean;
+}
+
+export class UpdateWorkflowDefinitionDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional({ type: [UpdateWorkflowStepDto] })
+  @IsOptional()
+  @IsArray()
+  steps?: UpdateWorkflowStepDto[];
+}
+
 export class DiscountRequestDto {
   @ApiProperty() @IsNumber() amount: number;
   @ApiProperty() @IsString() reason: string;
@@ -36,35 +54,12 @@ export class DiscountRequestDto {
 
 @Injectable()
 export class WorkflowService {
-  constructor(private readonly prisma: PrismaService) {}
-
-  private async ensureDefaultWarehouse(tenantId: string, branchId: string) {
-    const existing = await this.prisma.warehouse.findFirst({
-      where: { tenantId, branchId, isDefault: true, isActive: true },
-    });
-    if (existing) return existing;
-
-    const branch = await this.prisma.branch.findFirst({ where: { id: branchId, tenantId } });
-    if (!branch) throw new NotFoundException('Branch not found');
-
-    const codeBase = `${branch.code}-MAIN`.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 20);
-    let code = codeBase;
-    let n = 1;
-    while (await this.prisma.warehouse.findFirst({ where: { tenantId, code } })) {
-      code = `${codeBase}-${n++}`.slice(0, 24);
-    }
-
-    return this.prisma.warehouse.create({
-      data: {
-        tenantId,
-        branchId,
-        name: `${branch.name} Main`,
-        code,
-        isDefault: true,
-        isActive: true,
-      },
-    });
-  }
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(forwardRef(() => InventoryService))
+    private readonly inventoryService: InventoryService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async ensureDefinition(tenantId: string, key: string) {
     let def = await this.prisma.workflowDefinition.findFirst({
@@ -255,6 +250,64 @@ export class WorkflowService {
     return { operational: true, workflows: items };
   }
 
+  /** Full definitions with step roles for Accounting Settings. */
+  async listDefinitions(tenantId: string) {
+    return Promise.all(
+      this.catalogKeys.map(async (key) => {
+        const def = await this.ensureDefinition(tenantId, key);
+        return {
+          id: def.id,
+          key: def.key,
+          name: def.name,
+          version: def.version,
+          isActive: def.isActive,
+          steps: def.steps.map((s) => ({
+            id: s.id,
+            stepOrder: s.stepOrder,
+            name: s.name,
+            approverRole: s.approverRole,
+            isRequired: s.isRequired,
+          })),
+        };
+      }),
+    );
+  }
+
+  async updateDefinition(tenantId: string, key: string, dto: UpdateWorkflowDefinitionDto) {
+    const def = await this.ensureDefinition(tenantId, key);
+    if (dto.steps?.length === 0) {
+      throw new BadRequestException('Workflow must have at least one step');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.workflowDefinition.update({
+        where: { id: def.id },
+        data: {
+          ...(dto.name != null && { name: dto.name.trim() }),
+          ...(dto.isActive != null && { isActive: dto.isActive }),
+        },
+      });
+
+      if (dto.steps?.length) {
+        await tx.workflowStep.deleteMany({ where: { definitionId: def.id } });
+        await tx.workflowStep.createMany({
+          data: dto.steps.map((s, i) => ({
+            definitionId: def.id,
+            stepOrder: s.stepOrder ?? i + 1,
+            name: (s.name ?? `Step ${i + 1}`).trim(),
+            approverRole: s.approverRole ?? 'BRANCH_MANAGER',
+            isRequired: s.isRequired ?? true,
+          })),
+        });
+      }
+
+      return tx.workflowDefinition.findUnique({
+        where: { id: def.id },
+        include: { steps: { orderBy: { stepOrder: 'asc' } } },
+      });
+    });
+  }
+
   private async applyApprovedStockAdjustment(
     tenantId: string,
     userId: string,
@@ -267,50 +320,18 @@ export class WorkflowService {
     const notes = metadata.notes as string | undefined;
     if (!variantId || !branchId || quantity === undefined) return;
 
-    const inventory = await this.prisma.inventory.findFirst({
-      where: { tenantId, branchId, variantId },
-    });
-    const currentQty = inventory?.quantity ?? 0;
-    let newQty = currentQty;
-    if (movementType === StockMovementType.ADJUSTMENT) {
-      newQty = quantity;
-    } else if (movementType === StockMovementType.DAMAGE) {
-      newQty = Math.max(0, currentQty - quantity);
-    } else {
-      newQty = Math.max(0, currentQty + quantity);
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      if (inventory) {
-        await tx.inventory.update({
-          where: { id: inventory.id },
-          data: { quantity: Math.max(0, newQty) },
-        });
-      } else {
-        const warehouse = await this.ensureDefaultWarehouse(tenantId, branchId);
-        await tx.inventory.create({
-          data: {
-            tenantId,
-            branchId,
-            variantId,
-            warehouseId: warehouse.id,
-            quantity: Math.max(0, newQty),
-          },
-        });
-      }
-      await tx.inventoryLog.create({
-        data: {
-          tenantId,
-          branchId,
-          variantId,
-          movementType,
-          quantityChange: Math.max(0, newQty) - currentQty,
-          quantityBefore: currentQty,
-          quantityAfter: Math.max(0, newQty),
-          notes: notes ?? 'Approved via workflow',
-          performedBy: userId,
-        },
-      });
+    // Route through InventoryService so lots / warehouse / FEFO stay in sync
+    await this.inventoryService.adjustStock(tenantId, branchId, userId, {
+      variantId,
+      quantity,
+      movementType,
+      notes: notes ?? 'Approved via workflow',
+      warehouseId: typeof metadata.warehouseId === 'string' ? metadata.warehouseId : undefined,
+      lotId: typeof metadata.lotId === 'string' ? metadata.lotId : undefined,
+      batchNumber: typeof metadata.batchNumber === 'string' ? metadata.batchNumber : undefined,
+      expiryDate: typeof metadata.expiryDate === 'string' ? metadata.expiryDate : undefined,
+      manufactureDate: typeof metadata.manufactureDate === 'string' ? metadata.manufactureDate : undefined,
+      unitCost: typeof metadata.unitCost === 'number' ? metadata.unitCost : undefined,
     });
   }
 
@@ -460,6 +481,15 @@ export class WorkflowService {
       }
     }
 
+    this.eventEmitter.emit('workflow.approved', {
+      tenantId,
+      userId,
+      taskId,
+      entityType,
+      entityId,
+      final: isLast,
+    });
+
     return result;
   }
 
@@ -524,6 +554,14 @@ export class WorkflowService {
           data: { status: QuotationStatus.DRAFT },
         });
       }
+      this.eventEmitter.emit('workflow.rejected', {
+        tenantId,
+        userId,
+        taskId,
+        entityType,
+        entityId,
+        comment,
+      });
       return result;
     });
   }
@@ -577,6 +615,24 @@ export class WorkflowController {
     return this.workflowService.getCatalog(user.tenantId);
   }
 
+  @Get('definitions')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List workflow definitions with steps (Settings)' })
+  listDefinitions(@CurrentUser() user: IAuthUser) {
+    return this.workflowService.listDefinitions(user.tenantId);
+  }
+
+  @Put('definitions/:key')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Update workflow definition steps / roles' })
+  updateDefinition(
+    @CurrentUser() user: IAuthUser,
+    @Param('key') key: string,
+    @Body() dto: UpdateWorkflowDefinitionDto,
+  ) {
+    return this.workflowService.updateDefinition(user.tenantId, key, dto);
+  }
+
   @Get('tasks/pending')
   @RequireAnyPermissions('inventory:read', 'purchases:read', 'sales:read')
   @ApiOperation({ summary: 'List pending approval tasks' })
@@ -611,6 +667,7 @@ export class WorkflowController {
 }
 
 @Module({
+  imports: [forwardRef(() => InventoryModule)],
   controllers: [WorkflowController],
   providers: [WorkflowService],
   exports: [WorkflowService],

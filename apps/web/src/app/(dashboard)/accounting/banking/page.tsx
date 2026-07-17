@@ -1,7 +1,7 @@
 "use client";
 
-import { AccountingHub } from "@/components/accounting/accounting-hub";
+import { CashBankHub } from "@/components/accounting/cash-bank-hub";
 
 export default function AccountingBankingPage() {
-  return <AccountingHub section="banking" />;
+  return <CashBankHub initialTab="bank" />;
 }

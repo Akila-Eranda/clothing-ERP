@@ -51,6 +51,7 @@ import { WorkshopModule } from './modules/workshop/workshop.module';
 import { WorkflowModule } from './modules/workflow/workflow.module';
 import { CashManagementModule } from './modules/cash-management/cash-management.module';
 import { BranchContextInterceptor } from './common/interceptors/branch-context.interceptor';
+import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 
@@ -128,6 +129,7 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },
     { provide: APP_INTERCEPTOR, useClass: BranchContextInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
   ],
 })
 export class AppModule implements NestModule {

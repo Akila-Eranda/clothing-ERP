@@ -1,0 +1,603 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import {
+  Calculator, FileText, Loader2, Plus, RefreshCw, Settings2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { api } from "@/lib/api";
+import { formatNumber } from "@/lib/utils";
+import { useShopWorkspace } from "@/lib/use-shop-profile";
+
+type Tab = "config" | "returns" | "reports";
+
+type TaxRate = {
+  id: string;
+  code: string;
+  name: string;
+  rate: number;
+  direction: string;
+  isDefault: boolean;
+  isActive: boolean;
+  isInclusive: boolean;
+  description?: string | null;
+};
+
+type VatReport = {
+  period: { startDate: string; endDate: string };
+  outputVat: number;
+  inputVat: number;
+  netVat: number;
+  salesNet: number;
+  salesGross: number;
+  purchasesNet: number;
+  purchasesGross: number;
+  salesCount: number;
+  purchaseDocCount: number;
+  purchaseSource: string;
+  outputByRate: Array<{ taxRate: number; taxAmount: number; lineTotal: number; quantity: number }>;
+};
+
+type VatReturn = {
+  id: string;
+  periodStart: string;
+  periodEnd: string;
+  status: string;
+  outputVat: number;
+  inputVat: number;
+  netVat: number;
+  salesNet: number;
+  purchasesNet: number;
+  journalEntryId?: string | null;
+  notes?: string | null;
+  filedAt?: string | null;
+};
+
+function monthStart() {
+  const n = new Date();
+  return new Date(n.getFullYear(), n.getMonth(), 1).toISOString().slice(0, 10);
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function fmt(d?: string | null) {
+  if (!d) return "—";
+  return String(d).slice(0, 10);
+}
+
+export function VatTaxHub({ initialTab = "config" }: { initialTab?: Tab }) {
+  useShopWorkspace();
+  const [tab, setTab] = useState<Tab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
+
+  const tabs: { id: Tab; label: string; icon: typeof Settings2 }[] = [
+    { id: "config", label: "Tax Configuration", icon: Settings2 },
+    { id: "returns", label: "VAT Returns", icon: FileText },
+    { id: "reports", label: "VAT Reports", icon: Calculator },
+  ];
+
+  return (
+    <div className="space-y-4 p-4 md:p-6">
+      <div>
+        <h1 className="text-xl font-bold tracking-tight">VAT & Tax</h1>
+        <p className="text-sm text-muted-foreground">
+          Tax master, period VAT returns, and output/input reports — settlement posts via journals
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-1 border-b pb-px">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                active
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {tab === "config" && <ConfigPanel />}
+      {tab === "returns" && <ReturnsPanel />}
+      {tab === "reports" && <ReportsPanel />}
+    </div>
+  );
+}
+
+function ConfigPanel() {
+  const [rates, setRates] = useState<TaxRate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [rate, setRate] = useState("18");
+  const [direction, setDirection] = useState("BOTH");
+  const [isDefault, setIsDefault] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [previewAmt, setPreviewAmt] = useState("1000");
+  const [previewRate, setPreviewRate] = useState("18");
+  const [preview, setPreview] = useState<{ net: number; tax: number; gross: number } | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<TaxRate[]>("/accounting/tax-rates?includeInactive=true");
+      setRates(Array.isArray(res.data) ? res.data : []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load tax rates");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const seed = async () => {
+    setBusy(true);
+    try {
+      const res = await api.post<{ created: number; message?: string }>(
+        "/accounting/tax-rates/seed-defaults",
+      );
+      toast.success(res.data?.message ?? `Created ${res.data?.created ?? 0} rates`);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Seed failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async () => {
+    if (!code || !name) {
+      toast.error("Code and name required");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post("/accounting/tax-rates", {
+        code,
+        name,
+        rate: parseFloat(rate) || 0,
+        direction,
+        isDefault,
+      });
+      toast.success("Tax rate created");
+      setCode("");
+      setName("");
+      setRate("18");
+      setIsDefault(false);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const toggleActive = async (r: TaxRate) => {
+    try {
+      await api.put(`/accounting/tax-rates/${r.id}`, { isActive: !r.isActive });
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Update failed");
+    }
+  };
+
+  const runPreview = async () => {
+    try {
+      const res = await api.post<{ net: number; tax: number; gross: number }>(
+        "/accounting/tax/preview",
+        { amount: parseFloat(previewAmt) || 0, rate: parseFloat(previewRate) || 0 },
+      );
+      setPreview(res.data ?? null);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Preview failed");
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 justify-end">
+        <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+          <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+        <Button variant="secondary" size="sm" onClick={() => void seed()} disabled={busy}>
+          Seed defaults (VAT 18%)
+        </Button>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Plus className="h-4 w-4" /> New tax rate
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <Input className="h-9" placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
+              <Input className="h-9" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <Input className="h-9" type="number" placeholder="Rate %" value={rate} onChange={(e) => setRate(e.target.value)} />
+              <Select value={direction} onValueChange={setDirection}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="BOTH">Both</SelectItem>
+                  <SelectItem value="OUTPUT">Output</SelectItem>
+                  <SelectItem value="INPUT">Input</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-xs">
+              <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="rounded" />
+              Default rate
+            </label>
+            <Button size="sm" onClick={() => void create()} disabled={busy} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Create
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Calculator className="h-4 w-4" /> Tax calculator
+            </h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Net amount</Label>
+                <Input className="h-9" type="number" value={previewAmt} onChange={(e) => setPreviewAmt(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Rate %</Label>
+                <Input className="h-9" type="number" value={previewRate} onChange={(e) => setPreviewRate(e.target.value)} />
+              </div>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => void runPreview()}>Calculate</Button>
+            {preview && (
+              <div className="rounded-lg border p-3 text-sm grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Net</p>
+                  <p className="font-semibold tabular-nums">{formatNumber(preview.net)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Tax</p>
+                  <p className="font-semibold tabular-nums">{formatNumber(preview.tax)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase">Gross</p>
+                  <p className="font-semibold tabular-nums">{formatNumber(preview.gross)}</p>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
+                  <th className="text-left px-4 py-3">Code</th>
+                  <th className="text-left px-4 py-3">Name</th>
+                  <th className="text-right px-4 py-3">Rate</th>
+                  <th className="text-left px-4 py-3">Direction</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {rates.map((r) => (
+                  <tr key={r.id} className="border-b border-border/40">
+                    <td className="px-4 py-2.5 font-mono text-xs">
+                      {r.code}
+                      {r.isDefault && <Badge className="ml-2 text-[9px]">Default</Badge>}
+                    </td>
+                    <td className="px-4 py-2.5">{r.name}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{r.rate}%</td>
+                    <td className="px-4 py-2.5"><Badge variant="outline" className="text-[10px]">{r.direction}</Badge></td>
+                    <td className="px-4 py-2.5">
+                      <Badge className={`text-[10px] ${r.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
+                        {r.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-2.5 text-right">
+                      <Button variant="ghost" size="sm" className="h-8" onClick={() => void toggleActive(r)}>
+                        {r.isActive ? "Disable" : "Enable"}
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+                {!rates.length && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-muted-foreground py-10">
+                      No tax rates — seed defaults or create one
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function ReportsPanel() {
+  const [start, setStart] = useState(monthStart());
+  const [end, setEnd] = useState(today());
+  const [report, setReport] = useState<VatReport | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<VatReport>(
+        `/accounting/vat/report?startDate=${start}&endDate=${end}`,
+      );
+      setReport(res.data ?? null);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load VAT report");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <Label className="text-xs">From</Label>
+            <Input type="date" className="h-9 w-40" value={start} onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">To</Label>
+            <Input type="date" className="h-9 w-40" value={end} onChange={(e) => setEnd(e.target.value)} />
+          </div>
+          <Button size="sm" className="h-9" onClick={() => void load()} disabled={loading}>
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Load report"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {report && (
+        <>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            {[
+              { label: "Output VAT (sales)", value: report.outputVat },
+              { label: "Input VAT (purchases)", value: report.inputVat },
+              { label: "Net VAT", value: report.netVat, warn: report.netVat > 0 },
+              { label: "Sales / purchase docs", value: `${report.salesCount} / ${report.purchaseDocCount}` },
+            ].map((c) => (
+              <Card key={c.label}>
+                <CardContent className="p-4">
+                  <p className="text-[10px] uppercase text-muted-foreground">{c.label}</p>
+                  <p className={`text-xl font-bold tabular-nums mt-1 ${c.warn ? "text-amber-600" : ""}`}>
+                    {typeof c.value === "number" ? `LKR ${formatNumber(c.value)}` : c.value}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-4">
+            <Card>
+              <CardContent className="p-4 space-y-2 text-sm">
+                <h3 className="font-semibold text-sm">Sales</h3>
+                <div className="flex justify-between"><span className="text-muted-foreground">Net</span><span className="tabular-nums">{formatNumber(report.salesNet)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Gross</span><span className="tabular-nums">{formatNumber(report.salesGross)}</span></div>
+                <div className="flex justify-between font-medium"><span>Output VAT</span><span className="tabular-nums">{formatNumber(report.outputVat)}</span></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4 space-y-2 text-sm">
+                <h3 className="font-semibold text-sm">Purchases ({report.purchaseSource})</h3>
+                <div className="flex justify-between"><span className="text-muted-foreground">Net</span><span className="tabular-nums">{formatNumber(report.purchasesNet)}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Gross</span><span className="tabular-nums">{formatNumber(report.purchasesGross)}</span></div>
+                <div className="flex justify-between font-medium"><span>Input VAT</span><span className="tabular-nums">{formatNumber(report.inputVat)}</span></div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="p-0">
+              <div className="px-4 py-3 border-b">
+                <h3 className="text-sm font-semibold">Output VAT by rate</h3>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
+                    <th className="text-left px-4 py-2">Rate</th>
+                    <th className="text-right px-4 py-2">Qty</th>
+                    <th className="text-right px-4 py-2">Line total</th>
+                    <th className="text-right px-4 py-2">Tax</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.outputByRate.map((r) => (
+                    <tr key={r.taxRate} className="border-b border-border/40">
+                      <td className="px-4 py-2">{r.taxRate}%</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{r.quantity}</td>
+                      <td className="px-4 py-2 text-right tabular-nums">{formatNumber(r.lineTotal)}</td>
+                      <td className="px-4 py-2 text-right tabular-nums font-medium">{formatNumber(r.taxAmount)}</td>
+                    </tr>
+                  ))}
+                  {!report.outputByRate.length && (
+                    <tr>
+                      <td colSpan={4} className="text-center text-muted-foreground py-8">No sales tax in period</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ReturnsPanel() {
+  const [returns, setReturns] = useState<VatReturn[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [start, setStart] = useState(monthStart());
+  const [end, setEnd] = useState(today());
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<VatReturn[]>("/accounting/vat/returns");
+      setReturns(Array.isArray(res.data) ? res.data : []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load returns");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const create = async () => {
+    setBusy(true);
+    try {
+      await api.post("/accounting/vat/returns", { startDate: start, endDate: end, notes: notes || undefined });
+      toast.success("VAT return draft created");
+      setNotes("");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const act = async (id: string, action: "refresh" | "submit" | "file" | "cancel") => {
+    setBusy(true);
+    try {
+      await api.post(`/accounting/vat/returns/${id}/${action}`, action === "file" ? { postJournal: true } : {});
+      toast.success(`Return ${action}d`);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          <h3 className="text-sm font-semibold">New VAT return</h3>
+          <div className="grid sm:grid-cols-4 gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">From</Label>
+              <Input type="date" className="h-9" value={start} onChange={(e) => setStart(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">To</Label>
+              <Input type="date" className="h-9" value={end} onChange={(e) => setEnd(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+            <Button onClick={() => void create()} disabled={busy} className="h-9 gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Create draft
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
+                  <th className="text-left px-4 py-3">Period</th>
+                  <th className="text-right px-4 py-3">Output</th>
+                  <th className="text-right px-4 py-3">Input</th>
+                  <th className="text-right px-4 py-3">Net</th>
+                  <th className="text-left px-4 py-3">Status</th>
+                  <th className="text-right px-4 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returns.map((r) => (
+                  <tr key={r.id} className="border-b border-border/40">
+                    <td className="px-4 py-2.5">{fmt(r.periodStart)} → {fmt(r.periodEnd)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.outputVat)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.inputVat)}</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(r.netVat)}</td>
+                    <td className="px-4 py-2.5"><Badge className="text-[10px]">{r.status}</Badge></td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-1 flex-wrap">
+                        {(r.status === "DRAFT" || r.status === "SUBMITTED") && (
+                          <>
+                            {r.status === "DRAFT" && (
+                              <>
+                                <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "refresh")}>Refresh</Button>
+                                <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "submit")}>Submit</Button>
+                              </>
+                            )}
+                            <Button size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "file")}>File</Button>
+                            <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "cancel")}>Cancel</Button>
+                          </>
+                        )}
+                        {r.journalEntryId && (
+                          <Badge variant="outline" className="text-[9px]">JE linked</Badge>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!returns.length && (
+                  <tr>
+                    <td colSpan={6} className="text-center text-muted-foreground py-10">No VAT returns yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

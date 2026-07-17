@@ -11,6 +11,14 @@ export function creditAvailable(creditLimit: number, creditBalance: number): num
   return Math.max(0, round2(creditLimit - creditBalance));
 }
 
+/** Split a received amount into AR settlement + prepaid advance (wallet). */
+export function splitCreditPayment(amount: number, creditBalance: number): { applied: number; advance: number } {
+  const outstanding = Math.max(0, round2(creditBalance));
+  const applied = round2(Math.min(Math.max(0, amount), outstanding));
+  const advance = round2(Math.max(0, amount - applied));
+  return { applied, advance };
+}
+
 export function assertCreditAvailable(
   creditLimit: number,
   creditBalance: number,
@@ -116,3 +124,74 @@ export function chargeStatus(amount: number, paidAmount: number): 'OPEN' | 'PART
   if (paid + 0.009 >= amt) return 'PAID';
   return 'PARTIAL';
 }
+
+/** Signed effect of a credit txn on customer outstanding (CHARGE +, PAYMENT/CN −). */
+export function creditTxnSignedDelta(type: string, amount: number): number {
+  const amt = round2(Math.abs(amount));
+  if (type === 'CHARGE') return amt;
+  if (type === 'PAYMENT' || type === 'CREDIT_NOTE' || type === 'ADJUSTMENT_DOWN') return -amt;
+  if (type === 'ADJUSTMENT_UP') return amt;
+  return 0;
+}
+
+export type LedgerTxnInput = {
+  id: string;
+  type: string;
+  amount: number;
+  createdAt: Date;
+  description?: string | null;
+  referenceId?: string | null;
+  status?: string;
+  dueDate?: Date | null;
+  paidAmount?: number;
+};
+
+/** Chronological ledger with running outstanding balance. */
+export function buildCustomerLedger(
+  txns: LedgerTxnInput[],
+  range?: { from?: Date; to?: Date },
+): {
+  opening: number;
+  closing: number;
+  entries: (LedgerTxnInput & { debit: number; credit: number; balanceAfter: number })[];
+} {
+  const sorted = [...txns].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  let bal = 0;
+  let opening = 0;
+  let openingCaptured = !range?.from;
+  const entries: (LedgerTxnInput & { debit: number; credit: number; balanceAfter: number })[] = [];
+
+  for (const t of sorted) {
+    if (range?.to && t.createdAt.getTime() > range.to.getTime()) break;
+
+    if (range?.from && !openingCaptured && t.createdAt.getTime() >= range.from.getTime()) {
+      opening = bal;
+      openingCaptured = true;
+    }
+
+    const delta = creditTxnSignedDelta(t.type, t.amount);
+    bal = round2(bal + delta);
+
+    const inRange =
+      (!range?.from || t.createdAt.getTime() >= range.from.getTime()) &&
+      (!range?.to || t.createdAt.getTime() <= range.to.getTime());
+
+    if (inRange) {
+      entries.push({
+        ...t,
+        debit: delta > 0 ? Math.abs(delta) : 0,
+        credit: delta < 0 ? Math.abs(delta) : 0,
+        balanceAfter: bal,
+      });
+    }
+  }
+
+  if (!openingCaptured) {
+    // All activity was before `from`, or no activity — opening = current reconstructed bal
+    opening = range?.from ? bal : 0;
+  }
+  if (!range?.from) opening = 0;
+
+  return { opening: round2(opening), closing: round2(bal), entries };
+}
+

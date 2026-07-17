@@ -235,8 +235,26 @@ export class HrService {
 
     return this.prisma.payroll.upsert({
       where: { employeeId_month_year: { employeeId: dto.employeeId, month: dto.month, year: dto.year } },
-      update: { basicSalary: employee.basicSalary, allowances: dto.allowances ?? 0, bonus: dto.bonus ?? 0, deductions: dto.deductions ?? 0, netSalary },
-      create: { tenantId, employeeId: dto.employeeId, month: dto.month, year: dto.year, basicSalary: employee.basicSalary, allowances: dto.allowances ?? 0, bonus: dto.bonus ?? 0, deductions: dto.deductions ?? 0, netSalary },
+      update: {
+        basicSalary: employee.basicSalary,
+        allowances: dto.allowances ?? 0,
+        bonus: dto.bonus ?? 0,
+        deductions: dto.deductions ?? 0,
+        grossSalary: gross,
+        netSalary,
+      },
+      create: {
+        tenantId,
+        employeeId: dto.employeeId,
+        month: dto.month,
+        year: dto.year,
+        basicSalary: employee.basicSalary,
+        allowances: dto.allowances ?? 0,
+        bonus: dto.bonus ?? 0,
+        deductions: dto.deductions ?? 0,
+        grossSalary: gross,
+        netSalary,
+      },
     });
   }
 
@@ -257,8 +275,8 @@ export class HrService {
       const netSalary = Math.max(0, gross - deductions);
       const p = await this.prisma.payroll.upsert({
         where: { employeeId_month_year: { employeeId: emp.id, month, year } },
-        update: { basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, netSalary },
-        create: { tenantId, employeeId: emp.id, month, year, basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, netSalary },
+        update: { basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, grossSalary: gross, netSalary },
+        create: { tenantId, employeeId: emp.id, month, year, basicSalary: emp.basicSalary, allowances: opts.allowances ?? 0, bonus: opts.bonus ?? 0, deductions, grossSalary: gross, netSalary },
       });
       results.push(p);
     }

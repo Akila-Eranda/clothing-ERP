@@ -8,7 +8,7 @@ import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNe
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -19,6 +19,7 @@ import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } fr
 import { applyGiftVoucherRedeem, computeHelperCommission, generateGiftVoucherCode } from './pos-phase6.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
+import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { nanoid } from 'nanoid';
 import { recordSaleCashMovement, findOpenRegister, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
@@ -134,11 +135,11 @@ export class PosService {
     }
 
     let tierDiscount = 0;
-    let customerRecord: { id: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
+    let customerRecord: { id: string; firstName: string; lastName: string | null; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
     if (dto.customerId) {
       customerRecord = await this.prisma.customer.findFirst({
         where: { id: dto.customerId, tenantId },
-        select: { id: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, creditDays: true, tier: true },
+        select: { id: true, firstName: true, lastName: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, creditDays: true, tier: true },
       });
       if (!customerRecord) throw new BadRequestException('Customer not found');
       if (dto.applyTierDiscount !== false) {
@@ -190,6 +191,19 @@ export class PosService {
       assertCreditAvailable(customerRecord.creditLimit, customerRecord.creditBalance, totalCreditCharge);
     }
 
+    if (isPartial) {
+      if (!dto.customerId || !customerRecord) {
+        throw new BadRequestException(
+          'Customer required for partial payment — unpaid balance is charged to customer credit',
+        );
+      }
+      if (customerRecord.creditLimit <= 0) {
+        throw new BadRequestException(
+          'Customer has no credit limit — set a limit or collect the full amount',
+        );
+      }
+    }
+
     if (isPartial && !dto.allowPartialPayment) {
       throw new BadRequestException(`Payment short by LKR ${(amountDue - totalPaid).toFixed(2)}. Enable partial payment or add more.`);
     }
@@ -236,6 +250,13 @@ export class PosService {
         remainingBalance: redeem.remainingBalance,
         status: redeem.status as GiftVoucherStatus,
       });
+    }
+
+    const chequePays = dto.payments.filter((p) => p.method === PaymentMethod.CHEQUE && p.amount > 0);
+    for (const cp of chequePays) {
+      if (!(cp.reference ?? '').trim()) {
+        throw new BadRequestException('Cheque number required in payment reference for CHEQUE payments');
+      }
     }
 
     const sale = await this.prisma.$transaction(async (tx) => {
@@ -420,6 +441,26 @@ export class PosService {
 
       if (dto.heldBillId) {
         await tx.heldBill.delete({ where: { id: dto.heldBillId } }).catch(() => undefined);
+      }
+
+      for (const cp of chequePays) {
+        const partyName = customerRecord
+          ? `${customerRecord.firstName} ${customerRecord.lastName ?? ''}`.trim()
+          : 'Walk-in';
+        await tx.cheque.create({
+          data: {
+            tenantId,
+            direction: ChequeDirection.RECEIVED,
+            status: ChequeStatus.RECEIVED,
+            chequeNumber: cp.reference!.trim(),
+            amount: cp.amount,
+            partyType: dto.customerId ? 'CUSTOMER' : 'WALK_IN',
+            partyId: dto.customerId || undefined,
+            partyName,
+            notes: chequeSourceNotes('Sale', created.id, `POS sale ${invoiceNumber}`),
+            createdBy: cashierId,
+          },
+        });
       }
 
       return created;

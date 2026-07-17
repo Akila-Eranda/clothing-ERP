@@ -35,7 +35,7 @@ interface VariantRow {
   active: boolean;
 }
 interface Form {
-  name: string; description: string; shortDesc: string;
+  name: string; barcode: string; description: string; shortDesc: string;
   categoryId: string; brandId: string; hsn: string;
   status: "ACTIVE" | "DRAFT";
   tags: string[]; tagInput: string;
@@ -45,11 +45,13 @@ interface Form {
   warrantyMonths: string;
   loadIndex: string;
   speedRating: string;
+  tubeType: string;
+  pattern: string;
   images: string[];
   supplierIds: string[];
 }
 interface ExistingVariant {
-  id: string; name: string; sku: string;
+  id: string; name: string; sku: string; barcode?: string | null;
   size?: string | null; color?: string | null; material?: string | null; style?: string | null;
   costPrice: number; sellingPrice: number; mrp: number;
   isActive: boolean;
@@ -60,12 +62,14 @@ interface ExistingVariant {
   }[];
 }
 interface ProductData {
-  id: string; name: string; sku: string; hsn?: string | null;
+  id: string; name: string; sku: string; barcode?: string | null; hsn?: string | null;
   status: string; description?: string | null; shortDesc?: string | null;
   costPrice: number; sellingPrice: number; mrp: number; taxRate: number;
   warrantyMonths?: number | null;
   loadIndex?: string | null;
   speedRating?: string | null;
+  tubeType?: string | null;
+  pattern?: string | null;
   tags: string[]; hasVariants: boolean; trackInventory: boolean;
   images: string[];
   category?: { id: string; name: string } | null;
@@ -101,7 +105,7 @@ export default function EditProductPage() {
   const variantHint = variantVariantHint(shopProfile);
 
   const [form, setForm]             = useState<Form>({
-    name: "", description: "", shortDesc: "",
+    name: "", barcode: "", description: "", shortDesc: "",
     categoryId: "", brandId: "", hsn: "", status: "ACTIVE",
     tags: [], tagInput: "",
     sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
@@ -110,6 +114,8 @@ export default function EditProductPage() {
     warrantyMonths: "",
     loadIndex: "",
     speedRating: "",
+    tubeType: "",
+    pattern: "",
     images: [],
     supplierIds: [],
   });
@@ -152,6 +158,7 @@ export default function EditProductPage() {
       ));
       setForm({
         name:          p.name,
+        barcode:       p.barcode       ?? "",
         description:   p.description   ?? "",
         shortDesc:     p.shortDesc     ?? "",
         categoryId:    p.category?.id  ?? "",
@@ -170,6 +177,8 @@ export default function EditProductPage() {
         warrantyMonths: p.warrantyMonths != null && p.warrantyMonths > 0 ? String(p.warrantyMonths) : "",
         loadIndex: p.loadIndex ?? "",
         speedRating: p.speedRating ?? "",
+        tubeType: p.tubeType ?? "",
+        pattern: p.pattern ?? "",
         images: p.images ?? [],
         supplierIds: assignedSupplierIds,
       });
@@ -312,6 +321,7 @@ export default function EditProductPage() {
         categoryId:     form.categoryId   || undefined,
         brandId:        form.brandId      || undefined,
         hsn:            form.hsn          || undefined,
+        barcode:        form.barcode.trim() || null,
         sellingPrice:   parseFloat(form.sellingPrice) || derivedSelling,
         costPrice:      parseFloat(form.costPrice) || derivedCost,
         mrp:            parseFloat(form.mrp) || derivedMrp,
@@ -323,7 +333,12 @@ export default function EditProductPage() {
         ...(showWarranty
           ? { warrantyMonths: form.warrantyMonths.trim() ? parseInt(form.warrantyMonths, 10) || 0 : 0 }
           : {}),
-        ...(showTireMeta ? { loadIndex: form.loadIndex.trim() || undefined, speedRating: form.speedRating.trim() || undefined } : {}),
+        ...(showTireMeta ? {
+          loadIndex: form.loadIndex.trim() || undefined,
+          speedRating: form.speedRating.trim() || undefined,
+          tubeType: form.tubeType || undefined,
+          pattern: form.pattern.trim() || undefined,
+        } : {}),
         images: form.images,
         variants,
         supplierIds: form.supplierIds,
@@ -381,6 +396,11 @@ export default function EditProductPage() {
                 <Label className="text-xs font-semibold">Product Name <span className="text-destructive">*</span></Label>
                 <Input placeholder="e.g. Premium Cotton T-Shirt" value={form.name} maxLength={120}
                   onChange={(e) => set("name", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">Barcode</Label>
+                <Input placeholder="Scan or enter barcode" value={form.barcode}
+                  onChange={(e) => set("barcode", e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">Category</Label>
@@ -544,6 +564,20 @@ export default function EditProductPage() {
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Speed Rating</Label>
                   <Input placeholder="e.g. H, V, W" value={form.speedRating} onChange={(e) => set("speedRating", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Tube / Tubeless</Label>
+                  <Select value={form.tubeType || undefined} onValueChange={(v) => set("tubeType", v)}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="TUBELESS">Tubeless</SelectItem>
+                      <SelectItem value="TUBE">Tube</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Pattern / Model</Label>
+                  <Input placeholder="e.g. Primacy 4" value={form.pattern} onChange={(e) => set("pattern", e.target.value)} />
                 </div>
               </div>
             )}

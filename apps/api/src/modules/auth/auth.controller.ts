@@ -110,9 +110,11 @@ export class AuthController {
   logout(
     @CurrentUser() user: IAuthUser,
     @Headers('authorization') authHeader: string,
+    @Req() req: Request,
+    @Headers('user-agent') userAgent: string,
   ) {
     const token = authHeader?.replace('Bearer ', '') || '';
-    return this.authService.logout(user.id, token);
+    return this.authService.logout(user.id, token, user.tenantId, req.ip, userAgent);
   }
 
   @Public()

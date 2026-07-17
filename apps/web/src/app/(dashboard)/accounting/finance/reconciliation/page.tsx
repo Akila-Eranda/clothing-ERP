@@ -1,11 +1,7 @@
 "use client";
 
-import { FinancePageShell, ReconciliationSection } from "@/components/accounting/finance-hub";
+import { CashBankHub } from "@/components/accounting/cash-bank-hub";
 
 export default function ReconciliationPage() {
-  return (
-    <FinancePageShell title="Reconciliation" subtitle="Match bank statements with system balances">
-      <ReconciliationSection />
-    </FinancePageShell>
-  );
+  return <CashBankHub initialTab="recon" />;
 }

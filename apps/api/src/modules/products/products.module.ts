@@ -30,6 +30,26 @@ export class ProductsController {
     return this.productsService.findAll(user.tenantId, query);
   }
 
+  @Patch('bulk/status')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Bulk update product status' })
+  bulkStatus(@CurrentUser() user: IAuthUser, @Body() body: { ids: string[]; status: ProductStatus }) {
+    return this.productsService.bulkUpdateStatus(body.ids, user.tenantId, body.status);
+  }
+
+  @Post('seed-variants')
+  @ApiOperation({ summary: 'Seed default variant+inventory for products that have none' })
+  seedVariants(@CurrentUser() user: IAuthUser) {
+    return this.productsService.seedVariants(user.tenantId);
+  }
+
+  @Post('sync-shared-barcodes')
+  @RequirePermissions('products:update')
+  @ApiOperation({ summary: 'Copy product barcode onto all variants (shared barcode, per-variant prices)' })
+  syncSharedBarcodes(@CurrentUser() user: IAuthUser) {
+    return this.productsService.syncSharedBarcodes(user.tenantId);
+  }
+
   @Get(':id')
   @RequirePermissions('products:read')
   @ApiOperation({ summary: 'Get product by ID' })
@@ -49,26 +69,6 @@ export class ProductsController {
   @ApiOperation({ summary: 'Update product status' })
   updateStatus(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body('status') status: ProductStatus) {
     return this.productsService.updateStatus(id, user.tenantId, status);
-  }
-
-  @Patch('bulk/status')
-  @RequirePermissions('products:update')
-  @ApiOperation({ summary: 'Bulk update product status' })
-  bulkStatus(@CurrentUser() user: IAuthUser, @Body() body: { ids: string[]; status: ProductStatus }) {
-    return this.productsService.bulkUpdateStatus(body.ids, user.tenantId, body.status);
-  }
-
-  @Post('seed-variants')
-  @ApiOperation({ summary: 'Seed default variant+inventory for products that have none' })
-  seedVariants(@CurrentUser() user: IAuthUser) {
-    return this.productsService.seedVariants(user.tenantId);
-  }
-
-  @Post('sync-shared-barcodes')
-  @RequirePermissions('products:update')
-  @ApiOperation({ summary: 'Copy product barcode onto all variants (shared barcode, per-variant prices)' })
-  syncSharedBarcodes(@CurrentUser() user: IAuthUser) {
-    return this.productsService.syncSharedBarcodes(user.tenantId);
   }
 
   @Post(':id/variants')
