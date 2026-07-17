@@ -304,7 +304,7 @@ export function Sidebar() {
       "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none",
       sidebarCollapsed ? "h-10 w-10 justify-center mx-auto" : "h-10 w-full",
       !sidebarCollapsed && (nested ? "pl-8 pr-2.5" : "px-2.5"),
-      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[#818CF8]",
+      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-white",
     );
 
     const style = isActive
@@ -446,7 +446,7 @@ export function Sidebar() {
         <div
           className={cn(
             "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none h-10 px-2.5 w-full",
-            childActive && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[#818CF8]",
+            childActive && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-white",
           )}
           style={childActive
             ? { background: activeBg, color: activeFg }

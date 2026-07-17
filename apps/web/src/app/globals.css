@@ -4,11 +4,11 @@
 
 :root {
   /* Enterprise light table tokens (react-table-craft) */
-  --tc-background: 220 28% 96%;
+  --tc-background: 0 0% 100%;
   --tc-foreground: 220 39% 11%;
-  --tc-card: 220 28% 96%;
+  --tc-card: 0 0% 100%;
   --tc-card-foreground: 220 39% 11%;
-  --tc-popover: 220 28% 96%;
+  --tc-popover: 0 0% 100%;
   --tc-popover-foreground: 220 39% 11%;
   --tc-primary: 239 84% 67%;
   --tc-primary-foreground: 0 0% 100%;
@@ -20,8 +20,8 @@
   --tc-accent-foreground: 239 84% 40%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 217 39% 94%;
-  --tc-input: 220 13% 91%;
+  --tc-border: 220 16% 78%;
+  --tc-input: 220 16% 82%;
   --tc-ring: 239 84% 67%;
   --tc-radius: 0.75rem;
 }
@@ -50,16 +50,16 @@
 
 @layer base {
   :root {
-    /* Unified light surface — page + cards share one color */
+    /* Light canvas + white cards with clear dark edge */
     --background: 220 28% 96%;          /* #F1F4F9 */
     --foreground: 220 39% 11%;          /* #111827 */
-    --card: 220 28% 96%;                /* same as background */
+    --card: 0 0% 100%;                  /* white — lifts off canvas */
     --card-foreground: 220 39% 11%;
-    --popover: 220 28% 96%;
+    --popover: 0 0% 100%;
     --popover-foreground: 220 39% 11%;
     --primary: 239 84% 67%;             /* #6366F1 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 24% 93%;           /* slight step for nested chips */
+    --secondary: 217 24% 93%;
     --secondary-foreground: 220 39% 11%;
     --muted: 217 24% 93%;
     --muted-foreground: 220 9% 46%;     /* #6B7280 */
@@ -71,8 +71,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;              /* #F59E0B */
     --warning-foreground: 0 0% 100%;
-    --border: 217 22% 88%;
-    --input: 217 22% 88%;
+    --border: 220 16% 78%;              /* darker edge so black-line highlight reads */
+    --input: 220 16% 82%;
     --ring: 239 84% 67%;
     --radius: 0.75rem;
     --radius-control: 0.625rem;
@@ -358,7 +358,7 @@
   :root:not(.dark) .enterprise-table th,
   :root:not(.dark) [data-table-craft] th,
   :root:not(.dark) .rtc-table th {
-    border-bottom: 1px solid hsl(var(--border));
+    border-bottom: 1.5px solid rgba(15, 23, 42, 0.18);
     font-weight: 600;
     font-size: 12px;
     text-transform: uppercase;
@@ -369,7 +369,7 @@
   :root:not(.dark) .enterprise-table td,
   :root:not(.dark) [data-table-craft] td,
   :root:not(.dark) .rtc-table td {
-    border-bottom: 1px solid hsl(var(--border) / 0.7);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
@@ -403,9 +403,14 @@
     opacity: 1;
   }
 
-  /* Card hover — soft lift (same surface color; ring defines edge) */
+  /* Card hover — stronger black edge on lift */
   .card-hover {
-    @apply transition-all duration-150 ease-out hover:ring-slate-900/[0.1] hover:-translate-y-0.5;
+    @apply transition-all duration-150 ease-out hover:border-slate-900/25 hover:-translate-y-0.5 hover:shadow-md;
+  }
+
+  /* Shared panel edge — black line highlight on white surfaces */
+  .panel-edge {
+    @apply bg-card rounded-xl border border-slate-900/15 shadow-sm;
   }
 
   /* Input focus glow */
