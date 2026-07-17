@@ -30,6 +30,7 @@ type Props = {
   unitPrice: number;
   mrp?: number;
   variants?: PosAddPopupVariant[];
+  allowNegativeStock?: boolean;
   onConfirm: (payload: { qty: number; unitPrice: number; variant?: PosAddPopupVariant }) => void;
   onCancel: () => void;
   touchMode?: boolean;
@@ -48,6 +49,7 @@ export function PosQuantityPopup({
   unitPrice,
   mrp,
   variants = EMPTY_VARIANTS,
+  allowNegativeStock = false,
   onConfirm,
   onCancel,
   touchMode,
@@ -67,7 +69,9 @@ export function PosQuantityPopup({
     [variants, selectedVariantId],
   );
 
-  const stockLimit = Math.max(1, selectedVariant?.stock ?? maxQty);
+  const stockLimit = allowNegativeStock
+    ? Math.max(9999, selectedVariant?.stock ?? maxQty, maxQty)
+    : Math.max(1, selectedVariant?.stock ?? maxQty);
   const qty = Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
   const listPrice = posListPrice(selectedVariant ?? { unitPrice, mrp });
   const unitPriceValue = Math.max(0, parseFloat(priceRaw) || 0);
@@ -305,7 +309,7 @@ export function PosQuantityPopup({
                 <div ref={scrollRef} className={`grid ${variantGridClass} gap-2.5`}>
                   {variants.map((v) => {
                     const active = selectedVariantId === v.variantId;
-                    const out = v.stock <= 0;
+                    const out = !allowNegativeStock && v.stock <= 0;
                     return (
                       <button
                         key={v.variantId}
@@ -364,7 +368,7 @@ export function PosQuantityPopup({
                   >
                     {variants.map((v) => {
                       const active = selectedVariantId === v.variantId;
-                      const out = v.stock <= 0;
+                      const out = !allowNegativeStock && v.stock <= 0;
                       return (
                         <button
                           key={v.variantId}
@@ -472,7 +476,6 @@ export function PosQuantityPopup({
                 autoComplete="off"
                 value={priceRaw}
                 onChange={(e) => onPriceInput(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
                 onBlur={() => {
                   if (!priceRaw.trim() || Number.isNaN(parseFloat(priceRaw))) {
                     setPriceRaw(String(selectedVariant?.unitPrice ?? unitPrice));
@@ -535,7 +538,7 @@ export function PosQuantityPopup({
             <button
               type="button"
               onClick={submit}
-              disabled={unitPriceValue <= 0 || (selectedVariant?.stock ?? maxQty) <= 0}
+              disabled={unitPriceValue <= 0 || (!allowNegativeStock && (selectedVariant?.stock ?? maxQty) <= 0)}
               className={`flex-[1.35] ${btnH} rounded-xl font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2.5 transition-opacity`}
               style={{ background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)" }}
             >

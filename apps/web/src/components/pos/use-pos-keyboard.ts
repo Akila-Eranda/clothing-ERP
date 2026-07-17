@@ -175,11 +175,18 @@ function cyclePayment(ctx: PosKeyboardContext, delta: number) {
 }
 
 export function usePosKeyboard(ctx: PosKeyboardContext) {
+  const ctxRef = React.useRef(ctx);
+  ctxRef.current = ctx;
+
   React.useEffect(() => {
     if (!ctx.posOpen) return;
 
     const onKey = (e: KeyboardEvent) => {
+      const ctx = ctxRef.current;
       const inInput = isInputFocused();
+      const isSearch = document.activeElement === ctx.searchRef.current;
+      const searchValue = ctx.searchRef.current?.value ?? "";
+      const searchEmpty = isSearch && !searchValue.trim();
 
       if (ctx.pinLocked) {
         if (/^\d$/.test(e.key)) { ctx.handlePinEntry(e.key); return; }
@@ -188,6 +195,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
       }
@@ -205,7 +213,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
 
       // Search box has the full scanned code — prefer it over the wedge buffer.
-      if (e.key === "Enter" && document.activeElement === ctx.searchRef.current) {
+      if (e.key === "Enter" && isSearch) {
         e.preventDefault();
         ctx.barcodeBuffer.current = "";
         clearTimeout(ctx.barcodeTimer.current);
@@ -234,7 +242,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
 
       if (e.key === "Escape") {
         e.preventDefault();
-        if (ctx.qtyPopupOpen) { ctx.closeQtyPopup(); return; }
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
@@ -250,8 +257,99 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      // ── Function keys always work (even while barcode search is focused) ──
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        ctx.setActiveNav("products");
+        ctx.searchRef.current?.focus();
+        ctx.searchRef.current?.select();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && ctx.itemsLength > 0) {
+        e.preventDefault();
+        void ctx.handleCheckout("CASH");
+        return;
+      }
+      if (e.key === "F9" && e.shiftKey && ctx.itemsLength > 0) {
+        e.preventDefault();
+        void ctx.handleCheckout("CASH");
+        return;
+      }
+      if (e.key === "F2") {
+        e.preventDefault();
+        ctx.searchRef.current?.focus();
+        ctx.searchRef.current?.select();
+        ctx.setActiveNav("products");
+        return;
+      }
+      if (e.key === "F3") {
+        e.preventDefault();
+        if (ctx.itemsLength > 0) void ctx.handleHoldBill();
+        else toast.info("Cart is empty");
+        return;
+      }
+      if (e.key === "F4") {
+        e.preventDefault();
+        ctx.setShowCustomerSearch(false);
+        ctx.setFocusedCustomerIdx(0);
+        ctx.setActiveNav("customers");
+        return;
+      }
+      if (e.key === "F5") {
+        e.preventDefault();
+        ctx.discountInputRef.current?.focus();
+        return;
+      }
+      if (e.key === "F6") {
+        e.preventDefault();
+        if (ctx.selectedCartIdx < 0) { toast.info("Select a cart line first (↑↓)"); return; }
+        ctx.openQtyEditForSelected();
+        return;
+      }
+      if (e.key === "F7") {
+        e.preventDefault();
+        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
+        ctx.setActivePayment("CASH");
+        ctx.setCheckoutOpen(true);
+        return;
+      }
+      if (e.key === "F8") {
+        e.preventDefault();
+        ctx.setShowHeldBills(true);
+        ctx.setFocusedHeldIdx(0);
+        ctx.setActiveNav("products");
+        return;
+      }
+      if (e.key === "F9" && !e.shiftKey) {
+        e.preventDefault();
+        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
+        if (!ctx.checkoutOpen) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); return; }
+        void ctx.handleCheckout();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "c") {
+        e.preventDefault();
+        if (ctx.itemsLength === 0) { toast.info("Cart is already empty"); return; }
+        if (window.confirm("Clear all items from the cart?")) {
+          ctx.clearCart();
+          ctx.setSelectedCartIdx(-1);
+          ctx.setCheckoutOpen(false);
+          toast.success("Cart cleared");
+        }
+        return;
+      }
+      if (e.key === "F10") { e.preventDefault(); void ctx.handleThermalPrint(); return; }
+      if (e.key === "F11") { e.preventDefault(); void ctx.handleDayEnd(); return; }
+      if (e.key === "F12") {
+        e.preventDefault();
+        const st = localStorage.getItem("pos_pin");
+        if (st) { ctx.setPinLocked(true); ctx.setPinEntry(""); ctx.setPinError(false); }
+        else ctx.closePos();
+        return;
+      }
+
       // Search results: arrow navigate + keep typing in the barcode box
-      if (document.activeElement === ctx.searchRef.current && !ctx.checkoutOpen && !ctx.showCustomerSearch && !ctx.showHeldBills && !ctx.qtyPopupOpen) {
+      if (isSearch && !ctx.checkoutOpen && !ctx.showCustomerSearch && !ctx.showHeldBills) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setFocusedProductIdx((i) => Math.min(ctx.filteredProductsLength - 1, Math.max(0, i) + 1));
@@ -264,27 +362,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-        e.preventDefault();
-        ctx.setActiveNav("products");
-        ctx.searchRef.current?.focus();
-        ctx.searchRef.current?.select();
-        return;
-      }
-
-      // Instant Pay Cash — works from cart or checkout
-      if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && ctx.itemsLength > 0 && !inInput) {
-        e.preventDefault();
-        void ctx.handleCheckout("CASH");
-        return;
-      }
-      if (e.key === "F9" && e.shiftKey && ctx.itemsLength > 0) {
-        e.preventDefault();
-        void ctx.handleCheckout("CASH");
-        return;
-      }
-
-      if (ctx.showCustomerSearch && !inInput) {
+      if (ctx.showCustomerSearch && (!inInput || isSearch)) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setFocusedCustomerIdx((i) => Math.min(Math.max(0, ctx.customerModalListLength - 1), i + 1));
@@ -316,7 +394,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (ctx.showHeldBills && !inInput && !ctx.checkoutOpen) {
+      if (ctx.showHeldBills && (!inInput || isSearch) && !ctx.checkoutOpen) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setFocusedHeldIdx((i) => Math.min(Math.max(0, ctx.serverHeldBillsLength - 1), i + 1));
@@ -344,11 +422,16 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (inInput && e.key === "Enter" && document.activeElement !== ctx.searchRef.current) {
+      // Typing in a non-search field (coupon, cheque, cart qty edit, etc.)
+      if (inInput && e.key === "Enter" && !isSearch) {
         return;
       }
-
-      if (inInput) return;
+      // While typing a search query, don't steal letter keys / nav for tools
+      if (inInput && !isSearch) return;
+      if (isSearch && !searchEmpty) {
+        // Still allow Ctrl/Alt shortcuts while filtering
+        if (!(e.ctrlKey || e.metaKey || e.altKey)) return;
+      }
 
       if (e.altKey && /^[1-9]$/.test(e.key) && !ctx.checkoutOpen) {
         e.preventDefault();
@@ -357,7 +440,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
-      if (!anyModalOpen(ctx)) {
+      if (!anyModalOpen(ctx) && !isSearch) {
         if (e.key === "ArrowLeft" && !e.ctrlKey && !e.shiftKey) {
           e.preventDefault();
           cycleNav(ctx, -1);
@@ -407,58 +490,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
-      if (e.key === "F2") { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.searchRef.current?.select(); ctx.setActiveNav("products"); return; }
-      if (e.key === "F3") { e.preventDefault(); if (ctx.itemsLength > 0) void ctx.handleHoldBill(); else toast.info("Cart is empty"); return; }
-      if (e.key === "F4") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }
-      if (e.key === "F5") { e.preventDefault(); ctx.discountInputRef.current?.focus(); return; }
-      if (e.key === "F6") {
-        e.preventDefault();
-        if (ctx.selectedCartIdx < 0) { toast.info("Select a cart line first (↑↓)"); return; }
-        ctx.openQtyEditForSelected();
-        return;
-      }
-      if (e.key === "F7") {
-        e.preventDefault();
-        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
-        ctx.setActivePayment("CASH");
-        ctx.setCheckoutOpen(true);
-        return;
-      }
-      if (e.key === "F8") {
-        e.preventDefault();
-        ctx.setShowHeldBills(true);
-        ctx.setFocusedHeldIdx(0);
-        ctx.setActiveNav("products");
-        return;
-      }
-      if (e.key === "F9" && !e.shiftKey) {
-        e.preventDefault();
-        if (ctx.itemsLength === 0) { toast.info("Cart is empty"); return; }
-        if (!ctx.checkoutOpen) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); return; }
-        void ctx.handleCheckout();
-        return;
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && key === "c") {
-        e.preventDefault();
-        if (ctx.itemsLength === 0) { toast.info("Cart is already empty"); return; }
-        if (window.confirm("Clear all items from the cart?")) {
-          ctx.clearCart();
-          ctx.setSelectedCartIdx(-1);
-          ctx.setCheckoutOpen(false);
-          toast.success("Cart cleared");
-        }
-        return;
-      }
-      if (e.key === "F10") { e.preventDefault(); void ctx.handleThermalPrint(); return; }
-      if (e.key === "F11") { e.preventDefault(); void ctx.handleDayEnd(); return; }
-      if (e.key === "F12") {
-        e.preventDefault();
-        const st = localStorage.getItem("pos_pin");
-        if (st) { ctx.setPinLocked(true); ctx.setPinEntry(""); ctx.setPinError(false); }
-        else ctx.closePos();
-        return;
-      }
-
       if (ctx.checkoutOpen) {
         if (key === "/" || key === "c") {
           e.preventDefault();
@@ -503,7 +534,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           cyclePayment(ctx, 1);
           return;
         }
-        // Cash tendered numpad takes priority over number payment shortcuts
         if (ctx.activePayment === "CASH") {
           if (/^\d$/.test(e.key)) {
             e.preventDefault();
@@ -521,7 +551,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
             return;
           }
         }
-        // Alt+1…N always switches method; bare 1–N only when not entering cash
         if ((e.altKey || ctx.activePayment !== "CASH") && /^[1-9]$/.test(e.key)) {
           const idx = parseInt(e.key, 10) - 1;
           if (idx < POS_PAY_METHODS.length) {
@@ -591,20 +620,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         ctx.setSelectedCartIdx((i) => Math.max(0, i - 1));
         return;
       }
-      if (!e.ctrlKey && !anyModalOpen(ctx) && ctx.itemsLength > 0 && ctx.activeNav === "products") {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          ctx.setSelectedCartIdx((i) => Math.min(ctx.itemsLength - 1, i < 0 ? 0 : i + 1));
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          ctx.setSelectedCartIdx((i) => Math.max(0, i < 0 ? 0 : i - 1));
-          return;
-        }
-      }
-
-      if (!e.ctrlKey && !anyModalOpen(ctx) && ctx.itemsLength > 0 && ctx.activeNav !== "products") {
+      if (!e.ctrlKey && !anyModalOpen(ctx) && ctx.itemsLength > 0 && !isSearch) {
         if (e.key === "ArrowDown") {
           e.preventDefault();
           ctx.setSelectedCartIdx((i) => Math.min(ctx.itemsLength - 1, i < 0 ? 0 : i + 1));
@@ -627,11 +643,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
       if (e.key === "Delete" && ctx.selectedCartIdx >= 0 && !ctx.showHeldBills) {
         ctx.removeSelectedCartItem();
-        return;
       }
     };
 
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [ctx]);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [ctx.posOpen]);
 }

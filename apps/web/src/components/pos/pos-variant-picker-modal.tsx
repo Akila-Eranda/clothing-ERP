@@ -58,12 +58,12 @@ export function PosVariantPickerModal({
         onClose();
         return;
       }
-      if (e.key === "ArrowDown") {
+      if (e.key === "ArrowDown" || e.key === "ArrowRight") {
         e.preventDefault();
         setFocusIdx((i) => Math.min(variants.length - 1, i + 1));
         return;
       }
-      if (e.key === "ArrowUp") {
+      if (e.key === "ArrowUp" || e.key === "ArrowLeft") {
         e.preventDefault();
         setFocusIdx((i) => Math.max(0, i - 1));
         return;
@@ -101,7 +101,7 @@ export function PosVariantPickerModal({
           <div className="min-w-0">
             <p className="text-white font-bold text-sm truncate">{productName}</p>
             <p className="text-[11px]" style={{ color: "#6a8ab8" }}>
-              Select variant · ↑↓ Enter · Esc · {variants.length} options
+              Select variant · ↑↓←→ Enter · Esc · {variants.length} options
             </p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
