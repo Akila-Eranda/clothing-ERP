@@ -25,7 +25,6 @@ import { AppLogo } from "@/components/brand/app-logo";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { PosQuantityPopup } from "@/components/pos/pos-quantity-popup";
-import { PosVariantPickerModal } from "@/components/pos/pos-variant-picker-modal";
 import { bypassesWorkflowApproval, canViewAllPosSales, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
 import { calcPosAmountDue, calcTierDiscount } from "@/lib/pos-totals";
 import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
@@ -38,7 +37,6 @@ import { PosQuickExpensePanel } from "@/components/pos/pos-quick-expense-panel";
 import { PosPromotionsPanel } from "@/components/pos/pos-promotions-panel";
 import { PosSalesReportPanel } from "@/components/pos/pos-sales-report-panel";
 import {
-  readPosQtyPopup, writePosQtyPopup,
   readPosSoundAlerts, writePosSoundAlerts,
   readPosTouchMode, writePosTouchMode,
 } from "@/lib/pos-settings";
@@ -51,6 +49,7 @@ interface POSOverlayProps {
 }
 
 interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; mrp?: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
+type AddPopupState = { productName: string; selected: ProductItem; variants: ProductItem[] };
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
 interface ApiCustomerRow {
@@ -92,13 +91,17 @@ function formatSaleCustomerName(customer?: SaleCustomer | null): string {
 interface SaleReceipt { invoiceNumber: string; total: number; changeDue: number; paymentMethod: string; customerName?: string; items: { name: string; qty: number; price: number }[]; subtotal: number; discount: number; tax: number; savings?: number; cashTendered?: number; }
 interface RecentScan { id: string; variantId: string; name: string; variant: string; price: number; qty: number; time: Date; }
 interface SaleRow { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; paymentMethod?: string; customer?: SaleCustomer | null; _count?: { items: number }; payments?: { method: string }[]; }
-interface CustomerBillRow { id: string; invoiceNumber: string; invoiceDate: string; total: number; status: string; _count?: { items: number } }
+interface CustomerBillRow { id: string; invoiceNumber: string; invoiceDate: string; total: number; amountPaid?: number; paymentStatus?: string; status: string; balanceDue?: number; _count?: { items: number } }
 interface CustomerTopProduct { productName: string; qty: number; spent: number; variantId: string }
 interface CustomerInsight {
   sales: CustomerBillRow[];
   topProducts: CustomerTopProduct[];
+  outstandingSales?: CustomerBillRow[];
   totalOrders?: number;
   totalSpent?: number;
+  creditBalance?: number;
+  creditLimit?: number;
+  creditAvailable?: number;
 }
 interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
 interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: SaleCustomer | null; items: SaleItemDetail[]; }
@@ -208,12 +211,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [reprintingId, setReprintingId] = React.useState<string | null>(null);
   const [touchMode, setTouchMode] = React.useState(false);
   const [soundAlerts, setSoundAlerts] = React.useState(true);
-  const [qtyPopupEnabled, setQtyPopupEnabled] = React.useState(false);
-  const [qtyPopupProduct, setQtyPopupProduct] = React.useState<ProductItem | null>(null);
+  const [addPopup, setAddPopup] = React.useState<AddPopupState | null>(null);
   const [editingCartQtyIdx, setEditingCartQtyIdx] = React.useState<number | null>(null);
   const [editingCartQtyRaw, setEditingCartQtyRaw] = React.useState("");
   const cashPanelRef = React.useRef<HTMLDivElement>(null);
-  const [variantPickerName, setVariantPickerName] = React.useState<string | null>(null);
   const [helpers, setHelpers] = React.useState<{ id: string; firstName: string; lastName: string; commissionRate: number }[]>([]);
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
@@ -228,6 +229,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [customerInsight, setCustomerInsight] = React.useState<CustomerInsight | null>(null);
   const [customerInsightLoading, setCustomerInsightLoading] = React.useState(false);
   const [previewCustomerId, setPreviewCustomerId] = React.useState<string | null>(null);
+  const [partialPayAmount, setPartialPayAmount] = React.useState("");
+  const [creditPayAmount, setCreditPayAmount] = React.useState("");
+  const [creditPayMethod, setCreditPayMethod] = React.useState("CASH");
+  const [creditPayBusy, setCreditPayBusy] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
   const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{ entityId: string; percent: number } | null>(null);
@@ -427,6 +432,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, []);
 
+  React.useEffect(() => {
+    if (activePayment === "CASH" && payState.allowPartial) {
+      setPartialPayAmount(numpad);
+    }
+  }, [numpad, activePayment, payState.allowPartial]);
+
   React.useEffect(() => { if (!posOpen) return; const t = setInterval(() => setNow(new Date()), 1000); return () => clearInterval(t); }, [posOpen]);
   React.useEffect(() => { if (items.length === 0) setCheckoutOpen(false); }, [items.length]);
   React.useEffect(() => {
@@ -435,11 +446,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) {
       el.blur();
     }
-    // Cashier speed: cash numpad is ready for keyboard digits immediately after F7/F9
+    if ((customer?.creditLimit ?? 0) > 0) {
+      patchPayState({ allowPartial: true });
+    }
     if (activePayment === "CASH") {
       requestAnimationFrame(() => cashPanelRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" }));
     }
-  }, [checkoutOpen, activePayment]);
+  }, [checkoutOpen, activePayment, customer?.creditLimit, patchPayState]);
 
   const loadProducts = React.useCallback(async () => {
     setLoading(true);
@@ -525,7 +538,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   React.useEffect(() => {
     setTouchMode(readPosTouchMode());
     setSoundAlerts(readPosSoundAlerts());
-    setQtyPopupEnabled(readPosQtyPopup());
   }, []);
 
   React.useEffect(() => {
@@ -757,17 +769,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     return Array.from(map.values());
   }, [filteredProducts, getVariants, activeCategory]);
 
-  const variantPickerVariants = React.useMemo(
-    () => (variantPickerName ? getVariants(variantPickerName) : []),
-    [variantPickerName, getVariants],
-  );
+  const openAddPopup = React.useCallback((p: ProductItem) => {
+    const variants = getVariants(p.productName);
+    const list = variants.length > 0 ? variants : [p];
+    const selected = list.find((v) => v.variantId === p.variantId) ?? list.find((v) => v.stock > 0) ?? list[0];
+    if (!selected || list.every((v) => v.stock <= 0)) {
+      toast.error(`${p.productName} — Out of stock`);
+      playPosSound("scan_fail", soundAlerts);
+      return;
+    }
+    setAddPopup({ productName: p.productName, selected, variants: list });
+  }, [getVariants, soundAlerts]);
 
-  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean }) => {
+  const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean; unitPrice?: number }) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
+    const price = opts?.unitPrice ?? p.unitPrice;
     const lineTax = taxRate;
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
-      unitPrice: p.unitPrice, mrp: p.mrp && p.mrp > 0 ? p.mrp : p.unitPrice,
+      unitPrice: price, mrp: p.mrp && p.mrp > 0 ? p.mrp : price,
       quantity: qty, stock: p.stock, discountAmount: 0, discountType: "percentage", taxRate: lineTax,
       image: p.imageUrl,
     });
@@ -777,7 +797,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       variantId: p.variantId,
       name: p.productName,
       variant: variantDisplayLabel(p, profile),
-      price: p.unitPrice,
+      price,
       qty,
       time: new Date(),
     }, ...prev].slice(0, 8));
@@ -807,15 +827,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     });
   }, [addItem]);
 
-  const handleAddProduct = React.useCallback((p: ProductItem, opts?: { fromScan?: boolean }) => {
-    if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
-    // Barcode scan never shows qty popup — supermarket speed
-    if (qtyPopupEnabled && !opts?.fromScan) {
-      setQtyPopupProduct(p);
-      return;
-    }
-    commitAddProduct(p, 1, { keepSearchFocus: true });
-  }, [qtyPopupEnabled, commitAddProduct, soundAlerts]);
+  const handleAddProduct = React.useCallback((p: ProductItem) => {
+    openAddPopup(p);
+  }, [openAddPopup]);
 
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
@@ -834,7 +848,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         if (fromApi.requiresVariantPick && fromApi.productName) {
           setSelectedProductName(null);
           setSelAttrs({});
-          setVariantPickerName(fromApi.productName);
+          const siblings = getVariants(fromApi.productName);
+          const apiVariants = Array.isArray(fromApi.variants) ? fromApi.variants as ProductItem[] : [];
+          const pick = siblings[0] ?? apiVariants[0] ?? (fromApi as ProductItem);
+          openAddPopup(pick);
           setSearch("");
           setLastScanAt(new Date());
           setScanFlash(true);
@@ -865,7 +882,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           if (!exactSku && !exactBarcode) {
             setSelectedProductName(null);
             setSelAttrs({});
-            setVariantPickerName(found.productName);
+            openAddPopup(found);
             setSearch("");
             setLastScanAt(new Date());
             playPosSound("scan_ok", soundAlerts);
@@ -884,24 +901,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     setSelectedProductName(null);
     setSelAttrs({});
-    setVariantPickerName(null);
-    handleAddProduct(found, { fromScan: true });
+    openAddPopup(found);
     setLastScanAt(new Date());
     setSearch("");
     setScanFlash(true);
     setTimeout(() => setScanFlash(false), 500);
-  }, [products, handleAddProduct, soundAlerts, getVariants]);
+  }, [products, openAddPopup, soundAlerts, getVariants]);
 
   const handleCardClick = React.useCallback((p: ProductItem) => {
-    const variants = getVariants(p.productName);
-    if (variants.length <= 1) {
-      handleAddProduct(variants[0] ?? p);
-      return;
-    }
-    setSelectedProductName(null);
-    setSelAttrs({});
-    setVariantPickerName(p.productName);
-  }, [getVariants, handleAddProduct]);
+    openAddPopup(p);
+  }, [openAddPopup]);
 
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
@@ -1061,7 +1070,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     const payMethod = forceMethod ?? activePayment;
     if (forceMethod) setActivePayment(forceMethod);
     const tenderPad = forceMethod === "CASH" ? "" : numpad;
-    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber);
+    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount);
     if (payMethod === "WALLET" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for wallet payment"); return; }
       payments.length = 0;
@@ -1070,10 +1079,20 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     if (payMethod === "CUSTOMER_CREDIT" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for credit payment"); return; }
       const available = Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0));
-      if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
-      if (totalAmt > available + 0.01) { toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`); return; }
-      payments.length = 0;
-      payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
+      const paidNow = payments.reduce((s, p) => s + p.amount, 0);
+      const isPartialNow = payState.allowPartial && paidNow > 0 && paidNow + 0.01 < totalAmt;
+      if (isPartialNow) {
+        const onCredit = totalAmt - paidNow;
+        if (onCredit > available + 0.01) {
+          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
+          return;
+        }
+      } else {
+        if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
+        if (totalAmt > available + 0.01) { toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`); return; }
+        payments.length = 0;
+        payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
+      }
     }
     if (payMethod === "CHEQUE" && !payState.splitMode) {
       if (!chequeNumber.trim()) { toast.error("Enter cheque number"); return; }
@@ -1105,12 +1124,19 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     }
     if (!payState.splitMode && !payState.allowPartial) {
       if (payMethod === "CASH" && tenderPad && parseFloat(tenderPad) < totalAmt) {
-        toast.error("Cash tendered less than total");
+        toast.error("Cash tendered less than total — enable Partial pay for credit customers");
         return;
       }
       const paid = payments.reduce((s, p) => s + p.amount, 0);
       if (paid + 0.01 < totalAmt && payMethod !== "CASH") {
         toast.error("Payment amount is less than total");
+        return;
+      }
+    }
+    if (payState.allowPartial && !payState.splitMode && payMethod !== "CUSTOMER_CREDIT") {
+      const paid = payments.reduce((s, p) => s + p.amount, 0);
+      if (paid + 0.01 < totalAmt && paid > 0 && !customer?.id) {
+        toast.error("Select a customer — unpaid balance goes on credit account");
         return;
       }
     }
@@ -1140,7 +1166,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
         discountAmount:discountAmount(),
         couponCode:couponCode??undefined,
         loyaltyPointsToRedeem:loyaltyPointsToRedeem>0?loyaltyPointsToRedeem:undefined,
-        allowPartialPayment:payState.allowPartial,
+        allowPartialPayment: payState.allowPartial || paidCheck + 0.01 < totalAmt,
         applyTierDiscount:true,
         notes:cartNotes,
         ...(helperEmployeeId ? { helperEmployeeId } : {}),
@@ -1175,6 +1201,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber("");
       setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
+      setPartialPayAmount("");
       setActiveNav("products");
       playPosSound("sale_ok", soundAlerts);
       // Always print receipt after sale (cashier workflow). Print server / thermal often kicks cash drawer on cash.
@@ -1237,15 +1264,23 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       const res = await api.get<{
         sales?: CustomerBillRow[];
         topProducts?: CustomerTopProduct[];
+        outstandingSales?: CustomerBillRow[];
         totalOrders?: number;
         totalSpent?: number;
+        creditBalance?: number;
+        creditLimit?: number;
+        creditAvailable?: number;
       }>(`/customers/${customerId}`);
       const data = res.data;
       setCustomerInsight({
         sales: Array.isArray(data.sales) ? data.sales : [],
         topProducts: Array.isArray(data.topProducts) ? data.topProducts : [],
+        outstandingSales: Array.isArray(data.outstandingSales) ? data.outstandingSales : [],
         totalOrders: data.totalOrders,
         totalSpent: data.totalSpent,
+        creditBalance: data.creditBalance,
+        creditLimit: data.creditLimit,
+        creditAvailable: data.creditAvailable,
       });
     } catch {
       setCustomerInsight({ sales: [], topProducts: [] });
@@ -1271,6 +1306,41 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     void loadCustomerInsight(c.id);
     toast.success(`${c.name} added to bill`);
   }, [setCustomer, loadCustomerInsight]);
+
+  const payCustomerOutstanding = React.useCallback(async (customerId: string, customerName: string) => {
+    const amt = parseFloat(creditPayAmount);
+    if (!(amt > 0)) { toast.error("Enter payment amount"); return; }
+    const owed = customerInsight?.creditBalance ?? 0;
+    if (owed <= 0) { toast.error("No outstanding balance"); return; }
+    if (amt > owed + 0.01) {
+      toast.error(`Amount exceeds outstanding (LKR ${formatNumber(owed)})`);
+      return;
+    }
+    setCreditPayBusy(true);
+    try {
+      await api.post(`/customers/${customerId}/credit/payment`, {
+        amount: amt,
+        paymentMethod: creditPayMethod,
+        description: `POS credit settlement — ${customerName}`,
+      });
+      toast.success(`Received LKR ${formatNumber(amt)} from ${customerName}`);
+      setCreditPayAmount("");
+      void loadCustomerInsight(customerId);
+      if (customer?.id === customerId) {
+        setCustomer({
+          ...customer,
+          outstandingBalance: Math.max(0, (customer.outstandingBalance ?? 0) - amt),
+        });
+      }
+      setInlineCustomers((prev) =>
+        prev.map((c) => (c.id === customerId ? { ...c, creditBalance: Math.max(0, (c.creditBalance ?? 0) - amt) } : c)),
+      );
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Payment failed");
+    } finally {
+      setCreditPayBusy(false);
+    }
+  }, [creditPayAmount, creditPayMethod, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
 
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
@@ -1339,7 +1409,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     setEditingCartQtyRaw(String(it.quantity));
   }, [selectedCartIdx, items]);
 
-  const closeQtyPopup = React.useCallback(() => setQtyPopupProduct(null), []);
+  const closeQtyPopup = React.useCallback(() => setAddPopup(null), []);
 
   const keyboardCtx = React.useMemo(() => ({
     posOpen,
@@ -1349,8 +1419,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     showCustomerSearch,
     showHeldBills,
     showDayEnd,
-    qtyPopupOpen: !!qtyPopupProduct,
-    selectedProductName: selectedProductName ?? variantPickerName,
+    qtyPopupOpen: !!addPopup,
+    selectedProductName: selectedProductName ?? addPopup?.productName ?? null,
     activeNav,
     activePayment,
     itemsLength: items.length,
@@ -1377,7 +1447,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     setCheckoutOpen,
     setSelectedProductName: (v: string | null) => {
       setSelectedProductName(v);
-      if (!v) setVariantPickerName(null);
+      if (!v) setAddPopup(null);
     },
     setShowCustomerSearch,
     setShowHeldBills,
@@ -1425,7 +1495,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
     posOpen, pinLocked, checkoutOpen, showShortcuts, showCustomerSearch, showHeldBills, showDayEnd,
-    qtyPopupProduct, selectedProductName, variantPickerName, activeNav, activePayment, items.length, selectedCartIdx,
+    addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
     closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
@@ -1477,7 +1547,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   ? `LKR ${formatNumber(card.minPrice)}–${formatNumber(card.maxPrice)}`
                   : `LKR ${formatNumber(card.minPrice)}`;
                 return (
-                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName||variantPickerName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
+                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
                     <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"#162338":getCardBg(p.color)}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={getCardBg(p.color)} iconClassName="h-10 w-10 text-white/20" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
@@ -1699,7 +1769,87 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     {typeof customerInsight?.totalOrders === "number" ? `${customerInsight.totalOrders} orders` : `${customerInsight?.sales.length ?? 0} recent bills`}
                     {typeof customerInsight?.totalSpent === "number" ? ` · LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
                   </p>
+                  {(customerInsight?.creditBalance ?? 0) > 0 && (
+                    <div className="mt-2 flex items-center justify-between px-2.5 py-2 rounded-lg" style={{background:"rgba(245,158,11,0.12)",border:"1px solid rgba(245,158,11,0.35)"}}>
+                      <span className="text-[10px] font-bold uppercase" style={{color:"#fbbf24"}}>Outstanding</span>
+                      <span className="text-sm font-bold tabular-nums" style={{color:"#fbbf24"}}>LKR {formatNumber(customerInsight!.creditBalance!)}</span>
+                    </div>
+                  )}
+                  {(customerInsight?.creditLimit ?? 0) > 0 && (
+                    <p className="text-[10px] mt-1" style={{color:"#6a8ab8"}}>
+                      Credit limit LKR {formatNumber(customerInsight!.creditLimit!)} · Available LKR {formatNumber(customerInsight!.creditAvailable ?? 0)}
+                    </p>
+                  )}
                 </div>
+                {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
+                  <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"#162338",borderColor:"#1e3356"}}>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Settle outstanding</p>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        value={creditPayAmount}
+                        onChange={(e) => setCreditPayAmount(e.target.value)}
+                        placeholder={`Max ${formatNumber(customerInsight!.creditBalance!)}`}
+                        className="flex-1 h-9 rounded-xl px-3 text-sm text-white outline-none"
+                        style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                      />
+                      <select
+                        value={creditPayMethod}
+                        onChange={(e) => setCreditPayMethod(e.target.value)}
+                        className="h-9 rounded-xl px-2 text-xs text-white outline-none"
+                        style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                        <option value="UPI">UPI</option>
+                        <option value="BANK_TRANSFER">Bank</option>
+                      </select>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setCreditPayAmount(String(customerInsight!.creditBalance!))}
+                        className="flex-1 h-8 rounded-lg text-[10px] font-bold"
+                        style={{background:"#1a2b4a",color:"#93c5fd",border:"1px solid #1e3356"}}
+                      >
+                        Pay full
+                      </button>
+                      <button
+                        type="button"
+                        disabled={creditPayBusy}
+                        onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
+                        className="flex-1 h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
+                        style={{background:"linear-gradient(135deg,#10b981,#059669)"}}
+                      >
+                        {creditPayBusy ? "Paying…" : "Receive payment"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {(customerInsight?.outstandingSales?.length ?? 0) > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-3.5 w-3.5" style={{color:"#fbbf24"}}/>
+                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Unpaid bills</p>
+                    </div>
+                    <div className="space-y-1.5">
+                      {customerInsight!.outstandingSales!.map((sale) => (
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)"}}>
+                          <div className="min-w-0">
+                            <p className="text-xs font-mono font-bold truncate" style={{color:"#fbbf24"}}>{sale.invoiceNumber}</p>
+                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>
+                              {new Date(sale.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
+                              {" · "}Due LKR {formatNumber(sale.balanceDue ?? sale.total - (sale.amountPaid ?? 0))}
+                            </p>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0" style={{background:"rgba(245,158,11,0.2)",color:"#fbbf24"}}>PENDING</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Receipt className="h-3.5 w-3.5" style={{color:"#4f6ef7"}}/>
@@ -1709,15 +1859,19 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     <p className="text-xs py-3 text-center" style={{color:"#4a6a8a"}}>No previous bills</p>
                   ) : (
                     <div className="space-y-1.5">
-                      {customerInsight!.sales.slice(0, 10).map((sale) => (
-                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:"#162338",border:"1px solid #1e3356"}}>
+                      {customerInsight!.sales.slice(0, 10).map((sale) => {
+                        const isPending = sale.paymentStatus === "PENDING";
+                        const due = sale.balanceDue ?? (isPending ? sale.total - (sale.amountPaid ?? 0) : 0);
+                        return (
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:isPending?"rgba(245,158,11,0.06)":"#162338",border:`1px solid ${isPending?"rgba(245,158,11,0.25)":"#1e3356"}`}}>
                           <div className="min-w-0">
-                            <p className="text-xs font-mono font-bold truncate" style={{color:"#4f6ef7"}}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items</p>
+                            <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"#fbbf24":"#4f6ef7"}}>{sale.invoiceNumber}</p>
+                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
                           </div>
                           <p className="text-xs font-bold font-mono text-white shrink-0">LKR {formatNumber(sale.total)}</p>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -2201,7 +2355,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
             {([
               { key: "touch", label: "Touch Mode", desc: "Larger buttons & product tiles", icon: Hand, on: touchMode, set: (v: boolean) => { setTouchMode(writePosTouchMode(v)); } },
               { key: "sound", label: "Sound Alerts", desc: "Beep on scan / sale complete", icon: Volume2, on: soundAlerts, set: (v: boolean) => { setSoundAlerts(writePosSoundAlerts(v)); } },
-              { key: "qty", label: "Quantity Popup", desc: "Ask qty when adding products", icon: Package, on: qtyPopupEnabled, set: (v: boolean) => { setQtyPopupEnabled(writePosQtyPopup(v)); } },
+              { key: "qty", label: "Add popup", desc: "Always confirms qty, selling price, and variant", icon: Package, on: true, set: () => toast.info("Add popup is always enabled") },
             ] as const).map((row) => (
               <div key={row.key} className="flex items-center gap-3 py-2 border-b last:border-0" style={{borderColor:"#1e3356"}}>
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><row.icon className="h-4 w-4" style={{color:"#4f6ef7"}}/></div>
@@ -2321,31 +2475,20 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
         className={cn("fixed inset-0 z-[100] flex flex-col overflow-hidden", scanFlash && "ring-4 ring-inset ring-green-500/70", touchMode && "pos-touch-mode")}
         style={{ background: "#0d1b2e", fontSize: touchMode ? "15px" : undefined }}>
 
-        {qtyPopupProduct && (
+        {addPopup && (
           <PosQuantityPopup
-            productName={qtyPopupProduct.productName}
-            variantName={variantDisplayLabel(qtyPopupProduct, profile)}
-            maxQty={Math.max(1, qtyPopupProduct.stock)}
-            unitPrice={qtyPopupProduct.unitPrice}
+            productName={addPopup.productName}
+            variantName={variantDisplayLabel(addPopup.selected, profile)}
+            maxQty={Math.max(1, addPopup.selected.stock)}
+            unitPrice={addPopup.selected.unitPrice}
+            variants={addPopup.variants.length > 1 ? addPopup.variants : undefined}
             touchMode={touchMode}
-            onCancel={() => setQtyPopupProduct(null)}
-            onConfirm={(qty) => {
-              const p = qtyPopupProduct;
-              setQtyPopupProduct(null);
-              commitAddProduct(p, qty);
-            }}
-          />
-        )}
-
-        {variantPickerName && (
-          <PosVariantPickerModal
-            productName={variantPickerName}
-            variants={variantPickerVariants}
-            onClose={() => setVariantPickerName(null)}
-            onSelect={(v) => {
-              setVariantPickerName(null);
-              // One-click add — never open qty popup from variant picker
-              commitAddProduct(v as ProductItem, 1, { keepSearchFocus: true });
+            onCancel={() => setAddPopup(null)}
+            onConfirm={({ qty, unitPrice, variant }) => {
+              const base = variant ?? addPopup.selected;
+              const p: ProductItem = { ...base, unitPrice: unitPrice > 0 ? unitPrice : base.unitPrice };
+              setAddPopup(null);
+              commitAddProduct(p, qty, { unitPrice: p.unitPrice, keepSearchFocus: true });
             }}
           />
         )}
@@ -2683,6 +2826,12 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   customerCreditLimit={customer?.creditLimit}
                   customerCreditBalance={customer?.outstandingBalance}
                   customerTier={customer?.membershipTier}
+                  activePayment={activePayment}
+                  payNowAmount={partialPayAmount || (activePayment === "CASH" ? numpad : "")}
+                  onPayNowAmountChange={(v) => {
+                    setPartialPayAmount(v);
+                    if (activePayment === "CASH") setNumpad(v);
+                  }}
                   state={payState}
                   onStateChange={patchPayState}
                   onCouponChange={onCouponChange}
@@ -2760,8 +2909,14 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 )}
                 {activePayment==="CASH"&&(
                   <div ref={cashPanelRef} className="px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>Cash Received (LKR)</span><span className="text-[10px] font-mono" style={{color:"#4a6a8a"}}>Type amount · F9 confirm</span><button onClick={()=>setNumpad("")} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono" style={{color:"#4a6a8a"}}>Type amount · F9 confirm</span><button onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
                     <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
+                    {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
+                      <div className="flex justify-between text-xs mb-2 px-1">
+                        <span style={{color:"#6a8ab8"}}>Balance on credit</span>
+                        <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
+                      </div>
+                    )}
                     <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";

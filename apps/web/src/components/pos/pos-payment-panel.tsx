@@ -41,6 +41,9 @@ interface Props {
   customerCreditLimit?: number;
   customerCreditBalance?: number;
   customerTier?: string;
+  activePayment?: string;
+  payNowAmount?: string;
+  onPayNowAmountChange?: (v: string) => void;
   onCouponChange: (code: string | null, discount: number) => void;
   onStateChange: (patch: Partial<PosPaymentState>) => void;
   state: PosPaymentState;
@@ -51,20 +54,26 @@ const TIER_PCT: Record<string, number> = {
 };
 
 export function PosPaymentPanel({
-  totalAmt, subtotal, customerWallet, customerCreditLimit, customerCreditBalance, customerTier, onCouponChange, onStateChange, state,
+  totalAmt, subtotal, customerWallet, customerCreditLimit, customerCreditBalance, customerTier,
+  activePayment, payNowAmount, onPayNowAmountChange,
+  onCouponChange, onStateChange, state,
 }: Props) {
   const tierPct = customerTier ? (TIER_PCT[customerTier.toLowerCase()] ?? 0) : state.tierDiscountPct;
   const tierAmt = calcTierDiscount(subtotal, customerTier);
   const creditAvailable = customerCreditLimit !== undefined && customerCreditBalance !== undefined
     ? Math.max(0, customerCreditLimit - customerCreditBalance)
     : undefined;
+  const hasCreditCustomer = (customerCreditLimit ?? 0) > 0;
 
   React.useEffect(() => {
     onStateChange({ tierDiscountPct: tierPct });
   }, [tierPct, onStateChange]);
 
-  const paidTotal = state.paymentLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+  const paidTotal = state.splitMode
+    ? state.paymentLines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0)
+    : (parseFloat(payNowAmount ?? "") || 0);
   const balance = Math.max(0, totalAmt - paidTotal);
+  const onCreditAmt = state.allowPartial && hasCreditCustomer ? balance : 0;
 
   const applyCoupon = async () => {
     const code = state.couponCode.trim();
@@ -152,6 +161,42 @@ export function PosPaymentPanel({
         </label>
       </div>
 
+      {state.allowPartial && hasCreditCustomer && !state.splitMode && (
+        <div className="rounded-xl border px-3 py-2 space-y-2" style={{ background: "rgba(79,110,247,0.08)", borderColor: "rgba(79,110,247,0.25)" }}>
+          <p className="text-[10px] font-semibold" style={{ color: "#93c5fd" }}>
+            Pay part now — balance goes on customer credit account
+          </p>
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Paying now (LKR)</label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={payNowAmount ?? ""}
+              onChange={(e) => onPayNowAmountChange?.(e.target.value)}
+              placeholder={`0 — full bill LKR ${formatNumber(totalAmt)}`}
+              className="h-9 text-sm text-white"
+              style={{ background: "#1a2b4a", borderColor: "#1e3356" }}
+            />
+          </div>
+          {paidTotal > 0 && paidTotal + 0.01 < totalAmt && (
+            <div className="flex justify-between text-xs pt-1 border-t" style={{ borderColor: "#1e3356" }}>
+              <span style={{ color: "#6a8ab8" }}>Pay now</span>
+              <span className="text-emerald-400 font-bold tabular-nums">LKR {formatNumber(paidTotal)}</span>
+            </div>
+          )}
+          {onCreditAmt > 0.01 && (
+            <div className="flex justify-between text-xs">
+              <span style={{ color: "#6a8ab8" }}>On credit (later)</span>
+              <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(onCreditAmt)}</span>
+            </div>
+          )}
+          {onCreditAmt > 0.01 && creditAvailable !== undefined && onCreditAmt > creditAvailable + 0.01 && (
+            <p className="text-[10px] text-red-400">Exceeds credit available (LKR {formatNumber(creditAvailable)})</p>
+          )}
+        </div>
+      )}
+
       {state.splitMode ? (
         <div className="space-y-1.5">
           {state.paymentLines.map((line, idx) => (
@@ -206,14 +251,19 @@ export function PosPaymentPanel({
             </div>
           )}
           {creditAvailable !== undefined && customerCreditLimit !== undefined && customerCreditLimit > 0 && (
-            <div className="flex items-center justify-between text-[10px]" style={{ color: "#6a8ab8" }}>
-              <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Credit available</span>
-              <span className={creditAvailable < totalAmt ? "text-amber-400" : "text-emerald-400"}>
-                LKR {formatNumber(creditAvailable)}
-                {customerCreditBalance !== undefined && customerCreditBalance > 0 && (
-                  <span className="text-[9px] ml-1 opacity-80">(owed {formatNumber(customerCreditBalance)})</span>
-                )}
-              </span>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px]" style={{ color: "#6a8ab8" }}>
+                <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Credit available</span>
+                <span className={creditAvailable < totalAmt ? "text-amber-400" : "text-emerald-400"}>
+                  LKR {formatNumber(creditAvailable)}
+                </span>
+              </div>
+              {customerCreditBalance !== undefined && customerCreditBalance > 0 && (
+                <div className="flex items-center justify-between text-[10px]" style={{ color: "#fbbf24" }}>
+                  <span>Outstanding owed</span>
+                  <span className="font-bold tabular-nums">LKR {formatNumber(customerCreditBalance)}</span>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -228,6 +278,7 @@ export function buildCheckoutPayments(
   numpad: string,
   totalAmt: number,
   chequeNumber?: string,
+  partialPayAmount?: string,
 ): { method: string; amount: number; reference?: string }[] {
   if (state.splitMode) {
     return state.paymentLines
@@ -239,6 +290,17 @@ export function buildCheckoutPayments(
           : {}),
       }))
       .filter((p) => p.amount > 0);
+  }
+  if (state.allowPartial) {
+    const raw = (partialPayAmount?.trim() || (activePayment === "CASH" ? numpad : "")).trim();
+    const payNow = parseFloat(raw);
+    if (!Number.isNaN(payNow) && payNow > 0 && payNow + 0.01 < totalAmt) {
+      const method = activePayment === "CUSTOMER_CREDIT" ? "CASH" : activePayment;
+      if (method === "CHEQUE") {
+        return [{ method: "CHEQUE", amount: payNow, reference: chequeNumber?.trim() || undefined }];
+      }
+      return [{ method, amount: payNow }];
+    }
   }
   const cashAmt = activePayment === "CASH" && numpad ? parseFloat(numpad) : totalAmt;
   const amount = cashAmt || totalAmt;

@@ -114,7 +114,14 @@ export class CustomersService {
           where: { isReturn: false },
           orderBy: { invoiceDate: 'desc' },
           take: 20,
-          include: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            invoiceDate: true,
+            total: true,
+            amountPaid: true,
+            paymentStatus: true,
+            status: true,
             _count: { select: { items: true } },
             items: {
               select: {
@@ -153,7 +160,19 @@ export class CustomersService {
       .sort((a, b) => b.qty - a.qty || b.spent - a.spent)
       .slice(0, 8);
 
-    return { ...customer, topProducts };
+    const outstandingSales = customer.sales
+      .filter((s) => s.paymentStatus === 'PENDING')
+      .map((s) => ({
+        ...s,
+        balanceDue: Math.max(0, Math.round((s.total - (s.amountPaid ?? 0)) * 100) / 100),
+      }));
+
+    return {
+      ...customer,
+      topProducts,
+      outstandingSales,
+      creditAvailable: Math.max(0, customer.creditLimit - customer.creditBalance),
+    };
   }
 
   async findByPhone(phone: string, tenantId: string) {
