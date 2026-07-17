@@ -10,7 +10,7 @@ import {
   calcPosTaxAmount,
   type PosLineInput,
 } from "@/lib/pos-totals";
-import { readPosTaxRate, writePosTaxRate } from "@/lib/pos-settings";
+import { readPosTaxRate, writePosTaxRate, readPosAllowNegativeStock } from "@/lib/pos-settings";
 
 export interface HeldBillData {
   items: CartItem[];
@@ -33,6 +33,8 @@ interface CartStore {
   notes: string;
   taxRate: number;
   activeHeldBillId: string | null;
+  /** When true, cart qty is not capped by on-hand stock (tenant POS setting). */
+  allowNegativeStock: boolean;
 
   addItem: (item: CartItem) => void;
   removeItem: (variantId: string) => void;
@@ -44,6 +46,7 @@ interface CartStore {
   setLoyaltyPoints: (points: number) => void;
   setNotes: (notes: string) => void;
   setTaxRate: (rate: number) => void;
+  setAllowNegativeStock: (allow: boolean) => void;
   setActiveHeldBillId: (id: string | null) => void;
   clearCart: () => void;
   loadFromHeldBill: (data: HeldBillData, heldBillId: string) => void;
@@ -69,13 +72,17 @@ export const useCartStore = create<CartStore>()(
       notes: "",
       taxRate: readPosTaxRate(),
       activeHeldBillId: null,
+      allowNegativeStock: readPosAllowNegativeStock(),
 
       addItem: (newItem) =>
         set((state) => {
           const qtyToAdd = Math.max(1, newItem.quantity || 1);
           const existing = state.items.find((i) => i.variantId === newItem.variantId);
           if (existing) {
-            const newQty = Math.min(existing.quantity + qtyToAdd, existing.stock);
+            const stacked = existing.quantity + qtyToAdd;
+            const newQty = state.allowNegativeStock
+              ? stacked
+              : Math.min(stacked, existing.stock);
             const perUnitFromNew =
               newItem.discountType === "fixed" && newItem.discountAmount > 0 && newItem.quantity > 0
                 ? newItem.discountAmount / newItem.quantity
@@ -99,10 +106,13 @@ export const useCartStore = create<CartStore>()(
               ),
             };
           }
+          const initialQty = state.allowNegativeStock
+            ? qtyToAdd
+            : Math.min(qtyToAdd, Math.max(1, newItem.stock || qtyToAdd));
           return {
             items: [
               ...state.items,
-              { ...newItem, quantity: Math.min(qtyToAdd, Math.max(1, newItem.stock || qtyToAdd)) },
+              { ...newItem, quantity: initialQty },
             ],
           };
         }),
@@ -119,7 +129,9 @@ export const useCartStore = create<CartStore>()(
               ? state.items.filter((i) => i.variantId !== variantId)
               : state.items.map((i) => {
                   if (i.variantId !== variantId) return i;
-                  const newQty = Math.min(quantity, i.stock);
+                  const newQty = state.allowNegativeStock
+                    ? quantity
+                    : Math.min(quantity, i.stock);
                   const perUnitDisc =
                     i.discountType === "fixed" && i.discountAmount > 0 && i.quantity > 0
                       ? i.discountAmount / i.quantity
@@ -151,6 +163,7 @@ export const useCartStore = create<CartStore>()(
           items: state.items.map((i) => ({ ...i, taxRate: rate })),
         }));
       },
+      setAllowNegativeStock: (allowNegativeStock) => set({ allowNegativeStock }),
       setActiveHeldBillId: (activeHeldBillId) => set({ activeHeldBillId }),
 
       clearCart: () =>

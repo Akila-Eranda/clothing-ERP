@@ -70,6 +70,7 @@ export interface PosKeyboardContext {
   showNewCust: boolean;
   inCheckout: boolean;
   searchRef: React.RefObject<HTMLInputElement | null>;
+  cartCustomerSearchRef?: React.RefObject<HTMLInputElement | null>;
   discountInputRef: React.RefObject<HTMLInputElement | null>;
   barcodeBuffer: React.MutableRefObject<string>;
   lastKeyTime: React.MutableRefObject<number>;
@@ -362,22 +363,26 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         }
       }
 
-      if (ctx.showCustomerSearch && (!inInput || isSearch)) {
-        if (e.key === "ArrowDown") {
-          e.preventDefault();
-          ctx.setFocusedCustomerIdx((i) => Math.min(Math.max(0, ctx.customerModalListLength - 1), i + 1));
-          return;
-        }
-        if (e.key === "ArrowUp") {
-          e.preventDefault();
-          ctx.setFocusedCustomerIdx((i) => Math.max(0, i - 1));
-          return;
-        }
-        if (e.key === "Enter" && ctx.focusedCustomerIdx >= 0) {
-          e.preventDefault();
-          const c = ctx.getCustomerModalItem(ctx.focusedCustomerIdx);
-          if (c) ctx.applyCustomer(c);
-          return;
+      if (ctx.showCustomerSearch) {
+        const inCartCustSearch = document.activeElement === ctx.cartCustomerSearchRef?.current;
+        const blockForNewForm = ctx.showNewCust && inInput && !inCartCustSearch;
+        if (!blockForNewForm) {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            ctx.setFocusedCustomerIdx((i) => Math.min(Math.max(0, ctx.customerModalListLength - 1), i + 1));
+            return;
+          }
+          if (e.key === "ArrowUp") {
+            e.preventDefault();
+            ctx.setFocusedCustomerIdx((i) => Math.max(0, i - 1));
+            return;
+          }
+          if (e.key === "Enter" && ctx.focusedCustomerIdx >= 0) {
+            e.preventDefault();
+            const c = ctx.getCustomerModalItem(ctx.focusedCustomerIdx);
+            if (c) ctx.applyCustomer(c);
+            return;
+          }
         }
       }
 

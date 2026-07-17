@@ -241,13 +241,6 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
       toast.error("Check quantities and costs");
       return;
     }
-    if (showExpiry) {
-      const missingExp = items.find((i) => !i.expiryDate.trim());
-      if (missingExp) {
-        toast.error(`Expiry date required for ${missingExp.productName}`);
-        return;
-      }
-    }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
       const ok = window.confirm(
@@ -466,7 +459,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                         <th className="px-3 py-2 text-right font-semibold w-24">Qty</th>
                         <th className="px-3 py-2 text-right font-semibold w-28">Unit Cost</th>
                         {showExpiry && (
-                          <th className="px-3 py-2 text-left font-semibold w-36">Expiry *</th>
+                          <th className="px-3 py-2 text-left font-semibold w-36">Expiry</th>
                         )}
                         {showBatch && (
                           <th className="px-3 py-2 text-left font-semibold w-28">Batch</th>
@@ -517,10 +510,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                                 type="date"
                                 value={item.expiryDate}
                                 onChange={(e) => updateLine(idx, "expiryDate", e.target.value)}
-                                className={`w-36 text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring ${
-                                  !item.expiryDate ? "border-destructive/60" : ""
-                                }`}
-                                required
+                                className="w-36 text-sm border rounded-lg px-2 py-1.5 bg-background focus:outline-none focus:ring-2 focus:ring-ring"
                               />
                             </td>
                           )}
@@ -570,7 +560,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
 
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {showExpiry
-                ? "Expiry date is required on every line. Stock posts to inventory lots for FEFO. "
+                ? "Expiry date is optional. When set, stock posts to inventory lots for FEFO. "
                 : ""}
               To receive against a PO, open it and use{" "}
               <span className="font-medium text-foreground">Receive Items</span>.

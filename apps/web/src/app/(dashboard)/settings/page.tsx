@@ -376,6 +376,14 @@ export default function SettingsPage() {
   const [logoUploading, setLogoUploading] = React.useState(false);
   const logoInputRef = React.useRef<HTMLInputElement>(null);
 
+  const [posForm, setPosForm] = React.useState({
+    allowNegativeStock: false,
+    autoPrint: false,
+    roundOff: true,
+    loyalty: true,
+  });
+  const [posSaving, setPosSaving] = React.useState(false);
+
   const [branches, setBranches] = React.useState<Branch[]>([]);
   const [branchesLoading, setBranchesLoading] = React.useState(false);
   const [branchModal, setBranchModal] = React.useState<{ open: boolean; editing: Branch | null }>({ open: false, editing: null });
@@ -399,8 +407,43 @@ export default function SettingsPage() {
       setReceiptForm({ ...RECEIPT_DEFAULTS, ...r.data });
     }).catch(() => toast.error("Failed to load receipt settings"));
 
+    api.get<{
+      allowNegativeStock?: boolean;
+      autoPrint?: boolean;
+      roundOff?: boolean;
+      loyalty?: boolean;
+    }>("/tenants/pos-settings").then((r) => {
+      setPosForm({
+        allowNegativeStock: Boolean(r.data?.allowNegativeStock),
+        autoPrint: Boolean(r.data?.autoPrint),
+        roundOff: r.data?.roundOff !== false,
+        loyalty: r.data?.loyalty !== false,
+      });
+    }).catch(() => { /* optional */ });
+
     loadBranches();
   }, []);
+
+  async function savePosSettings() {
+    setPosSaving(true);
+    try {
+      const r = await api.put<typeof posForm>("/tenants/pos-settings", posForm);
+      setPosForm({
+        allowNegativeStock: Boolean(r.data?.allowNegativeStock),
+        autoPrint: Boolean(r.data?.autoPrint),
+        roundOff: r.data?.roundOff !== false,
+        loyalty: r.data?.loyalty !== false,
+      });
+      try {
+        localStorage.setItem("pos_allow_negative_stock", posForm.allowNegativeStock ? "1" : "0");
+      } catch { /* noop */ }
+      toast.success("POS settings saved");
+    } catch {
+      toast.error("Failed to save POS settings");
+    } finally {
+      setPosSaving(false);
+    }
+  }
 
   async function saveReceipt() {
     setReceiptSaving(true);
@@ -608,19 +651,26 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {[
-                { key: "autoPrint", label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout", default: false },
-                { key: "roundOff", label: "Round off totals", desc: "Round total amount to nearest unit", default: true },
-                { key: "negativeStock", label: "Allow negative stock", desc: "Enable sales even when stock is 0", default: false },
-                ...(showLoyalty ? [{ key: "loyalty", label: "Loyalty points on every sale", desc: "Auto-apply loyalty program", default: true }] : []),
+                { key: "autoPrint" as const, label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout" },
+                { key: "roundOff" as const, label: "Round off totals", desc: "Round total amount to nearest unit" },
+                { key: "allowNegativeStock" as const, label: "Allow negative stock", desc: "Enable sales even when stock is 0 (inventory can go minus)" },
+                ...(showLoyalty ? [{ key: "loyalty" as const, label: "Loyalty points on every sale", desc: "Auto-apply loyalty program" }] : []),
               ].map((s) => (
                 <div key={s.key} className="flex items-center justify-between py-0.5">
                   <div>
                     <p className="text-sm font-medium">{s.label}</p>
                     <p className="text-xs text-muted-foreground">{s.desc}</p>
                   </div>
-                  <Switch defaultChecked={s.default} />
+                  <Switch
+                    checked={posForm[s.key]}
+                    onCheckedChange={(v) => setPosForm((f) => ({ ...f, [s.key]: v }))}
+                  />
                 </div>
               ))}
+              <Button variant="gradient" size="sm" onClick={() => void savePosSettings()} disabled={posSaving}>
+                {posSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
+                Save POS Settings
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>

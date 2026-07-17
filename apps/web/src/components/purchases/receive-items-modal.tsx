@@ -78,14 +78,6 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     const hasAny = rows.some((r) => r.receivedQty > 0 || r.rejectedQty > 0);
     if (!hasAny) { toast.error("Enter at least one received quantity"); return; }
 
-    if (showExpiry) {
-      const missing = rows.find((r) => r.receivedQty > 0 && !r.expiryDate.trim());
-      if (missing) {
-        toast.error("Expiry date is required for every product you receive");
-        return;
-      }
-    }
-
     setLoading(true);
     try {
       await api.post(`/purchases/${po.id}/receive`, {
@@ -126,7 +118,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
   const headers = ["Product / SKU", "Ordered", "Already", "Receive", "Reject"];
   if (showBatch) headers.push("Batch");
-  if (showExpiry) headers.push("MFD", "Expiry *");
+  if (showExpiry) headers.push("MFD", "Expiry");
   else if (showBatch) headers.push("MFD");
 
   return (
@@ -172,8 +164,6 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                 {(po.items ?? []).map((item, idx) => {
                   const remaining = item.orderedQty - item.receivedQty;
                   const fullyReceived = remaining <= 0;
-                  const needsExpiry =
-                    showExpiry && (rows[idx]?.receivedQty ?? 0) > 0 && !rows[idx]?.expiryDate;
                   return (
                     <tr key={item.id} className={`border-t ${fullyReceived ? "opacity-50" : ""}`}>
                       <td className="px-3 py-2.5">
@@ -235,9 +225,8 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                             type="date"
                             value={rows[idx]?.expiryDate ?? ""}
                             disabled={fullyReceived}
-                            className={`h-7 text-xs px-2 w-36 ${needsExpiry ? "border-destructive ring-1 ring-destructive/40" : ""}`}
+                            className="h-7 text-xs px-2 w-36"
                             onChange={(e) => update(idx, "expiryDate", e.target.value)}
-                            required
                           />
                         </td>
                       )}
@@ -251,7 +240,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           {showExpiry && (
             <div className="mt-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
               <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              Expiry is mandatory on every received product. Stock is posted to inventory lots and POS sells by FEFO (earliest expiry first).
+              Expiry is optional. When set, stock posts to inventory lots and POS can sell by FEFO (earliest expiry first).
             </div>
           )}
         </div>

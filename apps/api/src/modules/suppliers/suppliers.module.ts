@@ -72,7 +72,6 @@ export class ReceiveItemDto {
   @ApiProperty() @IsInt() @Min(0) receivedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) rejectedQty?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
-  /** Required when receivedQty > 0 (enforced in GRN post). */
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }
@@ -889,7 +888,7 @@ export class QuickGrnLineDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiProperty() @IsInt() @Min(1) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
-  @ApiProperty() @IsString() expiryDate: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }

@@ -4,6 +4,7 @@ export const POS_TAX_RATE_KEY = "pos_tax_rate";
 export const POS_TOUCH_MODE_KEY = "pos_touch_mode";
 export const POS_SOUND_ALERTS_KEY = "pos_sound_alerts";
 export const POS_QTY_POPUP_KEY = "pos_qty_popup";
+export const POS_ALLOW_NEGATIVE_STOCK_KEY = "pos_allow_negative_stock";
 
 function readBool(key: string, fallback = false): boolean {
   if (typeof window === "undefined") return fallback;
@@ -59,3 +60,18 @@ export function readPosQtyPopup(): boolean {
 export function writePosQtyPopup(on: boolean): boolean {
   return writeBool(POS_QTY_POPUP_KEY, on);
 }
+
+export function readPosAllowNegativeStock(): boolean {
+  return readBool(POS_ALLOW_NEGATIVE_STOCK_KEY, false);
+}
+
+export function writePosAllowNegativeStock(on: boolean): boolean {
+  return writeBool(POS_ALLOW_NEGATIVE_STOCK_KEY, on);
+}
+
+export type PosTenantSettings = {
+  allowNegativeStock: boolean;
+  autoPrint: boolean;
+  roundOff: boolean;
+  loyalty: boolean;
+};

@@ -109,15 +109,29 @@ export class InventoryService {
     return normalizeBlockExpired(settings.posBlockExpired ?? settings.blockExpiredLots);
   }
 
+  /** Allow selling below zero stock — tenant.settings.pos.allowNegativeStock (default OFF). */
+  private async resolveAllowNegativeStock(tenantId: string): Promise<boolean> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { settings: true },
+    });
+    const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+    const pos = (settings.pos as Record<string, unknown>) ?? {};
+    const v = pos.allowNegativeStock ?? settings.allowNegativeStock ?? settings.negativeStock;
+    return v === true;
+  }
+
   private async resolveTenantLotSettings(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { settings: true },
     });
     const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
+    const pos = (settings.pos as Record<string, unknown>) ?? {};
     return {
       strategy: normalizeLotStrategy(settings.lotAllocation ?? settings.inventoryLotStrategy),
       blockExpired: normalizeBlockExpired(settings.posBlockExpired ?? settings.blockExpiredLots),
+      allowNegativeStock: (pos.allowNegativeStock ?? settings.allowNegativeStock ?? settings.negativeStock) === true,
     };
   }
 
@@ -335,6 +349,9 @@ export class InventoryService {
     tx?: Prisma.TransactionClient,
   ) {
     const client = tx ?? this.prisma;
+    const allowNegative = await this.resolveAllowNegativeStock(tenantId);
+    if (allowNegative) return;
+
     const blockExpired = await this.resolveBlockExpired(tenantId);
     const warehouseId = await this.resolveWarehouseId(tenantId, branchId);
     const heldByVariant = new Map<string, number>();
@@ -411,7 +428,7 @@ export class InventoryService {
     tx?: Prisma.TransactionClient,
   ) {
     const effectiveBranch = branchId || await this.resolveBranchId(tenantId, branchId);
-    const { strategy, blockExpired: tenantBlockExpired } = await this.resolveTenantLotSettings(tenantId);
+    const { strategy, blockExpired: tenantBlockExpired, allowNegativeStock } = await this.resolveTenantLotSettings(tenantId);
     const warehouseId = await this.resolveWarehouseId(tenantId, effectiveBranch, dto.warehouseId);
 
     const execute = async (client: Prisma.TransactionClient) => {
@@ -455,17 +472,21 @@ export class InventoryService {
         newQty = currentQty + qty;
       }
 
+      const allowNegSale =
+        allowNegativeStock && dto.movementType === StockMovementType.SALE;
+
       if (
         deductionTypes.includes(dto.movementType)
         && dto.movementType !== StockMovementType.ADJUSTMENT
         && newQty < 0
+        && !allowNegSale
       ) {
         throw new BadRequestException(
           `Insufficient stock: ${currentQty} on hand, ${qty} requested for ${dto.movementType}`,
         );
       }
 
-      const finalQty = Math.max(0, newQty);
+      const finalQty = allowNegSale ? newQty : Math.max(0, newQty);
       const expiry = dto.expiryDate ? new Date(dto.expiryDate) : null;
       const manufacture = dto.manufactureDate ? new Date(dto.manufactureDate) : null;
 

@@ -3,7 +3,7 @@ import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, ConflictException, ForbiddenException, BadRequestException, ServiceUnavailableException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsEmail, MinLength, IsEnum, IsNumber, IsArray, IsBoolean } from 'class-validator';
 import {
   DEFAULT_SUBSCRIPTION_PLANS,
   PLATFORM_CONFIG_SUBDOMAIN,
@@ -60,6 +60,13 @@ export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() printMode?: string;
   @ApiPropertyOptional() @IsOptional() autoPrintAfterSale?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() printerName?: string;
+}
+
+export class PosSettingsDto {
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() allowNegativeStock?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() autoPrint?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() roundOff?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() loyalty?: boolean;
 }
 
 export class PayslipSettingsDto {
@@ -1212,6 +1219,44 @@ export class TenantsService {
     });
     return this.getReceiptSettings(tenantId);
   }
+
+  async getPosSettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const s = (tenant.settings as Record<string, unknown>) ?? {};
+    const pos = (s['pos'] as Record<string, unknown>) ?? {};
+    const bool = (v: unknown, fallback: boolean) =>
+      typeof v === 'boolean' ? v : fallback;
+    return {
+      allowNegativeStock: bool(pos['allowNegativeStock'] ?? s['allowNegativeStock'] ?? s['negativeStock'], false),
+      autoPrint: bool(pos['autoPrint'] ?? s['autoPrint'], false),
+      roundOff: bool(pos['roundOff'] ?? s['roundOff'], true),
+      loyalty: bool(pos['loyalty'] ?? s['loyalty'], true),
+    };
+  }
+
+  async savePosSettings(tenantId: string, dto: PosSettingsDto) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { settings: true } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
+    const existing = (tenant.settings as Record<string, unknown>) ?? {};
+    const current = (existing['pos'] as Record<string, unknown>) ?? {};
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        settings: {
+          ...existing,
+          pos: {
+            ...current,
+            ...(dto.allowNegativeStock !== undefined ? { allowNegativeStock: dto.allowNegativeStock } : {}),
+            ...(dto.autoPrint !== undefined ? { autoPrint: dto.autoPrint } : {}),
+            ...(dto.roundOff !== undefined ? { roundOff: dto.roundOff } : {}),
+            ...(dto.loyalty !== undefined ? { loyalty: dto.loyalty } : {}),
+          },
+        },
+      },
+    });
+    return this.getPosSettings(tenantId);
+  }
 }
 
 @ApiTags('Tenants')
@@ -1281,6 +1326,21 @@ export class TenantsController {
   @ApiOperation({ summary: 'Save receipt/thermal print settings' })
   saveReceiptSettings(@CurrentUser() user: IAuthUser, @Body() dto: ReceiptSettingsDto) {
     return this.tenantsService.saveReceiptSettings(user.tenantId, dto);
+  }
+
+  @Get('pos-settings')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get POS configuration (negative stock, print, etc.)' })
+  getPosSettings(@CurrentUser() user: IAuthUser) {
+    return this.tenantsService.getPosSettings(user.tenantId);
+  }
+
+  @Put('pos-settings')
+  @ApiBearerAuth('access-token')
+  @Roles(RoleType.TENANT_ADMIN, RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Save POS configuration' })
+  savePosSettings(@CurrentUser() user: IAuthUser, @Body() dto: PosSettingsDto) {
+    return this.tenantsService.savePosSettings(user.tenantId, dto);
   }
 
   @Get('payslip-settings')

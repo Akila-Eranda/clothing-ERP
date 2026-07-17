@@ -157,7 +157,6 @@ export default function ProcurementHubPage() {
     const qty = parseInt(qgQty, 10);
     const cost = parseFloat(qgCost);
     if (!qty || qty < 1 || isNaN(cost)) { toast.error("Enter valid qty and cost"); return; }
-    if (showExpiry && !qgExpiry.trim()) { toast.error("Expiry date is required"); return; }
     setQgBusy(true);
     try {
       const res = await api.post<{ grnNumber: string }>("/procurement/grn/quick", {
@@ -629,7 +628,7 @@ export default function ProcurementHubPage() {
                 </div>
                 {showExpiry && (
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold">Expiry Date <span className="text-destructive">*</span></label>
+                    <label className="text-xs font-semibold">Expiry Date</label>
                     <Input type="date" value={qgExpiry} onChange={(e) => setQgExpiry(e.target.value)} className="h-9" />
                   </div>
                 )}
