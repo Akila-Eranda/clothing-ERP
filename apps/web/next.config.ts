@@ -5,6 +5,9 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Nginx handles compression in production. Leaving Next's built-in
+  // compression on caused streamed app responses to hang behind the proxy.
+  compress: false,
   typescript: { ignoreBuildErrors: true },
   eslint: { ignoreDuringBuilds: true },
   images: {
