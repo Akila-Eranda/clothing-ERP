@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getWorkspace } from "@/lib/shop-workspace";
 import { useAuthStore } from "@/stores/auth-store";
+import { useRouter } from "next/navigation";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface DailySummary {
@@ -110,9 +111,9 @@ function formatLongDate(d = new Date()) {
 }
 
 const insightColors: Record<string, string> = {
-  opportunity: "text-emerald-800 bg-emerald-50 border-emerald-100",
-  alert: "text-amber-800 bg-amber-50 border-amber-100",
-  action: "text-blue-800 bg-blue-50 border-blue-100",
+  opportunity: "text-emerald-800 bg-emerald-50 border border-emerald-200",
+  alert: "text-amber-800 bg-amber-50 border border-amber-200",
+  action: "text-blue-800 bg-blue-50 border border-blue-200",
 };
 const insightIcons: Record<string, React.ElementType> = {
   opportunity: TrendingUp,
@@ -130,6 +131,7 @@ export default function DashboardPage() {
   const shopProfile = useShopProfile();
   const workspace = getWorkspace(shopProfile.type);
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
   const [period, setPeriod] = React.useState<"7d" | "30d" | "90d">("30d");
   const [loading, setLoading] = React.useState(true);
   const [summary, setSummary] = React.useState<DailySummary | null>(null);
@@ -255,7 +257,8 @@ export default function DashboardPage() {
       subTone: "text-emerald-600",
       icon: DollarSign,
       color: "text-emerald-600",
-      bg: "bg-emerald-50",
+      bg: "bg-emerald-50 border border-emerald-200",
+      href: "/sales",
     },
     {
       title: "Today's Orders",
@@ -264,7 +267,8 @@ export default function DashboardPage() {
       subTone: "text-muted-foreground",
       icon: ShoppingCart,
       color: "text-blue-600",
-      bg: "bg-blue-50",
+      bg: "bg-blue-50 border border-blue-200",
+      href: "/sales",
     },
     {
       title: `Total ${workspace.customerLabel}`,
@@ -273,7 +277,8 @@ export default function DashboardPage() {
       subTone: "text-muted-foreground",
       icon: Users,
       color: "text-violet-600",
-      bg: "bg-violet-50",
+      bg: "bg-violet-50 border border-violet-200",
+      href: "/customers",
     },
     {
       title: "Low Stock Alerts",
@@ -282,7 +287,8 @@ export default function DashboardPage() {
       subTone: lowStock.length > 0 ? "text-amber-600" : "text-emerald-600",
       icon: Package,
       color: "text-amber-600",
-      bg: "bg-amber-50",
+      bg: "bg-amber-50 border border-amber-200",
+      href: "/inventory",
     },
     {
       title: "Cash in Drawer",
@@ -291,7 +297,8 @@ export default function DashboardPage() {
       subTone: "text-muted-foreground",
       icon: Wallet,
       color: "text-sky-600",
-      bg: "bg-sky-50",
+      bg: "bg-sky-50 border border-sky-200",
+      href: "/cash",
     },
   ];
 
@@ -309,11 +316,11 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-xs font-semibold text-emerald-700 border border-emerald-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live Data
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-card text-xs font-medium text-muted-foreground ring-1 ring-slate-900/[0.05] ">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-card text-xs font-medium text-muted-foreground border border-border ">
             <CalendarDays className="h-3.5 w-3.5" />
             {formatLongDate()}
           </div>
@@ -325,7 +332,19 @@ export default function DashboardPage() {
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="card-hover">
+            <Card
+              key={stat.title}
+              className="card-hover cursor-pointer"
+              role="link"
+              tabIndex={0}
+              onClick={() => router.push(stat.href)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  router.push(stat.href);
+                }
+              }}
+            >
               <CardContent className="p-5 flex items-center gap-3.5">
                 <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${stat.bg}`}>
                   <Icon className={`h-5 w-5 ${stat.color}`} />
@@ -411,7 +430,12 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground py-6 text-center">No sales data yet</p>
             ) : (
               topProducts.slice(0, 5).map((p, i) => (
-                <div key={p.variantId} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <button
+                  key={p.variantId}
+                  type="button"
+                  onClick={() => router.push("/products")}
+                  className="w-full flex items-center gap-3 py-3 first:pt-0 last:pb-0 text-left hover:bg-muted/50 transition-colors rounded-lg px-1 -mx-1"
+                >
                   <span className="text-[11px] font-bold text-primary w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                     {i + 1}
                   </span>
@@ -423,7 +447,7 @@ export default function DashboardPage() {
                     <p className="text-sm font-bold tabular-nums">LKR {formatNumber(p._sum.total ?? 0)}</p>
                     <p className="text-[11px] text-muted-foreground">{p._sum.quantity ?? 0} units</p>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </CardContent>
@@ -449,7 +473,12 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground py-6 text-center">No recent sales</p>
             ) : (
               recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                <button
+                  key={sale.id}
+                  type="button"
+                  onClick={() => router.push("/sales")}
+                  className="w-full flex items-center gap-3 py-3 first:pt-0 last:pb-0 text-left hover:bg-muted/50 transition-colors rounded-lg px-1 -mx-1"
+                >
                   <Avatar className="h-9 w-9 shrink-0">
                     <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
                       {getInitials(sale.customer?.name ?? "Walk-in")}
@@ -482,7 +511,7 @@ export default function DashboardPage() {
                       {sale.status}
                     </Badge>
                   </div>
-                </div>
+                </button>
               ))
             )}
           </CardContent>

@@ -22,6 +22,7 @@ import { formatNumber } from "@/lib/utils";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
 import { ModuleGate } from "@/components/shop/module-gate";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 type ReasonOption = { value: string; label: string };
 
@@ -776,7 +777,13 @@ export default function ReturnsPage() {
             <span className={`inline-flex items-center justify-center h-5 w-5 rounded-md text-[9px] font-bold ${isExchange ? "bg-violet-500/10 text-violet-600" : "bg-primary/10 text-primary"}`}>
               {isExchange ? "EX" : "RT"}
             </span>
-            <span className="font-mono text-xs font-medium">{row.original.returnNumber}</span>
+            <OpenRecordButton
+              onClick={() => setDetailRecord(row.original)}
+              className="font-mono text-xs"
+              title="View details"
+            >
+              {row.original.returnNumber}
+            </OpenRecordButton>
           </div>
         );
       },
@@ -858,7 +865,6 @@ export default function ReturnsPage() {
         const s = row.original.status;
         const isExchange = row.original.returnType === "EXCHANGE";
         const moreActions = [
-          { text: "View Details", function: () => setDetailRecord(row.original) },
           { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printBill(row.original, reasons) },
         ];
         if (s === "INITIATED") {
@@ -872,7 +878,12 @@ export default function ReturnsPage() {
             moreActions.push({ text: "Process Refund", function: () => updateStatus(row.original.id, "REFUND_PROCESSED", "Refund Processed") });
           }
         }
-        return <TableActionsRow dropMoreActions={moreActions} />;
+        return (
+          <TableActionsRow
+            showAction={{ action: () => setDetailRecord(row.original), tooltip: "View Details" }}
+            dropMoreActions={moreActions}
+          />
+        );
       },
     },
   ];

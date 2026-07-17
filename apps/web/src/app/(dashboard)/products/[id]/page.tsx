@@ -170,7 +170,7 @@ export default function ProductDetailPage() {
         <div className="space-y-5">
 
           {/* Hero card */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6 ">
+          <div className="panel-edge p-6 ">
             <div className="flex gap-6 items-start flex-wrap">
 
               {/* Image */}
@@ -272,7 +272,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Variants table */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05]  overflow-hidden">
+          <div className="panel-edge  overflow-hidden">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h2 className="font-semibold text-base">Variants
                 <span className="ml-2 text-xs font-normal text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{product.variants.length}</span>
@@ -334,7 +334,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Inventory by branch */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05]  overflow-hidden">
+          <div className="panel-edge  overflow-hidden">
             <div className="px-6 py-4 border-b flex items-center gap-2">
               <Warehouse className="h-4 w-4 text-muted-foreground" />
               <h2 className="font-semibold text-base">Inventory by Branch</h2>
@@ -379,7 +379,7 @@ export default function ProductDetailPage() {
         <div className="space-y-4 lg:sticky lg:top-6">
 
           {/* Pricing */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-0">
+          <div className="panel-edge p-5  space-y-0">
             <h3 className="font-semibold text-sm border-b pb-3 mb-1">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h3>
             <InfoRow label="Cost Price"    value={`LKR ${fmt(product.costPrice)}`} />
             <InfoRow label="Selling Price" value={<span className="text-blue-600 dark:text-blue-400 font-bold">LKR {fmt(product.sellingPrice)}</span>} />
@@ -404,7 +404,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Details */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-0">
+          <div className="panel-edge p-5  space-y-0">
             <h3 className="font-semibold text-sm border-b pb-3 mb-1">Product Details</h3>
             <InfoRow label="SKU"       value={<span className="font-mono">{product.sku}</span>} />
             {product.barcode && <InfoRow label="Barcode" value={<span className="font-mono">{product.barcode}</span>} />}
@@ -415,7 +415,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Status */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <h3 className="font-semibold text-sm border-b pb-2">Status & Flags</h3>
             {[
               { label: "Status",          value: product.status,       ok: product.status === "ACTIVE" },
@@ -431,7 +431,7 @@ export default function ProductDetailPage() {
           </div>
 
           {/* Actions */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-2">
+          <div className="panel-edge p-5  space-y-2">
             <Button className="w-full gap-2" onClick={() => router.push(`/products/${product.id}/edit`)}>
               <Edit2 className="h-4 w-4" /> Edit Product
             </Button>

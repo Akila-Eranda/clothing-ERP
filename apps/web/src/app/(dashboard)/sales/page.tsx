@@ -17,6 +17,7 @@ import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
@@ -415,7 +416,15 @@ export default function SalesPage() {
     {
       accessorKey: "invoiceNumber",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice" />,
-      cell: ({ row }) => <span className="font-mono text-xs font-medium text-primary">{row.original.invoiceNumber}</span>,
+      cell: ({ row }) => (
+        <OpenRecordButton
+          onClick={() => setViewId(row.original.id)}
+          className="font-mono text-xs"
+          title="View sale"
+        >
+          {row.original.invoiceNumber}
+        </OpenRecordButton>
+      ),
     },
     {
       id: "customer",
@@ -467,10 +476,11 @@ export default function SalesPage() {
       id: "actions",
       cell: ({ row }) => (
         <TableActionsRow
-          showAction={{ action: () => setViewId(row.original.id) }}
+          showAction={{ action: () => setViewId(row.original.id), tooltip: "View Details" }}
           dropMoreActions={[
-            { text: "View Details", function: () => setViewId(row.original.id) },
-            ...(row.original.status !== "REFUNDED" ? [{ text: "Process Return / Exchange", function: () => router.push(`/returns?invoice=${row.original.invoiceNumber}`) }] : []),
+            ...(row.original.status !== "REFUNDED"
+              ? [{ text: "Process Return / Exchange", function: () => router.push(`/returns?invoice=${row.original.invoiceNumber}`) }]
+              : []),
           ]}
         />
       ),

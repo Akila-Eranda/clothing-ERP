@@ -9,6 +9,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { TableActionsRow } from "@/components/table/table-actions-row";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { ModuleGate } from "@/components/shop/module-gate";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -77,7 +78,9 @@ function buildColumns(
               </div>
             )}
             <div>
-              <p className="text-sm font-semibold">{b.name}</p>
+              <OpenRecordButton onClick={() => onEdit(b)} className="text-sm" title="Edit brand">
+                {b.name}
+              </OpenRecordButton>
               <p className="text-[10px] text-muted-foreground font-mono">/{b.slug}</p>
             </div>
           </div>

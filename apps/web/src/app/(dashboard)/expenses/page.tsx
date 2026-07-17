@@ -14,6 +14,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { TableActionsRow } from "@/components/table/table-actions-row";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -154,7 +155,11 @@ export default function ExpensesPage() {
   // ── Table columns ──────────────────────────────────────────────────────────
   const columns: ColumnDef<Expense>[] = [
     { accessorKey: "reference",    header: ({ column }) => <DataTableColumnHeader column={column} title="Ref" />,         cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.reference ?? "—"}</span> },
-    { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="font-medium text-sm text-foreground">{row.original.description}</span> },
+    { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => (
+      <OpenRecordButton onClick={() => setEditItem(row.original)} className="text-sm" title="Edit expense">
+        {row.original.description}
+      </OpenRecordButton>
+    ) },
     { accessorKey: "categoryId",   header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,    cell: ({ row }) => {
       const cat = row.original.categoryId;
       const idx = catData.findIndex((c) => c.name === cat);
@@ -166,7 +171,10 @@ export default function ExpensesPage() {
     { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,     cell: ({ row }) => <span className="text-xs text-muted-foreground capitalize">{row.original.paymentMethod?.replace(/_/g, " ") ?? "—"}</span> },
     { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}</span> },
     { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,     cell: ({ row }) => <span className="font-bold text-red-500">LKR {formatNumber(row.original.amount)}</span> },
-    { id: "actions", cell: ({ row }) => <TableActionsRow dropMoreActions={[{ text: "Edit", function: () => setEditItem(row.original) }, { text: "Delete", function: () => deleteExpense(row.original.id) }]} /> },
+    { id: "actions", cell: ({ row }) => <TableActionsRow
+      editAction={{ action: () => setEditItem(row.original) }}
+      deleteAction={{ action: () => deleteExpense(row.original.id) }}
+    /> },
   ];
 
   return (
@@ -196,7 +204,7 @@ export default function ExpensesPage() {
       <div className="px-6 py-6 space-y-6">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
-        <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  ring-1 ring-slate-900/[0.05]">
+        <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setRange({ start: p.start, end: p.end })}
               className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-background text-muted-foreground hover:bg-muted border"}`}>

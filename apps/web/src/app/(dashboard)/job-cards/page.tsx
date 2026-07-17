@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { ModuleGate } from "@/components/shop/module-gate";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -94,7 +95,9 @@ function buildColumns(
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <ClipboardList className="h-4 w-4 text-primary" />
           </div>
-          <span className="font-mono text-xs font-semibold">{row.original.jobNumber}</span>
+          <OpenRecordButton onClick={() => onView(row.original)} className="font-mono text-xs" title="View job">
+            {row.original.jobNumber}
+          </OpenRecordButton>
         </div>
       ),
     },

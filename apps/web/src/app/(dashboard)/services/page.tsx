@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { ModuleGate } from "@/components/shop/module-gate";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -126,7 +127,9 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
           <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
             <Wrench className="h-4 w-4 text-primary" />
           </div>
-          <span className="font-mono text-xs font-semibold">{row.original.code}</span>
+          <OpenRecordButton onClick={() => onView(row.original)} className="font-mono text-xs" title="View service">
+            {row.original.code}
+          </OpenRecordButton>
         </div>
       ),
     },
@@ -135,7 +138,9 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
       header: ({ column }) => <DataTableColumnHeader column={column} title="Service" />,
       cell: ({ row }) => (
         <div>
-          <p className="text-sm font-medium">{row.original.name}</p>
+          <OpenRecordButton onClick={() => onView(row.original)} className="text-sm" title="View service">
+            {row.original.name}
+          </OpenRecordButton>
           {row.original.description && (
             <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{row.original.description}</p>
           )}

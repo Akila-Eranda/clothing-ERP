@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -60,13 +61,13 @@ export default function GrnPage() {
         accessorKey: "grnNumber",
         header: ({ column }) => <DataTableColumnHeader column={column} title="GRN #" />,
         cell: ({ row }) => (
-          <button
-            type="button"
+          <OpenRecordButton
             onClick={() => setViewId(row.original.id)}
-            className="font-mono text-xs font-semibold text-emerald-700 hover:underline"
+            className="font-mono text-xs"
+            title="View GRN"
           >
             {row.original.grnNumber}
-          </button>
+          </OpenRecordButton>
         ),
       },
       {

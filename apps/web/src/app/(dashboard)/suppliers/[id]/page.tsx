@@ -88,7 +88,7 @@ const PO_STATUS: Record<POStatus, { label: string; variant: "success" | "seconda
 
 function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex justify-between items-center py-2.5 border-b border-[#E8EDF5] last:border-0 text-sm">
+    <div className="flex justify-between items-center py-2.5 border-b border-border last:border-0 text-sm">
       <span className="text-muted-foreground font-normal">{label}</span>
       <span className="font-medium text-right text-foreground">{value}</span>
     </div>
@@ -496,7 +496,7 @@ export default function SupplierDetailPage() {
                       {supplier.isActive ? "Active" : "Inactive"}
                     </Badge>
                     {supplier.code && (
-                      <span className="text-xs text-muted-foreground font-mono bg-[#FAFBFC] border border-[#E8EDF5] px-2 py-0.5 rounded-[10px]">{supplier.code}</span>
+                      <span className="text-xs text-muted-foreground font-mono bg-muted/40 border border-border px-2 py-0.5 rounded-[10px]">{supplier.code}</span>
                     )}
                   </div>
                   {supplier.contactPerson && (
@@ -516,7 +516,7 @@ export default function SupplierDetailPage() {
               </div>
             </div>
 
-            <div className="mt-5 flex flex-wrap gap-4 text-sm text-muted-foreground border-t border-[#E8EDF5] pt-4">
+            <div className="mt-5 flex flex-wrap gap-4 text-sm text-muted-foreground border-t border-border pt-4">
               <div className="flex items-center gap-1.5">
                 <Phone className="h-3.5 w-3.5 shrink-0" />
                 <span className="font-mono font-medium text-foreground">{supplier.phone}</span>
@@ -535,7 +535,7 @@ export default function SupplierDetailPage() {
               )}
               {supplier.gstNumber && (
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-mono bg-[#FAFBFC] border border-[#E8EDF5] px-2 py-0.5 rounded-[10px]">GST: {supplier.gstNumber}</span>
+                  <span className="text-xs font-mono bg-muted/40 border border-border px-2 py-0.5 rounded-[10px]">GST: {supplier.gstNumber}</span>
                 </div>
               )}
             </div>
@@ -545,7 +545,7 @@ export default function SupplierDetailPage() {
             )}
 
             {supplier.notes && (
-              <p className="mt-4 text-sm italic text-muted-foreground border-t border-[#E8EDF5] pt-4 leading-relaxed">{supplier.notes}</p>
+              <p className="mt-4 text-sm italic text-muted-foreground border-t border-border pt-4 leading-relaxed">{supplier.notes}</p>
             )}
           </div>
 
@@ -568,7 +568,7 @@ export default function SupplierDetailPage() {
 
           {/* Recent Purchase Orders */}
           <div className="bg-card dark:bg-background rounded-xl  overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#E8EDF5] flex items-center justify-between gap-3">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between gap-3">
               <h3 className="font-bold text-sm tracking-tight">Recent Purchase Orders</h3>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1"
                 onClick={() => router.push(`/purchases?supplier=${id}`)}>
@@ -580,7 +580,7 @@ export default function SupplierDetailPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm enterprise-table">
-                  <thead className="bg-[#FAFBFC] border-b border-[#E8EDF5] text-xs uppercase tracking-wide text-muted-foreground">
+                  <thead className="bg-muted/40 border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-5 py-3.5 text-left font-semibold">PO #</th>
                       <th className="px-5 py-3.5 text-left font-semibold">Status</th>
@@ -594,7 +594,7 @@ export default function SupplierDetailPage() {
                       const st = PO_STATUS[po.status] ?? { label: po.status, variant: "secondary" as const };
                       return (
                         <tr key={po.id}
-                          className={`cursor-pointer transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}
+                          className={`cursor-pointer transition-colors duration-150 hover:bg-accent ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}
                           onClick={() => router.push(`/purchases/${po.id}`)}>
                           <td className="px-5 py-3.5 font-mono text-xs font-semibold text-primary">{po.poNumber}</td>
                           <td className="px-5 py-3.5">
@@ -617,12 +617,12 @@ export default function SupplierDetailPage() {
           {/* Recent Payments */}
           {supplier.payments.length > 0 && (
             <div className="bg-card dark:bg-background rounded-xl  overflow-hidden">
-              <div className="px-6 py-4 border-b border-[#E8EDF5]">
+              <div className="px-6 py-4 border-b border-border">
                 <h3 className="font-bold text-sm tracking-tight">Recent Payments</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm enterprise-table">
-                  <thead className="bg-[#FAFBFC] border-b border-[#E8EDF5] text-xs uppercase tracking-wide text-muted-foreground">
+                  <thead className="bg-muted/40 border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-5 py-3.5 text-left font-semibold">Date</th>
                       <th className="px-5 py-3.5 text-left font-semibold">Method</th>
@@ -632,7 +632,7 @@ export default function SupplierDetailPage() {
                   </thead>
                   <tbody>
                     {supplier.payments.map((pay, idx) => (
-                      <tr key={pay.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
+                      <tr key={pay.id} className={`transition-colors duration-150 hover:bg-accent ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
                         <td className="px-5 py-3.5 text-xs text-muted-foreground">{fmtDate(pay.paidAt)}</td>
                         <td className="px-5 py-3.5">
                           <Badge variant="secondary" className="text-[10px]">{pay.method}</Badge>
@@ -649,13 +649,13 @@ export default function SupplierDetailPage() {
 
           {/* Assigned Products */}
           <div className="bg-card dark:bg-background rounded-xl  overflow-hidden">
-            <div className="px-6 py-4 border-b border-[#E8EDF5]">
+            <div className="px-6 py-4 border-b border-border">
               <h3 className="font-bold text-sm tracking-tight">Assigned Products</h3>
               <p className="text-sm text-muted-foreground mt-1 font-normal leading-relaxed">
                 Search and assign products for this supplier.
               </p>
             </div>
-            <div className="p-6 space-y-3 border-b border-[#E8EDF5] bg-[#FAFBFC]">
+            <div className="p-6 space-y-3 border-b border-border bg-muted/40">
               <div className="flex gap-2 items-center">
                 <div className="relative flex-1">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -676,7 +676,7 @@ export default function SupplierDetailPage() {
                   {searchRows.map((v) => {
                     const already = assignments.some((a) => a.variantId === v.variantId);
                     return (
-                      <div key={v.variantId} className="px-4 py-3 border-b border-[#E8EDF5] last:border-0 flex items-center justify-between gap-3">
+                      <div key={v.variantId} className="px-4 py-3 border-b border-border last:border-0 flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{v.productName}</p>
                           <p className="text-xs text-muted-foreground font-mono truncate">{v.sku} · {v.variantName}</p>
@@ -702,7 +702,7 @@ export default function SupplierDetailPage() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm enterprise-table">
-                  <thead className="bg-[#FAFBFC] border-b border-[#E8EDF5] text-xs uppercase tracking-wide text-muted-foreground">
+                  <thead className="bg-muted/40 border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-5 py-3.5 text-left font-semibold">Product</th>
                       <th className="px-5 py-3.5 text-left font-semibold">SKU</th>
@@ -713,7 +713,7 @@ export default function SupplierDetailPage() {
                   </thead>
                   <tbody>
                     {assignments.map((a, idx) => (
-                      <tr key={a.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
+                      <tr key={a.id} className={`transition-colors duration-150 hover:bg-accent ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
                         <td className="px-5 py-3.5">
                           <p className="text-sm font-medium">{a.variant.product.name}</p>
                           <p className="text-xs text-muted-foreground">{a.variant.name}</p>
@@ -748,7 +748,7 @@ export default function SupplierDetailPage() {
 
           {/* Balance */}
           <div className="bg-card dark:bg-background rounded-xl p-6 ">
-            <h3 className="font-bold text-sm tracking-tight border-b border-[#E8EDF5] pb-3 mb-2">Financial Summary</h3>
+            <h3 className="font-bold text-sm tracking-tight border-b border-border pb-3 mb-2">Financial Summary</h3>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold mb-3">Amounts in LKR</p>
             <InfoRow label="Outstanding Balance" value={
               <span className={outstanding > 0 ? "text-amber-600 font-bold tabular-nums" : "text-emerald-700 font-bold"}>
@@ -763,14 +763,14 @@ export default function SupplierDetailPage() {
                   <span>Credit Used</span>
                   <span className="font-medium">{Math.min(100, ((outstanding / supplier.creditLimit) * 100)).toFixed(0)}%</span>
                 </div>
-                <div className="h-2 rounded-full bg-[#F3F6FC] overflow-hidden">
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
                   <div className="h-full rounded-full bg-amber-400 transition-all duration-150"
                     style={{ width: `${Math.min(100, (outstanding / supplier.creditLimit) * 100)}%` }} />
                 </div>
               </div>
             )}
             {aging && aging.total > 0.01 && (
-              <div className="mt-5 pt-4 border-t border-[#E8EDF5] space-y-2">
+              <div className="mt-5 pt-4 border-t border-border space-y-2">
                 <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold">AP Aging</p>
                 {[
                   ["Current", aging.current],
@@ -787,7 +787,7 @@ export default function SupplierDetailPage() {
               </div>
             )}
             {supplier.apLines && supplier.apLines.length > 0 && (
-              <div className="mt-5 pt-4 border-t border-[#E8EDF5] space-y-2">
+              <div className="mt-5 pt-4 border-t border-border space-y-2">
                 <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold">Open dues</p>
                 {supplier.apLines.slice(0, 6).map((line) => (
                   <div key={line.id} className="flex justify-between gap-2 text-xs">
@@ -803,7 +803,7 @@ export default function SupplierDetailPage() {
 
           {/* Details */}
           <div className="bg-card dark:bg-background rounded-xl p-6 ">
-            <h3 className="font-bold text-sm tracking-tight border-b border-[#E8EDF5] pb-3 mb-2">{copy.detailsSectionTitle}</h3>
+            <h3 className="font-bold text-sm tracking-tight border-b border-border pb-3 mb-2">{copy.detailsSectionTitle}</h3>
             {supplier.code     && <InfoRow label="Code"       value={<span className="font-mono text-xs">{supplier.code}</span>} />}
             {supplier.gstNumber && <InfoRow label="GST"        value={<span className="font-mono text-xs">{supplier.gstNumber}</span>} />}
             {supplier.panNumber && <InfoRow label="PAN / BRN"  value={<span className="font-mono text-xs">{supplier.panNumber}</span>} />}

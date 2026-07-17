@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { ModuleGate } from "@/components/shop/module-gate";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Promotion {
@@ -211,7 +212,9 @@ export default function PromotionsPage() {
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold truncate">{promo.name}</p>
+                      <OpenRecordButton onClick={() => openEdit(promo)} className="truncate" title="Edit promotion">
+                        {promo.name}
+                      </OpenRecordButton>
                       {expired && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-500/10 text-red-500 font-medium">EXPIRED</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1.5 flex-wrap">

@@ -465,7 +465,7 @@ export default function PrintTagsPage() {
         </div>
 
         <div className="p-6 space-y-5">
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] overflow-hidden ">
+          <div className="panel-edge overflow-hidden ">
             <div className="px-5 py-3 border-b bg-muted/20">
               <h3 className="font-semibold text-sm">Set Label Quantity Per Variant</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -531,7 +531,7 @@ export default function PrintTagsPage() {
             </table>
           </div>
 
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5 ">
+          <div className="panel-edge p-5 ">
             <h3 className="font-semibold text-sm mb-4">Label Preview ({totalLabels} labels)</h3>
             {totalLabels === 0 ? (
               <div className="py-12 text-center text-muted-foreground text-sm">Set qty above to preview labels</div>

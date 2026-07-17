@@ -20,14 +20,15 @@ import { api } from "@/lib/api";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { AddCustomerModal, type Customer } from "@/components/customers/add-customer-modal";
 import { ViewCustomerModal } from "@/components/customers/view-customer-modal";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  BRONZE:   { label: "Bronze",   color: "text-amber-800",  bg: "bg-amber-50",  icon: Star },
-  SILVER:   { label: "Silver",   color: "text-slate-600",  bg: "bg-slate-100", icon: Star },
-  GOLD:     { label: "Gold",     color: "text-amber-700",  bg: "bg-amber-50",  icon: Crown },
-  PLATINUM: { label: "Platinum", color: "text-violet-700", bg: "bg-violet-50", icon: Crown },
-  DIAMOND:  { label: "Diamond",  color: "text-cyan-700",   bg: "bg-cyan-50",   icon: Diamond },
+  BRONZE:   { label: "Bronze",   color: "text-amber-800",  bg: "bg-amber-50 border border-amber-200",  icon: Star },
+  SILVER:   { label: "Silver",   color: "text-slate-700",  bg: "bg-slate-100 border border-slate-300", icon: Star },
+  GOLD:     { label: "Gold",     color: "text-amber-700",  bg: "bg-amber-50 border border-amber-200",  icon: Crown },
+  PLATINUM: { label: "Platinum", color: "text-violet-700", bg: "bg-violet-50 border border-violet-200", icon: Crown },
+  DIAMOND:  { label: "Diamond",  color: "text-cyan-700",   bg: "bg-cyan-50 border border-cyan-200",   icon: Diamond },
 };
 
 const SEGMENT_ICON: Record<string, React.ElementType> = {
@@ -73,7 +74,9 @@ function buildColumns(
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">{name}</p>
+              <OpenRecordButton onClick={() => onView(c)} className="text-sm truncate block max-w-full">
+                {name}
+              </OpenRecordButton>
               <div className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1 ${tierConf.bg} ${tierConf.color}`}>
                 <TierIcon className="h-2.5 w-2.5" />
                 {tierConf.label}
@@ -200,7 +203,7 @@ export default function CustomersPage() {
       value: customers.length,
       icon: Users,
       color: "text-blue-600",
-      bg: "bg-blue-50",
+      bg: "bg-blue-50 border border-blue-200",
     },
     ...(showLoyalty
       ? [
@@ -209,14 +212,14 @@ export default function CustomersPage() {
             value: premium,
             icon: Crown,
             color: "text-amber-600",
-            bg: "bg-amber-50",
+            bg: "bg-amber-50 border border-amber-200",
           },
           {
             label: "Loyalty Points",
             value: formatNumber(totalPoints),
             icon: Gift,
             color: "text-violet-600",
-            bg: "bg-violet-50",
+            bg: "bg-violet-50 border border-violet-200",
           },
         ]
       : []),
@@ -225,7 +228,7 @@ export default function CustomersPage() {
       value: `LKR ${formatNumber(totalWallet)}`,
       icon: Wallet,
       color: "text-emerald-600",
-      bg: "bg-emerald-50",
+      bg: "bg-emerald-50 border border-emerald-200",
     },
   ];
 
@@ -304,7 +307,7 @@ export default function CustomersPage() {
             return (
               <Card key={s.key}>
                 <CardContent className="p-4 flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
+                  <div className="h-9 w-9 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
                     <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="min-w-0">

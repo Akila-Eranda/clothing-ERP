@@ -98,7 +98,7 @@ export default function NewSupplierPage() {
         <div className="space-y-5">
 
           {/* Basic Info */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -125,7 +125,7 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Address */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Address</h2>
             <div className="col-span-2 space-y-1.5">
               <F label="Street Address">
@@ -146,7 +146,7 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Business / Tax */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Business Details</h2>
             <div className="grid grid-cols-2 gap-4">
               <F label="GST / VAT Number">
@@ -165,7 +165,7 @@ export default function NewSupplierPage() {
         <div className="space-y-4 lg:sticky lg:top-6">
 
           {/* Status */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <h3 className="font-semibold text-sm border-b pb-2">Status</h3>
             <div className="flex items-center justify-between">
               <div>
@@ -177,7 +177,7 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Credit Terms */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <h3 className="font-semibold text-sm border-b pb-2">Credit Terms (LKR)</h3>
             <F label="Credit Days">
               <Input type="number" min={0} value={form.creditDays} onChange={(e) => set("creditDays", e.target.value)} />
@@ -193,14 +193,14 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Notes */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-2">
+          <div className="panel-edge p-5  space-y-2">
             <h3 className="font-semibold text-sm border-b pb-2">Notes</h3>
             <Textarea rows={3} placeholder={copy.notesPlaceholder} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} />
           </div>
 
           {/* Summary */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-2 text-sm">
+          <div className="panel-edge p-5  space-y-2 text-sm">
             <h3 className="font-semibold text-sm border-b pb-2">Summary</h3>
             {[
               ["Name",    form.name    || <span className="text-muted-foreground italic">Not set</span>],
@@ -217,7 +217,7 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Actions */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <Button className="w-full gap-2" disabled={loading} onClick={submit}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {copy.saveButton}

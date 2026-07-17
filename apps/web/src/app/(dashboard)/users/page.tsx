@@ -14,6 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Role {
@@ -269,7 +270,13 @@ export default function UsersPage() {
                         <div className="flex items-center gap-3">
                           <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">{initials}</div>
                           <div>
-                            <p className="text-sm font-medium">{u.firstName} {u.lastName}</p>
+                            <OpenRecordButton
+                              onClick={() => { setRoleAssignModal(u); setSelectedRoleId(u.roles?.[0]?.role?.id ?? ""); }}
+                              className="text-sm"
+                              title="Change role"
+                            >
+                              {u.firstName} {u.lastName}
+                            </OpenRecordButton>
                             <p className="text-xs text-muted-foreground">{u.email}</p>
                           </div>
                         </div>

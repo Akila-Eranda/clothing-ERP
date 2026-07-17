@@ -349,7 +349,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Basic Info */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1.5">
@@ -442,7 +442,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Images */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <h2 className="font-semibold text-base border-b pb-2">Product Images</h2>
             <p className="text-xs text-muted-foreground">The first image is shown as the cover in listings.</p>
             <ProductImageUpload
@@ -453,7 +453,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Pricing */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <div className="border-b pb-2 space-y-1">
               <h2 className="font-semibold text-base">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
               {form.hasVariants && (
@@ -560,7 +560,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Variants — editable list (type / select / edit everything here) */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <div className="flex items-center justify-between gap-3 border-b pb-3">
               <div className="min-w-0">
                 <h2 className="font-semibold text-base">Variants</h2>
@@ -758,7 +758,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Assign Suppliers */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-6  space-y-4">
+          <div className="panel-edge p-6  space-y-4">
             <div className="border-b pb-2 space-y-1">
               <h2 className="font-semibold text-base">Assign Suppliers</h2>
               <p className="text-xs text-muted-foreground">
@@ -821,7 +821,7 @@ function StandardAddProductPage() {
         <div className="space-y-4 lg:sticky lg:top-6">
 
           {/* Status */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <h3 className="font-semibold text-sm border-b pb-2">Status & Settings</h3>
             <div className="flex items-center justify-between">
               <div>
@@ -848,7 +848,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Summary */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-2 text-sm">
+          <div className="panel-edge p-5  space-y-2 text-sm">
             <h3 className="font-semibold text-sm border-b pb-2">Summary</h3>
             {[
               ["Name",     form.name     || <span className="text-muted-foreground italic">Not set</span>],
@@ -874,7 +874,7 @@ function StandardAddProductPage() {
           </div>
 
           {/* Actions */}
-          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5  space-y-3">
+          <div className="panel-edge p-5  space-y-3">
             <Button className="w-full gap-2" disabled={loading} onClick={() => submit("ACTIVE")}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Package className="h-4 w-4" />}
               Save Product

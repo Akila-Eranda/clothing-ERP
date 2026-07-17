@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { TableActionsRow } from "@/components/table/table-actions-row";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { DenominationInput, denominationTotal } from "@/components/cash/denomination-input";
 import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-movement-ledger";
 import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
@@ -421,7 +422,13 @@ export default function CashManagementPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Cashier" />,
       cell: ({ row }) => (
         <div>
-          <p className="text-sm font-semibold">{row.original.cashierName ?? "Cashier"}</p>
+          <OpenRecordButton
+            onClick={() => setDetailShiftId(row.original.id)}
+            className="text-sm"
+            title="View shift details"
+          >
+            {row.original.cashierName ?? "Cashier"}
+          </OpenRecordButton>
           <p className="text-[10px] text-muted-foreground">{row.original.branch?.name ?? "Branch"}</p>
         </div>
       ),
@@ -472,8 +479,8 @@ export default function CashManagementPage() {
       id: "actions",
       cell: ({ row }) => (
         <TableActionsRow
+          showAction={{ action: () => setDetailShiftId(row.original.id), tooltip: "View details" }}
           dropMoreActions={[
-            { text: "View details", function: () => setDetailShiftId(row.original.id) },
             ...(row.original.status === "PENDING_APPROVAL"
               ? [{ text: "Approve variance", function: () => void handleApprove(row.original.id) }]
               : []),
@@ -540,7 +547,7 @@ export default function CashManagementPage() {
         <div className="px-6 py-6 space-y-6">
 
           {/* Date filter — auto-applies to KPI, history & variance */}
-          <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  ring-1 ring-slate-900/[0.05]">
+          <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
             {DATE_PRESETS.map((p) => (
               <button
                 key={p.label}

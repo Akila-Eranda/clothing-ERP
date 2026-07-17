@@ -122,7 +122,7 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.06] w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="panel-edge w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0 bg-muted/30">
           <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">

@@ -16,6 +16,7 @@ import { type Supplier } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy, type SupplierPageCopy } from "@/lib/shop-vertical";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
@@ -32,7 +33,9 @@ function buildColumns(
         const s = row.original;
         return (
           <div>
-            <p className="text-sm font-semibold">{s.name}</p>
+            <OpenRecordButton onClick={() => onView(s)} className="text-sm block">
+              {s.name}
+            </OpenRecordButton>
             {s.contactPerson && (
               <p className="text-xs text-muted-foreground">{s.contactPerson}</p>
             )}
@@ -228,7 +231,7 @@ export default function SuppliersPage() {
       {/* Tips */}
       <div className="grid md:grid-cols-3 gap-5">
         {copy.tips.map((tip) => (
-          <Card key={tip} className="border border-dashed border-[#E8EDF5] shadow-none bg-[#FAFBFC]">
+          <Card key={tip} className="border border-dashed border-border shadow-none bg-muted/40">
             <CardContent className="p-6 flex gap-3 items-start">
               <div className="h-9 w-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
                 <Lightbulb className="h-4 w-4 text-amber-600" />

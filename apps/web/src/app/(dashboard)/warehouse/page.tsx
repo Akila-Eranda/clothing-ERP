@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { TableActionsRow } from "@/components/table/table-actions-row";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -214,7 +215,16 @@ export default function WarehousePage() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <p className="text-sm font-semibold">{w.name}</p>
+                <OpenRecordButton
+                  onClick={() => {
+                    setEditWh(w);
+                    setAddOpen(true);
+                  }}
+                  className="text-sm"
+                  title="Edit warehouse"
+                >
+                  {w.name}
+                </OpenRecordButton>
                 {w.isDefault && (
                   <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-primary/10 text-primary">
                     <Star className="h-2 w-2" />Default

@@ -10,20 +10,20 @@ const buttonVariants = cva(
       variant: {
         default:
           "bg-primary text-primary-foreground shadow-button hover:bg-primary/90 active:scale-[0.98]",
-        destructive:
-          "bg-red-50 text-red-600 border border-red-100 shadow-none hover:bg-red-100 active:scale-[0.98] dark:bg-destructive dark:text-destructive-foreground dark:border-transparent dark:hover:bg-destructive/90",
         outline:
-          "border border-border bg-card text-foreground shadow-none hover:bg-muted hover:border-border active:scale-[0.98] dark:bg-background dark:hover:bg-accent",
+          "border border-border bg-card text-foreground shadow-none hover:bg-muted hover:border-foreground/25 active:scale-[0.98] dark:bg-background dark:hover:bg-accent",
         secondary:
-          "bg-secondary text-secondary-foreground border border-border shadow-none hover:bg-[#F3F6FC] active:scale-[0.98]",
-        ghost: "hover:bg-[#F3F6FC] hover:text-foreground active:scale-[0.98] dark:hover:bg-accent",
+          "bg-secondary text-secondary-foreground border border-border shadow-none hover:bg-muted active:scale-[0.98]",
+        ghost: "hover:bg-muted hover:text-foreground active:scale-[0.98] dark:hover:bg-accent",
         link: "text-primary underline-offset-4 hover:underline",
         gradient:
           "gradient-primary text-white shadow-button hover:opacity-90 active:scale-[0.98] font-semibold",
         success:
-          "bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-none hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-600 dark:text-white dark:border-transparent dark:hover:bg-emerald-700",
+          "bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-none hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-600 dark:text-white dark:border-transparent dark:hover:bg-emerald-700",
         warning:
-          "bg-amber-50 text-amber-700 border border-amber-100 shadow-none hover:bg-amber-100 active:scale-[0.98] dark:bg-amber-500 dark:text-white dark:border-transparent dark:hover:bg-amber-600",
+          "bg-amber-50 text-amber-700 border border-amber-200 shadow-none hover:bg-amber-100 active:scale-[0.98] dark:bg-amber-500 dark:text-white dark:border-transparent dark:hover:bg-amber-600",
+        destructive:
+          "bg-red-50 text-red-600 border border-red-200 shadow-none hover:bg-red-100 active:scale-[0.98] dark:bg-destructive dark:text-destructive-foreground dark:border-transparent dark:hover:bg-destructive/90",
       },
       size: {
         default: "h-10 px-4 py-2",

@@ -263,7 +263,7 @@ export function Header() {
           variant="ghost"
           size="icon-sm"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="h-9 w-9 rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent"
+          className="h-9 w-9 rounded-[10px] hover:bg-muted dark:hover:bg-accent"
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -271,14 +271,14 @@ export function Header() {
         </Button>
 
         {/* Refresh */}
-        <Button variant="ghost" size="icon-sm" className="h-9 w-9 rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent" onClick={() => router.refresh()}>
+        <Button variant="ghost" size="icon-sm" className="h-9 w-9 rounded-[10px] hover:bg-muted dark:hover:bg-accent" onClick={() => router.refresh()}>
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent">
+            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative rounded-[10px] hover:bg-muted dark:hover:bg-accent">
               <Bell className="h-4 w-4" />
               {(isMaintenance || 4 > 0) && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">

@@ -12,16 +12,16 @@
   --tc-popover-foreground: 220 39% 11%;
   --tc-primary: 239 84% 67%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 217 24% 93%;
+  --tc-secondary: 220 24% 94%;
   --tc-secondary-foreground: 220 39% 11%;
-  --tc-muted: 217 24% 93%;
-  --tc-muted-foreground: 220 9% 46%;
-  --tc-accent: 219 100% 97%;
+  --tc-muted: 220 24% 94%;
+  --tc-muted-foreground: 220 9% 42%;
+  --tc-accent: 226 100% 97%;
   --tc-accent-foreground: 239 84% 40%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 220 16% 78%;
-  --tc-input: 220 16% 82%;
+  --tc-border: 220 18% 70%;
+  --tc-input: 220 18% 74%;
   --tc-ring: 239 84% 67%;
   --tc-radius: 0.75rem;
 }
@@ -50,30 +50,34 @@
 
 @layer base {
   :root {
-    /* Light canvas + white cards with clear dark edge */
-    --background: 220 28% 96%;          /* #F1F4F9 */
-    --foreground: 220 39% 11%;          /* #111827 */
-    --card: 0 0% 100%;                  /* white — lifts off canvas */
-    --card-foreground: 220 39% 11%;
+    /*
+      Full light theme
+      Canvas: cool gray | Surfaces: white | Lines: visible slate
+    */
+    --background: 220 28% 95%;          /* #EEF2F7 page canvas */
+    --foreground: 222 47% 11%;          /* #111827 ink */
+    --card: 0 0% 100%;                  /* white panels */
+    --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 39% 11%;
-    --primary: 239 84% 67%;             /* #6366F1 */
+    --popover-foreground: 222 47% 11%;
+    --primary: 239 84% 67%;             /* #6366F1 indigo */
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 24% 93%;
-    --secondary-foreground: 220 39% 11%;
-    --muted: 217 24% 93%;
-    --muted-foreground: 220 9% 46%;     /* #6B7280 */
-    --accent: 219 100% 97%;             /* #EEF4FF */
+    --secondary: 220 24% 94%;           /* soft chip fill */
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 24% 94%;
+    --muted-foreground: 220 10% 40%;    /* readable gray */
+    --accent: 226 100% 97%;             /* indigo wash */
     --accent-foreground: 239 84% 40%;
-    --destructive: 0 84% 60%;           /* #EF4444 */
+    --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;             /* #10B981 */
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;              /* #F59E0B */
+    --warning: 38 92% 48%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 16% 78%;              /* darker edge so black-line highlight reads */
-    --input: 220 16% 82%;
+    --border: 220 18% 68%;              /* clear line on white */
+    --input: 220 18% 72%;
     --ring: 239 84% 67%;
+    --line: 222 30% 18%;                /* near-black for strong rules */
     --radius: 0.75rem;
     --radius-control: 0.625rem;
     --chart-1: 239 84% 67%;
@@ -81,16 +85,16 @@
     --chart-3: 38 92% 50%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 217 68% 13%;  /* #0B1B3A — dark blue even in light mode */
+    --sidebar-background: 217 68% 13%;
     --sidebar-foreground: 213 40% 92%;
     --sidebar-primary: 239 84% 67%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 55% 18%;
     --sidebar-accent-foreground: 213 40% 92%;
-    --sidebar-border: 217 47% 23%;      /* #1E3356 */
+    --sidebar-border: 217 47% 23%;
     --sidebar-ring: 239 84% 67%;
     --hover: 220 40% 95%;
-    --selected: 219 100% 97%;
+    --selected: 226 100% 97%;
   }
 
   .dark {
@@ -202,7 +206,7 @@
   .glass-card {
     backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
-    @apply bg-card shadow-card border-0;
+    @apply bg-card border border-border shadow-sm;
   }
 
   .dark .glass-card {
@@ -248,6 +252,37 @@
   /* Standard dashboard page shell — use on page roots for consistent rhythm */
   .page-shell {
     @apply p-4 md:p-6 space-y-5 md:space-y-6 max-w-[1600px] mx-auto;
+  }
+
+  /* White panel with full visible border + soft shadow */
+  .panel-edge,
+  .surface-panel {
+    @apply bg-card text-card-foreground rounded-xl border border-border shadow-sm;
+  }
+
+  /* Horizontal rule / section divider */
+  .line-rule {
+    @apply h-px w-full bg-border;
+  }
+
+  /* Soft tinted fills used on KPI icon chips */
+  .chip-primary {
+    @apply bg-primary/10 text-primary border border-primary/20;
+  }
+  .chip-success {
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+  .chip-warning {
+    @apply bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  .chip-danger {
+    @apply bg-red-50 text-red-600 border border-red-200;
+  }
+  .chip-info {
+    @apply bg-sky-50 text-sky-700 border border-sky-200;
+  }
+  .chip-violet {
+    @apply bg-violet-50 text-violet-700 border border-violet-200;
   }
 
   /* No Scrollbar */
@@ -405,12 +440,7 @@
 
   /* Card hover — stronger black edge on lift */
   .card-hover {
-    @apply transition-all duration-150 ease-out hover:border-slate-900/25 hover:-translate-y-0.5 hover:shadow-md;
-  }
-
-  /* Shared panel edge — black line highlight on white surfaces */
-  .panel-edge {
-    @apply bg-card rounded-xl border border-slate-900/15 shadow-sm;
+    @apply transition-all duration-150 ease-out hover:border-foreground/25 hover:-translate-y-0.5 hover:shadow-md;
   }
 
   /* Input focus glow */
@@ -419,21 +449,23 @@
     box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
   }
 
-  /* Soft semantic surfaces */
+  /* Soft semantic surfaces — tinted + bordered */
   .surface-success {
-    background: rgba(16, 185, 129, 0.1);
-    color: #059669;
+    @apply bg-emerald-50 text-emerald-700 border border-emerald-200;
   }
   .surface-warning {
-    background: rgba(245, 158, 11, 0.1);
-    color: #d97706;
+    @apply bg-amber-50 text-amber-700 border border-amber-200;
   }
   .surface-danger {
-    background: rgba(239, 68, 68, 0.1);
-    color: #dc2626;
+    @apply bg-red-50 text-red-600 border border-red-200;
   }
   .surface-teal {
-    background: rgba(20, 184, 166, 0.1);
-    color: #0d9488;
+    @apply bg-teal-50 text-teal-700 border border-teal-200;
+  }
+  .surface-info {
+    @apply bg-sky-50 text-sky-700 border border-sky-200;
+  }
+  .surface-violet {
+    @apply bg-violet-50 text-violet-700 border border-violet-200;
   }
 }

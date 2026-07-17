@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
@@ -43,7 +44,9 @@ function buildColumns(
       accessorKey: "poNumber",
       header: ({ column }) => <DataTableColumnHeader column={column} title="PO Number" />,
       cell: ({ row }) => (
-        <button onClick={() => onView(row.original)} className="font-mono text-xs text-blue-500 font-semibold hover:underline">{row.original.poNumber}</button>
+        <OpenRecordButton onClick={() => onView(row.original)} className="font-mono text-xs">
+          {row.original.poNumber}
+        </OpenRecordButton>
       ),
     },
     {
@@ -104,7 +107,7 @@ function buildColumns(
         const canReceive = RECEIVABLE.includes(po.status);
         return (
           <TableActionsRow
-            showAction={canReceive ? { action: () => onReceive(po), tooltip: "Receive Items" } : undefined}
+            showAction={{ action: () => onView(po), tooltip: "View PO" }}
             dropMoreActions={[
               ...(canReceive ? [{ text: "Receive Items", function: () => onReceive(po) }] : []),
               ...(ORDERABLE.includes(po.status) ? [{ text: "Mark as Ordered", function: () => onUpdateStatus(po, "CONFIRMED") }] : []),

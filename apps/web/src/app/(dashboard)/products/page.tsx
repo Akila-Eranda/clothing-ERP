@@ -18,6 +18,7 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
+import { OpenRecordButton } from "@/components/table/open-record-button";
 
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
   ACTIVE: "success",
@@ -177,7 +178,12 @@ function buildColumns(
             <Package className="h-4 w-4 text-muted-foreground/40" />
           </div>
           <div>
-            <p className="text-sm font-medium">{row.original.productName}</p>
+            <OpenRecordButton
+              onClick={() => onView(row.original.product)}
+              className="text-sm font-medium block"
+            >
+              {row.original.productName}
+            </OpenRecordButton>
             <p className="text-xs text-muted-foreground">{row.original.brandName ?? "—"}</p>
           </div>
         </div>
