@@ -33,7 +33,7 @@ function buildColumns(
         const s = row.original;
         return (
           <div>
-            <OpenRecordButton onClick={() => onView(s)} className="text-sm block">
+            <OpenRecordButton onClick={() => onView(s)} className="text-sm">
               {s.name}
             </OpenRecordButton>
             {s.contactPerson && (

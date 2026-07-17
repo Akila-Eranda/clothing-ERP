@@ -180,7 +180,7 @@ function buildColumns(
           <div>
             <OpenRecordButton
               onClick={() => onView(row.original.product)}
-              className="text-sm font-medium block"
+              className="text-sm font-medium"
             >
               {row.original.productName}
             </OpenRecordButton>

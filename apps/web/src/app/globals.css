@@ -20,8 +20,8 @@
   --tc-accent-foreground: 239 84% 40%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 220 18% 70%;
-  --tc-input: 220 18% 74%;
+  --tc-border: 220 20% 82%;
+  --tc-input: 220 18% 78%;
   --tc-ring: 239 84% 67%;
   --tc-radius: 0.75rem;
 }
@@ -74,8 +74,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 48%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 18% 68%;              /* clear line on white */
-    --input: 220 18% 72%;
+    --border: 220 20% 82%;              /* soft hairline — clean, not heavy */
+    --input: 220 18% 78%;
     --ring: 239 84% 67%;
     --line: 222 30% 18%;                /* near-black for strong rules */
     --radius: 0.75rem;
@@ -393,7 +393,7 @@
   :root:not(.dark) .enterprise-table th,
   :root:not(.dark) [data-table-craft] th,
   :root:not(.dark) .rtc-table th {
-    border-bottom: 1.5px solid rgba(15, 23, 42, 0.18);
+    border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
     font-size: 12px;
     text-transform: uppercase;
@@ -404,7 +404,7 @@
   :root:not(.dark) .enterprise-table td,
   :root:not(.dark) [data-table-craft] td,
   :root:not(.dark) .rtc-table td {
-    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
+    border-bottom: 1px solid hsl(var(--border) / 0.55);
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),

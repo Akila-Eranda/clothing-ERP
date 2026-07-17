@@ -74,7 +74,7 @@ function buildColumns(
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0">
-              <OpenRecordButton onClick={() => onView(c)} className="text-sm truncate block max-w-full">
+              <OpenRecordButton onClick={() => onView(c)} className="text-sm truncate max-w-full">
                 {name}
               </OpenRecordButton>
               <div className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1 ${tierConf.bg} ${tierConf.color}`}>

@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Primary table cell that opens a record in one click. */
+/** Primary table cell that opens a record in one click — no underline clutter. */
 export function OpenRecordButton({
   children,
   onClick,
@@ -24,7 +24,10 @@ export function OpenRecordButton({
         onClick();
       }}
       className={cn(
-        "text-left font-semibold text-primary hover:underline underline-offset-2 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 rounded-sm",
+        "inline text-left font-semibold text-primary",
+        "hover:text-primary/80 transition-colors duration-150",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 rounded-sm",
+        "decoration-none no-underline",
         className,
       )}
     >
