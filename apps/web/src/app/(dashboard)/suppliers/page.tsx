@@ -173,13 +173,13 @@ export default function SuppliersPage() {
     <div className="p-6 space-y-6 w-full">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2 text-foreground">
             <span>{profile.emoji}</span> {copy.pageTitle}
           </h1>
-          <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
+          <p className="text-sm font-normal text-muted-foreground leading-relaxed">{copy.subtitle}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
+        <div className="flex gap-2 flex-wrap items-center">
           <Button variant="outline" size="sm" onClick={fetchSuppliers} className="gap-1.5">
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
@@ -190,12 +190,17 @@ export default function SuppliersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-5">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
-              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+          <Card key={s.label} className="card-hover">
+            <CardContent className="p-6 flex items-center gap-4">
+              <div className={`h-11 w-11 rounded-full flex items-center justify-center ${s.bg}`}>
+                <s.icon className={`h-5 w-5 ${s.color}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl font-bold tracking-tight tabular-nums truncate">{s.value}</p>
+                <p className="text-sm font-medium text-foreground/80 mt-0.5">{s.label}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
@@ -221,14 +226,14 @@ export default function SuppliersPage() {
       />
 
       {/* Tips */}
-      <div className="grid md:grid-cols-3 gap-3">
+      <div className="grid md:grid-cols-3 gap-5">
         {copy.tips.map((tip) => (
-          <Card key={tip} className="border-dashed">
-            <CardContent className="p-4 flex gap-3 items-start">
-              <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                <Lightbulb className="h-4 w-4 text-amber-500" />
+          <Card key={tip} className="border border-dashed border-[#E8EDF5] shadow-none bg-[#FAFBFC]">
+            <CardContent className="p-6 flex gap-3 items-start">
+              <div className="h-9 w-9 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                <Lightbulb className="h-4 w-4 text-amber-600" />
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed">{tip}</p>
+              <p className="text-sm font-normal text-muted-foreground leading-relaxed">{tip}</p>
             </CardContent>
           </Card>
         ))}

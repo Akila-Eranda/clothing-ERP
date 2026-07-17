@@ -424,27 +424,6 @@ export default function SettingsPage() {
     loadBranches();
   }, []);
 
-  async function savePosSettings() {
-    setPosSaving(true);
-    try {
-      const r = await api.put<typeof posForm>("/tenants/pos-settings", posForm);
-      setPosForm({
-        allowNegativeStock: Boolean(r.data?.allowNegativeStock),
-        autoPrint: Boolean(r.data?.autoPrint),
-        roundOff: r.data?.roundOff !== false,
-        loyalty: r.data?.loyalty !== false,
-      });
-      try {
-        localStorage.setItem("pos_allow_negative_stock", posForm.allowNegativeStock ? "1" : "0");
-      } catch { /* noop */ }
-      toast.success("POS settings saved");
-    } catch {
-      toast.error("Failed to save POS settings");
-    } finally {
-      setPosSaving(false);
-    }
-  }
-
   async function saveReceipt() {
     setReceiptSaving(true);
     try {
@@ -663,14 +642,31 @@ export default function SettingsPage() {
                   </div>
                   <Switch
                     checked={posForm[s.key]}
-                    onCheckedChange={(v) => setPosForm((f) => ({ ...f, [s.key]: v }))}
+                    disabled={posSaving}
+                    onCheckedChange={(v) => {
+                      const next = { ...posForm, [s.key]: v };
+                      setPosForm(next);
+                      setPosSaving(true);
+                      api.put("/tenants/pos-settings", next)
+                        .then(() => {
+                          if (s.key === "allowNegativeStock") {
+                            try { localStorage.setItem("pos_allow_negative_stock", v ? "1" : "0"); } catch { /* noop */ }
+                          }
+                          toast.success("POS settings saved");
+                        })
+                        .catch(() => {
+                          setPosForm(posForm);
+                          toast.error("Failed to save — admin permission required");
+                        })
+                        .finally(() => setPosSaving(false));
+                    }}
                   />
                 </div>
               ))}
-              <Button variant="gradient" size="sm" onClick={() => void savePosSettings()} disabled={posSaving}>
-                {posSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
-                Save POS Settings
-              </Button>
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                {posSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                {posSaving ? "Saving…" : "Changes save automatically"}
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

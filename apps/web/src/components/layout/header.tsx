@@ -188,7 +188,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-white dark:bg-background/80 backdrop-blur-xl px-6 shrink-0">
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[#E8EDF5] dark:border-border bg-[rgba(255,255,255,0.92)] dark:bg-background/80 backdrop-blur-[12px] px-6 shrink-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"
@@ -229,11 +229,11 @@ export function Header() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search products, customers..."
-            className="w-64 pl-8 h-8 text-sm bg-muted/50"
+            className="w-64 pl-8 h-10 text-sm bg-white dark:bg-muted/50 border-[#E8EDF5] shadow-none rounded-[10px]"
             onFocus={() => setSearchOpen(true)}
             onBlur={() => setSearchOpen(false)}
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-[#E8EDF5] bg-[#FAFBFC] px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-muted-foreground">
             ⌘K
           </kbd>
         </div>
@@ -244,16 +244,16 @@ export function Header() {
         <Button
           onClick={openPos}
           size="sm"
-          className="h-8 gap-1.5 text-xs font-semibold gradient-primary text-white border-0 hover:opacity-90 shadow-sm"
+          className="h-9 gap-1.5 text-xs font-semibold gradient-primary text-white border-0 hover:opacity-90 shadow-button"
         >
           <ShoppingCart className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">POS Terminal</span>
         </Button>
 
         {/* Live indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[11px] font-medium text-emerald-500">Live</span>
+          <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-500">Live</span>
         </div>
 
         {/* Theme toggle */}
@@ -261,7 +261,7 @@ export function Header() {
           variant="ghost"
           size="icon-sm"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="h-8 w-8"
+          className="h-9 w-9 rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent"
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -269,14 +269,14 @@ export function Header() {
         </Button>
 
         {/* Refresh */}
-        <Button variant="ghost" size="icon-sm" className="h-8 w-8" onClick={() => router.refresh()}>
+        <Button variant="ghost" size="icon-sm" className="h-9 w-9 rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent" onClick={() => router.refresh()}>
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 relative">
+            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative rounded-[10px] hover:bg-[#F3F6FC] dark:hover:bg-accent">
               <Bell className="h-4 w-4" />
               {(isMaintenance || 4 > 0) && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">

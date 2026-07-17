@@ -276,12 +276,14 @@ export function Sidebar() {
   };
 
   /* ── theme-aware palette ── */
-  const bg       = isDark ? "#0f172a" : "#ffffff";
-  const border   = isDark ? "#1e293b" : "#e5e7eb";
-  const textMut  = isDark ? "rgba(255,255,255,0.72)" : "#374151";
+  const bg       = isDark ? "#0f172a" : "#F8FAFC";
+  const border   = isDark ? "#1e293b" : "#E8EDF5";
+  const textMut  = isDark ? "rgba(255,255,255,0.72)" : "#6B7280";
   const textFull = isDark ? "#ffffff" : "#111827";
-  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)";
-  const sectLbl  = isDark ? "rgba(255,255,255,0.5)" : "#6b7280";
+  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "#EEF4FF";
+  const sectLbl  = isDark ? "rgba(255,255,255,0.5)" : "#9CA3AF";
+  const activeBg = isDark ? "rgba(99,102,241,0.12)" : "#EEF4FF";
+  const activeFg = "#6366F1";
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -291,14 +293,14 @@ export function Sidebar() {
     const Icon = item.icon;
 
     const className = cn(
-      "group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none",
+      "group relative flex items-center gap-3 rounded-[10px] transition-all duration-200 select-none",
       sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 w-full",
       !sidebarCollapsed && (nested ? "pl-9 pr-3" : "px-3"),
     );
 
     const style = isActive
-      ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
-      : { color: textMut };
+      ? { background: activeBg, color: activeFg }
+      : { background: "transparent", color: textMut };
 
     const body = (
       <>
@@ -306,8 +308,7 @@ export function Sidebar() {
           className={cn(
             "shrink-0",
             nested && !sidebarCollapsed ? "h-4 w-4" : "h-5 w-5",
-            isActive && "text-indigo-500",
-            !isActive && !isDark && "text-black",
+            isActive && "text-[#6366F1]",
           )}
           strokeWidth={isActive ? 2.2 : 1.8}
         />
@@ -317,9 +318,8 @@ export function Sidebar() {
               className={cn(
                 "flex-1 leading-snug",
                 nested ? "text-[13px]" : "text-[14px]",
-                isActive ? "font-semibold text-indigo-600" : "font-medium",
+                isActive ? "font-semibold text-[#6366F1]" : "font-medium",
               )}
-              style={!isActive && !isDark ? { color: "#000000" } : undefined}
               title={item.label}
             >
               {item.label}
@@ -337,7 +337,7 @@ export function Sidebar() {
         className={className}
         style={style}
         onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
-        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
+        onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = textMut; }}}
       >
         {body}
       </Link>
@@ -346,9 +346,9 @@ export function Sidebar() {
         type="button"
         onClick={() => { item.action?.(); closeMobile(); }}
         className={cn(className, "cursor-pointer")}
-        style={{ color: textMut }}
+        style={{ background: "transparent", color: textMut }}
         onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
-        onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
+        onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = textMut; }}
       >
         {body}
       </button>
@@ -391,7 +391,7 @@ export function Sidebar() {
         <div
           className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
           style={childActive
-            ? { background: "rgba(99,102,241,0.12)", color: "#4f46e5" }
+            ? { background: activeBg, color: activeFg }
             : { color: textMut }}
         >
           <Icon className="h-5 w-5" strokeWidth={childActive ? 2.2 : 1.8} />
@@ -418,7 +418,7 @@ export function Sidebar() {
                       onClick={closeMobile}
                       className={cn(
                         "block px-3 py-1.5 text-xs hover:bg-accent",
-                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-indigo-600",
+                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-[#6366F1]",
                       )}
                     >
                       {child.label}
@@ -435,12 +435,12 @@ export function Sidebar() {
     return (
       <div key={key}>
         <div
-          className="group relative flex items-center gap-3 rounded-xl transition-all duration-150 select-none min-h-11 py-2 px-3 w-full"
+          className="group relative flex items-center gap-3 rounded-[10px] transition-all duration-200 select-none min-h-11 py-2 px-3 w-full"
           style={childActive
-            ? { background: "rgba(99,102,241,0.08)", color: "#4f46e5" }
-            : { color: textMut }}
+            ? { background: activeBg, color: activeFg }
+            : { background: "transparent", color: textMut }}
           onMouseEnter={e => { if (!childActive) { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}}
-          onMouseLeave={e => { if (!childActive) { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}}
+          onMouseLeave={e => { if (!childActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = textMut; }}}
         >
           {item.href ? (
             <Link
@@ -452,12 +452,11 @@ export function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0"
             >
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
+                className={cn("shrink-0 h-5 w-5", childActive && "text-[#6366F1]")}
                 strokeWidth={childActive ? 2.2 : 1.8}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
-                style={!childActive && !isDark ? { color: "#000000" } : undefined}
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#6366F1]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -465,12 +464,11 @@ export function Sidebar() {
           ) : (
             <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left">
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-indigo-500", !childActive && !isDark && "text-black")}
+                className={cn("shrink-0 h-5 w-5", childActive && "text-[#6366F1]")}
                 strokeWidth={childActive ? 2.2 : 1.8}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-indigo-600" : "font-medium")}
-                style={!childActive && !isDark ? { color: "#000000" } : undefined}
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#6366F1]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -517,7 +515,7 @@ export function Sidebar() {
       <motion.aside
         initial={false}
         animate={{ width: sidebarCollapsed ? 68 : 260 }}
-        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="relative flex h-screen flex-col shrink-0 overflow-hidden"
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
@@ -583,14 +581,14 @@ export function Sidebar() {
         <ScrollArea className="flex-1">
           <nav className={cn("py-2", sidebarCollapsed ? "px-1.5" : "px-2.5")}>
             {navGroups.map((group, gi) => (
-              <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
+              <div key={group.title} className={gi > 0 ? "mt-6" : ""}>
                 {!sidebarCollapsed && (
-                  <p className="px-3 mb-1.5 text-xs font-semibold leading-snug select-none"
+                  <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] leading-snug select-none"
                     style={{ color: sectLbl }}>
                     {group.title}
                   </p>
                 )}
-                <div className="space-y-0.5">
+                <div className="space-y-1">
                   {group.items.map((item, ii) => {
                     const groupPeers = group.items.flatMap((sib) => {
                       const hrefs: string[] = [];
