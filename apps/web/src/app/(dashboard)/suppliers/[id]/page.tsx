@@ -457,7 +457,7 @@ export default function SupplierDetailPage() {
   const aging        = supplier.aging;
 
   return (
-    <div className="h-full flex flex-col bg-[#F5F7FB] dark:bg-muted/30">
+    <div className="h-full flex flex-col bg-background dark:bg-muted/30">
 
       {/* ── Top bar ── */}
       <div className="bg-white/92 dark:bg-background border-b border-[#E8EDF5] dark:border-border backdrop-blur-[12px] px-6 py-3 flex items-center justify-between shrink-0 gap-4">

@@ -76,9 +76,9 @@ function groupByDate(raw: RevenuePoint[] | unknown, days: number) {
 }
 
 const insightColors: Record<string, string> = {
-  opportunity: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
-  alert:       "text-amber-500 bg-amber-500/10 border-amber-500/20",
-  action:      "text-blue-500 bg-blue-500/10 border-blue-500/20",
+  opportunity: "text-emerald-700 bg-emerald-50",
+  alert:       "text-amber-700 bg-amber-50",
+  action:      "text-blue-700 bg-blue-50",
 };
 const insightIcons: Record<string, React.ElementType> = {
   opportunity: TrendingUp, alert: AlertTriangle, action: Zap,
@@ -166,25 +166,25 @@ export default function DashboardPage() {
       title: "Today's Revenue",
       value: loading ? "—" : `LKR ${formatNumber(summary?.totalRevenue ?? 0)}`,
       sub: `${summary?.totalSales ?? 0} orders`,
-      icon: DollarSign, color: "text-emerald-500", bg: "bg-emerald-500/10",
+      icon: DollarSign, color: "text-emerald-600", bg: "bg-emerald-50",
     },
     {
       title: "Today's Orders",
       value: loading ? "—" : String(summary?.totalSales ?? 0),
       sub: `LKR ${formatNumber(summary?.totalDiscount ?? 0)} discounted`,
-      icon: ShoppingCart, color: "text-blue-500", bg: "bg-blue-500/10",
+      icon: ShoppingCart, color: "text-blue-600", bg: "bg-blue-50",
     },
     {
       title: `Total ${workspace.customerLabel}`,
       value: loading ? "—" : formatNumber(custTotal),
       sub: "registered in system",
-      icon: Users, color: "text-violet-500", bg: "bg-violet-500/10",
+      icon: Users, color: "text-violet-600", bg: "bg-violet-50",
     },
     {
       title: "Low Stock Alerts",
       value: loading ? "—" : String(lowStock.length),
       sub: lowStock.length > 0 ? "Requires restock" : "All stock OK",
-      icon: Package, color: "text-amber-500", bg: "bg-amber-500/10",
+      icon: Package, color: "text-amber-600", bg: "bg-amber-50",
     },
   ];
 
@@ -193,18 +193,18 @@ export default function DashboardPage() {
 
       {/* Header */}
       <motion.div variants={IV} className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm font-normal text-muted-foreground leading-relaxed">
             Sales, inventory and business overview
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-xs font-medium text-emerald-500">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 text-xs font-medium text-emerald-700 ring-1 ring-emerald-100">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live Data
           </div>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={load} disabled={loading}>
+          <Button variant="outline" size="sm" className="gap-1.5 bg-white/80" onClick={load} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
@@ -212,21 +212,19 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* KPI Stats */}
-      <motion.div variants={IV} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
         {statCards.map((stat) => {
           const Icon = stat.icon;
           return (
-            <Card key={stat.title} className="hover:shadow-lg transition-shadow duration-300 group">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">{stat.title}</p>
-                    {loading ? <Skeleton className="h-7 w-24 mb-1" /> : <p className="text-2xl font-bold tracking-tight">{stat.value}</p>}
-                    <p className="text-xs text-muted-foreground mt-1">{stat.sub}</p>
-                  </div>
-                  <div className={`p-2.5 rounded-xl ${stat.bg} shrink-0 group-hover:scale-110 transition-transform`}>
-                    <Icon className={`h-5 w-5 ${stat.color}`} />
-                  </div>
+            <Card key={stat.title} className="card-hover group">
+              <CardContent className="p-6 flex items-center gap-4">
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center shrink-0 ${stat.bg}`}>
+                  <Icon className={`h-5 w-5 ${stat.color}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-muted-foreground mb-0.5">{stat.title}</p>
+                  {loading ? <Skeleton className="h-7 w-24 mb-1" /> : <p className="text-2xl font-bold tracking-tight tabular-nums truncate">{stat.value}</p>}
+                  <p className="text-xs text-muted-foreground mt-1 font-normal">{stat.sub}</p>
                 </div>
               </CardContent>
             </Card>
@@ -235,18 +233,18 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Charts row */}
-      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <RevenueChart chartData={chartData} period={period} setPeriod={setPeriod} loading={loading} />
         <PaymentMethodsChart pmethods={pmethods} loading={loading} />
       </motion.div>
 
       {/* AI Insights + Top Products + Recent Sales */}
-      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* AI Insights */}
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-violet-500/5">
+        <Card className="bg-gradient-to-br from-[#EEF4FF] via-white to-[#F5F3FF]">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-primary/10">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
                 <Sparkles className="h-4 w-4 text-primary" />
               </div>
               <div>
@@ -256,12 +254,12 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />) :
+            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-16 w-full rounded-xl" />) :
               AI_INSIGHTS.map((insight, i) => {
                 const InsightIcon = insightIcons[insight.type] ?? Zap;
                 return (
                   <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 * i }}
-                    className={`p-3 rounded-lg border ${insightColors[insight.type]} cursor-pointer hover:opacity-90 transition-opacity`}>
+                    className={`p-3.5 rounded-xl ${insightColors[insight.type]} cursor-pointer hover:opacity-90 transition-opacity duration-150`}>
                     <div className="flex items-start gap-2.5">
                       <InsightIcon className="h-4 w-4 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -288,18 +286,18 @@ export default function DashboardPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-10 w-full" />) :
+          <CardContent className="space-y-2">
+            {loading ? Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-xl" />) :
               topProducts.length === 0 ? <p className="text-sm text-muted-foreground">No sales data yet</p> :
               topProducts.slice(0, 5).map((p, i) => (
-                <div key={p.variantId} className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-muted-foreground w-4 shrink-0">#{i + 1}</span>
+                <div key={p.variantId} className="flex items-center gap-3 rounded-xl bg-muted/70 px-3 py-2.5">
+                  <span className="text-xs font-bold text-primary/70 w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center shrink-0">{i + 1}</span>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{p.productName}</p>
-                    <p className="text-xs text-muted-foreground">{p.sku}</p>
+                    <p className="text-xs text-muted-foreground font-mono">{p.sku}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold">LKR {formatNumber(p._sum.total ?? 0)}</p>
+                    <p className="text-sm font-semibold tabular-nums">LKR {formatNumber(p._sum.total ?? 0)}</p>
                     <p className="text-xs text-muted-foreground">{p._sum.quantity ?? 0} units</p>
                   </div>
                 </div>
@@ -318,13 +316,13 @@ export default function DashboardPage() {
               <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
           </CardHeader>
-          <CardContent className="space-y-2.5">
-            {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-12 w-full" />) :
+          <CardContent className="space-y-2">
+            {loading ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />) :
               recentSales.length === 0 ? <p className="text-sm text-muted-foreground">No recent sales</p> :
               recentSales.map((sale) => (
-                <div key={sale.id} className="flex items-center gap-3">
-                  <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarFallback className="text-[10px] font-semibold">
+                <div key={sale.id} className="flex items-center gap-3 rounded-xl bg-muted/70 px-3 py-2.5">
+                  <Avatar className="h-8 w-8 shrink-0 ring-2 ring-white">
+                    <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">
                       {getInitials(sale.customer?.name ?? "Walk-in")}
                     </AvatarFallback>
                   </Avatar>
@@ -340,7 +338,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-semibold">LKR {formatNumber(sale.total)}</p>
+                    <p className="text-sm font-semibold tabular-nums">LKR {formatNumber(sale.total)}</p>
                     <Badge variant={sale.status === "COMPLETED" ? "success" : "secondary"} className="text-[10px] h-4 px-1.5">
                       {sale.status}
                     </Badge>
@@ -352,15 +350,15 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Low Stock + Daily Orders Bar */}
-      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <motion.div variants={IV} className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         {/* Low Stock */}
-        <Card className="border-amber-500/20">
+        <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-lg bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-full bg-amber-50 flex items-center justify-center">
+                <AlertTriangle className="h-4 w-4 text-amber-600" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <CardTitle className="text-base">Low Stock Alerts</CardTitle>
                 <CardDescription>Items needing immediate restock</CardDescription>
               </div>
@@ -369,21 +367,21 @@ export default function DashboardPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-lg" />) :
+          <CardContent className="space-y-2">
+            {loading ? Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-14 w-full rounded-xl" />) :
               lowStock.length === 0 ? (
-                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/10 text-sm text-emerald-600 font-medium">
+                <div className="flex items-center gap-2 p-3.5 rounded-xl bg-emerald-50 text-sm text-emerald-700 font-medium">
                   All stock levels are healthy ✓
                 </div>
               ) :
               lowStock.slice(0, 5).map((item) => (
-                <div key={item.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-500/5 border border-amber-500/10">
+                <div key={item.id} className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-50/80">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{item.variant?.product?.name ?? "Unknown product"}</p>
                     <p className="text-xs text-muted-foreground">{item.variant?.name ?? "—"} · {item.variant?.sku ?? "—"}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-bold text-amber-500">{item.quantity} left</p>
+                    <p className="text-sm font-bold text-amber-600 tabular-nums">{item.quantity} left</p>
                     <p className="text-xs text-muted-foreground">min: {item.minStockLevel}</p>
                   </div>
                 </div>

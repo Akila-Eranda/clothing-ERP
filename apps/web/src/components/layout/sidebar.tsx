@@ -242,8 +242,8 @@ function NavBadge({ text }: { text: string }) {
     <span
       className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none border"
       style={isPOS
-        ? { borderColor: "#6366f1", color: "#6366f1", background: "rgba(99,102,241,0.07)" }
-        : { borderColor: "#0ea5e9", color: "#0ea5e9", background: "rgba(14,165,233,0.07)" }
+        ? { borderColor: "rgba(165,180,252,0.5)", color: "#A5B4FC", background: "rgba(99,102,241,0.18)" }
+        : { borderColor: "rgba(56,189,248,0.45)", color: "#7DD3FC", background: "rgba(14,165,233,0.15)" }
       }
     >
       {text}
@@ -275,15 +275,16 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* ── theme-aware palette ── */
-  const bg       = isDark ? "#0f172a" : "#F8FAFC";
-  const border   = isDark ? "#1e293b" : "#E8EDF5";
-  const textMut  = isDark ? "rgba(255,255,255,0.72)" : "#6B7280";
-  const textFull = isDark ? "#ffffff" : "#111827";
-  const hoverBg  = isDark ? "rgba(255,255,255,0.06)" : "#EEF4FF";
-  const sectLbl  = isDark ? "rgba(255,255,255,0.5)" : "#9CA3AF";
-  const activeBg = isDark ? "rgba(99,102,241,0.12)" : "#EEF4FF";
-  const activeFg = "#6366F1";
+  /* Sidebar stays dark blue in both light & dark app themes */
+  const bg       = "#0B1B3A";
+  const border   = "#1E3356";
+  const textMut  = "rgba(186, 208, 240, 0.72)";
+  const textFull = "#FFFFFF";
+  const hoverBg  = "rgba(99, 102, 241, 0.12)";
+  const sectLbl  = "rgba(148, 173, 210, 0.55)";
+  const activeBg = "rgba(99, 102, 241, 0.22)";
+  const activeFg = "#A5B4FC";
+  const logoBg   = "#071428";
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -308,7 +309,7 @@ export function Sidebar() {
           className={cn(
             "shrink-0",
             nested && !sidebarCollapsed ? "h-4 w-4" : "h-5 w-5",
-            isActive && "text-[#6366F1]",
+            isActive && "text-[#A5B4FC]",
           )}
           strokeWidth={isActive ? 2.2 : 1.8}
         />
@@ -318,7 +319,7 @@ export function Sidebar() {
               className={cn(
                 "flex-1 leading-snug",
                 nested ? "text-[13px]" : "text-[14px]",
-                isActive ? "font-semibold text-[#6366F1]" : "font-medium",
+                isActive ? "font-semibold text-[#A5B4FC]" : "font-medium",
               )}
               title={item.label}
             >
@@ -418,7 +419,7 @@ export function Sidebar() {
                       onClick={closeMobile}
                       className={cn(
                         "block px-3 py-1.5 text-xs hover:bg-accent",
-                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-[#6366F1]",
+                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-[#A5B4FC]",
                       )}
                     >
                       {child.label}
@@ -452,11 +453,11 @@ export function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0"
             >
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-[#6366F1]")}
+                className={cn("shrink-0 h-5 w-5", childActive && "text-[#A5B4FC]")}
                 strokeWidth={childActive ? 2.2 : 1.8}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#6366F1]" : "font-medium")}
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -464,11 +465,11 @@ export function Sidebar() {
           ) : (
             <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left">
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-[#6366F1]")}
+                className={cn("shrink-0 h-5 w-5", childActive && "text-[#A5B4FC]")}
                 strokeWidth={childActive ? 2.2 : 1.8}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#6366F1]" : "font-medium")}
+                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -477,7 +478,7 @@ export function Sidebar() {
           <button
             type="button"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggle(); }}
-            className="p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10"
+            className="p-1 rounded-md hover:bg-white/10"
             aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
           >
             <ChevronDown
@@ -528,8 +529,8 @@ export function Sidebar() {
               !logoSrc && "text-xl",
             )}
             style={logoSrc
-              ? { background: isDark ? "#1e293b" : "#f8fafc", border: `1px solid ${border}` }
-              : { background: isDark ? "#070d1a" : "#f8fafc", border: `1px solid ${border}` }}
+              ? { background: logoBg, border: `1px solid ${border}` }
+              : { background: logoBg, border: `1px solid ${border}` }}
           >
             {logoSrc ? (
               <img
@@ -538,7 +539,7 @@ export function Sidebar() {
                 className="h-full w-full object-contain p-1"
               />
             ) : (
-              <AppLogo variant="sidebar" theme="auto" className="h-full w-full items-center justify-center" alt={APP_NAME} />
+              <AppLogo variant="sidebar" theme="dark" className="h-full w-full items-center justify-center" alt={APP_NAME} />
             )}
           </div>
 
@@ -547,7 +548,7 @@ export function Sidebar() {
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold leading-snug" style={{ color: textFull }}>{shopName}</p>
                 <p className="text-[11px] font-medium leading-snug mt-0.5" style={{ color: textMut }}>{profile.label}</p>
-                <p className="text-xs font-semibold leading-snug mt-0.5" style={{ color: "#6366f1" }}>{planLabel}</p>
+                <p className="text-xs font-semibold leading-snug mt-0.5" style={{ color: "#A5B4FC" }}>{planLabel}</p>
               </div>
               <button
                 type="button"
@@ -635,7 +636,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
-                  style={{ background: isDark ? "#6366f1" : "hsl(var(--sidebar-border))" }}
+                  style={{ background: isDark ? "#6366f1" : "#1E3356" }}
                 >
                   <motion.span
                     className="absolute top-[3px] h-[14px] w-[14px] rounded-full bg-white shadow-sm"
@@ -648,7 +649,7 @@ export function Sidebar() {
               <button type="button" onClick={handleLogout}
                 className="flex h-11 w-full items-center gap-3 rounded-xl px-3 font-medium transition-colors"
                 style={{ color: textMut }}
-                onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.07)"; e.currentTarget.style.color = "#ef4444"; }}
+                onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
                 <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.8} />

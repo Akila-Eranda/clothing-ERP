@@ -90,7 +90,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <BranchProvider>
-      <div className="flex h-screen overflow-hidden bg-[#F5F7FB] dark:bg-background">
+      <div className="flex h-screen overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex">
           <Sidebar />

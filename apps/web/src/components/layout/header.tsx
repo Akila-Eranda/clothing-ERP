@@ -188,7 +188,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[#E8EDF5] dark:border-border bg-[rgba(255,255,255,0.92)] dark:bg-background/80 backdrop-blur-[12px] px-6 shrink-0">
+    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[#D8DEE9]/80 dark:border-border bg-[rgba(228,234,243,0.82)] dark:bg-background/80 backdrop-blur-[12px] px-6 shrink-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"
@@ -229,11 +229,11 @@ export function Header() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search products, customers..."
-            className="w-64 pl-8 h-10 text-sm bg-white dark:bg-muted/50 border-[#E8EDF5] shadow-none rounded-[10px]"
+            className="w-64 pl-8 h-10 text-sm bg-white/90 dark:bg-muted/50 border-[#D8DEE9] shadow-sm rounded-[10px]"
             onFocus={() => setSearchOpen(true)}
             onBlur={() => setSearchOpen(false)}
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-[#E8EDF5] bg-[#FAFBFC] px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-muted-foreground">
+          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-[#D8DEE9] bg-[#F1F4F9] px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-muted-foreground">
             ⌘K
           </kbd>
         </div>
