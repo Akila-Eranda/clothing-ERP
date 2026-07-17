@@ -139,13 +139,13 @@ export function PosQuantityPopup({
     let next = current;
     for (let checked = 0; checked < variants.length; checked += 1) {
       next = (next + direction + variants.length) % variants.length;
-      if (variants[next].stock > 0) {
-        pickVariant(variants[next]);
-        scrollRef.current?.children[next]?.scrollIntoView({
-          behavior: "smooth",
-          block: "nearest",
-          inline: "nearest",
-        });
+      // Prefer in-stock; if all are out, still allow cycling to any card
+      const candidate = variants[next];
+      const hasAnyStock = variants.some((v) => v.stock > 0);
+      if (!hasAnyStock || candidate.stock > 0) {
+        pickVariant(candidate);
+        const el = scrollRef.current?.children?.[next] as HTMLElement | undefined;
+        el?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
         break;
       }
     }
@@ -198,7 +198,7 @@ export function PosQuantityPopup({
         return;
       }
 
-      // Enter always confirms (works while typing in qty/price)
+      // Enter confirms selected product + qty/price
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
@@ -206,16 +206,11 @@ export function PosQuantityPopup({
         return;
       }
 
-      if (e.altKey && e.key === "ArrowLeft") {
+      // ← / → select product/variant (no Alt required); works even in qty/price fields
+      if (hasVariants && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
         e.preventDefault();
         e.stopPropagation();
-        moveVariant(-1);
-        return;
-      }
-      if (e.altKey && e.key === "ArrowRight") {
-        e.preventDefault();
-        e.stopPropagation();
-        moveVariant(1);
+        moveVariant(e.key === "ArrowLeft" ? -1 : 1);
         return;
       }
 
@@ -235,7 +230,7 @@ export function PosQuantityPopup({
         return;
       }
 
-      // Qty bump — works outside inputs, and with arrows inside qty field
+      // Qty bump — ↑/↓ (and +/- when not typing)
       if (e.key === "ArrowUp" || (!inPopupInput && (e.key === "+" || e.key === "="))) {
         e.preventDefault();
         e.stopPropagation();
@@ -250,7 +245,7 @@ export function PosQuantityPopup({
     };
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
-  }, [moveVariant, onCancel, qty, stockLimit, submit]);
+  }, [hasVariants, moveVariant, onCancel, qty, stockLimit, submit]);
 
   const variantLayout = variants.length <= 3 ? "grid" : "scroll";
   const variantGridClass =
@@ -307,7 +302,7 @@ export function PosQuantityPopup({
                 {crossProductPick ? "Same barcode — pick item" : "Pick variant"}
               </p>
               {variantLayout === "grid" ? (
-                <div className={`grid ${variantGridClass} gap-2.5`}>
+                <div ref={scrollRef} className={`grid ${variantGridClass} gap-2.5`}>
                   {variants.map((v) => {
                     const active = selectedVariantId === v.variantId;
                     const out = v.stock <= 0;
@@ -526,7 +521,7 @@ export function PosQuantityPopup({
         {/* Footer */}
         <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "#2a3140" }}>
           <p className="text-[10px] text-center pt-2" style={{ color: "#6b7280" }}>
-            Alt+←/→ variant · Q qty · P price · ↑/↓ qty · Enter add
+            {hasVariants ? "← → pick item · " : ""}↑/↓ qty · Q qty · P price · Enter add · Esc close
           </p>
           <div className="flex gap-2.5">
             <button
