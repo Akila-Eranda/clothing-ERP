@@ -49,8 +49,11 @@ export function PosQuantityPopup({
   const { profile } = useShopWorkspace();
   const hasVariants = variants.length > 1;
   const [selectedVariantId, setSelectedVariantId] = React.useState(() => variants[0]?.variantId ?? "");
-  const [qty, setQty] = React.useState(1);
+  const [qtyRaw, setQtyRaw] = React.useState("1");
+  const [priceRaw, setPriceRaw] = React.useState(String(unitPrice));
   const scrollRef = React.useRef<HTMLDivElement>(null);
+  const qtyInputRef = React.useRef<HTMLInputElement>(null);
+  const priceInputRef = React.useRef<HTMLInputElement>(null);
   const [canScrollRight, setCanScrollRight] = React.useState(false);
 
   const selectedVariant = React.useMemo(
@@ -59,16 +62,22 @@ export function PosQuantityPopup({
   );
 
   const stockLimit = Math.max(1, selectedVariant?.stock ?? maxQty);
-  const unitPriceValue = Math.max(0, selectedVariant?.unitPrice ?? unitPrice);
+  const qty = Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
+  const unitPriceValue = Math.max(0, parseFloat(priceRaw) || 0);
   const lineTotal = qty * unitPriceValue;
   const btnH = touchMode ? "h-14" : "h-12";
+  const fieldStyle = { background: "#1a1f2a", borderColor: "#2a3140" } as const;
 
   React.useEffect(() => {
     const next = variants[0];
-    if (!next) return;
+    if (!next) {
+      setPriceRaw(String(unitPrice));
+      return;
+    }
     setSelectedVariantId(next.variantId);
-    setQty(1);
-  }, [variants]);
+    setQtyRaw("1");
+    setPriceRaw(String(next.unitPrice));
+  }, [variants, unitPrice]);
 
   const refreshScrollHint = React.useCallback(() => {
     const el = scrollRef.current;
@@ -95,10 +104,44 @@ export function PosQuantityPopup({
 
   const pickVariant = (variant: PosAddPopupVariant) => {
     setSelectedVariantId(variant.variantId);
-    setQty(1);
+    setQtyRaw("1");
+    setPriceRaw(String(variant.unitPrice));
   };
 
-  const bump = (delta: number) => setQty((q) => clampQty(q + delta));
+  const bump = (delta: number) => setQtyRaw(String(clampQty(qty + delta)));
+
+  const moveVariant = React.useCallback((direction: -1 | 1) => {
+    if (!variants.length) return;
+    const current = Math.max(0, variants.findIndex((v) => v.variantId === selectedVariantId));
+    let next = current;
+    for (let checked = 0; checked < variants.length; checked += 1) {
+      next = (next + direction + variants.length) % variants.length;
+      if (variants[next].stock > 0) {
+        pickVariant(variants[next]);
+        scrollRef.current?.children[next]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "nearest",
+        });
+        break;
+      }
+    }
+  }, [selectedVariantId, variants]);
+
+  const onQtyInput = (value: string) => {
+    const cleaned = value.replace(/[^\d]/g, "");
+    if (!cleaned) {
+      setQtyRaw("");
+      return;
+    }
+    const n = parseInt(cleaned, 10);
+    if (Number.isNaN(n)) return;
+    setQtyRaw(String(Math.min(stockLimit, n)));
+  };
+
+  const onPriceInput = (value: string) => {
+    if (value === "" || /^\d*\.?\d*$/.test(value)) setPriceRaw(value);
+  };
 
   const submit = React.useCallback(() => {
     if (unitPriceValue <= 0) return;
@@ -110,30 +153,62 @@ export function PosQuantityPopup({
   }, [unitPriceValue, qty, selectedVariant, onConfirm]);
 
   React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      qtyInputRef.current?.focus();
+      qtyInputRef.current?.select();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      const inInput = e.target instanceof HTMLInputElement;
+
       if (e.key === "Escape") {
         e.preventDefault();
         onCancel();
         return;
       }
-      if (e.key === "Enter" && !(e.target instanceof HTMLInputElement)) {
+      if (e.key === "Enter") {
         e.preventDefault();
         submit();
         return;
       }
-      if (e.key === "+" || e.key === "=") {
+      if (e.altKey && e.key === "ArrowLeft") {
         e.preventDefault();
-        setQty((q) => Math.min(stockLimit, Math.max(1, q + 1)));
+        moveVariant(-1);
         return;
       }
-      if (e.key === "-") {
+      if (e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
-        setQty((q) => Math.min(stockLimit, Math.max(1, q - 1)));
+        moveVariant(1);
+        return;
+      }
+      if (!inInput && e.key.toLowerCase() === "q") {
+        e.preventDefault();
+        qtyInputRef.current?.focus();
+        qtyInputRef.current?.select();
+        return;
+      }
+      if (!inInput && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        priceInputRef.current?.focus();
+        priceInputRef.current?.select();
+        return;
+      }
+      if (!inInput && (e.key === "+" || e.key === "=" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        bump(1);
+        return;
+      }
+      if (!inInput && (e.key === "-" || e.key === "ArrowDown")) {
+        e.preventDefault();
+        bump(-1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onCancel, submit, stockLimit]);
+  }, [moveVariant, onCancel, qty, stockLimit, submit]);
 
   return (
     <div
@@ -247,7 +322,7 @@ export function PosQuantityPopup({
             </div>
           )}
 
-          {/* Quantity + Total */}
+          {/* Quantity + Unit price (both typable) */}
           <div className="grid grid-cols-2 gap-4 items-start">
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
@@ -255,79 +330,81 @@ export function PosQuantityPopup({
               </p>
               <div
                 className="flex items-center rounded-xl overflow-hidden border"
-                style={{ borderColor: "#2a3140", background: "#1a1f2a" }}
+                style={fieldStyle}
               >
                 <button
                   type="button"
                   onClick={() => bump(-1)}
                   disabled={qty <= 1}
-                  className="h-12 w-12 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5"
+                  className="h-12 w-11 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Minus className="h-4 w-4" />
                 </button>
-                <div className="flex-1 text-center text-xl font-bold text-white tabular-nums">{qty}</div>
+                <input
+                  ref={qtyInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  value={qtyRaw}
+                  onChange={(e) => onQtyInput(e.target.value)}
+                  onBlur={() => setQtyRaw(String(qty))}
+                  className="flex-1 min-w-0 h-12 bg-transparent text-center text-xl font-bold text-white tabular-nums outline-none"
+                />
                 <button
                   type="button"
                   onClick={() => bump(1)}
                   disabled={qty >= stockLimit}
-                  className="h-12 w-12 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5"
+                  className="h-12 w-11 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
             </div>
 
-            <div className="space-y-2 text-right">
+            <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Total
+                Selling price (Rs.)
               </p>
-              <p className="text-3xl font-bold tabular-nums leading-none pt-2" style={{ color: "#22c55e" }}>
-                {money(lineTotal)}
-              </p>
+              <input
+                ref={priceInputRef}
+                type="text"
+                inputMode="decimal"
+                value={priceRaw}
+                onChange={(e) => onPriceInput(e.target.value)}
+                onBlur={() => {
+                  if (!priceRaw || Number.isNaN(parseFloat(priceRaw))) setPriceRaw("0");
+                }}
+                className="w-full h-12 rounded-xl px-3 text-lg font-bold text-white tabular-nums outline-none border focus:border-[#3b82f6]"
+                style={fieldStyle}
+              />
             </div>
           </div>
 
-          {/* Quick qty */}
-          <div className="space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-              Quick qty
-            </p>
-            <div className="grid grid-cols-4 gap-2">
-              {[1, 2, 5, 10].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => bump(n)}
-                  disabled={qty >= stockLimit}
-                  className="h-10 rounded-xl text-sm font-bold text-white disabled:opacity-40 transition-opacity hover:opacity-90"
-                  style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
-                >
-                  +{n}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Unit / Subtotal */}
+          {/* Total */}
           <div
-            className="grid grid-cols-2 gap-3 pt-1 border-t"
+            className="flex items-end justify-between gap-3 pt-1 border-t"
             style={{ borderColor: "#2a3140" }}
           >
             <div className="pt-3">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Unit price
+                Unit × Qty
               </p>
-              <p className="text-sm font-semibold text-white tabular-nums mt-1">{money(unitPriceValue)}</p>
+              <p className="text-sm text-white/70 tabular-nums mt-1">
+                {money(unitPriceValue)} × {qty}
+              </p>
             </div>
             <div className="pt-3 text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Subtotal
+                Total
               </p>
-              <p className="text-sm font-bold tabular-nums mt-1" style={{ color: "#22c55e" }}>
+              <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: "#22c55e" }}>
                 {money(lineTotal)}
               </p>
             </div>
           </div>
+
+          <p className="text-[10px] text-center" style={{ color: "#6b7280" }}>
+            Alt + ←/→ variant · Q quantity · P price · ↑/↓ quantity · Enter add · Esc close
+          </p>
         </div>
 
         {/* Footer */}
