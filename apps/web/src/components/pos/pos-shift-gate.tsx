@@ -201,6 +201,16 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                 setOpeningCash(cleaned);
               }}
               onFocus={(e) => e.target.select()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void handleStart();
+                }
+                if (e.key === "Escape" && onClose) {
+                  e.preventDefault();
+                  onClose();
+                }
+              }}
               className="h-12 text-lg font-bold bg-[#1a2b4a] border-[#1e3356] text-white"
             />
             <div className="flex flex-wrap gap-2">

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -39,7 +39,7 @@ import { PosSalesReportPanel } from "@/components/pos/pos-sales-report-panel";
 import {
   readPosSoundAlerts, writePosSoundAlerts,
   readPosTouchMode, writePosTouchMode,
-  writePosAllowNegativeStock,
+  readPosAllowNegativeStock, writePosAllowNegativeStock,
   type PosTenantSettings,
 } from "@/lib/pos-settings";
 import { playPosSound } from "@/lib/pos-sound";
@@ -280,6 +280,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const adminBypass = bypassesWorkflowApproval(user?.role);
   const viewAllSales = canViewAllPosSales(user?.role);
   const [showNewCust, setShowNewCust] = React.useState(false);
+  const [cartShowNewCust, setCartShowNewCust] = React.useState(false);
   const [newCustFirst, setNewCustFirst] = React.useState("");
   const [newCustLast, setNewCustLast] = React.useState("");
   const [newCustPhone, setNewCustPhone] = React.useState("");
@@ -404,6 +405,33 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     setNumpad(s);
     setPartialPayAmount(s);
   }, []);
+
+  const focusCheckoutGiftOrCheque = React.useCallback(() => {
+    if (activePayment === "GIFT_VOUCHER") {
+      giftVoucherInputRef.current?.focus();
+      giftVoucherInputRef.current?.select();
+      return;
+    }
+    if (activePayment === "CHEQUE") {
+      chequeInputRef.current?.focus();
+      chequeInputRef.current?.select();
+      return;
+    }
+    setActivePayment("GIFT_VOUCHER");
+    requestAnimationFrame(() => {
+      giftVoucherInputRef.current?.focus();
+      giftVoucherInputRef.current?.select();
+    });
+  }, [activePayment]);
+
+  const setExactCashTender = React.useCallback(() => {
+    const s = String(Math.round(total() * 100) / 100);
+    setNumpad(s);
+    setPartialPayAmount(s);
+  }, [total]);
+
+  const openCashClose = React.useCallback(() => setShowCashClose(true), []);
+  const closeCashClose = React.useCallback(() => setShowCashClose(false), []);
 
   const applyCartDiscount = React.useCallback(async () => {
     const v = parseFloat(discountInput) || 0;
@@ -677,7 +705,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       if (el && !el.contains(e.target as Node)) {
         setCartCustomerOpen(false);
         setCustomerSearch("");
-        setShowNewCust(false);
+        setCartShowNewCust(false);
         setCustomers([]);
       }
     };
@@ -1204,7 +1232,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 
   const openCartCustomerDropdown = React.useCallback(() => {
     setShowHeldBills(false);
-    setShowNewCust(false);
+    setCartShowNewCust(false);
     setFocusedCustomerIdx(0);
     setCartCustomerOpen(true);
     setTimeout(() => cartCustomerSearchRef.current?.focus(), 50);
@@ -1453,6 +1481,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       isActive: true, createdAt: new Date(),
     });
     setCartCustomerOpen(false);
+    setCartShowNewCust(false);
     setCustomerSearch("");
     setCustomers([]);
     setShowNewCust(false);
@@ -1589,7 +1618,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     customersLength: customers.length,
     inlineCustomersLength: inlineCustomers.length,
     customerModalListLength: customers.length,
-    showNewCust,
+    showNewCust: cartCustomerOpen ? cartShowNewCust : showNewCust,
     inCheckout: checkoutOpen,
     searchRef,
     cartCustomerSearchRef,
@@ -1614,7 +1643,10 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     setFocusedHeldIdx,
     setFocusedCustomerIdx,
     setActiveCategory,
-    setShowNewCust,
+    setShowNewCust: ((v: React.SetStateAction<boolean>) => {
+      if (cartCustomerOpen) setCartShowNewCust(v);
+      else setShowNewCust(v);
+    }) as React.Dispatch<React.SetStateAction<boolean>>,
     setShowDayEnd,
     setPinLocked,
     setPinEntry,
@@ -1650,20 +1682,27 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     setQuickCash,
     payStateAllowPartial: payState.allowPartial,
     payStateSplitMode: payState.splitMode,
+    openCartCustomer: openCartCustomerDropdown,
+    openCashClose,
+    showCashClose,
+    closeCashClose,
+    setExactCashTender,
+    focusCheckoutGiftOrCheque,
     getFilteredProduct: (idx: number) => productCards[idx]?.rep,
     getHeldBill: (idx: number) => serverHeldBills[idx],
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
-    posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd,
+    posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose,
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
-    navItems, categories, activeCategory, customers, inlineCustomers, showNewCust,
+    navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
     closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
+    openCartCustomerDropdown, openCashClose, closeCashClose, setExactCashTender, focusCheckoutGiftOrCheque,
     payState.allowPartial, payState.splitMode,
   ]);
 
@@ -1671,7 +1710,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     if (activeNav === "hold-bills") openHeldBillsPopup();
   }, [activeNav, openHeldBillsPopup]);
 
-  usePosKeyboard(keyboardCtx);
+  usePosKeyboard(keyboardCtx as Parameters<typeof usePosKeyboard>[0]);
 
   React.useEffect(() => {
     if (posOpen && !pinLocked) {
@@ -2532,6 +2571,41 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               </div>
             ))}
           </div>
+          {/* Inventory admin */}
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
+            <h3 className="text-white font-bold text-base mb-1">Inventory (Admin)</h3>
+            <div className="flex items-center gap-3 py-2">
+              <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background: allowNegativeStock ? "rgba(245,158,11,0.15)" : "rgba(79,110,247,0.15)"}}>
+                <AlertTriangle className="h-4 w-4" style={{color: allowNegativeStock ? "#fbbf24" : "#4f6ef7"}}/>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-semibold">Allow negative stock</p>
+                <p className="text-[11px]" style={{color:"#6a8ab8"}}>
+                  Sell when stock is 0 — inventory can go minus. Admin setting.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !allowNegativeStock;
+                  const prev = allowNegativeStock;
+                  writePosAllowNegativeStock(next);
+                  setAllowNegativeStock(next);
+                  void api.put("/tenants/pos-settings", { allowNegativeStock: next })
+                    .then(() => toast.success(next ? "Negative stock ON — out-of-stock sales allowed" : "Negative stock OFF — out-of-stock blocked"))
+                    .catch((e: unknown) => {
+                      writePosAllowNegativeStock(prev);
+                      setAllowNegativeStock(prev);
+                      toast.error((e as Error).message ?? "Admin permission required to change this setting");
+                    });
+                }}
+                className="px-3 h-8 rounded-lg text-xs font-bold shrink-0"
+                style={{background: allowNegativeStock ? "#f59e0b" : "#1a2b4a", color: allowNegativeStock ? "#fff" : "#6a8ab8"}}
+              >
+                {allowNegativeStock ? "ON" : "OFF"}
+              </button>
+            </div>
+          </div>
           {/* Tax Rate */}
           <div className="rounded-2xl border p-5" style={{background:"#162338",borderColor:"#1e3356"}}>
             <div className="flex items-center gap-3 mb-4">
@@ -2796,7 +2870,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   if (cartCustomerOpen) {
                     setCartCustomerOpen(false);
                     setCustomerSearch("");
-                    setShowNewCust(false);
+                    setCartShowNewCust(false);
                     setCustomers([]);
                   } else {
                     openCartCustomerDropdown();
@@ -2848,24 +2922,24 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     <input
                       ref={cartCustomerSearchRef}
                       value={customerSearch}
-                      onChange={(e) => { setCustomerSearch(e.target.value); setShowNewCust(false); setFocusedCustomerIdx(0); }}
+                      onChange={(e) => { setCustomerSearch(e.target.value); setCartShowNewCust(false); setFocusedCustomerIdx(0); }}
                       placeholder="Search name or phone..."
                       className="flex-1 h-8 px-1.5 text-xs text-white outline-none bg-transparent"
                     />
                     <button
                       type="button"
                       onClick={() => {
-                        setShowNewCust((s) => !s);
-                        if (!showNewCust && /^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
+                        setCartShowNewCust((s) => !s);
+                        if (!cartShowNewCust && /^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
                       }}
                       className="h-7 px-2 rounded-lg text-[10px] font-bold text-white shrink-0 flex items-center gap-1"
-                      style={{ background: showNewCust ? "#162338" : "#4f6ef7", border: showNewCust ? "1px solid #4f6ef7" : "none" }}
+                      style={{ background: cartShowNewCust ? "#162338" : "#4f6ef7", border: cartShowNewCust ? "1px solid #4f6ef7" : "none" }}
                     >
-                      {showNewCust ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      {showNewCust ? "Cancel" : "Register"}
+                      {cartShowNewCust ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+                      {cartShowNewCust ? "Cancel" : "Register"}
                     </button>
                   </div>
-                  {showNewCust && (
+                  {cartShowNewCust && (
                     <div className="p-2 border-b space-y-1.5" style={{ borderColor: "#1e3356", background: "#162338" }}>
                       <div className="grid grid-cols-2 gap-1.5">
                         <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "#1a2b4a", border: "1px solid #1e3356" }} />
@@ -2886,9 +2960,9 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                         setCustomerInsight(null);
                         setPreviewCustomerId(null);
                         setCartCustomerOpen(false);
+                        setCartShowNewCust(false);
                         setCustomerSearch("");
                         setCustomers([]);
-                        setShowNewCust(false);
                         toast.info("Walk-in customer");
                       }}
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-left"
@@ -2906,13 +2980,13 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     {customerLoading && (
                       <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" style={{ color: "#4f6ef7" }} /></div>
                     )}
-                    {!customerLoading && customers.length === 0 && customerSearch && !showNewCust && (
+                    {!customerLoading && customers.length === 0 && customerSearch && !cartShowNewCust && (
                       <div className="text-center py-4 space-y-2">
                         <p className="text-xs" style={{ color: "#4a6a8a" }}>No customers found</p>
                         <button
                           type="button"
                           onClick={() => {
-                            setShowNewCust(true);
+                            setCartShowNewCust(true);
                             if (/^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
                           }}
                           className="text-[10px] font-bold px-3 h-7 rounded-lg text-white"

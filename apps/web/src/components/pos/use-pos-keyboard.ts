@@ -125,6 +125,15 @@ export interface PosKeyboardContext {
   setQuickCash: (amt: number) => void;
   payStateAllowPartial: boolean;
   payStateSplitMode: boolean;
+  /** Cart customer dropdown (F4) */
+  openCartCustomer: () => void;
+  /** Close shift cash drawer */
+  openCashClose: () => void;
+  showCashClose: boolean;
+  closeCashClose: () => void;
+  /** Fill cash tender = bill total */
+  setExactCashTender: () => void;
+  focusCheckoutGiftOrCheque: () => void;
   getFilteredProduct: (idx: number) => PosProductItem | undefined;
   getHeldBill: (idx: number) => PosHeldBill | undefined;
   getCustomerModalItem: (idx: number) => PosCustomerRow | undefined;
@@ -145,6 +154,7 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.showHeldBills
     || ctx.showShortcuts
     || ctx.showDayEnd
+    || ctx.showCashClose
     || ctx.qtyPopupOpen
     || !!ctx.selectedProductName
   );
@@ -196,6 +206,15 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      // Cash close owns its own keys; only Esc is handled here as fallback
+      if (ctx.showCashClose) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.closeCashClose();
+        }
+        return;
+      }
+
       // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
@@ -244,6 +263,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (e.key === "Escape") {
         e.preventDefault();
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
+        if (ctx.showCashClose) { ctx.closeCashClose(); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }
@@ -291,9 +311,12 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
       if (e.key === "F4") {
         e.preventDefault();
-        ctx.setShowCustomerSearch(false);
-        ctx.setFocusedCustomerIdx(0);
-        ctx.setActiveNav("customers");
+        ctx.openCartCustomer();
+        return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        ctx.openCashClose();
         return;
       }
       if (e.key === "F5") {
@@ -431,11 +454,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (inInput && e.key === "Enter" && !isSearch) {
         return;
       }
-      // While typing a search query, don't steal letter keys / nav for tools
       if (inInput && !isSearch) return;
-      if (isSearch && !searchEmpty) {
-        // Still allow Ctrl/Alt shortcuts while filtering
-        if (!(e.ctrlKey || e.metaKey || e.altKey)) return;
+      // Barcode search focused → letters type/scan; tool letters need Alt+key
+      if (isSearch && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+        return;
       }
 
       if (e.altKey && /^[1-9]$/.test(e.key) && !ctx.checkoutOpen) {
@@ -459,26 +481,28 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       }
 
       const key = e.key.toLowerCase();
+      // Letter tools: work when search not focused, OR with Alt while searching
+      const letterToolsOk = !isSearch || e.altKey;
 
       // Letter shortcuts for full POS tools (checkout remaps some keys)
-      if (key === "p" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("products"); setTimeout(() => ctx.searchRef.current?.focus(), 50); return; }
-      if (key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
-      if (key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
-      if (key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
-      if (key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
-      if (key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }
-      if (key === "o") { e.preventDefault(); ctx.setActiveNav("orders"); return; }
-      if (key === "v") { e.preventDefault(); ctx.setActiveNav("vouchers"); return; }
-      if (key === "b" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); ctx.setActiveNav("quick-grn"); return; }
-      if (key === "e") { e.preventDefault(); ctx.setActiveNav("expenses"); return; }
-      if (key === "w") { e.preventDefault(); ctx.setActiveNav("warranty"); return; }
-      if (key === "m") { e.preventDefault(); ctx.setActiveNav("discounts"); return; }
-      if (key === "t") { e.preventDefault(); ctx.setActiveNav("reports"); return; }
-      if (key === "g") { e.preventDefault(); ctx.setActiveNav("settings"); return; }
-      if (key === "n" && (ctx.showCustomerSearch || ctx.activeNav === "customers")) { e.preventDefault(); ctx.setShowNewCust(true); return; }
-      if (key === "x") { e.preventDefault(); ctx.setCustomer(null); toast.info("Customer removed from bill"); return; }
-      if (key === "d") { e.preventDefault(); ctx.discountInputRef.current?.focus(); return; }
-      if (key === "s" && !(ctx.checkoutOpen && e.shiftKey)) { e.preventDefault(); if (ctx.checkoutOpen) return; void ctx.handleSplitBill(); return; }
+      if (letterToolsOk && key === "p" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("products"); setTimeout(() => ctx.searchRef.current?.focus(), 50); return; }
+      if (letterToolsOk && key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
+      if (letterToolsOk && key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
+      if (letterToolsOk && key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
+      if (letterToolsOk && key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
+      if (letterToolsOk && key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }
+      if (letterToolsOk && key === "o") { e.preventDefault(); ctx.setActiveNav("orders"); return; }
+      if (letterToolsOk && key === "v") { e.preventDefault(); ctx.setActiveNav("vouchers"); return; }
+      if (letterToolsOk && key === "b" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); ctx.setActiveNav("quick-grn"); return; }
+      if (letterToolsOk && key === "e") { e.preventDefault(); ctx.setActiveNav("expenses"); return; }
+      if (letterToolsOk && key === "w") { e.preventDefault(); ctx.setActiveNav("warranty"); return; }
+      if (letterToolsOk && key === "m") { e.preventDefault(); ctx.setActiveNav("discounts"); return; }
+      if (letterToolsOk && key === "t") { e.preventDefault(); ctx.setActiveNav("reports"); return; }
+      if (letterToolsOk && key === "g") { e.preventDefault(); ctx.setActiveNav("settings"); return; }
+      if (letterToolsOk && key === "n" && (ctx.showCustomerSearch || ctx.activeNav === "customers")) { e.preventDefault(); ctx.setShowNewCust(true); return; }
+      if (letterToolsOk && key === "x" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setCustomer(null); toast.info("Customer removed from bill"); return; }
+      if (letterToolsOk && key === "d") { e.preventDefault(); ctx.discountInputRef.current?.focus(); return; }
+      if (letterToolsOk && key === "s" && !(ctx.checkoutOpen && e.shiftKey)) { e.preventDefault(); if (ctx.checkoutOpen) return; void ctx.handleSplitBill(); return; }
       if (key === "/" && !ctx.checkoutOpen) { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.setActiveNav("products"); return; }
       if ((e.ctrlKey || e.metaKey) && key === "f" && !ctx.checkoutOpen) { e.preventDefault(); ctx.searchRef.current?.focus(); ctx.setActiveNav("products"); return; }
 
@@ -505,6 +529,17 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           e.preventDefault();
           if (!ctx.payStateAllowPartial) ctx.toggleCheckoutPartial();
           else ctx.focusCheckoutPartialPay();
+          return;
+        }
+        if (e.key === "=" || ((e.ctrlKey || e.metaKey) && key === "e")) {
+          e.preventDefault();
+          ctx.setActivePayment("CASH");
+          ctx.setExactCashTender();
+          return;
+        }
+        if ((e.ctrlKey || e.metaKey) && key === "g") {
+          e.preventDefault();
+          ctx.focusCheckoutGiftOrCheque();
           return;
         }
         if (e.shiftKey && key === "s") {

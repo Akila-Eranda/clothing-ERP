@@ -15,6 +15,14 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
     ],
   },
   {
+    title: "Scan & type",
+    items: [
+      ["Letters in search", "Type / scan barcode only (tools do not steal keys)"],
+      ["Alt+letter", "POS tools while search is focused (Alt+Q, Alt+R, …)"],
+      ["Enter (search)", "Add focused / first match · complete scan"],
+    ],
+  },
+  {
     title: "Add product popup",
     items: [
       ["← →", "Pick same-barcode item / variant"],
@@ -27,7 +35,6 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
   {
     title: "Products & cart",
     items: [
-      ["Enter (search)", "Add focused / first match · scan barcode"],
       ["↑ ↓ (search)", "Navigate search results"],
       ["Ctrl+↑↓←→", "Move product grid focus"],
       ["Enter", "Add focused product"],
@@ -42,10 +49,11 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
   {
     title: "Customers & holds",
     items: [
-      ["F4 / U", "Customer popup"],
-      ["N", "Register new customer (in popup)"],
+      ["F4", "Open cart customer dropdown"],
+      ["U", "Customers sidebar (Alt+U while search focused)"],
+      ["N", "Register new customer (in customer UI)"],
       ["X", "Remove customer from bill"],
-      ["↑↓ Enter", "Pick customer in popup"],
+      ["↑↓ Enter", "Pick customer"],
       ["F3", "Hold current bill"],
       ["F8 / H", "Held bills / recent bills"],
       ["↑↓ Enter (holds)", "Navigate · restore held bill"],
@@ -62,6 +70,8 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
       ["Tab / Shift+Tab / ← →", "Cycle payment method"],
       ["1 – 5", "Pick method (when not on Cash)"],
       ["Alt+1 – 5", "Pick payment method anytime"],
+      ["= / Ctrl+E", "Exact cash tender (= bill total)"],
+      ["Ctrl+G", "Focus gift voucher / cheque field"],
       ["/ / C (checkout)", "Focus coupon field"],
       ["L (checkout)", "Toggle partial pay · focus amount"],
       ["Shift+S (checkout)", "Toggle split payment"],
@@ -76,21 +86,25 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
   {
     title: "POS tools (sidebar)",
     items: [
-      ["Q", "New Product (quick add)"],
-      ["O", "Orders (today’s sales)"],
-      ["V", "Gift vouchers"],
-      ["B", "Quick GRN"],
-      ["E", "Quick expense"],
-      ["R", "Returns"],
-      ["W", "Warranty"],
-      ["M", "Discounts & promotions"],
-      ["T", "Sales reports"],
-      ["G", "POS settings"],
+      ["Q / Alt+Q", "New Product (quick add)"],
+      ["O / Alt+O", "Orders (today’s sales)"],
+      ["V / Alt+V", "Gift vouchers"],
+      ["B / Alt+B", "Quick GRN"],
+      ["E / Alt+E", "Quick expense"],
+      ["R / Alt+R", "Returns"],
+      ["W / Alt+W", "Warranty"],
+      ["M / Alt+M", "Discounts & promotions"],
+      ["T / Alt+T", "Sales reports"],
+      ["G / Alt+G", "POS settings"],
     ],
   },
   {
     title: "Shift & lock",
     items: [
+      ["Ctrl+Shift+S", "Close cash shift"],
+      ["Enter (open shift)", "Start shift with opening cash"],
+      ["Esc (close shift)", "Cancel close-shift dialog"],
+      ["Ctrl+Enter / F9 (close)", "Confirm close shift"],
       ["F11", "Day end summary"],
       ["F12", "Lock POS (PIN) / exit if no PIN"],
       ["0–9 (lock)", "Enter PIN digits"],

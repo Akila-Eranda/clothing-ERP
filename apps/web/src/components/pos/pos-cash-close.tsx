@@ -59,7 +59,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
     setDenominations((prev) => ({ ...prev, [String(denom)]: n }));
   };
 
-  const handleClose = async () => {
+  const handleClose = React.useCallback(async () => {
     if (!active) return;
     if (actualTotal <= 0) {
       toast.error("Enter physical cash count");
@@ -84,7 +84,25 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
     } finally {
       setClosing(false);
     }
-  };
+  }, [active, actualTotal, denominations, notes, variance, onClosed]);
+
+  React.useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        onCancel();
+        return;
+      }
+      if ((e.key === "F9" || ((e.ctrlKey || e.metaKey) && e.key === "Enter")) && !closing && actualTotal > 0 && active) {
+        e.preventDefault();
+        e.stopPropagation();
+        void handleClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onCancel, closing, actualTotal, active, handleClose]);
 
   if (loading) {
     return (
