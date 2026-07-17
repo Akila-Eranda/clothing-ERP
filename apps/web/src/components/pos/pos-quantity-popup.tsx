@@ -252,6 +252,10 @@ export function PosQuantityPopup({
     return () => window.removeEventListener("keydown", onKey, true);
   }, [moveVariant, onCancel, qty, stockLimit, submit]);
 
+  const variantLayout = variants.length <= 3 ? "grid" : "scroll";
+  const variantGridClass =
+    variants.length === 1 ? "grid-cols-1" : variants.length === 2 ? "grid-cols-2" : "grid-cols-3";
+
   return (
     <div
       className="fixed inset-0 z-[120] flex items-center justify-center p-4"
@@ -259,49 +263,51 @@ export function PosQuantityPopup({
       onClick={(e) => { if (e.target === e.currentTarget) onCancel(); }}
     >
       <div
-        className="w-full max-w-lg rounded-2xl border overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
+        className="w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
         style={{ background: "#12151c", borderColor: "#2a3140" }}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 px-4 py-3.5 border-b shrink-0" style={{ borderColor: "#2a3140" }}>
-          <p className="text-white font-bold text-base truncate min-w-0">{headerTitle}</p>
-          <span
-            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md"
-            style={{ background: "rgba(79,110,247,0.22)", color: "#8ba3ff" }}
-          >
-            Max {stockLimit}
-          </span>
-          <span
-            className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md"
-            style={{ background: "rgba(16,185,129,0.18)", color: "#34d399" }}
-          >
-            Stock {selectedVariant?.stock ?? maxQty}
-          </span>
-          {!hasVariants && variantName ? (
-            <span className="text-xs truncate hidden sm:inline" style={{ color: "#6b7280" }}>{variantName}</span>
-          ) : null}
-          <button
-            type="button"
-            onClick={onCancel}
-            className="ml-auto p-1.5 rounded-lg hover:bg-white/10 shrink-0"
-          >
-            <X className="h-4 w-4 text-white" />
-          </button>
+        <div className="px-4 pt-4 pb-3 border-b shrink-0 space-y-2" style={{ borderColor: "#2a3140" }}>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-white font-bold text-lg leading-tight truncate">{headerTitle}</p>
+              {!hasVariants && variantName ? (
+                <p className="text-xs mt-1 truncate" style={{ color: "#9ca3af" }}>{variantName}</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="p-2 rounded-lg hover:bg-white/10 shrink-0 -mt-0.5"
+            >
+              <X className="h-4 w-4 text-white/80" />
+            </button>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: "rgba(79,110,247,0.18)", color: "#93b4ff" }}
+            >
+              Max qty {stockLimit}
+            </span>
+            <span
+              className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
+              style={{ background: "rgba(16,185,129,0.15)", color: "#4ade80" }}
+            >
+              {selectedVariant?.stock ?? maxQty} in stock
+            </span>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-          {/* Variants — horizontal cards */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
+          {/* Variants */}
           {hasVariants && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                {crossProductPick ? "Select item (same barcode)" : "Select variant"}
+            <div className="space-y-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+                {crossProductPick ? "Same barcode — pick item" : "Pick variant"}
               </p>
-              <div className="relative">
-                <div
-                  ref={scrollRef}
-                  className="flex gap-2.5 overflow-x-auto pb-1 pr-6 scrollbar-thin"
-                  style={{ scrollbarWidth: "thin" }}
-                >
+              {variantLayout === "grid" ? (
+                <div className={`grid ${variantGridClass} gap-2.5`}>
                   {variants.map((v) => {
                     const active = selectedVariantId === v.variantId;
                     const out = v.stock <= 0;
@@ -311,29 +317,30 @@ export function PosQuantityPopup({
                         type="button"
                         disabled={out}
                         onClick={() => pickVariant(v)}
-                        className="shrink-0 w-[148px] rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
+                        className="rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
                         style={{
-                          background: active ? "rgba(59,130,246,0.12)" : "#1a1f2a",
+                          background: active ? "rgba(59,130,246,0.14)" : "#1a1f2a",
                           borderColor: active ? "#3b82f6" : "#2a3140",
+                          boxShadow: active ? "0 0 0 1px rgba(59,130,246,0.35)" : undefined,
                         }}
                       >
-                        <div className="flex items-start justify-between gap-1 mb-1.5">
+                        <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0">
                             {crossProductPick ? (
                               <>
-                                <p className="text-sm font-bold text-white leading-tight line-clamp-2">{v.productName}</p>
-                                <p className="text-[10px] mt-0.5 truncate" style={{ color: "#9ca3af" }}>
+                                <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{v.productName}</p>
+                                <p className="text-[11px] mt-0.5 truncate" style={{ color: "#9ca3af" }}>
                                   {variantDisplayLabel(v, profile) || v.variantName}
                                 </p>
                               </>
                             ) : (
-                              <p className="text-sm font-bold text-white leading-tight line-clamp-2">
+                              <p className="text-sm font-semibold text-white leading-snug line-clamp-2">
                                 {variantDisplayLabel(v, profile) || v.variantName}
                               </p>
                             )}
                           </div>
                           <span
-                            className="mt-0.5 h-3.5 w-3.5 rounded-full border-2 shrink-0"
+                            className="mt-0.5 h-4 w-4 rounded-full border-2 shrink-0"
                             style={{
                               borderColor: active ? "#3b82f6" : "#4b5563",
                               background: active ? "#3b82f6" : "transparent",
@@ -341,55 +348,94 @@ export function PosQuantityPopup({
                             }}
                           />
                         </div>
-                        <p
-                          className="text-sm font-bold tabular-nums"
-                          style={{ color: active ? "#60a5fa" : "#e5e7eb" }}
-                        >
-                          {money(v.unitPrice)}
-                        </p>
-                        <p
-                          className="text-[11px] mt-0.5 font-medium"
-                          style={{ color: v.stock > 0 ? "#34d399" : "#f87171" }}
-                        >
-                          {v.stock} in stock
-                        </p>
+                        <div className="flex items-end justify-between gap-2">
+                          <p className="text-sm font-bold tabular-nums" style={{ color: active ? "#60a5fa" : "#f3f4f6" }}>
+                            {money(v.unitPrice)}
+                          </p>
+                          <p className="text-[11px] font-medium tabular-nums" style={{ color: v.stock > 0 ? "#4ade80" : "#f87171" }}>
+                            {v.stock} left
+                          </p>
+                        </div>
                       </button>
                     );
                   })}
                 </div>
-                {canScrollRight && (
+              ) : (
+                <div className="relative">
                   <div
-                    className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 flex items-center justify-end"
-                    style={{ background: "linear-gradient(90deg, transparent, #12151c 70%)" }}
+                    ref={scrollRef}
+                    className="flex gap-2.5 overflow-x-auto pb-1 pr-6 scrollbar-thin"
+                    style={{ scrollbarWidth: "thin" }}
                   >
-                    <div
-                      className="pointer-events-auto h-8 w-8 rounded-full flex items-center justify-center mr-0.5"
-                      style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
-                      onClick={() => scrollRef.current?.scrollBy({ left: 140, behavior: "smooth" })}
-                    >
-                      <ChevronRight className="h-4 w-4" style={{ color: "#9ca3af" }} />
-                    </div>
+                    {variants.map((v) => {
+                      const active = selectedVariantId === v.variantId;
+                      const out = v.stock <= 0;
+                      return (
+                        <button
+                          key={v.variantId}
+                          type="button"
+                          disabled={out}
+                          onClick={() => pickVariant(v)}
+                          className="shrink-0 w-[140px] rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
+                          style={{
+                            background: active ? "rgba(59,130,246,0.14)" : "#1a1f2a",
+                            borderColor: active ? "#3b82f6" : "#2a3140",
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-1 mb-2">
+                            <p className="text-sm font-semibold text-white leading-snug line-clamp-2">
+                              {crossProductPick ? v.productName : (variantDisplayLabel(v, profile) || v.variantName)}
+                            </p>
+                            <span
+                              className="mt-0.5 h-3.5 w-3.5 rounded-full border-2 shrink-0"
+                              style={{
+                                borderColor: active ? "#3b82f6" : "#4b5563",
+                                background: active ? "#3b82f6" : "transparent",
+                                boxShadow: active ? "inset 0 0 0 2px #12151c" : undefined,
+                              }}
+                            />
+                          </div>
+                          <p className="text-sm font-bold tabular-nums" style={{ color: active ? "#60a5fa" : "#e5e7eb" }}>
+                            {money(v.unitPrice)}
+                          </p>
+                          <p className="text-[11px] mt-0.5 font-medium" style={{ color: v.stock > 0 ? "#4ade80" : "#f87171" }}>
+                            {v.stock} left
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                  {canScrollRight && (
+                    <div
+                      className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 flex items-center justify-end"
+                      style={{ background: "linear-gradient(90deg, transparent, #12151c 70%)" }}
+                    >
+                      <div
+                        className="pointer-events-auto h-8 w-8 rounded-full flex items-center justify-center mr-0.5"
+                        style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
+                        onClick={() => scrollRef.current?.scrollBy({ left: 140, behavior: "smooth" })}
+                      >
+                        <ChevronRight className="h-4 w-4" style={{ color: "#9ca3af" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
-          {/* Quantity + Unit price (both typable) */}
-          <div className="grid grid-cols-2 gap-4 items-start">
+          {/* Quantity + price */}
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
                 Quantity
               </p>
-              <div
-                className="flex items-center rounded-xl overflow-hidden border"
-                style={fieldStyle}
-              >
+              <div className="flex items-center rounded-xl overflow-hidden border h-12" style={fieldStyle}>
                 <button
                   type="button"
                   onClick={() => bump(-1)}
                   disabled={qty <= 1}
-                  className="h-12 w-11 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Minus className="h-4 w-4" />
                 </button>
@@ -400,13 +446,13 @@ export function PosQuantityPopup({
                   value={qtyRaw}
                   onChange={(e) => onQtyInput(e.target.value)}
                   onBlur={() => setQtyRaw(String(qty))}
-                  className="flex-1 min-w-0 h-12 bg-transparent text-center text-xl font-bold text-white tabular-nums outline-none"
+                  className="flex-1 min-w-0 h-full bg-transparent text-center text-lg font-bold text-white tabular-nums outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => bump(1)}
                   disabled={qty >= stockLimit}
-                  className="h-12 w-11 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -414,14 +460,16 @@ export function PosQuantityPopup({
             </div>
 
             <div className="space-y-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Sale price (Rs.)
-              </p>
-              {listPrice > (selectedVariant?.unitPrice ?? unitPrice) + 0.001 ? (
-                <p className="text-[10px] tabular-nums -mb-1" style={{ color: "#9ca3af" }}>
-                  List price {money(listPrice)}
+              <div className="flex items-center justify-between gap-2 min-h-[16px]">
+                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+                  Sale price
                 </p>
-              ) : null}
+                {hasPriceCut ? (
+                  <p className="text-[10px] tabular-nums truncate" style={{ color: "#9ca3af" }}>
+                    List {money(listPrice)}
+                  </p>
+                ) : null}
+              </div>
               <input
                 ref={priceInputRef}
                 type="text"
@@ -441,20 +489,20 @@ export function PosQuantityPopup({
             </div>
           </div>
 
-          {/* Total */}
+          {/* Summary card */}
           <div
-            className="flex items-end justify-between gap-3 pt-1 border-t"
-            style={{ borderColor: "#2a3140" }}
+            className="rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4"
+            style={{ background: "#1a1f2a", borderColor: "#2a3140" }}
           >
-            <div className="pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Unit × Qty
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+                Line total
               </p>
-              <p className="text-sm text-white/70 tabular-nums mt-1">
+              <p className="text-sm text-white/80 tabular-nums mt-1">
                 {hasPriceCut ? (
                   <>
-                    <span style={{ textDecoration: "line-through" }}>{money(listPrice)}</span>
-                    {" → "}
+                    <span className="line-through text-white/45">{money(listPrice)}</span>
+                    <span className="mx-1.5 text-white/35">→</span>
                     {money(unitPriceValue)} × {qty}
                   </>
                 ) : (
@@ -462,54 +510,50 @@ export function PosQuantityPopup({
                 )}
               </p>
               {hasPriceCut ? (
-                <p className="text-xs mt-1 tabular-nums" style={{ color: "#fbbf24" }}>
-                  Discount -{money(lineDiscount)}
+                <p className="text-xs mt-1 tabular-nums font-medium" style={{ color: "#fbbf24" }}>
+                  Discount −{money(lineDiscount)}
                 </p>
               ) : null}
             </div>
-            <div className="pt-3 text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Total
-              </p>
-              <p className="text-3xl font-bold tabular-nums mt-1" style={{ color: "#22c55e" }}>
+            <div className="text-right shrink-0">
+              <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: "#22c55e" }}>
                 {money(lineTotal)}
               </p>
             </div>
           </div>
-
-          <p className="text-[10px] text-center" style={{ color: "#6b7280" }}>
-            Alt + ←/→ variant · Q quantity · P price · ↑/↓ quantity · Enter add · Esc close
-          </p>
         </div>
 
         {/* Footer */}
-        <div className="flex gap-2.5 px-4 pb-4 pt-1 shrink-0">
-          <button
-            type="button"
-            onClick={onCancel}
-            className={`flex-1 ${btnH} rounded-xl font-semibold text-white`}
-            style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={unitPriceValue <= 0 || (selectedVariant?.stock ?? maxQty) <= 0}
-            className={`flex-[1.4] ${btnH} rounded-xl font-bold text-white disabled:opacity-40 flex items-center justify-between gap-2 px-3`}
-            style={{ background: "#16a34a" }}
-          >
-            <span className="flex items-center gap-2 pl-1">
-              <ShoppingCart className="h-4 w-4" />
-              Add to Cart
-            </span>
-            <span
-              className="text-xs font-bold tabular-nums px-2.5 py-1 rounded-lg shrink-0"
-              style={{ background: "rgba(0,0,0,0.28)" }}
+        <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "#2a3140" }}>
+          <p className="text-[10px] text-center pt-2" style={{ color: "#6b7280" }}>
+            Alt+←/→ variant · Q qty · P price · ↑/↓ qty · Enter add
+          </p>
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={onCancel}
+              className={`flex-1 ${btnH} rounded-xl font-semibold text-white/90 hover:bg-white/5 transition-colors`}
+              style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
             >
-              {money(lineTotal)}
-            </span>
-          </button>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={submit}
+              disabled={unitPriceValue <= 0 || (selectedVariant?.stock ?? maxQty) <= 0}
+              className={`flex-[1.35] ${btnH} rounded-xl font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2.5 transition-opacity`}
+              style={{ background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)" }}
+            >
+              <ShoppingCart className="h-4 w-4 shrink-0" />
+              <span>Add to Cart</span>
+              <span
+                className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-md"
+                style={{ background: "rgba(0,0,0,0.22)" }}
+              >
+                {money(lineTotal)}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
