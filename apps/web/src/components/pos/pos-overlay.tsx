@@ -2756,87 +2756,60 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                   {items.length===0?(
                     <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Scan barcode to begin</p></div>
                   ):(
-                    <div className="p-3 space-y-2">
+                    <div className="px-2 py-1.5 space-y-1">
                       <AnimatePresence>{items.map((item,idx)=>{
-                        const lineDisc = calcPosLineDiscount(item);
                         const afterDisc = calcPosLineNet(item);
-                        const finalUnit = item.quantity > 0 ? afterDisc / item.quantity : item.unitPrice;
                         const lineTax = afterDisc * ((item.taxRate || 0) / 100);
                         const lineTotal = afterDisc + lineTax;
                         const editing = editingCartQtyIdx === idx;
-                        const showVariant = Boolean(
-                          item.variantName
-                          && item.variantName !== "Single"
-                          && item.variantName !== item.productName,
-                        );
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
-                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all"
+                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-9 w-9 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(item.variantName)} iconClassName="h-4 w-4 text-white/20" />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-white text-sm font-semibold truncate leading-tight">{item.productName}</p>
-                                {(showVariant || lineDisc > 0) && (
-                                  <p className="text-[11px] truncate mt-0.5 tabular-nums" style={{color:"#6a8ab8"}}>
-                                    {showVariant ? <span>{item.variantName}</span> : null}
-                                    {showVariant && lineDisc > 0 ? <span> · </span> : null}
-                                    {lineDisc > 0 ? (
-                                      <>
-                                        <span style={{ textDecoration: "line-through" }}>LKR {formatNumber(item.unitPrice)}</span>
-                                        {" "}
-                                        <span className="text-white/90">LKR {formatNumber(finalUnit)}</span>
-                                      </>
-                                    ) : null}
-                                  </p>
-                                )}
-                              </div>
-                              <p className="text-white text-sm font-bold shrink-0 tabular-nums leading-tight">LKR {formatNumber(lineTotal)}</p>
-                            </div>
-                            <div className="flex items-center justify-end gap-1 shrink-0 mt-1.5 group">
-                                <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
-                                {editing ? (
-                                  <input
-                                    autoFocus
-                                    value={editingCartQtyRaw}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
-                                    onBlur={() => {
-                                      const n = parseInt(editingCartQtyRaw, 10);
-                                      if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
-                                      setEditingCartQtyIdx(null);
-                                    }}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        (e.target as HTMLInputElement).blur();
-                                      }
-                                      if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        setEditingCartQtyIdx(null);
-                                      }
-                                    }}
-                                    className="w-8 h-6 rounded text-center text-xs font-bold text-white outline-none"
-                                    style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
-                                  />
-                                ) : (
-                                  <span
-                                    title="Double-click to edit"
-                                    onDoubleClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingCartQtyIdx(idx);
-                                      setEditingCartQtyRaw(String(item.quantity));
-                                    }}
-                                    className="text-white text-xs font-bold w-6 text-center select-none"
-                                  >
-                                    {item.quantity}
-                                  </span>
-                                )}
-                                <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
-                                <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
-                            </div>
+                          <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">{item.productName}</p>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
+                            {editing ? (
+                              <input
+                                autoFocus
+                                value={editingCartQtyRaw}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
+                                onBlur={() => {
+                                  const n = parseInt(editingCartQtyRaw, 10);
+                                  if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
+                                  setEditingCartQtyIdx(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    (e.target as HTMLInputElement).blur();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    setEditingCartQtyIdx(null);
+                                  }
+                                }}
+                                className="w-7 h-6 rounded text-center text-xs font-bold text-white outline-none"
+                                style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
+                              />
+                            ) : (
+                              <span
+                                title="Double-click to edit"
+                                onDoubleClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingCartQtyIdx(idx);
+                                  setEditingCartQtyRaw(String(item.quantity));
+                                }}
+                                className="text-white text-xs font-bold w-6 text-center select-none tabular-nums"
+                              >
+                                {item.quantity}
+                              </span>
+                            )}
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
                           </div>
+                          <p className="text-sm font-bold text-white tabular-nums leading-tight shrink-0 min-w-[4.5rem] text-right">LKR {formatNumber(lineTotal)}</p>
+                          <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
                         </motion.div>
                         );
                       })}</AnimatePresence>
