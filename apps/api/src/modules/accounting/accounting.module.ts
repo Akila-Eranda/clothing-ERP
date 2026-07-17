@@ -2232,14 +2232,14 @@ export class AccountingController {
   async exportFinancialReport(
     @CurrentUser() user: IAuthUser,
     @Param('type') type: string,
-    @Query('format') format: 'pdf' | 'xlsx' = 'pdf',
+    @Res({ passthrough: true }) res: Response,
+    @Query('format') format?: 'pdf' | 'xlsx',
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('accountId') accountId?: string,
     @Query('customerId') customerId?: string,
     @Query('supplierId') supplierId?: string,
     @Query('branchId') branchId?: string,
-    @Res({ passthrough: true }) res: Response,
   ) {
     const fmt = format === 'xlsx' ? 'xlsx' : 'pdf';
     const out = await this.financialReportsService.export(user.tenantId, type, fmt, {
