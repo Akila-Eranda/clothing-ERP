@@ -85,10 +85,20 @@ function useNavGroups(): NavGroup[] {
     { label: L["/inventory/expiry/reconcile"] ?? "Reconciliation", href: "/inventory/expiry/reconcile", icon: Scale },
   ];
 
-  const productItems: NavItem[] = [
+  /** Catalog only — keeps product setup separate from stock ops */
+  const catalogItems: NavItem[] = [
     { label: L["/products"], href: "/products", icon: Package },
     { label: L["/categories"], href: "/categories", icon: Layers },
     ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
+    ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
+    ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
+    ...(hasShopModule(profile, "workshop") ? [{ label: L["/job-cards"], href: "/job-cards", icon: ClipboardList }] : []),
+    ...(hasShopModule(profile, "workshop") ? [{ label: L["/services"], href: "/services", icon: Cog }] : []),
+    ...(hasShopModule(profile, "appointments") ? [{ label: L["/appointments"], href: "/appointments", icon: Calendar }] : []),
+  ];
+
+  /** Stock, warehouse, expiry — one clear Inventory section */
+  const inventoryItems: NavItem[] = [
     {
       label: "Inventory",
       icon: Warehouse,
@@ -99,17 +109,12 @@ function useNavGroups(): NavGroup[] {
     { label: L["/warehouse"] ?? "Warehouse", href: "/warehouse", icon: Building2 },
     ...(hasShopModule(profile, "expiry") || hasShopModule(profile, "batch")
       ? [{
-          label: "Expiry Management",
+          label: "Expiry",
           icon: CalendarClock,
           href: "/inventory/expiry",
           children: expiryChildren,
         }]
       : []),
-    ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
-    ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
-    ...(hasShopModule(profile, "workshop") ? [{ label: L["/job-cards"], href: "/job-cards", icon: ClipboardList }] : []),
-    ...(hasShopModule(profile, "workshop") ? [{ label: L["/services"], href: "/services", icon: Cog }] : []),
-    ...(hasShopModule(profile, "appointments") ? [{ label: L["/appointments"], href: "/appointments", icon: Calendar }] : []),
     ...(!skipWorkflows ? [{ label: L["/workflows"], href: "/workflows", icon: GitBranch }] : []),
   ];
 
@@ -193,13 +198,15 @@ function useNavGroups(): NavGroup[] {
       ],
     },
     { title: S.sales, items: salesItems },
-    { title: S.products, items: productItems },
+    { title: S.products, items: catalogItems },
+    { title: S.inventory, items: inventoryItems },
     {
       title: S.procurement,
       items: [
         { label: L["/suppliers"], href: "/suppliers", icon: Truck },
         { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
-        { label: L["/purchases/grn"] ?? "GRN", href: "/purchases/grn", icon: PackageCheck },
+        { label: L["/purchases/grn"] ?? "Goods Receipt", href: "/purchases/grn", icon: PackageCheck },
+        { label: L["/purchases/procurement"] ?? "Procurement Hub", href: "/purchases/procurement", icon: ClipboardList },
       ],
     },
     {
@@ -240,10 +247,10 @@ function NavBadge({ text }: { text: string }) {
   const isPOS = text === "POS";
   return (
     <span
-      className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold leading-none border"
+      className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none"
       style={isPOS
-        ? { borderColor: "rgba(165,180,252,0.5)", color: "#A5B4FC", background: "rgba(99,102,241,0.18)" }
-        : { borderColor: "rgba(56,189,248,0.45)", color: "#7DD3FC", background: "rgba(14,165,233,0.15)" }
+        ? { color: "#C7D2FE", background: "rgba(99,102,241,0.28)" }
+        : { color: "#7DD3FC", background: "rgba(14,165,233,0.18)" }
       }
     >
       {text}
@@ -294,9 +301,10 @@ export function Sidebar() {
     const Icon = item.icon;
 
     const className = cn(
-      "group relative flex items-center gap-3 rounded-[10px] transition-all duration-200 select-none",
-      sidebarCollapsed ? "h-11 w-11 justify-center mx-auto" : "min-h-11 py-2 w-full",
-      !sidebarCollapsed && (nested ? "pl-9 pr-3" : "px-3"),
+      "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none",
+      sidebarCollapsed ? "h-10 w-10 justify-center mx-auto" : "h-10 w-full",
+      !sidebarCollapsed && (nested ? "pl-8 pr-2.5" : "px-2.5"),
+      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[#818CF8]",
     );
 
     const style = isActive
@@ -308,17 +316,17 @@ export function Sidebar() {
         <Icon
           className={cn(
             "shrink-0",
-            nested && !sidebarCollapsed ? "h-4 w-4" : "h-5 w-5",
+            nested && !sidebarCollapsed ? "h-3.5 w-3.5" : "h-[18px] w-[18px]",
             isActive && "text-[#A5B4FC]",
           )}
-          strokeWidth={isActive ? 2.2 : 1.8}
+          strokeWidth={isActive ? 2.2 : 1.75}
         />
         {!sidebarCollapsed && (
           <>
             <span
               className={cn(
-                "flex-1 leading-snug",
-                nested ? "text-[13px]" : "text-[14px]",
+                "flex-1 truncate leading-none",
+                nested ? "text-[12.5px]" : "text-[13.5px]",
                 isActive ? "font-semibold text-[#A5B4FC]" : "font-medium",
               )}
               title={item.label}
@@ -390,12 +398,12 @@ export function Sidebar() {
     if (sidebarCollapsed) {
       const collapsedInner = (
         <div
-          className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
+          className="flex h-10 w-10 items-center justify-center mx-auto rounded-lg transition-colors"
           style={childActive
             ? { background: activeBg, color: activeFg }
             : { color: textMut }}
         >
-          <Icon className="h-5 w-5" strokeWidth={childActive ? 2.2 : 1.8} />
+          <Icon className="h-[18px] w-[18px]" strokeWidth={childActive ? 2.2 : 1.75} />
         </div>
       );
       return (
@@ -436,7 +444,10 @@ export function Sidebar() {
     return (
       <div key={key}>
         <div
-          className="group relative flex items-center gap-3 rounded-[10px] transition-all duration-200 select-none min-h-11 py-2 px-3 w-full"
+          className={cn(
+            "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none h-10 px-2.5 w-full",
+            childActive && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-[#818CF8]",
+          )}
           style={childActive
             ? { background: activeBg, color: activeFg }
             : { background: "transparent", color: textMut }}
@@ -453,11 +464,11 @@ export function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0"
             >
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-[#A5B4FC]")}
-                strokeWidth={childActive ? 2.2 : 1.8}
+                className={cn("shrink-0 h-[18px] w-[18px]", childActive && "text-[#A5B4FC]")}
+                strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
+                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -465,11 +476,11 @@ export function Sidebar() {
           ) : (
             <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left">
               <Icon
-                className={cn("shrink-0 h-5 w-5", childActive && "text-[#A5B4FC]")}
-                strokeWidth={childActive ? 2.2 : 1.8}
+                className={cn("shrink-0 h-[18px] w-[18px]", childActive && "text-[#A5B4FC]")}
+                strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[14px] leading-snug text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
+                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -482,13 +493,13 @@ export function Sidebar() {
             aria-label={open ? `Collapse ${item.label}` : `Expand ${item.label}`}
           >
             <ChevronDown
-              className={cn("h-4 w-4 shrink-0 transition-transform duration-200", open && "rotate-180")}
+              className={cn("h-3.5 w-3.5 shrink-0 transition-transform duration-200", open && "rotate-180")}
               strokeWidth={1.8}
             />
           </button>
         </div>
         {open && (
-          <div className="mt-0.5 space-y-0.5 border-l ml-5 pl-0" style={{ borderColor: border }}>
+          <div className="mt-0.5 space-y-0.5 border-l ml-4 pl-0" style={{ borderColor: "rgba(30,51,86,0.9)" }}>
             {item.children!.map((child, ci) => renderLeaf(child, `${key}-c${ci}`, true, peerHrefs))}
           </div>
         )}
@@ -501,7 +512,7 @@ export function Sidebar() {
     <Tooltip key={label}>
       <TooltipTrigger asChild>
         <button type="button" onClick={onClick}
-          className="flex h-11 w-11 items-center justify-center mx-auto rounded-xl transition-colors"
+          className="flex h-10 w-10 items-center justify-center mx-auto rounded-lg transition-colors"
           style={{ color: textMut }}
           onMouseEnter={e => { e.currentTarget.style.background = danger ? "rgba(239,68,68,0.1)" : hoverBg; e.currentTarget.style.color = danger ? "#ef4444" : textFull; }}
           onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
@@ -580,16 +591,16 @@ export function Sidebar() {
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
         <ScrollArea className="flex-1">
-          <nav className={cn("py-2", sidebarCollapsed ? "px-1.5" : "px-2.5")}>
+          <nav className={cn("py-2.5", sidebarCollapsed ? "px-1.5" : "px-2")}>
             {navGroups.map((group, gi) => (
-              <div key={group.title} className={gi > 0 ? "mt-6" : ""}>
+              <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                 {!sidebarCollapsed && (
-                  <p className="px-3 mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] leading-snug select-none"
+                  <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] leading-none select-none"
                     style={{ color: sectLbl }}>
                     {group.title}
                   </p>
                 )}
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   {group.items.map((item, ii) => {
                     const groupPeers = group.items.flatMap((sib) => {
                       const hrefs: string[] = [];
@@ -610,28 +621,28 @@ export function Sidebar() {
 
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
-        <div className={cn("shrink-0 py-2 space-y-0.5", sidebarCollapsed ? "px-1.5 flex flex-col items-center" : "px-2.5")}>
+        <div className={cn("shrink-0 py-2 space-y-0.5", sidebarCollapsed ? "px-1.5 flex flex-col items-center" : "px-2")}>
           {sidebarCollapsed ? (
             <>
-              {collapsedBtn(<Settings className="h-[17px] w-[17px]" />, "Settings", () => { closeMobile(); router.push("/settings"); })}
-              {collapsedBtn(<Moon className="h-[17px] w-[17px]" />, isDark ? "Light Mode" : "Dark Mode", () => setTheme(isDark ? "light" : "dark"))}
-              {collapsedBtn(<LogOut className="h-[17px] w-[17px]" />, "Logout", handleLogout, true)}
+              {collapsedBtn(<Settings className="h-4 w-4" />, "Settings", () => { closeMobile(); router.push("/settings"); })}
+              {collapsedBtn(<Moon className="h-4 w-4" />, isDark ? "Light Mode" : "Dark Mode", () => setTheme(isDark ? "light" : "dark"))}
+              {collapsedBtn(<LogOut className="h-4 w-4" />, "Logout", handleLogout, true)}
             </>
           ) : (
             <>
               <Link href="/settings" onClick={closeMobile}
-                className="flex h-11 items-center gap-3 rounded-xl px-3 font-medium transition-colors"
+                className="flex h-10 items-center gap-3 rounded-lg px-2.5 font-medium transition-colors"
                 style={{ color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.background = hoverBg; e.currentTarget.style.color = textFull; }}
                 onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
-                <Settings className="h-5 w-5 shrink-0" strokeWidth={1.8} />
-                <span className="flex-1 text-[15px]">Settings</span>
+                <Settings className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                <span className="flex-1 text-[13.5px]">Settings</span>
               </Link>
 
-              <div className="flex h-11 items-center gap-3 rounded-xl px-3" style={{ color: textMut }}>
-                <Moon className="h-5 w-5 shrink-0" strokeWidth={1.8} />
-                <span className="text-[15px] font-medium flex-1">Dark Mode</span>
+              <div className="flex h-10 items-center gap-3 rounded-lg px-2.5" style={{ color: textMut }}>
+                <Moon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                <span className="text-[13.5px] font-medium flex-1">Dark Mode</span>
                 <button
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -647,13 +658,13 @@ export function Sidebar() {
               </div>
 
               <button type="button" onClick={handleLogout}
-                className="flex h-11 w-full items-center gap-3 rounded-xl px-3 font-medium transition-colors"
+                className="flex h-10 w-full items-center gap-3 rounded-lg px-2.5 font-medium transition-colors"
                 style={{ color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.12)"; e.currentTarget.style.color = "#f87171"; }}
                 onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
-                <LogOut className="h-5 w-5 shrink-0" strokeWidth={1.8} />
-                <span className="text-[15px]">Logout</span>
+                <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
+                <span className="text-[13.5px]">Logout</span>
               </button>
             </>
           )}

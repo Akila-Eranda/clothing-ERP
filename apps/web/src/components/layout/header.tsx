@@ -64,6 +64,8 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
   "/customers": "Customers & CRM",
   "/suppliers": "Suppliers",
   "/purchases": "Purchase Orders",
+  "/purchases/grn": "Goods Receipt (GRN)",
+  "/purchases/procurement": "Procurement Hub",
   "/hr": "Employees",
   "/hr/attendance": "Attendance",
   "/hr/payroll": "Payroll",
@@ -188,7 +190,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-[#D8DEE9]/80 dark:border-border bg-[rgba(228,234,243,0.82)] dark:bg-background/80 backdrop-blur-[12px] px-6 shrink-0">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[#D8DEE9]/80 dark:border-border bg-[rgba(228,234,243,0.88)] dark:bg-background/80 backdrop-blur-[12px] px-4 md:px-6 shrink-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"

@@ -879,7 +879,7 @@ export default function ReturnsPage() {
 
   return (
     <ModuleGate module="returns">
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="page-shell">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>

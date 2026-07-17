@@ -202,11 +202,12 @@ export function getSidebarSectionTitles(profile: ShopProfile) {
   return {
     overview: 'Overview',
     sales: sales === 'SALES & POS' ? 'Sales & POS' : 'Sales',
-    products: product === 'TYRES & STOCK' ? 'Tyres & Stock'
-      : product === 'PARTS & STOCK' ? 'Parts & Stock'
-      : product === 'AGRI PRODUCTS' ? 'Agri Products'
-      : product === 'ITEMS & STOCK' ? 'Items & Stock'
-      : 'Products',
+    products: product === 'TYRES & STOCK' ? 'Tyres'
+      : product === 'PARTS & STOCK' ? 'Parts'
+      : product === 'AGRI PRODUCTS' ? 'Agri Catalog'
+      : product === 'ITEMS & STOCK' ? 'Items'
+      : 'Catalog',
+    inventory: 'Inventory',
     procurement: 'Procurement',
     finance: 'Finance',
     reports: 'Reports',

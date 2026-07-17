@@ -166,7 +166,7 @@ export default function GrnPage() {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="page-shell">
       {/* Header — same pattern as Purchase Orders */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
