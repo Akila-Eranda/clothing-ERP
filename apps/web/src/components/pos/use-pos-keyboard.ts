@@ -188,6 +188,10 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      if (ctx.qtyPopupOpen) {
+        return;
+      }
+
       const ms = Date.now();
       const delta = ms - ctx.lastKeyTime.current;
       ctx.lastKeyTime.current = ms;

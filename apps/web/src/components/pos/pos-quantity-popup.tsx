@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronRight, Minus, Plus, ShoppingCart, X } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
+import { posListPrice } from "@/lib/pos-totals";
 import { variantDisplayLabel } from "@/lib/shop-vertical";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
@@ -13,6 +14,7 @@ export type PosAddPopupVariant = {
   sku: string;
   barcode?: string;
   unitPrice: number;
+  mrp?: number;
   stock: number;
   color?: string;
   size?: string;
@@ -26,11 +28,14 @@ type Props = {
   variantName?: string;
   maxQty: number;
   unitPrice: number;
+  mrp?: number;
   variants?: PosAddPopupVariant[];
   onConfirm: (payload: { qty: number; unitPrice: number; variant?: PosAddPopupVariant }) => void;
   onCancel: () => void;
   touchMode?: boolean;
 };
+
+const EMPTY_VARIANTS: PosAddPopupVariant[] = [];
 
 function money(n: number) {
   return `Rs. ${formatNumber(n)}`;
@@ -41,7 +46,8 @@ export function PosQuantityPopup({
   variantName,
   maxQty,
   unitPrice,
-  variants = [],
+  mrp,
+  variants = EMPTY_VARIANTS,
   onConfirm,
   onCancel,
   touchMode,
@@ -63,25 +69,31 @@ export function PosQuantityPopup({
 
   const stockLimit = Math.max(1, selectedVariant?.stock ?? maxQty);
   const qty = Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
-  const catalogPrice = selectedVariant?.unitPrice ?? unitPrice;
+  const listPrice = posListPrice(selectedVariant ?? { unitPrice, mrp });
   const unitPriceValue = Math.max(0, parseFloat(priceRaw) || 0);
-  const priceCut = Math.max(0, catalogPrice - unitPriceValue);
+  const priceCut = Math.max(0, listPrice - unitPriceValue);
   const hasPriceCut = priceCut > 0.001;
   const lineTotal = qty * unitPriceValue;
   const lineDiscount = hasPriceCut ? priceCut * qty : 0;
   const btnH = touchMode ? "h-14" : "h-12";
   const fieldStyle = { background: "#1a1f2a", borderColor: "#2a3140" } as const;
 
+  const productKey = React.useMemo(
+    () => (hasVariants ? variants.map((v) => v.variantId).join("|") : `${productName}:${unitPrice}`),
+    [hasVariants, variants, productName, unitPrice],
+  );
+
   React.useEffect(() => {
     const next = variants[0];
     if (!next) {
       setPriceRaw(String(unitPrice));
+      setQtyRaw("1");
       return;
     }
     setSelectedVariantId(next.variantId);
     setQtyRaw("1");
     setPriceRaw(String(next.unitPrice));
-  }, [variants, unitPrice]);
+  }, [productKey, variants, unitPrice]);
 
   const refreshScrollHint = React.useCallback(() => {
     const el = scrollRef.current;
@@ -170,11 +182,13 @@ export function PosQuantityPopup({
 
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopPropagation();
         onCancel();
         return;
       }
-      if (e.key === "Enter") {
+      if (e.key === "Enter" && !inInput) {
         e.preventDefault();
+        e.stopPropagation();
         submit();
         return;
       }
@@ -210,8 +224,8 @@ export function PosQuantityPopup({
         bump(-1);
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
   }, [moveVariant, onCancel, qty, stockLimit, submit]);
 
   return (
@@ -366,16 +380,25 @@ export function PosQuantityPopup({
 
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Selling price (Rs.)
+                Sale price (Rs.)
               </p>
+              {listPrice > (selectedVariant?.unitPrice ?? unitPrice) + 0.001 ? (
+                <p className="text-[10px] tabular-nums -mb-1" style={{ color: "#9ca3af" }}>
+                  List price {money(listPrice)}
+                </p>
+              ) : null}
               <input
                 ref={priceInputRef}
                 type="text"
                 inputMode="decimal"
+                autoComplete="off"
                 value={priceRaw}
                 onChange={(e) => onPriceInput(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
                 onBlur={() => {
-                  if (!priceRaw || Number.isNaN(parseFloat(priceRaw))) setPriceRaw("0");
+                  if (!priceRaw.trim() || Number.isNaN(parseFloat(priceRaw))) {
+                    setPriceRaw(String(selectedVariant?.unitPrice ?? unitPrice));
+                  }
                 }}
                 className="w-full h-12 rounded-xl px-3 text-lg font-bold text-white tabular-nums outline-none border focus:border-[#3b82f6]"
                 style={fieldStyle}
@@ -395,7 +418,7 @@ export function PosQuantityPopup({
               <p className="text-sm text-white/70 tabular-nums mt-1">
                 {hasPriceCut ? (
                   <>
-                    <span style={{ textDecoration: "line-through" }}>{money(catalogPrice)}</span>
+                    <span style={{ textDecoration: "line-through" }}>{money(listPrice)}</span>
                     {" → "}
                     {money(unitPriceValue)} × {qty}
                   </>

@@ -8,6 +8,12 @@ export interface PosLineInput {
   taxRate?: number;
 }
 
+/** Tag / MRP list price shown before line discounts (max of MRP and catalog selling price). */
+export function posListPrice(item: { unitPrice: number; mrp?: number | null }) {
+  const mrp = item.mrp ?? 0;
+  return mrp > item.unitPrice ? mrp : item.unitPrice;
+}
+
 function lineDiscount(lineTotal: number, discount: number, type?: string) {
   if (type === "percentage") return (lineTotal * discount) / 100;
   return discount;

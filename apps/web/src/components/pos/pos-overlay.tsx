@@ -26,7 +26,7 @@ import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { PosQuantityPopup } from "@/components/pos/pos-quantity-popup";
 import { bypassesWorkflowApproval, canViewAllPosSales, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
-import { calcPosAmountDue, calcPosLineDiscount, calcPosLineNet, calcTierDiscount } from "@/lib/pos-totals";
+import { calcPosAmountDue, calcPosLineDiscount, calcPosLineNet, calcTierDiscount, posListPrice } from "@/lib/pos-totals";
 import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
 import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
@@ -846,16 +846,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean; unitPrice?: number }) => {
     if (p.stock <= 0) { toast.error(`${p.productName} (${p.variantName}) — Out of stock`); playPosSound("scan_fail", soundAlerts); return; }
-    const originalPrice = p.unitPrice;
-    const finalPrice = opts?.unitPrice ?? originalPrice;
+    const listPrice = posListPrice(p);
+    const finalPrice = opts?.unitPrice ?? p.unitPrice;
     const qtyClamped = Math.min(Math.max(1, qty), p.stock);
-    const priceCut = originalPrice - finalPrice;
+    const priceCut = listPrice - finalPrice;
     const hasPriceDiscount = priceCut > 0.001;
     const lineTax = taxRate;
     addItem({
       variantId: p.variantId, productName: p.productName, variantName: p.variantName, sku: p.sku,
-      unitPrice: hasPriceDiscount ? originalPrice : finalPrice,
-      mrp: p.mrp && p.mrp > 0 ? Math.max(p.mrp, originalPrice) : originalPrice,
+      unitPrice: hasPriceDiscount ? listPrice : finalPrice,
+      mrp: p.mrp && p.mrp > 0 ? Math.max(p.mrp, listPrice) : listPrice,
       quantity: qtyClamped, stock: p.stock,
       discountAmount: hasPriceDiscount ? priceCut * qtyClamped : 0,
       discountType: hasPriceDiscount ? "fixed" : "percentage",
@@ -1052,10 +1052,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const fs = s.fontSize==="small"?"11px":s.fontSize==="large"?"14px":"12px";
     const rows=r.items.map(i=>{
       const listUnit=i.listUnit??(i.qty>0?i.price/i.qty:0);
-      const gross=listUnit*i.qty;
       const disc=i.discount??0;
       const discRow=disc>0?`<div class="row"><span>&nbsp;&nbsp;Discount</span><span>-LKR ${disc.toFixed(2)}</span></div>`:"";
-      return `<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${listUnit.toFixed(2)}</span><span>LKR ${gross.toFixed(2)}</span></div>${discRow}<div class="row"><span>&nbsp;&nbsp;Line total</span><span>LKR ${i.price.toFixed(2)}</span></div>`;
+      return `<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${listUnit.toFixed(2)}</span><span>LKR ${i.price.toFixed(2)}</span></div>${discRow}`;
     }).join("");
     const logoHtml=s.logoUrl?`<img src="${resolvePublicAssetUrl(s.logoUrl)}" style="max-width:80px;display:block;margin:0 auto 4px"/>`:"";
     const addr=[s.address1,s.address2].filter(Boolean).map(a=>`<sub>${a}</sub>`).join("");
@@ -2568,6 +2567,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
             variantName={variantDisplayLabel(addPopup.selected, profile)}
             maxQty={Math.max(1, addPopup.selected.stock)}
             unitPrice={addPopup.selected.unitPrice}
+            mrp={addPopup.selected.mrp}
             variants={addPopup.variants.length > 1 ? addPopup.variants : undefined}
             touchMode={touchMode}
             onCancel={() => setAddPopup(null)}
@@ -2764,74 +2764,78 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                         const lineTax = afterDisc * ((item.taxRate || 0) / 100);
                         const lineTotal = afterDisc + lineTax;
                         const editing = editingCartQtyIdx === idx;
+                        const showVariant = Boolean(
+                          item.variantName
+                          && item.variantName !== "Single"
+                          && item.variantName !== item.productName,
+                        );
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
-                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                          onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2.5 p-2.5 rounded-xl cursor-pointer transition-all"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-12 w-12 rounded-lg shrink-0 overflow-hidden mt-0.5" fallbackBg={getCardBg(item.variantName)} iconClassName="h-6 w-6 text-white/20" />
+                          <PosProductThumb url={item.image ?? productImages.get(item.variantId)} name={item.productName} className="h-9 w-9 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(item.variantName)} iconClassName="h-4 w-4 text-white/20" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-white text-sm font-semibold truncate">{item.productName}</p>
-                            <p className="text-xs truncate" style={{color:"#6a8ab8"}}>{item.variantName}</p>
-                            <p className="text-[10px] mt-0.5 tabular-nums" style={{color:"#4a6a8a"}}>
-                              {lineDisc > 0 ? (
-                                <>
-                                  <span style={{ textDecoration: "line-through", color: "#6a8ab8" }}>
-                                    LKR {formatNumber(item.unitPrice)}
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-white text-sm font-semibold truncate leading-tight">{item.productName}</p>
+                                {(showVariant || lineDisc > 0) && (
+                                  <p className="text-[11px] truncate mt-0.5 tabular-nums" style={{color:"#6a8ab8"}}>
+                                    {showVariant ? <span>{item.variantName}</span> : null}
+                                    {showVariant && lineDisc > 0 ? <span> · </span> : null}
+                                    {lineDisc > 0 ? (
+                                      <>
+                                        <span style={{ textDecoration: "line-through" }}>LKR {formatNumber(item.unitPrice)}</span>
+                                        {" "}
+                                        <span className="text-white/90">LKR {formatNumber(finalUnit)}</span>
+                                      </>
+                                    ) : null}
+                                  </p>
+                                )}
+                              </div>
+                              <p className="text-white text-sm font-bold shrink-0 tabular-nums leading-tight">LKR {formatNumber(lineTotal)}</p>
+                            </div>
+                            <div className="flex items-center justify-end gap-1 shrink-0 mt-1.5 group">
+                                <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
+                                {editing ? (
+                                  <input
+                                    autoFocus
+                                    value={editingCartQtyRaw}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
+                                    onBlur={() => {
+                                      const n = parseInt(editingCartQtyRaw, 10);
+                                      if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
+                                      setEditingCartQtyIdx(null);
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        setEditingCartQtyIdx(null);
+                                      }
+                                    }}
+                                    className="w-8 h-6 rounded text-center text-xs font-bold text-white outline-none"
+                                    style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
+                                  />
+                                ) : (
+                                  <span
+                                    title="Double-click to edit"
+                                    onDoubleClick={(e) => {
+                                      e.stopPropagation();
+                                      setEditingCartQtyIdx(idx);
+                                      setEditingCartQtyRaw(String(item.quantity));
+                                    }}
+                                    className="text-white text-xs font-bold w-6 text-center select-none"
+                                  >
+                                    {item.quantity}
                                   </span>
-                                  {" → "}
-                                  <span className="text-white">LKR {formatNumber(finalUnit)}</span>
-                                  {` · Disc -LKR ${formatNumber(lineDisc)}`}
-                                </>
-                              ) : (
-                                <>@ LKR {formatNumber(item.unitPrice)}</>
-                              )}
-                              {(item.taxRate || 0) > 0 ? ` · Tax ${formatNumber(lineTax)}` : ""}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3.5 w-3.5 text-white"/></button>
-                            {editing ? (
-                              <input
-                                autoFocus
-                                value={editingCartQtyRaw}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
-                                onBlur={() => {
-                                  const n = parseInt(editingCartQtyRaw, 10);
-                                  if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
-                                  setEditingCartQtyIdx(null);
-                                }}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    (e.target as HTMLInputElement).blur();
-                                  }
-                                  if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    setEditingCartQtyIdx(null);
-                                  }
-                                }}
-                                className="w-10 h-7 rounded text-center text-sm font-bold text-white outline-none"
-                                style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
-                              />
-                            ) : (
-                              <span
-                                title="Double-click to edit"
-                                onDoubleClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCartQtyIdx(idx);
-                                  setEditingCartQtyRaw(String(item.quantity));
-                                }}
-                                className="text-white text-sm font-bold w-7 text-center select-none"
-                              >
-                                {item.quantity}
-                              </span>
-                            )}
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-7 w-7 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
-                          </div>
-                          <div className="text-right shrink-0 w-24 group pt-0.5">
-                            <p className="text-white text-sm font-bold">LKR {formatNumber(lineTotal)}</p>
-                            <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="opacity-0 group-hover:opacity-100 transition-opacity"><X className="h-4 w-4 mx-auto" style={{color:"#ef4444"}}/></button>
+                                )}
+                                <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
+                                <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
+                            </div>
                           </div>
                         </motion.div>
                         );
@@ -2893,7 +2897,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 </div>
             {checkoutOpen && (
               <div className="fixed inset-0 z-[115] flex items-center justify-center p-3 md:p-6" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
-              <div className="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}} onClick={e=>e.stopPropagation()}>
+              <div className="w-full max-w-lg max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}} onClick={e=>e.stopPropagation()}>
                 <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
                   <div>
                     <h2 className="text-white font-bold text-base">Checkout</h2>
@@ -2903,8 +2907,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     <X className="h-4 w-4" style={{color:"#6a8ab8"}}/>
                   </button>
                 </div>
-              <div className="flex-1 overflow-y-auto min-h-0 lg:grid lg:grid-cols-[1fr_minmax(300px,360px)]">
-                <div className="flex flex-col min-h-0 lg:border-r" style={{borderColor:"#1e3356"}}>
+              <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
                 <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"#1e3356"}}>
                   <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
                   {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
@@ -3050,7 +3053,6 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 <p className="px-4 py-2 text-[10px] text-center border-t shrink-0" style={{ color: "#6a8ab8", borderColor: "#1e3356" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split pay · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
-                </div>
               </div>
               </div>
               </div>
