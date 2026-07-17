@@ -13,6 +13,16 @@ function lineDiscount(lineTotal: number, discount: number, type?: string) {
   return discount;
 }
 
+export function calcPosLineDiscount(item: PosLineInput) {
+  const lineTotal = item.unitPrice * item.quantity;
+  return lineDiscount(lineTotal, item.discountAmount ?? 0, item.discountType);
+}
+
+export function calcPosLineNet(item: PosLineInput) {
+  const lineTotal = item.unitPrice * item.quantity;
+  return lineTotal - calcPosLineDiscount(item);
+}
+
 export function calcPosSubtotal(items: PosLineInput[]) {
   return items.reduce((sum, item) => {
     const lineTotal = item.unitPrice * item.quantity;

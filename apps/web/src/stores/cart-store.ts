@@ -75,11 +75,27 @@ export const useCartStore = create<CartStore>()(
           const qtyToAdd = Math.max(1, newItem.quantity || 1);
           const existing = state.items.find((i) => i.variantId === newItem.variantId);
           if (existing) {
+            const newQty = Math.min(existing.quantity + qtyToAdd, existing.stock);
+            const perUnitFromNew =
+              newItem.discountType === "fixed" && newItem.discountAmount > 0 && newItem.quantity > 0
+                ? newItem.discountAmount / newItem.quantity
+                : 0;
+            const perUnitFromExisting =
+              existing.discountType === "fixed" && existing.discountAmount > 0 && existing.quantity > 0
+                ? existing.discountAmount / existing.quantity
+                : 0;
+            const perUnitDisc = perUnitFromNew || perUnitFromExisting;
             return {
               items: state.items.map((i) =>
                 i.variantId === newItem.variantId
-                  ? { ...i, quantity: Math.min(i.quantity + qtyToAdd, i.stock) }
-                  : i
+                  ? {
+                      ...i,
+                      quantity: newQty,
+                      ...(perUnitDisc > 0
+                        ? { discountAmount: perUnitDisc * newQty, discountType: "fixed" as const }
+                        : {}),
+                    }
+                  : i,
               ),
             };
           }
@@ -101,11 +117,19 @@ export const useCartStore = create<CartStore>()(
           items:
             quantity <= 0
               ? state.items.filter((i) => i.variantId !== variantId)
-              : state.items.map((i) =>
-                  i.variantId === variantId
-                    ? { ...i, quantity: Math.min(quantity, i.stock) }
-                    : i
-                ),
+              : state.items.map((i) => {
+                  if (i.variantId !== variantId) return i;
+                  const newQty = Math.min(quantity, i.stock);
+                  const perUnitDisc =
+                    i.discountType === "fixed" && i.discountAmount > 0 && i.quantity > 0
+                      ? i.discountAmount / i.quantity
+                      : 0;
+                  return {
+                    ...i,
+                    quantity: newQty,
+                    discountAmount: perUnitDisc > 0 ? perUnitDisc * newQty : i.discountAmount,
+                  };
+                }),
         })),
 
       updateItemDiscount: (variantId, discount, type) =>

@@ -63,8 +63,12 @@ export function PosQuantityPopup({
 
   const stockLimit = Math.max(1, selectedVariant?.stock ?? maxQty);
   const qty = Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
+  const catalogPrice = selectedVariant?.unitPrice ?? unitPrice;
   const unitPriceValue = Math.max(0, parseFloat(priceRaw) || 0);
+  const priceCut = Math.max(0, catalogPrice - unitPriceValue);
+  const hasPriceCut = priceCut > 0.001;
   const lineTotal = qty * unitPriceValue;
+  const lineDiscount = hasPriceCut ? priceCut * qty : 0;
   const btnH = touchMode ? "h-14" : "h-12";
   const fieldStyle = { background: "#1a1f2a", borderColor: "#2a3140" } as const;
 
@@ -389,8 +393,21 @@ export function PosQuantityPopup({
                 Unit × Qty
               </p>
               <p className="text-sm text-white/70 tabular-nums mt-1">
-                {money(unitPriceValue)} × {qty}
+                {hasPriceCut ? (
+                  <>
+                    <span style={{ textDecoration: "line-through" }}>{money(catalogPrice)}</span>
+                    {" → "}
+                    {money(unitPriceValue)} × {qty}
+                  </>
+                ) : (
+                  <>{money(unitPriceValue)} × {qty}</>
+                )}
               </p>
+              {hasPriceCut ? (
+                <p className="text-xs mt-1 tabular-nums" style={{ color: "#fbbf24" }}>
+                  Discount -{money(lineDiscount)}
+                </p>
+              ) : null}
             </div>
             <div className="pt-3 text-right">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>

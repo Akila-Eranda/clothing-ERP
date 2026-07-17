@@ -12,9 +12,7 @@ import { calcTierDiscount } from "@/lib/pos-totals";
 const PAY_OPTIONS = [
   { value: "CASH", label: "Cash" },
   { value: "CARD", label: "Card" },
-  { value: "UPI", label: "UPI" },
   { value: "CHEQUE", label: "Cheque" },
-  { value: "WALLET", label: "Wallet" },
   { value: "CUSTOMER_CREDIT", label: "Credit" },
 ] as const;
 
@@ -47,6 +45,8 @@ interface Props {
   onCouponChange: (code: string | null, discount: number) => void;
   onStateChange: (patch: Partial<PosPaymentState>) => void;
   state: PosPaymentState;
+  couponInputRef?: React.RefObject<HTMLInputElement | null>;
+  partialPayInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 const TIER_PCT: Record<string, number> = {
@@ -57,6 +57,7 @@ export function PosPaymentPanel({
   totalAmt, subtotal, customerWallet, customerCreditLimit, customerCreditBalance, customerTier,
   activePayment, payNowAmount, onPayNowAmountChange,
   onCouponChange, onStateChange, state,
+  couponInputRef, partialPayInputRef,
 }: Props) {
   const tierPct = customerTier ? (TIER_PCT[customerTier.toLowerCase()] ?? 0) : state.tierDiscountPct;
   const tierAmt = calcTierDiscount(subtotal, customerTier);
@@ -126,6 +127,7 @@ export function PosPaymentPanel({
 
       <div className="flex gap-1.5">
         <Input
+          ref={couponInputRef}
           value={state.couponCode}
           onChange={(e) => onStateChange({ couponCode: e.target.value })}
           onKeyDown={(e) => { if (e.key === "Enter") applyCoupon(); }}
@@ -169,6 +171,7 @@ export function PosPaymentPanel({
           <div className="space-y-1">
             <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Paying now (LKR)</label>
             <Input
+              ref={partialPayInputRef}
               type="number"
               min={0}
               step="0.01"
