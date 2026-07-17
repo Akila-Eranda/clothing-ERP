@@ -540,7 +540,7 @@ export default function CashManagementPage() {
         <div className="px-6 py-6 space-y-6">
 
           {/* Date filter — auto-applies to KPI, history & variance */}
-          <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
+          <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-card ring-1 ring-slate-900/[0.05]">
             {DATE_PRESETS.map((p) => (
               <button
                 key={p.label}
@@ -618,7 +618,7 @@ export default function CashManagementPage() {
                   <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
                 ))
               : KPI.map((kpi) => (
-                  <Card key={kpi.label} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
+                  <Card key={kpi.label} className="card-hover">
                     <CardContent className="p-5 flex items-center gap-4">
                       <div className={cn(kpi.bg, "rounded-full p-2.5 shrink-0")}>
                         <kpi.icon className="h-5 w-5 text-white" />
@@ -636,7 +636,7 @@ export default function CashManagementPage() {
           {/* Overview — live shift dashboard */}
           <TabsContent value="overview" className="m-0 mt-0 space-y-4">
             {!shiftOpen ? (
-              <Card className="border shadow-sm">
+              <Card className="card-hover">
                 <CardContent className="py-16 text-center">
                   <LayoutDashboard className="h-12 w-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground mb-4">
@@ -717,7 +717,7 @@ export default function CashManagementPage() {
 
           {/* Cash Open */}
           <TabsContent value="open" className="m-0 mt-0">
-            <Card className="border shadow-sm">
+            <Card className="card-hover">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
                   <PlayCircle className="h-4 w-4 text-emerald-600" /> Opening Cash
@@ -834,7 +834,7 @@ export default function CashManagementPage() {
           {/* Cash Close */}
           <TabsContent value="close" className="m-0 mt-0">
             {!shiftOpen ? (
-              <Card className="border shadow-sm">
+              <Card className="card-hover">
                 <CardContent className="py-16 text-center text-muted-foreground">
                   <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open shift. Start a shift from Cash Open first.</p>
@@ -843,7 +843,7 @@ export default function CashManagementPage() {
               </Card>
             ) : (
               <div className="grid gap-6 lg:grid-cols-2">
-                <Card className="border shadow-sm">
+                <Card className="card-hover">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold">Daily Cash Close</CardTitle>
                   </CardHeader>
@@ -867,7 +867,7 @@ export default function CashManagementPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="border shadow-sm">
+                <Card className="card-hover">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold">Physical Count</CardTitle>
                   </CardHeader>
@@ -970,7 +970,7 @@ export default function CashManagementPage() {
                     { label: "Over Count", value: varianceReport.overCount, color: "text-emerald-600", bg: "bg-emerald-500/10" },
                     { label: "Short Count", value: varianceReport.shortCount, color: "text-red-600", bg: "bg-red-500/10" },
                   ].map((s) => (
-                    <Card key={s.label} className="border shadow-sm">
+                    <Card key={s.label} className="card-hover">
                       <CardContent className="p-5">
                         <p className="text-xs text-muted-foreground font-medium">{s.label}</p>
                         <p className={cn("text-2xl font-bold tabular-nums mt-1", s.color)}>
@@ -982,7 +982,7 @@ export default function CashManagementPage() {
                 </div>
 
                 {varianceChartData.length > 0 && (
-                  <Card className="border shadow-sm">
+                  <Card className="card-hover">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-semibold">Variance trend</CardTitle>
                     </CardHeader>
@@ -1004,7 +1004,7 @@ export default function CashManagementPage() {
                   </Card>
                 )}
 
-                <Card className="border shadow-sm">
+                <Card className="card-hover">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold">Recent variances ({varianceDays} days)</CardTitle>
                   </CardHeader>
@@ -1046,7 +1046,7 @@ export default function CashManagementPage() {
                 </Card>
               </>
             ) : (
-              <Card className="border shadow-sm">
+              <Card className="card-hover">
                 <CardContent className="py-12 text-center text-muted-foreground text-sm">No variance report available</CardContent>
               </Card>
             )}
@@ -1055,7 +1055,7 @@ export default function CashManagementPage() {
           {/* Movements */}
           <TabsContent value="movements" className="m-0 mt-0">
             <div className="grid gap-6 lg:grid-cols-2">
-              <Card className="border shadow-sm">
+              <Card className="card-hover">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
                     <ArrowDownCircle className="h-4 w-4 text-emerald-600" /> Record Movement
@@ -1099,7 +1099,7 @@ export default function CashManagementPage() {
               </Card>
 
               {shiftOpen && (
-                <Card className="border shadow-sm">
+                <Card className="card-hover">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold">Today&apos;s movements</CardTitle>
                   </CardHeader>

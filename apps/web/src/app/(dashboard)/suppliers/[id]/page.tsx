@@ -460,7 +460,7 @@ export default function SupplierDetailPage() {
     <div className="h-full flex flex-col bg-background dark:bg-muted/30">
 
       {/* ── Top bar ── */}
-      <div className="bg-white/92 dark:bg-background border-b border-[#E8EDF5] dark:border-border backdrop-blur-[12px] px-6 py-3 flex items-center justify-between shrink-0 gap-4">
+      <div className="bg-card/90 dark:bg-background border-b border-border backdrop-blur-[12px] px-6 py-3 flex items-center justify-between shrink-0 gap-4">
         <button onClick={() => router.push("/suppliers")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors duration-150 font-medium">
           <ArrowLeft className="h-4 w-4" /> {copy.backLabel}
@@ -483,7 +483,7 @@ export default function SupplierDetailPage() {
         <div className="space-y-6">
 
           {/* Hero */}
-          <div className="bg-white dark:bg-background rounded-xl p-6 shadow-card">
+          <div className="bg-card dark:bg-background rounded-xl p-6 shadow-card">
             <div className="flex items-start justify-between gap-4 flex-wrap">
               <div className="flex items-center gap-4">
                 <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
@@ -556,7 +556,7 @@ export default function SupplierDetailPage() {
               { label: "Total Value",     value: `LKR ${fmt(totalValue)}`, icon: TrendingUp, color: "text-emerald-700", bg: "bg-emerald-50" },
               { label: "Amount Paid",     value: `LKR ${fmt(totalPaid)}`,  icon: CreditCard, color: "text-violet-700", bg: "bg-violet-50" },
             ].map((stat) => (
-              <div key={stat.label} className="bg-white dark:bg-background rounded-xl p-6 flex items-center gap-4 shadow-card card-hover">
+              <div key={stat.label} className="bg-card dark:bg-background rounded-xl p-6 flex items-center gap-4 shadow-card card-hover">
                 <div className={`h-11 w-11 rounded-full flex items-center justify-center ${stat.bg}`}><stat.icon className={`h-5 w-5 ${stat.color}`} /></div>
                 <div className="min-w-0">
                   <p className="text-lg font-bold tracking-tight tabular-nums truncate">{stat.value}</p>
@@ -567,7 +567,7 @@ export default function SupplierDetailPage() {
           </div>
 
           {/* Recent Purchase Orders */}
-          <div className="bg-white dark:bg-background rounded-xl shadow-card overflow-hidden">
+          <div className="bg-card dark:bg-background rounded-xl shadow-card overflow-hidden">
             <div className="px-6 py-4 border-b border-[#E8EDF5] flex items-center justify-between gap-3">
               <h3 className="font-bold text-sm tracking-tight">Recent Purchase Orders</h3>
               <Button variant="ghost" size="sm" className="h-8 text-xs gap-1"
@@ -594,7 +594,7 @@ export default function SupplierDetailPage() {
                       const st = PO_STATUS[po.status] ?? { label: po.status, variant: "secondary" as const };
                       return (
                         <tr key={po.id}
-                          className={`cursor-pointer transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white"}`}
+                          className={`cursor-pointer transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}
                           onClick={() => router.push(`/purchases/${po.id}`)}>
                           <td className="px-5 py-3.5 font-mono text-xs font-semibold text-primary">{po.poNumber}</td>
                           <td className="px-5 py-3.5">
@@ -616,7 +616,7 @@ export default function SupplierDetailPage() {
 
           {/* Recent Payments */}
           {supplier.payments.length > 0 && (
-            <div className="bg-white dark:bg-background rounded-xl shadow-card overflow-hidden">
+            <div className="bg-card dark:bg-background rounded-xl shadow-card overflow-hidden">
               <div className="px-6 py-4 border-b border-[#E8EDF5]">
                 <h3 className="font-bold text-sm tracking-tight">Recent Payments</h3>
               </div>
@@ -632,7 +632,7 @@ export default function SupplierDetailPage() {
                   </thead>
                   <tbody>
                     {supplier.payments.map((pay, idx) => (
-                      <tr key={pay.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white"}`}>
+                      <tr key={pay.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
                         <td className="px-5 py-3.5 text-xs text-muted-foreground">{fmtDate(pay.paidAt)}</td>
                         <td className="px-5 py-3.5">
                           <Badge variant="secondary" className="text-[10px]">{pay.method}</Badge>
@@ -648,7 +648,7 @@ export default function SupplierDetailPage() {
           )}
 
           {/* Assigned Products */}
-          <div className="bg-white dark:bg-background rounded-xl shadow-card overflow-hidden">
+          <div className="bg-card dark:bg-background rounded-xl shadow-card overflow-hidden">
             <div className="px-6 py-4 border-b border-[#E8EDF5]">
               <h3 className="font-bold text-sm tracking-tight">Assigned Products</h3>
               <p className="text-sm text-muted-foreground mt-1 font-normal leading-relaxed">
@@ -672,7 +672,7 @@ export default function SupplierDetailPage() {
                 </Button>
               </div>
               {searchRows.length > 0 && (
-                <div className="max-h-56 overflow-auto rounded-xl bg-white shadow-card">
+                <div className="max-h-56 overflow-auto rounded-xl bg-card shadow-card">
                   {searchRows.map((v) => {
                     const already = assignments.some((a) => a.variantId === v.variantId);
                     return (
@@ -713,7 +713,7 @@ export default function SupplierDetailPage() {
                   </thead>
                   <tbody>
                     {assignments.map((a, idx) => (
-                      <tr key={a.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white"}`}>
+                      <tr key={a.id} className={`transition-colors duration-150 hover:bg-[#EEF4FF] ${idx % 2 === 1 ? "bg-muted/60" : "bg-transparent"}`}>
                         <td className="px-5 py-3.5">
                           <p className="text-sm font-medium">{a.variant.product.name}</p>
                           <p className="text-xs text-muted-foreground">{a.variant.name}</p>
@@ -747,7 +747,7 @@ export default function SupplierDetailPage() {
         <div className="space-y-5 lg:sticky lg:top-6">
 
           {/* Balance */}
-          <div className="bg-white dark:bg-background rounded-xl p-6 shadow-card">
+          <div className="bg-card dark:bg-background rounded-xl p-6 shadow-card">
             <h3 className="font-bold text-sm tracking-tight border-b border-[#E8EDF5] pb-3 mb-2">Financial Summary</h3>
             <p className="text-[11px] uppercase tracking-[0.06em] text-muted-foreground font-semibold mb-3">Amounts in LKR</p>
             <InfoRow label="Outstanding Balance" value={
@@ -802,7 +802,7 @@ export default function SupplierDetailPage() {
           </div>
 
           {/* Details */}
-          <div className="bg-white dark:bg-background rounded-xl p-6 shadow-card">
+          <div className="bg-card dark:bg-background rounded-xl p-6 shadow-card">
             <h3 className="font-bold text-sm tracking-tight border-b border-[#E8EDF5] pb-3 mb-2">{copy.detailsSectionTitle}</h3>
             {supplier.code     && <InfoRow label="Code"       value={<span className="font-mono text-xs">{supplier.code}</span>} />}
             {supplier.gstNumber && <InfoRow label="GST"        value={<span className="font-mono text-xs">{supplier.gstNumber}</span>} />}
@@ -812,7 +812,7 @@ export default function SupplierDetailPage() {
           </div>
 
           {/* Actions */}
-          <div className="bg-white dark:bg-background rounded-xl p-6 shadow-card space-y-3">
+          <div className="bg-card dark:bg-background rounded-xl p-6 shadow-card space-y-3">
             <Button className="w-full gap-2" onClick={() => router.push(`/suppliers/${id}/edit`)}>
               <Pencil className="h-4 w-4" /> {copy.editButton}
             </Button>

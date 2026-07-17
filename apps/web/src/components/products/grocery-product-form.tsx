@@ -105,8 +105,8 @@ function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="bg-background border rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 bg-muted/30">
+    <section className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] shadow-card overflow-hidden">
+      <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 bg-background">
         <div className="flex items-start gap-3 min-w-0">
           {step ? (
             <span className="mt-0.5 h-6 min-w-6 px-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-bold tabular-nums flex items-center justify-center shrink-0">
@@ -170,8 +170,8 @@ function ChoiceCard({
       className={cn(
         "rounded-xl border p-3.5 text-left transition-all h-full",
         selected
-          ? "border-primary bg-primary/10 shadow-sm"
-          : "border-border bg-card hover:border-primary/40 hover:bg-muted/30",
+          ? "border-primary bg-primary/10 shadow-card"
+          : "border-border bg-card hover:border-primary/40 hover:bg-background",
       )}
     >
       <div className="flex items-start gap-3">
@@ -214,9 +214,9 @@ function SidebarCard({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-background border rounded-2xl shadow-sm overflow-hidden", className)}>
+    <div className={cn("bg-card rounded-xl ring-1 ring-slate-900/[0.05] shadow-card overflow-hidden", className)}>
       {title ? (
-        <div className="px-4 py-3 border-b bg-muted/30">
+        <div className="px-4 py-3 border-b bg-background">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         </div>
       ) : null}
@@ -748,7 +748,7 @@ export function GroceryProductForm() {
   );
 
 return (
-    <div className="h-full flex flex-col bg-muted/30">
+    <div className="h-full flex flex-col bg-background">
       <div className="bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
         <button
           type="button"

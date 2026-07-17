@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { X, PackageCheck, Loader2, CheckCircle2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { X, PackageCheck, Loader2, CheckCircle2, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -27,6 +27,7 @@ export interface PurchaseOrder {
   poNumber: string;
   status: string;
   total: number;
+  paidAmount?: number;
   orderDate: string;
   expectedDate?: string | null;
   notes?: string | null;
@@ -44,6 +45,13 @@ interface ReceiveRow {
   manufactureDate: string;
 }
 
+const PAY_METHODS = [
+  { value: "CASH", label: "Cash" },
+  { value: "CARD", label: "Card" },
+  { value: "BANK_TRANSFER", label: "Bank" },
+  { value: "CHEQUE", label: "Cheque" },
+] as const;
+
 interface Props {
   po: PurchaseOrder | null;
   onClose: () => void;
@@ -56,6 +64,13 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
   const showExpiry = hasExpiryTracking(profile);
   const [rows, setRows] = useState<ReceiveRow[]>([]);
   const [loading, setLoading] = useState(false);
+  const [payNow, setPayNow] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState<string>("CASH");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeDueDate, setChequeDueDate] = useState("");
+  const [chequeBankName, setChequeBankName] = useState("");
+  const [payReference, setPayReference] = useState("");
 
   useEffect(() => {
     if (po) {
@@ -67,8 +82,31 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
         expiryDate: "",
         manufactureDate: "",
       })));
+      setPayNow(false);
+      setPayAmount("");
+      setPayMethod("CASH");
+      setChequeNumber("");
+      setChequeDueDate("");
+      setChequeBankName("");
+      setPayReference("");
     }
   }, [po]);
+
+  const receiveValue = useMemo(() => {
+    if (!po) return 0;
+    return rows.reduce((s, r) => {
+      const item = po.items?.find((i) => i.id === r.itemId);
+      return s + (r.receivedQty || 0) * (item?.unitCost ?? 0);
+    }, 0);
+  }, [po, rows]);
+
+  const poDue = Math.max(0, (po?.total ?? 0) - (po?.paidAmount ?? 0));
+
+  useEffect(() => {
+    if (payNow && receiveValue > 0) {
+      setPayAmount(String(Math.round(Math.min(receiveValue, poDue || receiveValue) * 100) / 100));
+    }
+  }, [payNow, receiveValue, poDue]);
 
   const update = <K extends keyof ReceiveRow>(idx: number, key: K, val: ReceiveRow[K]) =>
     setRows((prev) => prev.map((r, i) => (i === idx ? { ...r, [key]: val } : r)));
@@ -77,6 +115,15 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     if (!po) return;
     const hasAny = rows.some((r) => r.receivedQty > 0 || r.rejectedQty > 0);
     if (!hasAny) { toast.error("Enter at least one received quantity"); return; }
+
+    if (payNow) {
+      const amt = parseFloat(payAmount);
+      if (!(amt > 0)) { toast.error("Enter payment amount"); return; }
+      if (payMethod === "CHEQUE" && !chequeNumber.trim()) {
+        toast.error("Cheque number is required");
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -93,8 +140,29 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
             ? { manufactureDate: r.manufactureDate }
             : {}),
         })),
+        ...(payNow
+          ? {
+              payment: {
+                amount: parseFloat(payAmount),
+                method: payMethod,
+                reference: payReference.trim() || undefined,
+                notes: `Paid on receive — ${po.poNumber}`,
+                ...(payMethod === "CHEQUE"
+                  ? {
+                      chequeNumber: chequeNumber.trim(),
+                      chequeDueDate: chequeDueDate || undefined,
+                      chequeBankName: chequeBankName.trim() || undefined,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       });
-      toast.success("Items received — GRN posted & inventory updated");
+      toast.success(
+        payNow
+          ? "Items received & supplier payment recorded"
+          : "Items received — GRN posted & inventory updated",
+      );
       onReceived();
       onClose();
     } catch (e: unknown) {
@@ -150,7 +218,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div className="rounded-xl border overflow-x-auto">
             <table className="w-full text-sm min-w-[720px]">
               <thead className="bg-muted/30">
@@ -238,18 +306,91 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           </div>
 
           {showExpiry && (
-            <div className="mt-3 p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
+            <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/20 text-xs text-emerald-700 flex items-start gap-2">
               <PackageCheck className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               Expiry is optional. When set, stock posts to inventory lots and POS can sell by FEFO (earliest expiry first).
             </div>
           )}
+
+          <div className="rounded-xl border p-4 space-y-3 bg-muted/10">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={payNow}
+                  onChange={(e) => setPayNow(e.target.checked)}
+                  className="h-4 w-4 rounded border-border"
+                />
+                <Banknote className="h-4 w-4 text-emerald-600" />
+                Pay supplier now
+              </label>
+              <div className="text-xs text-muted-foreground">
+                This receive: <span className="font-bold text-foreground">LKR {receiveValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                {poDue > 0 && (
+                  <> · PO due: <span className="font-semibold">LKR {poDue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span></>
+                )}
+              </div>
+            </div>
+            {payNow && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Amount (LKR)</label>
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Method</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                  >
+                    {PAY_METHODS.map((m) => (
+                      <option key={m.value} value={m.value}>{m.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Reference</label>
+                  <Input
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="Optional"
+                    className="h-9"
+                  />
+                </div>
+                {payMethod === "CHEQUE" && (
+                  <>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Cheque # *</label>
+                      <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="h-9 font-mono" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due date</label>
+                      <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-9" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Bank</label>
+                      <Input value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} className="h-9" />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
-            Confirm Receipt
+            {payNow ? "Receive & Pay" : "Confirm Receipt"}
           </Button>
         </div>
       </div>

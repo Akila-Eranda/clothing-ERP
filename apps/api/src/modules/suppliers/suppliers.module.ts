@@ -76,6 +76,24 @@ export class ReceiveItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
 }
 
+/** Optional supplier payment recorded in the same receive action. */
+export class ReceivePaymentDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+}
+
+export class ReceivePoBodyDto {
+  @ApiProperty({ type: [ReceiveItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => ReceiveItemDto)
+  items: ReceiveItemDto[];
+  @ApiPropertyOptional({ type: ReceivePaymentDto }) @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
+  payment?: ReceivePaymentDto;
+}
+
 export class RecordPaymentDto {
   @ApiProperty() @IsNumber() @Min(0.01) amount: number;
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
@@ -573,11 +591,33 @@ export class SuppliersService {
     return this.prisma.supplierProductAssignment.delete({ where: { id: existing.id } });
   }
 
-  async receiveItems(poId: string, tenantId: string, branchId: string, userId: string, items: ReceiveItemDto[]) {
+  async receiveItems(
+    poId: string,
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    items: ReceiveItemDto[],
+    payment?: ReceivePaymentDto,
+  ) {
     // Phase 3: PO receive creates a formal GoodsReceipt (GRN from PO) + partial receive status
     const result = await this.procurementService.receiveFromPurchaseOrder(poId, tenantId, branchId, userId, items);
+    let paymentResult: unknown = null;
+    if (payment && payment.amount > 0) {
+      const po = result.purchaseOrder;
+      if (!po) throw new BadRequestException('Purchase order missing after receive');
+      paymentResult = await this.recordPayment(po.supplierId, tenantId, branchId, userId, {
+        amount: payment.amount,
+        method: payment.method,
+        purchaseId: poId,
+        reference: payment.reference,
+        notes: payment.notes ?? `Payment on GRN ${result.grn?.grnNumber ?? poId}`,
+        chequeNumber: payment.chequeNumber,
+        chequeDueDate: payment.chequeDueDate,
+        chequeBankName: payment.chequeBankName,
+      });
+    }
     // Backward-compatible shape for existing UI, plus grn document
-    return { ...result.purchaseOrder, grn: result.grn };
+    return { ...result.purchaseOrder, grn: result.grn, payment: paymentResult };
   }
 
   async getReorderSuggestions(tenantId: string, branchId?: string) {
@@ -848,13 +888,20 @@ export class PurchasesController {
 
   @Post(':id/receive')
   @RequirePermissions('purchases:update')
-  @ApiOperation({ summary: 'Receive items for a purchase order' })
+  @ApiOperation({ summary: 'Receive items for a purchase order (optional pay supplier now)' })
   receiveItems(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body('items') items: ReceiveItemDto[],
+    @Body() body: ReceivePoBodyDto,
   ) {
-    return this.suppliersService.receiveItems(id, user.tenantId, user.branchId ?? '', user.id, items);
+    return this.suppliersService.receiveItems(
+      id,
+      user.tenantId,
+      user.branchId ?? '',
+      user.id,
+      body.items ?? [],
+      body.payment,
+    );
   }
 
   @Post(':id/submit-approval')
@@ -898,6 +945,8 @@ export class QuickGrnDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiProperty({ type: [QuickGrnLineDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => QuickGrnLineDto)
   lines: QuickGrnLineDto[];
+  @ApiPropertyOptional({ type: ReceivePaymentDto }) @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
+  payment?: ReceivePaymentDto;
 }
 
 export class CreateSupplierReturnDto {

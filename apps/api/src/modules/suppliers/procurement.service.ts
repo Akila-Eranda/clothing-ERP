@@ -554,6 +554,16 @@ export class ProcurementService {
         expiryDate?: string;
         manufactureDate?: string;
       }[];
+      payment?: {
+        amount: number;
+        method: PaymentMethod;
+        reference?: string;
+        notes?: string;
+        chequeNumber?: string;
+        chequeDueDate?: string;
+        chequeBankName?: string;
+        chequeBankAccountId?: string;
+      };
     },
   ) {
     if (!dto.lines?.length) throw new BadRequestException('Add at least one product');
@@ -580,7 +590,7 @@ export class ProcurementService {
       };
     });
 
-    return this.postGoodsReceipt({
+    const grn = await this.postGoodsReceipt({
       tenantId,
       branchId,
       userId,
@@ -589,6 +599,29 @@ export class ProcurementService {
       notes: dto.notes ?? 'Quick GRN (cashier)',
       lines,
     });
+
+    let payment: unknown = null;
+    if (dto.payment && dto.payment.amount > 0) {
+      const inv = await this.prisma.supplierInvoice.findFirst({
+        where: { tenantId, goodsReceiptId: grn.id, status: { not: SupplierInvoiceStatus.CANCELLED } },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (!inv) {
+        throw new BadRequestException('Auto invoice not found for GRN — cannot record payment');
+      }
+      payment = await this.paySupplierInvoice(inv.id, tenantId, branchId, userId, {
+        amount: dto.payment.amount,
+        method: dto.payment.method,
+        reference: dto.payment.reference,
+        notes: dto.payment.notes ?? `Payment on GRN ${grn.grnNumber}`,
+        chequeNumber: dto.payment.chequeNumber,
+        chequeDueDate: dto.payment.chequeDueDate,
+        chequeBankName: dto.payment.chequeBankName,
+        chequeBankAccountId: dto.payment.chequeBankAccountId,
+      });
+    }
+
+    return { ...grn, payment };
   }
 
   // ── Supplier Returns ──────────────────────────────────────────────

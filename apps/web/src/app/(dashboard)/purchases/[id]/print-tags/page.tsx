@@ -419,7 +419,7 @@ export default function PrintTagsPage() {
     <div className="print-root">
       <style>{PRINT_CSS}</style>
 
-      <div className="no-print min-h-screen bg-muted/30">
+      <div className="no-print min-h-screen bg-background">
         <div className="bg-background border-b px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.push(`/purchases/${id}`)}>
@@ -465,7 +465,7 @@ export default function PrintTagsPage() {
         </div>
 
         <div className="p-6 space-y-5">
-          <div className="bg-background border rounded-2xl overflow-hidden shadow-sm">
+          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] overflow-hidden shadow-card">
             <div className="px-5 py-3 border-b bg-muted/20">
               <h3 className="font-semibold text-sm">Set Label Quantity Per Variant</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
@@ -531,7 +531,7 @@ export default function PrintTagsPage() {
             </table>
           </div>
 
-          <div className="bg-background border rounded-2xl p-5 shadow-sm">
+          <div className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] p-5 shadow-card">
             <h3 className="font-semibold text-sm mb-4">Label Preview ({totalLabels} labels)</h3>
             {totalLabels === 0 ? (
               <div className="py-12 text-center text-muted-foreground text-sm">Set qty above to preview labels</div>

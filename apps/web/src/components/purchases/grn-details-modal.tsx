@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FileText, Loader2, PackageCheck, X } from "lucide-react";
+import { ArrowRight, ClipboardPlus, FileText, Loader2, PackageCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -122,11 +122,11 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-3xl border overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="bg-card rounded-xl shadow-card-hover ring-1 ring-slate-900/[0.06] w-full max-w-3xl overflow-hidden max-h-[92vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-          <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
-            <PackageCheck className="h-4 w-4 text-emerald-600" />
+        <div className="flex items-center gap-3 px-6 py-4 border-b border-border shrink-0 bg-muted/30">
+          <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
+            <PackageCheck className="h-5 w-5 text-emerald-600" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
@@ -300,36 +300,44 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
           </div>
         )}
 
-        <div className="flex justify-between items-center gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
-          <div className="text-xs text-muted-foreground max-w-[220px]">
-            {!grn?.purchase && grn && (grn.source === "QUICK" || grn.source === "DIRECT")
-              ? "Admin can create a PO from this GRN for records / invoice."
-              : null}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 border-t border-border bg-muted/40 shrink-0">
+          <div className="min-w-0">
+            {!grn?.purchase && grn && (grn.source === "QUICK" || grn.source === "DIRECT") ? (
+              <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
+                Create a purchase order from this GRN for records and supplier invoices.
+              </p>
+            ) : (
+              <span />
+            )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 shrink-0 sm:ml-auto">
+            <Button variant="ghost" onClick={onClose} className="h-10 px-4">
+              Close
+            </Button>
+            {grn?.purchase?.id && (
+              <Button variant="outline" asChild className="h-10 gap-2">
+                <Link href={`/purchases/${grn.purchase.id}`}>
+                  <FileText className="h-4 w-4" />
+                  Open PO {grn.purchase.poNumber}
+                </Link>
+              </Button>
+            )}
             {grn && !grn.purchase && (grn.source === "QUICK" || grn.source === "DIRECT") && (
               <Button
-                className="gap-1.5"
+                size="lg"
+                className="h-11 gap-2.5 px-5 rounded-[10px] shadow-button font-semibold"
                 onClick={() => {
                   onClose();
                   router.push(`/purchases/new?fromGrn=${grn.id}`);
                 }}
               >
-                <FileText className="h-3.5 w-3.5" />
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/15">
+                  <ClipboardPlus className="h-4 w-4" />
+                </span>
                 Create PO from GRN
+                <ArrowRight className="h-4 w-4 opacity-80" />
               </Button>
             )}
-            {grn?.purchase?.id && (
-              <Button variant="outline" asChild className="gap-1.5">
-                <Link href={`/purchases/${grn.purchase.id}`}>
-                  <FileText className="h-3.5 w-3.5" />
-                  Open PO {grn.purchase.poNumber}
-                </Link>
-              </Button>
-            )}
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
           </div>
         </div>
       </div>

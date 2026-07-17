@@ -107,8 +107,8 @@ function SectionCard({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border bg-background shadow-sm overflow-hidden">
-      <div className="flex items-start justify-between gap-3 border-b bg-muted/30 px-4 py-3.5 sm:px-5">
+    <section className="rounded-xl bg-card shadow-card ring-1 ring-slate-900/[0.05] overflow-hidden">
+      <div className="flex items-start justify-between gap-3 border-b bg-background px-4 py-3.5 sm:px-5">
         <div className="flex items-start gap-3 min-w-0">
           {step ? (
             <span className="mt-0.5 h-6 min-w-6 px-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-bold flex items-center justify-center shrink-0">
@@ -129,8 +129,8 @@ function SectionCard({
 
 function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border bg-background shadow-sm overflow-hidden">
-      <div className="border-b bg-muted/30 px-4 py-3">
+    <div className="rounded-xl bg-card shadow-card ring-1 ring-slate-900/[0.05] overflow-hidden">
+      <div className="border-b bg-background px-4 py-3">
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
       <div className="p-4 space-y-2.5">{children}</div>
@@ -745,7 +745,7 @@ export default function CreatePOPage() {
   const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="min-h-screen bg-muted/30 pb-32 sm:pb-28">
+    <div className="min-h-screen bg-background pb-32 sm:pb-28">
       {/* Header — same layout as New Product (grocery master) */}
       <div className="sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
         <button
@@ -920,7 +920,7 @@ export default function CreatePOPage() {
                               i === searchHighlight ? "bg-primary/10" : "hover:bg-muted/50",
                             )}
                           >
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background">
                               {v.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={v.imageUrl} alt={v.productName} className="h-full w-full object-cover" />
@@ -986,7 +986,7 @@ export default function CreatePOPage() {
                       >
                         {item.variantId ? (
                           <div className="flex items-start gap-3">
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/30">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background">
                               {item.imageUrl || v?.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
@@ -1163,7 +1163,7 @@ export default function CreatePOPage() {
                           <td className="px-4 py-3">
                             {item.variantId ? (
                               <div className="flex min-w-0 items-start gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/30">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background">
                                   {item.imageUrl || v?.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
@@ -1352,7 +1352,7 @@ export default function CreatePOPage() {
             </SectionCard>
 
             {/* Selected details — mobile/tablet only (sidebar on xl) */}
-            <section className="space-y-3 rounded-2xl border bg-background p-4 shadow-sm xl:hidden sm:p-5">
+            <section className="space-y-3 rounded-xl bg-card p-4 shadow-card ring-1 ring-slate-900/[0.05] xl:hidden sm:p-5">
               <div>
                 <h2 className="text-sm font-semibold">Selected product</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">Tap a row to see stock context</p>
@@ -1407,7 +1407,7 @@ export default function CreatePOPage() {
               <MetaRow label="Warehouse" value={<span className="inline-flex items-center gap-1"><Warehouse className="h-3 w-3" />Default</span>} />
             </SidebarBlock>
 
-            <div className="hidden rounded-2xl border bg-background p-4 shadow-sm xl:block">
+            <div className="hidden rounded-xl bg-card p-4 shadow-card ring-1 ring-slate-900/[0.05] xl:block">
               <h3 className="text-sm font-semibold">Selected product</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">Click a table row</p>
               <div className="mt-3">
@@ -1528,7 +1528,7 @@ function SelectedProductPanel({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted/30 ${compact ? "h-12 w-12" : "h-14 w-14"}`}>
+        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background ${compact ? "h-12 w-12" : "h-14 w-14"}`}>
           {(item.imageUrl || variant?.imageUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.imageUrl || variant?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />

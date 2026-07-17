@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import {
-  Loader2, Package, PackageCheck, Plus, Search, ScanLine, Trash2, X,
+  Loader2, Package, PackageCheck, Plus, Search, ScanLine, Trash2, X, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +63,13 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
   const [loading, setLoading] = useState(false);
   const [booting, setBooting] = useState(false);
   const [openPos, setOpenPos] = useState<OpenPo[]>([]);
+  const [payNow, setPayNow] = useState(true);
+  const [payAmount, setPayAmount] = useState("");
+  const [payMethod, setPayMethod] = useState("CASH");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeDueDate, setChequeDueDate] = useState("");
+  const [chequeBankName, setChequeBankName] = useState("");
+  const [payReference, setPayReference] = useState("");
 
   const reset = useCallback(() => {
     setSupplierId("");
@@ -71,6 +78,13 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     setSearchQ("");
     setSearchOpen(false);
     setOpenPos([]);
+    setPayNow(true);
+    setPayAmount("");
+    setPayMethod("CASH");
+    setChequeNumber("");
+    setChequeDueDate("");
+    setChequeBankName("");
+    setPayReference("");
   }, []);
 
   useEffect(() => {
@@ -228,6 +242,12 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
   const grandTotal = items.reduce((s, i) => s + i.quantity * i.unitCost, 0);
   const totalQty = items.reduce((s, i) => s + i.quantity, 0);
 
+  useEffect(() => {
+    if (payNow && grandTotal > 0) {
+      setPayAmount(String(Math.round(grandTotal * 100) / 100));
+    }
+  }, [payNow, grandTotal]);
+
   const submit = async () => {
     if (!supplierId) {
       toast.error("Select a supplier");
@@ -240,6 +260,17 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     if (items.some((i) => i.quantity < 1 || i.unitCost < 0)) {
       toast.error("Check quantities and costs");
       return;
+    }
+    if (payNow) {
+      const amt = parseFloat(payAmount);
+      if (!(amt > 0)) {
+        toast.error("Enter payment amount");
+        return;
+      }
+      if (payMethod === "CHEQUE" && !chequeNumber.trim()) {
+        toast.error("Cheque number is required");
+        return;
+      }
     }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
@@ -260,8 +291,29 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
           ...(showExpiry && i.expiryDate ? { expiryDate: i.expiryDate } : {}),
           ...(showBatch && i.batchNumber.trim() ? { batchNumber: i.batchNumber.trim() } : {}),
         })),
+        ...(payNow
+          ? {
+              payment: {
+                amount: parseFloat(payAmount),
+                method: payMethod,
+                reference: payReference.trim() || undefined,
+                notes: "Paid on Quick GRN",
+                ...(payMethod === "CHEQUE"
+                  ? {
+                      chequeNumber: chequeNumber.trim(),
+                      chequeDueDate: chequeDueDate || undefined,
+                      chequeBankName: chequeBankName.trim() || undefined,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       });
-      toast.success(`GRN posted: ${res.data?.grnNumber ?? "OK"}`);
+      toast.success(
+        payNow
+          ? `GRN posted & supplier paid: ${res.data?.grnNumber ?? "OK"}`
+          : `GRN posted: ${res.data?.grnNumber ?? "OK"}`,
+      );
       onCreated();
       onClose();
     } catch (e: unknown) {
@@ -558,6 +610,80 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
               )}
             </div>
 
+            <div className="rounded-xl border p-4 space-y-3 bg-muted/10">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={payNow}
+                    onChange={(e) => setPayNow(e.target.checked)}
+                    className="h-4 w-4 rounded border-border"
+                  />
+                  <Banknote className="h-4 w-4 text-emerald-600" />
+                  Pay supplier now
+                </label>
+                <span className="text-xs text-muted-foreground">
+                  GRN total:{" "}
+                  <span className="font-bold text-foreground">
+                    LKR {grandTotal.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                  </span>
+                </span>
+              </div>
+              {payNow && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Amount (LKR)</label>
+                    <Input
+                      type="number"
+                      min={0.01}
+                      step="0.01"
+                      value={payAmount}
+                      onChange={(e) => setPayAmount(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Method</label>
+                    <select
+                      value={payMethod}
+                      onChange={(e) => setPayMethod(e.target.value)}
+                      className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                    >
+                      <option value="CASH">Cash</option>
+                      <option value="CARD">Card</option>
+                      <option value="BANK_TRANSFER">Bank</option>
+                      <option value="CHEQUE">Cheque</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Reference</label>
+                    <Input
+                      value={payReference}
+                      onChange={(e) => setPayReference(e.target.value)}
+                      placeholder="Optional"
+                      className="h-9"
+                    />
+                  </div>
+                  {payMethod === "CHEQUE" && (
+                    <>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Cheque # *</label>
+                        <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="h-9 font-mono" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due date</label>
+                        <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-9" />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Bank</label>
+                        <Input value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} className="h-9" />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               {showExpiry
                 ? "Expiry date is optional. When set, stock posts to inventory lots for FEFO. "
@@ -579,7 +705,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
             className="gap-1.5 min-w-[140px] bg-emerald-600 hover:bg-emerald-700"
           >
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
-            Post GRN
+            {payNow ? "Post GRN & Pay" : "Post GRN"}
           </Button>
         </div>
       </div>

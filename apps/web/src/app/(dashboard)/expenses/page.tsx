@@ -196,7 +196,7 @@ export default function ExpensesPage() {
       <div className="px-6 py-6 space-y-6">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
-        <div className="bg-card border rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-sm">
+        <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-card ring-1 ring-slate-900/[0.05]">
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setRange({ start: p.start, end: p.end })}
               className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-background text-muted-foreground hover:bg-muted border"}`}>
@@ -219,7 +219,7 @@ export default function ExpensesPage() {
             { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry" },
             { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories` },
           ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string }[]).map((kpi) => (
-            <Card key={kpi.label} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
+            <Card key={kpi.label} className="card-hover">
               <CardContent className="p-5 flex items-center gap-4">
                 <div className={`${kpi.bg} rounded-full p-2.5 shrink-0`}><kpi.icon className="h-5 w-5 text-white" /></div>
                 <div className="min-w-0">
@@ -237,7 +237,7 @@ export default function ExpensesPage() {
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
             {/* Category donut */}
-            <Card className="lg:col-span-2 bg-card border shadow-sm">
+            <Card className="lg:col-span-2 card-hover">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-foreground">By Category</CardTitle>
               </CardHeader>
@@ -264,7 +264,7 @@ export default function ExpensesPage() {
             </Card>
 
             {/* Payment method bar */}
-            <Card className="lg:col-span-3 bg-card border shadow-sm">
+            <Card className="lg:col-span-3 card-hover">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-semibold text-foreground">By Payment Method</CardTitle>
               </CardHeader>
@@ -289,7 +289,7 @@ export default function ExpensesPage() {
 
         {/* ── Category breakdown bars ──────────────────────────────────────── */}
         {catData.length > 0 && (
-          <Card className="bg-card border shadow-sm">
+          <Card className="card-hover">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold text-foreground">Expense Breakdown by Category</CardTitle>
             </CardHeader>
@@ -309,7 +309,7 @@ export default function ExpensesPage() {
         )}
 
         {/* ── Expenses Table ───────────────────────────────────────────────── */}
-        <Card className="bg-card border shadow-sm">
+        <Card className="card-hover">
           <CardHeader className="pb-3 flex-row items-center justify-between">
             <CardTitle className="text-sm font-semibold text-foreground">All Expenses</CardTitle>
             <div className="flex items-center gap-2">

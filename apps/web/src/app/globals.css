@@ -6,15 +6,15 @@
   /* Enterprise light table tokens (react-table-craft) */
   --tc-background: 0 0% 100%;
   --tc-foreground: 220 39% 11%;
-  --tc-card: 0 0% 100%;
+  --tc-card: 220 33% 98%;
   --tc-card-foreground: 220 39% 11%;
-  --tc-popover: 0 0% 100%;
+  --tc-popover: 220 33% 98%;
   --tc-popover-foreground: 220 39% 11%;
   --tc-primary: 239 84% 67%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 210 20% 98%;
+  --tc-secondary: 217 28% 94%;
   --tc-secondary-foreground: 220 39% 11%;
-  --tc-muted: 210 20% 98%;
+  --tc-muted: 217 28% 94%;
   --tc-muted-foreground: 220 9% 46%;
   --tc-accent: 219 100% 97%;
   --tc-accent-foreground: 239 84% 40%;
@@ -53,15 +53,15 @@
     /* Cooler canvas — less white wash; white cards lift with depth */
     --background: 217 33% 92%;          /* #E4EAF3 — visible cool canvas */
     --foreground: 220 39% 11%;          /* #111827 */
-    --card: 0 0% 100%;                  /* #FFFFFF */
+    --card: 220 33% 98%;               /* #F7F9FC — soft cool, not pure white */
     --card-foreground: 220 39% 11%;
-    --popover: 0 0% 100%;
+    --popover: 220 33% 98%;
     --popover-foreground: 220 39% 11%;
     --primary: 239 84% 67%;             /* #6366F1 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 28% 96%;           /* #F1F4F9 */
+    --secondary: 217 28% 94%;           /* #E9EEF6 */
     --secondary-foreground: 220 39% 11%;
-    --muted: 220 28% 96%;               /* #F1F4F9 — secondary surfaces */
+    --muted: 217 28% 94%;               /* #E9EEF6 — nested surfaces inside cards */
     --muted-foreground: 220 9% 46%;     /* #6B7280 */
     --accent: 219 100% 97%;             /* #EEF4FF */
     --accent-foreground: 239 84% 40%;
@@ -317,10 +317,10 @@
 
   /* Table stripes — enterprise alternate rows */
   .table-stripe tbody tr:nth-child(even) {
-    background: #fafbfc;
+    background: hsl(var(--muted));
   }
   .table-stripe tbody tr:nth-child(odd) {
-    background: #ffffff;
+    background: transparent;
   }
   .table-stripe tbody tr:hover {
     background: #eef4ff !important;
@@ -345,7 +345,7 @@
   :root:not(.dark) .enterprise-table thead,
   :root:not(.dark) [data-table-craft] thead,
   :root:not(.dark) .rtc-table thead {
-    background: #fafbfc;
+    background: hsl(var(--muted));
     position: sticky;
     top: 0;
     z-index: 1;
@@ -353,7 +353,7 @@
   :root:not(.dark) .enterprise-table th,
   :root:not(.dark) [data-table-craft] th,
   :root:not(.dark) .rtc-table th {
-    border-bottom: 1px solid #e8edf5;
+    border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
     font-size: 12px;
     text-transform: uppercase;
@@ -364,13 +364,13 @@
   :root:not(.dark) .enterprise-table td,
   :root:not(.dark) [data-table-craft] td,
   :root:not(.dark) .rtc-table td {
-    border-bottom: 1px solid rgba(232, 237, 245, 0.7);
+    border-bottom: 1px solid hsl(var(--border) / 0.7);
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
   :root:not(.dark) [data-table-craft] tbody tr:nth-child(even),
   :root:not(.dark) .rtc-table tbody tr:nth-child(even) {
-    background: #fafbfc;
+    background: hsl(var(--muted) / 0.65);
   }
   :root:not(.dark) .enterprise-table tbody tr:hover,
   :root:not(.dark) [data-table-craft] tbody tr:hover,
