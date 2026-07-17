@@ -4,24 +4,24 @@
 
 :root {
   /* Enterprise light table tokens (react-table-craft) */
-  --tc-background: 0 0% 100%;
+  --tc-background: 220 28% 97%;
   --tc-foreground: 220 39% 11%;
-  --tc-card: 0 0% 100%;
+  --tc-card: 220 28% 97%;
   --tc-card-foreground: 220 39% 11%;
-  --tc-popover: 0 0% 100%;
+  --tc-popover: 220 28% 97%;
   --tc-popover-foreground: 220 39% 11%;
   --tc-primary: 239 84% 67%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 220 24% 94%;
+  --tc-secondary: 220 22% 93%;
   --tc-secondary-foreground: 220 39% 11%;
-  --tc-muted: 220 24% 94%;
+  --tc-muted: 220 22% 93%;
   --tc-muted-foreground: 220 9% 42%;
   --tc-accent: 226 100% 97%;
   --tc-accent-foreground: 239 84% 40%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 220 20% 82%;
-  --tc-input: 220 18% 78%;
+  --tc-border: 220 18% 80%;
+  --tc-input: 220 16% 84%;
   --tc-ring: 239 84% 67%;
   --tc-radius: 0.75rem;
 }
@@ -51,22 +51,22 @@
 @layer base {
   :root {
     /*
-      Full light theme
-      Canvas: cool gray | Surfaces: white | Lines: visible slate
+      Soft light theme — less pure white glare
+      Canvas: cooler gray | Cards: soft blue-gray (not #fff)
     */
-    --background: 220 28% 95%;          /* #EEF2F7 page canvas */
+    --background: 220 26% 91%;          /* #E4EAF3 page canvas */
     --foreground: 222 47% 11%;          /* #111827 ink */
-    --card: 0 0% 100%;                  /* white panels */
+    --card: 220 28% 97%;                /* #F3F6FA soft panels — not pure white */
     --card-foreground: 222 47% 11%;
-    --popover: 0 0% 100%;
+    --popover: 220 28% 97%;
     --popover-foreground: 222 47% 11%;
     --primary: 239 84% 67%;             /* #6366F1 indigo */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 24% 94%;           /* soft chip fill */
+    --secondary: 220 22% 93%;
     --secondary-foreground: 222 47% 11%;
-    --muted: 220 24% 94%;
-    --muted-foreground: 220 10% 40%;    /* readable gray */
-    --accent: 226 100% 97%;             /* indigo wash */
+    --muted: 220 22% 93%;
+    --muted-foreground: 220 10% 40%;
+    --accent: 226 100% 97%;
     --accent-foreground: 239 84% 40%;
     --destructive: 0 84% 55%;
     --destructive-foreground: 0 0% 100%;
@@ -74,10 +74,10 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 48%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 20% 82%;              /* soft hairline — clean, not heavy */
-    --input: 220 18% 78%;
+    --border: 220 18% 80%;
+    --input: 220 20% 95%;               /* inputs slightly softer than pure white */
     --ring: 239 84% 67%;
-    --line: 222 30% 18%;                /* near-black for strong rules */
+    --line: 222 30% 18%;
     --radius: 0.75rem;
     --radius-control: 0.625rem;
     --chart-1: 239 84% 67%;
@@ -257,7 +257,7 @@
   /* White panel with full visible border + soft shadow */
   .panel-edge,
   .surface-panel {
-    @apply bg-card text-card-foreground rounded-xl border border-border shadow-sm;
+    @apply bg-card text-card-foreground rounded-xl border border-border shadow-none;
   }
 
   /* Horizontal rule / section divider */
