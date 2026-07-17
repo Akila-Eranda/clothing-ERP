@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeftRight, BookOpen, Building2, Landmark, Loader2, Plus, RefreshCw,
 } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +13,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -160,6 +169,7 @@ function CashBookPanel() {
   const [side, setSide] = useState<"debit" | "credit">("debit");
   const [contraId, setContraId] = useState("");
   const [entryDate, setEntryDate] = useState(today());
+  const [cashEntryOpen, setCashEntryOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -204,6 +214,7 @@ function CashBookPanel() {
       setDesc("");
       setAmount("");
       await load();
+      setCashEntryOpen(false);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to append");
     } finally {
@@ -235,64 +246,104 @@ function CashBookPanel() {
 
       <Card>
         <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Manual cash entry
-          </h3>
-          <div className="grid sm:grid-cols-6 gap-3 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">Date</Label>
-              <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="RECEIPT">Receipt</SelectItem>
-                  <SelectItem value="PAYMENT">Payment</SelectItem>
-                  <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label className="text-xs">Description</Label>
-              <Input value={desc} onChange={(e) => setDesc(e.target.value)} className="h-9" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Side</Label>
-              <Select value={side} onValueChange={(v: "debit" | "credit") => setSide(v)}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="debit">Debit (in)</SelectItem>
-                  <SelectItem value="credit">Credit (out)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Amount</Label>
-              <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-9" />
-            </div>
-          </div>
-          <div className="grid sm:grid-cols-2 gap-3 items-end">
-            <div className="space-y-1">
-              <Label className="text-xs">GL contra (optional — posts journal)</Label>
-              <Select value={contraId || "_none"} onValueChange={(v) => setContraId(v === "_none" ? "" : v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="No GL post" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">No GL post</SelectItem>
-                  {glAccounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <Button onClick={() => void append()} disabled={busy} className="h-9 w-fit gap-1.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Plus className="h-4 w-4" /> Manual cash entry
+            </h3>
+            <Button size="sm" onClick={() => setCashEntryOpen(true)} disabled={busy} className="gap-1.5">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               Add entry
             </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Enter details in a modal, then submit to the cash book.
+          </p>
         </CardContent>
       </Card>
+
+      <Dialog open={cashEntryOpen} onOpenChange={setCashEntryOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manual cash entry</DialogTitle>
+            <DialogDescription>
+              Optionally link a GL contra account (posts a journal).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid sm:grid-cols-6 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">Date</Label>
+                <Input type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} className="h-9" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={type} onValueChange={setType} disabled={busy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="RECEIPT">Receipt</SelectItem>
+                    <SelectItem value="PAYMENT">Payment</SelectItem>
+                    <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 sm:col-span-2">
+                <Label className="text-xs">Description</Label>
+                <Input value={desc} onChange={(e) => setDesc(e.target.value)} className="h-9" disabled={busy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Side</Label>
+                <Select value={side} onValueChange={(v: "debit" | "credit") => setSide(v)} disabled={busy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="debit">Debit (in)</SelectItem>
+                    <SelectItem value="credit">Credit (out)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Amount</Label>
+                <Input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="h-9"
+                  disabled={busy}
+                />
+              </div>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs">GL contra (optional — posts journal)</Label>
+                <Select
+                  value={contraId || "_none"}
+                  onValueChange={(v) => setContraId(v === "_none" ? "" : v)}
+                  disabled={busy}
+                >
+                  <SelectTrigger className="h-9"><SelectValue placeholder="No GL post" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No GL post</SelectItem>
+                    {glAccounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={busy} onClick={() => setCashEntryOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => void append()} disabled={busy} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Add entry
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">
@@ -367,6 +418,10 @@ function BankBookPanel() {
   const [xferDesc, setXferDesc] = useState("");
   const [xferBusy, setXferBusy] = useState(false);
 
+  const [newAccountOpen, setNewAccountOpen] = useState(false);
+  const [txnOpen, setTxnOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+
   const loadBanks = useCallback(async () => {
     try {
       const [b, a] = await Promise.all([
@@ -424,6 +479,7 @@ function BankBookPanel() {
         glAccountId: baGl || undefined,
       });
       toast.success("Bank account created");
+      setNewAccountOpen(false);
       setBaCode("");
       setBaName("");
       setBaBank("");
@@ -453,6 +509,7 @@ function BankBookPanel() {
         description: txnDesc || undefined,
       });
       toast.success("Transaction posted");
+      setTxnOpen(false);
       setTxnAmt("");
       setTxnDesc("");
       await loadBanks();
@@ -479,6 +536,7 @@ function BankBookPanel() {
         description: xferDesc || undefined,
       });
       toast.success("Transfer completed");
+      setTransferOpen(false);
       setXferAmt("");
       setXferDesc("");
       await loadBanks();
@@ -497,37 +555,78 @@ function BankBookPanel() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold">New account</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Input className="h-9" placeholder="Code" value={baCode} onChange={(e) => setBaCode(e.target.value)} />
-              <Input className="h-9" placeholder="Name" value={baName} onChange={(e) => setBaName(e.target.value)} />
-              <Select value={baType} onValueChange={setBaType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="CURRENT">Current</SelectItem>
-                  <SelectItem value="SAVINGS">Savings</SelectItem>
-                  <SelectItem value="CASH_IN_HAND">Cash in hand</SelectItem>
-                  <SelectItem value="PETTY_CASH">Petty cash</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input className="h-9" placeholder="Bank name" value={baBank} onChange={(e) => setBaBank(e.target.value)} />
-              <Input className="h-9" type="number" placeholder="Opening" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} />
-              <Select value={baGl || "_none"} onValueChange={(v) => setBaGl(v === "_none" ? "" : v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="GL link" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">No GL link</SelectItem>
-                  {glAccounts.filter((a) => a.type === "ASSET").map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">New account</h3>
+              <Button size="sm" onClick={() => setNewAccountOpen(true)} disabled={baBusy} className="gap-1.5">
+                {baBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Create
+              </Button>
             </div>
-            <Button size="sm" onClick={() => void createBank()} disabled={baBusy} className="gap-1.5">
-              {baBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Create
-            </Button>
+            <p className="text-xs text-muted-foreground">Fill the details in a modal.</p>
           </CardContent>
         </Card>
+
+        <Dialog open={newAccountOpen} onOpenChange={setNewAccountOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>New bank account</DialogTitle>
+              <DialogDescription>Optionally link to a GL account.</DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Code</Label>
+                <Input className="h-9" placeholder="e.g. CASH-001" value={baCode} onChange={(e) => setBaCode(e.target.value)} disabled={baBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Name</Label>
+                <Input className="h-9" placeholder="e.g. Petty Cash" value={baName} onChange={(e) => setBaName(e.target.value)} disabled={baBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={baType} onValueChange={setBaType} disabled={baBusy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CURRENT">Current</SelectItem>
+                    <SelectItem value="SAVINGS">Savings</SelectItem>
+                    <SelectItem value="CASH_IN_HAND">Cash in hand</SelectItem>
+                    <SelectItem value="PETTY_CASH">Petty cash</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Bank name</Label>
+                <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Opening balance</Label>
+                <Input className="h-9" type="number" placeholder="0" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} disabled={baBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">GL link</Label>
+                <Select value={baGl || "_none"} onValueChange={(v) => setBaGl(v === "_none" ? "" : v)} disabled={baBusy}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="No GL link" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">No GL link</SelectItem>
+                    {glAccounts.filter((a) => a.type === "ASSET").map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" disabled={baBusy} onClick={() => setNewAccountOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => void createBank()} disabled={baBusy} className="gap-1.5">
+                {baBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Create
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Card>
           <CardContent className="p-4 space-y-2">
@@ -580,53 +679,125 @@ function BankBookPanel() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Deposit / Withdrawal</h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={txnType} onValueChange={setTxnType}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="DEPOSIT">Deposit</SelectItem>
-                  <SelectItem value="WITHDRAWAL">Withdrawal</SelectItem>
-                  <SelectItem value="FEE">Bank fee</SelectItem>
-                  <SelectItem value="INTEREST">Interest</SelectItem>
-                  <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input type="date" className="h-9" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} />
-              <Input type="number" className="h-9" placeholder="Amount" value={txnAmt} onChange={(e) => setTxnAmt(e.target.value)} />
-              <Input className="h-9" placeholder="Description" value={txnDesc} onChange={(e) => setTxnDesc(e.target.value)} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold">Deposit / Withdrawal</h3>
+              <Button
+                size="sm"
+                onClick={() => setTxnOpen(true)}
+                disabled={txnBusy || !accountId}
+                className="gap-1.5"
+              >
+                {txnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Post
+              </Button>
             </div>
-            <Button size="sm" onClick={() => void postTxn()} disabled={txnBusy || !accountId} className="gap-1.5">
-              {txnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Post
-            </Button>
+            <p className="text-xs text-muted-foreground">Select type, amount, and description in a modal.</p>
           </CardContent>
         </Card>
 
+        <Dialog open={txnOpen} onOpenChange={setTxnOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Post bank transaction</DialogTitle>
+              <DialogDescription>Posts deposit/withdrawal into the selected bank account.</DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Type</Label>
+                <Select value={txnType} onValueChange={setTxnType} disabled={txnBusy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="DEPOSIT">Deposit</SelectItem>
+                    <SelectItem value="WITHDRAWAL">Withdrawal</SelectItem>
+                    <SelectItem value="FEE">Bank fee</SelectItem>
+                    <SelectItem value="INTEREST">Interest</SelectItem>
+                    <SelectItem value="ADJUSTMENT">Adjustment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Date</Label>
+                <Input type="date" className="h-9" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} disabled={txnBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Amount</Label>
+                <Input type="number" className="h-9" placeholder="0" value={txnAmt} onChange={(e) => setTxnAmt(e.target.value)} disabled={txnBusy} />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs">Description</Label>
+                <Input className="h-9" placeholder="Optional" value={txnDesc} onChange={(e) => setTxnDesc(e.target.value)} disabled={txnBusy} />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" disabled={txnBusy} onClick={() => setTxnOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => void postTxn()} disabled={txnBusy || !accountId} className="gap-1.5">
+                {txnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                Post
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Card>
           <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <ArrowLeftRight className="h-4 w-4" /> Transfer
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Select value={xferTo || "_none"} onValueChange={(v) => setXferTo(v === "_none" ? "" : v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="To account" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="_none">To account…</SelectItem>
-                  {otherBanks.map((b) => (
-                    <SelectItem key={b.id} value={b.id}>{b.code} — {b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input type="number" className="h-9" placeholder="Amount" value={xferAmt} onChange={(e) => setXferAmt(e.target.value)} />
-              <Input className="h-9 col-span-2" placeholder="Description" value={xferDesc} onChange={(e) => setXferDesc(e.target.value)} />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4" /> Transfer
+              </h3>
+              <Button size="sm" onClick={() => setTransferOpen(true)} disabled={xferBusy || !accountId} className="gap-1.5">
+                {xferBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+                Transfer
+              </Button>
             </div>
-            <Button size="sm" onClick={() => void transfer()} disabled={xferBusy || !accountId} className="gap-1.5">
-              {xferBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
-              Transfer
-            </Button>
+            <p className="text-xs text-muted-foreground">Choose destination account and amount in a modal.</p>
           </CardContent>
         </Card>
+
+        <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Transfer between bank accounts</DialogTitle>
+              <DialogDescription>Transfers from the currently selected account.</DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label className="text-xs">To account</Label>
+                <Select value={xferTo || "_none"} onValueChange={(v) => setXferTo(v === "_none" ? "" : v)} disabled={xferBusy}>
+                  <SelectTrigger className="h-9"><SelectValue placeholder="To account" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="_none">To account…</SelectItem>
+                    {otherBanks.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>{b.code} — {b.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Amount</Label>
+                <Input type="number" className="h-9" placeholder="0" value={xferAmt} onChange={(e) => setXferAmt(e.target.value)} disabled={xferBusy} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Description</Label>
+                <Input className="h-9" placeholder="Optional" value={xferDesc} onChange={(e) => setXferDesc(e.target.value)} disabled={xferBusy} />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 pt-2">
+              <Button variant="outline" disabled={xferBusy} onClick={() => setTransferOpen(false)}>
+                Cancel
+              </Button>
+              <Button size="sm" onClick={() => void transfer()} disabled={xferBusy || !accountId} className="gap-1.5">
+                {xferBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+                Transfer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Card>

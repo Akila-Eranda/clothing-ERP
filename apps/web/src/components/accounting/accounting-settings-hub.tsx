@@ -14,6 +14,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -175,6 +183,7 @@ function FiscalPanel() {
   const [selectedId, setSelectedId] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [fyOpen, setFyOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editReId, setEditReId] = useState("");
   const [fyName, setFyName] = useState(`${new Date().getFullYear()}`);
@@ -224,6 +233,7 @@ function FiscalPanel() {
         setCurrent: true,
       });
       toast.success("Fiscal year created");
+      setFyOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -260,35 +270,43 @@ function FiscalPanel() {
         <p className="text-sm text-muted-foreground">
           Configure the current fiscal year and retained earnings account.
         </p>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/accounting/periods">Open period management</Link>
-        </Button>
+        <div className="flex gap-2 flex-wrap">
+          <Button size="sm" onClick={() => setFyOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Create fiscal year
+          </Button>
+          <Button asChild size="sm" variant="outline">
+            <Link href="/accounting/periods">Open period management</Link>
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Create fiscal year</h3>
-          <div className="grid sm:grid-cols-4 gap-3">
+      <Dialog open={fyOpen} onOpenChange={setFyOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create fiscal year</DialogTitle>
+            <DialogDescription>Creates monthly periods and can set this year as current.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">Name</Label>
-              <Input className="h-9" value={fyName} onChange={(e) => setFyName(e.target.value)} />
+              <Input className="h-9" value={fyName} onChange={(e) => setFyName(e.target.value)} disabled={busy} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Start</Label>
-              <Input type="date" className="h-9" value={fyStart} onChange={(e) => setFyStart(e.target.value)} />
+              <Input type="date" className="h-9" value={fyStart} onChange={(e) => setFyStart(e.target.value)} disabled={busy} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">End</Label>
-              <Input type="date" className="h-9" value={fyEnd} onChange={(e) => setFyEnd(e.target.value)} />
-            </div>
-            <div className="flex items-end">
-              <Button size="sm" className="h-9 gap-1" disabled={busy} onClick={() => void createFy()}>
-                <Plus className="h-3.5 w-3.5" /> Create
-              </Button>
+              <Input type="date" className="h-9" value={fyEnd} onChange={(e) => setFyEnd(e.target.value)} disabled={busy} />
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <DialogFooter className="gap-2">
+            <Button size="sm" className="gap-1" disabled={busy} onClick={() => void createFy()}>
+              <Plus className="h-3.5 w-3.5" /> Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {selected && (
         <Card>
@@ -593,6 +611,7 @@ function TaxSettingsPanel() {
   const [rates, setRates] = useState<TaxRate[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");
   const [rate, setRate] = useState("18");
@@ -637,6 +656,7 @@ function TaxSettingsPanel() {
       toast.success("Tax rate created");
       setCode("");
       setName("");
+      setRateOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -658,33 +678,42 @@ function TaxSettingsPanel() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <p className="text-sm text-muted-foreground">Tax master used for VAT and invoices.</p>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button size="sm" variant="outline" disabled={busy} onClick={() => void seed()}>Seed defaults</Button>
+          <Button size="sm" onClick={() => setRateOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Add rate
+          </Button>
           <Button asChild size="sm" variant="outline">
             <Link href="/accounting/vat">VAT returns & reports</Link>
           </Button>
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-4 grid sm:grid-cols-4 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Code</Label>
-            <Input className="h-9" value={code} onChange={(e) => setCode(e.target.value)} placeholder="VAT18" />
+      <Dialog open={rateOpen} onOpenChange={setRateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add tax rate</DialogTitle>
+            <DialogDescription>Code, name, and percentage for VAT / invoices.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Code</Label>
+              <Input className="h-9" value={code} onChange={(e) => setCode(e.target.value)} placeholder="VAT18" disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 18%" disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Rate %</Label>
+              <Input className="h-9" value={rate} onChange={(e) => setRate(e.target.value)} disabled={busy} />
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Name</Label>
-            <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="VAT 18%" />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Rate %</Label>
-            <Input className="h-9" value={rate} onChange={(e) => setRate(e.target.value)} />
-          </div>
-          <div className="flex items-end">
-            <Button size="sm" className="h-9" disabled={busy} onClick={() => void create()}>Add rate</Button>
-          </div>
-        </CardContent>
-      </Card>
+          <DialogFooter className="gap-2">
+            <Button size="sm" disabled={busy} onClick={() => void create()}>Add rate</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>

@@ -12,6 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -147,6 +155,8 @@ function BookPanel() {
   const [fund, setFund] = useState<Fund | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [fundOpen, setFundOpen] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
 
   const [newCode, setNewCode] = useState("PC01");
   const [newName, setNewName] = useState("Main Petty Cash");
@@ -208,6 +218,7 @@ function BookPanel() {
       });
       toast.success("Petty cash fund created");
       setFundId(res.data?.id ?? "");
+      setFundOpen(false);
       await loadFunds();
       await loadBook();
     } catch (e: unknown) {
@@ -235,6 +246,7 @@ function BookPanel() {
       setExpAmt("");
       setExpDesc("");
       setExpCat("");
+      setExpenseOpen(false);
       await loadFunds();
       await loadBook();
     } catch (e: unknown) {
@@ -261,22 +273,72 @@ function BookPanel() {
 
   return (
     <div className="space-y-4">
-      {!funds.length && (
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Create petty cash fund</h3>
-            <div className="grid sm:grid-cols-4 gap-2 items-end">
-              <Input className="h-9" placeholder="Code" value={newCode} onChange={(e) => setNewCode(e.target.value)} />
-              <Input className="h-9" placeholder="Name" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <Input className="h-9" type="number" placeholder="Float" value={newFloat} onChange={(e) => setNewFloat(e.target.value)} />
-              <Button size="sm" className="h-9" disabled={busy} onClick={() => void createFund()}>
-                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-                <span className="ml-1">Create</span>
-              </Button>
+      <div className="flex flex-wrap gap-2 justify-end">
+        <Button size="sm" variant="outline" onClick={() => setFundOpen(true)} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> {!funds.length ? "Create fund" : "New fund"}
+        </Button>
+        <Button size="sm" onClick={() => setExpenseOpen(true)} disabled={!fundId} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> Quick expense
+        </Button>
+      </div>
+
+      <Dialog open={fundOpen} onOpenChange={setFundOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create petty cash fund</DialogTitle>
+            <DialogDescription>Sets float and opening balance, optionally linked to a bank account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Code</Label>
+              <Input className="h-9" value={newCode} onChange={(e) => setNewCode(e.target.value)} disabled={busy} />
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input className="h-9" value={newName} onChange={(e) => setNewName(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Float</Label>
+              <Input className="h-9" type="number" value={newFloat} onChange={(e) => setNewFloat(e.target.value)} disabled={busy} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button size="sm" disabled={busy} onClick={() => void createFund()} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={expenseOpen} onOpenChange={setExpenseOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Quick expense</DialogTitle>
+            <DialogDescription>Record a disbursement from the selected fund.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input className="h-9" type="number" value={expAmt} onChange={(e) => setExpAmt(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Category</Label>
+              <Input className="h-9" value={expCat} onChange={(e) => setExpCat(e.target.value)} disabled={busy} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button size="sm" disabled={busy || !fundId} onClick={() => void disburse()} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Record disbursement
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-4 flex flex-wrap items-end gap-3">
@@ -325,21 +387,7 @@ function BookPanel() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <Card className="lg:col-span-1">
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold">Quick expense</h3>
-            <Input className="h-9" type="number" placeholder="Amount" value={expAmt} onChange={(e) => setExpAmt(e.target.value)} />
-            <Input className="h-9" placeholder="Description" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} />
-            <Input className="h-9" placeholder="Category" value={expCat} onChange={(e) => setExpCat(e.target.value)} />
-            <Button size="sm" className="w-full gap-1.5" disabled={busy || !fundId} onClick={() => void disburse()}>
-              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
-              Record disbursement
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="lg:col-span-2">
+      <Card>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -385,7 +433,6 @@ function BookPanel() {
             )}
           </CardContent>
         </Card>
-      </div>
     </div>
   );
 }
@@ -395,6 +442,7 @@ function ClaimsPanel() {
   const [funds, setFunds] = useState<Fund[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [claimOpen, setClaimOpen] = useState(false);
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [desc, setDesc] = useState("");
@@ -443,6 +491,7 @@ function ClaimsPanel() {
       setAmount("");
       setDesc("");
       setCategory("");
+      setClaimOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -484,32 +533,56 @@ function ClaimsPanel() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">New expense claim</h3>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <Input className="h-9" placeholder="Claimant" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input className="h-9" type="number" placeholder="Amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-            <Input className="h-9" placeholder="Category" value={category} onChange={(e) => setCategory(e.target.value)} />
-            <Input className="h-9 sm:col-span-2" placeholder="Description" value={desc} onChange={(e) => setDesc(e.target.value)} />
-            <Select value={fundId} onValueChange={setFundId}>
-              <SelectTrigger className="h-9"><SelectValue placeholder="Pay from fund" /></SelectTrigger>
-              <SelectContent>
-                {funds.map((f) => (
-                  <SelectItem key={f.id} value={f.id}>{f.code} — {f.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setClaimOpen(true)} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New expense claim
+        </Button>
+      </div>
+
+      <Dialog open={claimOpen} onOpenChange={setClaimOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New expense claim</DialogTitle>
+            <DialogDescription>Save a draft or submit for approval.</DialogDescription>
+          </DialogHeader>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Claimant</Label>
+              <Input className="h-9" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input className="h-9" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Category</Label>
+              <Input className="h-9" value={category} onChange={(e) => setCategory(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Pay from fund</Label>
+              <Select value={fundId} onValueChange={setFundId} disabled={busy}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Pay from fund" /></SelectTrigger>
+                <SelectContent>
+                  {funds.map((f) => (
+                    <SelectItem key={f.id} value={f.id}>{f.code} — {f.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" value={desc} onChange={(e) => setDesc(e.target.value)} disabled={busy} />
+            </div>
           </div>
-          <div className="flex gap-2">
+          <DialogFooter className="gap-2">
             <Button size="sm" variant="outline" disabled={busy} onClick={() => void create(false)}>Save draft</Button>
             <Button size="sm" disabled={busy} onClick={() => void create(true)}>
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
               Submit claim
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">

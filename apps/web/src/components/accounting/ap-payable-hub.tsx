@@ -12,6 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -471,9 +479,11 @@ function PaymentPanel() {
   const [method, setMethod] = useState("CASH");
   const [notes, setNotes] = useState("Supplier payment");
   const [busy, setBusy] = useState(false);
+  const [payOpen, setPayOpen] = useState(false);
   const [dnAmount, setDnAmount] = useState("");
   const [dnReason, setDnReason] = useState("Debit note");
   const [dnBusy, setDnBusy] = useState(false);
+  const [dnOpen, setDnOpen] = useState(false);
   const [payments, setPayments] = useState<ApDashboard["recentPayments"]>([]);
   const [bills, setBills] = useState<Array<{
     id: string;
@@ -531,6 +541,7 @@ function PaymentPanel() {
       });
       toast.success(`Applied LKR ${formatNumber(res.data?.appliedTotal ?? amt)}`);
       setAmount("");
+      setPayOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Payment failed");
@@ -553,6 +564,7 @@ function PaymentPanel() {
       });
       toast.success("Debit note issued");
       setDnAmount("");
+      setDnOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Debit note failed");
@@ -588,29 +600,11 @@ function PaymentPanel() {
                 Outstanding LKR {formatNumber(selected.balance ?? 0)} · Terms {selected.creditDays ?? 30}d
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Amount</Label>
-                <Input type="number" className="h-9" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Method</Label>
-                <Select value={method} onValueChange={setMethod}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="CARD">Card</SelectItem>
-                    <SelectItem value="BANK_TRANSFER">Bank transfer</SelectItem>
-                    <SelectItem value="CHEQUE">Cheque</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Notes</Label>
-              <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-            <Button onClick={() => void pay()} disabled={busy} className="gap-1.5">
+            <Button
+              onClick={() => setPayOpen(true)}
+              disabled={busy || !supplierId}
+              className="gap-1.5"
+            >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
               Pay (FIFO bills → POs)
             </Button>
@@ -625,21 +619,100 @@ function PaymentPanel() {
             <p className="text-xs text-muted-foreground">
               Reduces outstanding AP (FIFO). Purchase returns also credit AP via the returns flow.
             </p>
-            <div className="space-y-1">
-              <Label className="text-xs">Amount</Label>
-              <Input type="number" className="h-9" value={dnAmount} onChange={(e) => setDnAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Reason</Label>
-              <Input className="h-9" value={dnReason} onChange={(e) => setDnReason(e.target.value)} />
-            </div>
-            <Button variant="secondary" onClick={() => void issueDn()} disabled={dnBusy || !supplierId} className="gap-1.5">
+            <Button
+              variant="secondary"
+              onClick={() => setDnOpen(true)}
+              disabled={dnBusy || !supplierId}
+              className="gap-1.5"
+            >
               {dnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileMinus2 className="h-3.5 w-3.5" />}
               Issue debit note
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={payOpen} onOpenChange={setPayOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Pay supplier</DialogTitle>
+            <DialogDescription>Apply a supplier payment to open bills (FIFO).</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Amount</Label>
+                <Input
+                  type="number"
+                  className="h-9"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Method</Label>
+                <Select value={method} onValueChange={setMethod} disabled={busy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                    <SelectItem value="CARD">Card</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Bank transfer</SelectItem>
+                    <SelectItem value="CHEQUE">Cheque</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Notes</Label>
+              <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" disabled={busy} onClick={() => setPayOpen(false)}>Cancel</Button>
+            <Button onClick={() => void pay()} disabled={busy || !supplierId} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
+              Pay (FIFO bills → POs)
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dnOpen} onOpenChange={setDnOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Issue debit note</DialogTitle>
+            <DialogDescription>Increases outstanding AP (FIFO against bills).</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input
+                type="number"
+                className="h-9"
+                value={dnAmount}
+                onChange={(e) => setDnAmount(e.target.value)}
+                disabled={dnBusy}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Reason</Label>
+              <Input className="h-9" value={dnReason} onChange={(e) => setDnReason(e.target.value)} disabled={dnBusy} />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" disabled={dnBusy} onClick={() => setDnOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => void issueDn()} disabled={dnBusy || !supplierId} className="gap-1.5">
+              {dnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileMinus2 className="h-3.5 w-3.5" />}
+              Issue debit note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>

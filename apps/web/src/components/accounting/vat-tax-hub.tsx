@@ -12,6 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -132,6 +140,7 @@ function ConfigPanel() {
   const [direction, setDirection] = useState("BOTH");
   const [isDefault, setIsDefault] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
   const [previewAmt, setPreviewAmt] = useState("1000");
   const [previewRate, setPreviewRate] = useState("18");
   const [preview, setPreview] = useState<{ net: number; tax: number; gross: number } | null>(null);
@@ -186,6 +195,7 @@ function ConfigPanel() {
       setName("");
       setRate("18");
       setIsDefault(false);
+      setRateOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -224,19 +234,33 @@ function ConfigPanel() {
         <Button variant="secondary" size="sm" onClick={() => void seed()} disabled={busy}>
           Seed defaults (VAT 18%)
         </Button>
+        <Button size="sm" onClick={() => setRateOpen(true)} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New tax rate
+        </Button>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        <Card>
-          <CardContent className="p-4 space-y-3">
-            <h3 className="text-sm font-semibold flex items-center gap-2">
-              <Plus className="h-4 w-4" /> New tax rate
-            </h3>
-            <div className="grid grid-cols-2 gap-2">
-              <Input className="h-9" placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} />
-              <Input className="h-9" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input className="h-9" type="number" placeholder="Rate %" value={rate} onChange={(e) => setRate(e.target.value)} />
-              <Select value={direction} onValueChange={setDirection}>
+      <Dialog open={rateOpen} onOpenChange={setRateOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New tax rate</DialogTitle>
+            <DialogDescription>Add a rate used for VAT and invoices.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Code</Label>
+              <Input className="h-9" placeholder="VAT18" value={code} onChange={(e) => setCode(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input className="h-9" placeholder="VAT 18%" value={name} onChange={(e) => setName(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Rate %</Label>
+              <Input className="h-9" type="number" value={rate} onChange={(e) => setRate(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Direction</Label>
+              <Select value={direction} onValueChange={setDirection} disabled={busy}>
                 <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BOTH">Both</SelectItem>
@@ -245,23 +269,26 @@ function ConfigPanel() {
                 </SelectContent>
               </Select>
             </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="rounded" />
-              Default rate
-            </label>
+          </div>
+          <label className="flex items-center gap-2 text-xs">
+            <input type="checkbox" checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} className="rounded" disabled={busy} />
+            Default rate
+          </label>
+          <DialogFooter className="gap-2">
             <Button size="sm" onClick={() => void create()} disabled={busy} className="gap-1.5">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               Create
             </Button>
-          </CardContent>
-        </Card>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <Card>
+      <Card>
           <CardContent className="p-4 space-y-3">
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <Calculator className="h-4 w-4" /> Tax calculator
             </h3>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 max-w-md">
               <div className="space-y-1">
                 <Label className="text-xs">Net amount</Label>
                 <Input className="h-9" type="number" value={previewAmt} onChange={(e) => setPreviewAmt(e.target.value)} />
@@ -273,7 +300,7 @@ function ConfigPanel() {
             </div>
             <Button size="sm" variant="outline" onClick={() => void runPreview()}>Calculate</Button>
             {preview && (
-              <div className="rounded-lg border p-3 text-sm grid grid-cols-3 gap-2">
+              <div className="rounded-lg border p-3 text-sm grid grid-cols-3 gap-2 max-w-md">
                 <div>
                   <p className="text-[10px] text-muted-foreground uppercase">Net</p>
                   <p className="font-semibold tabular-nums">{formatNumber(preview.net)}</p>
@@ -290,7 +317,6 @@ function ConfigPanel() {
             )}
           </CardContent>
         </Card>
-      </div>
 
       <Card>
         <CardContent className="p-0">
@@ -473,6 +499,7 @@ function ReturnsPanel() {
   const [end, setEnd] = useState(today());
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  const [returnOpen, setReturnOpen] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -496,6 +523,7 @@ function ReturnsPanel() {
       await api.post("/accounting/vat/returns", { startDate: start, endDate: end, notes: notes || undefined });
       toast.success("VAT return draft created");
       setNotes("");
+      setReturnOpen(false);
       await load();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Create failed");
@@ -519,29 +547,40 @@ function ReturnsPanel() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">New VAT return</h3>
-          <div className="grid sm:grid-cols-4 gap-3 items-end">
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setReturnOpen(true)} className="gap-1.5">
+          <Plus className="h-3.5 w-3.5" /> New VAT return
+        </Button>
+      </div>
+
+      <Dialog open={returnOpen} onOpenChange={setReturnOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New VAT return</DialogTitle>
+            <DialogDescription>Create a draft return for a period.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
             <div className="space-y-1">
               <Label className="text-xs">From</Label>
-              <Input type="date" className="h-9" value={start} onChange={(e) => setStart(e.target.value)} />
+              <Input type="date" className="h-9" value={start} onChange={(e) => setStart(e.target.value)} disabled={busy} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">To</Label>
-              <Input type="date" className="h-9" value={end} onChange={(e) => setEnd(e.target.value)} />
+              <Input type="date" className="h-9" value={end} onChange={(e) => setEnd(e.target.value)} disabled={busy} />
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Notes</Label>
-              <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} disabled={busy} />
             </div>
-            <Button onClick={() => void create()} disabled={busy} className="h-9 gap-1.5">
+          </div>
+          <DialogFooter className="gap-2">
+            <Button onClick={() => void create()} disabled={busy} className="gap-1.5">
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
               Create draft
             </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">

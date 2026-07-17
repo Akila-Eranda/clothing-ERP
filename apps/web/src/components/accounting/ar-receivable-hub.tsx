@@ -12,6 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -491,9 +499,11 @@ function PaymentPanel() {
   const [desc, setDesc] = useState("Credit payment received");
   const [fromWallet, setFromWallet] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
   const [cnAmount, setCnAmount] = useState("");
   const [cnDesc, setCnDesc] = useState("Credit note");
   const [cnBusy, setCnBusy] = useState(false);
+  const [cnOpen, setCnOpen] = useState(false);
   const [payments, setPayments] = useState<ArDashboard["recentPayments"]>([]);
   const [selected, setSelected] = useState<CreditCustomer | null>(null);
 
@@ -541,6 +551,7 @@ function PaymentPanel() {
           (res.data?.advanceToWallet ? ` · Advance ${formatNumber(res.data.advanceToWallet)}` : ""),
       );
       setAmount("");
+      setReceiveOpen(false);
       await loadCustomers();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Payment failed");
@@ -563,6 +574,7 @@ function PaymentPanel() {
       });
       toast.success("Credit note issued");
       setCnAmount("");
+      setCnOpen(false);
       await loadCustomers();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Credit note failed");
@@ -600,37 +612,11 @@ function PaymentPanel() {
                 <span>Limit {formatNumber(selected.creditLimit)}</span>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-xs">Amount</Label>
-                <Input type="number" className="h-9" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Method</Label>
-                <Select value={method} onValueChange={setMethod} disabled={fromWallet}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="CASH">Cash</SelectItem>
-                    <SelectItem value="CARD">Card</SelectItem>
-                    <SelectItem value="BANK_TRANSFER">Bank transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Description</Label>
-              <Input className="h-9" value={desc} onChange={(e) => setDesc(e.target.value)} />
-            </div>
-            <label className="flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={fromWallet}
-                onChange={(e) => setFromWallet(e.target.checked)}
-                className="rounded"
-              />
-              Settle from wallet advance
-            </label>
-            <Button onClick={() => void pay()} disabled={busy} className="gap-1.5">
+            <Button
+              onClick={() => setReceiveOpen(true)}
+              disabled={busy || !customerId}
+              className="gap-1.5"
+            >
               {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
               Receive payment
             </Button>
@@ -645,21 +631,111 @@ function PaymentPanel() {
             <p className="text-xs text-muted-foreground">
               Reduces outstanding AR (FIFO against open charges). Returns from sales also create credit notes automatically.
             </p>
-            <div className="space-y-1">
-              <Label className="text-xs">Amount</Label>
-              <Input type="number" className="h-9" value={cnAmount} onChange={(e) => setCnAmount(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Description</Label>
-              <Input className="h-9" value={cnDesc} onChange={(e) => setCnDesc(e.target.value)} />
-            </div>
-            <Button variant="secondary" onClick={() => void issueCn()} disabled={cnBusy || !customerId} className="gap-1.5">
+            <Button
+              variant="secondary"
+              onClick={() => setCnOpen(true)}
+              disabled={cnBusy || !customerId}
+              className="gap-1.5"
+            >
               {cnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileMinus2 className="h-3.5 w-3.5" />}
               Issue credit note
             </Button>
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={receiveOpen} onOpenChange={setReceiveOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Receive payment</DialogTitle>
+            <DialogDescription>Apply payment to the selected customer.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Amount</Label>
+                <Input
+                  type="number"
+                  className="h-9"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  disabled={busy}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Method</Label>
+                <Select value={method} onValueChange={setMethod} disabled={fromWallet || busy}>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="CASH">Cash</SelectItem>
+                    <SelectItem value="CARD">Card</SelectItem>
+                    <SelectItem value="BANK_TRANSFER">Bank transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" value={desc} onChange={(e) => setDesc(e.target.value)} disabled={busy} />
+            </div>
+
+            <label className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={fromWallet}
+                onChange={(e) => setFromWallet(e.target.checked)}
+                className="rounded"
+                disabled={busy}
+              />
+              Settle from wallet advance
+            </label>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" disabled={busy} onClick={() => setReceiveOpen(false)}>Cancel</Button>
+            <Button onClick={() => void pay()} disabled={busy || !customerId} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
+              Receive payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cnOpen} onOpenChange={setCnOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Issue credit note</DialogTitle>
+            <DialogDescription>Reduces outstanding AR (FIFO).</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input
+                type="number"
+                className="h-9"
+                value={cnAmount}
+                onChange={(e) => setCnAmount(e.target.value)}
+                disabled={cnBusy}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" value={cnDesc} onChange={(e) => setCnDesc(e.target.value)} disabled={cnBusy} />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" disabled={cnBusy} onClick={() => setCnOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={() => void issueCn()} disabled={cnBusy || !customerId} className="gap-1.5">
+              {cnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileMinus2 className="h-3.5 w-3.5" />}
+              Issue credit note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="p-0">

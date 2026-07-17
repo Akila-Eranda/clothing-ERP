@@ -13,6 +13,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -182,19 +190,21 @@ function JournalFormModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
-          <h2 className="font-bold">{edit ? `Edit ${edit.entryNumber}` : "New Journal Entry"}</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-3xl w-full max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <DialogTitle className="font-bold">
+                {edit ? `Edit ${edit.entryNumber}` : "New Journal Entry"}
+              </DialogTitle>
+              <DialogDescription>
+                Create or update a journal voucher. Debits must equal credits.
+              </DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5 col-span-2">
@@ -303,7 +313,7 @@ function JournalFormModal({
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <DialogFooter className="flex flex-wrap justify-end gap-2 px-6 py-4 border-t bg-muted/10">
           <Button variant="outline" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
@@ -316,9 +326,9 @@ function JournalFormModal({
           <Button onClick={() => save("POST")} disabled={saving || !balanced} className="min-w-[100px]">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Post"}
           </Button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -380,27 +390,19 @@ function JournalViewModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b">
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="sm:max-w-2xl w-full max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogHeader className="px-6 py-4 border-b">
           <div className="flex items-center gap-2">
-            <h2 className="font-bold">{entry.entryNumber}</h2>
+            <DialogTitle className="font-bold">{entry.entryNumber}</DialogTitle>
             <StatusBadge status={entry.status} />
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 ml-auto">
             <Button variant="ghost" size="sm" onClick={printVoucher}>
               <Printer className="h-4 w-4" />
             </Button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted">
-              <X className="h-4 w-4" />
-            </button>
           </div>
-        </div>
+        </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
           <div ref={printRef}>
@@ -454,7 +456,7 @@ function JournalViewModal({
           )}
         </div>
 
-        <div className="flex flex-wrap justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <DialogFooter className="flex flex-wrap justify-end gap-2 px-6 py-4 border-t bg-muted/10">
           {entry.status === "DRAFT" && (
             <>
               <Button variant="outline" size="sm" onClick={onEdit} disabled={busy}>
@@ -531,9 +533,9 @@ function JournalViewModal({
               <Trash2 className="h-3.5 w-3.5 mr-1" /> Void
             </Button>
           )}
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

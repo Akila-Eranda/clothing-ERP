@@ -13,6 +13,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -527,47 +535,39 @@ export function FinancialPeriodsHub() {
         </>
       )}
 
-      {showCreate && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-          onClick={(e) => { if (e.target === e.currentTarget && busy !== "create") setShowCreate(false); }}
-        >
-          <div className="bg-background rounded-2xl border shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-base font-bold">New Fiscal Year</h2>
-              <p className="text-xs text-muted-foreground">Creates 12 monthly accounting periods automatically</p>
+      <Dialog open={showCreate} onOpenChange={(open) => { if (busy !== "create") setShowCreate(open); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>New Fiscal Year</DialogTitle>
+            <DialogDescription>Creates 12 monthly accounting periods automatically.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input value={fyName} onChange={(e) => setFyName(e.target.value)} className="h-9" placeholder="FY 2026" disabled={busy === "create"} />
             </div>
-            <div className="p-5 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Name</Label>
-                <Input value={fyName} onChange={(e) => setFyName(e.target.value)} className="h-9" placeholder="FY 2026" />
+                <Label className="text-xs">Start date</Label>
+                <Input type="date" value={fyStart} onChange={(e) => setFyStart(e.target.value)} className="h-9" disabled={busy === "create"} />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Start date</Label>
-                  <Input type="date" value={fyStart} onChange={(e) => setFyStart(e.target.value)} className="h-9" />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">End date</Label>
-                  <Input type="date" value={fyEnd} onChange={(e) => setFyEnd(e.target.value)} className="h-9" />
-                </div>
+              <div className="space-y-1">
+                <Label className="text-xs">End date</Label>
+                <Input type="date" value={fyEnd} onChange={(e) => setFyEnd(e.target.value)} className="h-9" disabled={busy === "create"} />
               </div>
-              <p className="text-[10px] text-muted-foreground">
-                Tip: Apr–Mar year → start 2025-04-01, end 2026-03-31
-              </p>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
-              <Button variant="outline" size="sm" disabled={busy === "create"} onClick={() => setShowCreate(false)}>
-                Cancel
-              </Button>
-              <Button size="sm" disabled={busy === "create"} onClick={createFy} className="gap-1.5">
-                {busy === "create" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Create
-              </Button>
-            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Tip: Apr–Mar year → start 2025-04-01, end 2026-03-31
+            </p>
           </div>
-        </div>
-      )}
+          <DialogFooter className="gap-2">
+            <Button size="sm" disabled={busy === "create"} onClick={createFy} className="gap-1.5">
+              {busy === "create" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

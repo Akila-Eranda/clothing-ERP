@@ -12,6 +12,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -333,6 +341,7 @@ function ProcessPanel() {
   const [run, setRun] = useState<PayrollRun | null>(null);
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [busy, setBusy] = useState(false);
+  const [processOpen, setProcessOpen] = useState(false);
 
   const loadRuns = useCallback(async () => {
     try {
@@ -357,6 +366,7 @@ function ProcessPanel() {
       });
       setRun(res.data ?? null);
       toast.success(`Calculated ${res.data?.employeeCount ?? 0} employees`);
+      setProcessOpen(false);
       await loadRuns();
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Process failed");
@@ -411,33 +421,47 @@ function ProcessPanel() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4 flex flex-wrap items-end gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs">Month</Label>
-            <Select value={month} onValueChange={setMonth}>
-              <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {MONTHS.map((m, i) => (
-                  <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <div className="flex justify-end">
+        <Button size="sm" onClick={() => setProcessOpen(true)} className="gap-1.5">
+          <Calculator className="h-3.5 w-3.5" /> Calculate run
+        </Button>
+      </div>
+
+      <Dialog open={processOpen} onOpenChange={setProcessOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Calculate payroll run</DialogTitle>
+            <DialogDescription>Process salaries for a month with optional flat bonus.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Month</Label>
+              <Select value={month} onValueChange={setMonth} disabled={busy}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m, i) => (
+                    <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Year</Label>
+              <Input className="h-9" type="number" value={year} onChange={(e) => setYear(e.target.value)} disabled={busy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Flat bonus</Label>
+              <Input className="h-9" type="number" value={bonus} onChange={(e) => setBonus(e.target.value)} disabled={busy} />
+            </div>
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Year</Label>
-            <Input className="h-9 w-24" type="number" value={year} onChange={(e) => setYear(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Flat bonus</Label>
-            <Input className="h-9 w-28" type="number" value={bonus} onChange={(e) => setBonus(e.target.value)} />
-          </div>
-          <Button size="sm" className="h-9" disabled={busy} onClick={() => void process()}>
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-            Calculate run
-          </Button>
-        </CardContent>
-      </Card>
+          <DialogFooter className="gap-2">
+            <Button size="sm" disabled={busy} onClick={() => void process()} className="gap-1.5">
+              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              Calculate run
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {runs.length > 0 && (
         <Card>
