@@ -119,10 +119,17 @@ export default function DashboardPage() {
       if (custRes.status  === "fulfilled") {
         const payload = custRes.value.data as unknown as { total?: number; meta?: { total?: number } };
         setCustTotal(payload?.meta?.total ?? payload?.total ?? 0);
+      } else {
+        setCustTotal(0);
       }
+      // Optional widgets (e.g. customers count) may 403 for roles without that permission —
+      // don't block the whole dashboard with a toast for those.
+      const isPermissionError = (msg?: string) =>
+        !!msg && /insufficient permissions|forbidden|403/i.test(msg);
       const errors = [sumRes, salesRes, topRes, lowRes, revRes, custRes]
         .filter((r) => r.status === "rejected")
-        .map((r) => (r as PromiseRejectedResult).reason?.message);
+        .map((r) => (r as PromiseRejectedResult).reason?.message as string | undefined)
+        .filter((msg) => msg && !isPermissionError(msg));
       if (errors.length > 0) toast.error(`Dashboard: ${errors[0]}`);
     } catch { toast.error("Failed to load dashboard"); }
     finally { setLoading(false); }

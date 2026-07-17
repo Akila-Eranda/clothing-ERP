@@ -48,6 +48,7 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
     'inventory:read', 'inventory:update',
     'purchases:read', 'purchases:create', 'purchases:update',
     'sales:read', 'reports:read', 'products:read',
+    'customers:read', 'customers:create', 'customers:update',
     'cash:read', 'cash:update',
   ));
 }
