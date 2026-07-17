@@ -26,6 +26,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const [openingCash, setOpeningCash] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [suggested, setSuggested] = React.useState<number | null>(null);
+  const onShiftReadyRef = React.useRef(onShiftReady);
+  onShiftReadyRef.current = onShiftReady;
   const canApprove =
     bypassesWorkflowApproval(user?.role) || isWorkflowApproverRole(user?.role);
 
@@ -40,10 +42,11 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         if (cancelled) return;
         if (suggestRes.data?.suggestedOpening != null) {
           setSuggested(suggestRes.data.suggestedOpening);
-          setOpeningCash(String(suggestRes.data.suggestedOpening));
+          // Prefill once only — never overwrite what the cashier is typing
+          setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
         }
         if (activeRes.data?.status === "OPEN") {
-          onShiftReady();
+          onShiftReadyRef.current();
           return;
         }
         if (activeRes.data?.status === "PENDING_APPROVAL") {
@@ -58,7 +61,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
       }
     })();
     return () => { cancelled = true; };
-  }, [onShiftReady, onClose]);
+  }, []);
 
   const handleStart = async () => {
     const amount = parseFloat(openingCash);
@@ -186,13 +189,18 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           <div className="space-y-2">
             <Label className="text-white/70">Opening amount (LKR)</Label>
             <Input
-              type="number"
-              min={0}
-              step="0.01"
+              type="text"
+              inputMode="decimal"
               autoFocus
               placeholder="10,000.00"
               value={openingCash}
-              onChange={(e) => setOpeningCash(e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^\d.]/g, "");
+                const parts = v.split(".");
+                const cleaned = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : v;
+                setOpeningCash(cleaned);
+              }}
+              onFocus={(e) => e.target.select()}
               className="h-12 text-lg font-bold bg-[#1a2b4a] border-[#1e3356] text-white"
             />
             <div className="flex flex-wrap gap-2">

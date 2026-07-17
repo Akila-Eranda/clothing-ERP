@@ -845,64 +845,79 @@ export class PosService {
       if (variants.length === 0) continue;
 
       const keyLower = key.toLowerCase();
-      const exactSku = variants.filter((v) => v.sku.toLowerCase() === keyLower);
-      if (exactSku.length === 1) {
-        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(exactSku[0]), supplierId);
-      }
-
-      const exactVariantBarcode = variants.filter(
-        (v) => (v.barcode ?? '').toLowerCase() === keyLower,
-      );
-      if (exactVariantBarcode.length === 1) {
-        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(exactVariantBarcode[0]), supplierId);
-      }
-
-      const byProduct = new Map<string, VariantRow[]>();
-      for (const v of variants) {
-        const list = byProduct.get(v.productId) ?? [];
-        list.push(v);
-        byProduct.set(v.productId, list);
-      }
-
-      let multiGroup = [...byProduct.values()].find((list) => list.length > 1);
-
-      // Shared product barcode: one hit, but product has other variants — open picker.
-      if (!multiGroup && byProduct.size === 1) {
-        const only = [...byProduct.values()][0];
-        if (only.length === 1) {
-          const matchedViaSharedBarcode =
-            (only[0].product.barcode ?? '').toLowerCase() === keyLower ||
-            (only[0].barcode ?? '').toLowerCase() === keyLower;
-          if (matchedViaSharedBarcode) {
-            const siblings = await this.prisma.productVariant.findMany({
-              where: {
-                productId: only[0].productId,
-                isActive: true,
-                product: { tenantId, status: 'ACTIVE' },
-              },
-              include: {
-                product: { include: { category: true, brand: true } },
-                inventory: {
-                  where: { branchId: resolvedBranchId },
-                  select: { quantity: true, reservedQty: true },
-                  take: 1,
-                },
-              },
-              orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-            }) as VariantRow[];
-            if (siblings.length > 1) multiGroup = siblings;
-          }
-        }
-      }
-
-      if (multiGroup && multiGroup.length > 1) {
-        const options = multiGroup.map(mapVariant).sort((a, b) => b.stock - a.stock);
+      const pickMulti = (rows: VariantRow[]) => {
+        const options = rows.map(mapVariant).sort((a, b) => b.stock - a.stock);
         const primary = options.find((o) => o.stock > 0) ?? options[0];
         return {
           ...primary,
           requiresVariantPick: true,
           variants: options,
         };
+      };
+
+      const exactSku = variants.filter((v) => v.sku.toLowerCase() === keyLower);
+      if (exactSku.length === 1) {
+        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(exactSku[0]), supplierId);
+      }
+      if (exactSku.length > 1) {
+        return pickMulti(exactSku);
+      }
+
+      // Same barcode on multiple variants / products — cashier must pick.
+      const exactBarcodeHits = variants.filter(
+        (v) =>
+          (v.barcode ?? '').toLowerCase() === keyLower ||
+          (v.product.barcode ?? '').toLowerCase() === keyLower,
+      );
+      if (exactBarcodeHits.length > 1) {
+        const productIds = new Set(exactBarcodeHits.map((v) => v.productId));
+        // One product, shared barcode: offer all active siblings for that product.
+        if (productIds.size === 1) {
+          const siblings = await this.prisma.productVariant.findMany({
+            where: {
+              productId: exactBarcodeHits[0].productId,
+              isActive: true,
+              product: { tenantId, status: 'ACTIVE' },
+            },
+            include: {
+              product: { include: { category: true, brand: true } },
+              inventory: {
+                where: { branchId: resolvedBranchId },
+                select: { quantity: true, reservedQty: true },
+                take: 1,
+              },
+            },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          }) as VariantRow[];
+          if (siblings.length > 1) return pickMulti(siblings);
+        }
+        return pickMulti(exactBarcodeHits);
+      }
+      if (exactBarcodeHits.length === 1) {
+        const only = exactBarcodeHits[0];
+        const matchedViaSharedBarcode =
+          (only.product.barcode ?? '').toLowerCase() === keyLower ||
+          (only.barcode ?? '').toLowerCase() === keyLower;
+        if (matchedViaSharedBarcode) {
+          const siblings = await this.prisma.productVariant.findMany({
+            where: {
+              productId: only.productId,
+              isActive: true,
+              product: { tenantId, status: 'ACTIVE' },
+            },
+            include: {
+              product: { include: { category: true, brand: true } },
+              inventory: {
+                where: { branchId: resolvedBranchId },
+                select: { quantity: true, reservedQty: true },
+                take: 1,
+              },
+            },
+            orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+          }) as VariantRow[];
+          if (siblings.length > 1) return pickMulti(siblings);
+        }
+        return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(only), supplierId);
       }
 
       const ranked = variants
@@ -914,6 +929,10 @@ export class PosService {
           ),
         }))
         .sort((a, b) => b.stock - a.stock);
+
+      if (ranked.length > 1) {
+        return pickMulti(ranked.map((r) => r.variant));
+      }
 
       const picked = mapVariant((ranked.find((row) => row.stock > 0) ?? ranked[0]).variant);
       return this.enrichBarcodeResult(tenantId, resolvedBranchId, picked, supplierId);

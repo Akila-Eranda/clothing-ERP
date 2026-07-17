@@ -1,15 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, PackagePlus } from "lucide-react";
+import { Loader2, PackagePlus, RefreshCw, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type Category = { id: string; name: string };
+type SupplierRow = { id: string; name: string };
+
+const INPUT_CLS =
+  "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors placeholder:text-white/30";
+const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
 
 export function PosQuickProductPanel({
   onBack,
@@ -20,21 +22,37 @@ export function PosQuickProductPanel({
 }) {
   const { profile } = useShopWorkspace();
   const [categories, setCategories] = React.useState<Category[]>([]);
+  const [suppliers, setSuppliers] = React.useState<SupplierRow[]>([]);
+  const [suppliersLoading, setSuppliersLoading] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [name, setName] = React.useState("");
   const [barcode, setBarcode] = React.useState("");
   const [categoryId, setCategoryId] = React.useState("");
+  const [supplierId, setSupplierId] = React.useState("");
   const [sellingPrice, setSellingPrice] = React.useState("");
   const [costPrice, setCostPrice] = React.useState("");
   const [mrp, setMrp] = React.useState("");
   const [stockQty, setStockQty] = React.useState("0");
+
+  const loadSuppliers = React.useCallback(async () => {
+    setSuppliersLoading(true);
+    try {
+      const r = await api.get<{ data: SupplierRow[] }>("/suppliers?limit=100");
+      setSuppliers(r.data?.data ?? []);
+    } catch {
+      /* supplier list optional */
+    } finally {
+      setSuppliersLoading(false);
+    }
+  }, []);
 
   React.useEffect(() => {
     api
       .get<Category[]>("/categories")
       .then((r) => setCategories(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
-  }, []);
+    void loadSuppliers();
+  }, [loadSuppliers]);
 
   const submit = async () => {
     if (!name.trim()) {
@@ -85,6 +103,19 @@ export function PosQuickProductPanel({
         /* product created; stock optional / may need inventory permission */
       }
 
+      if (supplierId && variantId) {
+        try {
+          await api.post(`/suppliers/${supplierId}/products`, {
+            variantId,
+            lastBuyingPrice: cost > 0 ? cost : undefined,
+          });
+          const supName = suppliers.find((s) => s.id === supplierId)?.name ?? "supplier";
+          toast.success(`Assigned to ${supName}`);
+        } catch (e: unknown) {
+          toast.error((e as Error).message ?? "Supplier assignment failed");
+        }
+      }
+
       toast.success(`Product created: ${name.trim()}`);
       setName("");
       setBarcode("");
@@ -93,6 +124,7 @@ export function PosQuickProductPanel({
       setMrp("");
       setStockQty("0");
       setCategoryId("");
+      setSupplierId("");
       onCreated(variantId);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to create product");
@@ -101,25 +133,22 @@ export function PosQuickProductPanel({
     }
   };
 
-  const fieldStyle = {
-    background: "#1a2b4a",
-    border: "1px solid #1e3356",
-    color: "#fff",
-  } as const;
-
   return (
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <PackagePlus className="h-4 w-4" style={{ color: "#4f6ef7" }} />
           <h2 className="text-white font-bold text-base">Quick Product</h2>
-          <Badge className="ml-1 text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}>
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-md"
+            style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}
+          >
             {profile.label}
-          </Badge>
+          </span>
         </div>
         <button
           onClick={onBack}
-          className="text-xs font-semibold px-3 h-8 rounded-lg"
+          className="text-xs font-semibold px-3 h-8 rounded-lg transition-colors hover:bg-white/10"
           style={{ color: "#6a8ab8" }}
         >
           ← Back
@@ -136,12 +165,12 @@ export function PosQuickProductPanel({
 
         <div className="space-y-1.5">
           <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Name *</label>
-          <Input
+          <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Product name"
-            className="h-10 rounded-xl border-0 text-white"
-            style={fieldStyle}
+            className={INPUT_CLS}
+            style={INPUT_STYLE}
             autoFocus
           />
         </div>
@@ -149,12 +178,12 @@ export function PosQuickProductPanel({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Barcode</label>
-            <Input
+            <input
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
               placeholder="Optional"
-              className="h-10 rounded-xl border-0 text-white"
-              style={fieldStyle}
+              className={INPUT_CLS}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="space-y-1.5">
@@ -162,8 +191,8 @@ export function PosQuickProductPanel({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full h-10 rounded-xl text-sm px-3 outline-none"
-              style={fieldStyle}
+              className="w-full h-10 rounded-xl text-sm px-3 text-white outline-none"
+              style={INPUT_STYLE}
             >
               <option value="">Optional…</option>
               {categories.map((c) => (
@@ -173,10 +202,45 @@ export function PosQuickProductPanel({
           </div>
         </div>
 
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#6a8ab8" }}>
+            <Truck className="h-3.5 w-3.5" />
+            Supplier (assign for Quick GRN)
+          </label>
+          <div className="flex gap-2">
+            <select
+              value={supplierId}
+              onChange={(e) => setSupplierId(e.target.value)}
+              disabled={suppliersLoading || busy}
+              className="flex-1 h-10 rounded-xl text-sm px-3 text-white outline-none disabled:opacity-60"
+              style={INPUT_STYLE}
+            >
+              <option value="">{suppliersLoading ? "Loading..." : "Optional — select supplier…"}</option>
+              {suppliers.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => void loadSuppliers()}
+              disabled={suppliersLoading || busy}
+              className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-all hover:bg-white/10 disabled:opacity-50"
+              style={{ border: "1px solid #1e3356", color: "#6a8ab8", background: "transparent" }}
+            >
+              <RefreshCw className={`h-4 w-4 ${suppliersLoading ? "animate-spin" : ""}`} />
+            </button>
+          </div>
+          {supplierId && (
+            <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+              Buying price (cost) will be saved as last buying price for this supplier.
+            </p>
+          )}
+        </div>
+
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Selling *</label>
-            <Input
+            <input
               type="number"
               min={0}
               value={sellingPrice}
@@ -184,55 +248,56 @@ export function PosQuickProductPanel({
                 setSellingPrice(e.target.value);
                 if (!mrp) setMrp(e.target.value);
               }}
-              className="h-10 rounded-xl border-0 text-white"
-              style={fieldStyle}
+              className={INPUT_CLS}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Cost *</label>
-            <Input
+            <input
               type="number"
               min={0}
               value={costPrice}
               onChange={(e) => setCostPrice(e.target.value)}
-              className="h-10 rounded-xl border-0 text-white"
-              style={fieldStyle}
+              className={INPUT_CLS}
+              style={INPUT_STYLE}
             />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>MRP</label>
-            <Input
+            <input
               type="number"
               min={0}
               value={mrp}
               onChange={(e) => setMrp(e.target.value)}
-              className="h-10 rounded-xl border-0 text-white"
-              style={fieldStyle}
+              className={INPUT_CLS}
+              style={INPUT_STYLE}
             />
           </div>
         </div>
 
         <div className="space-y-1.5">
           <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Opening stock (optional)</label>
-          <Input
+          <input
             type="number"
             min={0}
             value={stockQty}
             onChange={(e) => setStockQty(e.target.value)}
-            className="h-10 rounded-xl border-0 text-white"
-            style={fieldStyle}
+            className={INPUT_CLS}
+            style={INPUT_STYLE}
           />
         </div>
 
-        <Button
+        <button
+          type="button"
           onClick={() => void submit()}
           disabled={busy}
-          className="w-full h-10 gap-1.5"
-          style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#fff" }}
+          className="w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)" }}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
           Create Product
-        </Button>
+        </button>
       </div>
     </div>
   );

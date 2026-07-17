@@ -15,7 +15,7 @@ import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-sett
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
-import { barcodeLookupCandidates, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
+import { barcodeLookupCandidates, findAllProductsByBarcodeCode, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
@@ -342,6 +342,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount } = useCartStore();
 
   React.useEffect(() => { if (!posOpen) setShiftReady(false); }, [posOpen]);
+  const markShiftReady = React.useCallback(() => setShiftReady(true), []);
 
   React.useEffect(() => {
     if (!posOpen) return;
@@ -832,8 +833,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     return Array.from(map.values());
   }, [filteredProducts, getVariants, activeCategory]);
 
-  const openAddPopup = React.useCallback((p: ProductItem) => {
-    const variants = getVariants(p.productName);
+  const openAddPopup = React.useCallback((p: ProductItem, matchList?: ProductItem[]) => {
+    const variants = matchList && matchList.length > 0
+      ? matchList
+      : (() => {
+          const siblings = getVariants(p.productName);
+          return siblings.length > 0 ? siblings : [p];
+        })();
     const list = variants.length > 0 ? variants : [p];
     const selected = list.find((v) => v.variantId === p.variantId) ?? list.find((v) => v.stock > 0) ?? list[0];
     if (!selected || list.every((v) => v.stock <= 0)) {
@@ -841,7 +847,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       playPosSound("scan_fail", soundAlerts);
       return;
     }
-    setAddPopup({ productName: p.productName, selected, variants: list });
+    const title = list.length > 1 && new Set(list.map((v) => v.productName)).size > 1
+      ? `Select item (${list.length})`
+      : selected.productName;
+    setAddPopup({ productName: title, selected, variants: list });
   }, [getVariants, soundAlerts]);
 
   const commitAddProduct = React.useCallback((p: ProductItem, qty = 1, opts?: { keepSearchFocus?: boolean; unitPrice?: number }) => {
@@ -915,23 +924,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       variants?: ProductItem[];
     };
 
+    const finishScanOpen = (pick: ProductItem, matches?: ProductItem[]) => {
+      setSelectedProductName(null);
+      setSelAttrs({});
+      openAddPopup(pick, matches);
+      setSearch("");
+      setLastScanAt(new Date());
+      setScanFlash(true);
+      setTimeout(() => setScanFlash(false), 500);
+      playPosSound("scan_ok", soundAlerts);
+    };
+
     let found: BarcodeLookup | undefined;
     for (const key of barcodeLookupCandidates(trimmed)) {
       try {
         const r = await api.get<BarcodeLookup>(`/pos/barcode/${encodeURIComponent(key)}`);
         const fromApi = r.data;
-        if (fromApi.requiresVariantPick && fromApi.productName) {
-          setSelectedProductName(null);
-          setSelAttrs({});
-          const siblings = getVariants(fromApi.productName);
-          const apiVariants = Array.isArray(fromApi.variants) ? fromApi.variants as ProductItem[] : [];
-          const pick = siblings[0] ?? apiVariants[0] ?? (fromApi as ProductItem);
-          openAddPopup(pick);
-          setSearch("");
-          setLastScanAt(new Date());
-          setScanFlash(true);
-          setTimeout(() => setScanFlash(false), 500);
-          playPosSound("scan_ok", soundAlerts);
+        const apiVariants = Array.isArray(fromApi.variants) ? (fromApi.variants as ProductItem[]) : [];
+        if (fromApi.requiresVariantPick || apiVariants.length > 1) {
+          const matches = apiVariants.length > 0 ? apiVariants : [fromApi as ProductItem];
+          const pick = matches.find((v) => v.stock > 0) ?? matches[0];
+          finishScanOpen(pick, matches);
           return;
         }
         const cached = products.find((p) => p.variantId === fromApi.variantId);
@@ -946,21 +959,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
 
     if (!found) {
-      found = findProductByBarcodeCode(trimmed, products);
-      // Shared product barcode may hit several local variants — open picker.
+      const localMatches = findAllProductsByBarcodeCode(trimmed, products);
+      if (localMatches.length > 1) {
+        const pick = localMatches.find((p) => p.stock > 0) ?? localMatches[0];
+        finishScanOpen(pick, localMatches);
+        return;
+      }
+      found = localMatches[0] ?? findProductByBarcodeCode(trimmed, products);
       if (found) {
         const siblings = getVariants(found.productName);
         if (siblings.length > 1) {
           const codeLower = trimmed.toLowerCase();
           const exactSku = siblings.find((p) => p.sku.toLowerCase() === codeLower);
           const exactBarcode = siblings.find((p) => p.barcode?.toLowerCase() === codeLower);
+          // Shared product barcode (no unique variant match) → picker
           if (!exactSku && !exactBarcode) {
-            setSelectedProductName(null);
-            setSelAttrs({});
-            openAddPopup(found);
-            setSearch("");
-            setLastScanAt(new Date());
-            playPosSound("scan_ok", soundAlerts);
+            finishScanOpen(found, siblings);
             return;
           }
           found = exactSku ?? exactBarcode ?? found;
@@ -974,13 +988,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       requestAnimationFrame(() => searchRef.current?.focus());
       return;
     }
-    setSelectedProductName(null);
-    setSelAttrs({});
-    openAddPopup(found);
-    setLastScanAt(new Date());
-    setSearch("");
-    setScanFlash(true);
-    setTimeout(() => setScanFlash(false), 500);
+    finishScanOpen(found);
   }, [products, openAddPopup, soundAlerts, getVariants]);
 
   const handleCardClick = React.useCallback((p: ProductItem) => {
@@ -2584,7 +2592,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 
         {/* SHIFT GATE — opening cash required */}
         {posOpen && !pinLocked && !shiftReady && !showCashClose && (
-          <PosShiftGate onShiftReady={() => setShiftReady(true)} onClose={closePos} />
+          <PosShiftGate onShiftReady={markShiftReady} onClose={closePos} />
         )}
 
         {showCashClose && (

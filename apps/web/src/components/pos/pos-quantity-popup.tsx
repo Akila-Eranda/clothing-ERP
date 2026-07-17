@@ -77,6 +77,13 @@ export function PosQuantityPopup({
   const lineDiscount = hasPriceCut ? priceCut * qty : 0;
   const btnH = touchMode ? "h-14" : "h-12";
   const fieldStyle = { background: "#1a1f2a", borderColor: "#2a3140" } as const;
+  const crossProductPick = React.useMemo(
+    () => hasVariants && new Set(variants.map((v) => v.productName)).size > 1,
+    [hasVariants, variants],
+  );
+  const headerTitle = crossProductPick
+    ? (selectedVariant?.productName ?? productName)
+    : productName;
 
   const productKey = React.useMemo(
     () => (hasVariants ? variants.map((v) => v.variantId).join("|") : `${productName}:${unitPrice}`),
@@ -178,7 +185,11 @@ export function PosQuantityPopup({
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const inInput = e.target instanceof HTMLInputElement;
+      const target = e.target as HTMLElement | null;
+      const inQty = target === qtyInputRef.current;
+      const inPrice = target === priceInputRef.current;
+      const inPopupInput = inQty || inPrice;
+      const key = e.key.toLowerCase();
 
       if (e.key === "Escape") {
         e.preventDefault();
@@ -186,41 +197,54 @@ export function PosQuantityPopup({
         onCancel();
         return;
       }
-      if (e.key === "Enter" && !inInput) {
+
+      // Enter always confirms (works while typing in qty/price)
+      if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
         submit();
         return;
       }
+
       if (e.altKey && e.key === "ArrowLeft") {
         e.preventDefault();
+        e.stopPropagation();
         moveVariant(-1);
         return;
       }
       if (e.altKey && e.key === "ArrowRight") {
         e.preventDefault();
+        e.stopPropagation();
         moveVariant(1);
         return;
       }
-      if (!inInput && e.key.toLowerCase() === "q") {
+
+      // Q / P switch fields even when already in an input
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && key === "q") {
         e.preventDefault();
+        e.stopPropagation();
         qtyInputRef.current?.focus();
         qtyInputRef.current?.select();
         return;
       }
-      if (!inInput && e.key.toLowerCase() === "p") {
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && key === "p") {
         e.preventDefault();
+        e.stopPropagation();
         priceInputRef.current?.focus();
         priceInputRef.current?.select();
         return;
       }
-      if (!inInput && (e.key === "+" || e.key === "=" || e.key === "ArrowUp")) {
+
+      // Qty bump — works outside inputs, and with arrows inside qty field
+      if (e.key === "ArrowUp" || (!inPopupInput && (e.key === "+" || e.key === "="))) {
         e.preventDefault();
+        e.stopPropagation();
         bump(1);
         return;
       }
-      if (!inInput && (e.key === "-" || e.key === "ArrowDown")) {
+      if (e.key === "ArrowDown" || (!inPopupInput && e.key === "-")) {
         e.preventDefault();
+        e.stopPropagation();
         bump(-1);
       }
     };
@@ -240,7 +264,7 @@ export function PosQuantityPopup({
       >
         {/* Header */}
         <div className="flex items-center gap-2 px-4 py-3.5 border-b shrink-0" style={{ borderColor: "#2a3140" }}>
-          <p className="text-white font-bold text-base truncate min-w-0">{productName}</p>
+          <p className="text-white font-bold text-base truncate min-w-0">{headerTitle}</p>
           <span
             className="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md"
             style={{ background: "rgba(79,110,247,0.22)", color: "#8ba3ff" }}
@@ -270,7 +294,7 @@ export function PosQuantityPopup({
           {hasVariants && (
             <div className="space-y-2">
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#6b7280" }}>
-                Select variant
+                {crossProductPick ? "Select item (same barcode)" : "Select variant"}
               </p>
               <div className="relative">
                 <div
@@ -287,16 +311,27 @@ export function PosQuantityPopup({
                         type="button"
                         disabled={out}
                         onClick={() => pickVariant(v)}
-                        className="shrink-0 w-[132px] rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
+                        className="shrink-0 w-[148px] rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
                         style={{
                           background: active ? "rgba(59,130,246,0.12)" : "#1a1f2a",
                           borderColor: active ? "#3b82f6" : "#2a3140",
                         }}
                       >
-                        <div className="flex items-start justify-between gap-1 mb-2">
-                          <p className="text-sm font-bold text-white leading-tight line-clamp-2">
-                            {variantDisplayLabel(v, profile) || v.variantName}
-                          </p>
+                        <div className="flex items-start justify-between gap-1 mb-1.5">
+                          <div className="min-w-0">
+                            {crossProductPick ? (
+                              <>
+                                <p className="text-sm font-bold text-white leading-tight line-clamp-2">{v.productName}</p>
+                                <p className="text-[10px] mt-0.5 truncate" style={{ color: "#9ca3af" }}>
+                                  {variantDisplayLabel(v, profile) || v.variantName}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-sm font-bold text-white leading-tight line-clamp-2">
+                                {variantDisplayLabel(v, profile) || v.variantName}
+                              </p>
+                            )}
+                          </div>
                           <span
                             className="mt-0.5 h-3.5 w-3.5 rounded-full border-2 shrink-0"
                             style={{

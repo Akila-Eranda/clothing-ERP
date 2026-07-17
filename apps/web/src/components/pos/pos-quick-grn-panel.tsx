@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Loader2, Minus, PackageCheck, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, Minus, PackageCheck, Plus, RefreshCw, Scan, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { barcodeLookupCandidates, findAllProductsByBarcodeCode, isLikelyBarcodeScan } from "@/lib/pos-barcode";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
 
@@ -24,6 +25,7 @@ type SupplierProduct = {
   productName: string;
   variantName: string;
   sku: string;
+  barcode?: string | null;
   costPrice: number;
   stock: number;
   lastBuyingPrice?: number | null;
@@ -80,6 +82,9 @@ export function PosQuickGrnPanel({
   const [busy, setBusy] = React.useState(false);
   const [productsLoading, setProductsLoading] = React.useState(false);
   const [supplierProducts, setSupplierProducts] = React.useState<SupplierProduct[]>([]);
+  const [productSearch, setProductSearch] = React.useState("");
+  const [scanBusy, setScanBusy] = React.useState(false);
+  const searchRef = React.useRef<HTMLInputElement>(null);
   const [lineCosts, setLineCosts] = React.useState<Record<string, string>>({});
   const [lineExpiries, setLineExpiries] = React.useState<Record<string, string>>({});
   const [lineBatches, setLineBatches] = React.useState<Record<string, string>>({});
@@ -89,6 +94,18 @@ export function PosQuickGrnPanel({
     () => new Map(items.map((i) => [i.variantId, i])),
     [items],
   );
+
+  const filteredProducts = React.useMemo(() => {
+    const q = productSearch.trim().toLowerCase();
+    if (!q) return supplierProducts;
+    return supplierProducts.filter((p) =>
+      p.productName.toLowerCase().includes(q)
+      || p.variantName.toLowerCase().includes(q)
+      || p.sku.toLowerCase().includes(q)
+      || (p.barcode ?? "").toLowerCase().includes(q)
+      || (p.supplierProductCode ?? "").toLowerCase().includes(q),
+    );
+  }, [supplierProducts, productSearch]);
 
   const grnLines = React.useMemo(() => {
     const variantSet = new Set(supplierProducts.map((p) => p.variantId));
@@ -172,6 +189,107 @@ export function PosQuickGrnPanel({
     void loadSupplierProducts(supplierId, true);
   }, [supplierId, loadSupplierProducts]);
 
+  React.useEffect(() => {
+    setProductSearch("");
+  }, [supplierId]);
+
+  const addMatchedProduct = React.useCallback((p: SupplierProduct) => {
+    onAddGrnItem(p, 1);
+    setLineCosts((prev) => ({
+      ...prev,
+      [p.variantId]: prev[p.variantId] ?? String(p.lastBuyingPrice ?? p.costPrice ?? 0),
+    }));
+    toast.success(`${p.productName} added to GRN`);
+    setProductSearch("");
+    requestAnimationFrame(() => searchRef.current?.focus());
+  }, [onAddGrnItem]);
+
+  const handleProductSearchEnter = React.useCallback(async () => {
+    const q = productSearch.trim();
+    if (!q || !supplierId || scanBusy) return;
+
+    const localExact = findAllProductsByBarcodeCode(q, supplierProducts.map((p) => ({
+      ...p,
+      barcode: p.barcode ?? undefined,
+    })));
+    if (localExact.length === 1) {
+      addMatchedProduct(localExact[0]);
+      return;
+    }
+    if (localExact.length > 1) {
+      toast.info(`${localExact.length} items match this barcode — pick from list`);
+      return;
+    }
+
+    // Name search: if only one filtered row, add it
+    if (!isLikelyBarcodeScan(q) && filteredProducts.length === 1) {
+      addMatchedProduct(filteredProducts[0]);
+      return;
+    }
+
+    if (!isLikelyBarcodeScan(q) && filteredProducts.length > 1) {
+      toast.info(`${filteredProducts.length} matches — pick from list`);
+      return;
+    }
+
+    // Barcode API lookup scoped to this supplier
+    setScanBusy(true);
+    try {
+      type Lookup = SupplierProduct & { requiresVariantPick?: boolean; variants?: SupplierProduct[]; supplierAssigned?: boolean };
+      let found: Lookup | null = null;
+      for (const key of barcodeLookupCandidates(q)) {
+        try {
+          const r = await api.get<Lookup>(
+            `/pos/barcode/${encodeURIComponent(key)}?supplierId=${encodeURIComponent(supplierId)}`,
+          );
+          found = r.data;
+          break;
+        } catch {
+          /* try next */
+        }
+      }
+      if (!found) {
+        toast.error(`Not found for this supplier: ${q}`);
+        return;
+      }
+      const variants = Array.isArray(found.variants) ? found.variants : [];
+      if (found.requiresVariantPick || variants.length > 1) {
+        const assigned = variants.filter((v) =>
+          supplierProducts.some((p) => p.variantId === v.variantId),
+        );
+        const pool = assigned.length > 0 ? assigned : variants;
+        if (pool.length === 1) {
+          const row = pool[0];
+          setSupplierProducts((prev) =>
+            prev.some((p) => p.variantId === row.variantId) ? prev : [...prev, row],
+          );
+          addMatchedProduct(row);
+          return;
+        }
+        toast.info(`${pool.length} items share this barcode — pick from list`);
+        setProductSearch(q);
+        setSupplierProducts((prev) => {
+          const map = new Map(prev.map((p) => [p.variantId, p]));
+          for (const v of pool) map.set(v.variantId, { ...map.get(v.variantId), ...v });
+          return [...map.values()];
+        });
+        return;
+      }
+      if (found.supplierAssigned === false) {
+        toast.error(`${found.productName} is not assigned to this supplier`);
+        return;
+      }
+      setSupplierProducts((prev) =>
+        prev.some((p) => p.variantId === found!.variantId) ? prev : [...prev, found!],
+      );
+      addMatchedProduct(found);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Barcode lookup failed");
+    } finally {
+      setScanBusy(false);
+    }
+  }, [productSearch, supplierId, scanBusy, supplierProducts, filteredProducts, addMatchedProduct]);
+
   const postQuickGrn = async () => {
     if (!supplierId) {
       toast.error("Select supplier");
@@ -184,13 +302,6 @@ export function PosQuickGrnPanel({
     if (grnLines.some((l) => l.unitCost <= 0)) {
       toast.error("Enter buying price for all lines");
       return;
-    }
-    if (showExpiry) {
-      const missingExp = grnLines.find((l) => !String(lineExpiries[l.variantId] ?? "").trim());
-      if (missingExp) {
-        toast.error(`Expiry date required for ${missingExp.productName}`);
-        return;
-      }
     }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
@@ -321,19 +432,73 @@ export function PosQuickGrnPanel({
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#6a8ab8" }}>
                 Assigned Products
               </p>
               {productsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />}
             </div>
+
+            {supplierId && (
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style={{ color: "#6a8ab8" }} />
+                <input
+                  ref={searchRef}
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      void handleProductSearchEnter();
+                    }
+                    if (e.key === "Escape" && productSearch) {
+                      e.preventDefault();
+                      setProductSearch("");
+                    }
+                  }}
+                  disabled={!supplierId || productsLoading || busy || scanBusy}
+                  placeholder="Search name / SKU / barcode · Enter to add"
+                  className="w-full h-10 pl-9 pr-16 rounded-xl text-sm text-white outline-none placeholder:text-white/30"
+                  style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+                />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                  {scanBusy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />
+                  ) : (
+                    <Scan className="h-3.5 w-3.5" style={{ color: "#4a6a8a" }} />
+                  )}
+                  {productSearch ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductSearch("");
+                        searchRef.current?.focus();
+                      }}
+                      className="p-1 rounded hover:bg-white/10"
+                    >
+                      <X className="h-3.5 w-3.5" style={{ color: "#6a8ab8" }} />
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
             {!supplierId ? (
               <p className="text-xs" style={{ color: "#4a6a8a" }}>Select a supplier to load assigned items.</p>
             ) : supplierProducts.length === 0 && !productsLoading ? (
               <p className="text-xs" style={{ color: "#4a6a8a" }}>No products assigned to this supplier.</p>
+            ) : filteredProducts.length === 0 && !productsLoading ? (
+              <p className="text-xs" style={{ color: "#4a6a8a" }}>
+                No match for “{productSearch.trim()}”. Press Enter to lookup barcode.
+              </p>
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-                {supplierProducts.map((p) => {
+                {productSearch.trim() && (
+                  <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                    Showing {filteredProducts.length} of {supplierProducts.length}
+                  </p>
+                )}
+                {filteredProducts.map((p) => {
                   const inCart = cartByVariant.has(p.variantId);
                   return (
                     <div
@@ -346,6 +511,7 @@ export function PosQuickGrnPanel({
                           <p className="text-sm font-bold text-white truncate">{p.productName}</p>
                           <p className="text-[10px] truncate" style={{ color: "#6a8ab8" }}>
                             {p.variantName !== "Default" ? p.variantName : p.sku}
+                            {p.barcode ? ` · ${p.barcode}` : ""}
                             {p.supplierProductCode ? ` · ${p.supplierProductCode}` : ""}
                           </p>
                         </div>
@@ -462,7 +628,7 @@ export function PosQuickGrnPanel({
                         </div>
                         {showExpiry && (
                           <div>
-                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "#fbbf24" }}>Expiry *</label>
+                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Expiry</label>
                             <input
                               type="date"
                               value={lineExpiries[l.variantId] ?? ""}
