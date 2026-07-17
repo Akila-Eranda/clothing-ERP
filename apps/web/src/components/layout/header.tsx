@@ -190,7 +190,7 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-[#D8DEE9]/80 dark:border-border bg-[rgba(228,234,243,0.88)] dark:bg-background/80 backdrop-blur-[12px] px-4 md:px-6 shrink-0">
+    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 dark:bg-background/80 backdrop-blur-[12px] px-4 md:px-6 shrink-0">
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"

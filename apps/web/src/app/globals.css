@@ -4,17 +4,17 @@
 
 :root {
   /* Enterprise light table tokens (react-table-craft) */
-  --tc-background: 0 0% 100%;
+  --tc-background: 220 28% 96%;
   --tc-foreground: 220 39% 11%;
-  --tc-card: 220 33% 98%;
+  --tc-card: 220 28% 96%;
   --tc-card-foreground: 220 39% 11%;
-  --tc-popover: 220 33% 98%;
+  --tc-popover: 220 28% 96%;
   --tc-popover-foreground: 220 39% 11%;
   --tc-primary: 239 84% 67%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 217 28% 94%;
+  --tc-secondary: 217 24% 93%;
   --tc-secondary-foreground: 220 39% 11%;
-  --tc-muted: 217 28% 94%;
+  --tc-muted: 217 24% 93%;
   --tc-muted-foreground: 220 9% 46%;
   --tc-accent: 219 100% 97%;
   --tc-accent-foreground: 239 84% 40%;
@@ -50,18 +50,18 @@
 
 @layer base {
   :root {
-    /* Cooler canvas — less white wash; white cards lift with depth */
-    --background: 217 33% 92%;          /* #E4EAF3 — visible cool canvas */
+    /* Unified light surface — page + cards share one color */
+    --background: 220 28% 96%;          /* #F1F4F9 */
     --foreground: 220 39% 11%;          /* #111827 */
-    --card: 220 33% 98%;               /* #F7F9FC — soft cool, not pure white */
+    --card: 220 28% 96%;                /* same as background */
     --card-foreground: 220 39% 11%;
-    --popover: 220 33% 98%;
+    --popover: 220 28% 96%;
     --popover-foreground: 220 39% 11%;
     --primary: 239 84% 67%;             /* #6366F1 */
     --primary-foreground: 0 0% 100%;
-    --secondary: 217 28% 94%;           /* #E9EEF6 */
+    --secondary: 217 24% 93%;           /* slight step for nested chips */
     --secondary-foreground: 220 39% 11%;
-    --muted: 217 28% 94%;               /* #E9EEF6 — nested surfaces inside cards */
+    --muted: 217 24% 93%;
     --muted-foreground: 220 9% 46%;     /* #6B7280 */
     --accent: 219 100% 97%;             /* #EEF4FF */
     --accent-foreground: 239 84% 40%;
@@ -71,8 +71,8 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;              /* #F59E0B */
     --warning-foreground: 0 0% 100%;
-    --border: 217 28% 88%;              /* slightly stronger edge */
-    --input: 220 16% 88%;
+    --border: 217 22% 88%;
+    --input: 217 22% 88%;
     --ring: 239 84% 67%;
     --radius: 0.75rem;
     --radius-control: 0.625rem;
@@ -185,11 +185,11 @@
 }
 
 @layer utilities {
-  /* Glass — sticky top nav (tinted, not pure white) */
+  /* Glass — sticky top nav matches unified surface */
   .glass {
     backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
-    background: rgba(228, 234, 243, 0.82);
+    background: hsl(var(--background) / 0.9);
     border-bottom: 1px solid hsl(var(--border));
   }
 
@@ -403,9 +403,9 @@
     opacity: 1;
   }
 
-  /* Card hover — soft lift */
+  /* Card hover — soft lift (same surface color; ring defines edge) */
   .card-hover {
-    @apply transition-all duration-150 ease-out hover:shadow-card-hover hover:-translate-y-0.5;
+    @apply transition-all duration-150 ease-out hover:ring-slate-900/[0.1] hover:-translate-y-0.5;
   }
 
   /* Input focus glow */

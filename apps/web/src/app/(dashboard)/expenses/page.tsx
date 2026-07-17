@@ -196,7 +196,7 @@ export default function ExpensesPage() {
       <div className="px-6 py-6 space-y-6">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
-        <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-card ring-1 ring-slate-900/[0.05]">
+        <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  ring-1 ring-slate-900/[0.05]">
           {PRESETS.map((p) => (
             <button key={p.label} onClick={() => setRange({ start: p.start, end: p.end })}
               className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-all ${range.start === p.start && range.end === p.end ? "bg-red-500 text-white border-red-500" : "bg-background text-muted-foreground hover:bg-muted border"}`}>

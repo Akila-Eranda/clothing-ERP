@@ -313,7 +313,7 @@ export default function DashboardPage() {
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Live Data
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-card text-xs font-medium text-muted-foreground ring-1 ring-slate-900/[0.05] shadow-card">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-[10px] bg-card text-xs font-medium text-muted-foreground ring-1 ring-slate-900/[0.05] ">
             <CalendarDays className="h-3.5 w-3.5" />
             {formatLongDate()}
           </div>

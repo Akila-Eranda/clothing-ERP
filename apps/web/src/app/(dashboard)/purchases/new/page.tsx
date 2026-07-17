@@ -107,7 +107,7 @@ function SectionCard({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl bg-card shadow-card ring-1 ring-slate-900/[0.05] overflow-hidden">
+    <section className="rounded-xl bg-card  ring-1 ring-slate-900/[0.05] overflow-hidden">
       <div className="flex items-start justify-between gap-3 border-b bg-background px-4 py-3.5 sm:px-5">
         <div className="flex items-start gap-3 min-w-0">
           {step ? (
@@ -129,7 +129,7 @@ function SectionCard({
 
 function SidebarBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-card shadow-card ring-1 ring-slate-900/[0.05] overflow-hidden">
+    <div className="rounded-xl bg-card  ring-1 ring-slate-900/[0.05] overflow-hidden">
       <div className="border-b bg-background px-4 py-3">
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
@@ -1352,7 +1352,7 @@ export default function CreatePOPage() {
             </SectionCard>
 
             {/* Selected details — mobile/tablet only (sidebar on xl) */}
-            <section className="space-y-3 rounded-xl bg-card p-4 shadow-card ring-1 ring-slate-900/[0.05] xl:hidden sm:p-5">
+            <section className="space-y-3 rounded-xl bg-card p-4  ring-1 ring-slate-900/[0.05] xl:hidden sm:p-5">
               <div>
                 <h2 className="text-sm font-semibold">Selected product</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">Tap a row to see stock context</p>
@@ -1407,7 +1407,7 @@ export default function CreatePOPage() {
               <MetaRow label="Warehouse" value={<span className="inline-flex items-center gap-1"><Warehouse className="h-3 w-3" />Default</span>} />
             </SidebarBlock>
 
-            <div className="hidden rounded-xl bg-card p-4 shadow-card ring-1 ring-slate-900/[0.05] xl:block">
+            <div className="hidden rounded-xl bg-card p-4  ring-1 ring-slate-900/[0.05] xl:block">
               <h3 className="text-sm font-semibold">Selected product</h3>
               <p className="mt-0.5 text-xs text-muted-foreground">Click a table row</p>
               <div className="mt-3">

@@ -105,7 +105,7 @@ function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="bg-card rounded-xl ring-1 ring-slate-900/[0.05] shadow-card overflow-hidden">
+    <section className="bg-card rounded-xl ring-1 ring-slate-900/[0.05]  overflow-hidden">
       <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 bg-background">
         <div className="flex items-start gap-3 min-w-0">
           {step ? (
@@ -170,7 +170,7 @@ function ChoiceCard({
       className={cn(
         "rounded-xl border p-3.5 text-left transition-all h-full",
         selected
-          ? "border-primary bg-primary/10 shadow-card"
+          ? "border-primary bg-primary/10  "
           : "border-border bg-card hover:border-primary/40 hover:bg-background",
       )}
     >
@@ -214,7 +214,7 @@ function SidebarCard({
   className?: string;
 }) {
   return (
-    <div className={cn("bg-card rounded-xl ring-1 ring-slate-900/[0.05] shadow-card overflow-hidden", className)}>
+    <div className={cn("bg-card rounded-xl ring-1 ring-slate-900/[0.05]   overflow-hidden", className)}>
       {title ? (
         <div className="px-4 py-3 border-b bg-background">
           <h3 className="text-sm font-semibold text-foreground">{title}</h3>

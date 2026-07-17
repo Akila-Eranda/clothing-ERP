@@ -540,7 +540,7 @@ export default function CashManagementPage() {
         <div className="px-6 py-6 space-y-6">
 
           {/* Date filter — auto-applies to KPI, history & variance */}
-          <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap shadow-card ring-1 ring-slate-900/[0.05]">
+          <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  ring-1 ring-slate-900/[0.05]">
             {DATE_PRESETS.map((p) => (
               <button
                 key={p.label}
