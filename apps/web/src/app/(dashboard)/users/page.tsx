@@ -204,7 +204,7 @@ export default function UsersPage() {
           <Button variant="outline" onClick={loadAll} className="h-10 rounded-[12px] gap-1.5 text-sm">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => {
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => {
             setUserForm({
               ...EMPTY_USER,
               roleId: staffRoles[0]?.id ?? "",

@@ -4,26 +4,26 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-medium transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-control text-sm font-semibold transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-none hover:bg-[hsl(var(--primary-hover))] active:scale-[0.98]",
+          "bg-gradient-to-b from-[hsl(var(--primary-light))] to-[hsl(var(--primary))] text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-[hsl(var(--primary))] hover:to-[hsl(var(--primary-hover))] hover:shadow-[0_4px_14px_hsl(var(--primary)/0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] active:shadow-none",
         outline:
-          "border border-black/10 bg-white text-foreground shadow-none hover:bg-[#F8FAFC] active:scale-[0.98] dark:border-white/10 dark:bg-card dark:hover:bg-[hsl(var(--card-hover))]",
+          "border border-black/[0.08] bg-white text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)] [&_svg]:text-muted-foreground hover:border-primary/30 hover:text-[hsl(var(--primary-hover))] hover:bg-[hsl(var(--primary-soft))] hover:[&_svg]:text-[hsl(var(--primary-hover))] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/10 dark:bg-card dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))] dark:hover:text-foreground dark:hover:border-white/20 dark:hover:[&_svg]:text-foreground",
         secondary:
-          "border border-black/10 bg-white text-foreground shadow-none hover:bg-[#F8FAFC] active:scale-[0.98] dark:border-white/10 dark:bg-secondary dark:hover:bg-[hsl(var(--card-hover))]",
-        ghost: "hover:bg-[hsl(var(--primary-soft))] hover:text-[hsl(var(--primary-hover))] active:scale-[0.98] dark:hover:bg-white/[0.04]",
-        link: "text-primary underline-offset-4 hover:underline",
+          "border border-black/[0.08] bg-white text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)] [&_svg]:text-muted-foreground hover:bg-[#F8FAFC] hover:border-black/[0.14] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/10 dark:bg-secondary dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))]",
+        ghost: "font-medium hover:bg-[hsl(var(--primary-soft))] hover:text-[hsl(var(--primary-hover))] active:scale-[0.98] dark:hover:bg-white/[0.04]",
+        link: "font-medium text-primary underline-offset-4 hover:underline",
         gradient:
-          "gradient-primary text-white shadow-button hover:opacity-90 active:scale-[0.98] font-semibold",
+          "gradient-primary text-white shadow-button hover:opacity-90 hover:-translate-y-px hover:shadow-[0_4px_14px_hsl(var(--primary)/0.35)] active:translate-y-0 active:scale-[0.98]",
         success:
-          "bg-[#DCFCE7] text-[#16A34A] border border-[#86EFAC] shadow-none hover:bg-emerald-100 active:scale-[0.98] dark:bg-emerald-600 dark:text-white dark:border-transparent dark:hover:bg-emerald-700",
+          "bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-emerald-600 hover:to-emerald-700 hover:shadow-[0_4px_14px_rgba(16,185,129,0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
         warning:
-          "bg-[#FEF3C7] text-[#F59E0B] border border-[#FCD34D] shadow-none hover:bg-amber-100 active:scale-[0.98] dark:bg-amber-500 dark:text-white dark:border-transparent dark:hover:bg-amber-600",
+          "bg-gradient-to-b from-amber-400 to-amber-500 text-white shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-amber-500 hover:to-amber-600 hover:shadow-[0_4px_14px_rgba(245,158,11,0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
         destructive:
-          "bg-[#FEE2E2] text-[#EF4444] border border-[#FCA5A5] shadow-none hover:bg-red-100 active:scale-[0.98] dark:bg-destructive dark:text-destructive-foreground dark:border-transparent dark:hover:bg-destructive/90",
+          "bg-white text-[#EF4444] border border-[#FCA5A5] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-red-50 hover:border-red-400 hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(239,68,68,0.15)] active:translate-y-0 active:scale-[0.98] dark:bg-destructive dark:text-destructive-foreground dark:border-transparent dark:hover:bg-destructive/90",
       },
       size: {
         default: "h-[42px] px-4 py-2",

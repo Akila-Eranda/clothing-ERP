@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Star, Plus, Package, Upload, Download, RefreshCw, Lightbulb } from "lucide-react";
+import { Plus, Package, Upload, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
@@ -207,7 +206,7 @@ export default function BrandsPage() {
               <Upload className="h-[18px] w-[18px]" /> Import CSV
             </Button>
             <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-            <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
+            <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
               <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
             </Button>
           </div>
@@ -254,20 +253,6 @@ export default function BrandsPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
         />
-
-        {/* Tips */}
-        <div className="grid md:grid-cols-3 gap-3">
-          {copy.tips.map((tip) => (
-            <Card key={tip} className="border-dashed">
-              <CardContent className="p-4 flex gap-3 items-start">
-                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0">
-                  <Lightbulb className="h-4 w-4 text-amber-500" />
-                </div>
-                <p className="text-xs text-muted-foreground leading-relaxed">{tip}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
 
         <AddBrandModal
           open={modalOpen}

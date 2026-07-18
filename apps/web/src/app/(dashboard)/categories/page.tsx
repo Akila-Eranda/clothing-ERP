@@ -139,7 +139,7 @@ export default function CategoriesPage() {
           <Button variant="outline" onClick={fetchCategories} className="h-10 rounded-[12px] gap-1.5 text-sm">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
             <Plus className="h-[18px] w-[18px]" /> Add Category
           </Button>
         </div>
