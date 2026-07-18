@@ -494,6 +494,8 @@ model Tenant {
   calendarMeetings CalendarMeeting[]
   documentNumberSeries DocumentNumberSeries[]
   accountingPreference AccountingPreference?
+  accountMappings      AccountMapping[]
+  accountingOutboxEvents AccountingOutboxEvent[]
   costCenters       CostCenter[]
   accountingBudgets AccountingBudget[]
   recurringJournals RecurringJournal[]
@@ -2675,6 +2677,7 @@ model Account {
   debitLines  JournalLine[] @relation("DebitAccount")
   creditLines JournalLine[] @relation("CreditAccount")
   budgetLines AccountingBudgetLine[]
+  accountMappings AccountMapping[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3127,6 +3130,8 @@ model AccountingPreference {
   blockPostingClosedPeriod  Boolean  @default(true)
   fiscalYearStartMonth      Int      @default(1)
   decimalPlaces             Int      @default(2)
+  autoPostEnabled           Boolean  @default(true)
+  repairVatEnabled          Boolean  @default(false)
   defaultCashAccountId      String?
   defaultArAccountId        String?
   defaultApAccountId        String?
@@ -3139,6 +3144,56 @@ model AccountingPreference {
   tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("accounting_preferences")
+}
+
+enum AccountingOutboxStatus {
+  PENDING
+  PROCESSING
+  POSTED
+  FAILED
+  SKIPPED
+}
+
+/// Configurable GL mapping key → account for commerce posting.
+model AccountMapping {
+  id        String   @id @default(cuid())
+  tenantId  String
+  key       String
+  accountId String
+  label     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+  @@index([accountId])
+  @@map("account_mappings")
+}
+
+/// Durable accounting event queue for auto-post / manual sync.
+model AccountingOutboxEvent {
+  id             String                 @id @default(cuid())
+  tenantId       String
+  sourceType     String
+  sourceId       String
+  payload        Json                   @default("{}")
+  status         AccountingOutboxStatus @default(PENDING)
+  attempts       Int                    @default(0)
+  lastError      String?
+  journalEntryId String?
+  processedAt    DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, sourceType, sourceId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@map("accounting_outbox_events")
 }
 
 // ============================================================

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClientSideTable } from "@/components/table/client-side-table";
+import { ClientSideTable } from "../../../../components/table/client-side-table";
 import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
 import { toast } from "sonner";
 import { api } from "@/lib/api";

@@ -175,11 +175,13 @@ export class FinancialReportsService {
       operational = null;
     }
 
+    const usedOperationalFallback = !(gl.revenue.total || gl.expenses.total);
     return {
       reportType: 'profit-loss',
       period: { startDate, endDate },
       generatedAt: new Date().toISOString(),
-      source: gl.revenue.total || gl.expenses.total ? 'general-ledger' : 'operational',
+      source: usedOperationalFallback ? 'operational' : 'general-ledger',
+      usedOperationalFallback,
       ...gl,
       operational,
     };

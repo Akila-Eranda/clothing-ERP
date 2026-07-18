@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Optional } from '@nestjs/common';
 import {
   AccountType,
   AccountingPeriodStatus,
@@ -8,6 +8,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AuditLogService } from '@/modules/audit-log/audit-log.module';
 import { AccountingSettingsService } from './accounting-settings.service';
 import {
   assertCanClosePeriod,
@@ -25,6 +26,7 @@ export class FinancialPeriodsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly settings: AccountingSettingsService,
+    @Optional() private readonly audit?: AuditLogService,
   ) {}
 
   async listFiscalYears(tenantId: string) {
@@ -191,7 +193,7 @@ export class FinancialPeriodsService {
       fiscalYearStatus: period.fiscalYear.status,
     });
 
-    return this.prisma.accountingPeriod.update({
+    const closed = await this.prisma.accountingPeriod.update({
       where: { id },
       data: {
         status: AccountingPeriodStatus.CLOSED,
@@ -201,6 +203,15 @@ export class FinancialPeriodsService {
       },
       include: { fiscalYear: { select: { id: true, name: true, status: true } } },
     });
+    await this.audit?.log({
+      tenantId,
+      userId,
+      action: 'UPDATE',
+      resource: 'accounting_period',
+      resourceId: id,
+      newData: { status: 'CLOSED', notes },
+    });
+    return closed;
   }
 
   async reopenPeriod(id: string, tenantId: string, userId: string, notes?: string) {
@@ -214,7 +225,7 @@ export class FinancialPeriodsService {
       fiscalYearStatus: period.fiscalYear.status,
     });
 
-    return this.prisma.accountingPeriod.update({
+    const reopened = await this.prisma.accountingPeriod.update({
       where: { id },
       data: {
         status: AccountingPeriodStatus.OPEN,
@@ -226,6 +237,15 @@ export class FinancialPeriodsService {
       },
       include: { fiscalYear: { select: { id: true, name: true, status: true } } },
     });
+    await this.audit?.log({
+      tenantId,
+      userId,
+      action: 'UPDATE',
+      resource: 'accounting_period',
+      resourceId: id,
+      newData: { status: 'OPEN', notes },
+    });
+    return reopened;
   }
 
   async closeAllOpenPeriods(fiscalYearId: string, tenantId: string, userId: string) {
@@ -444,6 +464,126 @@ export class FinancialPeriodsService {
         journalEntryId: journalId,
         entryNumber: lines.length ? entryNumber : null,
         closing: preview.closing,
+      };
+    });
+  }
+
+  /**
+   * Reopen a closed fiscal year: reverse YEAR_END_CLOSE journal and unlock periods.
+   */
+  async reopenFiscalYear(fiscalYearId: string, tenantId: string, userId: string, notes?: string) {
+    const fy = await this.prisma.fiscalYear.findFirst({
+      where: { id: fiscalYearId, tenantId },
+      include: { periods: true },
+    });
+    if (!fy) throw new NotFoundException('Fiscal year not found');
+    if (fy.status !== FiscalYearStatus.CLOSED) {
+      throw new BadRequestException('Only closed fiscal years can be reopened');
+    }
+
+    const closing = await this.prisma.journalEntry.findFirst({
+      where: {
+        tenantId,
+        referenceType: 'YEAR_END_CLOSE',
+        referenceId: fiscalYearId,
+        status: { not: JournalEntryStatus.VOID },
+      },
+      include: { lines: true },
+    });
+
+    return this.prisma.$transaction(async (tx) => {
+      let reversalId: string | null = null;
+      if (closing?.lines?.length) {
+        const entryNumber = `YE-REV-${Date.now().toString(36).toUpperCase()}`;
+        const reverseLines: Prisma.JournalLineUncheckedCreateWithoutJournalEntryInput[] = [];
+        // Undo balances applied by year-end close, then record mirror journal for audit
+        for (const line of closing.lines) {
+          if (line.debitAccountId) {
+            await tx.account.update({
+              where: { id: line.debitAccountId },
+              data: { balance: { increment: line.amount } },
+            });
+            reverseLines.push({
+              creditAccountId: line.debitAccountId,
+              type: JournalEntryType.CREDIT,
+              amount: line.amount,
+              description: `Reverse: ${line.description ?? ''}`.trim(),
+            });
+          }
+          if (line.creditAccountId) {
+            await tx.account.update({
+              where: { id: line.creditAccountId },
+              data: { balance: { decrement: line.amount } },
+            });
+            reverseLines.push({
+              debitAccountId: line.creditAccountId,
+              type: JournalEntryType.DEBIT,
+              amount: line.amount,
+              description: `Reverse: ${line.description ?? ''}`.trim(),
+            });
+          }
+        }
+        const rev = await tx.journalEntry.create({
+          data: {
+            tenantId,
+            entryNumber,
+            description: `Reopen FY ${fy.name}: reverse year-end close`,
+            date: new Date(),
+            status: JournalEntryStatus.POSTED,
+            isPosted: true,
+            postedAt: new Date(),
+            createdBy: userId,
+            referenceType: 'YEAR_END_REOPEN',
+            referenceId: fiscalYearId,
+            lines: { create: reverseLines },
+          },
+        });
+        reversalId = rev.id;
+
+        await tx.journalEntry.update({
+          where: { id: closing.id },
+          data: {
+            status: JournalEntryStatus.VOID,
+            voidedAt: new Date(),
+            voidedBy: userId,
+            voidReason: notes ?? 'Fiscal year reopened',
+          },
+        });
+      }
+
+      await tx.accountingPeriod.updateMany({
+        where: { fiscalYearId, tenantId },
+        data: {
+          status: AccountingPeriodStatus.OPEN,
+          reopenedAt: new Date(),
+          reopenedBy: userId,
+          closedAt: null,
+          closedBy: null,
+        },
+      });
+
+      const reopened = await tx.fiscalYear.update({
+        where: { id: fiscalYearId },
+        data: {
+          status: FiscalYearStatus.OPEN,
+          closedAt: null,
+          closedBy: null,
+          closingNotes: notes ?? fy.closingNotes,
+          isCurrent: true,
+        },
+        include: { periods: { orderBy: { sequence: 'asc' } } },
+      });
+
+      // Ensure only one current FY
+      await tx.fiscalYear.updateMany({
+        where: { tenantId, id: { not: fiscalYearId } },
+        data: { isCurrent: false },
+      });
+
+      return {
+        fiscalYear: reopened,
+        reversalJournalId: reversalId,
+        voidedClosingJournalId: closing?.id ?? null,
       };
     });
   }

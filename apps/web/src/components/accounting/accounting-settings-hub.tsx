@@ -32,7 +32,8 @@ type Tab =
   | "series"
   | "tax"
   | "workflow"
-  | "preferences";
+  | "preferences"
+  | "mappings";
 
 type FiscalYear = {
   id: string;
@@ -90,6 +91,8 @@ type Preferences = {
   requireJournalApproval: boolean;
   allowPostDraft: boolean;
   blockPostingClosedPeriod: boolean;
+  autoPostEnabled?: boolean;
+  repairVatEnabled?: boolean;
   fiscalYearStartMonth: number;
   decimalPlaces: number;
   defaultCashAccountId?: string | null;
@@ -98,6 +101,13 @@ type Preferences = {
   defaultSalesAccountId?: string | null;
   defaultPurchaseAccountId?: string | null;
   defaultRetainedEarningsId?: string | null;
+};
+
+type MappingRow = {
+  key: string;
+  label: string;
+  accountId: string | null;
+  account?: { id: string; code: string; name: string; type: string } | null;
 };
 
 type TenantInfo = {
@@ -134,6 +144,7 @@ export function AccountingSettingsHub() {
     { id: "tax", label: "Tax Settings", icon: Settings2 },
     { id: "workflow", label: "Approval Workflow", icon: GitBranch },
     { id: "preferences", label: "Preferences", icon: ShieldCheck },
+    { id: "mappings", label: "GL Mappings", icon: Settings2 },
   ];
 
   return (
@@ -173,6 +184,7 @@ export function AccountingSettingsHub() {
       {tab === "tax" && <TaxSettingsPanel />}
       {tab === "workflow" && <WorkflowPanel />}
       {tab === "preferences" && <PreferencesPanel />}
+      {tab === "mappings" && <MappingsPanel />}
     </div>
   );
 }
@@ -1021,6 +1033,34 @@ function PreferencesPanel() {
               <span className="block text-xs text-muted-foreground">Recommended for compliance</span>
             </span>
           </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={prefs.autoPostEnabled !== false}
+              onChange={(e) => setPrefs({ ...prefs, autoPostEnabled: e.target.checked })}
+            />
+            <span>
+              Auto-post commerce events
+              <span className="block text-xs text-muted-foreground">
+                When off, events stay queued until Sync → Process
+              </span>
+            </span>
+          </label>
+          <label className="flex items-start gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={prefs.repairVatEnabled === true}
+              onChange={(e) => setPrefs({ ...prefs, repairVatEnabled: e.target.checked })}
+            />
+            <span>
+              Split 18% VAT on repair journals
+              <span className="block text-xs text-muted-foreground">
+                Off = full amount to Repair Income (default)
+              </span>
+            </span>
+          </label>
         </CardContent>
       </Card>
 
@@ -1071,6 +1111,132 @@ function PreferencesPanel() {
       <Button size="sm" disabled={busy} onClick={() => void save()}>
         {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save preferences"}
       </Button>
+    </div>
+  );
+}
+
+function MappingsPanel() {
+  const [rows, setRows] = useState<MappingRow[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [mRes, aRes] = await Promise.all([
+        api.get<MappingRow[]>("/accounting/settings/mappings"),
+        api.get<{ data?: Account[] } | Account[]>("/accounting/accounts?flat=true"),
+      ]);
+      const list = Array.isArray(mRes.data) ? mRes.data : [];
+      setRows(list);
+      const next: Record<string, string> = {};
+      for (const r of list) {
+        if (r.accountId) next[r.key] = r.accountId;
+      }
+      setDraft(next);
+      const raw = aRes.data;
+      setAccounts(Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load mappings");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const seed = async () => {
+    setBusy(true);
+    try {
+      await api.post("/accounting/settings/mappings/seed", {});
+      toast.success("Default mappings seeded");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Seed failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const mappings = Object.entries(draft)
+        .filter(([, accountId]) => !!accountId)
+        .map(([key, accountId]) => ({ key, accountId }));
+      await api.put("/accounting/settings/mappings", { mappings });
+      toast.success("Mappings saved");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2 justify-between items-center">
+        <p className="text-sm text-muted-foreground">
+          Map commerce posting keys to GL accounts. Missing keys fall back to default codes.
+        </p>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => void seed()}>
+            Seed defaults
+          </Button>
+          <Button size="sm" disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save mappings"}
+          </Button>
+        </div>
+      </div>
+      <Card>
+        <CardContent className="p-0 overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/70 text-xs text-muted-foreground text-left">
+              <tr>
+                <th className="p-3">Key</th>
+                <th className="p-3">Label</th>
+                <th className="p-3">Account</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.key} className="border-t">
+                  <td className="p-3 font-mono text-xs">{r.key}</td>
+                  <td className="p-3">{r.label}</td>
+                  <td className="p-3 min-w-[240px]">
+                    <Select
+                      value={draft[r.key] || "__none__"}
+                      onValueChange={(v) =>
+                        setDraft((d) => {
+                          const next = { ...d };
+                          if (v === "__none__") delete next[r.key];
+                          else next[r.key] = v;
+                          return next;
+                        })
+                      }
+                    >
+                      <SelectTrigger className="h-9"><SelectValue placeholder="Not set" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Not set</SelectItem>
+                        {accounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

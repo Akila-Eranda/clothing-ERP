@@ -1,8 +1,9 @@
 /** Phase 06 Sprint 13 — Accounting settings service. */
 
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { NumberSeriesResetPolicy, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { AuditLogService } from '@/modules/audit-log/audit-log.module';
 import {
   assertDecimalPlaces,
   assertFiscalYearStartMonth,
@@ -15,6 +16,11 @@ import {
   previewDocumentNumber,
   NumberSeriesKey,
 } from './accounting-settings.helper';
+import {
+  ACCOUNT_MAPPING_KEYS,
+  ACCOUNT_MAPPING_LABELS,
+  AccountMappingKey,
+} from './account-mapping.helper';
 
 export type UpdateNumberSeriesDto = {
   name?: string;
@@ -34,6 +40,8 @@ export type UpdateAccountingPreferencesDto = {
   blockPostingClosedPeriod?: boolean;
   fiscalYearStartMonth?: number;
   decimalPlaces?: number;
+  autoPostEnabled?: boolean;
+  repairVatEnabled?: boolean;
   defaultCashAccountId?: string | null;
   defaultArAccountId?: string | null;
   defaultApAccountId?: string | null;
@@ -44,7 +52,10 @@ export type UpdateAccountingPreferencesDto = {
 
 @Injectable()
 export class AccountingSettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly audit?: AuditLogService,
+  ) {}
 
   // ── Number series ────────────────────────────────────────────────────
 
@@ -258,6 +269,8 @@ export class AccountingSettingsService {
         ...(dto.blockPostingClosedPeriod != null && { blockPostingClosedPeriod: dto.blockPostingClosedPeriod }),
         ...(dto.fiscalYearStartMonth != null && { fiscalYearStartMonth: dto.fiscalYearStartMonth }),
         ...(dto.decimalPlaces != null && { decimalPlaces: dto.decimalPlaces }),
+        ...(dto.autoPostEnabled != null && { autoPostEnabled: dto.autoPostEnabled }),
+        ...(dto.repairVatEnabled != null && { repairVatEnabled: dto.repairVatEnabled }),
         ...(dto.defaultCashAccountId !== undefined && { defaultCashAccountId: dto.defaultCashAccountId }),
         ...(dto.defaultArAccountId !== undefined && { defaultArAccountId: dto.defaultArAccountId }),
         ...(dto.defaultApAccountId !== undefined && { defaultApAccountId: dto.defaultApAccountId }),
@@ -266,5 +279,64 @@ export class AccountingSettingsService {
         ...(dto.defaultRetainedEarningsId !== undefined && { defaultRetainedEarningsId: dto.defaultRetainedEarningsId }),
       },
     });
+  }
+
+  async listAccountMappings(tenantId: string) {
+    const rows = await this.prisma.accountMapping.findMany({
+      where: { tenantId },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
+      orderBy: { key: 'asc' },
+    });
+    const byKey = new Map(rows.map((r) => [r.key, r]));
+    return ACCOUNT_MAPPING_KEYS.map((key) => {
+      const row = byKey.get(key);
+      return {
+        key,
+        label: ACCOUNT_MAPPING_LABELS[key],
+        accountId: row?.accountId ?? null,
+        account: row?.account ?? null,
+      };
+    });
+  }
+
+  async upsertAccountMapping(tenantId: string, key: string, accountId: string) {
+    if (!ACCOUNT_MAPPING_KEYS.includes(key as AccountMappingKey)) {
+      throw new BadRequestException(`Unknown mapping key: ${key}`);
+    }
+    const account = await this.prisma.account.findFirst({
+      where: { id: accountId, tenantId, isActive: true },
+    });
+    if (!account) throw new BadRequestException('Invalid account');
+
+    const row = await this.prisma.accountMapping.upsert({
+      where: { tenantId_key: { tenantId, key } },
+      create: {
+        tenantId,
+        key,
+        accountId,
+        label: ACCOUNT_MAPPING_LABELS[key as AccountMappingKey],
+      },
+      update: { accountId },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
+    });
+    await this.audit?.log({
+      tenantId,
+      action: 'UPDATE',
+      resource: 'account_mapping',
+      resourceId: row.id,
+      newData: { key, accountId, code: row.account.code },
+    });
+    return row;
+  }
+
+  async bulkUpsertAccountMappings(
+    tenantId: string,
+    mappings: Array<{ key: string; accountId: string }>,
+  ) {
+    const results = [];
+    for (const m of mappings) {
+      results.push(await this.upsertAccountMapping(tenantId, m.key, m.accountId));
+    }
+    return results;
   }
 }

@@ -2,6 +2,7 @@ import {
   Injectable, Module, NotFoundException, BadRequestException,
   Controller, Get, Post, Put, Body, Param, Query,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ApiBearerAuth, ApiOperation, ApiProperty, ApiPropertyOptional, ApiTags,
 } from '@nestjs/swagger';
@@ -122,7 +123,28 @@ export class WorkshopService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
+
+  private emitRepairAccounting(
+    tenantId: string,
+    jobCardId: string,
+    prevStatus: JobCardStatus | string | undefined,
+    nextStatus: JobCardStatus | string | undefined,
+    userId?: string,
+  ) {
+    const delivered =
+      nextStatus === JobCardStatus.COMPLETED || nextStatus === JobCardStatus.INVOICED;
+    const wasDelivered =
+      prevStatus === JobCardStatus.COMPLETED || prevStatus === JobCardStatus.INVOICED;
+    if (delivered && !wasDelivered) {
+      this.eventEmitter.emit('accounting.repair.delivered', {
+        jobCardId,
+        tenantId,
+        userId,
+      });
+    }
+  }
 
   private jobInclude = {
     customer: { select: { id: true, firstName: true, lastName: true, phone: true } },
@@ -260,7 +282,7 @@ export class WorkshopService {
       });
       await this.prisma.jobCardLine.createMany({ data: lineData });
       const totals = recalcJobTotals(lineData);
-      return this.prisma.jobCard.update({
+      const updated = await this.prisma.jobCard.update({
         where: { id },
         data: {
           status: dto.status,
@@ -279,9 +301,11 @@ export class WorkshopService {
         },
         include: this.jobInclude,
       });
+      this.emitRepairAccounting(tenantId, id, existing.status, dto.status ?? updated.status);
+      return updated;
     }
 
-    return this.prisma.jobCard.update({
+    const updated = await this.prisma.jobCard.update({
       where: { id },
       data: {
         status: dto.status,
@@ -297,6 +321,8 @@ export class WorkshopService {
       },
       include: this.jobInclude,
     });
+    this.emitRepairAccounting(tenantId, id, existing.status, dto.status ?? updated.status);
+    return updated;
   }
 
   // ── Appointments ────────────────────────────────────────────

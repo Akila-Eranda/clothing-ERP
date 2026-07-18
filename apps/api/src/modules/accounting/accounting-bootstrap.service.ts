@@ -4,6 +4,12 @@ import { Injectable, Logger } from '@nestjs/common';
 import { BankAccountType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { defaultCoaSeed, normalizeAccountCode } from './coa.helper';
+import {
+  ACCOUNT_MAPPING_CODE_FALLBACKS,
+  ACCOUNT_MAPPING_KEYS,
+  ACCOUNT_MAPPING_LABELS,
+  AccountMappingKey,
+} from './account-mapping.helper';
 import { AccountingSettingsService } from './accounting-settings.service';
 import { FinancialPeriodsService } from './financial-periods.service';
 import { TaxService } from './tax.service';
@@ -18,7 +24,7 @@ const CODE = {
   sales: '4100',
   cogs: '5100',
   retained: '3100',
-  purchase: '1400', // inventory / purchases
+  purchase: '1400',
 } as const;
 
 @Injectable()
@@ -41,11 +47,13 @@ export class AccountingBootstrapService {
     accountsExisting: number;
     fiscalYearCreated: boolean;
     cashAccountsCreated: number;
+    mappingsCreated: number;
     preferencesLinked: boolean;
   }> {
     const coa = await this.upsertDefaultCoa(tenantId);
     const cashAccountsCreated = await this.ensureCashBankAccounts(tenantId, coa.codeToId);
     await this.linkPreferences(tenantId, coa.codeToId);
+    const mappingsCreated = await this.seedAccountMappings(tenantId, coa.codeToId);
     const fiscalYearCreated = await this.ensureCurrentFiscalYear(tenantId, userId, coa.codeToId);
     await this.settings.ensureNumberSeries(tenantId);
     try {
@@ -55,7 +63,7 @@ export class AccountingBootstrapService {
     }
 
     this.logger.log(
-      `Accounting bootstrap tenant=${tenantId} created=${coa.created} existing=${coa.existing} fy=${fiscalYearCreated}`,
+      `Accounting bootstrap tenant=${tenantId} created=${coa.created} existing=${coa.existing} fy=${fiscalYearCreated} maps=${mappingsCreated}`,
     );
 
     return {
@@ -63,6 +71,7 @@ export class AccountingBootstrapService {
       accountsExisting: coa.existing,
       fiscalYearCreated,
       cashAccountsCreated,
+      mappingsCreated,
       preferencesLinked: true,
     };
   }
@@ -70,9 +79,7 @@ export class AccountingBootstrapService {
   /** Upsert default COA by code — never fails if some accounts already exist. */
   async upsertDefaultCoa(tenantId: string) {
     const seed = defaultCoaSeed();
-    // Parents first
     const ordered = [...seed].sort((a, b) => Number(!!a.parentCode) - Number(!!b.parentCode));
-    // Multi-pass so deep parents resolve
     const codeToId = new Map<string, string>();
     const existing = await this.prisma.account.findMany({
       where: { tenantId },
@@ -88,7 +95,7 @@ export class AccountingBootstrapService {
         const parentId = row.parentCode
           ? codeToId.get(normalizeAccountCode(row.parentCode)) ?? null
           : null;
-        if (row.parentCode && !parentId) continue; // wait for parent
+        if (row.parentCode && !parentId) continue;
         try {
           const acc = await this.prisma.account.create({
             data: {
@@ -106,7 +113,6 @@ export class AccountingBootstrapService {
           codeToId.set(code, acc.id);
           created++;
         } catch (err) {
-          // concurrent create — re-read
           const again = await this.prisma.account.findFirst({
             where: { tenantId, code },
             select: { id: true },
@@ -120,7 +126,7 @@ export class AccountingBootstrapService {
     return { created, existing: existing.length, codeToId };
   }
 
-  /** Public — fill preference mappings + enable auto-post flags. */
+  /** Public — fill preference mappings + account mapping keys. */
   async ensureMappings(tenantId: string) {
     const accounts = await this.prisma.account.findMany({
       where: { tenantId, isActive: true },
@@ -129,12 +135,60 @@ export class AccountingBootstrapService {
     const codeToId = new Map(accounts.map((a) => [normalizeAccountCode(a.code), a.id]));
     await this.linkPreferences(tenantId, codeToId);
     await this.ensureCashBankAccounts(tenantId, codeToId);
+    await this.seedAccountMappings(tenantId, codeToId);
+  }
+
+  async seedAccountMappings(tenantId: string, codeToId?: Map<string, string>) {
+    let map = codeToId;
+    if (!map) {
+      const accounts = await this.prisma.account.findMany({
+        where: { tenantId, isActive: true },
+        select: { id: true, code: true },
+      });
+      map = new Map(accounts.map((a) => [normalizeAccountCode(a.code), a.id]));
+    }
+
+    const existing = await this.prisma.accountMapping.findMany({
+      where: { tenantId },
+      select: { key: true },
+    });
+    const have = new Set(existing.map((e) => e.key));
+    let created = 0;
+
+    for (const key of ACCOUNT_MAPPING_KEYS) {
+      if (have.has(key)) continue;
+      const accountId = this.pickAccountId(map, key);
+      if (!accountId) continue;
+      try {
+        await this.prisma.accountMapping.create({
+          data: {
+            tenantId,
+            key,
+            accountId,
+            label: ACCOUNT_MAPPING_LABELS[key],
+          },
+        });
+        created++;
+      } catch {
+        // unique race — ignore
+      }
+    }
+    return created;
+  }
+
+  private pickAccountId(codeToId: Map<string, string>, key: AccountMappingKey): string | null {
+    for (const code of ACCOUNT_MAPPING_CODE_FALLBACKS[key]) {
+      const id = codeToId.get(normalizeAccountCode(code));
+      if (id) return id;
+    }
+    return null;
   }
 
   private async ensureCashBankAccounts(tenantId: string, codeToId: Map<string, string>) {
     const specs: { code: string; name: string; type: BankAccountType; glCode: string }[] = [
-      { code: 'CASH-01', name: 'Cash in Hand', type: BankAccountType.CASH_IN_HAND, glCode: CODE.cash },
+      { code: 'CASH-01', name: 'Cash on Hand', type: BankAccountType.CASH_IN_HAND, glCode: CODE.cash },
       { code: 'PETTY-01', name: 'Petty Cash', type: BankAccountType.PETTY_CASH, glCode: CODE.petty },
+      { code: 'BANK-01', name: 'Bank — Main', type: BankAccountType.CURRENT, glCode: CODE.bank },
     ];
     let created = 0;
     for (const s of specs) {
@@ -144,20 +198,24 @@ export class AccountingBootstrapService {
       });
       if (exists) continue;
       const glAccountId = codeToId.get(s.glCode) ?? null;
-      await this.prisma.bankAccount.create({
-        data: {
-          tenantId,
-          code: s.code,
-          name: s.name,
-          type: s.type,
-          currency: 'LKR',
-          openingBalance: 0,
-          currentBalance: 0,
-          glAccountId: glAccountId ?? undefined,
-          isActive: true,
-        },
-      });
-      created++;
+      try {
+        await this.prisma.bankAccount.create({
+          data: {
+            tenantId,
+            code: s.code,
+            name: s.name,
+            type: s.type,
+            currency: 'LKR',
+            openingBalance: 0,
+            currentBalance: 0,
+            glAccountId: glAccountId ?? undefined,
+            isActive: true,
+          },
+        });
+        created++;
+      } catch (err) {
+        this.logger.warn(`Bank account ${s.code} skipped: ${(err as Error).message}`);
+      }
     }
     return created;
   }
@@ -170,6 +228,8 @@ export class AccountingBootstrapService {
       blockPostingClosedPeriod: true,
       fiscalYearStartMonth: 1,
       decimalPlaces: 2,
+      autoPostEnabled: true,
+      repairVatEnabled: false,
       defaultCashAccountId: codeToId.get(CODE.cash) ?? null,
       defaultArAccountId: codeToId.get(CODE.ar) ?? null,
       defaultApAccountId: codeToId.get(CODE.ap) ?? null,
@@ -181,12 +241,7 @@ export class AccountingBootstrapService {
     await this.prisma.accountingPreference.upsert({
       where: { tenantId },
       create: data,
-      update: {
-        // Only fill missing mappings — don't overwrite tenant customizations
-        ...(data.defaultCashAccountId && {
-          defaultCashAccountId: undefined, // handled below
-        }),
-      },
+      update: {},
     });
 
     const prefs = await this.prisma.accountingPreference.findUnique({ where: { tenantId } });
@@ -203,6 +258,8 @@ export class AccountingBootstrapService {
         defaultSalesAccountId: prefs.defaultSalesAccountId ?? data.defaultSalesAccountId,
         defaultPurchaseAccountId: prefs.defaultPurchaseAccountId ?? data.defaultPurchaseAccountId,
         defaultRetainedEarningsId: prefs.defaultRetainedEarningsId ?? data.defaultRetainedEarningsId,
+        autoPostEnabled: prefs.autoPostEnabled ?? true,
+        repairVatEnabled: prefs.repairVatEnabled ?? false,
       },
     });
   }

@@ -754,10 +754,16 @@ export class ProcurementService {
       });
     });
 
-    return this.prisma.supplierReturn.findUnique({
+    const posted = await this.prisma.supplierReturn.findUnique({
       where: { id },
       include: { items: true, supplier: true },
     });
+    this.eventEmitter.emit('accounting.supplier-return.posted', {
+      returnId: id,
+      tenantId,
+      userId,
+    });
+    return posted;
   }
 
   async listSupplierReturns(tenantId: string, query: PaginationDto) {
@@ -831,6 +837,11 @@ export class ProcurementService {
         referenceId: inv.id,
         notes: `Invoice ${inv.invoiceNumber}`,
         createdBy: userId,
+      });
+      this.eventEmitter.emit('accounting.supplier-invoice.posted', {
+        invoiceId: inv.id,
+        tenantId,
+        userId,
       });
     }
 

@@ -315,11 +315,35 @@ export function AdvancedAccountingHub() {
     setBusy(true);
     try {
       await api.post("/accounting/bootstrap", {});
+      const scan = await api.post<{ missing: number }>("/accounting/sync/scan?limit=200", {});
+      const processed = await api.post<{ posted: number; failed: number }>(
+        "/accounting/sync/process?limit=200",
+        {},
+      );
       const result = await api.post<{ journalsPosted: number }>("/accounting/backfill?limit=500", {});
-      toast.success(`Ledger repaired — ${result.data?.journalsPosted ?? 0} journals posted`);
+      toast.success(
+        `Synced — scanned ${scan.data?.missing ?? 0}, posted ${processed.data?.posted ?? 0}, backfill ${result.data?.journalsPosted ?? 0}`,
+      );
       await load();
     } catch (error) {
       toast.error((error as Error).message || "Ledger repair failed");
+    } finally { setBusy(false); }
+  };
+
+  const runSyncOnly = async () => {
+    setBusy(true);
+    try {
+      await api.post("/accounting/sync/scan?limit=200", {});
+      const processed = await api.post<{ posted: number; failed: number; skipped: number }>(
+        "/accounting/sync/process?limit=200",
+        {},
+      );
+      toast.success(
+        `Outbox processed — posted ${processed.data?.posted ?? 0}, failed ${processed.data?.failed ?? 0}`,
+      );
+      await load();
+    } catch (error) {
+      toast.error((error as Error).message || "Sync failed");
     } finally { setBusy(false); }
   };
 
@@ -461,16 +485,22 @@ export function AdvancedAccountingHub() {
                     </div>
                   ))}
                 </div>
-                {(diagnostics?.unpostedTotal ?? 0) > 0 || (diagnostics?.missingAccounts.length ?? 0) > 0 ? (
-                  <Button size="sm" className="w-full gap-1.5" onClick={() => void repairLedger()} disabled={busy}>
-                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    Repair & Backfill Ledger
+                <div className="flex flex-col gap-2">
+                  <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => void runSyncOnly()} disabled={busy}>
+                    {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                    Scan & process outbox
                   </Button>
-                ) : (
-                  <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
-                    <CheckCircle2 className="h-4 w-4" /> All source transactions are posted
-                  </div>
-                )}
+                  {(diagnostics?.unpostedTotal ?? 0) > 0 || (diagnostics?.missingAccounts.length ?? 0) > 0 ? (
+                    <Button size="sm" className="w-full gap-1.5" onClick={() => void repairLedger()} disabled={busy}>
+                      {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                      Repair & Backfill Ledger
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                      <CheckCircle2 className="h-4 w-4" /> All source transactions are posted
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>

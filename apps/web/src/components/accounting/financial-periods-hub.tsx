@@ -262,6 +262,26 @@ export function FinancialPeriodsHub() {
     }
   };
 
+  const runYearEndReopen = async () => {
+    if (!selected) return;
+    if (!window.confirm(`Reopen fiscal year ${selected.name}? This reverses the year-end closing journal.`)) {
+      return;
+    }
+    setBusy("year-reopen");
+    try {
+      await api.post(`/accounting/fiscal-years/${selected.id}/reopen`, {
+        notes: "Year-end reopen from Periods UI",
+      });
+      toast.success("Fiscal year reopened · closing journal reversed");
+      setPreview(null);
+      await load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Year reopen failed");
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const openCount = selected?.periods.filter((p) => p.status === "OPEN").length ?? 0;
   const closedCount = selected?.periods.filter((p) => p.status !== "OPEN").length ?? 0;
 
@@ -421,6 +441,28 @@ export function FinancialPeriodsHub() {
                   </div>
                 </CardContent>
               </Card>
+
+              {selected.status === "CLOSED" && (
+                <Card>
+                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <h3 className="text-sm font-semibold">Year closed</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Reopen reverses the year-end closing journal and unlocks periods
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={busy === "year-reopen"}
+                      onClick={() => void runYearEndReopen()}
+                    >
+                      {busy === "year-reopen" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
+                      Reopen year
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
               {selected.status === "OPEN" && (
                 <Card>

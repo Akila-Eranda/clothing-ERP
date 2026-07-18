@@ -31,6 +31,7 @@ import { FinancialPeriodsService } from './financial-periods.service';
 import { JournalEntriesService } from './journal-entries.service';
 import { AccountingBootstrapService } from './accounting-bootstrap.service';
 import { AccountingPostingService } from './accounting-posting.service';
+import { AccountingOutboxService } from './accounting-outbox.service';
 import { AccountingAutomationListener } from './accounting-automation.listener';
 import { AdvancedAccountingService } from './advanced-accounting.service';
 import { AdvancedAccountingController } from './advanced-accounting.controller';
@@ -466,6 +467,8 @@ export class UpdateAccountingPreferencesDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() requireJournalApproval?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() allowPostDraft?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() blockPostingClosedPeriod?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() autoPostEnabled?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() repairVatEnabled?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsNumber() fiscalYearStartMonth?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() decimalPlaces?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() defaultCashAccountId?: string | null;
@@ -474,6 +477,19 @@ export class UpdateAccountingPreferencesDto {
   @ApiPropertyOptional() @IsOptional() @IsString() defaultSalesAccountId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() defaultPurchaseAccountId?: string | null;
   @ApiPropertyOptional() @IsOptional() @IsString() defaultRetainedEarningsId?: string | null;
+}
+
+export class UpsertAccountMappingDto {
+  @ApiProperty() @IsString() key: string;
+  @ApiProperty() @IsString() accountId: string;
+}
+
+export class BulkAccountMappingsDto {
+  @ApiProperty({ type: [UpsertAccountMappingDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpsertAccountMappingDto)
+  mappings: UpsertAccountMappingDto[];
 }
 
 export class CreatePayrollComponentDto {
@@ -1186,6 +1202,7 @@ export class AccountingController {
     private readonly settingsService: AccountingSettingsService,
     private readonly bootstrapService: AccountingBootstrapService,
     private readonly postingService: AccountingPostingService,
+    private readonly outboxService: AccountingOutboxService,
   ) {}
 
   @Post('bootstrap')
@@ -1201,6 +1218,69 @@ export class AccountingController {
   backfillAccounting(@CurrentUser() user: IAuthUser, @Query('limit') limit?: string) {
     const n = Math.min(500, Math.max(1, Number(limit) || 200));
     return this.postingService.backfillTenant(user.tenantId, n);
+  }
+
+  @Get('sync/events')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List accounting outbox events' })
+  listSyncEvents(
+    @CurrentUser() user: IAuthUser,
+    @Query('status') status?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.outboxService.list(user.tenantId, {
+      status: status as any,
+      limit: Number(limit) || 50,
+    });
+  }
+
+  @Post('sync/scan')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Scan missing source transactions and enqueue outbox events' })
+  scanSync(@CurrentUser() user: IAuthUser, @Query('limit') limit?: string) {
+    return this.outboxService.scanMissing(user.tenantId, Number(limit) || 100);
+  }
+
+  @Post('sync/process')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Process pending/failed accounting outbox events' })
+  processSync(@CurrentUser() user: IAuthUser, @Query('limit') limit?: string) {
+    return this.outboxService.processPending(user.tenantId, Number(limit) || 50);
+  }
+
+  @Post('sync/retry/:id')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Retry a failed outbox event' })
+  retrySync(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.outboxService.retry(user.tenantId, id);
+  }
+
+  @Get('sync/verify')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'Tenant accounting readiness checklist' })
+  verifyAccounting(@CurrentUser() user: IAuthUser) {
+    return this.outboxService.verifyChecklist(user.tenantId);
+  }
+
+  @Get('settings/mappings')
+  @RequirePermissions('accounting:read')
+  @ApiOperation({ summary: 'List GL account mappings' })
+  listMappings(@CurrentUser() user: IAuthUser) {
+    return this.settingsService.listAccountMappings(user.tenantId);
+  }
+
+  @Put('settings/mappings')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Bulk upsert GL account mappings' })
+  upsertMappings(@CurrentUser() user: IAuthUser, @Body() dto: BulkAccountMappingsDto) {
+    return this.settingsService.bulkUpsertAccountMappings(user.tenantId, dto.mappings ?? []);
+  }
+
+  @Post('settings/mappings/seed')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Seed missing default GL account mappings' })
+  seedMappings(@CurrentUser() user: IAuthUser) {
+    return this.bootstrapService.ensureMappings(user.tenantId);
   }
 
   @Get('accounts')
@@ -2323,6 +2403,13 @@ export class AccountingController {
     );
   }
 
+  @Post('fiscal-years/:id/reopen')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Reopen closed fiscal year and reverse year-end closing journal' })
+  reopenFiscalYear(@CurrentUser() user: IAuthUser, @Param('id') id: string, @Body() dto: ClosePeriodDto) {
+    return this.periodsService.reopenFiscalYear(id, user.tenantId, user.id, dto.notes);
+  }
+
   @Post('fiscal-years/:id/close-periods')
   @RequirePermissions('accounting:update')
   @ApiOperation({ summary: 'Close all open periods in a fiscal year' })
@@ -2409,6 +2496,7 @@ export class AccountingController {
     AccountingSettingsService,
     AccountingBootstrapService,
     AccountingPostingService,
+    AccountingOutboxService,
     AccountingAutomationListener,
     AdvancedAccountingService,
   ],
@@ -2425,6 +2513,7 @@ export class AccountingController {
     AccountingSettingsService,
     AccountingBootstrapService,
     AccountingPostingService,
+    AccountingOutboxService,
     AdvancedAccountingService,
   ],
 })
