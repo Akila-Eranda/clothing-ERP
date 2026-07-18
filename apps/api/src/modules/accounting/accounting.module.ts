@@ -32,6 +32,8 @@ import { JournalEntriesService } from './journal-entries.service';
 import { AccountingBootstrapService } from './accounting-bootstrap.service';
 import { AccountingPostingService } from './accounting-posting.service';
 import { AccountingAutomationListener } from './accounting-automation.listener';
+import { AdvancedAccountingService } from './advanced-accounting.service';
+import { AdvancedAccountingController } from './advanced-accounting.controller';
 import { TaxService } from './tax.service';
 import { PettyCashService } from './petty-cash.service';
 import { FixedAssetsService } from './fixed-assets.service';
@@ -2393,7 +2395,7 @@ export class AccountingController {
 
 @Module({
   imports: [AuditLogModule, CustomersModule, SuppliersModule],
-  controllers: [AccountingController],
+  controllers: [AccountingController, AdvancedAccountingController],
   providers: [
     AccountingService,
     FinanceService,
@@ -2408,6 +2410,7 @@ export class AccountingController {
     AccountingBootstrapService,
     AccountingPostingService,
     AccountingAutomationListener,
+    AdvancedAccountingService,
   ],
   exports: [
     AccountingService,
@@ -2422,6 +2425,7 @@ export class AccountingController {
     AccountingSettingsService,
     AccountingBootstrapService,
     AccountingPostingService,
+    AdvancedAccountingService,
   ],
 })
 export class AccountingModule {}

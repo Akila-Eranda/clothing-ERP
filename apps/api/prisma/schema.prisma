@@ -494,6 +494,10 @@ model Tenant {
   calendarMeetings CalendarMeeting[]
   documentNumberSeries DocumentNumberSeries[]
   accountingPreference AccountingPreference?
+  costCenters       CostCenter[]
+  accountingBudgets AccountingBudget[]
+  recurringJournals RecurringJournal[]
+  exchangeRates     ExchangeRate[]
 
   @@map("tenants")
 }
@@ -2670,6 +2674,7 @@ model Account {
   children    Account[]     @relation("AccountHierarchy")
   debitLines  JournalLine[] @relation("DebitAccount")
   creditLines JournalLine[] @relation("CreditAccount")
+  budgetLines AccountingBudgetLine[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3134,6 +3139,115 @@ model AccountingPreference {
   tenant                    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("accounting_preferences")
+}
+
+// ============================================================
+// ADVANCED ACCOUNTING
+// ============================================================
+
+model CostCenter {
+  id          String   @id @default(cuid())
+  tenantId    String
+  code        String
+  name        String
+  description String?
+  manager     String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  budgetLines AccountingBudgetLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("cost_centers")
+}
+
+model AccountingBudget {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  fiscalYear  Int
+  status      String   @default("DRAFT")
+  notes       String?
+  createdBy   String?
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  lines       AccountingBudgetLine[]
+
+  @@unique([tenantId, name, fiscalYear])
+  @@index([tenantId, fiscalYear, status])
+  @@map("accounting_budgets")
+}
+
+model AccountingBudgetLine {
+  id           String   @id @default(cuid())
+  budgetId     String
+  accountId    String
+  costCenterId String?
+  month        Int
+  amount       Float
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  budget       AccountingBudget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account      Account          @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  costCenter   CostCenter?      @relation(fields: [costCenterId], references: [id], onDelete: SetNull)
+
+  @@unique([budgetId, accountId, costCenterId, month])
+  @@index([budgetId, month])
+  @@index([accountId])
+  @@map("accounting_budget_lines")
+}
+
+model RecurringJournal {
+  id            String   @id @default(cuid())
+  tenantId      String
+  name          String
+  description   String
+  frequency     String
+  startDate     DateTime
+  endDate       DateTime?
+  nextRunDate   DateTime
+  lastRunDate   DateTime?
+  autoPost      Boolean  @default(true)
+  isActive      Boolean  @default(true)
+  branchId      String?
+  lines         Json
+  createdBy     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isActive, nextRunDate])
+  @@map("recurring_journals")
+}
+
+model ExchangeRate {
+  id           String   @id @default(cuid())
+  tenantId     String
+  fromCurrency String
+  toCurrency   String
+  rate         Float
+  effectiveAt  DateTime
+  source       String?
+  isActive     Boolean  @default(true)
+  createdBy    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, fromCurrency, toCurrency, effectiveAt])
+  @@index([tenantId, effectiveAt])
+  @@map("exchange_rates")
 }
 
 model PayrollComponent {
