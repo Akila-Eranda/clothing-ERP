@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   ChequeDirection,
   ChequeStatus,
@@ -63,6 +64,7 @@ export class ProcurementService {
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly workflowService: WorkflowService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async nextNumber(tenantId: string, prefix: string, table: 'pr' | 'grn' | 'sret' | 'sinv') {
@@ -403,6 +405,12 @@ export class ProcurementService {
       });
 
       return created;
+    });
+
+    this.eventEmitter.emit('accounting.grn.posted', {
+      grnId: grn.id,
+      tenantId,
+      userId,
     });
 
     return this.getGoodsReceipt(grn.id, tenantId);

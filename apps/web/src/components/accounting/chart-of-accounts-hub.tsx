@@ -377,11 +377,40 @@ export function ChartOfAccountsHub() {
 
   const seedDefaults = async () => {
     try {
-      const res = await api.post<{ created: number }>("/accounting/accounts/seed-defaults", {});
-      toast.success(`Seeded ${res.data?.created ?? 0} default accounts`);
+      const res = await api.post<{
+        accountsCreated: number;
+        accountsExisting: number;
+        fiscalYearCreated: boolean;
+        cashAccountsCreated: number;
+      }>("/accounting/bootstrap", {});
+      const d = res.data;
+      toast.success(
+        `Accounting ready — ${d?.accountsCreated ?? 0} new accounts` +
+          (d?.fiscalYearCreated ? ", fiscal year created" : "") +
+          (d?.cashAccountsCreated ? `, ${d.cashAccountsCreated} cash books` : ""),
+      );
       load();
     } catch (e: unknown) {
-      toast.error((e as Error).message ?? "Seed failed");
+      toast.error((e as Error).message ?? "Bootstrap failed");
+    }
+  };
+
+  const backfillJournals = async () => {
+    try {
+      const res = await api.post<{
+        journalsPosted: number;
+        alreadyPostedOrSkipped: number;
+        sales: number;
+        grns: number;
+        expenses: number;
+      }>("/accounting/backfill?limit=200", {});
+      const d = res.data;
+      toast.success(
+        `Posted ${d?.journalsPosted ?? 0} journals` +
+          (d?.alreadyPostedOrSkipped ? ` (${d.alreadyPostedOrSkipped} already done)` : ""),
+      );
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Backfill failed");
     }
   };
 
@@ -418,11 +447,12 @@ export function ChartOfAccountsHub() {
               Import
             </span>
           </label>
-          {!flat.length && (
-            <Button variant="outline" size="sm" onClick={seedDefaults} className="gap-1.5">
-              <FileUp className="h-3.5 w-3.5" /> Seed defaults
-            </Button>
-          )}
+          <Button variant="outline" size="sm" onClick={seedDefaults} className="gap-1.5">
+            <FileUp className="h-3.5 w-3.5" /> Auto-setup
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void backfillJournals()} className="gap-1.5">
+            <RefreshCw className="h-3.5 w-3.5" /> Backfill journals
+          </Button>
           <Button
             size="sm"
             className="gap-1.5"
@@ -519,7 +549,7 @@ export function ChartOfAccountsHub() {
                   Clear filters
                 </Button>
               ) : (
-                <Button size="sm" variant="outline" onClick={() => void seedDefaults()}>Seed default COA</Button>
+                <Button size="sm" variant="outline" onClick={() => void seedDefaults()}>Auto-setup accounting</Button>
               )}
             </div>
           ) : (

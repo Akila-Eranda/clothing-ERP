@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   PaymentMethod,
   SupplierDebitNoteStatus,
@@ -19,7 +20,10 @@ import * as dayjs from 'dayjs';
 
 @Injectable()
 export class SupplierApService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async getApDashboard(tenantId: string, asOfDate?: string) {
     const asOf = asOfDate ? dayjs(asOfDate).endOf('day').toDate() : new Date();
@@ -362,6 +366,15 @@ export class SupplierApService {
     });
 
     void branchId;
+
+    for (const p of result.payments) {
+      this.eventEmitter.emit('accounting.supplier-payment.posted', {
+        paymentId: p.id,
+        tenantId,
+        userId,
+      });
+    }
+
     return {
       ...result,
       supplierBalance: result.balanceAfter,

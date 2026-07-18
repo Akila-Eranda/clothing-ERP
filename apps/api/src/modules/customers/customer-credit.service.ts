@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   CreditReminderStatus,
   CreditScheduleLineStatus,
@@ -36,7 +37,10 @@ export type ReceiveCreditPaymentOpts = {
 
 @Injectable()
 export class CustomerCreditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async listCreditCustomers(tenantId: string) {
     const customers = await this.prisma.customer.findMany({
@@ -257,6 +261,8 @@ export class CustomerCreditService {
       throw new BadRequestException('Cheque number is required for cheque settlements');
     }
 
+    let paymentTxnId: string | null = null;
+
     await this.prisma.$transaction(async (tx) => {
       const walletDelta = (advance > 0.009 ? advance : 0) - (applyFromWallet ? applied : 0);
       await tx.customer.update({
@@ -270,7 +276,7 @@ export class CustomerCreditService {
       });
 
       if (applied > 0.009) {
-        await tx.customerCreditTransaction.create({
+        const payTxn = await tx.customerCreditTransaction.create({
           data: {
             customerId,
             tenantId,
@@ -283,6 +289,7 @@ export class CustomerCreditService {
               : description,
           },
         });
+        paymentTxnId = payTxn.id;
 
         for (const a of allocFixed) {
           const charge = openCharges.find((c) => c.id === a.chargeId)!;
@@ -348,7 +355,7 @@ export class CustomerCreditService {
       }
 
       if (advance > 0.009) {
-        await tx.walletTransaction.create({
+        const adv = await tx.walletTransaction.create({
           data: {
             customerId,
             tenantId,
@@ -357,6 +364,7 @@ export class CustomerCreditService {
             description: `${description} — prepaid advance`,
           },
         });
+        if (!paymentTxnId) paymentTxnId = adv.id;
       }
 
       if (applyFromWallet && applied > 0.009) {
@@ -423,6 +431,23 @@ export class CustomerCreditService {
         });
       }
     });
+
+    if (paymentTxnId) {
+      this.eventEmitter.emit('accounting.customer-credit.payment', {
+        tenantId,
+        branchId: opts.branchId,
+        userId: opts.userId,
+        customerId,
+        paymentTxnId,
+        amount,
+        applied,
+        advance,
+        method,
+        applyFromWallet,
+        description,
+        date: new Date(),
+      });
+    }
 
     return {
       creditBalance: round2(customer.creditBalance - applied),

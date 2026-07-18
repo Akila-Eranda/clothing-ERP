@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsString, IsEnum, IsArray, IsBoolean, IsOptional, IsInt, IsNumber, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -49,6 +50,7 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly creditService: CustomerCreditService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async create(tenantId: string, branchId: string, userId: string, dto: CreateReturnDto) {
@@ -128,6 +130,12 @@ export class ReturnsService {
         `Return ${ret.returnNumber} credit reversal`,
       );
     }
+
+    this.eventEmitter.emit('accounting.return.completed', {
+      returnId: ret.id,
+      tenantId,
+      userId,
+    });
 
     return ret;
   }

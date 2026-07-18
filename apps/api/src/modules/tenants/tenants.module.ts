@@ -462,6 +462,7 @@ export class TenantsService {
       };
     }).then((result) => {
       this.eventEmitter.emit('tenant.registered', {
+        tenantId: result.tenant.id,
         email: adminEmail,
         name: dto.companyName,
         subdomain: dto.subdomain,

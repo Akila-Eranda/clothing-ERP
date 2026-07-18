@@ -2,6 +2,7 @@ import { Module, NotFoundException } from '@nestjs/common';
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, BadRequestException } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsBoolean, ValidateNested, IsArray, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -28,6 +29,9 @@ import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { FinanceService } from './finance.service';
 import { FinancialPeriodsService } from './financial-periods.service';
 import { JournalEntriesService } from './journal-entries.service';
+import { AccountingBootstrapService } from './accounting-bootstrap.service';
+import { AccountingPostingService } from './accounting-posting.service';
+import { AccountingAutomationListener } from './accounting-automation.listener';
 import { TaxService } from './tax.service';
 import { PettyCashService } from './petty-cash.service';
 import { FixedAssetsService } from './fixed-assets.service';
@@ -44,7 +48,6 @@ import {
   assertValidParent,
   buildAccountTree,
   collectDescendantIds,
-  defaultCoaSeed,
   flattenAccountTree,
   normalizeAccountCode,
   parseCoaImportRow,
@@ -514,6 +517,8 @@ export class AccountingService {
     private readonly finance: FinanceService,
     private readonly periods: FinancialPeriodsService,
     private readonly journals: JournalEntriesService,
+    private readonly bootstrap: AccountingBootstrapService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private static readonly SETTLED_RETURN_STATUSES = ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] as const;
@@ -736,29 +741,7 @@ export class AccountingService {
   }
 
   async seedDefaultCoa(tenantId: string) {
-    const existing = await this.prisma.account.count({ where: { tenantId } });
-    if (existing > 0) {
-      throw new BadRequestException('Chart of accounts already has accounts — seed skipped');
-    }
-    const seed = defaultCoaSeed();
-    const codeToId = new Map<string, string>();
-    for (const row of seed) {
-      const created = await this.prisma.account.create({
-        data: {
-          tenantId,
-          code: row.code,
-          name: row.name,
-          type: row.type,
-          description: row.description ?? null,
-          parentId: row.parentCode ? codeToId.get(row.parentCode) ?? null : null,
-          isSystem: true,
-          openingBalance: 0,
-          balance: 0,
-        },
-      });
-      codeToId.set(row.code, created.id);
-    }
-    return { created: seed.length };
+    return this.bootstrap.bootstrapTenant(tenantId);
   }
 
   async exportAccounts(tenantId: string) {
@@ -866,6 +849,13 @@ export class AccountingService {
         });
       }
 
+      return expense;
+    }).then((expense) => {
+      this.eventEmitter.emit('accounting.expense.created', {
+        expenseId: expense.id,
+        tenantId,
+        userId,
+      });
       return expense;
     });
   }
@@ -1192,7 +1182,24 @@ export class AccountingController {
     private readonly payrollService: PayrollService,
     private readonly financialReportsService: FinancialReportsService,
     private readonly settingsService: AccountingSettingsService,
+    private readonly bootstrapService: AccountingBootstrapService,
+    private readonly postingService: AccountingPostingService,
   ) {}
+
+  @Post('bootstrap')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Auto-create COA, fiscal year, cash accounts, tax rates, and GL mappings' })
+  bootstrapAccounting(@CurrentUser() user: IAuthUser) {
+    return this.bootstrapService.bootstrapTenant(user.tenantId, user.id);
+  }
+
+  @Post('backfill')
+  @RequirePermissions('accounting:update')
+  @ApiOperation({ summary: 'Post missing GL journals for past sales, GRNs, expenses, and AP payments' })
+  backfillAccounting(@CurrentUser() user: IAuthUser, @Query('limit') limit?: string) {
+    const n = Math.min(500, Math.max(1, Number(limit) || 200));
+    return this.postingService.backfillTenant(user.tenantId, n);
+  }
 
   @Get('accounts')
   @RequirePermissions('accounting:read')
@@ -2398,6 +2405,9 @@ export class AccountingController {
     PayrollService,
     FinancialReportsService,
     AccountingSettingsService,
+    AccountingBootstrapService,
+    AccountingPostingService,
+    AccountingAutomationListener,
   ],
   exports: [
     AccountingService,
@@ -2410,6 +2420,8 @@ export class AccountingController {
     PayrollService,
     FinancialReportsService,
     AccountingSettingsService,
+    AccountingBootstrapService,
+    AccountingPostingService,
   ],
 })
 export class AccountingModule {}
