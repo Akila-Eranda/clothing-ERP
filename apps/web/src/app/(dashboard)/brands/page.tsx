@@ -196,17 +196,20 @@ export default function BrandsPage() {
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <Button variant="outline" onClick={fetchBrands} className="h-10 rounded-[12px] gap-1.5 text-sm">
-              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-            <Button variant="outline" onClick={() => exportToCsv(brands, copy.csvFileName)} disabled={!brands.length} className="h-10 rounded-[12px] gap-1.5 text-sm">
-              <Download className="h-[18px] w-[18px]" /> Export CSV
-            </Button>
-            <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm">
-              <Upload className="h-[18px] w-[18px]" /> Import CSV
-            </Button>
-            <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-            <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="outline" onClick={fetchBrands} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+              </Button>
+              <Button variant="outline" onClick={() => exportToCsv(brands, copy.csvFileName)} disabled={!brands.length} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Download className="h-[18px] w-[18px]" /> Export CSV
+              </Button>
+              <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Upload className="h-[18px] w-[18px]" /> Import CSV
+              </Button>
+              <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
+            </div>
+            <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+            <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
               <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
             </Button>
           </div>

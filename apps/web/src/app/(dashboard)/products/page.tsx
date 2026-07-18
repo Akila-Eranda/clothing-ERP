@@ -321,20 +321,23 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={() => fetch()} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button variant="outline" onClick={() => exportToCsv(products)} className="h-10 rounded-[12px] gap-1.5 text-sm" disabled={!products.length}>
-            <Download className="h-[18px] w-[18px]" /> Export CSV
-          </Button>
-          <Button variant="outline" onClick={() => printLabels(listRows, brandName)} className="h-10 rounded-[12px] gap-1.5 text-sm" disabled={!listRows.length}>
-            <Tag className="h-[18px] w-[18px]" /> {printLabel}
-          </Button>
-          <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <Upload className="h-[18px] w-[18px]" /> Import CSV
-          </Button>
-          <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/products/new")}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => fetch()} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button variant="outline" onClick={() => exportToCsv(products)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" disabled={!products.length}>
+              <Download className="h-[18px] w-[18px]" /> Export CSV
+            </Button>
+            <Button variant="outline" onClick={() => printLabels(listRows, brandName)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" disabled={!listRows.length}>
+              <Tag className="h-[18px] w-[18px]" /> {printLabel}
+            </Button>
+            <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Upload className="h-[18px] w-[18px]" /> Import CSV
+            </Button>
+            <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button onClick={() => router.push("/products/new")} className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
             <Plus className="h-[18px] w-[18px]" /> Add New
           </Button>
         </div>
