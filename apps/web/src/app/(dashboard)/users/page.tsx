@@ -224,7 +224,7 @@ export default function UsersPage() {
           { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground",  tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
           { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary",           tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
         ].map((s) => (
-          <div key={s.label} className={`rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}>
+          <div key={s.label} className={`rounded-[18px] border bg-card h-[68px] px-4 py-2 flex flex-col justify-center overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}>
             <p className={`text-[22px] font-bold leading-none tabular-nums ${s.color}`}>{s.value}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
           </div>
