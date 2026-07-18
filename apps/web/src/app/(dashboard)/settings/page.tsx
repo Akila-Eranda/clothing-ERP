@@ -24,6 +24,12 @@ import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
+import {
+  ACCENT_PRESETS,
+  type AccentId,
+  loadStoredAccent,
+  persistAccent,
+} from "@/lib/accent-theme";
 
 type Tenant = {
   id: string; name: string; email: string; phone?: string;
@@ -348,6 +354,13 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
 export default function SettingsPage() {
   const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
+  const [accent, setAccent] = React.useState<AccentId>("blue");
+  React.useEffect(() => { setAccent(loadStoredAccent()); }, []);
+  const pickAccent = (id: AccentId) => {
+    setAccent(id);
+    persistAccent(id);
+    toast.success(`Accent set to ${ACCENT_PRESETS.find((p) => p.id === id)?.name ?? id}`);
+  };
   const { profile } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
   const [activeTab, setActiveTab] = React.useState<SettingsTab>(() =>
@@ -1165,21 +1178,56 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Palette className="h-4 w-4 text-primary" />Theme & Display</CardTitle>
-              <CardDescription>Choose your preferred color scheme</CardDescription>
+              <CardDescription>Choose light, dark, or follow the system</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-3">
                 {(["light","dark","system"] as const).map((t) => (
                   <button
                     key={t}
+                    type="button"
                     onClick={() => setTheme(t)}
-                    className={`p-4 rounded-xl border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+                    className={`p-4 rounded-[18px] border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
                   >
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-zinc-900" : t === "light" ? "bg-white border" : "bg-gradient-to-br from-white to-zinc-900"}`} />
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-[#080C14]" : t === "light" ? "bg-white border" : "bg-gradient-to-br from-white to-[#080C14]"}`} />
                     {t.charAt(0).toUpperCase() + t.slice(1)}
                     {theme === t && <Check className="h-3.5 w-3.5" />}
                   </button>
                 ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2"><Palette className="h-4 w-4 text-primary" />Accent color</CardTitle>
+              <CardDescription>Single brand accent for buttons, links, and active nav — Hexalyte presets</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {ACCENT_PRESETS.map((p) => {
+                  const selected = accent === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => pickAccent(p.id)}
+                      className={`flex items-center gap-3 rounded-[18px] border-2 p-3 text-left transition-all ${
+                        selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+                      }`}
+                    >
+                      <span
+                        className="h-9 w-9 shrink-0 rounded-full ring-2 ring-white shadow-sm"
+                        style={{ background: `linear-gradient(135deg, ${p.hex}, ${p.lightHex})` }}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-foreground">{p.name}</span>
+                        <span className="block text-[11px] font-mono text-muted-foreground">{p.hex}</span>
+                      </span>
+                      {selected && <Check className="h-4 w-4 text-primary shrink-0" />}
+                    </button>
+                  );
+                })}
               </div>
             </CardContent>
           </Card>

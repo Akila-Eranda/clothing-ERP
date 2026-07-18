@@ -129,6 +129,7 @@ function useNavGroups(): NavGroup[] {
     { label: L["/accounting/cash-bank"] ?? "Cash & Bank", href: "/accounting/cash-bank", icon: Landmark },
     { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
     { label: "Advanced Accounting", icon: Zap, sectionLabel: true },
+    { label: "Advanced Command Center", href: "/accounting/advanced", icon: Zap },
     { label: L["/accounting/vat"] ?? "VAT / Tax", href: "/accounting/vat", icon: FileText },
     { label: L["/accounting/petty-cash"] ?? "Petty Cash", href: "/accounting/petty-cash", icon: Wallet },
     { label: L["/accounting/payroll"] ?? "Payroll", href: "/accounting/payroll", icon: UserCheck },
@@ -149,6 +150,7 @@ function useNavGroups(): NavGroup[] {
       "/accounting/ar-ap",
       "/accounting/cash-bank",
       "/accounting/finance/cheques",
+      "/accounting/advanced",
       "/accounting/vat",
       "/accounting/petty-cash",
       "/accounting/payroll",
@@ -253,9 +255,9 @@ function NavBadge({ text }: { text: string }) {
   return (
     <span
       className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none"
-      style={isPOS
-        ? { color: "#C7D2FE", background: "rgba(99,102,241,0.28)" }
-        : { color: "#7DD3FC", background: "rgba(14,165,233,0.18)" }
+      style={      isPOS
+        ? { color: "#1D4ED8", background: "#EFF6FF" }
+        : { color: "#0891B2", background: "rgba(8,145,178,0.12)" }
       }
     >
       {text}
@@ -293,16 +295,19 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* Light theme: dark blue brand sidebar. Dark theme: match the near-black app surface. */
-  const bg       = darkUi ? "#050914" : "#0B1B3A";
-  const border   = darkUi ? "#141C2E" : "#1E3356";
-  const textMut  = darkUi ? "rgba(163, 178, 204, 0.72)" : "rgba(186, 208, 240, 0.72)";
-  const textFull = "#FFFFFF";
-  const hoverBg  = "rgba(99, 102, 241, 0.12)";
-  const sectLbl  = darkUi ? "rgba(130, 146, 176, 0.55)" : "rgba(148, 173, 210, 0.55)";
-  const activeBg = "rgba(99, 102, 241, 0.22)";
-  const activeFg = "#A5B4FC";
-  const logoBg   = darkUi ? "#0B1120" : "#071428";
+  /* Hexalyte sidebar — soft slate (light) / near-black navy (dark) */
+  const bg       = darkUi ? "#0A0F1A" : "#F8FAFC";
+  const border   = darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)";
+  const textMut  = darkUi ? "#94A3B8" : "#64748B";
+  const textFull = darkUi ? "#F8FAFC" : "#0F172A";
+  const hoverBg  = darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9";
+  const sectLbl  = darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8";
+  const activeBg = darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF";
+  const activeFg = darkUi ? "#BFDBFE" : "#1D4ED8";
+  const activeIcon = darkUi ? "#93C5FD" : "#2563EB";
+  const logoBg   = darkUi ? "#101827" : "#FFFFFF";
+  const planBadgeBg = darkUi ? "rgba(37,99,235,0.22)" : "#EFF6FF";
+  const planBadgeFg = darkUi ? "#93C5FD" : "#1D4ED8";
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -334,7 +339,7 @@ export function Sidebar() {
       "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none",
       sidebarCollapsed ? "h-10 w-10 justify-center mx-auto" : "h-10 w-full",
       !sidebarCollapsed && (nested ? "pl-8 pr-2.5" : "px-2.5"),
-      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-white",
+      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary",
     );
 
     const style = isActive
@@ -347,8 +352,8 @@ export function Sidebar() {
           className={cn(
             "shrink-0",
             nested && !sidebarCollapsed ? "h-3.5 w-3.5" : "h-[18px] w-[18px]",
-            isActive && "text-[#A5B4FC]",
           )}
+          style={isActive ? { color: activeIcon } : undefined}
           strokeWidth={isActive ? 2.2 : 1.75}
         />
         {!sidebarCollapsed && (
@@ -357,7 +362,7 @@ export function Sidebar() {
               className={cn(
                 "flex-1 truncate leading-none",
                 nested ? "text-[12.5px]" : "text-[13.5px]",
-                isActive ? "font-semibold text-[#A5B4FC]" : "font-medium",
+                isActive ? "font-semibold" : "font-medium",
               )}
               title={item.label}
             >
@@ -457,7 +462,7 @@ export function Sidebar() {
                       onClick={closeMobile}
                       className={cn(
                         "block px-3 py-1.5 text-xs hover:bg-accent",
-                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-[#A5B4FC]",
+                        pathMatches(pathname, child.href, peerHrefs) && "font-semibold text-primary",
                       )}
                     >
                       {child.label}
@@ -476,7 +481,7 @@ export function Sidebar() {
         <div
           className={cn(
             "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none h-10 px-2.5 w-full",
-            childActive && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-white",
+            childActive && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary",
           )}
           style={childActive
             ? { background: activeBg, color: activeFg }
@@ -494,11 +499,12 @@ export function Sidebar() {
               className="flex flex-1 items-center gap-3 min-w-0"
             >
               <Icon
-                className={cn("shrink-0 h-[18px] w-[18px]", childActive && "text-[#A5B4FC]")}
+                className="shrink-0 h-[18px] w-[18px]"
+                style={childActive ? { color: activeIcon } : undefined}
                 strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
+                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -506,11 +512,12 @@ export function Sidebar() {
           ) : (
             <button type="button" onClick={onToggle} className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer text-left">
               <Icon
-                className={cn("shrink-0 h-[18px] w-[18px]", childActive && "text-[#A5B4FC]")}
+                className="shrink-0 h-[18px] w-[18px]"
+                style={childActive ? { color: activeIcon } : undefined}
                 strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold text-[#A5B4FC]" : "font-medium")}
+                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold" : "font-medium")}
               >
                 {item.label}
               </span>
@@ -581,7 +588,7 @@ export function Sidebar() {
                 onError={() => setLogoFailed(true)}
               />
             ) : (
-              <AppLogo variant="sidebar" theme="dark" className="h-full w-full items-center justify-center" alt={APP_NAME} />
+              <AppLogo variant="sidebar" theme={darkUi ? "dark" : "light"} className="h-full w-full items-center justify-center" alt={APP_NAME} />
             )}
           </div>
 
@@ -601,7 +608,7 @@ export function Sidebar() {
                   </span>
                   <span
                     className="shrink-0 rounded-full px-1.5 py-[3px] text-[9px] font-bold uppercase tracking-wide leading-none"
-                    style={{ color: "#C7D2FE", background: "rgba(99,102,241,0.28)" }}
+                    style={{ color: planBadgeFg, background: planBadgeBg }}
                   >
                     {planLabel}
                   </span>
@@ -694,7 +701,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
-                  style={{ background: isDark ? "#6366f1" : "#1E3356" }}
+                  style={{ background: isDark ? "#2563EB" : "#CBD5E1" }}
                 >
                   <motion.span
                     className="absolute top-[3px] h-[14px] w-[14px] rounded-full bg-white shadow-sm"

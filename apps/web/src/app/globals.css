@@ -3,134 +3,169 @@
 @tailwind utilities;
 
 :root {
-  /* Premium light table tokens (react-table-craft) */
-  --tc-background: 220 40% 98.5%;
-  --tc-foreground: 224 40% 12%;
-  --tc-card: 220 40% 98.5%;
-  --tc-card-foreground: 224 40% 12%;
-  --tc-popover: 220 40% 98.5%;
-  --tc-popover-foreground: 224 40% 12%;
-  --tc-primary: 243 75% 59%;
+  /* react-table-craft — track Hexalyte surfaces */
+  --tc-background: 0 0% 100%;
+  --tc-foreground: 222 47% 11%;
+  --tc-card: 0 0% 100%;
+  --tc-card-foreground: 222 47% 11%;
+  --tc-popover: 0 0% 100%;
+  --tc-popover-foreground: 222 47% 11%;
+  --tc-primary: 217 91% 53%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 220 26% 94%;
-  --tc-secondary-foreground: 224 40% 12%;
-  --tc-muted: 220 26% 94%;
-  --tc-muted-foreground: 220 14% 42%;
-  --tc-accent: 231 100% 96.5%;
-  --tc-accent-foreground: 243 65% 45%;
-  --tc-destructive: 0 74% 51%;
+  --tc-secondary: 210 40% 98%;
+  --tc-secondary-foreground: 222 47% 11%;
+  --tc-muted: 210 40% 98%;
+  --tc-muted-foreground: 215 16% 47%;
+  --tc-accent: 214 100% 97%;
+  --tc-accent-foreground: 224 76% 48%;
+  --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 221 22% 86%;
-  --tc-input: 221 22% 86%;
-  --tc-ring: 243 75% 59%;
+  --tc-border: 214 32% 91%;
+  --tc-input: 214 32% 88%;
+  --tc-ring: 217 91% 53%;
   --tc-radius: 0.75rem;
 }
 
 .dark {
-  --tc-background: 222.2 84% 4.9%;
+  --tc-background: 220 47% 5%;
   --tc-foreground: 210 40% 98%;
-  --tc-card: 222.2 84% 4.9%;
+  --tc-card: 217 36% 11%;
   --tc-card-foreground: 210 40% 98%;
-  --tc-popover: 222.2 84% 4.9%;
+  --tc-popover: 221 45% 7%;
   --tc-popover-foreground: 210 40% 98%;
-  --tc-primary: 217.2 91.2% 59.8%;
-  --tc-primary-foreground: 222.2 47.4% 11.2%;
-  --tc-secondary: 217.2 32.6% 17.5%;
+  --tc-primary: 217 91% 53%;
+  --tc-primary-foreground: 0 0% 100%;
+  --tc-secondary: 216 47% 7%;
   --tc-secondary-foreground: 210 40% 98%;
-  --tc-muted: 217.2 32.6% 17.5%;
-  --tc-muted-foreground: 215 20.2% 65.1%;
-  --tc-accent: 217.2 32.6% 17.5%;
-  --tc-accent-foreground: 210 40% 98%;
-  --tc-destructive: 0 62.8% 30.6%;
-  --tc-destructive-foreground: 210 40% 98%;
-  --tc-border: 217.2 32.6% 17.5%;
-  --tc-input: 217.2 32.6% 17.5%;
-  --tc-ring: 224.3 76.3% 48%;
+  --tc-muted: 216 47% 7%;
+  --tc-muted-foreground: 215 20% 65%;
+  --tc-accent: 217 40% 14%;
+  --tc-accent-foreground: 213 97% 87%;
+  --tc-destructive: 0 84% 60%;
+  --tc-destructive-foreground: 0 0% 100%;
+  --tc-border: 217 25% 18%;
+  --tc-input: 217 25% 20%;
+  --tc-ring: 217 91% 60%;
 }
 
 @layer base {
   :root {
     /*
-      Premium SaaS light theme
-      Layered surfaces: cool canvas + ambient wash → near-white cards
-      Depth from soft layered shadows, not heavy borders
+      Hexalyte Design System v2 — Light
+      Clean white UI + blue accent (user-switchable via --primary*)
     */
-    --background: 221 30% 93%;          /* #E8ECF4 refined cool canvas */
-    --foreground: 224 40% 12%;          /* #12192B deep ink */
-    --card: 220 40% 98.5%;              /* #FAFBFD near-white premium surface */
-    --card-foreground: 224 40% 12%;
-    --popover: 220 40% 98.5%;
-    --popover-foreground: 224 40% 12%;
-    --primary: 243 75% 59%;             /* #4F46E5 premium indigo */
+    --background: 0 0% 100%;                 /* #FFFFFF */
+    --secondary-background: 210 40% 98%;      /* #F8FAFC */
+    --foreground: 222 47% 11%;               /* #0F172A */
+    --card: 0 0% 100%;                       /* #FFFFFF */
+    --card-foreground: 222 47% 11%;
+    --card-hover: 210 40% 98%;               /* #F8FAFC */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 217 91% 53%;                  /* #2563EB — overridable by accent */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 26% 94%;
-    --secondary-foreground: 224 40% 12%;
-    --muted: 220 26% 94%;
-    --muted-foreground: 220 14% 42%;    /* #5B6472 slate */
-    --accent: 231 100% 96.5%;           /* indigo wash */
-    --accent-foreground: 243 65% 45%;
-    --destructive: 0 74% 51%;
+    --primary-hover: 224 76% 48%;            /* #1D4ED8 */
+    --primary-light: 217 91% 60%;            /* #3B82F6 */
+    --primary-soft: 214 100% 97%;            /* #EFF6FF */
+    --primary-glow: rgba(37, 99, 235, 0.18);
+    --secondary: 210 40% 98%;
+    --secondary-foreground: 215 19% 35%;     /* #334155 */
+    --muted: 210 40% 98%;
+    --muted-foreground: 215 16% 47%;         /* #64748B */
+    --accent: 214 100% 97%;                  /* Primary Soft */
+    --accent-foreground: 224 76% 48%;
+    --destructive: 0 84% 60%;                /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
-    --success: 161 84% 32%;
+    --success: 142 76% 36%;                  /* #16A34A */
     --success-foreground: 0 0% 100%;
-    --warning: 33 95% 44%;
+    --warning: 38 92% 50%;                   /* #F59E0B */
     --warning-foreground: 0 0% 100%;
-    --border: 221 22% 86%;              /* light refined hairline */
-    --input: 221 18% 78%;               /* darker outline so inputs read clearly on cards */
-    --ring: 243 75% 59%;
-    --line: 224 30% 18%;
-    --radius: 0.75rem;
-    --radius-control: 0.625rem;
-    --chart-1: 243 75% 59%;
-    --chart-2: 161 84% 36%;
-    --chart-3: 33 95% 50%;
-    --chart-4: 271 81% 56%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 224 47% 12%;   /* #101A33 deep navy */
-    --sidebar-foreground: 217 30% 88%;
-    --sidebar-primary: 243 75% 62%;
+    --info: 199 89% 48%;                     /* #0EA5E9 */
+    --info-foreground: 0 0% 100%;
+    --border: 214 32% 91%;                   /* soft card edge ≈ rgba(15,23,42,.08) on white */
+    --border-hsl: 214 32% 91%;
+    --input: 215 20% 85%;                    /* stronger ≈ rgba(15,23,42,.12) */
+    --ring: 217 91% 53%;
+    --divider: 214 32% 94%;
+    --line: 214 32% 91%;
+    --radius: 1.125rem;                      /* 18px cards */
+    --radius-control: 0.75rem;               /* 12px inputs */
+    --chart-1: 217 91% 53%;                  /* Revenue / Primary */
+    --chart-2: 0 84% 60%;                    /* Expense */
+    --chart-3: 142 76% 36%;                  /* Profit */
+    --chart-4: 263 70% 58%;                  /* Orders */
+    --chart-5: 38 92% 50%;                   /* Customers */
+    --chart-6: 189 94% 43%;                  /* Products */
+    --sidebar-background: 210 40% 98%;       /* #F8FAFC */
+    --sidebar-foreground: 222 47% 11%;
+    --sidebar-primary: 217 91% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 226 42% 18%;
-    --sidebar-accent-foreground: 217 30% 92%;
-    --sidebar-border: 225 36% 21%;
-    --sidebar-ring: 243 75% 62%;
-    --hover: 227 60% 96%;
-    --selected: 231 100% 96.5%;
+    --sidebar-accent: 214 100% 97%;          /* active bg #EFF6FF */
+    --sidebar-accent-foreground: 224 76% 48%; /* #1D4ED8 */
+    --sidebar-border: 214 32% 91%;
+    --sidebar-ring: 217 91% 53%;
+    --sidebar-active-text: 224 76% 48%;
+    --sidebar-active-text-dark: 213 97% 87%;
+    --sidebar-active-icon-dark: 213 97% 78%;
+    --sidebar-hover: 210 40% 96%;            /* #F1F5F9 */
+    --header-background: 0 0% 100%;
+    --hover: 210 40% 98%;
+    --selected: 214 100% 97%;
   }
 
   .dark {
-    --background: 224 71% 4%;
-    --foreground: 213 31% 91%;
-    --card: 222 47% 7%;
-    --card-foreground: 213 31% 91%;
-    --popover: 224 71% 6%;
-    --popover-foreground: 213 31% 91%;
-    --primary: 239 84% 67%;
+    --background: 220 47% 5%;                /* #080C14 */
+    --secondary-background: 216 47% 7%;      /* #0A101C */
+    --foreground: 210 40% 98%;               /* #F8FAFC */
+    --card: 217 36% 11%;                     /* #101827 */
+    --card-foreground: 210 40% 98%;
+    --card-hover: 221 41% 14%;               /* #151F33 */
+    --popover: 221 45% 7%;                   /* #0A0F1A */
+    --popover-foreground: 210 40% 98%;
+    --primary: 217 91% 53%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 222 47% 11%;
-    --secondary-foreground: 213 31% 91%;
-    --muted: 223 47% 11%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 216 34% 17%;
-    --accent-foreground: 213 31% 91%;
-    --destructive: 0 63% 50%;
-    --destructive-foreground: 210 20% 98%;
-    --border: 216 34% 17%;
-    --input: 216 28% 26%;               /* lighter outline so inputs read clearly on dark cards */
-    --ring: 239 84% 67%;
-    --chart-1: 239 84% 67%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 224 71% 5%;
-    --sidebar-foreground: 213 31% 91%;
-    --sidebar-primary: 239 84% 67%;
+    --primary-hover: 224 76% 48%;
+    --primary-light: 217 91% 60%;
+    --primary-soft: 217 40% 14%;
+    --primary-glow: rgba(37, 99, 235, 0.30);
+    --secondary: 216 47% 7%;
+    --secondary-foreground: 214 32% 84%;     /* #CBD5E1 */
+    --muted: 216 47% 7%;
+    --muted-foreground: 215 20% 65%;         /* #94A3B8 */
+    --accent: 217 40% 14%;
+    --accent-foreground: 213 97% 87%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 199 89% 48%;
+    --info-foreground: 0 0% 100%;
+    --border: 217 25% 16%;                   /* soft white ~6% on navy */
+    --border-hsl: 217 25% 16%;
+    --input: 217 25% 20%;
+    --ring: 217 91% 60%;
+    --divider: 217 25% 14%;
+    --line: 217 25% 16%;
+    --chart-1: 217 91% 60%;
+    --chart-2: 0 84% 60%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 263 70% 66%;
+    --chart-5: 38 92% 50%;
+    --chart-6: 189 94% 43%;
+    --sidebar-background: 221 45% 7%;        /* #0A0F1A */
+    --sidebar-foreground: 210 40% 98%;
+    --sidebar-primary: 217 91% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 11%;
-    --sidebar-accent-foreground: 213 31% 91%;
-    --sidebar-border: 216 34% 17%;
-    --sidebar-ring: 239 84% 67%;
+    --sidebar-accent: 217 91% 53%;
+    --sidebar-accent-foreground: 213 97% 87%;
+    --sidebar-border: 217 25% 14%;
+    --sidebar-ring: 217 91% 60%;
+    --sidebar-hover: 0 0% 100%;
+    --header-background: 221 45% 7%;
+    --hover: 221 41% 14%;
+    --selected: 217 91% 53%;
   }
 }
 
@@ -152,13 +187,14 @@
     font-weight: 500;
   }
 
-  /* Premium ambient wash — faint indigo/violet glow on the canvas */
+  /* Hexalyte — flat white canvas, no purple wash */
   :root:not(.dark) body {
-    background-image:
-      radial-gradient(1200px 500px at 15% -10%, hsl(243 75% 59% / 0.055), transparent 60%),
-      radial-gradient(1000px 450px at 90% -15%, hsl(271 81% 56% / 0.04), transparent 55%),
-      linear-gradient(180deg, hsl(222 32% 95%), hsl(var(--background)) 320px);
-    background-attachment: fixed;
+    background: hsl(var(--background));
+    background-image: none;
+  }
+
+  .dark body {
+    background: hsl(var(--background));
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -199,18 +235,19 @@
 }
 
 @layer utilities {
-  /* Glass — sticky top nav matches unified surface */
+  /* Glass — header uses white / dark navy shell */
   .glass {
     backdrop-filter: blur(12px) saturate(160%);
     -webkit-backdrop-filter: blur(12px) saturate(160%);
-    background: hsl(var(--background) / 0.9);
+    background: hsl(var(--header-background) / 0.92);
     border-bottom: 1px solid hsl(var(--border));
   }
 
   .dark .glass {
-    @apply bg-background/70 border-border/50;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: hsl(var(--header-background) / 0.92);
+    border-bottom: 1px solid hsl(var(--border));
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
   }
 
   .glass-card {
@@ -244,7 +281,7 @@
 
   /* Background Gradients */
   .gradient-primary {
-    @apply bg-gradient-to-r from-primary to-violet-600;
+    background: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-hover)));
   }
 
   .gradient-success {
@@ -267,7 +304,7 @@
   /* Premium panel — near-white surface, hairline border, soft layered shadow */
   .panel-edge,
   .surface-panel {
-    @apply bg-card text-card-foreground rounded-xl border border-border/70 shadow-card;
+    @apply bg-card text-card-foreground rounded-[18px] border border-border shadow-card;
   }
   .dark .panel-edge,
   .dark .surface-panel {
@@ -369,24 +406,16 @@
     @apply bg-muted hover:bg-accent active:scale-95 cursor-pointer select-none;
   }
 
-  /* Table stripes — enterprise alternate rows */
-  .table-stripe tbody tr:nth-child(even) {
-    background: hsl(220 30% 96.5%);
-  }
+  /* Table stripes — Hexalyte: zebra off; row hover only */
+  .table-stripe tbody tr:nth-child(even),
   .table-stripe tbody tr:nth-child(odd) {
     background: transparent;
   }
   .table-stripe tbody tr:hover {
-    background: hsl(231 100% 96.5%) !important;
-  }
-  .dark .table-stripe tbody tr:nth-child(even) {
-    @apply bg-muted/30;
-  }
-  .dark .table-stripe tbody tr:nth-child(odd) {
-    @apply bg-transparent;
+    background: hsl(var(--hover)) !important;
   }
   .dark .table-stripe tbody tr:hover {
-    @apply bg-muted/50;
+    background: hsl(var(--card-hover)) !important;
   }
 
   /* ── Data tables (react-table-craft via [data-table-craft] wrapper) ──
@@ -394,13 +423,13 @@
      never shows the page canvas through, in light or dark mode. */
   [data-table-craft] {
     background: hsl(var(--card));
-    border: 1px solid hsl(var(--border) / 0.7);
+    border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
     padding: 0.75rem;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
   }
   .dark [data-table-craft] {
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.06);
     box-shadow: none;
   }
 
@@ -413,19 +442,20 @@
   [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
+    border-radius: var(--radius-control);
   }
   .dark [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
-    background: hsl(var(--secondary) / 0.6);
+    background: hsl(var(--secondary));
   }
   [data-table-craft] button[role="combobox"] {
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
   }
   .dark [data-table-craft] button[role="combobox"] {
-    background: hsl(var(--secondary) / 0.6);
+    background: hsl(var(--secondary));
   }
 
-  /* Enterprise header + row treatment */
+  /* Enterprise header + row treatment — no zebra */
   :root:not(.dark) .enterprise-table,
   :root:not(.dark) [data-table-craft] table {
     border-collapse: separate;
@@ -433,13 +463,13 @@
   }
   :root:not(.dark) .enterprise-table thead,
   :root:not(.dark) [data-table-craft] thead {
-    background: linear-gradient(180deg, hsl(222 30% 96%), hsl(220 26% 94%));
+    background: hsl(var(--secondary-background));
     position: sticky;
     top: 0;
     z-index: 1;
   }
   .dark [data-table-craft] thead {
-    background: hsl(var(--muted) / 0.5);
+    background: hsl(var(--secondary-background));
     position: sticky;
     top: 0;
     z-index: 1;
@@ -451,21 +481,24 @@
     font-size: 11.5px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: hsl(220 14% 42%);
+    color: hsl(var(--secondary-foreground));
     height: 44px;
   }
   :root:not(.dark) .enterprise-table td,
   :root:not(.dark) [data-table-craft] td {
-    border-bottom: 1px solid hsl(var(--border) / 0.45);
+    border-bottom: 1px solid hsl(var(--divider));
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
   :root:not(.dark) [data-table-craft] tbody tr:nth-child(even) {
-    background: hsl(220 30% 96.5%);
+    background: transparent;
   }
   :root:not(.dark) .enterprise-table tbody tr:hover,
   :root:not(.dark) [data-table-craft] tbody tr:hover {
-    background: hsl(231 100% 96.5%);
+    background: hsl(var(--hover));
+  }
+  .dark [data-table-craft] tbody tr:hover {
+    background: hsl(var(--card-hover));
   }
   :root:not(.dark) .enterprise-table tbody tr,
   :root:not(.dark) [data-table-craft] tbody tr {
@@ -492,9 +525,16 @@
     opacity: 1;
   }
 
-  /* Card hover — stronger black edge on lift */
+  /* Card hover — Hexalyte elevation */
   .card-hover {
-    @apply transition-all duration-150 ease-out hover:border-foreground/25 hover:-translate-y-0.5 hover:shadow-md;
+    @apply transition-all duration-150 ease-out hover:-translate-y-0.5;
+  }
+  .card-hover:hover {
+    background: hsl(var(--card-hover));
+    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
+  }
+  .dark .card-hover:hover {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
   }
 
   /* Input focus glow */
