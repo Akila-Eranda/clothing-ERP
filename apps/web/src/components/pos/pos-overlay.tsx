@@ -19,7 +19,7 @@ import { barcodeLookupCandidates, findAllProductsByBarcodeCode, findProductByBar
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
-import { getReturnReasons, variantTableColumns, variantFieldValue, variantDisplayLabel } from "@/lib/shop-vertical";
+import { getReturnReasons, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
@@ -164,8 +164,6 @@ const BASE_NAV_ITEMS = [
   { id:"reports", label:"Reports", icon: BarChart2 },
   { id:"settings", label:"Settings", icon: Settings },
 ];
-const COLOR_HEX: Record<string,string> = { black:"#1a1a1a", white:"#f0f0ef", navy:"#1e3a5f", maroon:"#7f1d1d", red:"#dc2626", blue:"#2563eb", "sky blue":"#38bdf8", beige:"#d4c5a9", green:"#16a34a", gray:"#6b7280", pink:"#ec4899", yellow:"#eab308", orange:"#f97316", brown:"#92400e", purple:"#7c3aed" };
-function getColorHex(c="") { return COLOR_HEX[c.toLowerCase()] ?? "#6b7280"; }
 function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"rgba(245,158,11,0.15)",color:"#f59e0b"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6", diamond:"#a78bfa" };
@@ -206,7 +204,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { user } = useAuthStore();
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
-  const variantCols = variantTableColumns(profile);
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
     if (posOnly && (item.id === "reports" || item.id === "settings")) return false;
     if (!item.module) return true;
@@ -241,7 +238,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [thankYouSale, setThankYouSale] = React.useState<ThankYouSale | null>(null);
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
-  const [selAttrs, setSelAttrs] = React.useState<Record<string, string | null>>({});
   const [now, setNow] = React.useState(new Date());
   const [todayStats, setTodayStats] = React.useState({ sales: 0, orders: 0, items: 0 });
   const [liked, setLiked] = React.useState<Set<string>>(new Set());
@@ -753,28 +749,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const productGroups = React.useMemo(() => { const m = new Map<string,ProductItem[]>(); for (const p of products) m.set(p.productName,[...(m.get(p.productName)||[]),p]); return m; }, [products]);
   const getVariants = React.useCallback((n:string)=>productGroups.get(n)||[], [productGroups]);
-  const getAttrValues = React.useCallback((n: string, field: 'size' | 'color' | 'material' | 'style') => {
-    const presets = variantCols.find((c) => c.field === field)?.presets ?? [];
-    const values = [...new Set(getVariants(n).map((v) => variantFieldValue(v, field)).filter(Boolean))] as string[];
-    return values.sort((a, b) => {
-      const ai = presets.indexOf(a);
-      const bi = presets.indexOf(b);
-      if (ai === -1 && bi === -1) return a.localeCompare(b);
-      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
-    });
-  }, [getVariants, variantCols]);
-  const findVariant = React.useCallback((n: string, attrs: Record<string, string | null | undefined>) =>
-    getVariants(n).find((v) =>
-      variantCols.every((col) => {
-        const sel = attrs[col.field];
-        if (!sel) return true;
-        return variantFieldValue(v, col.field) === sel;
-      }),
-    ) ?? getVariants(n)[0],
-  [getVariants, variantCols]);
-  const activeVariant = React.useMemo(() =>
-    selectedProductName ? findVariant(selectedProductName, selAttrs) : null,
-  [selectedProductName, selAttrs, findVariant]);
   const totalAmt = React.useMemo(
     () => calcPosAmountDue(
       items.map((i) => ({
@@ -1013,7 +987,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
     const finishScanOpen = (pick: ProductItem, matches?: ProductItem[]) => {
       setSelectedProductName(null);
-      setSelAttrs({});
       openAddPopup(pick, matches);
       setSearch("");
       setLastScanAt(new Date());
@@ -1765,38 +1738,11 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           )}
         </div>
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
-          <div className="w-64 border-r flex flex-col shrink-0" style={{borderColor:"#1e3356"}}>
+          <div className="flex-1 border-r flex flex-col min-w-0" style={{borderColor:"#1e3356"}}>
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
-          <div className="flex-1 flex flex-col border-r" style={{borderColor:"#1e3356"}}>
-            {selectedProductName&&activeVariant?(
-              <div className="flex h-full">
-                <div className="w-24 shrink-0 p-2 flex items-center justify-center border-r" style={{borderColor:"#1e3356"}}><PosProductThumb url={activeVariant.imageUrl} name={activeVariant.productName} className="w-full aspect-square rounded-xl overflow-hidden" fallbackBg={getCardBg(activeVariant.color)} iconClassName="h-8 w-8" /></div>
-                <div className="flex-1 p-2 flex flex-col gap-1.5 overflow-y-auto">
-                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold leading-tight">{activeVariant.productName}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{variantDisplayLabel(activeVariant, profile)}</p></div><button onClick={()=>setSelectedProductName(null)} className="p-0.5 rounded hover:bg-white/10"><X className="h-3 w-3" style={{color:"#6a8ab8"}}/></button></div>
-                  {variantCols.map((col) => {
-                    const values = selectedProductName ? getAttrValues(selectedProductName, col.field) : [];
-                    if (values.length === 0) return null;
-                    return (
-                      <div key={col.field}>
-                        <p className="text-[10px] mb-1 font-semibold" style={{color:"#6a8ab8"}}>{col.label}</p>
-                        <div className="flex gap-1 flex-wrap">
-                          {values.map((val) => col.isColor ? (
-                            <button key={val} onClick={() => setSelAttrs((a) => ({ ...a, [col.field]: val }))} title={val} className="h-5 w-5 rounded-full border-2 transition-all" style={{background:getColorHex(val),borderColor:selAttrs[col.field]===val?"#4f6ef7":"transparent"}}/>
-                          ) : (
-                            <button key={val} onClick={() => setSelAttrs((a) => ({ ...a, [col.field]: val }))} className="px-2 py-0.5 rounded text-[10px] font-bold border transition-all" style={{background:selAttrs[col.field]===val?"#4f6ef7":"#1a2b4a",color:selAttrs[col.field]===val?"#fff":"#6a8ab8",borderColor:selAttrs[col.field]===val?"#4f6ef7":"#1e3356"}}>{val}</button>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  <div className="flex items-center justify-between mt-auto"><div><p className="text-white text-sm font-bold">LKR {formatNumber(activeVariant.unitPrice)}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>Stock: {activeVariant.stock} {profile.defaultUnit}</p></div><button onClick={()=>{if(activeVariant){handleAddProduct(activeVariant);setSelectedProductName(null);}}} className="px-3 py-1.5 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>Add to Cart</button></div>
-                </div>
-              </div>
-            ):(<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><ShoppingBag className="h-12 w-12 mb-2 opacity-30"/><p className="text-base font-semibold">Products with variants open a picker</p></div>)}
-          </div>
-          <div className="w-80 flex flex-col shrink-0">
+          <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>}</div>
             <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>{
               const product = products.find((p) => p.variantId === s.variantId);

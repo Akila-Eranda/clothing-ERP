@@ -62,7 +62,6 @@ function itemOrChildActive(pathname: string, item: NavItem): boolean {
 
 /* ── Navigation structure ────────────────────────────────── */
 function useNavGroups(): NavGroup[] {
-  const { openPos } = useUIStore();
   const { user } = useAuthStore();
   const skipWorkflows = bypassesWorkflowApproval(user?.role);
   const { profile, workspace: ws } = useShopWorkspace();
@@ -165,7 +164,6 @@ function useNavGroups(): NavGroup[] {
   };
 
   const salesItems: NavItem[] = [
-    { label: "Point of Sale", icon: ShoppingCart, badge: "POS", action: openPos },
     { label: L["/sales"], href: "/sales", icon: History },
     ...(hasShopModule(profile, "quotations") ? [{ label: L["/quotations"], href: "/quotations", icon: FileText }] : []),
     ...(hasShopModule(profile, "returns") ? [{ label: L["/returns"], href: "/returns", icon: RotateCcw }] : []),
@@ -201,6 +199,7 @@ function useNavGroups(): NavGroup[] {
       title: S.overview,
       items: [
         { label: L["/dashboard"], href: "/dashboard", icon: LayoutDashboard },
+        { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
         { label: L["/notifications"] ?? "Notifications", href: "/notifications", icon: Bell },
       ],
     },
@@ -220,7 +219,6 @@ function useNavGroups(): NavGroup[] {
       title: S.finance,
       items: [
         accountingItem,
-        { label: L["/calendar"] ?? "Business Calendar", href: "/calendar", icon: CalendarDays },
         { label: L["/cash"] ?? "Cash Registers", href: "/cash", icon: Banknote },
         { label: L["/expenses"], href: "/expenses", icon: TrendingDown },
         { label: L["/analytics"], href: "/analytics", icon: BarChart3 },
