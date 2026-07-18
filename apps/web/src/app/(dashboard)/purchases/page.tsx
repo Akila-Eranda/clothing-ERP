@@ -181,15 +181,18 @@ export default function PurchasesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchPOs} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button variant="outline" asChild className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <Link href="/purchases/grn">
-              <PackageCheck className="h-[18px] w-[18px]" /> GRN History
-            </Link>
-          </Button>
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/purchases/new")}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={fetchPOs} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button variant="outline" asChild className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Link href="/purchases/grn">
+                <PackageCheck className="h-[18px] w-[18px]" /> GRN History
+              </Link>
+            </Button>
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => router.push("/purchases/new")}>
             <Plus className="h-[18px] w-[18px]" /> New Purchase Order
           </Button>
         </div>

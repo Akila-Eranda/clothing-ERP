@@ -186,22 +186,25 @@ export default function GrnPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button
-            variant="outline"
-            onClick={load}
-            disabled={loading}
-            className="h-10 rounded-[12px] gap-1.5 text-sm"
-          >
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button
-            variant="outline"
-            className="h-10 rounded-[12px] gap-1.5 text-sm"
-            onClick={() => setAddOpen(true)}
-          >
-            <Plus className="h-[18px] w-[18px]" /> Quick GRN (no PO)
-          </Button>
-          <Button asChild className="h-10 rounded-[12px] gap-1.5 text-sm">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              onClick={load}
+              disabled={loading}
+              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
+            >
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
+              onClick={() => setAddOpen(true)}
+            >
+              <Plus className="h-[18px] w-[18px]" /> Quick GRN (no PO)
+            </Button>
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button asChild className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
             <Link href="/purchases">
               <ShoppingBag className="h-[18px] w-[18px]" /> Receive from PO
             </Link>

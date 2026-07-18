@@ -575,24 +575,29 @@ export default function ServicesPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm">
-              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-            <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
-              <Link href="/job-cards"><ClipboardList className="h-[18px] w-[18px]" /> Job Cards</Link>
-            </Button>
-            <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
-              <Link href="/appointments"><Clock className="h-[18px] w-[18px]" /> Appointments</Link>
-            </Button>
-            {tab === "services" && services.length === 0 && (
-              <Button variant="outline" onClick={seedServices} className="h-10 rounded-[12px] gap-1.5 text-sm">
-                <Package className="h-[18px] w-[18px]" /> Load Defaults
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
               </Button>
-            )}
+              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+                <Link href="/job-cards"><ClipboardList className="h-[18px] w-[18px]" /> Job Cards</Link>
+              </Button>
+              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+                <Link href="/appointments"><Clock className="h-[18px] w-[18px]" /> Appointments</Link>
+              </Button>
+              {tab === "services" && services.length === 0 && (
+                <Button variant="outline" onClick={seedServices} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                  <Package className="h-[18px] w-[18px]" /> Load Defaults
+                </Button>
+              )}
+            </div>
             {primaryLabel && (
-              <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={primaryAction}>
-                <Plus className="h-[18px] w-[18px]" /> {primaryLabel}
-              </Button>
+              <>
+                <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={primaryAction}>
+                  <Plus className="h-[18px] w-[18px]" /> {primaryLabel}
+                </Button>
+              </>
             )}
           </div>
         </div>

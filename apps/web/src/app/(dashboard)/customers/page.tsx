@@ -258,21 +258,24 @@ export default function CustomersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchCustomers} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={fetchCustomers} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => exportCsv(customers)}
+              disabled={!customers.length}
+              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
+            >
+              <Download className="h-[18px] w-[18px]" />
+              Export
+            </Button>
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
           <Button
-            variant="outline"
-            onClick={() => exportCsv(customers)}
-            disabled={!customers.length}
-            className="h-10 rounded-[12px] gap-1.5 text-sm"
-          >
-            <Download className="h-[18px] w-[18px]" />
-            Export
-          </Button>
-          <Button
-            className="h-10 rounded-[12px] gap-1.5 text-sm shadow-button"
+            className="h-10 rounded-[12px] gap-1.5 text-sm px-4 shadow-button"
             onClick={() => {
               setEditCustomer(undefined);
               setAddOpen(true);

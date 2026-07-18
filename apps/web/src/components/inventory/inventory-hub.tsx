@@ -622,32 +622,37 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           <h1 className="text-2xl font-bold">{meta.title}</h1>
           <p className="text-sm text-muted-foreground">{sectionSubtitle}</p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={fetchData} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          {section === "stock" && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
-                <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
-                <ArrowLeftRight className="h-3.5 w-3.5" /> Stock Transfer
-              </Button>
-              {(showBatch || showExpiry) && (
-                <Button variant="outline" size="sm" onClick={() => router.push("/inventory/expiry")} className="gap-1.5">
-                  <Clock className="h-3.5 w-3.5" /> Expiry Dashboard
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={fetchData} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            {section === "stock" && (
+              <>
+                <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                  <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
                 </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => router.push("/warehouse")} className="gap-1.5">
-                <Layers className="h-3.5 w-3.5" /> Warehouses
+                <Button variant="outline" onClick={() => setTransferOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                  <ArrowLeftRight className="h-[18px] w-[18px]" /> Stock Transfer
+                </Button>
+                {(showBatch || showExpiry) && (
+                  <Button variant="outline" onClick={() => router.push("/inventory/expiry")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                    <Clock className="h-[18px] w-[18px]" /> Expiry Dashboard
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => router.push("/warehouse")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                  <Layers className="h-[18px] w-[18px]" /> Warehouses
+                </Button>
+              </>
+            )}
+          </div>
+          {section === "transfers" && (
+            <>
+              <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+              <Button onClick={() => setTransferOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
+                <Plus className="h-[18px] w-[18px]" /> New Transfer
               </Button>
             </>
-          )}
-          {section === "transfers" && (
-            <Button size="sm" onClick={() => setTransferOpen(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> New Transfer
-            </Button>
           )}
         </div>
       </div>

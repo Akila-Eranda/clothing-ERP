@@ -297,12 +297,13 @@ export function FinancialPeriodsHub() {
             {profile.label} · Phase 01 Sprint 2 · Fiscal years, open/close, year-end
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => setShowCreate(true)}>
-            <Plus className="h-3.5 w-3.5" /> New Fiscal Year
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setShowCreate(true)}>
+            <Plus className="h-[18px] w-[18px]" /> New Fiscal Year
           </Button>
         </div>
       </div>

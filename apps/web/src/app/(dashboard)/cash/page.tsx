@@ -522,16 +522,17 @@ export default function CashManagementPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap shrink-0">
-              <Button variant="outline" onClick={() => void refresh()} className="h-10 w-10 rounded-[12px] p-0">
-                <RefreshCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} />
+              <Button variant="outline" onClick={() => void refresh()} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <RefreshCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} /> Refresh
               </Button>
+              <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
               {!shiftOpen && !shiftPending && (
-                <Button className="h-10 rounded-[12px] gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
+                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4 bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
                   <Plus className="h-[18px] w-[18px]" /> Start Shift
                 </Button>
               )}
               {shiftOpen && (
-                <Button className="h-10 rounded-[12px] gap-1.5 text-sm bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
+                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
                   <StopCircle className="h-[18px] w-[18px]" /> Cash Close
                 </Button>
               )}

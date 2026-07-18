@@ -407,22 +407,25 @@ export default function ProcurementHubPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button variant="outline" onClick={() => setQuickGrnOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <Zap className="h-[18px] w-[18px] text-amber-500" /> Quick GRN
-          </Button>
-          <Button variant="outline" onClick={() => setInvoiceOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <FileText className="h-[18px] w-[18px]" /> Post Invoice
-          </Button>
-          <Button variant="outline" onClick={() => { setPayInvoiceId(undefined); setPayOpen(true); }} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <Wallet className="h-[18px] w-[18px]" /> Pay Invoice
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm">
-            <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
-          </Button>
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/purchases/new")}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
+            </Button>
+            <Button variant="outline" onClick={() => setQuickGrnOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Zap className="h-[18px] w-[18px] text-amber-500" /> Quick GRN
+            </Button>
+            <Button variant="outline" onClick={() => setInvoiceOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <FileText className="h-[18px] w-[18px]" /> Post Invoice
+            </Button>
+            <Button variant="outline" onClick={() => { setPayInvoiceId(undefined); setPayOpen(true); }} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Wallet className="h-[18px] w-[18px]" /> Pay Invoice
+            </Button>
+            <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
+            </Button>
+          </div>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => router.push("/purchases/new")}>
             <Plus className="h-[18px] w-[18px]" /> New PO
           </Button>
         </div>

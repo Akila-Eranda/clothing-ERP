@@ -289,10 +289,10 @@ export default function WorkflowsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchTasks} className="h-10 rounded-[12px] gap-1.5 text-sm">
+          <Button variant="outline" onClick={fetchTasks} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
+          <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
             <Link href="/purchases"><ExternalLink className="h-[18px] w-[18px]" /> Purchases</Link>
           </Button>
         </div>

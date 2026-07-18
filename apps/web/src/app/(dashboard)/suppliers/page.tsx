@@ -183,10 +183,11 @@ export default function SuppliersPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchSuppliers} className="h-10 rounded-[12px] gap-1.5 text-sm">
+          <Button variant="outline" onClick={fetchSuppliers} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/suppliers/new")}>
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => router.push("/suppliers/new")}>
             <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
           </Button>
         </div>

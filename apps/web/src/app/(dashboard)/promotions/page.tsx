@@ -157,12 +157,13 @@ export default function PromotionsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Promotions & Coupons</h1>
           <p className="text-muted-foreground text-sm mt-1">Create and manage discount coupons and offers</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="gradient" className="gap-2" onClick={openCreate}>
-            <Plus className="h-4 w-4" /> Create Promo
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
+          <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={openCreate}>
+            <Plus className="h-[18px] w-[18px]" /> Create Promo
           </Button>
         </div>
       </div>
