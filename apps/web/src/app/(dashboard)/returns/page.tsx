@@ -897,11 +897,11 @@ export default function ReturnsPage() {
           <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Returns & Exchanges</h1>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">Manage product returns, refunds, and exchanges</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchReturns} className="h-10 rounded-[12px] gap-1.5 text-sm">
+        <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchReturns} className="h-10 min-w-[110px] rounded-[12px] gap-1.5 text-sm">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => setAddOpen(true)}>
+          <Button onClick={() => setAddOpen(true)} className="h-10 min-w-[140px] rounded-[12px] gap-1.5 text-sm">
             <Plus className="h-[18px] w-[18px]" /> New Request
           </Button>
         </div>

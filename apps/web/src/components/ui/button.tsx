@@ -11,9 +11,9 @@ const buttonVariants = cva(
         default:
           "bg-gradient-to-b from-[hsl(var(--primary-light))] to-[hsl(var(--primary))] text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-[hsl(var(--primary))] hover:to-[hsl(var(--primary-hover))] hover:shadow-[0_4px_14px_hsl(var(--primary)/0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] active:shadow-none",
         outline:
-          "border border-black/[0.08] bg-white text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)] [&_svg]:text-muted-foreground hover:border-primary/30 hover:text-[hsl(var(--primary-hover))] hover:bg-[hsl(var(--primary-soft))] hover:[&_svg]:text-[hsl(var(--primary-hover))] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/10 dark:bg-card dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))] dark:hover:text-foreground dark:hover:border-white/20 dark:hover:[&_svg]:text-foreground",
+          "border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] [&_svg]:text-slate-500 hover:border-primary/35 hover:text-[hsl(var(--primary-hover))] hover:bg-[hsl(var(--primary-soft))] hover:[&_svg]:text-[hsl(var(--primary-hover))] hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/12 dark:bg-card dark:text-foreground dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))] dark:hover:border-white/25 dark:hover:[&_svg]:text-foreground",
         secondary:
-          "border border-black/[0.08] bg-white text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.05)] [&_svg]:text-muted-foreground hover:bg-[#F8FAFC] hover:border-black/[0.14] hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/10 dark:bg-secondary dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))]",
+          "border border-slate-200 bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.06)] [&_svg]:text-slate-500 hover:bg-[#F8FAFC] hover:border-slate-300 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/12 dark:bg-secondary dark:text-foreground dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))]",
         ghost: "font-medium hover:bg-[hsl(var(--primary-soft))] hover:text-[hsl(var(--primary-hover))] active:scale-[0.98] dark:hover:bg-white/[0.04]",
         link: "font-medium text-primary underline-offset-4 hover:underline",
         gradient:
@@ -52,7 +52,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
-        className={cn(buttonVariants({ variant, size, className }))}
+        className={cn(buttonVariants({ variant, size }), className)}
         ref={ref}
         {...props}
       />
