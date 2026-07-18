@@ -3,26 +3,26 @@
 @tailwind utilities;
 
 :root {
-  /* Enterprise light table tokens (react-table-craft) */
-  --tc-background: 220 28% 97%;
-  --tc-foreground: 220 39% 11%;
-  --tc-card: 220 28% 97%;
-  --tc-card-foreground: 220 39% 11%;
-  --tc-popover: 220 28% 97%;
-  --tc-popover-foreground: 220 39% 11%;
-  --tc-primary: 239 84% 67%;
+  /* Premium light table tokens (react-table-craft) */
+  --tc-background: 220 40% 98.5%;
+  --tc-foreground: 224 40% 12%;
+  --tc-card: 220 40% 98.5%;
+  --tc-card-foreground: 224 40% 12%;
+  --tc-popover: 220 40% 98.5%;
+  --tc-popover-foreground: 224 40% 12%;
+  --tc-primary: 243 75% 59%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 220 22% 93%;
-  --tc-secondary-foreground: 220 39% 11%;
-  --tc-muted: 220 22% 93%;
-  --tc-muted-foreground: 220 9% 42%;
-  --tc-accent: 226 100% 97%;
-  --tc-accent-foreground: 239 84% 40%;
-  --tc-destructive: 0 84% 60%;
+  --tc-secondary: 220 26% 94%;
+  --tc-secondary-foreground: 224 40% 12%;
+  --tc-muted: 220 26% 94%;
+  --tc-muted-foreground: 220 14% 42%;
+  --tc-accent: 231 100% 96.5%;
+  --tc-accent-foreground: 243 65% 45%;
+  --tc-destructive: 0 74% 51%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 220 18% 80%;
-  --tc-input: 220 16% 84%;
-  --tc-ring: 239 84% 67%;
+  --tc-border: 221 22% 86%;
+  --tc-input: 221 22% 86%;
+  --tc-ring: 243 75% 59%;
   --tc-radius: 0.75rem;
 }
 
@@ -51,50 +51,51 @@
 @layer base {
   :root {
     /*
-      Soft light theme — less pure white glare
-      Canvas: cooler gray | Cards: soft blue-gray (not #fff)
+      Premium SaaS light theme
+      Layered surfaces: cool canvas + ambient wash → near-white cards
+      Depth from soft layered shadows, not heavy borders
     */
-    --background: 220 26% 91%;          /* #E4EAF3 page canvas */
-    --foreground: 222 47% 11%;          /* #111827 ink */
-    --card: 220 28% 97%;                /* #F3F6FA soft panels — not pure white */
-    --card-foreground: 222 47% 11%;
-    --popover: 220 28% 97%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 239 84% 67%;             /* #6366F1 indigo */
+    --background: 221 30% 93%;          /* #E8ECF4 refined cool canvas */
+    --foreground: 224 40% 12%;          /* #12192B deep ink */
+    --card: 220 40% 98.5%;              /* #FAFBFD near-white premium surface */
+    --card-foreground: 224 40% 12%;
+    --popover: 220 40% 98.5%;
+    --popover-foreground: 224 40% 12%;
+    --primary: 243 75% 59%;             /* #4F46E5 premium indigo */
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 22% 93%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 22% 93%;
-    --muted-foreground: 220 10% 40%;
-    --accent: 226 100% 97%;
-    --accent-foreground: 239 84% 40%;
-    --destructive: 0 84% 55%;
+    --secondary: 220 26% 94%;
+    --secondary-foreground: 224 40% 12%;
+    --muted: 220 26% 94%;
+    --muted-foreground: 220 14% 42%;    /* #5B6472 slate */
+    --accent: 231 100% 96.5%;           /* indigo wash */
+    --accent-foreground: 243 65% 45%;
+    --destructive: 0 74% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 39%;
+    --success: 161 84% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 48%;
+    --warning: 33 95% 44%;
     --warning-foreground: 0 0% 100%;
-    --border: 220 18% 80%;
-    --input: 220 20% 95%;               /* inputs slightly softer than pure white */
-    --ring: 239 84% 67%;
-    --line: 222 30% 18%;
+    --border: 221 22% 86%;              /* light refined hairline */
+    --input: 221 22% 86%;
+    --ring: 243 75% 59%;
+    --line: 224 30% 18%;
     --radius: 0.75rem;
     --radius-control: 0.625rem;
-    --chart-1: 239 84% 67%;
-    --chart-2: 160 84% 39%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 65% 60%;
+    --chart-1: 243 75% 59%;
+    --chart-2: 161 84% 36%;
+    --chart-3: 33 95% 50%;
+    --chart-4: 271 81% 56%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 217 68% 13%;
-    --sidebar-foreground: 213 40% 92%;
-    --sidebar-primary: 239 84% 67%;
+    --sidebar-background: 224 47% 12%;   /* #101A33 deep navy */
+    --sidebar-foreground: 217 30% 88%;
+    --sidebar-primary: 243 75% 62%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 55% 18%;
-    --sidebar-accent-foreground: 213 40% 92%;
-    --sidebar-border: 217 47% 23%;
-    --sidebar-ring: 239 84% 67%;
-    --hover: 220 40% 95%;
-    --selected: 226 100% 97%;
+    --sidebar-accent: 226 42% 18%;
+    --sidebar-accent-foreground: 217 30% 92%;
+    --sidebar-border: 225 36% 21%;
+    --sidebar-ring: 243 75% 62%;
+    --hover: 227 60% 96%;
+    --selected: 231 100% 96.5%;
   }
 
   .dark {
@@ -149,6 +150,15 @@
     text-rendering: optimizeLegibility;
     line-height: 1.55;
     font-weight: 500;
+  }
+
+  /* Premium ambient wash — faint indigo/violet glow on the canvas */
+  :root:not(.dark) body {
+    background-image:
+      radial-gradient(1200px 500px at 15% -10%, hsl(243 75% 59% / 0.055), transparent 60%),
+      radial-gradient(1000px 450px at 90% -15%, hsl(271 81% 56% / 0.04), transparent 55%),
+      linear-gradient(180deg, hsl(222 32% 95%), hsl(var(--background)) 320px);
+    background-attachment: fixed;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -254,10 +264,14 @@
     @apply p-4 md:p-6 space-y-5 md:space-y-6 max-w-[1600px] mx-auto;
   }
 
-  /* White panel with full visible border + soft shadow */
+  /* Premium panel — near-white surface, hairline border, soft layered shadow */
   .panel-edge,
   .surface-panel {
-    @apply bg-card text-card-foreground rounded-xl border border-border shadow-none;
+    @apply bg-card text-card-foreground rounded-xl border border-border/70 shadow-card;
+  }
+  .dark .panel-edge,
+  .dark .surface-panel {
+    @apply shadow-none;
   }
 
   /* Horizontal rule / section divider */
@@ -357,13 +371,13 @@
 
   /* Table stripes — enterprise alternate rows */
   .table-stripe tbody tr:nth-child(even) {
-    background: hsl(var(--muted));
+    background: hsl(220 30% 96.5%);
   }
   .table-stripe tbody tr:nth-child(odd) {
     background: transparent;
   }
   .table-stripe tbody tr:hover {
-    background: #eef4ff !important;
+    background: hsl(231 100% 96.5%) !important;
   }
   .dark .table-stripe tbody tr:nth-child(even) {
     @apply bg-muted/30;
@@ -385,7 +399,7 @@
   :root:not(.dark) .enterprise-table thead,
   :root:not(.dark) [data-table-craft] thead,
   :root:not(.dark) .rtc-table thead {
-    background: hsl(var(--muted));
+    background: linear-gradient(180deg, hsl(222 30% 96%), hsl(220 26% 94%));
     position: sticky;
     top: 0;
     z-index: 1;
@@ -395,27 +409,32 @@
   :root:not(.dark) .rtc-table th {
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
-    font-size: 12px;
+    font-size: 11.5px;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #6b7280;
+    letter-spacing: 0.05em;
+    color: hsl(220 14% 42%);
     height: 44px;
   }
   :root:not(.dark) .enterprise-table td,
   :root:not(.dark) [data-table-craft] td,
   :root:not(.dark) .rtc-table td {
-    border-bottom: 1px solid hsl(var(--border) / 0.55);
+    border-bottom: 1px solid hsl(var(--border) / 0.45);
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
   :root:not(.dark) [data-table-craft] tbody tr:nth-child(even),
   :root:not(.dark) .rtc-table tbody tr:nth-child(even) {
-    background: hsl(var(--muted) / 0.65);
+    background: hsl(220 30% 96.5%);
   }
   :root:not(.dark) .enterprise-table tbody tr:hover,
   :root:not(.dark) [data-table-craft] tbody tr:hover,
   :root:not(.dark) .rtc-table tbody tr:hover {
-    background: #eef4ff;
+    background: hsl(231 100% 96.5%);
+  }
+  :root:not(.dark) .enterprise-table tbody tr,
+  :root:not(.dark) [data-table-craft] tbody tr,
+  :root:not(.dark) .rtc-table tbody tr {
+    transition: background-color 0.12s ease;
   }
 
   /* Animated border */
