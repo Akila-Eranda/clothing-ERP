@@ -167,10 +167,10 @@ export default function GrnPage() {
   }).length;
 
   const STATS = [
-    { label: "Total GRNs", value: grns.length, icon: PackageCheck, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Today", value: today, icon: Zap, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "From PO", value: fromPo, icon: ShoppingBag, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Quick / Direct", value: quickOrDirect, icon: PackageCheck, color: "text-violet-500", bg: "bg-violet-500/10" },
+    { label: "Total GRNs", value: grns.length, icon: PackageCheck, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Today", value: today, icon: Zap, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "From PO", value: fromPo, icon: ShoppingBag, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Quick / Direct", value: quickOrDirect, icon: PackageCheck, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
   ];
 
   return (
@@ -214,7 +214,7 @@ export default function GrnPage() {
         {STATS.map((s) => (
           <Card
             key={s.label}
-            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
           >
             <CardContent className="h-[68px] p-4 flex items-center gap-3">
               <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>

@@ -217,12 +217,12 @@ export default function ExpensesPage() {
         {/* ── KPI Cards — compact ─────────────────────────────────────────── */}
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           {([
-            { label: "Total Expenses",    value: `LKR ${formatNumber(total)}`,   icon: TrendingDown, bg: "bg-red-500",    sub: `${expenses.length} entries in period` },
-            { label: "Average per Entry", value: `LKR ${formatNumber(avg)}`,     icon: Activity,     bg: "bg-amber-500",  sub: "Per recorded expense" },
-            { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry" },
-            { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories` },
-          ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string }[]).map((kpi) => (
-            <Card key={kpi.label} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            { label: "Total Expenses",    value: `LKR ${formatNumber(total)}`,   icon: TrendingDown, bg: "bg-red-500",    sub: `${expenses.length} entries in period`, tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
+            { label: "Average per Entry", value: `LKR ${formatNumber(avg)}`,     icon: Activity,     bg: "bg-amber-500",  sub: "Per recorded expense", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+            { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry", tint: "border-purple-200/70 bg-gradient-to-br from-purple-50 to-white dark:border-purple-500/20 dark:from-purple-500/10 dark:to-transparent" },
+            { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories`, tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+          ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string; tint: string }[]).map((kpi) => (
+            <Card key={kpi.label} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${kpi.tint}`}>
               <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
                 <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${kpi.bg}`}><kpi.icon className="h-[18px] w-[18px] text-white" /></div>
                 <div className="min-w-0">

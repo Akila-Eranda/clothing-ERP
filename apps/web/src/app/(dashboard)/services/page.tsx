@@ -518,33 +518,33 @@ export default function ServicesPage() {
   const STATS = useMemo(() => {
     if (tab === "services") {
       return [
-        { label: "Total Services", value: services.length, icon: Wrench, color: "text-blue-500", bg: "bg-blue-500/10" },
-        { label: "Active", value: services.filter((s) => s.isActive).length, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Categories", value: new Set(services.map((s) => s.category)).size, icon: Package, color: "text-violet-500", bg: "bg-violet-500/10" },
-        { label: "Avg. Price", value: `LKR ${formatNumber(Math.round(avgPrice))}`, icon: Banknote, color: "text-amber-500", bg: "bg-amber-500/10" },
+        { label: "Total Services", value: services.length, icon: Wrench, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+        { label: "Active", value: services.filter((s) => s.isActive).length, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+        { label: "Categories", value: new Set(services.map((s) => s.category)).size, icon: Package, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+        { label: "Avg. Price", value: `LKR ${formatNumber(Math.round(avgPrice))}`, icon: Banknote, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
       ];
     }
     if (tab === "reminders") {
       return [
-        { label: "Total Reminders", value: reminders.length, icon: Bell, color: "text-blue-500", bg: "bg-blue-500/10" },
-        { label: "Pending", value: pendingReminders, icon: Clock, color: "text-amber-500", bg: "bg-amber-500/10" },
-        { label: "Sent", value: reminders.filter((r) => r.status === "SENT").length, icon: Send, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Failed", value: reminders.filter((r) => r.status === "FAILED").length, icon: Bell, color: "text-red-500", bg: "bg-red-500/10" },
+        { label: "Total Reminders", value: reminders.length, icon: Bell, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+        { label: "Pending", value: pendingReminders, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+        { label: "Sent", value: reminders.filter((r) => r.status === "SENT").length, icon: Send, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+        { label: "Failed", value: reminders.filter((r) => r.status === "FAILED").length, icon: Bell, color: "text-red-600", bg: "bg-red-500/15", tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
       ];
     }
     if (tab === "fleet") {
       return [
-        { label: "Fleet Accounts", value: fleetCustomers.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
-        { label: "Retail Customers", value: customers.length - fleetCustomers.length, icon: Users, color: "text-violet-500", bg: "bg-violet-500/10" },
-        { label: "Total Customers", value: customers.length, icon: Users, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-        { label: "Fleet %", value: customers.length ? `${Math.round((fleetCustomers.length / customers.length) * 100)}%` : "0%", icon: Banknote, color: "text-amber-500", bg: "bg-amber-500/10" },
+        { label: "Fleet Accounts", value: fleetCustomers.length, icon: Users, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+        { label: "Retail Customers", value: customers.length - fleetCustomers.length, icon: Users, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+        { label: "Total Customers", value: customers.length, icon: Users, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+        { label: "Fleet %", value: customers.length ? `${Math.round((fleetCustomers.length / customers.length) * 100)}%` : "0%", icon: Banknote, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
       ];
     }
     return [
-      { label: "Total Serials", value: serials.length, icon: Hash, color: "text-blue-500", bg: "bg-blue-500/10" },
-      { label: "In Stock", value: inStockSerials, icon: Package, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-      { label: "Sold", value: serials.filter((s) => s.status === "SOLD").length, icon: CheckCircle2, color: "text-violet-500", bg: "bg-violet-500/10" },
-      { label: "Claimed", value: serials.filter((s) => s.status === "CLAIMED").length, icon: Hash, color: "text-amber-500", bg: "bg-amber-500/10" },
+      { label: "Total Serials", value: serials.length, icon: Hash, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+      { label: "In Stock", value: inStockSerials, icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+      { label: "Sold", value: serials.filter((s) => s.status === "SOLD").length, icon: CheckCircle2, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+      { label: "Claimed", value: serials.filter((s) => s.status === "CLAIMED").length, icon: Hash, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
     ];
   }, [tab, services, reminders, customers, fleetCustomers, serials, avgPrice, pendingReminders, inStockSerials]);
 
@@ -622,7 +622,7 @@ export default function ServicesPage() {
           {STATS.map((s) => (
             <Card
               key={s.label}
-              className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+              className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
             >
               <CardContent className="h-[68px] p-4 flex items-center gap-3">
                 <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>

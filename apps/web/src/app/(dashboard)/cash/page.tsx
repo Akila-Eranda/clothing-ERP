@@ -387,6 +387,11 @@ export default function CashManagementPage() {
       value: isViewingToday && shiftOpen ? "Open" : isViewingToday && shiftPending ? "Pending" : `${today?.closedToday ?? 0} closed`,
       icon: isViewingToday && shiftOpen ? CheckCircle2 : Clock,
       bg: isViewingToday && shiftOpen ? "bg-emerald-600" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
+      tint: isViewingToday && shiftOpen
+        ? "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent"
+        : isViewingToday && shiftPending
+          ? "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent"
+          : "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
       sub: isViewingToday && shiftOpen
         ? `Opened LKR ${formatNumber(active?.openingCash ?? 0)}`
         : isViewingToday && shiftPending
@@ -398,6 +403,7 @@ export default function CashManagementPage() {
       value: `LKR ${formatNumber(periodExpected)}`,
       icon: DollarSign,
       bg: "bg-blue-600",
+      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
       sub: isViewingToday && shiftOpen ? "Live · updates from POS" : rangeLabel,
     },
     {
@@ -405,6 +411,9 @@ export default function CashManagementPage() {
       value: `LKR ${formatNumber(Math.abs(today?.difference ?? 0))}`,
       icon: Activity,
       bg: (today?.difference ?? 0) < 0 ? "bg-red-500" : "bg-teal-600",
+      tint: (today?.difference ?? 0) < 0
+        ? "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent"
+        : "border-teal-200/70 bg-gradient-to-br from-teal-50 to-white dark:border-teal-500/20 dark:from-teal-500/10 dark:to-transparent",
       sub: (today?.difference ?? 0) >= 0 ? "Over / balanced" : "Short count",
     },
     {
@@ -412,6 +421,7 @@ export default function CashManagementPage() {
       value: String(today?.pendingApproval ?? varianceReport?.pendingApproval ?? 0),
       icon: AlertTriangle,
       bg: "bg-orange-500",
+      tint: "border-orange-200/70 bg-gradient-to-br from-orange-50 to-white dark:border-orange-500/20 dark:from-orange-500/10 dark:to-transparent",
       sub: rangeLabel,
     },
   ];
@@ -625,7 +635,7 @@ export default function CashManagementPage() {
                   <Card key={i} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]"><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
                 ))
               : KPI.map((kpi) => (
-                  <Card key={kpi.label} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+                  <Card key={kpi.label} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${kpi.tint}`}>
                     <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
                       <div className={cn(kpi.bg, "h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0")}>
                         <kpi.icon className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />

@@ -760,10 +760,10 @@ export default function ReturnsPage() {
     .reduce((s, r) => s + r.refundAmount, 0);
 
   const STATS = [
-    { label: "Total",         value: returns.length,                                                   color: "text-foreground",   bg: "bg-muted/40",         icon: RotateCcw },
-    { label: "Exchanges",     value: returns.filter((r) => r.returnType === "EXCHANGE").length,        color: "text-violet-500",   bg: "bg-violet-500/10",    icon: ArrowLeftRight },
-    { label: "Pending",       value: returns.filter((r) => r.status === "INITIATED").length,           color: "text-amber-500",    bg: "bg-amber-500/10",     icon: Clock },
-    { label: "Total Refunded",value: `LKR ${formatNumber(totalRefunded)}`,                             color: "text-blue-500",     bg: "bg-blue-500/10",      icon: DollarSign },
+    { label: "Total",         value: returns.length,                                                   color: "text-foreground",   bg: "bg-muted/40",         icon: RotateCcw, tint: "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent" },
+    { label: "Exchanges",     value: returns.filter((r) => r.returnType === "EXCHANGE").length,        color: "text-violet-600",   bg: "bg-violet-500/15",    icon: ArrowLeftRight, tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Pending",       value: returns.filter((r) => r.status === "INITIATED").length,           color: "text-amber-600",    bg: "bg-amber-500/15",     icon: Clock, tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "Total Refunded",value: `LKR ${formatNumber(totalRefunded)}`,                             color: "text-blue-600",     bg: "bg-blue-500/15",      icon: DollarSign, tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
   ];
 
   const columns: ColumnDef<ReturnRecord>[] = [
@@ -912,7 +912,7 @@ export default function ReturnsPage() {
         {STATS.map((s) => (
           <Card
             key={s.label}
-            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
           >
             <CardContent className="h-[68px] p-4 flex items-center gap-3">
               <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>

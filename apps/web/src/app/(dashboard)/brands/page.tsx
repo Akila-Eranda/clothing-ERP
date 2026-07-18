@@ -215,19 +215,19 @@ export default function BrandsPage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
             <p className="text-[22px] font-bold leading-none tabular-nums">{brands.length}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total {copy.plural}</p>
           </div>
-          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
-            <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-500">{activeCount}</p>
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+            <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-600">{activeCount}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Active</p>
           </div>
-          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
             <p className="text-[22px] font-bold leading-none tabular-nums text-muted-foreground">{inactiveCount}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Inactive</p>
           </div>
-          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent">
             <p className="text-[22px] font-bold leading-none tabular-nums text-primary">{totalProducts}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total {workspace.productLabel}</p>
           </div>

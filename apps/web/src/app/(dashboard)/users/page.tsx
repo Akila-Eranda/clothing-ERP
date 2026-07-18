@@ -219,12 +219,12 @@ export default function UsersPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: "Total Users",   value: users.length,                   color: "text-foreground" },
-          { label: "Active",        value: activeCount,                    color: "text-emerald-500" },
-          { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground" },
-          { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary" },
+          { label: "Total Users",   value: users.length,                   color: "text-foreground",        tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+          { label: "Active",        value: activeCount,                    color: "text-emerald-600",       tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+          { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground",  tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+          { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary",           tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
         ].map((s) => (
-          <div key={s.label} className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <div key={s.label} className={`rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}>
             <p className={`text-[22px] font-bold leading-none tabular-nums ${s.color}`}>{s.value}</p>
             <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
           </div>

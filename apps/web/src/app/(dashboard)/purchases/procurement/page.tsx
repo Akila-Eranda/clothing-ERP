@@ -471,10 +471,10 @@ export default function ProcurementHubPage() {
   ], []);
 
   const STATS = [
-    { label: "Purchase Requests", value: prs.length, icon: ClipboardList, color: "text-blue-500", bg: "bg-blue-500/10" },
-    { label: "Goods Receipts", value: grns.length, icon: PackageCheck, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Supplier Returns", value: returns.length, icon: RotateCcw, color: "text-amber-500", bg: "bg-amber-500/10" },
-    { label: "Invoices", value: invoices.length, icon: FileText, color: "text-indigo-500", bg: "bg-indigo-500/10" },
+    { label: "Purchase Requests", value: prs.length, icon: ClipboardList, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Goods Receipts", value: grns.length, icon: PackageCheck, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Supplier Returns", value: returns.length, icon: RotateCcw, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "Invoices", value: invoices.length, icon: FileText, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent" },
   ];
 
   return (
@@ -515,7 +515,7 @@ export default function ProcurementHubPage() {
         {STATS.map((s) => (
           <Card
             key={s.label}
-            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
           >
             <CardContent className="h-[68px] p-4 flex items-center gap-3">
               <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>

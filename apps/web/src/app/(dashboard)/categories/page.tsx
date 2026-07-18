@@ -147,16 +147,16 @@ export default function CategoriesPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
           <p className="text-[22px] font-bold leading-none tabular-nums">{categories.length}</p>
           <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Categories</p>
         </div>
-        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent">
           <p className="text-[22px] font-bold leading-none tabular-nums text-primary">{categories.reduce((s, c) => s + c.children.length, 0)}</p>
           <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Subcategories</p>
         </div>
-        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
-          <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-500">{flatRows.reduce((s, c) => s + c._count.products, 0)}</p>
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+          <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-600">{flatRows.reduce((s, c) => s + c._count.products, 0)}</p>
           <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Products</p>
         </div>
       </div>
