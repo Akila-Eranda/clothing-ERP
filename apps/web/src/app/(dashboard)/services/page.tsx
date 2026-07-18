@@ -150,7 +150,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
     {
       accessorKey: "category",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
-      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.category}</Badge>,
+      cell: ({ row }) => <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.category}</Badge>,
     },
     {
       accessorKey: "durationMinutes",
@@ -172,7 +172,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
       accessorKey: "isActive",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.isActive ? "Active" : "Inactive"}
         </Badge>
       ),
@@ -180,7 +180,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => onView(row.original)}>
+        <Button variant="ghost" size="sm" className="h-8 rounded-[10px] px-3 text-xs font-semibold text-primary hover:bg-[hsl(var(--primary-soft))]" onClick={() => onView(row.original)}>
           View
         </Button>
       ),
@@ -203,7 +203,7 @@ function buildReminderColumns(onSend: (id: string) => void): ColumnDef<Reminder>
     {
       accessorKey: "channel",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Channel" />,
-      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.channel}</Badge>,
+      cell: ({ row }) => <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.channel}</Badge>,
     },
     {
       accessorKey: "scheduledFor",
@@ -224,7 +224,7 @@ function buildReminderColumns(onSend: (id: string) => void): ColumnDef<Reminder>
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => {
         const cfg = REMINDER_STATUS_CFG[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
-        return <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>;
+        return <Badge variant={cfg.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{cfg.label}</Badge>;
       },
     },
     {
@@ -256,7 +256,7 @@ function buildFleetColumns(onToggle: (id: string, isFleet: boolean) => void): Co
       id: "fleet",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Fleet" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isFleet ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original.isFleet ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.isFleet ? "Fleet Account" : "Retail"}
         </Badge>
       ),
@@ -313,7 +313,7 @@ function buildSerialColumns(): ColumnDef<Serial>[] {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => {
         const cfg = SERIAL_STATUS_CFG[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
-        return <Badge variant={cfg.variant} className="text-[10px]">{cfg.label}</Badge>;
+        return <Badge variant={cfg.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{cfg.label}</Badge>;
       },
     },
   ];
@@ -563,35 +563,35 @@ export default function ServicesPage() {
 
   return (
     <ModuleGate module="workshop">
-      <div className="p-6 space-y-6 w-full">
+      <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight flex items-center gap-2">
               <span>{profile.emoji}</span> Workshop Services
             </h1>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">
               Service catalog, reminders, fleet accounts & premium tyre serial tracking
             </p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" asChild>
-              <Link href="/job-cards"><ClipboardList className="h-3.5 w-3.5" /> Job Cards</Link>
+            <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
+              <Link href="/job-cards"><ClipboardList className="h-[18px] w-[18px]" /> Job Cards</Link>
             </Button>
-            <Button variant="outline" size="sm" className="gap-1.5" asChild>
-              <Link href="/appointments"><Clock className="h-3.5 w-3.5" /> Appointments</Link>
+            <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
+              <Link href="/appointments"><Clock className="h-[18px] w-[18px]" /> Appointments</Link>
             </Button>
             {tab === "services" && services.length === 0 && (
-              <Button variant="outline" size="sm" onClick={seedServices} className="gap-1.5">
-                <Package className="h-3.5 w-3.5" /> Load Defaults
+              <Button variant="outline" onClick={seedServices} className="h-10 rounded-[12px] gap-1.5 text-sm">
+                <Package className="h-[18px] w-[18px]" /> Load Defaults
               </Button>
             )}
             {primaryLabel && (
-              <Button size="sm" className="gap-1.5" onClick={primaryAction}>
-                <Plus className="h-3.5 w-3.5" /> {primaryLabel}
+              <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={primaryAction}>
+                <Plus className="h-[18px] w-[18px]" /> {primaryLabel}
               </Button>
             )}
           </div>
@@ -618,16 +618,21 @@ export default function ServicesPage() {
         </div>
 
         {/* KPI stats */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           {STATS.map((s) => (
-            <Card key={s.label}>
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
+            <Card
+              key={s.label}
+              className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+            >
+              <CardContent className="h-[68px] p-4 flex items-center gap-3">
+                <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                  <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
                 </div>
-                <div>
-                  <p className="text-xl font-bold">{loading && typeof s.value === "number" ? "—" : s.value}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
+                <div className="min-w-0">
+                  <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums`}>
+                    {loading && typeof s.value === "number" ? "—" : s.value}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
                 </div>
               </CardContent>
             </Card>
@@ -710,8 +715,8 @@ export default function ServicesPage() {
         {/* Tables */}
         {tab === "services" && (
           displayedServices.length === 0 && !loading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+            <Card className="border-dashed rounded-[18px]">
+              <CardContent className="p-10 flex flex-col items-center text-center gap-3">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Wrench className="h-7 w-7 text-primary" />
                 </div>
@@ -745,8 +750,8 @@ export default function ServicesPage() {
 
         {tab === "reminders" && (
           displayedReminders.length === 0 && !loading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+            <Card className="border-dashed rounded-[18px]">
+              <CardContent className="p-10 flex flex-col items-center text-center gap-3">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Bell className="h-7 w-7 text-primary" />
                 </div>
@@ -772,8 +777,8 @@ export default function ServicesPage() {
 
         {tab === "fleet" && (
           customers.length === 0 && !loading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+            <Card className="border-dashed rounded-[18px]">
+              <CardContent className="p-10 flex flex-col items-center text-center gap-3">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Users className="h-7 w-7 text-primary" />
                 </div>
@@ -799,8 +804,8 @@ export default function ServicesPage() {
 
         {tab === "serials" && (
           displayedSerials.length === 0 && !loading ? (
-            <Card className="border-dashed">
-              <CardContent className="p-12 flex flex-col items-center text-center gap-3">
+            <Card className="border-dashed rounded-[18px]">
+              <CardContent className="p-10 flex flex-col items-center text-center gap-3">
                 <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <Hash className="h-7 w-7 text-primary" />
                 </div>

@@ -178,30 +178,25 @@ export default function ExpensesPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="bg-card border-b px-6 py-4 sticky top-0 z-10">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-red-500 rounded-xl p-2.5"><TrendingDown className="h-5 w-5 text-white" /></div>
-            <div>
-              <h1 className="text-lg font-bold text-foreground">Expenses</h1>
-              <p className="text-xs text-muted-foreground">Track and manage all business expenses</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={load} className="h-9 w-9 p-0">
-              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-            </Button>
-            <Button size="sm" className="gap-1.5 h-9 bg-red-500 hover:bg-red-600" onClick={() => setAddOpen(true)}>
-              <Plus className="h-4 w-4" /> Record Expense
-            </Button>
-          </div>
+      {/* ── Header — compact single row ───────────────────────────────────── */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Expenses</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Track and manage all business expenses</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={load} className="h-10 w-10 rounded-[12px] p-0">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+          </Button>
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm bg-red-500 hover:bg-red-600" onClick={() => setAddOpen(true)}>
+            <Plus className="h-[18px] w-[18px]" /> Record Expense
+          </Button>
         </div>
       </div>
 
-      <div className="px-6 py-6 space-y-6">
+      <div className="space-y-4">
 
         {/* ── Date filter bar ─────────────────────────────────────────────── */}
         <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
@@ -219,21 +214,21 @@ export default function ExpensesPage() {
           <span className="ml-auto text-xs text-muted-foreground">{expenses.length} entries found</span>
         </div>
 
-        {/* ── KPI Cards ───────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+        {/* ── KPI Cards — compact ─────────────────────────────────────────── */}
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
           {([
             { label: "Total Expenses",    value: `LKR ${formatNumber(total)}`,   icon: TrendingDown, bg: "bg-red-500",    sub: `${expenses.length} entries in period` },
             { label: "Average per Entry", value: `LKR ${formatNumber(avg)}`,     icon: Activity,     bg: "bg-amber-500",  sub: "Per recorded expense" },
             { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry" },
             { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories` },
           ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string }[]).map((kpi) => (
-            <Card key={kpi.label} className="card-hover">
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className={`${kpi.bg} rounded-full p-2.5 shrink-0`}><kpi.icon className="h-5 w-5 text-white" /></div>
+            <Card key={kpi.label} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+              <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
+                <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${kpi.bg}`}><kpi.icon className="h-[18px] w-[18px] text-white" /></div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
-                  <p className="text-xl font-bold text-foreground truncate">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{kpi.sub}</p>
+                  <p className="text-lg font-bold leading-none tabular-nums truncate">{kpi.value}</p>
+                  <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{kpi.label}</p>
+                  <p className="text-[11px] text-muted-foreground truncate">{kpi.sub}</p>
                 </div>
               </CardContent>
             </Card>
@@ -242,7 +237,7 @@ export default function ExpensesPage() {
 
         {/* ── Charts ──────────────────────────────────────────────────────── */}
         {catData.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3">
 
             {/* Category donut */}
             <Card className="lg:col-span-2 card-hover">
@@ -317,9 +312,9 @@ export default function ExpensesPage() {
         )}
 
         {/* ── Expenses Table ───────────────────────────────────────────────── */}
-        <Card className="card-hover">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardHeader className="pb-3 flex-row items-center justify-between">
-            <CardTitle className="text-sm font-semibold text-foreground">All Expenses</CardTitle>
+            <CardTitle className="text-lg font-semibold leading-tight text-foreground">All Expenses</CardTitle>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{expenses.length} records · LKR {formatNumber(total)}</span>
               <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddOpen(true)}><Plus className="h-3 w-3" />Add</Button>

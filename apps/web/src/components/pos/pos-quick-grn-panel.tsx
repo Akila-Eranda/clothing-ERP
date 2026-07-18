@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { AlertTriangle, Loader2, Minus, PackageCheck, Plus, RefreshCw, Scan, Search, Trash2, X } from "lucide-react";
+import { AlertTriangle, Banknote, Loader2, Minus, PackageCheck, Plus, RefreshCw, Scan, Search, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, isLikelyBarcodeScan } from "@/lib/pos-barcode";
@@ -90,6 +90,16 @@ export function PosQuickGrnPanel({
   const [lineBatches, setLineBatches] = React.useState<Record<string, string>>({});
   const [openPos, setOpenPos] = React.useState<OpenPo[]>([]);
 
+  // Pay supplier now
+  const [payNow, setPayNow] = React.useState(true);
+  const [payAmount, setPayAmount] = React.useState("");
+  const [payAmountTouched, setPayAmountTouched] = React.useState(false);
+  const [payMethod, setPayMethod] = React.useState("CASH");
+  const [payReference, setPayReference] = React.useState("");
+  const [chequeNumber, setChequeNumber] = React.useState("");
+  const [chequeDueDate, setChequeDueDate] = React.useState("");
+  const [chequeBankName, setChequeBankName] = React.useState("");
+
   const cartByVariant = React.useMemo(
     () => new Map(items.map((i) => [i.variantId, i])),
     [items],
@@ -122,6 +132,13 @@ export function PosQuickGrnPanel({
     () => grnLines.reduce((s, l) => s + l.lineTotal, 0),
     [grnLines],
   );
+
+  // Keep pay amount synced to the GRN total until the cashier edits it manually
+  React.useEffect(() => {
+    if (payNow && !payAmountTouched) {
+      setPayAmount(total > 0 ? String(Math.round(total * 100) / 100) : "");
+    }
+  }, [payNow, payAmountTouched, total]);
 
   const loadSuppliers = React.useCallback(async () => {
     setSupplierLoading(true);
@@ -303,6 +320,17 @@ export function PosQuickGrnPanel({
       toast.error("Enter buying price for all lines");
       return;
     }
+    if (payNow) {
+      const amt = parseFloat(payAmount);
+      if (!(amt > 0)) {
+        toast.error("Enter payment amount");
+        return;
+      }
+      if (payMethod === "CHEQUE" && !chequeNumber.trim()) {
+        toast.error("Cheque number is required");
+        return;
+      }
+    }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");
       const ok = window.confirm(
@@ -327,15 +355,40 @@ export function PosQuickGrnPanel({
             ? { batchNumber: lineBatches[l.variantId].trim() }
             : {}),
         })),
+        ...(payNow
+          ? {
+              payment: {
+                amount: parseFloat(payAmount),
+                method: payMethod,
+                reference: payReference.trim() || undefined,
+                notes: "Paid on POS Quick GRN",
+                ...(payMethod === "CHEQUE"
+                  ? {
+                      chequeNumber: chequeNumber.trim(),
+                      chequeDueDate: chequeDueDate || undefined,
+                      chequeBankName: chequeBankName.trim() || undefined,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       });
       const grnNo = res.data?.grnNumber ?? res.data?.id ?? "GRN";
-      toast.success(`Quick GRN posted — ${grnNo}`);
+      toast.success(payNow ? `GRN posted & supplier paid — ${grnNo}` : `Quick GRN posted — ${grnNo}`);
       setNotes("");
       setSupplierId("");
       setSupplierProducts([]);
       setLineCosts({});
       setLineExpiries({});
       setLineBatches({});
+      setPayNow(true);
+      setPayAmount("");
+      setPayAmountTouched(false);
+      setPayMethod("CASH");
+      setPayReference("");
+      setChequeNumber("");
+      setChequeDueDate("");
+      setChequeBankName("");
       onPosted();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Quick GRN failed");
@@ -667,15 +720,125 @@ export function PosQuickGrnPanel({
             </div>
           </div>
 
+          {/* Pay supplier now */}
+          <div
+            className="rounded-xl border p-3 space-y-2.5 shrink-0"
+            style={{ background: "#0f1f3a", borderColor: payNow ? "rgba(16,185,129,0.45)" : "#1e3356" }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={payNow}
+                  onChange={(e) => setPayNow(e.target.checked)}
+                  disabled={busy}
+                  className="h-4 w-4 rounded accent-emerald-500"
+                />
+                <Banknote className="h-4 w-4" style={{ color: "#34d399" }} />
+                Pay supplier now
+              </label>
+              <span className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                GRN total <span className="font-bold text-white tabular-nums">LKR {formatNumber(total)}</span>
+              </span>
+            </div>
+            {payNow && (
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Amount (LKR)</label>
+                  <input
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    value={payAmount}
+                    onChange={(e) => {
+                      setPayAmount(e.target.value);
+                      setPayAmountTouched(true);
+                    }}
+                    disabled={busy}
+                    className={INPUT_CLS}
+                    style={INPUT_STYLE}
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Method</label>
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    disabled={busy}
+                    className={INPUT_CLS}
+                    style={INPUT_STYLE}
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="BANK_TRANSFER">Bank</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Reference</label>
+                  <input
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="Optional"
+                    disabled={busy}
+                    className={INPUT_CLS}
+                    style={INPUT_STYLE}
+                  />
+                </div>
+                {payMethod === "CHEQUE" && (
+                  <>
+                    <div>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Cheque # *</label>
+                      <input
+                        value={chequeNumber}
+                        onChange={(e) => setChequeNumber(e.target.value)}
+                        disabled={busy}
+                        className={`${INPUT_CLS} font-mono`}
+                        style={INPUT_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Due date</label>
+                      <input
+                        type="date"
+                        value={chequeDueDate}
+                        onChange={(e) => setChequeDueDate(e.target.value)}
+                        disabled={busy}
+                        className={INPUT_CLS}
+                        style={INPUT_STYLE}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Bank</label>
+                      <input
+                        value={chequeBankName}
+                        onChange={(e) => setChequeBankName(e.target.value)}
+                        disabled={busy}
+                        className={INPUT_CLS}
+                        style={INPUT_STYLE}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           <button
             type="button"
             onClick={() => void postQuickGrn()}
             disabled={busy || grnLines.length === 0}
-            className="h-12 gap-2 w-full shrink-0 rounded-xl flex items-center justify-center text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#fff" }}
+            className="h-12 gap-2 w-full shrink-0 rounded-xl flex items-center justify-center text-sm font-bold transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
+            style={{
+              background: payNow
+                ? "linear-gradient(135deg,#059669,#0d9488)"
+                : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+              color: "#fff",
+              boxShadow: payNow ? "0 4px 16px rgba(16,185,129,0.35)" : "0 4px 16px rgba(79,110,247,0.35)",
+            }}
           >
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
-            Post Quick GRN Bill
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : payNow ? <Banknote className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />}
+            {payNow ? "Post GRN & Pay Supplier" : "Post Quick GRN Bill"}
           </button>
         </div>
       </div>

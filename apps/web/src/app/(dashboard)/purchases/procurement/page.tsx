@@ -287,7 +287,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.status}</Badge>,
     },
     {
       id: "createdAt",
@@ -336,7 +336,7 @@ export default function ProcurementHubPage() {
       id: "source",
       accessorKey: "source",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Source" />,
-      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.source}</Badge>,
+      cell: ({ row }) => <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.source}</Badge>,
     },
     {
       id: "supplier",
@@ -391,7 +391,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.status}</Badge>,
     },
     {
       id: "actions",
@@ -444,7 +444,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="secondary" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.status}</Badge>,
     },
     {
       id: "actions",
@@ -479,22 +479,22 @@ export default function ProcurementHubPage() {
 
   return (
     <div className="page-shell">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Procurement</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Procurement</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {profile.label} · Recommended: PO → Receive → Invoice → Pay
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/purchases")} className="gap-1.5">
-            <ShoppingBag className="h-3.5 w-3.5" /> Purchase Orders
+          <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
-            <Plus className="h-3.5 w-3.5" /> New PO
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/purchases/new")}>
+            <Plus className="h-[18px] w-[18px]" /> New PO
           </Button>
         </div>
       </div>
@@ -511,16 +511,19 @@ export default function ProcurementHubPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-xl font-bold leading-tight">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>

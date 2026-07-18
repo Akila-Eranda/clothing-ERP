@@ -98,7 +98,7 @@ function buildColumns(
       id: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.isActive ? "Active" : "Inactive"}
         </Badge>
       ),
@@ -161,45 +161,55 @@ export default function BranchesPage() {
   return (
     <div className="page-shell">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Branches</h1>
-          <p className="text-sm text-muted-foreground">Manage all store locations and branches</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Branches</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Manage all store locations and branches</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchBranches} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchBranches} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => { setEditBranch(undefined); setAddOpen(true); }}>
-            <Plus className="h-3.5 w-3.5" /> Add Branch
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setEditBranch(undefined); setAddOpen(true); }}>
+            <Plus className="h-[18px] w-[18px]" /> Add Branch
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
-              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
       {/* Table */}
-      <ClientSideTable
-        data={branches}
-        columns={columns}
-        pageCount={Math.ceil(branches.length / 10)}
-        searchableColumns={[{ id: "name", title: "Branch Name" }]}
-        filterableColumns={[{
-          id: "isActive", title: "Status",
-          options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],
-        }]}
-        isShowExportButtons={{ isShow: true, fileName: "branches-export" }}
-      />
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={branches}
+          columns={columns}
+          pageCount={Math.ceil(branches.length / 10)}
+          searchableColumns={[{ id: "name", title: "Branch Name" }]}
+          filterableColumns={[{
+            id: "isActive", title: "Status",
+            options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],
+          }]}
+          isShowExportButtons={{ isShow: true, fileName: "branches-export" }}
+        />
+      </div>
 
       {/* Modal */}
       <AddBranchModal

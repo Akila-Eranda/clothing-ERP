@@ -110,9 +110,9 @@ function formatRangeLabel(from: string, to: string) {
 }
 
 function statusBadge(status: CashRegister["status"]) {
-  if (status === "OPEN") return <Badge variant="success" className="text-[10px]">Open</Badge>;
-  if (status === "PENDING_APPROVAL") return <Badge variant="warning" className="text-[10px]">Pending Approval</Badge>;
-  return <Badge variant="secondary" className="text-[10px]">Closed</Badge>;
+  if (status === "OPEN") return <Badge variant="success" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Open</Badge>;
+  if (status === "PENDING_APPROVAL") return <Badge variant="warning" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Pending Approval</Badge>;
+  return <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Closed</Badge>;
 }
 
 export default function CashManagementPage() {
@@ -502,8 +502,8 @@ export default function CashManagementPage() {
                 <Banknote className="h-5 w-5 text-white" />
               </div>
               <div className="min-w-0">
-                <h1 className="text-lg font-bold text-foreground">Cash Management</h1>
-                <p className="text-xs text-muted-foreground truncate">
+                <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight text-foreground">Cash Management</h1>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   Automated POS tracking · shift control · variance
                   {lastRefreshed && shiftOpen && (
                     <span className="ml-1">· Live {lastRefreshed.toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" })}</span>
@@ -511,18 +511,18 @@ export default function CashManagementPage() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={() => void refresh()} className="h-9 w-9 p-0">
-                <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <Button variant="outline" onClick={() => void refresh()} className="h-10 w-10 rounded-[12px] p-0">
+                <RefreshCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} />
               </Button>
               {!shiftOpen && !shiftPending && (
-                <Button size="sm" className="gap-1.5 h-9 bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
-                  <Plus className="h-4 w-4" /> Start Shift
+                <Button className="h-10 rounded-[12px] gap-1.5 text-sm bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
+                  <Plus className="h-[18px] w-[18px]" /> Start Shift
                 </Button>
               )}
               {shiftOpen && (
-                <Button size="sm" className="gap-1.5 h-9 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
-                  <StopCircle className="h-4 w-4" /> Cash Close
+                <Button className="h-10 rounded-[12px] gap-1.5 text-sm bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
+                  <StopCircle className="h-[18px] w-[18px]" /> Cash Close
                 </Button>
               )}
             </div>
@@ -544,7 +544,7 @@ export default function CashManagementPage() {
           </div>
         </div>
 
-        <div className="px-6 py-6 space-y-6">
+        <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
 
           {/* Date filter — auto-applies to KPI, history & variance */}
           <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
@@ -618,22 +618,22 @@ export default function CashManagementPage() {
             </div>
           )}
 
-          {/* KPI row */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+          {/* KPI row — compact cards */}
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {loading
               ? Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i}><CardContent className="p-5"><Skeleton className="h-16 w-full" /></CardContent></Card>
+                  <Card key={i} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]"><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
                 ))
               : KPI.map((kpi) => (
-                  <Card key={kpi.label} className="card-hover">
-                    <CardContent className="p-5 flex items-center gap-4">
-                      <div className={cn(kpi.bg, "rounded-full p-2.5 shrink-0")}>
-                        <kpi.icon className="h-5 w-5 text-white" />
+                  <Card key={kpi.label} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+                    <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
+                      <div className={cn(kpi.bg, "h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0")}>
+                        <kpi.icon className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs text-muted-foreground font-medium">{kpi.label}</p>
-                        <p className="text-xl font-bold text-foreground truncate">{kpi.value}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{kpi.sub}</p>
+                        <p className="text-lg font-bold leading-none tabular-nums text-foreground truncate">{kpi.value}</p>
+                        <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{kpi.label}</p>
+                        <p className="text-[11px] text-muted-foreground truncate">{kpi.sub}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -644,7 +644,7 @@ export default function CashManagementPage() {
           <TabsContent value="overview" className="m-0 mt-0 space-y-4">
             {!shiftOpen ? (
               <Card className="card-hover">
-                <CardContent className="py-16 text-center">
+                <CardContent className="py-10 text-center">
                   <LayoutDashboard className="h-12 w-12 mx-auto mb-3 opacity-30 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground mb-4">
                     {shiftPending
@@ -667,7 +667,7 @@ export default function CashManagementPage() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-6 lg:grid-cols-5">
+              <div className="grid gap-3 lg:grid-cols-5">
                 <Card className="lg:col-span-2 border shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -842,14 +842,14 @@ export default function CashManagementPage() {
           <TabsContent value="close" className="m-0 mt-0">
             {!shiftOpen ? (
               <Card className="card-hover">
-                <CardContent className="py-16 text-center text-muted-foreground">
+                <CardContent className="py-10 text-center text-muted-foreground">
                   <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open shift. Start a shift from Cash Open first.</p>
                   <Button className="mt-4" size="sm" variant="outline" onClick={() => setTab("open")}>Cash Open</Button>
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid gap-6 lg:grid-cols-2">
+              <div className="grid gap-3 lg:grid-cols-2">
                 <Card className="card-hover">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold">Daily Cash Close</CardTitle>
@@ -970,7 +970,7 @@ export default function CashManagementPage() {
               <Skeleton className="h-48 w-full rounded-xl" />
             ) : varianceReport ? (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {[
                     { label: "Total Shifts", value: varianceReport.totalShifts, color: "text-blue-600", bg: "bg-blue-500/10" },
                     { label: "Net Variance", value: varianceReport.totalVariance, color: "text-foreground", bg: "bg-muted" },
@@ -1061,7 +1061,7 @@ export default function CashManagementPage() {
 
           {/* Movements */}
           <TabsContent value="movements" className="m-0 mt-0">
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-3 lg:grid-cols-2">
               <Card className="card-hover">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">

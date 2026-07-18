@@ -152,7 +152,7 @@ function buildColumns(
       accessorKey: "stepOrder",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Step" />,
       cell: ({ row }) => (
-        <Badge variant="secondary" className="text-[10px] font-mono">
+        <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center font-mono">
           Step {row.original.stepOrder}
         </Badge>
       ),
@@ -168,7 +168,7 @@ function buildColumns(
       id: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: () => (
-        <Badge variant="warning" className="text-[10px] gap-1">
+        <Badge variant="warning" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
           <Clock className="h-2.5 w-2.5" /> Pending
         </Badge>
       ),
@@ -279,21 +279,21 @@ export default function WorkflowsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 w-full">
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Approval Workflows</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Approval Workflows</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             Review and approve purchase orders, discounts, stock adjustments & transfers — tasks match your role
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={fetchTasks} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchTasks} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <Link href="/purchases"><ExternalLink className="h-3.5 w-3.5" /> Purchases</Link>
+          <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
+            <Link href="/purchases"><ExternalLink className="h-[18px] w-[18px]" /> Purchases</Link>
           </Button>
         </div>
       </div>
@@ -323,16 +323,19 @@ export default function WorkflowsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-xl font-bold">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -362,12 +365,12 @@ export default function WorkflowsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-24 rounded-xl border bg-card">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="flex items-center justify-center py-24 rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : displayed.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
             <div className="p-4 rounded-2xl bg-emerald-500/10">
               <CheckCircle2 className="h-10 w-10 text-emerald-500" />
             </div>
@@ -390,11 +393,11 @@ export default function WorkflowsPage() {
 
       {/* Workflow guide */}
       <div className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">Supported Workflows</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">All paths are live — submit from the linked module to start approval</p>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold leading-tight">Supported Workflows</h2>
+          <p className="text-xs text-muted-foreground">All paths are live — submit from the linked module to start approval</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {GUIDE.map((g) => {
             const cfg = workflowCfg(g.key);
             const Icon = cfg.icon;

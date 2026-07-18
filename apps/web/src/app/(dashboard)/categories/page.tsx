@@ -67,7 +67,7 @@ function buildColumns(
       accessorKey: "isActive",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.isActive ? "Active" : "Inactive"}
         </Badge>
       ),
@@ -129,47 +129,49 @@ export default function CategoriesPage() {
   const columns = buildColumns(handleDelete, handleAddSub);
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Categories</h1>
-          <p className="text-muted-foreground text-sm mt-1">Organize products into categories and subcategories</p>
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Categories</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Organize products into categories and subcategories</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={fetchCategories} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchCategories} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="gradient" className="gap-2" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
-            <Plus className="h-4 w-4" /> Add Category
+          <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
+            <Plus className="h-[18px] w-[18px]" /> Add Category
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Total Categories</p>
-          <p className="text-2xl font-bold mt-1">{categories.length}</p>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <p className="text-[22px] font-bold leading-none tabular-nums">{categories.length}</p>
+          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Categories</p>
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Subcategories</p>
-          <p className="text-2xl font-bold mt-1 text-primary">{categories.reduce((s, c) => s + c.children.length, 0)}</p>
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <p className="text-[22px] font-bold leading-none tabular-nums text-primary">{categories.reduce((s, c) => s + c.children.length, 0)}</p>
+          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Subcategories</p>
         </div>
-        <div className="rounded-xl border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Total Products</p>
-          <p className="text-2xl font-bold mt-1 text-emerald-500">{flatRows.reduce((s, c) => s + c._count.products, 0)}</p>
+        <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+          <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-500">{flatRows.reduce((s, c) => s + c._count.products, 0)}</p>
+          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Products</p>
         </div>
       </div>
 
-      <ClientSideTable
-        data={flatRows}
-        columns={columns}
-        pageCount={Math.ceil(flatRows.length / 10)}
-        searchableColumns={[
-          { id: "name", title: "Category" },
-          { id: "slug", title: "Slug" },
-        ]}
-      />
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={flatRows}
+          columns={columns}
+          pageCount={Math.ceil(flatRows.length / 10)}
+          searchableColumns={[
+            { id: "name", title: "Category" },
+            { id: "slug", title: "Slug" },
+          ]}
+        />
+      </div>
 
       <AddCategoryModal
         open={modalOpen}

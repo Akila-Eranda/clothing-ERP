@@ -245,54 +245,55 @@ export default function CustomersPage() {
   return (
     <div className="page-shell">
       {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{customerTitle}</h1>
-          <p className="text-sm font-normal text-muted-foreground leading-relaxed">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">{customerTitle}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             Manage {workspace.customerLabel.toLowerCase()}
             {showLoyalty ? " relationships and loyalty" : " accounts and credit"}
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap items-center">
-          <Button variant="outline" size="sm" onClick={fetchCustomers} className="gap-1.5 h-10">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchCustomers} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
           <Button
             variant="outline"
-            size="sm"
             onClick={() => exportCsv(customers)}
             disabled={!customers.length}
-            className="gap-1.5 h-10"
+            className="h-10 rounded-[12px] gap-1.5 text-sm"
           >
-            <Download className="h-3.5 w-3.5" />
+            <Download className="h-[18px] w-[18px]" />
             Export
           </Button>
           <Button
-            size="sm"
-            className="gap-1.5 h-10 shadow-button"
+            className="h-10 rounded-[12px] gap-1.5 text-sm shadow-button"
             onClick={() => {
               setEditCustomer(undefined);
               setAddOpen(true);
             }}
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-[18px] w-[18px]" />
             Add {workspace.customerLabel.replace(/s$/, "")}
           </Button>
         </div>
       </div>
 
       {/* Primary KPIs */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${showLoyalty ? "xl:grid-cols-4" : "xl:grid-cols-2"}`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${showLoyalty ? "xl:grid-cols-4" : "xl:grid-cols-2"}`}>
         {STATS.map((s) => (
-          <Card key={s.label} className="card-hover">
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className={`h-11 w-11 rounded-full flex items-center justify-center shrink-0 ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
-                <p className="text-xl font-bold tracking-tight tabular-nums truncate">{s.value}</p>
-                <p className="text-xs font-medium text-muted-foreground mt-0.5">{s.label}</p>
+                <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums truncate`}>{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -305,13 +306,16 @@ export default function CustomersPage() {
           {segments.map((s) => {
             const Icon = SEGMENT_ICON[s.key] ?? Users;
             return (
-              <Card key={s.key}>
-                <CardContent className="p-4 flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-full bg-muted border border-border flex items-center justify-center shrink-0">
-                    <Icon className="h-4 w-4 text-muted-foreground" />
+              <Card
+                key={s.key}
+                className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+              >
+                <CardContent className="h-[68px] p-4 flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-[12px] bg-muted border border-border flex items-center justify-center shrink-0">
+                    <Icon className="h-[18px] w-[18px] text-muted-foreground" strokeWidth={1.75} />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-lg font-bold tabular-nums leading-none">{s.count}</p>
+                    <p className="text-[22px] font-bold tabular-nums leading-none">{s.count}</p>
                     <p className="text-[11px] font-medium text-muted-foreground mt-1 leading-tight truncate">
                       {s.label}
                     </p>
@@ -324,23 +328,25 @@ export default function CustomersPage() {
       )}
 
       {/* Table */}
-      <ClientSideTable
-        data={customers}
-        columns={columns}
-        pageCount={Math.ceil(customers.length / 10)}
-        searchableColumns={[
-          { id: "phone", title: "Phone" },
-          { id: "email", title: "Email" },
-        ]}
-        filterableColumns={[
-          {
-            id: "tier",
-            title: "Tier",
-            options: Object.entries(TIER_CONF).map(([v, c]) => ({ value: v, label: c.label })),
-          },
-        ]}
-        isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
-      />
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={customers}
+          columns={columns}
+          pageCount={Math.ceil(customers.length / 10)}
+          searchableColumns={[
+            { id: "phone", title: "Phone" },
+            { id: "email", title: "Email" },
+          ]}
+          filterableColumns={[
+            {
+              id: "tier",
+              title: "Tier",
+              options: Object.entries(TIER_CONF).map(([v, c]) => ({ value: v, label: c.label })),
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
+        />
+      </div>
 
       <AddCustomerModal
         open={addOpen}

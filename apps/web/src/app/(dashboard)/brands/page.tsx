@@ -110,7 +110,7 @@ function buildColumns(
       accessorKey: "isActive",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.isActive ? "Active" : "Inactive"}
         </Badge>
       ),
@@ -187,49 +187,49 @@ export default function BrandsPage() {
 
   return (
     <ModuleGate module="brands">
-      <div className="space-y-6 p-6 w-full">
+      <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto w-full">
         {/* Header */}
-        <div className="flex items-center justify-between flex-wrap gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="min-w-0">
+            <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight flex items-center gap-2">
               <span>{profile.emoji}</span> {copy.pageTitle}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1">{copy.subtitle}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={fetchBrands} className="gap-1.5">
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            <Button variant="outline" onClick={fetchBrands} className="h-10 rounded-[12px] gap-1.5 text-sm">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={() => exportToCsv(brands, copy.csvFileName)} disabled={!brands.length} className="gap-1.5">
-              <Download className="h-3.5 w-3.5" /> Export CSV
+            <Button variant="outline" onClick={() => exportToCsv(brands, copy.csvFileName)} disabled={!brands.length} className="h-10 rounded-[12px] gap-1.5 text-sm">
+              <Download className="h-[18px] w-[18px]" /> Export CSV
             </Button>
-            <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
-              <Upload className="h-3.5 w-3.5" /> Import CSV
+            <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm">
+              <Upload className="h-[18px] w-[18px]" /> Import CSV
             </Button>
             <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-            <Button variant="gradient" className="gap-2" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
-              <Plus className="h-4 w-4" /> {copy.addButton}
+            <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
+              <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
             </Button>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Total {copy.plural}</p>
-            <p className="text-2xl font-bold mt-1">{brands.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            <p className="text-[22px] font-bold leading-none tabular-nums">{brands.length}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total {copy.plural}</p>
           </div>
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Active</p>
-            <p className="text-2xl font-bold mt-1 text-emerald-500">{activeCount}</p>
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-500">{activeCount}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Active</p>
           </div>
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Inactive</p>
-            <p className="text-2xl font-bold mt-1 text-muted-foreground">{inactiveCount}</p>
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            <p className="text-[22px] font-bold leading-none tabular-nums text-muted-foreground">{inactiveCount}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Inactive</p>
           </div>
-          <div className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Total {workspace.productLabel}</p>
-            <p className="text-2xl font-bold mt-1 text-primary">{totalProducts}</p>
+          <div className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            <p className="text-[22px] font-bold leading-none tabular-nums text-primary">{totalProducts}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total {workspace.productLabel}</p>
           </div>
         </div>
 

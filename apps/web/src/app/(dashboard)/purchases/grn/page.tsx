@@ -81,7 +81,14 @@ export default function GrnPage() {
               : src === "QUICK" ? "Quick"
                 : src === "DIRECT" ? "Direct"
                   : src;
-          return <Badge variant="outline" className="text-[10px]">{label}</Badge>;
+          return (
+            <Badge
+              variant="outline"
+              className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center"
+            >
+              {label}
+            </Badge>
+          );
         },
       },
       {
@@ -138,9 +145,9 @@ export default function GrnPage() {
         cell: ({ row }) => (
           <Button
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-7 text-xs"
+            className="h-8 rounded-[10px] px-3 text-xs font-semibold text-primary hover:bg-[hsl(var(--primary-soft))]"
             onClick={() => setViewId(row.original.id)}
           >
             View
@@ -167,73 +174,92 @@ export default function GrnPage() {
   ];
 
   return (
-    <div className="page-shell">
-      {/* Header — same pattern as Purchase Orders */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{routeLabels["/purchases/grn"] ?? "GRN"}</h1>
-          <p className="text-sm text-muted-foreground">
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+      {/* Header — compact single row */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">
+            {routeLabels["/purchases/grn"] ?? "GRN"}
+          </h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {profile.emoji} {profile.label} — prefer Receive against PO; Quick GRN only if no PO
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={load} disabled={loading} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button
+            variant="outline"
+            onClick={load}
+            disabled={loading}
+            className="h-10 rounded-[12px] gap-1.5 text-sm"
+          >
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button size="sm" asChild className="gap-1.5">
+          <Button
+            variant="outline"
+            className="h-10 rounded-[12px] gap-1.5 text-sm"
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus className="h-[18px] w-[18px]" /> Quick GRN (no PO)
+          </Button>
+          <Button asChild className="h-10 rounded-[12px] gap-1.5 text-sm">
             <Link href="/purchases">
-              <ShoppingBag className="h-3.5 w-3.5" /> Receive from PO
+              <ShoppingBag className="h-[18px] w-[18px]" /> Receive from PO
             </Link>
-          </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setAddOpen(true)}>
-            <Plus className="h-3.5 w-3.5" /> Quick GRN (no PO)
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Stats — compact 68px cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-xl font-bold leading-tight">{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Table */}
-      <div className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">GRN Documents</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
+      {/* Table — fills remaining viewport */}
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold leading-tight">GRN Documents</h2>
+          <p className="text-xs text-muted-foreground">
             All goods receipts — from PO, quick GRN, or direct entry
           </p>
         </div>
         {loading ? (
-          <div className="flex justify-center py-16">
+          <div
+            className="flex items-center justify-center rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
+            style={{ height: "calc(100vh - 240px)" }}
+          >
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <ClientSideTable
-            data={grns}
-            columns={grnColumns}
-            pageCount={Math.ceil(grns.length / 10) || 1}
-            searchableColumns={[
-              { id: "grnNumber", title: "GRN #" },
-              { id: "supplier", title: "Supplier" },
-              { id: "source", title: "Source" },
-              { id: "po", title: "PO" },
-            ]}
-            filterableColumns={[]}
-            isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
-          />
+          <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+            <ClientSideTable
+              data={grns}
+              columns={grnColumns}
+              pageCount={Math.ceil(grns.length / 10) || 1}
+              searchableColumns={[
+                { id: "grnNumber", title: "GRN #" },
+                { id: "supplier", title: "Supplier" },
+                { id: "source", title: "Source" },
+                { id: "po", title: "PO" },
+              ]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
+            />
+          </div>
         )}
       </div>
 

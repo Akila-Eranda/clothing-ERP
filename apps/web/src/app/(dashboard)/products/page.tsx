@@ -194,7 +194,7 @@ function buildColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Variant" />,
       cell: ({ row }) => (
         row.original.isVariant ? (
-          <Badge variant="secondary" className="text-[10px]">{row.original.variantName}</Badge>
+          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.variantName}</Badge>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>
         )
@@ -214,7 +214,7 @@ function buildColumns(
       id: "category",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
       cell: ({ row }) => (
-        <Badge variant="secondary" className="text-[10px]">{row.original.categoryName ?? "—"}</Badge>
+        <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.categoryName ?? "—"}</Badge>
       ),
     },
     {
@@ -226,7 +226,7 @@ function buildColumns(
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={STATUS_BADGE[row.original.status] ?? "secondary"} className="text-[10px]">
+        <Badge variant={STATUS_BADGE[row.original.status] ?? "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original.status.replace("_", " ")}
         </Badge>
       ),
@@ -313,67 +313,77 @@ export default function ProductsPage() {
 
   return (
     <div className="page-shell">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{workspace.productLabel}</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">{workspace.productLabel}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             Each variant shows as its own row · same product barcode · separate selling prices
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={() => fetch()} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={() => fetch()} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={() => exportToCsv(products)} className="gap-1.5" disabled={!products.length}>
-            <Download className="h-3.5 w-3.5" /> Export CSV
+          <Button variant="outline" onClick={() => exportToCsv(products)} className="h-10 rounded-[12px] gap-1.5 text-sm" disabled={!products.length}>
+            <Download className="h-[18px] w-[18px]" /> Export CSV
           </Button>
-          <Button variant="outline" size="sm" onClick={() => printLabels(listRows, brandName)} className="gap-1.5" disabled={!listRows.length}>
-            <Tag className="h-3.5 w-3.5" /> {printLabel}
+          <Button variant="outline" onClick={() => printLabels(listRows, brandName)} className="h-10 rounded-[12px] gap-1.5 text-sm" disabled={!listRows.length}>
+            <Tag className="h-[18px] w-[18px]" /> {printLabel}
           </Button>
-          <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
-            <Upload className="h-3.5 w-3.5" /> Import CSV
+          <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <Upload className="h-[18px] w-[18px]" /> Import CSV
           </Button>
           <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-          <Button size="sm" className="gap-1.5" onClick={() => router.push("/products/new")}>
-            <Plus className="h-3.5 w-3.5" /> Add New
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/products/new")}>
+            <Plus className="h-[18px] w-[18px]" /> Add New
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
-              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      <ClientSideTable
-        data={listRows}
-        columns={columns}
-        pageCount={Math.ceil(listRows.length / 10) || 1}
-        searchableColumns={[
-          { id: "productName", title: "Product" },
-          { id: "variantName", title: "Variant" },
-          { id: "sku", title: "SKU" },
-          { id: "barcode", title: "Barcode" },
-        ]}
-        filterableColumns={[
-          {
-            id: "status",
-            title: "Status",
-            options: [
-              { value: "ACTIVE", label: "Active" },
-              { value: "DRAFT", label: "Draft" },
-              { value: "INACTIVE", label: "Inactive" },
-            ],
-          },
-        ]}
-        isShowExportButtons={{ isShow: true, fileName: "products-variants" }}
-      />
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={listRows}
+          columns={columns}
+          pageCount={Math.ceil(listRows.length / 10) || 1}
+          searchableColumns={[
+            { id: "productName", title: "Product" },
+            { id: "variantName", title: "Variant" },
+            { id: "sku", title: "SKU" },
+            { id: "barcode", title: "Barcode" },
+          ]}
+          filterableColumns={[
+            {
+              id: "status",
+              title: "Status",
+              options: [
+                { value: "ACTIVE", label: "Active" },
+                { value: "DRAFT", label: "Draft" },
+                { value: "INACTIVE", label: "Inactive" },
+              ],
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "products-variants" }}
+        />
+      </div>
     </div>
   );
 }

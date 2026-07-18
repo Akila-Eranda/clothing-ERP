@@ -193,40 +193,40 @@ export default function UsersPage() {
   const activeCount = users.filter((u) => u.status === "ACTIVE").length;
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Users & Roles</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage staff access and role-based permissions</p>
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Users & Roles</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">Manage staff access and role-based permissions</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadAll} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={loadAll} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
           </Button>
-          <Button variant="gradient" className="gap-2" onClick={() => {
+          <Button variant="gradient" className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => {
             setUserForm({
               ...EMPTY_USER,
               roleId: staffRoles[0]?.id ?? "",
             });
             setUserModal(true);
           }}>
-            <Plus className="h-4 w-4" /> Invite User
+            <Plus className="h-[18px] w-[18px]" /> Invite User
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
           { label: "Total Users",   value: users.length,                   color: "text-foreground" },
           { label: "Active",        value: activeCount,                    color: "text-emerald-500" },
           { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground" },
           { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary" },
         ].map((s) => (
-          <div key={s.label} className="rounded-xl border bg-card p-4">
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          <div key={s.label} className="rounded-[18px] border bg-card h-[68px] p-4 flex flex-col justify-center shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150">
+            <p className={`text-[22px] font-bold leading-none tabular-nums ${s.color}`}>{s.value}</p>
+            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
           </div>
         ))}
       </div>
@@ -244,7 +244,7 @@ export default function UsersPage() {
             <Input placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
           </div>
 
-          <div className="rounded-xl border bg-card overflow-hidden">
+          <div className="rounded-[18px] border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
             <table className="w-full">
               <thead>
                 <tr className="border-b bg-muted/30">
@@ -283,7 +283,7 @@ export default function UsersPage() {
                       </td>
                       <td className="px-4 py-3">
                         {primaryRole ? (
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[primaryRole.type] ?? ROLE_COLORS.CUSTOM}`}>
+                          <span className={`h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center border ${ROLE_COLORS[primaryRole.type] ?? ROLE_COLORS.CUSTOM}`}>
                             {primaryRole.name}
                           </span>
                         ) : <span className="text-xs text-muted-foreground">No role</span>}
@@ -326,9 +326,9 @@ export default function UsersPage() {
           <p className="text-xs text-muted-foreground">
             Roles configured for your shop only — other tenants&apos; roles are not shown.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {tenantRoleCards.map((role) => (
-              <div key={role.id} className="rounded-xl border bg-card p-4">
+              <div key={role.id} className="rounded-[18px] border bg-card p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div className="flex items-start gap-2 mb-3">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Shield className="h-4 w-4 text-primary" />

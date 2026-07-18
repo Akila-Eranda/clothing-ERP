@@ -695,18 +695,31 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
         )}
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
-          <Button variant="outline" onClick={onClose} disabled={loading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={submit}
-            disabled={loading || booting || !supplierId || items.length === 0}
-            className="gap-1.5 min-w-[140px] bg-emerald-600 hover:bg-emerald-700"
-          >
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
-            {payNow ? "Post GRN & Pay" : "Post GRN"}
-          </Button>
+        <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-muted/10 shrink-0">
+          <div className="min-w-0 text-sm">
+            <span className="text-muted-foreground">Total</span>{" "}
+            <span className="font-bold tabular-nums">
+              LKR {grandTotal.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            {payNow && (
+              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                <Banknote className="h-3 w-3" /> Paying supplier
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button
+              onClick={submit}
+              disabled={loading || booting || !supplierId || items.length === 0}
+              className="gap-2 min-w-[170px] h-[42px] font-semibold text-white border-0 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-[0_2px_12px_rgba(16,185,129,0.35)] hover:shadow-[0_4px_16px_rgba(16,185,129,0.45)] active:scale-[0.98] transition-all disabled:from-emerald-600/40 disabled:to-teal-600/40 disabled:text-white/70 disabled:shadow-none"
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
+              {payNow ? "Post GRN & Pay" : "Post GRN"}
+            </Button>
+          </div>
         </div>
       </div>
 

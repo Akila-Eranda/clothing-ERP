@@ -469,7 +469,7 @@ export default function SalesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
         <Badge variant={row.original.status === "COMPLETED" ? "success" : row.original.status === "REFUNDED" ? "danger" : "warning"}
-          className="text-[10px] capitalize">{row.original.status?.toLowerCase()}</Badge>
+          className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center capitalize">{row.original.status?.toLowerCase()}</Badge>
       ),
     },
     {
@@ -490,30 +490,40 @@ export default function SalesPage() {
   return (
     <div className="page-shell">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Sales</h1>
-          <p className="text-sm text-muted-foreground">View and manage all sales transactions</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Sales</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">View and manage all sales transactions</p>
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1.5 border rounded-lg px-2.5 h-8">
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-1.5 border rounded-[12px] px-2.5 h-10">
+            <CalendarDays className="h-[18px] w-[18px] text-muted-foreground" />
             <input type="date" value={dateFilter} onChange={(e) => setDateFilter(e.target.value)}
               className="text-xs bg-transparent border-0 outline-none text-foreground" />
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchSales(); fetchSummary(); }} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+          <Button variant="outline" onClick={() => { fetchSales(); fetchSummary(); }} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}><CardContent className="p-4 flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
-            <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
-          </CardContent></Card>
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums`}>{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
         ))}
       </div>
 
@@ -530,29 +540,31 @@ export default function SalesPage() {
       )}
 
       {/* Table */}
-      <ClientSideTable
-        data={sales}
-        columns={columns}
-        pageCount={Math.ceil(sales.length / 10)}
-        searchableColumns={[{ id: "invoiceNumber", title: "Invoice" }]}
-        filterableColumns={[{
-          id: "status", title: "Status",
-          options: [
-            { label: "Completed", value: "COMPLETED" },
-            { label: "Refunded",  value: "REFUNDED" },
-            { label: "Pending",   value: "PENDING" },
-          ],
-        }, {
-          id: "paymentMethod", title: "Payment",
-          options: [
-            { label: "Cash",   value: "CASH" },
-            { label: "Card",   value: "CARD" },
-            { label: "UPI",    value: "UPI" },
-            { label: "Wallet", value: "WALLET" },
-          ],
-        }]}
-        isShowExportButtons={{ isShow: true, fileName: "sales-export" }}
-      />
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={sales}
+          columns={columns}
+          pageCount={Math.ceil(sales.length / 10)}
+          searchableColumns={[{ id: "invoiceNumber", title: "Invoice" }]}
+          filterableColumns={[{
+            id: "status", title: "Status",
+            options: [
+              { label: "Completed", value: "COMPLETED" },
+              { label: "Refunded",  value: "REFUNDED" },
+              { label: "Pending",   value: "PENDING" },
+            ],
+          }, {
+            id: "paymentMethod", title: "Payment",
+            options: [
+              { label: "Cash",   value: "CASH" },
+              { label: "Card",   value: "CARD" },
+              { label: "UPI",    value: "UPI" },
+              { label: "Wallet", value: "WALLET" },
+            ],
+          }]}
+          isShowExportButtons={{ isShow: true, fileName: "sales-export" }}
+        />
+      </div>
 
       {/* Sale detail modal */}
       {viewId && (

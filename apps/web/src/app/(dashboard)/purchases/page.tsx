@@ -94,7 +94,7 @@ function buildColumns(
         const conf = STATUS_CONFIG[row.original.status] ?? STATUS_CONFIG.DRAFT;
         const Icon = conf.icon;
         return (
-          <Badge variant={conf.variant} className="text-[10px] gap-1">
+          <Badge variant={conf.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
             <Icon className="h-2.5 w-2.5" />{conf.label}
           </Badge>
         );
@@ -172,56 +172,66 @@ export default function PurchasesPage() {
 
   return (
     <div className="page-shell">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{routeLabels["/purchases"]}</h1>
-          <p className="text-sm text-muted-foreground">
+      {/* Header — compact single row */}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">{routeLabels["/purchases"]}</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             {profile.emoji} {profile.label} — recommended: Create PO → Confirm → Receive (GRN)
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={fetchPOs} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchPOs} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" asChild className="gap-1.5">
+          <Button variant="outline" asChild className="h-10 rounded-[12px] gap-1.5 text-sm">
             <Link href="/purchases/grn">
-              <PackageCheck className="h-3.5 w-3.5" /> GRN History
+              <PackageCheck className="h-[18px] w-[18px]" /> GRN History
             </Link>
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => router.push("/purchases/new")}>
-            <Plus className="h-3.5 w-3.5" /> New Purchase Order
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => router.push("/purchases/new")}>
+            <Plus className="h-[18px] w-[18px]" /> New Purchase Order
           </Button>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* Stats — compact 68px cards */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}><s.icon className={`h-5 w-5 ${s.color}`} /></div>
-              <div><p className="text-xl font-bold">{s.value}</p><p className="text-xs text-muted-foreground">{s.label}</p></div>
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+              </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Table */}
-      <ClientSideTable
-        data={pos}
-        columns={columns}
-        pageCount={Math.ceil(pos.length / 10)}
-        searchableColumns={[{ id: "poNumber", title: "PO Number" }]}
-        filterableColumns={[
-          {
-            id: "status",
-            title: "Status",
-            options: Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label })),
-          },
-        ]}
-        isShowExportButtons={{ isShow: true, fileName: "purchase-orders-export" }}
-      />
+      {/* Table — fills remaining viewport */}
+      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
+        <ClientSideTable
+          data={pos}
+          columns={columns}
+          pageCount={Math.ceil(pos.length / 10)}
+          searchableColumns={[{ id: "poNumber", title: "PO Number" }]}
+          filterableColumns={[
+            {
+              id: "status",
+              title: "Status",
+              options: Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label })),
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "purchase-orders-export" }}
+        />
+      </div>
 
       <ReceiveItemsModal po={receivePO} onClose={() => setReceivePO(null)} onReceived={fetchPOs} />
     </div>

@@ -102,7 +102,7 @@ function buildModelColumns(): ColumnDef<VehicleModel>[] {
       id: "parts",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Mapped Parts" />,
       cell: ({ row }) => (
-        <Badge variant={row.original._count?.compatibilities ? "success" : "secondary"} className="text-[10px]">
+        <Badge variant={row.original._count?.compatibilities ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
           {row.original._count?.compatibilities ?? 0} parts
         </Badge>
       ),
@@ -328,39 +328,42 @@ export default function VehiclesPage() {
   const mappingColumns = useMemo(() => buildPartColumns(removeMapping, deleting), [deleting]);
 
   return (
-    <div className="p-6 space-y-6 w-full">
+    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto w-full">
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Vehicle Compatibility</h1>
-          <p className="text-sm text-muted-foreground">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Vehicle Compatibility</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
             Map spare parts to vehicles — search by make, model, year, VIN or part name
           </p>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" size="sm" onClick={fetchAll} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button variant="outline" onClick={fetchAll} className="h-10 rounded-[12px] gap-1.5 text-sm">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" size="sm" className="gap-1.5" asChild>
-            <Link href="/products"><ExternalLink className="h-3.5 w-3.5" /> Parts Catalog</Link>
+          <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm" asChild>
+            <Link href="/products"><ExternalLink className="h-[18px] w-[18px]" /> Parts Catalog</Link>
           </Button>
-          <Button size="sm" className="gap-1.5" onClick={() => setActiveTab("mapping")}>
-            <Plus className="h-3.5 w-3.5" /> New Mapping
+          <Button className="h-10 rounded-[12px] gap-1.5 text-sm" onClick={() => setActiveTab("mapping")}>
+            <Plus className="h-[18px] w-[18px]" /> New Mapping
           </Button>
         </div>
       </div>
 
       {/* KPI stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
-          <Card key={s.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                <s.icon className={`h-5 w-5 ${s.color}`} />
+          <Card
+            key={s.label}
+            className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
-              <div>
-                <p className="text-xl font-bold">{loading ? "—" : s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums">{loading ? "—" : s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>
@@ -444,12 +447,12 @@ export default function VehiclesPage() {
           </Card>
 
           {searching ? (
-            <div className="flex items-center justify-center py-24 rounded-xl border bg-card">
+            <div className="flex items-center justify-center py-12 rounded-xl border bg-card">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : !hasSearched ? (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+              <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
                 <div className="p-4 rounded-2xl bg-blue-500/10">
                   <Car className="h-10 w-10 text-blue-500" />
                 </div>
@@ -461,7 +464,7 @@ export default function VehiclesPage() {
             </Card>
           ) : parts.length === 0 ? (
             <Card>
-              <CardContent className="flex flex-col items-center justify-center py-16 gap-3">
+              <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
                 <div className="p-4 rounded-2xl bg-amber-500/10">
                   <Package className="h-10 w-10 text-amber-500" />
                 </div>
@@ -490,7 +493,7 @@ export default function VehiclesPage() {
       {/* Brands & Models */}
       {activeTab === "catalog" && (
         <div className="space-y-4">
-          <div className="grid xl:grid-cols-2 gap-4">
+          <div className="grid xl:grid-cols-2 gap-3">
             <Card>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center gap-2">
@@ -531,11 +534,11 @@ export default function VehiclesPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-16 rounded-xl border bg-card">
+            <div className="flex items-center justify-center py-10 rounded-xl border bg-card">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <div className="grid xl:grid-cols-2 gap-4">
+            <div className="grid xl:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <h2 className="text-sm font-semibold">Brands ({brands.length})</h2>
                 <ClientSideTable data={brands} columns={brandColumns} pageCount={Math.ceil(brands.length / 10) || 1} searchableColumns={[]} filterableColumns={[]} />
@@ -599,7 +602,7 @@ export default function VehiclesPage() {
           <div className="space-y-2">
             <h2 className="text-sm font-semibold">All Mappings ({allMappings.length})</h2>
             {loading ? (
-              <div className="flex items-center justify-center py-16 rounded-xl border bg-card">
+              <div className="flex items-center justify-center py-10 rounded-xl border bg-card">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : allMappings.length === 0 ? (
@@ -629,7 +632,7 @@ export default function VehiclesPage() {
           <h2 className="text-sm font-semibold">How Vehicle Compatibility Works</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Set up your catalog once — staff can find the right part in seconds</p>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
           {GUIDE.map((g) => (
             <Card key={g.title} className="hover:shadow-md transition-shadow">
               <CardContent className="p-4 space-y-2">

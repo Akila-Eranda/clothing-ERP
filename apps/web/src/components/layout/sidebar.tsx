@@ -361,8 +361,8 @@ export function Sidebar() {
             <span
               className={cn(
                 "flex-1 truncate leading-none",
-                nested ? "text-[12.5px]" : "text-[13.5px]",
-                isActive ? "font-semibold" : "font-medium",
+                nested ? "text-[13px]" : "text-[14.5px]",
+                isActive ? "font-bold" : "font-semibold",
               )}
               title={item.label}
             >
@@ -504,7 +504,7 @@ export function Sidebar() {
                 strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold" : "font-medium")}
+                className={cn("flex-1 text-[14.5px] leading-none truncate text-left", childActive ? "font-bold" : "font-semibold")}
               >
                 {item.label}
               </span>
@@ -517,7 +517,7 @@ export function Sidebar() {
                 strokeWidth={childActive ? 2.2 : 1.75}
               />
               <span
-                className={cn("flex-1 text-[13.5px] leading-none truncate text-left", childActive ? "font-semibold" : "font-medium")}
+                className={cn("flex-1 text-[14.5px] leading-none truncate text-left", childActive ? "font-bold" : "font-semibold")}
               >
                 {item.label}
               </span>
@@ -596,7 +596,7 @@ export function Sidebar() {
             <>
               <div className="flex-1 min-w-0">
                 <p
-                  className="text-[13.5px] font-bold leading-tight truncate"
+                  className="text-[14.5px] font-bold leading-tight truncate"
                   style={{ color: textFull }}
                   title={shopName}
                 >
@@ -649,7 +649,7 @@ export function Sidebar() {
             {navGroups.map((group, gi) => (
               <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                 {!sidebarCollapsed && (
-                  <p className="px-2.5 mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] leading-none select-none"
+                  <p className="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] leading-none select-none"
                     style={{ color: sectLbl }}>
                     {group.title}
                   </p>
@@ -691,12 +691,12 @@ export function Sidebar() {
                 onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
                 <Settings className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="flex-1 text-[13.5px]">Settings</span>
+                <span className="flex-1 text-[14.5px] font-semibold">Settings</span>
               </Link>
 
               <div className="flex h-10 items-center gap-3 rounded-lg px-2.5" style={{ color: textMut }}>
                 <Moon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="text-[13.5px] font-medium flex-1">Dark Mode</span>
+                <span className="text-[14.5px] font-semibold flex-1">Dark Mode</span>
                 <button
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
@@ -718,7 +718,7 @@ export function Sidebar() {
                 onMouseLeave={e => { e.currentTarget.style.background = ""; e.currentTarget.style.color = textMut; }}
               >
                 <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />
-                <span className="text-[13.5px]">Logout</span>
+                <span className="text-[14.5px] font-semibold">Logout</span>
               </button>
             </>
           )}
