@@ -34,6 +34,8 @@ interface NavItem {
   badge?: string;
   action?: () => void;
   children?: NavItem[];
+  /** Non-clickable label used to divide long dropdown menus. */
+  sectionLabel?: boolean;
   /** Extra path prefixes excluded when deciding if this item owns the current URL */
   peerHrefs?: string[];
 }
@@ -126,9 +128,11 @@ function useNavGroups(): NavGroup[] {
     { label: L["/accounting/ar-ap"] ?? "AR / AP", href: "/accounting/ar-ap", icon: Users },
     { label: L["/accounting/cash-bank"] ?? "Cash & Bank", href: "/accounting/cash-bank", icon: Landmark },
     { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
+    { label: "Advanced Accounting", icon: Zap, sectionLabel: true },
     { label: L["/accounting/vat"] ?? "VAT / Tax", href: "/accounting/vat", icon: FileText },
     { label: L["/accounting/petty-cash"] ?? "Petty Cash", href: "/accounting/petty-cash", icon: Wallet },
     { label: L["/accounting/payroll"] ?? "Payroll", href: "/accounting/payroll", icon: UserCheck },
+    { label: L["/accounting/fixed-assets"] ?? "Fixed Assets", href: "/accounting/fixed-assets", icon: Building2 },
     { label: L["/accounting/periods"] ?? "Periods", href: "/accounting/periods", icon: CalendarDays },
     { label: L["/accounting/audit"] ?? "Audit Trail", href: "/accounting/audit", icon: Shield },
     { label: L["/accounting/settings"] ?? "Settings", href: "/accounting/settings", icon: Settings },
@@ -148,6 +152,7 @@ function useNavGroups(): NavGroup[] {
       "/accounting/vat",
       "/accounting/petty-cash",
       "/accounting/payroll",
+      "/accounting/fixed-assets",
       "/accounting/periods",
       "/accounting/audit",
       "/accounting/transactions",
@@ -303,6 +308,25 @@ export function Sidebar() {
 
   /* ── leaf link / action button ── */
   const renderLeaf = (item: NavItem, key: string, nested = false, peerHrefs: string[] = []) => {
+    if (item.sectionLabel) {
+      if (sidebarCollapsed) {
+        return <div key={key} className="mx-auto my-2 h-px w-6" style={{ background: border }} />;
+      }
+      const SectionIcon = item.icon;
+      return (
+        <div key={key} className="px-3 pb-1 pt-3">
+          <div className="mb-1.5 h-px w-full" style={{ background: border }} />
+          <div
+            className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+            style={{ color: sectLbl }}
+          >
+            <SectionIcon className="h-3 w-3" strokeWidth={2} />
+            <span>{item.label}</span>
+          </div>
+        </div>
+      );
+    }
+
     const isActive = pathMatches(pathname, item.href, peerHrefs);
     const Icon = item.icon;
 
