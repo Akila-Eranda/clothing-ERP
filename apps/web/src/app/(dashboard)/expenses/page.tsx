@@ -6,6 +6,7 @@ import {
   BarChart2, X, Loader2, Activity,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -104,7 +105,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
           </div>
           <div className="space-y-1.5"><Label className="text-xs font-semibold">Reference</Label><Input placeholder="e.g. EXP-2024-001" value={reference} onChange={(e) => setReference(e.target.value)} /></div>
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving} className="bg-red-500 hover:bg-red-600 min-w-[110px]">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : edit ? "Save Changes" : "Record"}

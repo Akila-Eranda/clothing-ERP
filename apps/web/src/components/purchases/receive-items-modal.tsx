@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, PackageCheck, Loader2, CheckCircle2, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -386,7 +387,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}

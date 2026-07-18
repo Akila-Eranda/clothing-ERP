@@ -6,6 +6,7 @@ import {
   Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalFooterButtonClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,7 +19,7 @@ import { DataTableColumnHeader } from "@/components/table/data-table-column-head
 import { TableActionsRow } from "@/components/table/table-actions-row";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, cn } from "@/lib/utils";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
 import { ModuleGate } from "@/components/shop/module-gate";
@@ -693,7 +694,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
         </div>
 
         {/* Footer nav */}
-        <div className="flex items-center justify-between px-6 py-4 border-t bg-muted/10 shrink-0">
+        <div className={cn(modalFooterButtonClass, "flex items-center justify-between px-6 py-4 border-t bg-muted/10 shrink-0")}>
           <Button variant="outline" onClick={() => step === 0 ? onClose() : setStep((s) => s - 1)} disabled={submitting}>
             {step === 0 ? "Cancel" : "← Back"}
           </Button>

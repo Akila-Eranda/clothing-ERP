@@ -7,6 +7,7 @@ import {
   Banknote, ClipboardList, Send, CheckCircle2, Package,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -886,7 +887,7 @@ export default function ServicesPage() {
                 <Label className="text-xs">Description (optional)</Label>
                 <Textarea rows={2} value={serviceForm.description} onChange={(e) => setServiceForm((f) => ({ ...f, description: e.target.value }))} />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className={modalInlineFooterClass}>
                 <Button variant="outline" onClick={() => setCreateServiceOpen(false)}>Cancel</Button>
                 <Button onClick={createService} disabled={saving || !serviceForm.code || !serviceForm.name} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
@@ -932,7 +933,7 @@ export default function ServicesPage() {
                 <Label className="text-xs">Message</Label>
                 <Textarea rows={3} placeholder="Hi, your service appointment is tomorrow at 10:00 AM…" value={remForm.message} onChange={(e) => setRemForm((f) => ({ ...f, message: e.target.value }))} />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className={modalInlineFooterClass}>
                 <Button variant="outline" onClick={() => setCreateReminderOpen(false)}>Cancel</Button>
                 <Button onClick={createReminder} disabled={saving} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
@@ -967,7 +968,7 @@ export default function ServicesPage() {
                 <Label className="text-xs">DOT code (optional)</Label>
                 <Input placeholder="2524" value={serialForm.dotCode} onChange={(e) => setSerialForm((f) => ({ ...f, dotCode: e.target.value }))} />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className={modalInlineFooterClass}>
                 <Button variant="outline" onClick={() => setCreateSerialOpen(false)}>Cancel</Button>
                 <Button onClick={addSerial} disabled={saving} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Hash className="h-4 w-4" />}

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { X, ArrowLeftRight, Plus, Trash2, Loader2, Search, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -305,7 +306,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading || !items.length || !toBranchId} className="gap-1.5 min-w-[140px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}

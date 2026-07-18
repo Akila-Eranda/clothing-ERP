@@ -7,6 +7,7 @@ import {
   Banknote, Wrench, Package, Play, FileCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -580,7 +581,7 @@ export default function JobCardsPage() {
                   placeholder="e.g. Front tyres worn, need balancing after replacement"
                 />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className={modalInlineFooterClass}>
                 <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>
                   Cancel
                 </Button>

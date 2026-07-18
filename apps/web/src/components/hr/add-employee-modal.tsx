@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, UserCog, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -161,7 +162,7 @@ export function AddEmployeeModal({ open, onClose, onSaved, editEmployee }: Props
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10 shrink-0">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[130px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserCog className="h-3.5 w-3.5" />}

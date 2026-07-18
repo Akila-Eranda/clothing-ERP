@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, Loader2, RotateCcw, Skull, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -203,7 +204,7 @@ export function LotActionModal({ open, mode, lot, onClose, onDone }: Props) {
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" size="sm" onClick={onClose} disabled={loading}>
             Cancel
           </Button>

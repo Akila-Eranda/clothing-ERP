@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -638,7 +639,7 @@ export function ChequesHub() {
                 <Input className="h-9" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+            <div className={modalBarFooterClass}>
               <Button variant="outline" size="sm" disabled={saving} onClick={() => setRegisterOpen(false)}>
                 Cancel
               </Button>
@@ -684,7 +685,7 @@ export function ChequesHub() {
                 </Select>
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+            <div className={modalBarFooterClass}>
               <Button variant="outline" size="sm" disabled={!!busyId} onClick={() => setClearTarget(null)}>
                 Cancel
               </Button>

@@ -6,6 +6,7 @@ import {
   User, RefreshCw, Search, Trash2, Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -410,7 +411,7 @@ export default function UsersPage() {
                   <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
                 </Select></div>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className={modalInlineFooterClass}>
               <Button variant="outline" onClick={() => setUserModal(false)} disabled={saving}>Cancel</Button>
               <Button
                 variant="gradient"
@@ -442,7 +443,7 @@ export default function UsersPage() {
               </Select>
               <p className="text-[10px] text-muted-foreground mt-1">Existing roles only</p>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className={modalInlineFooterClass}>
               <Button variant="outline" onClick={() => setRoleAssignModal(null)} disabled={saving}>Cancel</Button>
               <Button variant="gradient" onClick={handleAssignRole} disabled={saving || !selectedRoleId}>{saving ? "Saving…" : "Assign Role"}</Button>
             </div>

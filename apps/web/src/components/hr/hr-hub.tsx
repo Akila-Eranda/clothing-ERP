@@ -8,6 +8,7 @@ import {
   X, FileText, BarChart3, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -114,7 +115,7 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
           </div>
           <p className="text-xs text-amber-600 bg-amber-500/10 rounded-lg px-3 py-2">Existing payroll entries for this month will be overwritten.</p>
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 min-w-[140px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DollarSign className="h-3.5 w-3.5" />} Generate All
@@ -177,7 +178,7 @@ function NewLeaveModal({ employees, onClose, onSaved }: { employees: Employee[];
           <p className="text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2 font-medium">Duration: {days} day{days > 1 ? "s" : ""}</p>
           <div className="space-y-1.5"><Label className="text-xs font-semibold">Reason</Label><Input placeholder="Brief reason for leave…" value={reason} onChange={(e) => setReason(e.target.value)} /></div>
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading || !empId} className="gap-1.5 min-w-[130px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CalendarDays className="h-3.5 w-3.5" />} Submit Leave

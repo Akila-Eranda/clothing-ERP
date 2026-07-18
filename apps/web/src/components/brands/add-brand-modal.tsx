@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Star, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -121,7 +122,7 @@ export function AddBrandModal({ open, onClose, onSaved, editBrand, copy }: Props
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={handleClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[120px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Star className="h-3.5 w-3.5" />}

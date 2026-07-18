@@ -7,6 +7,7 @@ import {
   CheckCircle2, XCircle, FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -503,7 +504,7 @@ export default function WarrantyPage() {
                 <Label className="text-xs">Issue description</Label>
                 <Textarea rows={3} value={form.issueDescription} onChange={(e) => setForm((f) => ({ ...f, issueDescription: e.target.value }))} placeholder="Describe the defect or failure…" />
               </div>
-              <div className="flex justify-end gap-2 pt-2 border-t">
+              <div className={modalInlineFooterClass}>
                 <Button variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
                 <Button onClick={createClaim} disabled={saving || !form.customerId || !form.variantId} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}

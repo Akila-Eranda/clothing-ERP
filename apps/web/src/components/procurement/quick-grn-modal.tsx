@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Zap, Loader2, PackageCheck, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -179,7 +180,7 @@ export function QuickGrnModal({ open, onClose, onPosted, suppliers, showExpiry, 
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-6 py-4 border-t bg-muted/30">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
           <Button onClick={submit} disabled={busy} className="gap-1.5">
             {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}

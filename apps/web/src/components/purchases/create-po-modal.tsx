@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { X, ShoppingBag, Plus, Trash2, Loader2, Search, ChevronRight, CheckCircle2, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -331,7 +332,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-2 px-6 py-3 border-t bg-muted/10 shrink-0">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading || !items.length} className="gap-1.5 min-w-[160px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShoppingBag className="h-3.5 w-3.5" />}

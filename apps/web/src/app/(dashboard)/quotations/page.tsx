@@ -7,6 +7,7 @@ import {
   Clock, Banknote, ExternalLink, Package, XCircle, Printer, GitBranch,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalFooterButtonClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -834,7 +835,7 @@ export default function QuotationsPage() {
 
             <div className="flex justify-between items-center pt-2 border-t">
               <span className="font-bold">Total: LKR {formatNumber(totalPreview)}</span>
-              <div className="flex gap-2">
+              <div className={cn(modalFooterButtonClass, "flex gap-2")}>
                 <Button type="button" variant="outline" onClick={() => { setCreateOpen(false); resetForm(); }}>Cancel</Button>
                 <Button type="button" onClick={createQuote} disabled={saving || !canSave} className="gap-1.5">
                   {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}

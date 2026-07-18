@@ -6,6 +6,7 @@ import {
   RefreshCw, Tag, Percent, DollarSign, Gift, Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -340,7 +341,7 @@ export default function PromotionsPage() {
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2 border-t">
+            <div className={modalInlineFooterClass}>
               <Button variant="outline" onClick={() => setModalOpen(false)} disabled={saving}>Cancel</Button>
               <Button variant="gradient" onClick={handleSave} disabled={saving}>
                 {saving ? "Saving…" : editing ? "Update" : "Create"}

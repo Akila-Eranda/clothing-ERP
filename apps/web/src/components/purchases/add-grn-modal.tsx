@@ -5,9 +5,11 @@ import {
   Loader2, Package, PackageCheck, Plus, Search, ScanLine, Trash2, X, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalFooterButtonClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
 
 type Supplier = { id: string; name: string; phone?: string | null };
@@ -707,14 +709,14 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className={cn(modalFooterButtonClass, "flex items-center gap-2 shrink-0")}>
             <Button variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
             <Button
               onClick={submit}
               disabled={loading || booting || !supplierId || items.length === 0}
-              className="gap-2 min-w-[170px] h-[42px] font-semibold text-white border-0 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-[0_2px_12px_rgba(16,185,129,0.35)] hover:shadow-[0_4px_16px_rgba(16,185,129,0.45)] active:scale-[0.98] transition-all disabled:from-emerald-600/40 disabled:to-teal-600/40 disabled:text-white/70 disabled:shadow-none"
+              className="gap-2 min-w-[170px] font-semibold text-white border-0 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-[0_2px_12px_rgba(16,185,129,0.35)] hover:shadow-[0_4px_16px_rgba(16,185,129,0.45)] active:scale-[0.98] transition-all disabled:from-emerald-600/40 disabled:to-teal-600/40 disabled:text-white/70 disabled:shadow-none"
             >
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackageCheck className="h-4 w-4" />}
               {payNow ? "Post GRN & Pay" : "Post GRN"}

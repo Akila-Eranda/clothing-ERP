@@ -7,6 +7,7 @@ import {
   BarChart2, CreditCard, Wallet, Scale, Printer, Activity, Building2, Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -164,7 +165,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
             </div>
           )}
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving} className="min-w-[100px]">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : edit ? "Update" : "Record"}
@@ -219,7 +220,7 @@ function AccountModal({ edit, onClose, onSaved }: { edit?: Account | null; onClo
           <div className="space-y-1.5"><Label className="text-xs font-semibold">Account Name *</Label><Input placeholder="e.g. Cash in Hand" value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label className="text-xs font-semibold">Description</Label><Input placeholder="Optional…" value={desc} onChange={(e) => setDesc(e.target.value)} /></div>
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving}>{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : edit ? "Save Changes" : "Create"}</Button>
         </div>
@@ -297,7 +298,7 @@ function JournalModal({ accounts, onClose, onSaved }: { accounts: Account[]; onC
             <p className="text-[10px] text-muted-foreground">Total: LKR {formatNumber(lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0))}</p>
           </div>
         </div>
-        <div className="flex justify-end gap-2 px-6 py-4 border-t bg-muted/10">
+        <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
           <Button onClick={save} disabled={saving} className="min-w-[120px]">{saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Post Entry"}</Button>
         </div>

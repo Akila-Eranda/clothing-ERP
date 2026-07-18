@@ -9,6 +9,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { formatNumber } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable } from "@/components/table/client-side-table";
@@ -304,18 +305,17 @@ function SaleDetailModal({
             </div>
 
             {/* Footer */}
-            <div className="shrink-0 border-t px-5 sm:px-6 py-3 flex flex-wrap items-center justify-end gap-2 bg-muted/10">
+            <div className={modalBarFooterClass}>
               {sale.status !== "REFUNDED" && (
                 <Button
                   variant="outline"
-                  size="sm"
-                  className="gap-1.5 border-blue-200 text-blue-700 hover:bg-blue-50"
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
                   onClick={() => onReturn(sale.invoiceNumber)}
                 >
                   <RotateCcw className="h-3.5 w-3.5" /> Process return
                 </Button>
               )}
-              <Button variant="outline" size="sm" onClick={onClose}>
+              <Button variant="outline" onClick={onClose}>
                 Close
               </Button>
             </div>

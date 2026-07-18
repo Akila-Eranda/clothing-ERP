@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -732,7 +733,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 px-5 py-4 border-t bg-muted/10">
+            <div className={modalBarFooterClass}>
               <Button variant="outline" size="sm" disabled={payBusy} onClick={() => setPayCustomer(null)}>
                 Cancel
               </Button>
