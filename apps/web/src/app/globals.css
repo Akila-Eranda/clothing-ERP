@@ -76,7 +76,7 @@
     --warning: 33 95% 44%;
     --warning-foreground: 0 0% 100%;
     --border: 221 22% 86%;              /* light refined hairline */
-    --input: 221 22% 86%;
+    --input: 221 18% 78%;               /* darker outline so inputs read clearly on cards */
     --ring: 243 75% 59%;
     --line: 224 30% 18%;
     --radius: 0.75rem;
@@ -116,7 +116,7 @@
     --destructive: 0 63% 50%;
     --destructive-foreground: 210 20% 98%;
     --border: 216 34% 17%;
-    --input: 216 34% 17%;
+    --input: 216 28% 26%;               /* lighter outline so inputs read clearly on dark cards */
     --ring: 239 84% 67%;
     --chart-1: 239 84% 67%;
     --chart-2: 160 60% 45%;
@@ -389,24 +389,63 @@
     @apply bg-muted/50;
   }
 
-  /* Enterprise data tables (light) */
+  /* ── Data tables (react-table-craft via [data-table-craft] wrapper) ──
+     One solid card surface for toolbar + table + pagination so the block
+     never shows the page canvas through, in light or dark mode. */
+  [data-table-craft] {
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
+  }
+  .dark [data-table-craft] {
+    border-color: rgba(255, 255, 255, 0.12);
+    box-shadow: none;
+  }
+
+  /* Inner table frame sits on the same card surface */
+  [data-table-craft] table {
+    background: hsl(var(--card));
+  }
+
+  /* Search boxes + filter inputs: solid fill + clear outline in both themes */
+  [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
+    background: hsl(0 0% 100%);
+    border-color: hsl(var(--input));
+  }
+  .dark [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
+    background: hsl(var(--secondary) / 0.6);
+  }
+  [data-table-craft] button[role="combobox"] {
+    background: hsl(0 0% 100%);
+    border-color: hsl(var(--input));
+  }
+  .dark [data-table-craft] button[role="combobox"] {
+    background: hsl(var(--secondary) / 0.6);
+  }
+
+  /* Enterprise header + row treatment */
   :root:not(.dark) .enterprise-table,
-  :root:not(.dark) [data-table-craft] table,
-  :root:not(.dark) .rtc-table {
+  :root:not(.dark) [data-table-craft] table {
     border-collapse: separate;
     border-spacing: 0;
   }
   :root:not(.dark) .enterprise-table thead,
-  :root:not(.dark) [data-table-craft] thead,
-  :root:not(.dark) .rtc-table thead {
+  :root:not(.dark) [data-table-craft] thead {
     background: linear-gradient(180deg, hsl(222 30% 96%), hsl(220 26% 94%));
     position: sticky;
     top: 0;
     z-index: 1;
   }
+  .dark [data-table-craft] thead {
+    background: hsl(var(--muted) / 0.5);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
   :root:not(.dark) .enterprise-table th,
-  :root:not(.dark) [data-table-craft] th,
-  :root:not(.dark) .rtc-table th {
+  :root:not(.dark) [data-table-craft] th {
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
     font-size: 11.5px;
@@ -416,24 +455,20 @@
     height: 44px;
   }
   :root:not(.dark) .enterprise-table td,
-  :root:not(.dark) [data-table-craft] td,
-  :root:not(.dark) .rtc-table td {
+  :root:not(.dark) [data-table-craft] td {
     border-bottom: 1px solid hsl(var(--border) / 0.45);
     height: 52px;
   }
   :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
-  :root:not(.dark) [data-table-craft] tbody tr:nth-child(even),
-  :root:not(.dark) .rtc-table tbody tr:nth-child(even) {
+  :root:not(.dark) [data-table-craft] tbody tr:nth-child(even) {
     background: hsl(220 30% 96.5%);
   }
   :root:not(.dark) .enterprise-table tbody tr:hover,
-  :root:not(.dark) [data-table-craft] tbody tr:hover,
-  :root:not(.dark) .rtc-table tbody tr:hover {
+  :root:not(.dark) [data-table-craft] tbody tr:hover {
     background: hsl(231 100% 96.5%);
   }
   :root:not(.dark) .enterprise-table tbody tr,
-  :root:not(.dark) [data-table-craft] tbody tr,
-  :root:not(.dark) .rtc-table tbody tr {
+  :root:not(.dark) [data-table-craft] tbody tr {
     transition: background-color 0.12s ease;
   }
 

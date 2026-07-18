@@ -231,7 +231,7 @@ export function Header() {
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder="Search products, customers..."
-            className="w-64 pl-8 h-10 text-sm bg-card/90 dark:bg-muted/50 border-border shadow-sm rounded-[10px]"
+            className="w-64 pl-8 h-10 text-sm shadow-sm rounded-[10px]"
             onFocus={() => setSearchOpen(true)}
             onBlur={() => setSearchOpen(false)}
           />

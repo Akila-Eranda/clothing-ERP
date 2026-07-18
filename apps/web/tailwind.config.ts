@@ -67,6 +67,26 @@ const config: Config = {
           "4": "hsl(var(--chart-4))",
           "5": "hsl(var(--chart-5))",
         },
+        /* Tokens consumed by react-table-craft (bg-brand, bg-main-300, …).
+           Without these the package classes compile to nothing and its
+           buttons/badges/dividers render transparent. */
+        brand: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))",
+          muted: "hsl(var(--accent))",
+        },
+        main: {
+          DEFAULT: "hsl(var(--muted-foreground))",
+          "300": "hsl(var(--border))",
+        },
+        "tab-teal": {
+          DEFAULT: "#0D9488",
+          "800": "#115E59",
+        },
+        "tab-turquoise": {
+          DEFAULT: "#0891B2",
+          "800": "#155E75",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
