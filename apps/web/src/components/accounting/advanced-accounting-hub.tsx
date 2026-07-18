@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Activity, ArrowRightLeft, BarChart3, Building2, CalendarClock, CheckCircle2,
+  Activity, ArrowRightLeft, BarChart3, Building2, CheckCircle2,
   CircleDollarSign, Gauge, Layers3, Loader2, Play, Plus, RefreshCw, Repeat2,
-  ShieldCheck, Sparkles, Target, TrendingUp, WalletCards, XCircle,
+  ShieldCheck, Sparkles, Target, TrendingUp, WalletCards,
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
