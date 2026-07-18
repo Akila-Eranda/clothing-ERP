@@ -1229,7 +1229,7 @@ export class TenantsService {
     const bool = (v: unknown, fallback: boolean) =>
       typeof v === 'boolean' ? v : fallback;
     return {
-      allowNegativeStock: bool(pos['allowNegativeStock'] ?? s['allowNegativeStock'] ?? s['negativeStock'], false),
+      allowNegativeStock: bool(pos['allowNegativeStock'] ?? s['allowNegativeStock'] ?? s['negativeStock'], true),
       autoPrint: bool(pos['autoPrint'] ?? s['autoPrint'], false),
       roundOff: bool(pos['roundOff'] ?? s['roundOff'], true),
       loyalty: bool(pos['loyalty'] ?? s['loyalty'], true),

@@ -390,7 +390,7 @@ export default function SettingsPage() {
   const logoInputRef = React.useRef<HTMLInputElement>(null);
 
   const [posForm, setPosForm] = React.useState({
-    allowNegativeStock: false,
+    allowNegativeStock: true,
     autoPrint: false,
     roundOff: true,
     loyalty: true,

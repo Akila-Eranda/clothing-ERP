@@ -109,7 +109,7 @@ export class InventoryService {
     return normalizeBlockExpired(settings.posBlockExpired ?? settings.blockExpiredLots);
   }
 
-  /** Allow selling below zero stock — tenant.settings.pos.allowNegativeStock (default OFF). */
+  /** Allow selling below zero stock — tenant.settings.pos.allowNegativeStock (default ON). */
   private async resolveAllowNegativeStock(tenantId: string): Promise<boolean> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -118,7 +118,7 @@ export class InventoryService {
     const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
     const pos = (settings.pos as Record<string, unknown>) ?? {};
     const v = pos.allowNegativeStock ?? settings.allowNegativeStock ?? settings.negativeStock;
-    return v === true;
+    return typeof v === 'boolean' ? v : true;
   }
 
   private async resolveTenantLotSettings(tenantId: string) {
@@ -128,10 +128,11 @@ export class InventoryService {
     });
     const settings = (tenant?.settings ?? {}) as Record<string, unknown>;
     const pos = (settings.pos as Record<string, unknown>) ?? {};
+    const neg = pos.allowNegativeStock ?? settings.allowNegativeStock ?? settings.negativeStock;
     return {
       strategy: normalizeLotStrategy(settings.lotAllocation ?? settings.inventoryLotStrategy),
       blockExpired: normalizeBlockExpired(settings.posBlockExpired ?? settings.blockExpiredLots),
-      allowNegativeStock: (pos.allowNegativeStock ?? settings.allowNegativeStock ?? settings.negativeStock) === true,
+      allowNegativeStock: typeof neg === 'boolean' ? neg : true,
     };
   }
 

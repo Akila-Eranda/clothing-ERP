@@ -62,7 +62,7 @@ export function writePosQtyPopup(on: boolean): boolean {
 }
 
 export function readPosAllowNegativeStock(): boolean {
-  return readBool(POS_ALLOW_NEGATIVE_STOCK_KEY, false);
+  return readBool(POS_ALLOW_NEGATIVE_STOCK_KEY, true);
 }
 
 export function writePosAllowNegativeStock(on: boolean): boolean {
