@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2, Eye, FilePlus2, Loader2, Pencil, Printer, RefreshCw,
-  Send, ShieldCheck, Trash2, X, XCircle,
+  Send, ShieldCheck, Sparkles, Trash2, X, XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -544,11 +544,13 @@ export function JournalsHub() {
   const [entries, setEntries] = useState<JournalEntry[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
   const [status, setStatus] = useState<string>("ALL");
   const [q, setQ] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<JournalEntry | null>(null);
   const [viewEntry, setViewEntry] = useState<JournalEntry | null>(null);
+  const autoGenTried = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -579,6 +581,41 @@ export function JournalsHub() {
     void load();
   }, [load]);
 
+  const generateFromTransactions = async () => {
+    setGenerating(true);
+    try {
+      await api.post("/accounting/bootstrap", {});
+      const res = await api.post<{
+        journalsPosted: number;
+        alreadyPostedOrSkipped: number;
+        sales: number;
+        grns: number;
+        expenses: number;
+        supplierPayments: number;
+      }>("/accounting/backfill?limit=500", {});
+      const d = res.data;
+      toast.success(
+        `Generated ${d?.journalsPosted ?? 0} journals from ` +
+          `${d?.sales ?? 0} sales, ${d?.grns ?? 0} GRNs, ${d?.expenses ?? 0} expenses`,
+      );
+      await load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to generate journals");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // First visit with empty ledger — auto-generate once
+  useEffect(() => {
+    if (loading || generating || autoGenTried.current) return;
+    if (entries.length > 0) return;
+    if (status !== "ALL" || q.trim()) return;
+    autoGenTried.current = true;
+    void generateFromTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, entries.length, status, q]);
+
   const openView = async (id: string) => {
     try {
       const res = await api.get<JournalEntry>(`/accounting/journal-entries/${id}`);
@@ -603,9 +640,19 @@ export function JournalsHub() {
             Double-entry journal vouchers — draft, approve, post, and print
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 mr-1 ${loading ? "animate-spin" : ""}`} /> Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void generateFromTransactions()}
+            disabled={generating}
+            className="gap-1.5"
+          >
+            {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Generate from sales
           </Button>
           <Button
             size="sm"
@@ -618,6 +665,23 @@ export function JournalsHub() {
           </Button>
         </div>
       </div>
+
+      {!loading && entries.length === 0 && (
+        <Card className="border-primary/30 bg-primary/[0.03]">
+          <CardContent className="p-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold">No journal entries yet</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Auto-create balanced GL journals from past POS sales, GRNs, expenses, and payments.
+              </p>
+            </div>
+            <Button size="sm" onClick={() => void generateFromTransactions()} disabled={generating} className="gap-1.5">
+              {generating ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              Generate journals now
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex flex-wrap gap-2 items-center">
         <Input
