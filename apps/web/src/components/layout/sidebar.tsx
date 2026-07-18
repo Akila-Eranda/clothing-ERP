@@ -128,7 +128,7 @@ function useNavGroups(): NavGroup[] {
     { label: L["/accounting/cash-bank"] ?? "Cash & Bank", href: "/accounting/cash-bank", icon: Landmark },
     { label: L["/accounting/finance/cheques"] ?? "Cheques", href: "/accounting/finance/cheques", icon: FileCheck },
     { label: "Advanced Accounting", icon: Zap, sectionLabel: true },
-    { label: "Advanced Command Center", href: "/accounting/advanced", icon: Zap },
+    { label: "Command Center", href: "/accounting/advanced", icon: Zap },
     { label: L["/accounting/vat"] ?? "VAT / Tax", href: "/accounting/vat", icon: FileText },
     { label: L["/accounting/petty-cash"] ?? "Petty Cash", href: "/accounting/petty-cash", icon: Wallet },
     { label: L["/accounting/payroll"] ?? "Payroll", href: "/accounting/payroll", icon: UserCheck },
