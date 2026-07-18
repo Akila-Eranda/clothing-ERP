@@ -55,6 +55,15 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
 
 const LS_KEY = "receipt_settings_cache";
 
+/** Fired after receipt settings are saved so live consumers (sidebar, POS) refresh instantly. */
+export const RECEIPT_SETTINGS_EVENT = "receipt-settings-updated";
+
+export function notifyReceiptSettingsUpdated() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(RECEIPT_SETTINGS_EVENT));
+  }
+}
+
 function fromCache(): ReceiptSettings | null {
   if (typeof window === "undefined") return null;
   try {
@@ -83,6 +92,16 @@ export function useReceiptSettings() {
   }, []);
 
   React.useEffect(() => { load(); }, [load]);
+
+  React.useEffect(() => {
+    const onUpdated = () => {
+      const cached = fromCache();
+      if (cached) setSettings(cached);
+      load();
+    };
+    window.addEventListener(RECEIPT_SETTINGS_EVENT, onUpdated);
+    return () => window.removeEventListener(RECEIPT_SETTINGS_EVENT, onUpdated);
+  }, [load]);
 
   return { settings, loading, reload: load };
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
-  ArrowLeftRight, BookOpen, Building2, Landmark, Loader2, Plus, RefreshCw,
+  ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Banknote, BookOpen, Building2,
+  Landmark, LayoutGrid, Loader2, Plus, RefreshCw, Scale, Wallet,
 } from "lucide-react";
-import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,7 +26,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
-type Tab = "cash" | "bank" | "recon";
+type Tab = "accounts" | "cash" | "bank" | "recon";
 
 type BankAccount = {
   id: string;
@@ -100,19 +100,26 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function CashBankHub({ initialTab = "cash" }: { initialTab?: Tab }) {
+export function CashBankHub({ initialTab = "accounts" }: { initialTab?: Tab }) {
   useShopWorkspace();
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [bookAccountId, setBookAccountId] = useState<string | undefined>();
 
   useEffect(() => {
     setTab(initialTab);
   }, [initialTab]);
 
   const tabs: { id: Tab; label: string; icon: typeof BookOpen }[] = [
+    { id: "accounts", label: "Accounts", icon: LayoutGrid },
     { id: "cash", label: "Cash Book", icon: BookOpen },
     { id: "bank", label: "Bank Book", icon: Landmark },
     { id: "recon", label: "Reconciliation", icon: Building2 },
   ];
+
+  const openBook = (accountId: string) => {
+    setBookAccountId(accountId);
+    setTab("bank");
+  };
 
   return (
     <div className="space-y-4 p-4 md:p-6">
@@ -144,9 +151,464 @@ export function CashBankHub({ initialTab = "cash" }: { initialTab?: Tab }) {
         })}
       </div>
 
+      {tab === "accounts" && (
+        <AccountsOverviewPanel onOpenBook={openBook} onReconcile={() => setTab("recon")} />
+      )}
       {tab === "cash" && <CashBookPanel />}
-      {tab === "bank" && <BankBookPanel />}
+      {tab === "bank" && <BankBookPanel initialAccountId={bookAccountId} />}
       {tab === "recon" && <ReconciliationPanel />}
+    </div>
+  );
+}
+
+/* ── Accounts overview (liquidity rail + account cards) ── */
+
+const CASH_TYPES = ["CASH_IN_HAND", "PETTY_CASH"];
+const BANK_TYPES = ["CURRENT", "SAVINGS"];
+
+function typeLabel(t: string) {
+  switch (t) {
+    case "CASH_IN_HAND": return "Cash in hand";
+    case "PETTY_CASH": return "Petty cash";
+    case "CURRENT": return "Current";
+    case "SAVINGS": return "Savings";
+    default: return t.replace(/_/g, " ").toLowerCase();
+  }
+}
+
+function AccountsOverviewPanel({
+  onOpenBook,
+  onReconcile,
+}: {
+  onOpenBook: (accountId: string) => void;
+  onReconcile: () => void;
+}) {
+  const [banks, setBanks] = useState<BankAccount[]>([]);
+  const [glAccounts, setGlAccounts] = useState<GlAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // quick transaction dialog
+  const [txnAccount, setTxnAccount] = useState<BankAccount | null>(null);
+  const [txnType, setTxnType] = useState<"DEPOSIT" | "WITHDRAWAL">("DEPOSIT");
+  const [txnAmt, setTxnAmt] = useState("");
+  const [txnDesc, setTxnDesc] = useState("");
+  const [txnDate, setTxnDate] = useState(today());
+  const [txnBusy, setTxnBusy] = useState(false);
+
+  // transfer dialog
+  const [xferFrom, setXferFrom] = useState<BankAccount | null>(null);
+  const [xferTo, setXferTo] = useState("");
+  const [xferAmt, setXferAmt] = useState("");
+  const [xferDesc, setXferDesc] = useState("");
+  const [xferBusy, setXferBusy] = useState(false);
+
+  // add account dialog
+  const [addOpen, setAddOpen] = useState(false);
+  const [baCode, setBaCode] = useState("");
+  const [baName, setBaName] = useState("");
+  const [baType, setBaType] = useState("CURRENT");
+  const [baBank, setBaBank] = useState("");
+  const [baOpen, setBaOpen] = useState("0");
+  const [baGl, setBaGl] = useState("");
+  const [baBusy, setBaBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [b, a] = await Promise.all([
+        api.get<BankAccount[]>("/accounting/bank-accounts"),
+        api.get<{ data: GlAccount[] }>("/accounting/accounts?flat=true"),
+      ]);
+      setBanks(Array.isArray(b.data) ? b.data : []);
+      setGlAccounts(a.data?.data ?? []);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Failed to load accounts");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const cashAccounts  = useMemo(() => banks.filter((b) => CASH_TYPES.includes(b.type)), [banks]);
+  const bankAccounts  = useMemo(() => banks.filter((b) => BANK_TYPES.includes(b.type)), [banks]);
+  const otherAccounts = useMemo(
+    () => banks.filter((b) => !CASH_TYPES.includes(b.type) && !BANK_TYPES.includes(b.type)),
+    [banks],
+  );
+
+  const cashTotal  = cashAccounts.reduce((s, b) => s + b.currentBalance, 0);
+  const bankTotal  = bankAccounts.reduce((s, b) => s + b.currentBalance, 0);
+  const otherTotal = otherAccounts.reduce((s, b) => s + b.currentBalance, 0);
+  const totalLiquidity = cashTotal + bankTotal + otherTotal;
+
+  const openTxn = (b: BankAccount, type: "DEPOSIT" | "WITHDRAWAL") => {
+    setTxnAccount(b);
+    setTxnType(type);
+    setTxnAmt("");
+    setTxnDesc("");
+    setTxnDate(today());
+  };
+
+  const postTxn = async () => {
+    const amt = parseFloat(txnAmt);
+    if (!txnAccount || !(amt > 0)) {
+      toast.error("Amount required");
+      return;
+    }
+    setTxnBusy(true);
+    try {
+      await api.post("/accounting/bank-transactions", {
+        bankAccountId: txnAccount.id,
+        type: txnType,
+        amount: amt,
+        txnDate,
+        description: txnDesc || undefined,
+      });
+      toast.success(txnType === "DEPOSIT" ? "Money in recorded" : "Money out recorded");
+      setTxnAccount(null);
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Post failed");
+    } finally {
+      setTxnBusy(false);
+    }
+  };
+
+  const transfer = async () => {
+    const amt = parseFloat(xferAmt);
+    if (!xferFrom || !xferTo || !(amt > 0)) {
+      toast.error("Destination and amount required");
+      return;
+    }
+    setXferBusy(true);
+    try {
+      await api.post("/accounting/bank-transfers", {
+        fromAccountId: xferFrom.id,
+        toAccountId: xferTo,
+        amount: amt,
+        description: xferDesc || undefined,
+      });
+      toast.success("Transfer completed");
+      setXferFrom(null);
+      setXferTo("");
+      setXferAmt("");
+      setXferDesc("");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Transfer failed");
+    } finally {
+      setXferBusy(false);
+    }
+  };
+
+  const createBank = async () => {
+    if (!baCode || !baName) {
+      toast.error("Code and name required");
+      return;
+    }
+    setBaBusy(true);
+    try {
+      await api.post("/accounting/bank-accounts", {
+        code: baCode,
+        name: baName,
+        type: baType,
+        bankName: baBank || undefined,
+        openingBalance: parseFloat(baOpen) || 0,
+        glAccountId: baGl || undefined,
+      });
+      toast.success("Account created");
+      setAddOpen(false);
+      setBaCode(""); setBaName(""); setBaBank(""); setBaOpen("0"); setBaGl("");
+      await load();
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : "Create failed");
+    } finally {
+      setBaBusy(false);
+    }
+  };
+
+  const summaryRows = [
+    { label: "Cash", value: cashTotal, count: cashAccounts.length, icon: Banknote, tone: "text-emerald-600 bg-emerald-50" },
+    { label: "Bank", value: bankTotal, count: bankAccounts.length, icon: Landmark, tone: "text-indigo-600 bg-indigo-50" },
+    ...(otherAccounts.length
+      ? [{ label: "Other", value: otherTotal, count: otherAccounts.length, icon: Wallet, tone: "text-teal-600 bg-teal-50" }]
+      : []),
+  ];
+
+  const accountCard = (b: BankAccount) => {
+    const negative = b.currentBalance < 0;
+    const isCash = CASH_TYPES.includes(b.type);
+    return (
+      <div
+        key={b.id}
+        className="rounded-xl bg-card ring-1 ring-slate-900/[0.05] p-4 flex flex-col gap-3 hover:ring-primary/25 transition-all"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <button
+              type="button"
+              onClick={() => onOpenBook(b.id)}
+              title="Open account book"
+              className="text-sm font-semibold text-left text-foreground hover:text-primary hover:underline underline-offset-2 truncate block max-w-full"
+            >
+              {b.name}
+            </button>
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+              {typeLabel(b.type)}{b.bankName ? ` · ${b.bankName}` : ""} · <span className="font-mono">{b.code}</span>
+            </p>
+          </div>
+          <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${isCash ? "bg-emerald-50 text-emerald-600" : "bg-indigo-50 text-indigo-600"}`}>
+            {isCash ? <Banknote className="h-4 w-4" /> : <Landmark className="h-4 w-4" />}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Balance</p>
+          <p className={`text-lg font-bold tabular-nums ${negative ? "text-red-600" : "text-foreground"}`}>
+            LKR {formatNumber(b.currentBalance)}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-1.5 mt-auto">
+          <button
+            type="button"
+            onClick={() => openTxn(b, "DEPOSIT")}
+            className="inline-flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 ring-1 ring-emerald-600/10 hover:bg-emerald-100 transition-colors"
+          >
+            <ArrowDownCircle className="h-3.5 w-3.5" /> In
+          </button>
+          <button
+            type="button"
+            onClick={() => openTxn(b, "WITHDRAWAL")}
+            className="inline-flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-semibold bg-red-50 text-red-600 ring-1 ring-red-600/10 hover:bg-red-100 transition-colors"
+          >
+            <ArrowUpCircle className="h-3.5 w-3.5" /> Out
+          </button>
+          <button
+            type="button"
+            onClick={() => { setXferFrom(b); setXferTo(""); setXferAmt(""); setXferDesc(""); }}
+            className="inline-flex items-center justify-center gap-1 h-8 rounded-lg text-xs font-semibold bg-muted text-muted-foreground ring-1 ring-slate-900/[0.05] hover:bg-muted/70 hover:text-foreground transition-colors"
+          >
+            <ArrowLeftRight className="h-3.5 w-3.5" /> Move
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const section = (id: string, title: string, icon: ReactNode, tone: string, accounts: BankAccount[]) => (
+    <div id={id} className="rounded-xl bg-card ring-1 ring-slate-900/[0.05] overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+        <div className="flex items-center gap-2.5">
+          <div className={`h-7 w-7 rounded-lg flex items-center justify-center ${tone}`}>{icon}</div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+        </div>
+        <Badge variant="secondary" className="text-[10px]">{accounts.length}</Badge>
+      </div>
+      <div className="p-4">
+        {accounts.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-6">No accounts yet</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {accounts.map(accountCard)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  if (loading) {
+    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  return (
+    <div className="grid lg:grid-cols-[250px,1fr] gap-4 items-start">
+      {/* ── Liquidity rail ── */}
+      <div className="lg:sticky lg:top-4 space-y-3">
+        <div className="rounded-xl bg-card ring-1 ring-slate-900/[0.05] p-4">
+          <p className="text-[10px] font-bold uppercase tracking-wide text-primary">Total liquidity</p>
+          <p className={`text-2xl font-bold tabular-nums mt-1 ${totalLiquidity < 0 ? "text-red-600" : "text-foreground"}`}>
+            {formatNumber(totalLiquidity)}
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">Cash + bank balances</p>
+
+          <div className="mt-4 space-y-1.5">
+            {summaryRows.map((r) => {
+              const Icon = r.icon;
+              return (
+                <div key={r.label} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 bg-muted/50">
+                  <div className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 ${r.tone}`}>
+                    <Icon className="h-3.5 w-3.5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{r.label}</p>
+                    <p className={`text-sm font-bold tabular-nums ${r.value < 0 ? "text-red-600" : ""}`}>
+                      {formatNumber(r.value)}
+                    </p>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] shrink-0">{r.count}</Badge>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-card ring-1 ring-slate-900/[0.05] p-3 space-y-1.5">
+          <Button size="sm" className="w-full gap-1.5" onClick={() => setAddOpen(true)}>
+            <Plus className="h-3.5 w-3.5" /> Add account
+          </Button>
+          <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={onReconcile}>
+            <Scale className="h-3.5 w-3.5" /> Reconcile
+          </Button>
+          <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => void load()}>
+            <RefreshCw className="h-3.5 w-3.5" /> Refresh balances
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Account sections ── */}
+      <div className="space-y-4 min-w-0">
+        {section("cash-registers", "Cash registers", <Banknote className="h-3.5 w-3.5" />, "bg-emerald-50 text-emerald-600", cashAccounts)}
+        {section("bank-accounts", "Bank accounts", <Landmark className="h-3.5 w-3.5" />, "bg-indigo-50 text-indigo-600", bankAccounts)}
+        {otherAccounts.length > 0 &&
+          section("other-accounts", "Other accounts", <Wallet className="h-3.5 w-3.5" />, "bg-teal-50 text-teal-600", otherAccounts)}
+      </div>
+
+      {/* ── Money in / out dialog ── */}
+      <Dialog open={!!txnAccount} onOpenChange={(o) => { if (!o) setTxnAccount(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {txnType === "DEPOSIT" ? "Money in" : "Money out"} — {txnAccount?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {txnType === "DEPOSIT"
+                ? "Record a deposit into this account."
+                : "Record a withdrawal from this account."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input type="number" className="h-9" placeholder="0.00" value={txnAmt} onChange={(e) => setTxnAmt(e.target.value)} disabled={txnBusy} autoFocus />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Date</Label>
+              <Input type="date" className="h-9" value={txnDate} onChange={(e) => setTxnDate(e.target.value)} disabled={txnBusy} />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" placeholder="Optional" value={txnDesc} onChange={(e) => setTxnDesc(e.target.value)} disabled={txnBusy} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={txnBusy} onClick={() => setTxnAccount(null)}>Cancel</Button>
+            <Button onClick={() => void postTxn()} disabled={txnBusy} className="gap-1.5">
+              {txnBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : txnType === "DEPOSIT" ? <ArrowDownCircle className="h-3.5 w-3.5" /> : <ArrowUpCircle className="h-3.5 w-3.5" />}
+              {txnType === "DEPOSIT" ? "Record in" : "Record out"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Transfer dialog ── */}
+      <Dialog open={!!xferFrom} onOpenChange={(o) => { if (!o) setXferFrom(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Transfer from {xferFrom?.name}</DialogTitle>
+            <DialogDescription>Move money to another cash or bank account.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-xs">To account</Label>
+              <Select value={xferTo || "_none"} onValueChange={(v) => setXferTo(v === "_none" ? "" : v)} disabled={xferBusy}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="Select…" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">Select account…</SelectItem>
+                  {banks.filter((b) => b.id !== xferFrom?.id).map((b) => (
+                    <SelectItem key={b.id} value={b.id}>{b.code} — {b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Amount</Label>
+              <Input type="number" className="h-9" placeholder="0.00" value={xferAmt} onChange={(e) => setXferAmt(e.target.value)} disabled={xferBusy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Description</Label>
+              <Input className="h-9" placeholder="Optional" value={xferDesc} onChange={(e) => setXferDesc(e.target.value)} disabled={xferBusy} />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" disabled={xferBusy} onClick={() => setXferFrom(null)}>Cancel</Button>
+            <Button onClick={() => void transfer()} disabled={xferBusy} className="gap-1.5">
+              {xferBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+              Transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Add account dialog ── */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>New cash / bank account</DialogTitle>
+            <DialogDescription>Optionally link to a GL account.</DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label className="text-xs">Code</Label>
+              <Input className="h-9" placeholder="e.g. BANK-001" value={baCode} onChange={(e) => setBaCode(e.target.value)} disabled={baBusy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Name</Label>
+              <Input className="h-9" placeholder="e.g. Main Bank" value={baName} onChange={(e) => setBaName(e.target.value)} disabled={baBusy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Type</Label>
+              <Select value={baType} onValueChange={setBaType} disabled={baBusy}>
+                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CURRENT">Current</SelectItem>
+                  <SelectItem value="SAVINGS">Savings</SelectItem>
+                  <SelectItem value="CASH_IN_HAND">Cash in hand</SelectItem>
+                  <SelectItem value="PETTY_CASH">Petty cash</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Bank name</Label>
+              <Input className="h-9" placeholder="Optional" value={baBank} onChange={(e) => setBaBank(e.target.value)} disabled={baBusy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Opening balance</Label>
+              <Input className="h-9" type="number" placeholder="0" value={baOpen} onChange={(e) => setBaOpen(e.target.value)} disabled={baBusy} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">GL link</Label>
+              <Select value={baGl || "_none"} onValueChange={(v) => setBaGl(v === "_none" ? "" : v)} disabled={baBusy}>
+                <SelectTrigger className="h-9"><SelectValue placeholder="No GL link" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="_none">No GL link</SelectItem>
+                  {glAccounts.filter((a) => a.type === "ASSET").map((a) => (
+                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 pt-2">
+            <Button variant="outline" disabled={baBusy} onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={() => void createBank()} disabled={baBusy} className="gap-1.5">
+              {baBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -385,10 +847,10 @@ function CashBookPanel() {
   );
 }
 
-function BankBookPanel() {
+function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
   const [banks, setBanks] = useState<BankAccount[]>([]);
   const [glAccounts, setGlAccounts] = useState<GlAccount[]>([]);
-  const [accountId, setAccountId] = useState("");
+  const [accountId, setAccountId] = useState(initialAccountId ?? "");
   const [start, setStart] = useState(monthStart());
   const [end, setEnd] = useState(today());
   const [loading, setLoading] = useState(false);

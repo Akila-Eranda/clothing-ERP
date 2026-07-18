@@ -8,7 +8,7 @@ import {
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
   Printer, Image, Server, FileText, Upload,
 } from "lucide-react";
-import { type ReceiptSettings, RECEIPT_DEFAULTS } from "@/lib/use-receipt-settings";
+import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated } from "@/lib/use-receipt-settings";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -429,6 +429,7 @@ export default function SettingsPage() {
     try {
       await api.put("/tenants/receipt-settings", receiptForm);
       try { localStorage.setItem("receipt_settings_cache", JSON.stringify(receiptForm)); } catch { /* noop */ }
+      notifyReceiptSettingsUpdated();
       toast.success("Receipt settings saved");
     } catch { toast.error("Failed to save receipt settings"); }
     finally { setReceiptSaving(false); }

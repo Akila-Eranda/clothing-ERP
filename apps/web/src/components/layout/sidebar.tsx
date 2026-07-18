@@ -264,13 +264,19 @@ export function Sidebar() {
   const router    = useRouter();
   const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen } = useUIStore();
   const { logoutApi, user } = useAuthStore();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const isDark    = theme === "dark";
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+  const darkUi    = mounted && resolvedTheme === "dark";
   const navGroups = useNavGroups();
   const { profile } = useShopWorkspace();
   const { settings: receiptSettings } = useReceiptSettings();
 
+  const [logoFailed, setLogoFailed] = React.useState(false);
   const logoSrc = resolvePublicAssetUrl(receiptSettings.logoUrl);
+  React.useEffect(() => setLogoFailed(false), [logoSrc]);
+  const showShopLogo = !!logoSrc && !logoFailed;
   const shopName = receiptSettings.shopName?.trim() || user?.branch?.name || APP_NAME;
   const planLabel = planTierFromRole(user?.role);
 
@@ -282,16 +288,16 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* Sidebar stays dark blue in both light & dark app themes */
-  const bg       = "#0B1B3A";
-  const border   = "#1E3356";
-  const textMut  = "rgba(186, 208, 240, 0.72)";
+  /* Light theme: dark blue brand sidebar. Dark theme: match the near-black app surface. */
+  const bg       = darkUi ? "#050914" : "#0B1B3A";
+  const border   = darkUi ? "#141C2E" : "#1E3356";
+  const textMut  = darkUi ? "rgba(163, 178, 204, 0.72)" : "rgba(186, 208, 240, 0.72)";
   const textFull = "#FFFFFF";
   const hoverBg  = "rgba(99, 102, 241, 0.12)";
-  const sectLbl  = "rgba(148, 173, 210, 0.55)";
+  const sectLbl  = darkUi ? "rgba(130, 146, 176, 0.55)" : "rgba(148, 173, 210, 0.55)";
   const activeBg = "rgba(99, 102, 241, 0.22)";
   const activeFg = "#A5B4FC";
-  const logoBg   = "#071428";
+  const logoBg   = darkUi ? "#0B1120" : "#071428";
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -499,7 +505,7 @@ export function Sidebar() {
           </button>
         </div>
         {open && (
-          <div className="mt-0.5 space-y-0.5 border-l ml-4 pl-0" style={{ borderColor: "rgba(30,51,86,0.9)" }}>
+          <div className="mt-0.5 space-y-0.5 border-l ml-4 pl-0" style={{ borderColor: border }}>
             {item.children!.map((child, ci) => renderLeaf(child, `${key}-c${ci}`, true, peerHrefs))}
           </div>
         )}
@@ -533,21 +539,22 @@ export function Sidebar() {
       >
 
         {/* ── Header: shop avatar + name + collapse btn ── */}
-        <div className={cn("flex items-center shrink-0 gap-3 px-3 py-4", sidebarCollapsed && "justify-center")}>
+        <div className={cn("flex items-center shrink-0 gap-2.5 px-3 py-3.5", sidebarCollapsed && "justify-center")}>
           <div
             className={cn(
-              "h-11 w-11 rounded-xl shrink-0 flex items-center justify-center select-none overflow-hidden",
-              !logoSrc && "text-xl",
+              "h-10 w-10 rounded-xl shrink-0 flex items-center justify-center select-none overflow-hidden",
+              !showShopLogo && "text-xl",
             )}
-            style={logoSrc
-              ? { background: logoBg, border: `1px solid ${border}` }
+            style={showShopLogo
+              ? { background: "#FFFFFF", border: `1px solid ${border}` }
               : { background: logoBg, border: `1px solid ${border}` }}
           >
-            {logoSrc ? (
+            {showShopLogo ? (
               <img
                 src={logoSrc}
                 alt={shopName}
                 className="h-full w-full object-contain p-1"
+                onError={() => setLogoFailed(true)}
               />
             ) : (
               <AppLogo variant="sidebar" theme="dark" className="h-full w-full items-center justify-center" alt={APP_NAME} />
@@ -557,13 +564,29 @@ export function Sidebar() {
           {!sidebarCollapsed && (
             <>
               <div className="flex-1 min-w-0">
-                <p className="text-[15px] font-bold leading-snug" style={{ color: textFull }}>{shopName}</p>
-                <p className="text-[11px] font-medium leading-snug mt-0.5" style={{ color: textMut }}>{profile.label}</p>
-                <p className="text-xs font-semibold leading-snug mt-0.5" style={{ color: "#A5B4FC" }}>{planLabel}</p>
+                <p
+                  className="text-[13.5px] font-bold leading-tight truncate"
+                  style={{ color: textFull }}
+                  title={shopName}
+                >
+                  {shopName}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1 min-w-0">
+                  <span className="text-[11px] font-medium leading-none truncate" style={{ color: textMut }}>
+                    {profile.label}
+                  </span>
+                  <span
+                    className="shrink-0 rounded-full px-1.5 py-[3px] text-[9px] font-bold uppercase tracking-wide leading-none"
+                    style={{ color: "#C7D2FE", background: "rgba(99,102,241,0.28)" }}
+                  >
+                    {planLabel}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={toggleSidebar}
+                aria-label="Collapse sidebar"
                 className="h-7 w-7 flex items-center justify-center rounded-lg border transition-colors shrink-0"
                 style={{ borderColor: border, color: textMut }}
                 onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
