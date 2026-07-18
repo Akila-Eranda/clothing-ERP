@@ -120,6 +120,17 @@ export class AccountingBootstrapService {
     return { created, existing: existing.length, codeToId };
   }
 
+  /** Public — fill preference mappings + enable auto-post flags. */
+  async ensureMappings(tenantId: string) {
+    const accounts = await this.prisma.account.findMany({
+      where: { tenantId, isActive: true },
+      select: { id: true, code: true },
+    });
+    const codeToId = new Map(accounts.map((a) => [normalizeAccountCode(a.code), a.id]));
+    await this.linkPreferences(tenantId, codeToId);
+    await this.ensureCashBankAccounts(tenantId, codeToId);
+  }
+
   private async ensureCashBankAccounts(tenantId: string, codeToId: Map<string, string>) {
     const specs: { code: string; name: string; type: BankAccountType; glCode: string }[] = [
       { code: 'CASH-01', name: 'Cash in Hand', type: BankAccountType.CASH_IN_HAND, glCode: CODE.cash },

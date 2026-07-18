@@ -48,19 +48,21 @@ export class AccountingPostingService {
   // ── Account resolution ───────────────────────────────────────────────
 
   async resolveAccounts(tenantId: string): Promise<ResolvedAccounts | null> {
-    let accounts = await this.prisma.account.findMany({
+    // Always upsert missing default accounts so partial/old COAs become complete
+    await this.bootstrap.upsertDefaultCoa(tenantId);
+    await this.bootstrap.ensureMappings(tenantId);
+
+    const accounts = await this.prisma.account.findMany({
       where: { tenantId, isActive: true },
       select: { id: true, code: true },
     });
-    if (accounts.length < 5) {
-      await this.bootstrap.bootstrapTenant(tenantId);
-      accounts = await this.prisma.account.findMany({
-        where: { tenantId, isActive: true },
-        select: { id: true, code: true },
-      });
+    if (!accounts.length) {
+      this.logger.warn(`No COA for tenant ${tenantId} after bootstrap — skipping auto-post`);
+      return null;
     }
 
     const byCode = new Map(accounts.map((a) => [normalizeAccountCode(a.code), a.id]));
+    const byId = new Set(accounts.map((a) => a.id));
     const prefs = await this.prisma.accountingPreference.findUnique({ where: { tenantId } });
 
     const pick = (...codes: string[]) => {
@@ -70,26 +72,32 @@ export class AccountingPostingService {
       }
       return null;
     };
+    const prefOr = (prefId: string | null | undefined, ...codes: string[]) => {
+      if (prefId && byId.has(prefId)) return prefId;
+      return pick(...codes);
+    };
 
-    const cash = prefs?.defaultCashAccountId ?? pick('1100', '1110');
-    const bank = pick('1200', '1100');
-    const card = pick('1210', '1200', '1100');
-    const chequeRecv = pick('1220', '1300');
+    const cash = prefOr(prefs?.defaultCashAccountId, '1100', '1110', '1200');
+    const bank = pick('1200', '1100') ?? cash;
+    const card = pick('1210', '1200', '1100') ?? cash;
+    const chequeRecv = pick('1220', '1300') ?? cash;
     const chequePay = pick('2420', '2100');
-    const ar = prefs?.defaultArAccountId ?? pick('1300');
-    const ap = prefs?.defaultApAccountId ?? pick('2100');
-    const inventory = prefs?.defaultPurchaseAccountId ?? pick('1400');
-    const sales = prefs?.defaultSalesAccountId ?? pick('4100', '4000');
-    const salesReturns = pick('4200', '4100');
-    const vatPayable = pick('2200');
-    const vatInput = pick('2210');
-    const wallet = pick('2400');
-    const gift = pick('2410', '2400');
-    const cogs = pick('5100');
+    const ar = prefOr(prefs?.defaultArAccountId, '1300', '1100');
+    const ap = prefOr(prefs?.defaultApAccountId, '2100');
+    const inventory = prefOr(prefs?.defaultPurchaseAccountId, '1400');
+    const sales = prefOr(prefs?.defaultSalesAccountId, '4100', '4000');
+    const salesReturns = pick('4200', '4100') ?? sales;
+    const vatPayable = pick('2200') ?? sales;
+    const vatInput = pick('2210') ?? inventory;
+    const wallet = pick('2400') ?? ar;
+    const gift = pick('2410', '2400') ?? sales;
+    const cogs = pick('5100') ?? pick('5000');
     const expense = pick('5600', '5200', '5000');
 
     if (!cash || !ar || !ap || !inventory || !sales || !cogs || !expense) {
-      this.logger.warn(`Incomplete COA for tenant ${tenantId} — skipping auto-post`);
+      this.logger.warn(
+        `Incomplete COA for tenant ${tenantId} (cash=${!!cash} ar=${!!ar} ap=${!!ap} inv=${!!inventory} sales=${!!sales} cogs=${!!cogs} exp=${!!expense})`,
+      );
       return null;
     }
 
@@ -233,21 +241,48 @@ export class AccountingPostingService {
 
     for (const p of sale.payments) {
       if (p.amount <= 0.009) continue;
+      // Loyalty points reduce revenue, not a cash tender
+      if (String(p.method).toUpperCase() === 'LOYALTY_POINTS') continue;
       const key = this.tenderAccount(accounts, p.method);
       tenderTotals.set(key, round2((tenderTotals.get(key) ?? 0) + p.amount));
     }
 
-    // Unpaid balance charged to AR (partial / credit)
-    const paid = round2(sale.payments.reduce((s, p) => s + p.amount, 0));
-    const arCharge = round2(Math.max(0, sale.total - paid));
+    // Change / overpay: peel off from cash first, then other tenders
+    let changeLeft = round2(sale.changeDue ?? 0);
+    if (changeLeft > 0.009) {
+      const order = [accounts.cash, accounts.card, accounts.bank, accounts.chequeRecv, accounts.wallet, accounts.gift];
+      for (const acct of order) {
+        if (changeLeft <= 0.009) break;
+        const have = tenderTotals.get(acct) ?? 0;
+        if (have <= 0.009) continue;
+        const take = Math.min(have, changeLeft);
+        tenderTotals.set(acct, round2(have - take));
+        changeLeft = round2(changeLeft - take);
+      }
+    }
+
+    const collected = round2([...tenderTotals.values()].reduce((s, n) => s + n, 0));
+    const arCharge = round2(Math.max(0, sale.total - collected));
     if (arCharge > 0.009) {
       tenderTotals.set(accounts.ar, round2((tenderTotals.get(accounts.ar) ?? 0) + arCharge));
     }
 
-    // Change given in cash reduces cash debit
-    if (sale.changeDue > 0.009) {
-      const cashAmt = tenderTotals.get(accounts.cash) ?? 0;
-      tenderTotals.set(accounts.cash, round2(Math.max(0, cashAmt - sale.changeDue)));
+    // If still over-collected (rare), dump excess to cash credit via reducing sales side later
+    let debitTotal = round2([...tenderTotals.values()].reduce((s, n) => s + n, 0));
+    const target = round2(sale.total);
+    if (debitTotal > target + 0.05) {
+      // Scale down largest tender
+      const excess = round2(debitTotal - target);
+      let biggestKey = accounts.cash;
+      let biggestAmt = 0;
+      for (const [k, v] of tenderTotals) {
+        if (v > biggestAmt) {
+          biggestAmt = v;
+          biggestKey = k;
+        }
+      }
+      tenderTotals.set(biggestKey, round2(Math.max(0, biggestAmt - excess)));
+      debitTotal = target;
     }
 
     for (const [accountId, amount] of tenderTotals) {
@@ -256,8 +291,15 @@ export class AccountingPostingService {
       }
     }
 
-    const tax = round2(sale.taxAmount ?? 0);
-    const netSales = round2(Math.max(0, sale.total - tax));
+    // Ensure at least one debit when sale has value
+    debitTotal = round2(lines.filter((l) => l.side === 'DEBIT').reduce((s, l) => s + l.amount, 0));
+    if (target > 0.009 && debitTotal <= 0.009) {
+      lines.push({ accountId: accounts.cash, side: 'DEBIT', amount: target, description: 'Sale total' });
+      debitTotal = target;
+    }
+
+    const tax = round2(Math.min(sale.taxAmount ?? 0, debitTotal));
+    const netSales = round2(Math.max(0, debitTotal - tax));
     if (netSales > 0.009) {
       lines.push({ accountId: accounts.sales, side: 'CREDIT', amount: netSales, description: 'Sales' });
     }
@@ -472,6 +514,19 @@ export class AccountingPostingService {
 
   async backfillTenant(tenantId: string, limit = 200) {
     await this.bootstrap.bootstrapTenant(tenantId);
+    // Ensure auto-post prefs are on
+    await this.prisma.accountingPreference.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        requireJournalApproval: false,
+        allowPostDraft: true,
+      },
+      update: {
+        requireJournalApproval: false,
+        allowPostDraft: true,
+      },
+    });
 
     const sales = await this.prisma.sale.findMany({
       where: { tenantId, status: 'COMPLETED' },
