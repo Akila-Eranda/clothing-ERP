@@ -124,6 +124,10 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
         toast.error("Cheque number is required");
         return;
       }
+      if (payMethod === "CHEQUE" && !chequeDueDate.trim()) {
+        toast.error("Cheque due date is required");
+        return;
+      }
     }
 
     setLoading(true);

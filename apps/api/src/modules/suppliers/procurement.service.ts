@@ -893,6 +893,9 @@ export class ProcurementService {
     if (dto.method === PaymentMethod.CHEQUE && !dto.chequeNumber?.trim() && !dto.reference?.trim()) {
       throw new BadRequestException('Cheque number is required for cheque payments');
     }
+    if (dto.method === PaymentMethod.CHEQUE && !dto.chequeDueDate?.trim()) {
+      throw new BadRequestException('Cheque due date is required');
+    }
 
     const result = await this.apService.receivePayment(
       inv.supplierId,
@@ -906,6 +909,10 @@ export class ProcurementService {
         notes: dto.notes ?? `Payment against invoice ${inv.invoiceNumber}`,
         invoiceId: inv.id,
         paidAt: dto.paidAt,
+        chequeNumber: dto.chequeNumber,
+        chequeDueDate: dto.chequeDueDate,
+        chequeBankName: dto.chequeBankName,
+        chequeBankAccountId: dto.chequeBankAccountId,
       },
     );
 

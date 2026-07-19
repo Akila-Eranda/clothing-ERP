@@ -306,6 +306,10 @@ export class SupplierApService {
       paidAt?: string;
       /** Original UI method before CHEQUE→BANK_TRANSFER normalize */
       methodLabel?: string;
+      chequeNumber?: string;
+      chequeDueDate?: string;
+      chequeBankName?: string;
+      chequeBankAccountId?: string;
     },
   ) {
     if (dto.amount <= 0) throw new BadRequestException('Amount must be positive');
@@ -317,6 +321,23 @@ export class SupplierApService {
     const paidAt = dto.paidAt ? new Date(dto.paidAt) : new Date();
     await this.assertPostingDateAllowed(tenantId, paidAt);
 
+    const chequeNumber = (dto.chequeNumber ?? dto.reference)?.trim();
+    if (uiMethod === 'CHEQUE' && !chequeNumber) {
+      throw new BadRequestException('Cheque number is required for cheque payments');
+    }
+    if (uiMethod === 'CHEQUE' && !dto.chequeDueDate?.trim()) {
+      throw new BadRequestException('Cheque due date is required');
+    }
+
+    const chequeOpts = uiMethod === 'CHEQUE'
+      ? {
+          chequeNumber: chequeNumber!,
+          chequeDueDate: dto.chequeDueDate!,
+          chequeBankName: dto.chequeBankName?.trim() || undefined,
+          chequeBankAccountId: dto.chequeBankAccountId || undefined,
+        }
+      : undefined;
+
     const purchaseIds = this.uniqueIds(dto.purchaseIds);
     if (dto.purchaseId && !purchaseIds.includes(dto.purchaseId)) {
       purchaseIds.push(dto.purchaseId);
@@ -326,10 +347,50 @@ export class SupplierApService {
 
     // ── Spec primary path: selected POs only ─────────────────────────
     if (purchaseIds.length > 0 && !dto.invoiceId) {
+      // Allow advance payment against unreceived POs (pay on create / deposit).
+      const missingPoIds = purchaseIds.filter(
+        (id) => !lines.some((l) => l.id === id && l.source === 'PO'),
+      );
+      if (missingPoIds.length > 0) {
+        const advancePos = await this.prisma.purchaseOrder.findMany({
+          where: {
+            id: { in: missingPoIds },
+            tenantId,
+            supplierId,
+            status: { notIn: [PurchaseOrderStatus.CANCELLED] },
+          },
+          include: { items: { select: { receivedQty: true, unitCost: true } } },
+        });
+        const found = new Set(advancePos.map((p) => p.id));
+        for (const id of missingPoIds) {
+          if (!found.has(id)) {
+            throw new BadRequestException(`PO not found for this supplier: ${id}`);
+          }
+        }
+        for (const po of advancePos) {
+          const receivedValue = roundAp(
+            po.items.reduce((s, i) => s + i.receivedQty * i.unitCost, 0),
+          );
+          const liabilityBase = receivedValue > 0.01 ? receivedValue : po.total;
+          const due = roundAp(Math.max(0, liabilityBase - po.paidAmount));
+          if (due <= 0.01) {
+            throw new BadRequestException(`PO ${po.poNumber} is already fully paid`);
+          }
+          lines.push({
+            id: po.id,
+            source: 'PO',
+            docNumber: po.poNumber,
+            amount: due,
+            dueDate: new Date(po.orderDate.getTime() + 30 * 86400000),
+            asOfDate: paidAt,
+          });
+        }
+      }
+
       for (const id of purchaseIds) {
         const line = lines.find((l) => l.id === id && l.source === 'PO');
         if (!line) {
-          throw new BadRequestException(`PO not payable (wrong supplier, already paid, or not received): ${id}`);
+          throw new BadRequestException(`PO not payable (wrong supplier, already paid, or cancelled): ${id}`);
         }
       }
       const selectedDue = roundAp(
@@ -351,12 +412,13 @@ export class SupplierApService {
         userId,
         method,
         uiMethod,
-        reference: dto.reference,
+        reference: dto.reference ?? chequeNumber,
         notes: dto.notes,
         paidAt,
         allocations: poAllocs,
         appliedTotal,
         supplierName: supplier.name,
+        cheque: chequeOpts,
       });
 
       this.eventEmitter.emit('accounting.supplier-payment.posted', {
@@ -415,8 +477,8 @@ export class SupplierApService {
           invoiceId: allocations.find((a) => a.source === 'INVOICE')?.lineId,
           amount: appliedTotal,
           method,
-          reference: dto.reference ?? (uiMethod === 'CHEQUE' ? `CHEQUE:${dto.reference ?? ''}` : undefined),
-          notes: dto.notes ?? (uiMethod === 'CHEQUE' ? 'Paid by cheque (settled via Main Bank)' : undefined),
+          reference: dto.reference ?? (uiMethod === 'CHEQUE' ? chequeNumber : undefined),
+          notes: dto.notes ?? (uiMethod === 'CHEQUE' ? 'Paid by cheque' : undefined),
           paidAt,
         },
       });
@@ -481,7 +543,8 @@ export class SupplierApService {
         method,
         uiMethod,
         paidAt,
-        reference: dto.reference ?? payment.reference ?? undefined,
+        reference: dto.reference ?? payment.reference ?? chequeNumber ?? undefined,
+        cheque: chequeOpts,
       });
 
       return { payment, allocations: allocationRows, balanceAfter, appliedTotal };
@@ -553,6 +616,12 @@ export class SupplierApService {
     allocations: { lineId: string; source: 'PO'; applied: number }[];
     appliedTotal: number;
     supplierName: string;
+    cheque?: {
+      chequeNumber: string;
+      chequeDueDate: string;
+      chequeBankName?: string;
+      chequeBankAccountId?: string;
+    };
   }) {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.supplierPayment.create({
@@ -562,12 +631,10 @@ export class SupplierApService {
           purchaseId: opts.allocations[0]?.lineId,
           amount: opts.appliedTotal,
           method: opts.method,
-          reference:
-            opts.reference
-            ?? (opts.uiMethod === 'CHEQUE' ? undefined : undefined),
+          reference: opts.reference,
           notes:
             opts.notes
-            ?? (opts.uiMethod === 'CHEQUE' ? 'Paid by cheque (settled via Main Bank)' : undefined),
+            ?? (opts.uiMethod === 'CHEQUE' ? 'Paid by cheque' : undefined),
           paidAt: opts.paidAt,
         },
       });
@@ -608,6 +675,7 @@ export class SupplierApService {
         uiMethod: opts.uiMethod,
         paidAt: opts.paidAt,
         reference: opts.reference ?? payment.reference ?? undefined,
+        cheque: opts.cheque,
       });
 
       return { payment, allocations: allocationRows, balanceAfter };
@@ -618,7 +686,8 @@ export class SupplierApService {
    * Reduce Cash / Bank registers when AP is paid.
    * GL (Dr AP / Cr Cash|Bank) still posts via accounting outbox — do not post GL here.
    * CASH → Cash on Hand + cash book credit
-   * BANK_TRANSFER / CHEQUE → Main Bank withdrawal (+ issued cheque when CHEQUE)
+   * BANK_TRANSFER → Main Bank withdrawal
+   * CHEQUE → ISSUED cheque (calendar + cheque hub); bank hits on clear
    */
   private async applyTenderOutflow(
     tx: ApTx,
@@ -634,6 +703,12 @@ export class SupplierApService {
       uiMethod: string;
       paidAt: Date;
       reference?: string;
+      cheque?: {
+        chequeNumber: string;
+        chequeDueDate: string;
+        chequeBankName?: string;
+        chequeBankAccountId?: string;
+      };
     },
   ) {
     const amount = roundAp(opts.amount);
@@ -642,7 +717,8 @@ export class SupplierApService {
     const stored = String(opts.method).toUpperCase();
     const ui = String(opts.uiMethod).toUpperCase();
     const isCash = stored === 'CASH';
-    const isBank = stored === 'BANK_TRANSFER' || stored === 'CHEQUE' || ui === 'CHEQUE';
+    const isCheque = ui === 'CHEQUE';
+    const isBankTransfer = !isCheque && (stored === 'BANK_TRANSFER' || stored === 'CHEQUE');
     const desc = `Supplier payment — ${opts.supplierName}`;
 
     if (isCash) {
@@ -694,34 +770,47 @@ export class SupplierApService {
       return;
     }
 
-    if (!isBank) return;
-
-    const bankAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
-    if (!bankAcct) return;
-
-    let chequeId: string | undefined;
-    if (ui === 'CHEQUE') {
-      const chequeNumber = (opts.reference || '').trim() || `SP-${opts.paymentId.slice(0, 8).toUpperCase()}`;
-      const cheque = await tx.cheque.create({
+    if (isCheque) {
+      const chequeNumber =
+        (opts.cheque?.chequeNumber || opts.reference || '').trim()
+        || `SP-${opts.paymentId.slice(0, 8).toUpperCase()}`;
+      let bankAccountId = opts.cheque?.chequeBankAccountId;
+      if (bankAccountId) {
+        const selected = await tx.bankAccount.findFirst({
+          where: { id: bankAccountId, tenantId: opts.tenantId, isActive: true },
+        });
+        if (!selected) bankAccountId = undefined;
+      }
+      if (!bankAccountId) {
+        bankAccountId = (await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK'))?.id;
+      }
+      await tx.cheque.create({
         data: {
           tenantId: opts.tenantId,
           direction: ChequeDirection.ISSUED,
-          // Already deducted from Main Bank with this payment — avoid a second hit on clear.
-          status: ChequeStatus.CLEARED,
+          status: ChequeStatus.ISSUED,
           chequeNumber,
           amount,
+          bankName: opts.cheque?.chequeBankName,
           issueDate: opts.paidAt,
+          dueDate: opts.cheque?.chequeDueDate
+            ? new Date(opts.cheque.chequeDueDate)
+            : undefined,
           partyType: 'SUPPLIER',
           partyId: opts.supplierId,
           partyName: opts.supplierName,
-          bankAccountId: bankAcct.id,
-          clearedAt: opts.paidAt,
-          notes: chequeSourceNotes('SupplierPayment', opts.paymentId, 'Paid by cheque (Main Bank)'),
+          bankAccountId,
+          notes: chequeSourceNotes('SupplierPayment', opts.paymentId, 'Paid by cheque'),
           createdBy: opts.userId,
         },
       });
-      chequeId = cheque.id;
+      return;
     }
+
+    if (!isBankTransfer) return;
+
+    const bankAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
+    if (!bankAcct) return;
 
     await tx.bankTransaction.create({
       data: {
@@ -732,8 +821,7 @@ export class SupplierApService {
         amount,
         txnDate: opts.paidAt,
         reference: opts.reference,
-        description: ui === 'CHEQUE' ? `${desc} (cheque)` : desc,
-        chequeId,
+        description: desc,
         createdBy: opts.userId,
       },
     });
@@ -793,15 +881,28 @@ export class SupplierApService {
       );
     }
     const fullyPaid = nextPaid >= liabilityBase - 0.01;
+    const goodsReceived = receivedValue > 0.01;
+    let nextStatus = po.status;
+    if (goodsReceived) {
+      if (fullyPaid) {
+        nextStatus = PurchaseOrderStatus.CLOSED;
+      } else if (po.status === PurchaseOrderStatus.PARTIALLY_RECEIVED) {
+        nextStatus = PurchaseOrderStatus.PARTIALLY_RECEIVED;
+      } else if (
+        po.status === PurchaseOrderStatus.RECEIVED
+        || po.status === PurchaseOrderStatus.CLOSED
+      ) {
+        nextStatus = PurchaseOrderStatus.RECEIVED;
+      } else {
+        nextStatus = PurchaseOrderStatus.RECEIVED;
+      }
+    }
+    // Advance / pay-on-create: keep DRAFT/SENT/CONFIRMED until goods are received.
     await tx.purchaseOrder.update({
       where: { id: po.id },
       data: {
         paidAmount: nextPaid,
-        status: fullyPaid
-          ? PurchaseOrderStatus.CLOSED
-          : po.status === PurchaseOrderStatus.PARTIALLY_RECEIVED
-            ? PurchaseOrderStatus.PARTIALLY_RECEIVED
-            : PurchaseOrderStatus.RECEIVED,
+        status: nextStatus,
       },
     });
   }

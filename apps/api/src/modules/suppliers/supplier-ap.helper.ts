@@ -291,7 +291,7 @@ export function allocatePoPaymentFifo(
   return out;
 }
 
-/** Persist CHEQUE as BANK_TRANSFER for GL (Main Bank). */
+/** Persist CHEQUE as BANK_TRANSFER for payment method storage / GL mapping. */
 export function normalizeSupplierPaymentMethod(method?: PaymentMethod | string): PaymentMethod {
   const raw = String(method ?? PaymentMethod.CASH).toUpperCase();
   if (raw === 'CHEQUE') return PaymentMethod.BANK_TRANSFER;

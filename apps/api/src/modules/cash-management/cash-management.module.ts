@@ -264,6 +264,9 @@ export class CashManagementService {
     if (register.status !== CashRegisterStatus.OPEN) {
       throw new BadRequestException('Cannot add movements to a closed shift');
     }
+    if (register.cashierId !== userId) {
+      throw new ForbiddenException('Only the cashier who opened this shift can add cash movements');
+    }
     const allowed: CashMovementType[] = [
       CashMovementType.DEPOSIT,
       CashMovementType.WITHDRAWAL,

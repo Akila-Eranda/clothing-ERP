@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { X, ShoppingBag, Plus, Trash2, Loader2, Search, ChevronRight, CheckCircle2, Package } from "lucide-react";
+import { X, ShoppingBag, Plus, Trash2, Loader2, Search, ChevronRight, CheckCircle2, Package, Banknote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
@@ -40,6 +40,14 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
   const [productSearch, setProductSearch]     = useState("");
   const [selectedProduct, setSelectedProduct] = useState<string | null>(null);
   const [loading, setLoading]                 = useState(false);
+  const [payNow, setPayNow]                   = useState(false);
+  const [payAmount, setPayAmount]             = useState("");
+  const [payAmountTouched, setPayAmountTouched] = useState(false);
+  const [payMethod, setPayMethod]             = useState("CASH");
+  const [payReference, setPayReference]       = useState("");
+  const [chequeNumber, setChequeNumber]       = useState("");
+  const [chequeDueDate, setChequeDueDate]     = useState("");
+  const [chequeBankName, setChequeBankName]   = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -55,6 +63,9 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
     if (!open) {
       setSupplierId(""); setExpectedDate(""); setNotes("");
       setItems([]); setProductSearch(""); setSelectedProduct(null);
+      setPayNow(false); setPayAmount(""); setPayAmountTouched(false);
+      setPayMethod("CASH"); setPayReference("");
+      setChequeNumber(""); setChequeDueDate(""); setChequeBankName("");
     }
   }, [open]);
 
@@ -105,10 +116,23 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
   const taxTotal   = items.reduce((s, i) => s + (i.unitCost * i.orderedQty * i.taxRate) / 100, 0);
   const grandTotal = subtotal + taxTotal;
 
+  useEffect(() => {
+    if (payNow && !payAmountTouched) {
+      setPayAmount(grandTotal > 0 ? grandTotal.toFixed(2) : "");
+    }
+  }, [payNow, payAmountTouched, grandTotal]);
+
   const submit = async () => {
     if (!supplierId)    { toast.error("Select a supplier"); return; }
     if (!items.length)  { toast.error("Add at least one item"); return; }
     if (items.some((i) => i.orderedQty < 1)) { toast.error("All items need quantity ≥ 1"); return; }
+    if (payNow) {
+      const amt = parseFloat(payAmount);
+      if (!(amt > 0)) { toast.error("Enter payment amount"); return; }
+      if (amt > grandTotal + 0.01) { toast.error("Payment cannot exceed PO total"); return; }
+      if (payMethod === "CHEQUE" && !chequeNumber.trim()) { toast.error("Cheque number is required"); return; }
+      if (payMethod === "CHEQUE" && !chequeDueDate.trim()) { toast.error("Cheque due date is required"); return; }
+    }
     setLoading(true);
     try {
       await api.post("/purchases", {
@@ -119,8 +143,25 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
           variantId: i.variantId, productName: i.productName, variantName: i.variantName,
           sku: i.sku, orderedQty: i.orderedQty, unitCost: i.unitCost, taxRate: i.taxRate,
         })),
+        ...(payNow
+          ? {
+              payment: {
+                amount: parseFloat(payAmount),
+                method: payMethod,
+                reference: payReference.trim() || undefined,
+                notes: "Paid on PO create",
+                ...(payMethod === "CHEQUE"
+                  ? {
+                      chequeNumber: chequeNumber.trim(),
+                      chequeDueDate: chequeDueDate || undefined,
+                      chequeBankName: chequeBankName.trim() || undefined,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       });
-      toast.success("Purchase order created");
+      toast.success(payNow ? "Purchase order created · supplier paid" : "Purchase order created");
       onCreated(); onClose();
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to create PO");
@@ -323,11 +364,65 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="px-6 py-3 border-t shrink-0">
+          {/* Notes + optional pay */}
+          <div className="px-6 py-3 border-t shrink-0 space-y-3">
             <Textarea rows={1} placeholder="Internal notes for this PO… (optional)"
               value={notes} onChange={(e) => setNotes(e.target.value)}
               className="text-xs resize-none" />
+            <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
+              <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={payNow}
+                  onChange={(e) => {
+                    setPayNow(e.target.checked);
+                    if (!e.target.checked) setPayAmountTouched(false);
+                  }}
+                  className="h-3.5 w-3.5 rounded border-border"
+                />
+                <Banknote className="h-3.5 w-3.5 text-emerald-600" />
+                Pay supplier now
+                <span className="ml-auto text-[10px] font-normal text-muted-foreground">
+                  Total LKR {grandTotal.toFixed(2)}
+                </span>
+              </label>
+              {payNow && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <Input
+                    type="number"
+                    min={0.01}
+                    step="0.01"
+                    value={payAmount}
+                    onChange={(e) => { setPayAmountTouched(true); setPayAmount(e.target.value); }}
+                    placeholder="Amount"
+                    className="h-8 text-xs"
+                  />
+                  <select
+                    value={payMethod}
+                    onChange={(e) => setPayMethod(e.target.value)}
+                    className="h-8 rounded-md border bg-background px-2 text-xs"
+                  >
+                    <option value="CASH">Cash</option>
+                    <option value="CARD">Card</option>
+                    <option value="BANK_TRANSFER">Bank</option>
+                    <option value="CHEQUE">Cheque</option>
+                  </select>
+                  <Input
+                    value={payReference}
+                    onChange={(e) => setPayReference(e.target.value)}
+                    placeholder="Reference"
+                    className="h-8 text-xs"
+                  />
+                  {payMethod === "CHEQUE" && (
+                    <>
+                      <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="Cheque #" className="h-8 text-xs font-mono" />
+                      <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-8 text-xs" />
+                      <Input value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} placeholder="Bank" className="h-8 text-xs" />
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -335,8 +430,8 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
         <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading || !items.length} className="gap-1.5 min-w-[160px]">
-            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ShoppingBag className="h-3.5 w-3.5" />}
-            Create Purchase Order {items.length > 0 && `(${items.length})`}
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : payNow ? <Banknote className="h-3.5 w-3.5" /> : <ShoppingBag className="h-3.5 w-3.5" />}
+            {payNow ? "Create & Pay" : "Create Purchase Order"} {items.length > 0 && `(${items.length})`}
           </Button>
         </div>
       </div>

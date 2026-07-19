@@ -330,6 +330,10 @@ export function PosQuickGrnPanel({
         toast.error("Cheque number is required");
         return;
       }
+      if (payMethod === "CHEQUE" && !chequeDueDate.trim()) {
+        toast.error("Cheque due date is required");
+        return;
+      }
     }
     if (openPos.length > 0) {
       const names = openPos.map((p) => p.poNumber).join(", ");

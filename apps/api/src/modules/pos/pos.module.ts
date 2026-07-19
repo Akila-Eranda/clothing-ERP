@@ -106,6 +106,14 @@ export class PosService {
   async createSale(tenantId: string, branchId: string, cashierId: string, dto: CreateSaleDto) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
+
+    const openRegister = await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
+    if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
+      throw new BadRequestException(
+        'Open your cash shift before selling (POS → enter opening cash)',
+      );
+    }
+
     const invoiceNumber = await this.generateInvoiceNumber(tenantId);
 
     const subtotal = dto.items.reduce((sum, item) => {

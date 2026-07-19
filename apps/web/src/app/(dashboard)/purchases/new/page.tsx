@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2 } from "lucide-react";
+import { ArrowLeft, Banknote, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -170,6 +170,14 @@ export default function CreatePOPage() {
   const [fromGrnNumber, setFromGrnNumber] = useState<string | null>(null);
   const [grnPrefillLoading, setGrnPrefillLoading] = useState(false);
   const [loadingSupplierDetail, setLoadingSupplierDetail] = useState(false);
+  const [payNow, setPayNow] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payAmountTouched, setPayAmountTouched] = useState(false);
+  const [payMethod, setPayMethod] = useState("CASH");
+  const [payReference, setPayReference] = useState("");
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeDueDate, setChequeDueDate] = useState("");
+  const [chequeBankName, setChequeBankName] = useState("");
 
   const [searchQ,      setSearchQ]      = useState<string[]>([]);
   const [searchOpen,   setSearchOpen]   = useState<number | null>(null);
@@ -690,6 +698,12 @@ export default function CreatePOPage() {
   const grandTotal = subtotal - totalDisc + totalTax;
   const totalQty   = items.reduce((s, i) => s + i.orderedQty, 0);
 
+  useEffect(() => {
+    if (payNow && !payAmountTouched) {
+      setPayAmount(grandTotal > 0 ? grandTotal.toFixed(2) : "");
+    }
+  }, [payNow, payAmountTouched, grandTotal]);
+
   // ── Submit ─────────────────────────────────────────────────────────────
   const submit = async (submitForApproval: boolean) => {
     if (!supplierId) { toast.error("Please select a supplier"); return; }
@@ -703,6 +717,25 @@ export default function CreatePOPage() {
       toast.error("Buying price is required on all lines");
       return;
     }
+    if (payNow) {
+      const amt = parseFloat(payAmount);
+      if (!(amt > 0)) {
+        toast.error("Enter payment amount");
+        return;
+      }
+      if (amt > grandTotal + 0.01) {
+        toast.error("Payment cannot exceed PO total");
+        return;
+      }
+      if (payMethod === "CHEQUE" && !chequeNumber.trim()) {
+        toast.error("Cheque number is required");
+        return;
+      }
+      if (payMethod === "CHEQUE" && !chequeDueDate.trim()) {
+        toast.error("Cheque due date is required");
+        return;
+      }
+    }
     setSaving(true);
     try {
       const payload = {
@@ -714,23 +747,40 @@ export default function CreatePOPage() {
           sku: i.sku, orderedQty: i.orderedQty, unitCost: i.unitCost,
           discount: i.discount, taxRate: i.taxRate,
         })),
+        ...(payNow
+          ? {
+              payment: {
+                amount: parseFloat(payAmount),
+                method: payMethod,
+                reference: payReference.trim() || undefined,
+                notes: "Paid on PO create",
+                ...(payMethod === "CHEQUE"
+                  ? {
+                      chequeNumber: chequeNumber.trim(),
+                      chequeDueDate: chequeDueDate || undefined,
+                      chequeBankName: chequeBankName.trim() || undefined,
+                    }
+                  : {}),
+              },
+            }
+          : {}),
       };
       const res = await api.post<{ id: string }>("/purchases", payload);
       if (fromGrnId) {
         toast.success(
           fromGrnNumber
-            ? `PO created & linked to ${fromGrnNumber} (already received)`
-            : "PO created and linked to GRN",
+            ? `PO created & linked to ${fromGrnNumber}${payNow ? " · supplier paid" : " (already received)"}`
+            : `PO created and linked to GRN${payNow ? " · supplier paid" : ""}`,
         );
       } else if (submitForApproval) {
         await api.post(`/purchases/${res.data.id}/submit-approval`);
         toast.success(
           adminBypass
-            ? "Purchase order created and confirmed"
-            : "Purchase order submitted for approval",
+            ? `Purchase order created and confirmed${payNow ? " · supplier paid" : ""}`
+            : `Purchase order submitted for approval${payNow ? " · supplier paid" : ""}`,
         );
       } else {
-        toast.success("Purchase order saved as draft");
+        toast.success(`Purchase order saved as draft${payNow ? " · supplier paid" : ""}`);
       }
       router.push(`/purchases/${res.data.id}`);
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to create PO"); }
@@ -1349,6 +1399,92 @@ export default function CreatePOPage() {
                   </div>
                 </div>
               )}
+            </SectionCard>
+
+            <SectionCard
+              step="3"
+              title="Supplier payment"
+              subtitle="Optional — record advance / pay now when creating this PO"
+            >
+              <div className="rounded-xl border p-4 space-y-3 bg-muted/10">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={payNow}
+                      onChange={(e) => {
+                        setPayNow(e.target.checked);
+                        if (!e.target.checked) setPayAmountTouched(false);
+                      }}
+                      className="h-4 w-4 rounded border-border"
+                    />
+                    <Banknote className="h-4 w-4 text-emerald-600" />
+                    Pay supplier now
+                  </label>
+                  <span className="text-xs text-muted-foreground">
+                    PO total:{" "}
+                    <span className="font-bold text-foreground">
+                      LKR {fmtMoney(grandTotal)}
+                    </span>
+                  </span>
+                </div>
+                {payNow && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Amount (LKR)</label>
+                      <Input
+                        type="number"
+                        min={0.01}
+                        step="0.01"
+                        value={payAmount}
+                        onChange={(e) => {
+                          setPayAmountTouched(true);
+                          setPayAmount(e.target.value);
+                        }}
+                        className="h-9"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Method</label>
+                      <select
+                        value={payMethod}
+                        onChange={(e) => setPayMethod(e.target.value)}
+                        className="w-full h-9 rounded-md border bg-background px-2 text-sm"
+                      >
+                        <option value="CASH">Cash</option>
+                        <option value="CARD">Card</option>
+                        <option value="BANK_TRANSFER">Bank</option>
+                        <option value="CHEQUE">Cheque</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Reference</label>
+                      <Input
+                        value={payReference}
+                        onChange={(e) => setPayReference(e.target.value)}
+                        placeholder="Optional"
+                        className="h-9"
+                      />
+                    </div>
+                    {payMethod === "CHEQUE" && (
+                      <>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Cheque # *</label>
+                          <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="h-9 font-mono" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due date *</label>
+                          <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-9" />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Bank</label>
+                          <Input value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} className="h-9" />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </SectionCard>
 
             {/* Selected details — mobile/tablet only (sidebar on xl) */}

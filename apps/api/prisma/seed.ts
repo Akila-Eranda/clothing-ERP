@@ -192,7 +192,7 @@ async function main() {
       tenantId: tenant.id, name: 'Cashier', type: RoleType.CASHIER, isSystem: true,
       permissions: {
         create: permissions
-          .filter((p: Permission) => ['sales', 'customers', 'inventory', 'products'].includes(p.resource) && p.action !== 'delete')
+          .filter((p: Permission) => ['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) && p.action !== 'delete')
           .map((p: Permission) => ({ permissionId: p.id })),
       },
     },
@@ -213,6 +213,8 @@ async function main() {
         create: permIds(
           'inventory:read', 'inventory:update', 'purchases:read', 'purchases:create', 'purchases:update',
           'sales:read', 'reports:read', 'products:read',
+          'customers:read', 'customers:create', 'customers:update',
+          'cash:read', 'cash:update',
         ),
       },
     },
@@ -267,9 +269,16 @@ async function main() {
     },
   });
 
+  await syncRolePermissions(cashierRole.id,
+    permissions
+      .filter((p: Permission) => ['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) && p.action !== 'delete')
+      .map((p: Permission) => `${p.resource}:${p.action}`),
+  );
   await syncRolePermissions(branchManagerRole.id, [
     'inventory:read', 'inventory:update', 'purchases:read', 'purchases:create', 'purchases:update',
     'sales:read', 'reports:read', 'products:read',
+    'customers:read', 'customers:create', 'customers:update',
+    'cash:read', 'cash:update',
   ]);
   await syncRolePermissions(inventoryManagerRole.id, [
     'inventory:read', 'inventory:update', 'inventory:create', 'products:read', 'products:update', 'reports:read',
@@ -312,7 +321,8 @@ async function main() {
   });
   console.log(`✅ Shop admin: ${adminUser.email} (password: Admin@123456) — shop.hexalyte.com only`);
 
-  // ── Demo Cashier ──────────────────────────────────────────
+  // ── Demo Cashiers (separate drawers / concurrent shifts) ──
+  const cashierPassword = await bcrypt.hash('Cashier@123456', 12);
   const cashierUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: 'cashier@demo.fashionerp.com' } },
     update: {},
@@ -322,13 +332,35 @@ async function main() {
       email: 'cashier@demo.fashionerp.com',
       firstName: 'Demo',
       lastName: 'Cashier',
-      passwordHash: await bcrypt.hash('Cashier@123456', 12),
+      passwordHash: cashierPassword,
       emailVerified: true,
       status: UserStatus.ACTIVE,
       roles: { create: [{ roleId: cashierRole.id }] },
     },
   });
-  console.log(`✅ Cashier user: ${cashierUser.email} (password: Cashier@123456)`);
+  console.log(`✅ Cashier 1: ${cashierUser.email} (password: Cashier@123456)`);
+
+  const cashier2User = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: 'cashier2@demo.fashionerp.com' } },
+    update: { status: UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      email: 'cashier2@demo.fashionerp.com',
+      firstName: 'Demo',
+      lastName: 'Cashier 2',
+      passwordHash: cashierPassword,
+      emailVerified: true,
+      status: UserStatus.ACTIVE,
+      roles: { create: [{ roleId: cashierRole.id }] },
+    },
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: cashier2User.id, roleId: cashierRole.id } },
+    update: {},
+    create: { userId: cashier2User.id, roleId: cashierRole.id },
+  });
+  console.log(`✅ Cashier 2: ${cashier2User.email} (password: Cashier@123456) — separate cash drawer`);
 
   const managerPassword = await bcrypt.hash('Manager@123456', 12);
   await prisma.user.upsert({

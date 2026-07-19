@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2 } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -307,6 +307,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
   const [dayEndLoading, setDayEndLoading] = React.useState(false);
   const [showDayEnd, setShowDayEnd] = React.useState(false);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [dayEndSummary, setDayEndSummary] = React.useState<{
     date: string;
     totalSales: number;
@@ -1113,6 +1114,31 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }catch(e:unknown){toast.error((e as Error).message??"Day end failed");}
     finally{setDayEndLoading(false);}
   },[dayEndLoading]);
+
+  const toggleFullscreen = React.useCallback(async () => {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch {
+      toast.error("Fullscreen not available on this device");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const sync = () => setIsFullscreen(!!document.fullscreenElement);
+    sync();
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+
+  React.useEffect(() => {
+    if (!posOpen && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
+  }, [posOpen]);
 
   const buildReceiptHtml = React.useCallback((r: SaleReceipt): string => {
     const s: ReceiptSettings = receiptSettings;
@@ -3284,6 +3310,16 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })}</div>
           <div className="text-xs shrink-0" style={{ color: "#6a8ab8" }}>{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
           <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <button
+            type="button"
+            onClick={() => void toggleFullscreen()}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
+            style={{background: isFullscreen ? "rgba(79,110,247,0.2)" : "rgba(255,255,255,0.06)", color: isFullscreen ? "#93c5fd" : "#a0b4d4", border: `1px solid ${isFullscreen ? "rgba(79,110,247,0.35)" : "#1e3356"}`}}
+          >
+            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+            {isFullscreen ? "Exit Full" : "Fullscreen"}
+          </button>
           <button onClick={handleDayEnd} disabled={dayEndLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}}>{dayEndLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<TrendingUp className="h-3.5 w-3.5"/>}Day End</button>
           <button onClick={()=>setShowCashClose(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90" style={{background:"rgba(16,185,129,0.12)",color:"#10b981",border:"1px solid rgba(16,185,129,0.3)"}}><Banknote className="h-3.5 w-3.5"/>Close Shift</button>
           <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>

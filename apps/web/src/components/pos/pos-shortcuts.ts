@@ -105,7 +105,7 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
       ["Enter (open shift)", "Start shift with opening cash"],
       ["Esc (close shift)", "Cancel close-shift dialog"],
       ["Ctrl+Enter / F9 (close)", "Confirm close shift"],
-      ["F11", "Reserved (free — not used)"],
+      ["F11", "Reserved (use Fullscreen button)"],
       ["F12", "Lock POS (PIN) / exit if no PIN"],
       ["0–9 (lock)", "Enter PIN digits"],
       ["Esc (lock)", "Exit POS from lock screen"],

@@ -60,6 +60,9 @@ export class CreatePurchaseOrderDto {
   @ApiPropertyOptional({ description: 'Link an existing Quick/Direct GRN (stock already posted)' })
   @IsOptional() @IsString() fromGrnId?: string;
   @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
+  @ApiPropertyOptional({ type: ReceivePaymentDto, description: 'Optional advance / pay-now against this PO' })
+  @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
+  payment?: ReceivePaymentDto;
 }
 
 export class UpdatePOStatusDto {
@@ -339,10 +342,30 @@ export class SuppliersService {
           createdBy: userId,
         });
       });
-      return this.findOnePO(po.id, tenantId);
     }
 
-    return po;
+    let paymentResult: unknown = null;
+    if (dto.payment && dto.payment.amount > 0) {
+      if (dto.payment.method === PaymentMethod.CHEQUE && !(dto.payment.chequeNumber ?? dto.payment.reference)?.trim()) {
+        throw new BadRequestException('Cheque number is required for cheque payments');
+      }
+      if (dto.payment.method === PaymentMethod.CHEQUE && !dto.payment.chequeDueDate?.trim()) {
+        throw new BadRequestException('Cheque due date is required');
+      }
+      paymentResult = await this.recordPayment(dto.supplierId, tenantId, branchId, userId, {
+        amount: dto.payment.amount,
+        method: dto.payment.method,
+        purchaseId: po.id,
+        reference: dto.payment.reference,
+        notes: dto.payment.notes ?? `Payment on PO ${po.poNumber}`,
+        chequeNumber: dto.payment.chequeNumber,
+        chequeDueDate: dto.payment.chequeDueDate,
+        chequeBankName: dto.payment.chequeBankName,
+      });
+    }
+
+    const refreshed = await this.findOnePO(po.id, tenantId);
+    return paymentResult ? { ...refreshed, payment: paymentResult } : refreshed;
   }
 
   async findAllPOs(tenantId: string, query: PaginationDto & { status?: PurchaseOrderStatus }) {
@@ -440,6 +463,10 @@ export class SuppliersService {
       purchaseId: dto.purchaseId,
       purchaseIds: dto.purchaseId ? [dto.purchaseId] : undefined,
       paidAt: dto.paidAt,
+      chequeNumber: dto.chequeNumber,
+      chequeDueDate: dto.chequeDueDate,
+      chequeBankName: dto.chequeBankName,
+      chequeBankAccountId: dto.chequeBankAccountId,
     });
   }
 
