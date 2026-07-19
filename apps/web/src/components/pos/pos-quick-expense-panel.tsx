@@ -176,6 +176,10 @@ export function PosQuickExpensePanel({
       toast.error("Enter cheque number");
       return;
     }
+    if (method === "CHEQUE" && !chequeDue.trim()) {
+      toast.error("Cheque due date is required");
+      return;
+    }
     const bal = selectedSupplier?.balance ?? 0;
     if (bal > 0 && amt > bal + 0.01) {
       toast.error(`Amount exceeds outstanding (LKR ${formatNumber(bal)})`);
@@ -191,7 +195,9 @@ export function PosQuickExpensePanel({
         notes: notes.trim() || undefined,
         ...(method === "CHEQUE"
           ? {
-              reference: reference.trim(),
+              chequeNumber: reference.trim(),
+              chequeDueDate: chequeDue.trim(),
+              chequeBankName: chequeBank.trim() || undefined,
             }
           : {}),
       });
@@ -450,7 +456,7 @@ export function PosQuickExpensePanel({
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date</label>
+                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date *</label>
                 <input
                   type="date"
                   value={chequeDue}

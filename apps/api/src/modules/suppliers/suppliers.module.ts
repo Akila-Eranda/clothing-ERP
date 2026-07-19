@@ -122,6 +122,10 @@ export class SupplierApPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) purchaseIds?: string[];
   @ApiPropertyOptional() @IsOptional() @IsDateString() paidAt?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
 }
 
 export class AssignSupplierProductDto {
