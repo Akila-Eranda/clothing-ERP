@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2 } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -33,6 +33,7 @@ import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
+import { PosDemoProductPanel } from "@/components/pos/pos-demo-product-panel";
 import { PosQuickExpensePanel } from "@/components/pos/pos-quick-expense-panel";
 import { PosPromotionsPanel } from "@/components/pos/pos-promotions-panel";
 import { PosSalesReportPanel } from "@/components/pos/pos-sales-report-panel";
@@ -152,6 +153,7 @@ const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CA
 const BASE_NAV_ITEMS = [
   { id:"products", label:"Products", icon: ShoppingBag },
   { id:"quick-product", label:"New Product", icon: PackagePlus },
+  { id:"demo-product", label:"Demo Product", icon: Sparkles },
   { id:"customers", label:"Customers", icon: Users },
   { id:"hold-bills", label:"Hold Bills", icon: PauseCircle },
   { id:"orders", label:"Orders", icon: FileText },
@@ -1327,7 +1329,19 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       const pm=new Map(products.map(p=>[p.variantId,p]));
       const payload={
         customerId:customer?.id,
-        items:items.map(i=>({variantId:i.variantId,productName:i.productName,variantName:i.variantName,sku:i.sku,quantity:i.quantity,unitPrice:i.unitPrice,costPrice:pm.get(i.variantId)?.costPrice??0,discount:i.discountAmount??0,discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",taxRate:taxRate})),
+        items:items.map(i=>({
+          variantId: i.isCustom ? undefined : i.variantId,
+          isCustom: !!i.isCustom,
+          productName:i.productName,
+          variantName:i.isCustom ? (i.variantName || "Custom") : i.variantName,
+          sku:i.isCustom ? (i.sku || "CUSTOM") : i.sku,
+          quantity:i.quantity,
+          unitPrice:i.unitPrice,
+          costPrice:i.isCustom ? (i.costPrice ?? 0) : (pm.get(i.variantId)?.costPrice??0),
+          discount:i.discountAmount??0,
+          discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",
+          taxRate:taxRate,
+        })),
         payments,
         discountAmount:discountAmount(),
         couponCode:couponCode??undefined,
@@ -1780,13 +1794,27 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       </div>
     );
 
-    // QUICK PRODUCT
+    // QUICK PRODUCT (catalog)
     if (activeNav === "quick-product") {
       return (
         <PosQuickProductPanel
           onBack={() => setActiveNav("products")}
           onCreated={() => {
             void loadProducts();
+            setActiveNav("products");
+          }}
+        />
+      );
+    }
+
+    // DEMO PRODUCT (bill-only, not in products table)
+    if (activeNav === "demo-product") {
+      return (
+        <PosDemoProductPanel
+          onBack={() => setActiveNav("products")}
+          taxRate={taxRate}
+          onAddToCart={(item) => {
+            addItem(item);
             setActiveNav("products");
           }}
         />
@@ -2973,7 +3001,17 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
-                          <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">{item.productName}</p>
+                          <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">
+                            {item.productName}
+                            {item.isCustom && (
+                              <span
+                                className="ml-1.5 inline-flex align-middle text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
+                                style={{ background: "rgba(16,185,129,0.2)", color: "#6ee7b7" }}
+                              >
+                                Demo
+                              </span>
+                            )}
+                          </p>
                           <div className="flex items-center gap-0.5 shrink-0">
                             <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
                             {editing ? (
@@ -3016,7 +3054,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                             <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
                           </div>
                           <p className="text-sm font-bold text-white tabular-nums leading-tight shrink-0 min-w-[4.5rem] text-right">LKR {formatNumber(lineTotal)}</p>
-                          <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className="h-6 w-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0" title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
+                          <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className={`h-6 w-6 rounded flex items-center justify-center transition-opacity shrink-0 ${item.isCustom ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
                         </motion.div>
                         );
                       })}</AnimatePresence>

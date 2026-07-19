@@ -86,7 +86,8 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
   {
     title: "POS tools (sidebar)",
     items: [
-      ["Q / Alt+Q", "New Product (quick add)"],
+      ["Q / Alt+Q", "New Product (save to catalog)"],
+      ["Y / Alt+Y", "Demo Product (bill only)"],
       ["O / Alt+O", "Orders (today’s sales)"],
       ["V / Alt+V", "Gift vouchers"],
       ["B / Alt+B", "Quick GRN"],

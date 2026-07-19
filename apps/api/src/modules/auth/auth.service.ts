@@ -26,6 +26,7 @@ import {
   ChangePasswordDto,
 } from './dto/login.dto';
 import { IJwtPayload, IRefreshTokenPayload } from '@/common/interfaces/jwt-payload.interface';
+import { ensureSystemRoles } from '@/modules/roles/default-system-roles';
 
 const BCRYPT_ROUNDS = 12;
 const MAX_LOGIN_ATTEMPTS = 5;
@@ -189,7 +190,24 @@ export class AuthService {
       },
     });
 
-    const permissions = user.roles.flatMap((ur) =>
+    // Keep system role permission packs in sync (e.g. cashier POS supplier create)
+    await ensureSystemRoles(this.prisma, user.tenantId);
+    const userWithPerms = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: {
+                permissions: { include: { permission: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    const roleRows = userWithPerms?.roles ?? user.roles;
+    const permissions = roleRows.flatMap((ur) =>
       (ur.role as { permissions: { permission: { resource: string; action: string } }[] }).permissions.map(
         (rp) => `${rp.permission.resource}:${rp.permission.action}`,
       ),

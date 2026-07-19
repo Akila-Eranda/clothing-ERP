@@ -268,6 +268,10 @@ export interface CartItem {
   discountType: "percentage" | "fixed";
   taxRate: number;
   stock: number;
+  /** Bill-only line — not linked to products table / no stock. */
+  isCustom?: boolean;
+  /** Cost for margin on custom lines (optional). */
+  costPrice?: number;
 }
 
 export interface Payment {

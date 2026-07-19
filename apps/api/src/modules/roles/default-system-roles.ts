@@ -34,13 +34,24 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
     await syncRolePermissions(role.id, permissionIds);
   };
 
-  const cashierPermIds = permissions
+  const cashierBase = permissions
     .filter(
       (p) =>
-        (['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) &&
-        p.action !== 'delete'),
+        ['sales', 'customers', 'inventory', 'products', 'cash'].includes(p.resource) &&
+        p.action !== 'delete',
     )
     .map((p) => p.id);
+  // POS Quick GRN / supplier pay need list + register supplier at the counter
+  const cashierExtra = permIds(
+    'suppliers:read',
+    'suppliers:create',
+    'purchases:read',
+    'purchases:create',
+    'purchases:update',
+    'accounting:create',
+    'accounting:read',
+  );
+  const cashierPermIds = [...new Set([...cashierBase, ...cashierExtra])];
 
   await upsertRole('Cashier', RoleType.CASHIER, cashierPermIds);
 

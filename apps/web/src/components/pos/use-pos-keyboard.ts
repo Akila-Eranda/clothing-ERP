@@ -489,6 +489,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (letterToolsOk && key === "p" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("products"); setTimeout(() => ctx.searchRef.current?.focus(), 50); return; }
       if (letterToolsOk && key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
       if (letterToolsOk && key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
+      if (letterToolsOk && key === "y") { e.preventDefault(); ctx.setActiveNav("demo-product"); return; }
       if (letterToolsOk && key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
       if (letterToolsOk && key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
       if (letterToolsOk && key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }

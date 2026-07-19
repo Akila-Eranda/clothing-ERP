@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
+import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
   "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
@@ -275,7 +276,16 @@ export function PosQuickExpensePanel({
 
           {mode === "supplier" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier *</label>
+              <div className="flex items-center justify-between gap-2">
+                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier *</label>
+                <PosRegisterSupplier
+                  disabled={busy}
+                  onRegistered={(s) => {
+                    setSuppliers((prev) => (prev.some((x) => x.id === s.id) ? prev : [{ ...s, balance: s.balance ?? 0 }, ...prev]));
+                    setSupplierId(s.id);
+                  }}
+                />
+              </div>
               <div className="flex gap-2">
                 <select
                   value={supplierId}

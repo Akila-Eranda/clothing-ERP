@@ -10,6 +10,7 @@ import { formatNumber } from "@/lib/utils";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { printGrnReceipt } from "@/lib/grn-receipt-print";
 import { useAuthStore } from "@/stores/auth-store";
+import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
@@ -502,7 +503,16 @@ export function PosQuickGrnPanel({
           style={{ background: "#162338", borderColor: "#1e3356" }}
         >
           <div className="flex flex-col gap-2">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier</label>
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier</label>
+              <PosRegisterSupplier
+                disabled={busy}
+                onRegistered={(s) => {
+                  setSuppliers((prev) => (prev.some((x) => x.id === s.id) ? prev : [s, ...prev]));
+                  setSupplierId(s.id);
+                }}
+              />
+            </div>
             <div className="flex gap-2">
               <select
                 value={supplierId}

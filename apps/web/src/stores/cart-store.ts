@@ -77,10 +77,17 @@ export const useCartStore = create<CartStore>()(
       addItem: (newItem) =>
         set((state) => {
           const qtyToAdd = Math.max(1, newItem.quantity || 1);
-          const existing = state.items.find((i) => i.variantId === newItem.variantId);
+          const existing = newItem.isCustom
+            ? state.items.find(
+                (i) =>
+                  i.isCustom &&
+                  i.productName === newItem.productName &&
+                  i.unitPrice === newItem.unitPrice,
+              )
+            : state.items.find((i) => i.variantId === newItem.variantId);
           if (existing) {
             const stacked = existing.quantity + qtyToAdd;
-            const newQty = state.allowNegativeStock
+            const newQty = state.allowNegativeStock || existing.isCustom
               ? stacked
               : Math.min(stacked, existing.stock);
             const perUnitFromNew =
@@ -94,7 +101,7 @@ export const useCartStore = create<CartStore>()(
             const perUnitDisc = perUnitFromNew || perUnitFromExisting;
             return {
               items: state.items.map((i) =>
-                i.variantId === newItem.variantId
+                i.variantId === existing.variantId
                   ? {
                       ...i,
                       quantity: newQty,
@@ -106,7 +113,7 @@ export const useCartStore = create<CartStore>()(
               ),
             };
           }
-          const initialQty = state.allowNegativeStock
+          const initialQty = state.allowNegativeStock || newItem.isCustom
             ? qtyToAdd
             : Math.min(qtyToAdd, Math.max(1, newItem.stock || qtyToAdd));
           return {
@@ -129,7 +136,7 @@ export const useCartStore = create<CartStore>()(
               ? state.items.filter((i) => i.variantId !== variantId)
               : state.items.map((i) => {
                   if (i.variantId !== variantId) return i;
-                  const newQty = state.allowNegativeStock
+                  const newQty = state.allowNegativeStock || i.isCustom
                     ? quantity
                     : Math.min(quantity, i.stock);
                   const perUnitDisc =

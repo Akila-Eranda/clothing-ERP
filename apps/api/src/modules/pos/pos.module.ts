@@ -42,7 +42,9 @@ export class ReturnSaleDto {
 }
 
 export class SaleItemDto {
-  @ApiProperty() @IsString() variantId: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() variantId?: string;
+  /** When true (or variantId omitted), line is bill-only — no catalog / stock. */
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isCustom?: boolean;
   @ApiProperty() @IsInt() @Min(1) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
@@ -115,6 +117,16 @@ export class PosService {
     }
 
     const invoiceNumber = await this.generateInvoiceNumber(tenantId);
+
+    for (const item of dto.items) {
+      const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
+      if (isCustom && !item.productName?.trim()) {
+        throw new BadRequestException('Custom bill items require a product name');
+      }
+      if (!isCustom && !item.variantId?.trim()) {
+        throw new BadRequestException('Catalog items require a variantId');
+      }
+    }
 
     const subtotal = dto.items.reduce((sum, item) => {
       const lineTotal = item.unitPrice * item.quantity;
@@ -314,11 +326,12 @@ export class PosService {
                 ? (lineTotal * (item.discount ?? 0)) / 100
                 : (item.discount ?? 0);
               const taxAmt = ((lineTotal - discount) * (item.taxRate ?? 0)) / 100;
+              const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
               return {
-                variantId: item.variantId,
+                variantId: isCustom ? null : item.variantId,
                 productName: item.productName,
-                variantName: item.variantName,
-                sku: item.sku,
+                variantName: isCustom ? (item.variantName || 'Custom') : item.variantName,
+                sku: isCustom ? (item.sku || 'CUSTOM') : item.sku,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
                 costPrice: item.costPrice,
@@ -368,8 +381,10 @@ export class PosService {
       }
 
       for (const item of dto.items) {
+        const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
+        if (isCustom) continue;
         await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
-          variantId: item.variantId,
+          variantId: item.variantId!,
           quantity: item.quantity,
           movementType: StockMovementType.SALE,
           referenceId: created.id,
@@ -627,6 +642,7 @@ export class PosService {
         data: { tenantId, branchId: resolvedBranchId, cashierId, label: dto.label, data: dto.data as object },
       });
       for (const item of data.items ?? []) {
+        if (!item.variantId || item.variantId.startsWith('custom-')) continue;
         await this.inventoryService.reserveStock(
           tenantId,
           resolvedBranchId,
