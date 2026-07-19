@@ -1,13 +1,20 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  BankAccountType,
+  BankTxnStatus,
+  BankTxnType,
+  ChequeDirection,
+  ChequeStatus,
   PaymentMethod,
+  Prisma,
   PurchaseOrderStatus,
   SupplierDebitNoteStatus,
   SupplierInvoiceStatus,
   SupplierLedgerEntryType,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { applyInvoicePayment } from './procurement.helper';
 import {
   allocateApPaymentFifo,
@@ -20,6 +27,8 @@ import {
   syncSupplierBalanceWithLedger,
 } from './supplier-ap.helper';
 import * as dayjs from 'dayjs';
+
+type ApTx = Prisma.TransactionClient;
 
 @Injectable()
 export class SupplierApService {
@@ -338,6 +347,7 @@ export class SupplierApService {
       const result = await this.applyPoAllocations({
         tenantId,
         supplierId,
+        branchId,
         userId,
         method,
         uiMethod,
@@ -346,9 +356,9 @@ export class SupplierApService {
         paidAt,
         allocations: poAllocs,
         appliedTotal,
+        supplierName: supplier.name,
       });
 
-      void branchId;
       this.eventEmitter.emit('accounting.supplier-payment.posted', {
         paymentId: result.payment.id,
         tenantId,
@@ -460,10 +470,23 @@ export class SupplierApService {
         createdBy: userId,
       });
 
+      await this.applyTenderOutflow(tx, {
+        tenantId,
+        branchId,
+        userId,
+        supplierId,
+        supplierName: supplier.name,
+        paymentId: payment.id,
+        amount: appliedTotal,
+        method,
+        uiMethod,
+        paidAt,
+        reference: dto.reference ?? payment.reference ?? undefined,
+      });
+
       return { payment, allocations: allocationRows, balanceAfter, appliedTotal };
     });
 
-    void branchId;
     this.eventEmitter.emit('accounting.supplier-payment.posted', {
       paymentId: result.payment.id,
       tenantId,
@@ -520,6 +543,7 @@ export class SupplierApService {
   private async applyPoAllocations(opts: {
     tenantId: string;
     supplierId: string;
+    branchId?: string;
     userId: string;
     method: PaymentMethod;
     uiMethod: string;
@@ -528,6 +552,7 @@ export class SupplierApService {
     paidAt: Date;
     allocations: { lineId: string; source: 'PO'; applied: number }[];
     appliedTotal: number;
+    supplierName: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.supplierPayment.create({
@@ -571,8 +596,178 @@ export class SupplierApService {
         createdBy: opts.userId,
       });
 
+      await this.applyTenderOutflow(tx, {
+        tenantId: opts.tenantId,
+        branchId: opts.branchId,
+        userId: opts.userId,
+        supplierId: opts.supplierId,
+        supplierName: opts.supplierName,
+        paymentId: payment.id,
+        amount: opts.appliedTotal,
+        method: opts.method,
+        uiMethod: opts.uiMethod,
+        paidAt: opts.paidAt,
+        reference: opts.reference ?? payment.reference ?? undefined,
+      });
+
       return { payment, allocations: allocationRows, balanceAfter };
     });
+  }
+
+  /**
+   * Reduce Cash / Bank registers when AP is paid.
+   * GL (Dr AP / Cr Cash|Bank) still posts via accounting outbox — do not post GL here.
+   * CASH → Cash on Hand + cash book credit
+   * BANK_TRANSFER / CHEQUE → Main Bank withdrawal (+ issued cheque when CHEQUE)
+   */
+  private async applyTenderOutflow(
+    tx: ApTx,
+    opts: {
+      tenantId: string;
+      branchId?: string;
+      userId: string;
+      supplierId: string;
+      supplierName: string;
+      paymentId: string;
+      amount: number;
+      method: PaymentMethod;
+      uiMethod: string;
+      paidAt: Date;
+      reference?: string;
+    },
+  ) {
+    const amount = roundAp(opts.amount);
+    if (amount <= 0.009) return;
+
+    const stored = String(opts.method).toUpperCase();
+    const ui = String(opts.uiMethod).toUpperCase();
+    const isCash = stored === 'CASH';
+    const isBank = stored === 'BANK_TRANSFER' || stored === 'CHEQUE' || ui === 'CHEQUE';
+    const desc = `Supplier payment — ${opts.supplierName}`;
+
+    if (isCash) {
+      const last = await tx.cashBookEntry.findFirst({
+        where: {
+          tenantId: opts.tenantId,
+          ...(opts.branchId ? { branchId: opts.branchId } : {}),
+        },
+        orderBy: [{ entryDate: 'desc' }, { createdAt: 'desc' }],
+      });
+      const prev = last?.balanceAfter ?? 0;
+      await tx.cashBookEntry.create({
+        data: {
+          tenantId: opts.tenantId,
+          branchId: opts.branchId || undefined,
+          entryDate: opts.paidAt,
+          type: 'SUPPLIER_PAYMENT',
+          description: desc,
+          debit: 0,
+          credit: amount,
+          balanceAfter: roundAp(prev - amount),
+          paymentMethod: PaymentMethod.CASH,
+          referenceType: 'SupplierPayment',
+          referenceId: opts.paymentId,
+          createdBy: opts.userId,
+        },
+      });
+
+      const cashAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'CASH');
+      if (cashAcct) {
+        await tx.bankTransaction.create({
+          data: {
+            tenantId: opts.tenantId,
+            bankAccountId: cashAcct.id,
+            type: BankTxnType.WITHDRAWAL,
+            status: BankTxnStatus.CLEARED,
+            amount,
+            txnDate: opts.paidAt,
+            reference: opts.reference,
+            description: desc,
+            createdBy: opts.userId,
+          },
+        });
+        await tx.bankAccount.update({
+          where: { id: cashAcct.id },
+          data: { currentBalance: { decrement: amount } },
+        });
+      }
+      return;
+    }
+
+    if (!isBank) return;
+
+    const bankAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
+    if (!bankAcct) return;
+
+    let chequeId: string | undefined;
+    if (ui === 'CHEQUE') {
+      const chequeNumber = (opts.reference || '').trim() || `SP-${opts.paymentId.slice(0, 8).toUpperCase()}`;
+      const cheque = await tx.cheque.create({
+        data: {
+          tenantId: opts.tenantId,
+          direction: ChequeDirection.ISSUED,
+          // Already deducted from Main Bank with this payment — avoid a second hit on clear.
+          status: ChequeStatus.CLEARED,
+          chequeNumber,
+          amount,
+          issueDate: opts.paidAt,
+          partyType: 'SUPPLIER',
+          partyId: opts.supplierId,
+          partyName: opts.supplierName,
+          bankAccountId: bankAcct.id,
+          clearedAt: opts.paidAt,
+          notes: chequeSourceNotes('SupplierPayment', opts.paymentId, 'Paid by cheque (Main Bank)'),
+          createdBy: opts.userId,
+        },
+      });
+      chequeId = cheque.id;
+    }
+
+    await tx.bankTransaction.create({
+      data: {
+        tenantId: opts.tenantId,
+        bankAccountId: bankAcct.id,
+        type: BankTxnType.WITHDRAWAL,
+        status: BankTxnStatus.CLEARED,
+        amount,
+        txnDate: opts.paidAt,
+        reference: opts.reference,
+        description: ui === 'CHEQUE' ? `${desc} (cheque)` : desc,
+        chequeId,
+        createdBy: opts.userId,
+      },
+    });
+    await tx.bankAccount.update({
+      where: { id: bankAcct.id },
+      data: { currentBalance: { decrement: amount } },
+    });
+  }
+
+  private async resolveTenderBankAccount(
+    tx: ApTx,
+    tenantId: string,
+    tender: 'CASH' | 'BANK',
+  ) {
+    if (tender === 'CASH') {
+      return (
+        (await tx.bankAccount.findFirst({
+          where: { tenantId, isActive: true, code: 'CASH-01' },
+        }))
+        ?? (await tx.bankAccount.findFirst({
+          where: { tenantId, isActive: true, type: BankAccountType.CASH_IN_HAND },
+          orderBy: { code: 'asc' },
+        }))
+      );
+    }
+    return (
+      (await tx.bankAccount.findFirst({
+        where: { tenantId, isActive: true, code: 'BANK-01' },
+      }))
+      ?? (await tx.bankAccount.findFirst({
+        where: { tenantId, isActive: true, type: BankAccountType.CURRENT },
+        orderBy: { code: 'asc' },
+      }))
+    );
   }
 
   private async bumpPoPaid(

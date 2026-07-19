@@ -346,7 +346,7 @@ export class FinanceService {
       };
     }
 
-    const [sales, expenseRows, movements] = await Promise.all([
+    const [sales, expenseRows, movements, supplierCashPays] = await Promise.all([
       this.prisma.sale.findMany({
         where: {
           tenantId,
@@ -367,6 +367,15 @@ export class FinanceService {
           createdAt: { gte: from, lte: to },
         },
         orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.supplierPayment.findMany({
+        where: {
+          tenantId,
+          method: PaymentMethod.CASH,
+          paidAt: { gte: from, lte: to },
+        },
+        include: { supplier: { select: { name: true } } },
+        orderBy: { paidAt: 'asc' },
       }),
     ]);
 
@@ -401,6 +410,16 @@ export class FinanceService {
         debit: isIn ? Math.abs(m.amount) : 0,
         credit: isIn ? 0 : Math.abs(m.amount),
         referenceId: m.id,
+      });
+    }
+    for (const p of supplierCashPays) {
+      synth.push({
+        entryDate: p.paidAt,
+        type: 'SUPPLIER_PAYMENT',
+        description: `Supplier payment — ${p.supplier?.name ?? 'supplier'}`,
+        debit: 0,
+        credit: p.amount,
+        referenceId: p.id,
       });
     }
     synth.sort((a, b) => a.entryDate.getTime() - b.entryDate.getTime());

@@ -461,7 +461,7 @@ export default function SupplierDetailPage() {
 
       {/* ── Body ── */}
       <div className="flex-1 overflow-y-auto">
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,340px)] gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══ */}
         <div className="space-y-6">
@@ -728,7 +728,7 @@ export default function SupplierDetailPage() {
         {/* ══ END LEFT ══ */}
 
         {/* ══ RIGHT SIDEBAR ══ */}
-        <div className="space-y-5 lg:sticky lg:top-6">
+        <div className="space-y-5 lg:sticky lg:top-6 min-w-0 w-full">
 
           {/* Balance */}
           <div className="bg-card dark:bg-background rounded-xl p-6 ">
@@ -785,32 +785,47 @@ export default function SupplierDetailPage() {
             )}
           </div>
 
-          {/* Details */}
-          <div className="bg-card dark:bg-background rounded-xl p-6 ">
+          {/* Details + Actions */}
+          <div className="bg-card dark:bg-background rounded-xl p-5 min-w-0 overflow-visible">
             <h3 className="font-bold text-sm tracking-tight border-b border-border pb-3 mb-2">{copy.detailsSectionTitle}</h3>
             {supplier.code     && <InfoRow label="Code"       value={<span className="font-mono text-xs">{supplier.code}</span>} />}
             {supplier.gstNumber && <InfoRow label="GST"        value={<span className="font-mono text-xs">{supplier.gstNumber}</span>} />}
             {supplier.panNumber && <InfoRow label="PAN / BRN"  value={<span className="font-mono text-xs">{supplier.panNumber}</span>} />}
             <InfoRow label="Total POs"   value={totalPOs} />
             <InfoRow label="Last Updated" value={fmtDate(supplier.updatedAt)} />
-          </div>
 
-          {/* Actions */}
-          <div className="bg-card dark:bg-background rounded-xl p-6  space-y-3">
-            <Button className="w-full gap-2" onClick={() => router.push(`/suppliers/${id}/edit`)}>
-              <Pencil className="h-4 w-4" /> {copy.editButton}
-            </Button>
-            <Button variant="success" className="w-full gap-2"
-              onClick={() => setPayOpen(true)}>
-              <Banknote className="h-4 w-4" /> Record Payment
-            </Button>
-            <Button variant="outline" className="w-full gap-2"
-              onClick={() => router.push(`/purchases/new?supplier=${id}`)}>
-              <Package className="h-4 w-4" /> New Purchase Order
-            </Button>
-            <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push("/suppliers")}>
-              {copy.backLabel}
-            </Button>
+            <div className="mt-5 pt-4 border-t border-border flex flex-col gap-2.5">
+              <Button
+                className="w-full min-w-0 justify-center gap-1.5 px-3 text-[13px] whitespace-normal h-auto min-h-10 py-2.5 leading-snug"
+                onClick={() => router.push(`/suppliers/${id}/edit`)}
+              >
+                <Pencil className="h-4 w-4 shrink-0" />
+                <span>{copy.editButton}</span>
+              </Button>
+              <Button
+                variant="success"
+                className="w-full min-w-0 justify-center gap-1.5 px-3 text-[13px] whitespace-normal h-auto min-h-10 py-2.5 leading-snug"
+                onClick={() => setPayOpen(true)}
+              >
+                <Banknote className="h-4 w-4 shrink-0" />
+                <span>Record Payment</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full min-w-0 justify-center gap-1.5 px-3 text-[13px] whitespace-normal h-auto min-h-10 py-2.5 leading-snug"
+                onClick={() => router.push(`/purchases/new?supplier=${id}`)}
+              >
+                <Package className="h-4 w-4 shrink-0" />
+                <span>New Purchase Order</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full min-w-0 justify-center text-[13px] text-muted-foreground h-auto min-h-9 py-2"
+                onClick={() => router.push("/suppliers")}
+              >
+                {copy.backLabel}
+              </Button>
+            </div>
           </div>
 
         </div>
