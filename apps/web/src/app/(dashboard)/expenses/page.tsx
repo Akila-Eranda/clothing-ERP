@@ -20,9 +20,9 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const CATEGORIES = ["Payroll", "Rent", "Utilities", "Marketing", "Operations", "Assets", "Logistics", "Maintenance", "Other"];
 const PAY_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "CHEQUE", "UPI", "WALLET"];
 const CAT_COLORS = ["#6366f1", "#f43f5e", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899", "#14b8a6", "#f97316"];
 
@@ -52,7 +52,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
   const [amount, setAmount]           = useState(edit?.amount?.toString() ?? "");
   const [description, setDescription] = useState(edit?.description ?? "");
   const [date, setDate]               = useState(edit?.date ? edit.date.split("T")[0] : today);
-  const [categoryId, setCategoryId]   = useState(edit?.categoryId ?? "");
+  const [categoryId, setCategoryId]   = useState(normalizeExpenseCategory(edit?.categoryId));
   const [method, setMethod]           = useState(edit?.paymentMethod ?? "CASH");
   const [reference, setReference]     = useState(edit?.reference ?? "");
   const [saving, setSaving]           = useState(false);
@@ -92,7 +92,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
               <Label className="text-xs font-semibold">Category</Label>
               <Select value={categoryId} onValueChange={setCategoryId}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -222,7 +222,7 @@ export default function ExpensesPage() {
             { label: "Total Expenses",    value: `LKR ${formatNumber(total)}`,   icon: TrendingDown, bg: "bg-red-500",    sub: `${expenses.length} entries in period`, tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
             { label: "Average per Entry", value: `LKR ${formatNumber(avg)}`,     icon: Activity,     bg: "bg-amber-500",  sub: "Per recorded expense", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
             { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry", tint: "border-purple-200/70 bg-gradient-to-br from-purple-50 to-white dark:border-purple-500/20 dark:from-purple-500/10 dark:to-transparent" },
-            { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${CATEGORIES.length} total categories`, tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+            { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${EXPENSE_CATEGORIES.length} total categories`, tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
           ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string; tint: string }[]).map((kpi) => (
             <Card key={kpi.label} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${kpi.tint}`}>
               <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
@@ -341,7 +341,7 @@ export default function ExpensesPage() {
                 searchableColumns={[{ id: "description", title: "Description" }, { id: "reference", title: "Reference" }]}
                 filterableColumns={[
                   { id: "paymentMethod", title: "Method",   options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g, " "), value: m })) },
-                  { id: "categoryId",    title: "Category", options: CATEGORIES.map((c) => ({ label: c, value: c })) },
+                  { id: "categoryId",    title: "Category", options: EXPENSE_CATEGORIES.map((c) => ({ label: c, value: c })) },
                 ]}
                 isShowExportButtons={{ isShow: true, fileName: "expenses-export" }}
               />

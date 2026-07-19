@@ -1,4 +1,5 @@
 import {
+  PaymentMethod,
   PurchaseOrderStatus,
   SupplierInvoiceStatus,
   SupplierLedgerEntryType,
@@ -264,6 +265,38 @@ export function allocateApPaymentFifo(
     out.push({ lineId: l.id, source: l.source, applied });
   }
   return out;
+}
+
+/** FIFO allocate across PO lines only (oldest due first), optionally scoped to selected IDs. */
+export function allocatePoPaymentFifo(
+  lines: SupplierApLine[],
+  paymentAmount: number,
+  purchaseIds?: string[],
+): { lineId: string; source: 'PO'; applied: number }[] {
+  const idSet = purchaseIds?.length ? new Set(purchaseIds) : null;
+  const pay = round2(paymentAmount);
+  if (pay <= 0) return [];
+  const sorted = [...lines]
+    .filter((l) => l.source === 'PO' && l.amount > 0.009 && (!idSet || idSet.has(l.id)))
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+  let left = pay;
+  const out: { lineId: string; source: 'PO'; applied: number }[] = [];
+  for (const l of sorted) {
+    if (left <= 0.009) break;
+    const applied = round2(Math.min(l.amount, left));
+    left = round2(left - applied);
+    out.push({ lineId: l.id, source: 'PO', applied });
+  }
+  return out;
+}
+
+/** Persist CHEQUE as BANK_TRANSFER for GL (Main Bank). */
+export function normalizeSupplierPaymentMethod(method?: PaymentMethod | string): PaymentMethod {
+  const raw = String(method ?? PaymentMethod.CASH).toUpperCase();
+  if (raw === 'CHEQUE') return PaymentMethod.BANK_TRANSFER;
+  if ((Object.values(PaymentMethod) as string[]).includes(raw)) return raw as PaymentMethod;
+  return PaymentMethod.CASH;
 }
 
 export type SupplierLedgerRow = {

@@ -213,6 +213,7 @@ function useNavGroups(): NavGroup[] {
         { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
         { label: L["/purchases/grn"] ?? "Goods Receipt", href: "/purchases/grn", icon: PackageCheck },
         { label: L["/purchases/procurement"] ?? "Procurement Hub", href: "/purchases/procurement", icon: ClipboardList },
+        { label: L["/purchases/supplier-payments"] ?? "Supplier Payments", href: "/purchases/supplier-payments", icon: Wallet },
       ],
     },
     {

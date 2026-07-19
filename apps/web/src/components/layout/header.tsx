@@ -66,6 +66,7 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
   "/purchases": "Purchase Orders",
   "/purchases/grn": "Goods Receipt (GRN)",
   "/purchases/procurement": "Procurement Hub",
+  "/purchases/supplier-payments": "Supplier Payments",
   "/hr": "Employees",
   "/hr/attendance": "Attendance",
   "/hr/payroll": "Payroll",

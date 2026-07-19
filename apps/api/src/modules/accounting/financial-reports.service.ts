@@ -503,7 +503,7 @@ export class FinancialReportsService {
       lte: dayjs(endDate).endOf('day').toDate(),
     };
     const settled = ['APPROVED', 'COMPLETED', 'REFUND_PROCESSED'] as const;
-    const [payments, creditPayments, expenses, refunds] = await Promise.all([
+    const [payments, creditPayments, expenses, supplierPayments, refunds] = await Promise.all([
       this.prisma.salePayment.findMany({
         where: {
           sale: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
@@ -519,6 +519,10 @@ export class FinancialReportsService {
         where: { tenantId, date: dateRange },
         select: { amount: true, date: true },
       }),
+      this.prisma.supplierPayment.findMany({
+        where: { tenantId, paidAt: dateRange },
+        select: { amount: true, paidAt: true, method: true },
+      }),
       this.prisma.return.findMany({
         where: { tenantId, createdAt: dateRange, status: { in: [...settled] } },
         select: { refundAmount: true, createdAt: true },
@@ -532,6 +536,7 @@ export class FinancialReportsService {
     for (const p of payments) bump(dayjs(p.sale.invoiceDate).format('YYYY-MM-DD'), 'inflow', p.amount);
     for (const cp of creditPayments) bump(dayjs(cp.createdAt).format('YYYY-MM-DD'), 'inflow', cp.amount);
     for (const e of expenses) bump(dayjs(e.date).format('YYYY-MM-DD'), 'outflow', e.amount);
+    for (const p of supplierPayments) bump(dayjs(p.paidAt).format('YYYY-MM-DD'), 'outflow', p.amount);
     for (const r of refunds) bump(dayjs(r.createdAt).format('YYYY-MM-DD'), 'outflow', r.refundAmount);
     const data = Object.values(map).sort((a, b) => a.date.localeCompare(b.date));
     return {
@@ -540,8 +545,18 @@ export class FinancialReportsService {
         payments.reduce((s, p) => s + p.amount, 0) + creditPayments.reduce((s, c) => s + c.amount, 0),
       ),
       totalOutflow: roundMoney(
-        expenses.reduce((s, e) => s + e.amount, 0) + refunds.reduce((s, r) => s + r.refundAmount, 0),
+        expenses.reduce((s, e) => s + e.amount, 0)
+        + supplierPayments.reduce((s, p) => s + p.amount, 0)
+        + refunds.reduce((s, r) => s + r.refundAmount, 0),
       ),
+      outflowBreakdown: {
+        expenses: roundMoney(expenses.reduce((s, e) => s + e.amount, 0)),
+        supplierPayments: roundMoney(supplierPayments.reduce((s, p) => s + p.amount, 0)),
+        cashSupplierPayments: roundMoney(
+          supplierPayments.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0),
+        ),
+        refunds: roundMoney(refunds.reduce((s, r) => s + r.refundAmount, 0)),
+      },
     };
   }
 

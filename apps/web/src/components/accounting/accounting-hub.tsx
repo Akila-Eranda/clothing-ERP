@@ -22,6 +22,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import Link from "next/link";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -55,7 +56,6 @@ interface ARData { total: number; count: number; customers: { id: string; code: 
 interface APData { total: number; supplierBalanceTotal: number; purchaseOrderDueTotal: number; suppliers: { id: string; name: string; balance: number }[]; unpaidPurchaseOrders: { poNumber: string; balanceDue: number; supplier: { name: string } }[]; }
 
 const PAY_METHODS = ["CASH","CARD","UPI","BANK_TRANSFER","WALLET","CUSTOMER_CREDIT","CHEQUE"];
-const CATEGORIES  = ["Payroll","Rent","Utilities","Marketing","Operations","Logistics","Assets","Other"];
 const CAT_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6","#06b6d4","#84cc16","#ec4899"];
 
 const ACCT_TYPE_CFG: Record<string, { label: string; color: string; bg: string; grad: string }> = {
@@ -71,7 +71,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
   const [amount, setAmount]       = useState(edit?.amount?.toString() ?? "");
   const [description, setDesc]    = useState(edit?.description ?? "");
   const [date, setDate]           = useState(edit?.date ? edit.date.split("T")[0] : new Date().toISOString().split("T")[0]);
-  const [category, setCategory]   = useState(edit?.categoryId ?? "");
+  const [category, setCategory]   = useState(normalizeExpenseCategory(edit?.categoryId));
   const [method, setMethod]       = useState(edit?.paymentMethod ?? "CASH");
   const [reference, setReference] = useState(edit?.reference ?? "");
   const [chequeDue, setChequeDue] = useState("");
@@ -133,7 +133,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
               <Label className="text-xs font-semibold">Category</Label>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
-                <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                <SelectContent>{EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
@@ -358,7 +358,12 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
   const [accounts, setAccounts]       = useState<Account[]>([]);
   const [monthlyPL, setMonthlyPL]     = useState<PLData[]>([]);
   const [plReport, setPlReport]       = useState<PLReport | null>(null);
-  const [cashFlow, setCashFlow]       = useState<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number } | null>(null);
+  const [cashFlow, setCashFlow]       = useState<{
+    data: CashFlowDay[];
+    totalInflow: number;
+    totalOutflow: number;
+    outflowBreakdown?: { expenses: number; supplierPayments: number; cashSupplierPayments?: number; refunds: number };
+  } | null>(null);
   const [journalEntries, setJournal]  = useState<JournalEntry[]>([]);
   const [balanceSheet, setBS]         = useState<BalanceSheet | null>(null);
   const [thisMonthPL, setThisMonthPL] = useState<PLReport | null>(null);
@@ -384,7 +389,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
         api.get<{ data: Expense[] }>(`/accounting/expenses?limit=200&startDate=${tmStart}&endDate=${tmEnd}`),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
-        api.get<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number }>(`/accounting/cash-flow?startDate=${cfRange.start}&endDate=${cfRange.end}`),
+        api.get<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number; outflowBreakdown?: { expenses: number; supplierPayments: number; cashSupplierPayments?: number; refunds: number } }>(`/accounting/cash-flow?startDate=${cfRange.start}&endDate=${cfRange.end}`),
         api.get<{ data: JournalEntry[] }>("/accounting/journal-entries?limit=50"),
         api.get<BalanceSheet>("/accounting/balance-sheet"),
         api.get<PLData[]>("/accounting/monthly-pl?months=6"),
@@ -406,7 +411,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
         setAccounts(Array.isArray(tree) ? tree : []);
       }
       const pl = ok<PLReport>(2); if (pl) setPlReport(pl);
-      const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number }>(3); if (cf) setCashFlow(cf as any);
+      const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number; outflowBreakdown?: { expenses: number; supplierPayments: number; refunds: number } }>(3); if (cf) setCashFlow(cf as any);
       const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal((je?.data ?? []) as JournalEntry[]);
       const bs = ok<BalanceSheet>(5); if (bs) setBS(bs);
       const month = ok<PLData[]>(6); if (month) setMonthlyPL(Array.isArray(month) ? month : []);
@@ -489,7 +494,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
   // ── Table columns ──────────────────────────────────────────────────────────
   const expenseCols: ColumnDef<Expense>[] = [
     { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="font-medium text-sm">{row.original.description}</span> },
-    { accessorKey: "categoryId",   header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,   cell: ({ row }) => { const cat = row.original.categoryId; const idx = CATEGORIES.indexOf(cat ?? ""); return <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-muted">{cat ? <><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: idx >= 0 ? CAT_COLORS[idx % CAT_COLORS.length] : "#888" }} />{cat}</> : "—"}</span>; } },
+    { accessorKey: "categoryId",   header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,   cell: ({ row }) => { const cat = normalizeExpenseCategory(row.original.categoryId); const idx = EXPENSE_CATEGORIES.indexOf(cat as (typeof EXPENSE_CATEGORIES)[number]); return <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-muted"><span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: CAT_COLORS[idx % CAT_COLORS.length] }} />{cat}</span>; } },
     { accessorKey: "paymentMethod", header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.paymentMethod?.replace(/_/g," ")}</span> },
     { accessorKey: "date",          header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,      cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK",{ day:"2-digit",month:"short",year:"numeric" })}</span> },
     { accessorKey: "amount",        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,    cell: ({ row }) => <span className="font-bold text-red-500 text-sm">LKR {formatNumber(row.original.amount)}</span> },
@@ -573,8 +578,8 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                           tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                         <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "11px" }} />
                         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
-                        <Line type="monotone" dataKey="inflow"  name="Income"   stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
-                        <Line type="monotone" dataKey="outflow" name="Expenses" stroke="#ef4444" strokeWidth={2}   dot={false} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="inflow"  name="Cash In"   stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
+                        <Line type="monotone" dataKey="outflow" name="Cash Out" stroke="#ef4444" strokeWidth={2}   dot={false} activeDot={{ r: 4 }} />
                       </LineChart>
                     </ResponsiveContainer>
                   ) : (
@@ -743,7 +748,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             </div>
             <ClientSideTable data={expenses} columns={expenseCols} pageCount={Math.ceil(expenses.length / 20)}
               searchableColumns={[{ id: "description", title: "Description" }]}
-              filterableColumns={[{ id: "paymentMethod", title: "Method", options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g," "), value: m })) }, { id: "categoryId", title: "Category", options: CATEGORIES.map((c) => ({ label: c, value: c })) }]}
+              filterableColumns={[{ id: "paymentMethod", title: "Method", options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g," "), value: m })) }, { id: "categoryId", title: "Category", options: EXPENSE_CATEGORIES.map((c) => ({ label: c, value: c })) }]}
               isShowExportButtons={{ isShow: true, fileName: "expenses-export" }} />
             <div className="flex items-center justify-between pt-2">
               <h2 className="text-sm font-semibold text-foreground">Journal Entries</h2>
@@ -907,6 +912,22 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                             <span className={`font-bold ${row.color}`}>LKR {formatNumber(row.value)}</span>
                           </div>
                         ))}
+                        {cashFlow.outflowBreakdown && (
+                          <div className="rounded-xl bg-muted/40 p-3 space-y-2">
+                            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Outflow allocation</p>
+                            {[
+                              { label: "Operating expenses", value: cashFlow.outflowBreakdown.expenses },
+                              { label: "Supplier payments", value: cashFlow.outflowBreakdown.supplierPayments },
+                              { label: "Cash supplier payments", value: cashFlow.outflowBreakdown.cashSupplierPayments ?? 0 },
+                              { label: "Refunds", value: cashFlow.outflowBreakdown.refunds },
+                            ].map((row) => (
+                              <div key={row.label} className="flex justify-between items-center text-sm">
+                                <span className="text-muted-foreground">{row.label}</span>
+                                <span className="font-medium">LKR {formatNumber(row.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         <div className="h-px bg-border" />
                         <div className="flex justify-between items-center">
                           <span className="text-sm font-semibold">{cashFlow.totalInflow - cashFlow.totalOutflow >= 0 ? "Net Surplus" : "Net Deficit"}</span>

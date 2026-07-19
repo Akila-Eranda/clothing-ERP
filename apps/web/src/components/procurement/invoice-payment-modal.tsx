@@ -34,6 +34,7 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
   const [invoiceId, setInvoiceId] = useState("");
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState("CASH");
+  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
   const [chequeDueDate, setChequeDueDate] = useState("");
@@ -47,12 +48,14 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
     setInvoiceId(id);
     const inv = invoices.find((i) => i.id === id);
     setAmount(inv ? Math.max(0, inv.total - inv.paidAmount).toFixed(2) : "");
+    setPaidAt(new Date().toISOString().slice(0, 10));
   }, [open, initialInvoiceId, invoices]);
 
   const reset = () => {
     setAmount(""); setReference(""); setNotes("");
     setChequeDueDate(""); setChequeBankName(""); setChequeBankAccountId("");
     setMethod("CASH");
+    setPaidAt(new Date().toISOString().slice(0, 10));
   };
   const handleClose = () => { reset(); onClose(); };
 
@@ -69,6 +72,7 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
       await api.post(`/procurement/supplier-invoices/${invoiceId}/pay`, {
         amount: amt,
         method,
+        paidAt: paidAt || undefined,
         reference: reference || undefined,
         notes: notes || undefined,
         chequeNumber: method === "CHEQUE" ? reference : undefined,
@@ -139,6 +143,13 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
               <Input type="number" min="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Payment Date</Label>
+              <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
               <Label className="text-xs font-semibold">Method</Label>
               <select
                 className="w-full h-10 rounded-md border bg-background px-3 text-sm"
@@ -149,6 +160,12 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
                 <option value="BANK_TRANSFER">Bank Transfer</option>
                 <option value="CHEQUE">Cheque</option>
               </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Balance Due</Label>
+              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-amber-600">
+                LKR {formatNumber(due)}
+              </div>
             </div>
           </div>
 

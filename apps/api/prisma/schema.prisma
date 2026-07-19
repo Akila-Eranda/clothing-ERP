@@ -133,6 +133,7 @@ enum PurchaseOrderStatus {
   CONFIRMED
   PARTIALLY_RECEIVED
   RECEIVED
+  CLOSED
   CANCELLED
 }
 
@@ -2051,6 +2052,7 @@ model PurchaseOrder {
   supplier        Supplier            @relation(fields: [supplierId], references: [id])
   items           PurchaseOrderItem[]
   payments        SupplierPayment[]
+  paymentAllocations SupplierPaymentAllocation[]
   goodsReceipts   GoodsReceipt[]
   supplierReturns SupplierReturn[]
   invoices        SupplierInvoice[]
@@ -2097,13 +2099,35 @@ model SupplierPayment {
   paidAt      DateTime @default(now())
   createdAt   DateTime @default(now())
 
-  supplier    Supplier         @relation(fields: [supplierId], references: [id])
-  purchase    PurchaseOrder?   @relation(fields: [purchaseId], references: [id])
-  invoice     SupplierInvoice? @relation(fields: [invoiceId], references: [id])
+  supplier    Supplier                    @relation(fields: [supplierId], references: [id])
+  purchase    PurchaseOrder?              @relation(fields: [purchaseId], references: [id])
+  invoice     SupplierInvoice?            @relation(fields: [invoiceId], references: [id])
+  allocations SupplierPaymentAllocation[]
 
   @@index([supplierId])
   @@index([invoiceId])
+  @@index([tenantId, paidAt])
   @@map("supplier_payments")
+}
+
+// Per-PO (or invoice) application of a supplier payment — supports multi-PO FIFO.
+model SupplierPaymentAllocation {
+  id          String   @id @default(cuid())
+  tenantId    String
+  paymentId   String
+  purchaseId  String?
+  invoiceId   String?
+  amount      Float
+  createdAt   DateTime @default(now())
+
+  payment     SupplierPayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  purchase    PurchaseOrder?   @relation(fields: [purchaseId], references: [id])
+  invoice     SupplierInvoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([paymentId])
+  @@index([purchaseId])
+  @@index([invoiceId])
+  @@map("supplier_payment_allocations")
 }
 
 model PurchaseRequest {
@@ -2273,6 +2297,7 @@ model SupplierInvoice {
   purchase        PurchaseOrder?        @relation(fields: [purchaseId], references: [id])
   goodsReceipt    GoodsReceipt?         @relation(fields: [goodsReceiptId], references: [id])
   payments        SupplierPayment[]
+  paymentAllocations SupplierPaymentAllocation[]
   debitNotes      SupplierDebitNote[]
 
   @@unique([tenantId, supplierId, invoiceNumber])

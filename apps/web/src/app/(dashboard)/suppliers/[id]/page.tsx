@@ -17,8 +17,10 @@ import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy } from "@/lib/shop-vertical";
 
+import { modalBarFooterClass } from "@/components/ui/modal-footer";
+
 // ── Types ────────────────────────────────────────────────────────────────
-type POStatus = "DRAFT" | "SENT" | "CONFIRMED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CANCELLED";
+type POStatus = "DRAFT" | "SENT" | "CONFIRMED" | "PARTIALLY_RECEIVED" | "RECEIVED" | "CLOSED" | "CANCELLED";
 
 interface PurchaseOrder {
   id: string; poNumber: string; status: POStatus;
@@ -107,38 +109,54 @@ const PAY_METHODS = [
 
 // ── Record Payment Modal ──────────────────────────────────────────────────
 function PaymentModal({
-  supplierId, purchases, balance, paymentTitle,
+  supplierId, balance, paymentTitle,
   onClose, onSaved,
 }: {
   supplierId: string;
   paymentTitle: string;
-  purchases: { id: string; poNumber: string; total: number; paidAmount: number; orderDate: string }[];
   balance: number;
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [method,     setMethod]     = useState("BANK_TRANSFER");
-  const [selected,   setSelected]   = useState<Set<string>>(new Set());
-  const [reference,  setReference]  = useState("");
-  const [notes,      setNotes]      = useState("");
-  const [chequeDueDate, setChequeDueDate] = useState("");
-  const [chequeBankName, setChequeBankName] = useState("");
-  const [chequeBankAccountId, setChequeBankAccountId] = useState("");
-  const [banks, setBanks] = useState<{ id: string; code: string; name: string }[]>([]);
-  const [loading,    setLoading]    = useState(false);
+  type UnpaidPo = { id: string; poNumber: string; dueAmount: number; dueDate: string };
+  const [unpaidPOs, setUnpaidPOs] = useState<UnpaidPo[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [method, setMethod] = useState("CASH");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [amount, setAmount] = useState("");
+  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get<{ id: string; code: string; name: string }[]>("/accounting/bank-accounts")
-      .then((res) => setBanks(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setBanks([]));
-  }, []);
+    let cancelled = false;
+    (async () => {
+      setLoadingList(true);
+      try {
+        const res = await api.get<{ purchaseOrders: UnpaidPo[]; totalDue: number; supplier?: { outstanding?: number } }>(
+          `/suppliers/${supplierId}/ap/unpaid-pos`,
+        );
+        if (cancelled) return;
+        const rows = res.data?.purchaseOrders ?? [];
+        setUnpaidPOs(rows);
+        setSelected(new Set(rows.map((r) => r.id)));
+        const due = rows.reduce((s, r) => s + r.dueAmount, 0);
+        setAmount(due > 0 ? due.toFixed(2) : "");
+      } catch (e: unknown) {
+        if (!cancelled) toast.error((e as Error).message ?? "Failed to load unpaid POs");
+      } finally {
+        if (!cancelled) setLoadingList(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [supplierId]);
 
-  const unpaidPOs = purchases.filter((p) => p.total > p.paidAmount);
-  const totalDue  = unpaidPOs.reduce((s, p) => s + (p.total - p.paidAmount), 0);
+  const totalDue = unpaidPOs.reduce((s, p) => s + p.dueAmount, 0);
   const allSelected = unpaidPOs.length > 0 && selected.size === unpaidPOs.length;
   const selectedDue = unpaidPOs
     .filter((p) => selected.has(p.id))
-    .reduce((s, p) => s + (p.total - p.paidAmount), 0);
+    .reduce((s, p) => s + p.dueAmount, 0);
 
   const togglePO = (id: string) => {
     setSelected((prev) => {
@@ -148,15 +166,16 @@ function PaymentModal({
     });
   };
 
-  const toggleAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(unpaidPOs.map((p) => p.id)));
-  };
+  useEffect(() => {
+    if (!loadingList) setAmount(selectedDue > 0 ? selectedDue.toFixed(2) : "");
+  }, [selectedDue, loadingList]);
 
   const submit = async () => {
-    if (selectedDue <= 0 && selected.size === 0) { toast.error("Select at least one purchase order"); return; }
-    if (selected.size === 0) {
-      toast.error("Select at least one purchase order");
+    const amt = parseFloat(amount);
+    if (selected.size === 0) { toast.error("Select at least one purchase order"); return; }
+    if (!Number.isFinite(amt) || amt <= 0) { toast.error("Enter a valid amount"); return; }
+    if (amt > selectedDue + 0.01) {
+      toast.error(`Amount exceeds selected due (LKR ${selectedDue.toLocaleString("en-LK")})`);
       return;
     }
     if (method === "CHEQUE" && !reference.trim()) {
@@ -165,29 +184,19 @@ function PaymentModal({
     }
     setLoading(true);
     try {
-      const selectedPOs = unpaidPOs.filter((p) => selected.has(p.id));
-      for (let i = 0; i < selectedPOs.length; i++) {
-        const po = selectedPOs[i];
-        const due = po.total - po.paidAmount;
-        const isCheque = method === "CHEQUE";
-        await api.post(`/suppliers/${supplierId}/payments`, {
-          amount:     due,
+      const res = await api.post<{ supplierBalance: number; poSummary?: string }>(
+        `/suppliers/${supplierId}/ap/payment`,
+        {
+          amount: amt,
           method,
-          purchaseId: po.id,
-          reference:  reference || undefined,
-          notes:      notes     || undefined,
-          chequeNumber: isCheque ? reference.trim() : undefined,
-          chequeDueDate: isCheque && chequeDueDate ? chequeDueDate : undefined,
-          chequeBankName: isCheque && chequeBankName ? chequeBankName : undefined,
-          chequeBankAccountId: isCheque && chequeBankAccountId ? chequeBankAccountId : undefined,
-          registerCheque: isCheque && i === 0,
-          chequeAmount: isCheque && i === 0 ? selectedDue : undefined,
-        });
-      }
+          paidAt,
+          purchaseIds: [...selected],
+          reference: reference || undefined,
+          notes: notes || undefined,
+        },
+      );
       toast.success(
-        selectedPOs.length === 1
-          ? `Payment of LKR ${selectedDue.toLocaleString("en-LK")} recorded — expense added`
-          : `${selectedPOs.length} payments totalling LKR ${selectedDue.toLocaleString("en-LK")} recorded — expenses added`
+        `Payment of LKR ${amt.toLocaleString("en-LK")} recorded${res.data.poSummary ? ` · ${res.data.poSummary}` : ""} — balance LKR ${(res.data.supplierBalance ?? 0).toLocaleString("en-LK")}`,
       );
       onSaved();
     } catch (e: unknown) {
@@ -199,8 +208,6 @@ function PaymentModal({
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="bg-background rounded-2xl shadow-2xl w-full max-w-2xl border overflow-hidden max-h-[92vh] flex flex-col">
-
-        {/* Header */}
         <div className="flex items-center gap-3 px-5 py-4 border-b shrink-0">
           <div className="h-9 w-9 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0">
             <Banknote className="h-4 w-4 text-emerald-600" />
@@ -208,34 +215,42 @@ function PaymentModal({
           <div>
             <h2 className="text-base font-bold">{paymentTitle}</h2>
             <p className="text-xs text-muted-foreground">
-              Total outstanding: <span className="text-amber-500 font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
+              Outstanding: <span className="text-amber-500 font-semibold">LKR {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</span>
+              {balance > 0 ? ` · Supplier balance LKR ${balance.toLocaleString("en-LK")}` : ""}
             </p>
           </div>
           <button onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
         </div>
 
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
-
-          {/* Outstanding breakdown table */}
-          {unpaidPOs.length > 0 ? (
+          {loadingList ? (
+            <div className="h-24 flex items-center justify-center text-sm text-muted-foreground gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" /> Loading unpaid POs…
+            </div>
+          ) : unpaidPOs.length > 0 ? (
             <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                Outstanding Purchase Orders — click a row to select &amp; auto-fill amount
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Unpaid Purchase Orders (FIFO allocate)
+                </p>
+                <button
+                  type="button"
+                  className="text-xs text-blue-600 hover:underline"
+                  onClick={() => setSelected(allSelected ? new Set() : new Set(unpaidPOs.map((p) => p.id)))}
+                >
+                  {allSelected ? "Clear all" : "Select all"}
+                </button>
+              </div>
               <div className="border rounded-xl overflow-hidden">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 text-left">PO #</th>
-                      <th className="px-3 py-2 text-right">Total</th>
-                      <th className="px-3 py-2 text-right">Paid</th>
                       <th className="px-3 py-2 text-right font-bold text-amber-600">Due</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
                     {unpaidPOs.map((p) => {
-                      const due      = p.total - p.paidAmount;
                       const isSelected = selected.has(p.id);
                       return (
                         <tr key={p.id}
@@ -250,93 +265,67 @@ function PaymentModal({
                               {isSelected && <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />}
                               <span className="font-mono text-xs font-semibold text-primary">{p.poNumber}</span>
                             </div>
-                            <p className="text-[10px] text-muted-foreground ml-4">
-                              {new Date(p.orderDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
-                            </p>
                           </td>
-                          <td className="px-3 py-2.5 text-right text-xs">{p.total.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
-                          <td className="px-3 py-2.5 text-right text-xs text-emerald-600">{p.paidAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
-                          <td className="px-3 py-2.5 text-right font-bold text-amber-600">{due.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</td>
+                          <td className="px-3 py-2.5 text-right font-bold text-amber-600">
+                            {p.dueAmount.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+                          </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="bg-muted/30 border-t">
-                    <tr>
-                      <td colSpan={3} className="px-3 py-2 text-xs font-semibold text-right text-muted-foreground">Total Due</td>
-                      <td className="px-3 py-2 text-right font-bold text-amber-600">
-                        {totalDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               </div>
-              {selected.size > 0 && (
-                <p className="text-xs text-emerald-600 font-medium">
-                  ✓ {selected.size} purchase order{selected.size !== 1 ? "s" : ""} selected — click again to deselect
-                </p>
-              )}
             </div>
           ) : (
-            <div className="rounded-xl border bg-emerald-50 dark:bg-emerald-950/20 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
-              All purchase orders are fully paid. Recording a general advance payment.
+            <div className="rounded-xl border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+              No unpaid received purchase orders.
             </div>
           )}
 
-          {/* Payment fields */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold">Payment Method <span className="text-destructive">*</span></Label>
+              <Label className="text-xs font-semibold">Amount Paid *</Label>
+              <Input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Payment Date *</Label>
+              <Input type="date" value={paidAt} onChange={(e) => setPaidAt(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Payment Method *</Label>
               <Select value={method} onValueChange={setMethod}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {PAY_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                  {PAY_METHODS.filter((m) => m.value !== "WALLET").map((m) => (
+                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
+              {method === "CHEQUE" && (
+                <p className="text-[11px] text-muted-foreground">Settles via Main Bank (stored as bank transfer)</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Balance Due (selected)</Label>
+              <div className="h-10 rounded-md border bg-muted/40 px-3 flex items-center text-sm font-semibold text-amber-600">
+                LKR {selectedDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}
+              </div>
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
-              {method === "CHEQUE" ? (
-                <>Cheque No. <span className="text-destructive">*</span></>
-              ) : (
-                "Reference / Cheque No."
-              )}
+              {method === "CHEQUE" ? <>Cheque No. <span className="text-destructive">*</span></> : "Reference"}
             </Label>
             <Input
-              placeholder={method === "CHEQUE" ? "e.g. CHQ-001" : "e.g. CHQ-001 or TXN-12345"}
+              placeholder={method === "CHEQUE" ? "e.g. CHQ-001" : "Optional"}
               value={reference}
               onChange={(e) => setReference(e.target.value)}
             />
           </div>
-
-          {method === "CHEQUE" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-violet-500/20 bg-violet-500/5 p-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Cheque due date</Label>
-                <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Cheque bank</Label>
-                <Input placeholder="Bank name" value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} />
-              </div>
-              <div className="space-y-1.5 sm:col-span-2">
-                <Label className="text-xs font-semibold">Company bank account</Label>
-                <Select value={chequeBankAccountId || undefined} onValueChange={setChequeBankAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Select account…" /></SelectTrigger>
-                  <SelectContent>
-                    {banks.map((b) => (
-                      <SelectItem key={b.id} value={b.id}>{b.code} · {b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[11px] text-muted-foreground">
-                  Cheque is registered in Accounting → Cheques as Issued (supplier).
-                </p>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Notes</Label>
@@ -344,18 +333,13 @@ function PaymentModal({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-between items-center gap-3 px-5 py-4 border-t bg-muted/10 shrink-0">
-          <div className="text-sm">
-            {selectedDue > 0 && (
-              <span className="text-muted-foreground">
-                Paying: <strong className="text-foreground">LKR {selectedDue.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</strong>
-              </span>
-            )}
+        <div className={`${modalBarFooterClass} justify-between`}>
+          <div className="text-sm text-muted-foreground">
+            Paying <strong className="text-foreground">LKR {Number(amount || 0).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</strong>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
+            <Button onClick={submit} disabled={loading || loadingList} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
               Record Payment
             </Button>
@@ -839,7 +823,6 @@ export default function SupplierDetailPage() {
         <PaymentModal
           supplierId={id}
           paymentTitle={copy.paymentModalTitle}
-          purchases={supplier.purchases}
           balance={outstanding}
           onClose={() => setPayOpen(false)}
           onSaved={() => { setPayOpen(false); load(); }}

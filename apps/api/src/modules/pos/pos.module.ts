@@ -1297,12 +1297,19 @@ export class PosService {
       invoiceDate: { gte: todayStart, lte: todayEnd },
     };
 
-    const [sales, totals] = await Promise.all([
+    const [sales, totals, supplierPays] = await Promise.all([
       this.prisma.sale.findMany({ where, include: { payments: true } }),
       this.prisma.sale.aggregate({
         where,
         _sum: { total: true, taxAmount: true, discountAmount: true },
         _count: { id: true },
+      }),
+      this.prisma.supplierPayment.findMany({
+        where: {
+          tenantId,
+          paidAt: { gte: todayStart, lte: todayEnd },
+        },
+        select: { amount: true, method: true },
       }),
     ]);
 
@@ -1367,6 +1374,13 @@ export class PosService {
         : null,
     };
 
+    const supplierPaymentsTotal = Math.round(
+      supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+    const cashSupplierPayments = Math.round(
+      supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+
     const summary = {
       date: now.format('YYYY-MM-DD'),
       closedAt: now.toISOString(),
@@ -1378,6 +1392,9 @@ export class PosService {
       totalDiscount: totals._sum.discountAmount ?? 0,
       byPaymentMethod,
       cash,
+      /** AP settlements — cash-out, not operating expense */
+      supplierPayments: supplierPaymentsTotal,
+      cashSupplierPayments,
     };
     this.eventEmitter.emit('pos.day.closed', { tenantId, branchId: resolvedBranchId, ...summary });
     return summary;

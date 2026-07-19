@@ -281,9 +281,8 @@ export class AccountingPostingService {
       case 'WALLET':
         return accounts.upi;
       case 'BANK_TRANSFER':
+      case 'CHEQUE': // CHEQUE settles via Main Bank (stored as BANK_TRANSFER)
         return accounts.bank;
-      case 'CHEQUE':
-        return accounts.chequePay;
       default:
         return accounts.cash;
     }

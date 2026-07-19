@@ -41,6 +41,7 @@ import { FixedAssetsService } from './fixed-assets.service';
 import { PayrollService } from './payroll.service';
 import { FinancialReportsService } from './financial-reports.service';
 import { AccountingSettingsService } from './accounting-settings.service';
+import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from './expense-categories';
 import { chequeSourceNotes } from './finance.helper';
 import { AuditLogModule } from '@/modules/audit-log/audit-log.module';
 import { CustomersModule } from '@/modules/customers/customers.module';
@@ -114,7 +115,7 @@ export class CreateExpenseDto {
   @ApiProperty() @IsNumber() amount: number;
   @ApiProperty() @IsString() description: string;
   @ApiProperty() @IsDateString() date: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() categoryId?: string;
+  @ApiPropertyOptional({ enum: EXPENSE_CATEGORIES }) @IsOptional() @IsString() categoryId?: string;
   @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional({ description: 'Required when paymentMethod is CHEQUE' })
@@ -128,7 +129,7 @@ export class UpdateExpenseDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() amount?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() date?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() categoryId?: string;
+  @ApiPropertyOptional({ enum: EXPENSE_CATEGORIES }) @IsOptional() @IsString() categoryId?: string;
   @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) paymentMethod?: PaymentMethod;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
 }
@@ -841,7 +842,7 @@ export class AccountingService {
           amount: dto.amount,
           description: dto.description,
           date: new Date(dto.date),
-          categoryId: dto.categoryId,
+          categoryId: normalizeExpenseCategory(dto.categoryId),
           paymentMethod: method,
           reference: dto.reference || chequeNumber || undefined,
           createdBy: userId,
@@ -917,7 +918,7 @@ export class AccountingService {
         ...(dto.amount !== undefined && { amount: dto.amount }),
         ...(dto.description && { description: dto.description }),
         ...(dto.date && { date: new Date(dto.date) }),
-        ...(dto.categoryId !== undefined && { categoryId: dto.categoryId }),
+        ...(dto.categoryId !== undefined && { categoryId: normalizeExpenseCategory(dto.categoryId) }),
         ...(dto.paymentMethod && { paymentMethod: dto.paymentMethod }),
         ...(dto.reference !== undefined && { reference: dto.reference }),
       },
@@ -943,7 +944,7 @@ export class AccountingService {
     const byMethod: Record<string, number> = {};
     let total = 0;
     for (const e of expenses) {
-      const cat = e.categoryId ?? 'Uncategorized';
+      const cat = normalizeExpenseCategory(e.categoryId);
       byCategory[cat] = (byCategory[cat] ?? 0) + e.amount;
       byMethod[e.paymentMethod] = (byMethod[e.paymentMethod] ?? 0) + e.amount;
       total += e.amount;
@@ -982,7 +983,7 @@ export class AccountingService {
 
   async getCashFlow(tenantId: string, startDate: string, endDate: string) {
     const dateRange = { gte: dayjs(startDate).startOf('day').toDate(), lte: dayjs(endDate).endOf('day').toDate() };
-    const [payments, creditPayments, expenses, refunds] = await Promise.all([
+    const [payments, creditPayments, expenses, supplierPayments, refunds] = await Promise.all([
       this.prisma.salePayment.findMany({
         where: {
           sale: { tenantId, invoiceDate: dateRange, status: { not: 'CANCELLED' } },
@@ -999,6 +1000,10 @@ export class AccountingService {
         select: { amount: true, createdAt: true },
       }),
       this.prisma.expense.findMany({ where: { tenantId, date: dateRange }, select: { amount: true, date: true } }),
+      this.prisma.supplierPayment.findMany({
+        where: { tenantId, paidAt: dateRange },
+        select: { amount: true, paidAt: true, method: true },
+      }),
       this.prisma.return.findMany({
         where: {
           tenantId,
@@ -1022,6 +1027,9 @@ export class AccountingService {
     for (const e of expenses) {
       bump(dayjs(e.date).format('YYYY-MM-DD'), 'outflow', e.amount);
     }
+    for (const p of supplierPayments) {
+      bump(dayjs(p.paidAt).format('YYYY-MM-DD'), 'outflow', p.amount);
+    }
     for (const r of refunds) {
       bump(dayjs(r.createdAt).format('YYYY-MM-DD'), 'outflow', r.refundAmount);
     }
@@ -1029,8 +1037,21 @@ export class AccountingService {
     const totalInflow = payments.reduce((s, p) => s + p.amount, 0)
       + creditPayments.reduce((s, c) => s + c.amount, 0);
     const totalOutflow = expenses.reduce((s, e) => s + e.amount, 0)
+      + supplierPayments.reduce((s, p) => s + p.amount, 0)
       + refunds.reduce((s, r) => s + r.refundAmount, 0);
-    return { data, totalInflow, totalOutflow };
+    return {
+      data,
+      totalInflow,
+      totalOutflow,
+      outflowBreakdown: {
+        expenses: expenses.reduce((s, e) => s + e.amount, 0),
+        supplierPayments: supplierPayments.reduce((s, p) => s + p.amount, 0),
+        cashSupplierPayments: supplierPayments
+          .filter((p) => p.method === PaymentMethod.CASH)
+          .reduce((s, p) => s + p.amount, 0),
+        refunds: refunds.reduce((s, r) => s + r.refundAmount, 0),
+      },
+    };
   }
 
   async getBalanceSheet(tenantId: string) {

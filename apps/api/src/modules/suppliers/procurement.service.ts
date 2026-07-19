@@ -18,7 +18,6 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { InventoryService } from '@/modules/inventory/inventory.module';
 import { WorkflowService } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
-import { createLinkedExpense } from '@/shared/expense.helper';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import {
@@ -31,6 +30,7 @@ import {
   assertSupplierCreditLimit,
   syncSupplierBalanceWithLedger,
 } from './supplier-ap.helper';
+import { SupplierApService } from './supplier-ap.service';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 
 export type PrItemInput = {
@@ -65,6 +65,7 @@ export class ProcurementService {
     private readonly inventoryService: InventoryService,
     private readonly workflowService: WorkflowService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly apService: SupplierApService,
   ) {}
 
   private async nextNumber(tenantId: string, prefix: string, table: 'pr' | 'grn' | 'sret' | 'sinv') {
@@ -878,6 +879,7 @@ export class ProcurementService {
       chequeDueDate?: string;
       chequeBankName?: string;
       chequeBankAccountId?: string;
+      paidAt?: string;
     },
   ) {
     const inv = await this.prisma.supplierInvoice.findFirst({
@@ -888,84 +890,29 @@ export class ProcurementService {
     if (inv.status === SupplierInvoiceStatus.DRAFT || inv.status === SupplierInvoiceStatus.CANCELLED) {
       throw new BadRequestException('Post the invoice before recording payment');
     }
-
-    const next = applyInvoicePayment(inv.total, inv.paidAmount, dto.amount);
-    if (dto.method === PaymentMethod.CHEQUE && !dto.chequeNumber?.trim()) {
+    if (dto.method === PaymentMethod.CHEQUE && !dto.chequeNumber?.trim() && !dto.reference?.trim()) {
       throw new BadRequestException('Cheque number is required for cheque payments');
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const payment = await tx.supplierPayment.create({
-        data: {
-          tenantId,
-          supplierId: inv.supplierId,
-          purchaseId: inv.purchaseId ?? undefined,
-          invoiceId: inv.id,
-          amount: dto.amount,
-          method: dto.method,
-          reference: dto.reference,
-          notes: dto.notes,
-        },
-      });
-
-      await tx.supplierInvoice.update({
-        where: { id: inv.id },
-        data: { paidAmount: next.paidAmount, status: next.status },
-      });
-
-      if (inv.purchaseId) {
-        await tx.purchaseOrder.update({
-          where: { id: inv.purchaseId },
-          data: { paidAmount: { increment: dto.amount } },
-        });
-      }
-
-      await syncSupplierBalanceWithLedger(tx, tenantId, inv.supplierId, {
-        entryType: SupplierLedgerEntryType.PAYMENT,
-        amount: -dto.amount,
-        referenceType: 'SupplierPayment',
-        referenceId: payment.id,
-        notes: `Payment against invoice ${inv.invoiceNumber}`,
-        createdBy: userId,
-      });
-
-      if (dto.method === PaymentMethod.CHEQUE) {
-        await tx.cheque.create({
-          data: {
-            tenantId,
-            direction: ChequeDirection.ISSUED,
-            status: ChequeStatus.ISSUED,
-            chequeNumber: dto.chequeNumber!.trim(),
-            amount: dto.amount,
-            bankName: dto.chequeBankName?.trim() || undefined,
-            dueDate: dto.chequeDueDate ? new Date(dto.chequeDueDate) : undefined,
-            partyType: 'SUPPLIER',
-            partyId: inv.supplierId,
-            partyName: inv.supplier.name,
-            bankAccountId: dto.chequeBankAccountId,
-            notes: chequeSourceNotes(
-              'SupplierInvoicePayment',
-              payment.id,
-              dto.notes ? `Supplier invoice payment: ${dto.notes}` : `Supplier invoice ${inv.invoiceNumber}`,
-            ),
-            createdBy: userId,
-          },
-        });
-      }
-
-      await createLinkedExpense(tx, {
-        tenantId,
-        branchId: branchId || undefined,
-        userId,
+    const result = await this.apService.receivePayment(
+      inv.supplierId,
+      tenantId,
+      branchId,
+      userId,
+      {
         amount: dto.amount,
-        description: `Supplier invoice ${inv.invoiceNumber} — ${inv.supplier.name}`,
-        date: payment.paidAt,
-        categoryId: 'Operations',
-        paymentMethod: dto.method,
-        reference: `supplier-invoice-payment:${payment.id}`,
-      });
+        method: dto.method,
+        reference: dto.reference ?? dto.chequeNumber,
+        notes: dto.notes ?? `Payment against invoice ${inv.invoiceNumber}`,
+        invoiceId: inv.id,
+        paidAt: dto.paidAt,
+      },
+    );
 
-      return { payment, invoice: await tx.supplierInvoice.findUnique({ where: { id: inv.id } }) };
-    });
+    return {
+      payment: result.payment ?? result.payments?.[0],
+      invoice: await this.prisma.supplierInvoice.findUnique({ where: { id: inv.id } }),
+      supplierBalance: result.supplierBalance,
+    };
   }
 }

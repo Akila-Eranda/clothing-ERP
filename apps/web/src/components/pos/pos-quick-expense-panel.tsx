@@ -6,15 +6,12 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
+import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 
 const INPUT_CLS =
   "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
 const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
 
-const CATEGORIES = [
-  "Payroll", "Rent", "Utilities", "Marketing", "Operations",
-  "Assets", "Logistics", "Maintenance", "Other",
-];
 const PAY_METHODS = [
   { value: "CASH", label: "Cash" },
   { value: "CARD", label: "Card" },
@@ -72,7 +69,7 @@ export function PosQuickExpensePanel({
   // Shop expense fields
   const [description, setDescription] = React.useState("");
   const [date, setDate] = React.useState(today);
-  const [categoryId, setCategoryId] = React.useState("Operations");
+  const [categoryId, setCategoryId] = React.useState("Other Expenses");
   const [recent, setRecent] = React.useState<ExpenseRow[]>([]);
 
   // Supplier payment fields
@@ -161,7 +158,7 @@ export function PosQuickExpensePanel({
       toast.success(`Expense recorded: LKR ${formatNumber(amt)}`);
       setDescription("");
       setDate(today);
-      setCategoryId("Operations");
+      setCategoryId("Other Expenses");
       resetShared();
       void loadRecent();
     } catch (e: unknown) {
@@ -392,7 +389,7 @@ export function PosQuickExpensePanel({
                     className={INPUT_CLS}
                     style={INPUT_STYLE}
                   >
-                    {CATEGORIES.map((c) => (
+                    {EXPENSE_CATEGORIES.map((c) => (
                       <option key={c} value={c}>{c}</option>
                     ))}
                   </select>

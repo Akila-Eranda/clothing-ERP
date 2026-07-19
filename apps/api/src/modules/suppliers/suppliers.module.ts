@@ -15,7 +15,6 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
-import { createLinkedExpense } from '@/shared/expense.helper';
 import { ProcurementService } from './procurement.service';
 import { SupplierApService } from './supplier-ap.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
@@ -111,6 +110,17 @@ export class RecordPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0.01) chequeAmount?: number;
 }
 
+export class SupplierApPaymentDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiPropertyOptional({ enum: PaymentMethod }) @IsOptional() @IsEnum(PaymentMethod) method?: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() invoiceId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() purchaseId?: string;
+  @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() @IsString({ each: true }) purchaseIds?: string[];
+  @ApiPropertyOptional() @IsOptional() @IsDateString() paidAt?: string;
+}
+
 export class AssignSupplierProductDto {
   @ApiProperty() @IsString() variantId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() supplierProductCode?: string;
@@ -127,6 +137,7 @@ export class SuppliersService {
     private readonly inventoryService: InventoryService,
     private readonly workflowService: WorkflowService,
     private readonly procurementService: ProcurementService,
+    private readonly apService: SupplierApService,
   ) {}
 
   async createSupplier(tenantId: string, dto: CreateSupplierDto) {
@@ -417,102 +428,18 @@ export class SuppliersService {
     userId: string,
     dto: RecordPaymentDto,
   ) {
-    const supplier = await this.findOneSupplier(supplierId, tenantId);
-    if (dto.amount <= 0) {
-      throw new BadRequestException('Payment amount must be positive');
-    }
-    const chequeNumber = (dto.chequeNumber ?? dto.reference)?.trim();
-    if (dto.method === PaymentMethod.CHEQUE && !chequeNumber) {
+    // All supplier payments go through unified AP settle (FIFO, allocations, CLOSED, CHEQUE→BANK).
+    if (dto.method === PaymentMethod.CHEQUE && !(dto.chequeNumber ?? dto.reference)?.trim()) {
       throw new BadRequestException('Cheque number is required for cheque payments');
     }
-    return this.prisma.$transaction(async (tx) => {
-      let poNumber: string | undefined;
-      if (dto.purchaseId) {
-        const po = await tx.purchaseOrder.findFirst({
-          where: { id: dto.purchaseId, tenantId, supplierId },
-        });
-        if (!po) throw new NotFoundException('Purchase order not found for this supplier');
-        poNumber = po.poNumber;
-        const due = Math.max(0, po.total - po.paidAmount);
-        if (dto.amount > due + 0.01) {
-          throw new BadRequestException(
-            `Payment exceeds PO balance due (LKR ${due.toFixed(2)} remaining)`,
-          );
-        }
-      }
-
-      const payment = await tx.supplierPayment.create({
-        data: {
-          tenantId,
-          supplierId,
-          purchaseId: dto.purchaseId || undefined,
-          amount: dto.amount,
-          method: dto.method,
-          reference: dto.reference ?? chequeNumber,
-          notes: dto.notes,
-          paidAt: dto.paidAt ? new Date(dto.paidAt) : new Date(),
-        },
-      });
-
-      if (dto.purchaseId) {
-        await tx.purchaseOrder.update({
-          where: { id: dto.purchaseId },
-          data: { paidAmount: { increment: dto.amount } },
-        });
-      }
-
-      if (dto.method === PaymentMethod.CHEQUE && dto.registerCheque !== false) {
-        await tx.cheque.create({
-          data: {
-            tenantId,
-            direction: ChequeDirection.ISSUED,
-            status: ChequeStatus.ISSUED,
-            chequeNumber: chequeNumber!,
-            amount: dto.chequeAmount && dto.chequeAmount > 0 ? dto.chequeAmount : dto.amount,
-            bankName: dto.chequeBankName?.trim() || undefined,
-            dueDate: dto.chequeDueDate ? new Date(dto.chequeDueDate) : undefined,
-            partyType: 'SUPPLIER',
-            partyId: supplierId,
-            partyName: supplier.name,
-            bankAccountId: dto.chequeBankAccountId || undefined,
-            notes: chequeSourceNotes(
-              'SupplierPayment',
-              payment.id,
-              dto.notes
-                ? `Supplier payment: ${dto.notes}`
-                : poNumber
-                  ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
-                  : `Supplier payment — ${supplier.name}`,
-            ),
-            createdBy: userId,
-          },
-        });
-      }
-
-      await createLinkedExpense(tx, {
-        tenantId,
-        branchId: branchId || undefined,
-        userId,
-        amount: dto.amount,
-        description: poNumber
-          ? `Supplier payment — ${supplier.name} (PO ${poNumber})`
-          : `Supplier payment — ${supplier.name}`,
-        date: payment.paidAt,
-        categoryId: 'Operations',
-        paymentMethod: dto.method,
-        reference: `supplier-payment:${payment.id}`,
-      });
-
-      await syncSupplierBalanceWithLedger(tx, tenantId, supplierId, {
-        entryType: SupplierLedgerEntryType.PAYMENT,
-        amount: -dto.amount,
-        referenceType: 'SupplierPayment',
-        referenceId: payment.id,
-        notes: poNumber ? `Payment against PO ${poNumber}` : 'Supplier payment',
-        createdBy: userId,
-      });
-
-      return payment;
+    return this.apService.receivePayment(supplierId, tenantId, branchId, userId, {
+      amount: dto.amount,
+      method: dto.method,
+      reference: dto.reference ?? dto.chequeNumber,
+      notes: dto.notes,
+      purchaseId: dto.purchaseId,
+      purchaseIds: dto.purchaseId ? [dto.purchaseId] : undefined,
+      paidAt: dto.paidAt,
     });
   }
 
@@ -718,6 +645,13 @@ export class SuppliersController {
     return this.apService.listDebitNotes(user.tenantId, supplierId);
   }
 
+  @Get(':id/ap/unpaid-pos')
+  @RequirePermissions('suppliers:read')
+  @ApiOperation({ summary: 'List unpaid received POs for supplier payment' })
+  unpaidPos(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.apService.listUnpaidPurchaseOrders(user.tenantId, id);
+  }
+
   @Get(':id/ap/ledger')
   @RequirePermissions('suppliers:read')
   @ApiOperation({ summary: 'Supplier AP ledger' })
@@ -748,16 +682,7 @@ export class SuppliersController {
   apPayment(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
-    @Body()
-    body: {
-      amount: number;
-      method?: string;
-      reference?: string;
-      notes?: string;
-      invoiceId?: string;
-      purchaseId?: string;
-      paidAt?: string;
-    },
+    @Body() body: SupplierApPaymentDto,
   ) {
     return this.apService.receivePayment(
       id,
@@ -983,6 +908,7 @@ export class PayInvoiceDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() paidAt?: string;
 }
 
 @ApiTags('Procurement')
