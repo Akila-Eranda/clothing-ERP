@@ -363,7 +363,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
       if (e.key === "F10") { e.preventDefault(); void ctx.handleThermalPrint(); return; }
-      if (e.key === "F11") { e.preventDefault(); void ctx.handleDayEnd(); return; }
       if (e.key === "F12") {
         e.preventDefault();
         const st = localStorage.getItem("pos_pin");
