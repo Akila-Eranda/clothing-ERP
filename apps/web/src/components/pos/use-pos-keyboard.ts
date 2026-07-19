@@ -363,6 +363,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
       if (e.key === "F10") { e.preventDefault(); void ctx.handleThermalPrint(); return; }
+      // Keep F11 free for OS/browser / future use — block browser fullscreen while POS is open
+      if (e.key === "F11") { e.preventDefault(); return; }
       if (e.key === "F12") {
         e.preventDefault();
         const st = localStorage.getItem("pos_pin");
