@@ -1764,7 +1764,7 @@ model Sale {
 model SaleItem {
   id            String   @id @default(cuid())
   saleId        String
-  /** Null for POS bill-only / custom lines (not linked to product catalog). */
+  /// Null for POS bill-only / custom lines (not linked to product catalog).
   variantId     String?
   productName   String
   variantName   String
