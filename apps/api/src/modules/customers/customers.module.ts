@@ -151,7 +151,7 @@ export class CustomersService {
             productName: item.productName,
             qty: item.quantity,
             spent: item.total,
-            variantId: item.variantId,
+            variantId: item.variantId ?? '',
           });
         }
       }

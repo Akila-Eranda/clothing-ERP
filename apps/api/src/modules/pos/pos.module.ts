@@ -283,7 +283,9 @@ export class PosService {
       await this.inventoryService.assertSaleStockAvailable(
         tenantId,
         branchId,
-        dto.items,
+        dto.items
+          .filter((i) => !(i.isCustom || !i.variantId?.trim() || i.variantId.startsWith('custom-')))
+          .map((i) => ({ variantId: i.variantId!, quantity: i.quantity })),
         dto.heldBillId,
         tx,
       );

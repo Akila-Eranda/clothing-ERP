@@ -208,7 +208,7 @@ export class ReturnsService {
     }
 
     const fullyReturned = sale.items.every(
-      (si) => (returnedByVariant.get(si.variantId) ?? 0) >= si.quantity,
+      (si) => (returnedByVariant.get(si.variantId ?? '') ?? 0) >= si.quantity,
     );
 
     await client.sale.update({
