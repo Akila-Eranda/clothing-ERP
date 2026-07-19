@@ -51,6 +51,17 @@ export class PurchaseItemDto {
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) taxRate?: number;
 }
 
+/** Optional supplier payment recorded with GRN receive / PO create. */
+export class ReceivePaymentDto {
+  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
+  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
+  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
+}
+
 export class CreatePurchaseOrderDto {
   @ApiProperty() @IsString() supplierId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() expectedDate?: string;
@@ -76,17 +87,6 @@ export class ReceiveItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() batchNumber?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() manufactureDate?: string;
-}
-
-/** Optional supplier payment recorded in the same receive action. */
-export class ReceivePaymentDto {
-  @ApiProperty() @IsNumber() @Min(0.01) amount: number;
-  @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
-  @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeNumber?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
 }
 
 export class ReceivePoBodyDto {
