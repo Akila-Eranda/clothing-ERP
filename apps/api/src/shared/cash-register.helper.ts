@@ -158,6 +158,38 @@ export async function recordRefundCashMovement(
   });
 }
 
+/**
+ * When a cashier pays a supplier in cash from POS / counter,
+ * deduct the amount from their open cash drawer (shift).
+ * No-ops if they have no open register (e.g. office AP payment).
+ */
+export async function recordSupplierCashOutflow(
+  db: Db,
+  opts: {
+    tenantId: string;
+    branchId?: string;
+    cashierId: string;
+    paymentId: string;
+    amount: number;
+    description: string;
+  },
+) {
+  if (opts.amount <= 0.009 || !opts.branchId) return null;
+
+  const register = await findOpenRegister(db, opts.tenantId, opts.branchId, opts.cashierId);
+  if (!register || register.status !== CashRegisterStatus.OPEN) return null;
+
+  return recordCashMovement(db, {
+    tenantId: opts.tenantId,
+    registerId: register.id,
+    type: CashMovementType.EXPENSE,
+    amount: opts.amount,
+    reference: opts.paymentId,
+    description: opts.description,
+    createdById: opts.cashierId,
+  });
+}
+
 export function denominationTotal(counts: Record<string, number>): number {
   return Object.entries(counts).reduce((sum, [denom, qty]) => {
     const d = parseFloat(denom);

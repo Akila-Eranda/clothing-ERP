@@ -7,6 +7,9 @@ import { api } from "@/lib/api";
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, isLikelyBarcodeScan } from "@/lib/pos-barcode";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printGrnReceipt } from "@/lib/grn-receipt-print";
+import { useAuthStore } from "@/stores/auth-store";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
@@ -55,25 +58,17 @@ function fmtDate(d?: string | null) {
 }
 
 export function PosQuickGrnPanel({
-  items,
   onPosted,
   onBack,
-  onClearCart,
-  onAddGrnItem,
-  onUpdateQuantity,
-  onRemoveItem,
 }: {
-  items: CartLine[];
   onPosted: () => void;
   onBack: () => void;
-  onClearCart: () => void;
-  onAddGrnItem: (p: SupplierProduct, qty?: number) => void;
-  onUpdateQuantity: (variantId: string, quantity: number) => void;
-  onRemoveItem: (variantId: string) => void;
 }) {
   const { profile } = useShopWorkspace();
   const showExpiry = hasExpiryTracking(profile);
   const showBatch = hasBatchTracking(profile);
+  const { settings: receiptSettings } = useReceiptSettings();
+  const userName = useAuthStore((s) => s.user?.name);
 
   const [suppliers, setSuppliers] = React.useState<SupplierRow[]>([]);
   const [supplierLoading, setSupplierLoading] = React.useState(true);
@@ -89,6 +84,8 @@ export function PosQuickGrnPanel({
   const [lineExpiries, setLineExpiries] = React.useState<Record<string, string>>({});
   const [lineBatches, setLineBatches] = React.useState<Record<string, string>>({});
   const [openPos, setOpenPos] = React.useState<OpenPo[]>([]);
+  /** Local GRN bill — never writes to the POS sales cart. */
+  const [grnItems, setGrnItems] = React.useState<CartLine[]>([]);
 
   // Pay supplier now
   const [payNow, setPayNow] = React.useState(true);
@@ -100,9 +97,48 @@ export function PosQuickGrnPanel({
   const [chequeDueDate, setChequeDueDate] = React.useState("");
   const [chequeBankName, setChequeBankName] = React.useState("");
 
+  const addGrnItem = React.useCallback((p: SupplierProduct, qty = 1) => {
+    setGrnItems((prev) => {
+      const existing = prev.find((i) => i.variantId === p.variantId);
+      if (existing) {
+        return prev.map((i) =>
+          i.variantId === p.variantId ? { ...i, quantity: i.quantity + qty } : i,
+        );
+      }
+      return [
+        ...prev,
+        {
+          variantId: p.variantId,
+          productName: p.productName,
+          variantName: p.variantName,
+          sku: p.sku,
+          quantity: qty,
+        },
+      ];
+    });
+    setLineCosts((prev) => ({
+      ...prev,
+      [p.variantId]: prev[p.variantId] ?? String(p.lastBuyingPrice ?? p.costPrice ?? 0),
+    }));
+  }, []);
+
+  const updateGrnQuantity = React.useCallback((variantId: string, quantity: number) => {
+    if (quantity <= 0) {
+      setGrnItems((prev) => prev.filter((i) => i.variantId !== variantId));
+      return;
+    }
+    setGrnItems((prev) =>
+      prev.map((i) => (i.variantId === variantId ? { ...i, quantity } : i)),
+    );
+  }, []);
+
+  const removeGrnItem = React.useCallback((variantId: string) => {
+    setGrnItems((prev) => prev.filter((i) => i.variantId !== variantId));
+  }, []);
+
   const cartByVariant = React.useMemo(
-    () => new Map(items.map((i) => [i.variantId, i])),
-    [items],
+    () => new Map(grnItems.map((i) => [i.variantId, i])),
+    [grnItems],
   );
 
   const filteredProducts = React.useMemo(() => {
@@ -118,15 +154,14 @@ export function PosQuickGrnPanel({
   }, [supplierProducts, productSearch]);
 
   const grnLines = React.useMemo(() => {
-    const variantSet = new Set(supplierProducts.map((p) => p.variantId));
-    return items
-      .filter((i) => i.quantity > 0 && variantSet.has(i.variantId))
+    return grnItems
+      .filter((i) => i.quantity > 0)
       .map((i) => {
         const p = supplierProducts.find((x) => x.variantId === i.variantId);
         const unitCost = parseFloat(lineCosts[i.variantId] ?? "") || p?.lastBuyingPrice || p?.costPrice || 0;
         return { ...i, unitCost, lineTotal: unitCost * i.quantity, product: p };
       });
-  }, [items, supplierProducts, lineCosts]);
+  }, [grnItems, supplierProducts, lineCosts]);
 
   const total = React.useMemo(
     () => grnLines.reduce((s, l) => s + l.lineTotal, 0),
@@ -152,10 +187,11 @@ export function PosQuickGrnPanel({
     }
   }, []);
 
-  const loadSupplierProducts = React.useCallback(async (sid: string, autoLoadCart = false) => {
+  const loadSupplierProducts = React.useCallback(async (sid: string) => {
     if (!sid) {
       setSupplierProducts([]);
       setOpenPos([]);
+      setGrnItems([]);
       return;
     }
     setProductsLoading(true);
@@ -177,33 +213,41 @@ export function PosQuickGrnPanel({
       }
       setLineCosts(costs);
 
-      if (autoLoadCart) {
-        onClearCart();
-        for (const p of rows) {
-          onAddGrnItem(p, 1);
-        }
-        if (rows.length > 0) {
-          toast.success(`${rows.length} assigned item(s) loaded to cart`);
-        } else {
-          toast.info("No products assigned to this supplier");
-        }
+      // Prefill local GRN bill only — never the POS sales cart
+      setGrnItems(rows.map((p) => ({
+        variantId: p.variantId,
+        productName: p.productName,
+        variantName: p.variantName,
+        sku: p.sku,
+        quantity: 1,
+      })));
+      if (rows.length > 0) {
+        toast.success(`${rows.length} assigned item(s) loaded to GRN bill`);
+      } else {
+        toast.info("No products assigned to this supplier");
       }
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load supplier products");
       setSupplierProducts([]);
       setOpenPos([]);
+      setGrnItems([]);
     } finally {
       setProductsLoading(false);
     }
-  }, [onAddGrnItem, onClearCart]);
+  }, []);
 
   React.useEffect(() => {
     void loadSuppliers();
   }, [loadSuppliers]);
 
   React.useEffect(() => {
-    if (!supplierId) return;
-    void loadSupplierProducts(supplierId, true);
+    if (!supplierId) {
+      setGrnItems([]);
+      setSupplierProducts([]);
+      setOpenPos([]);
+      return;
+    }
+    void loadSupplierProducts(supplierId);
   }, [supplierId, loadSupplierProducts]);
 
   React.useEffect(() => {
@@ -211,15 +255,11 @@ export function PosQuickGrnPanel({
   }, [supplierId]);
 
   const addMatchedProduct = React.useCallback((p: SupplierProduct) => {
-    onAddGrnItem(p, 1);
-    setLineCosts((prev) => ({
-      ...prev,
-      [p.variantId]: prev[p.variantId] ?? String(p.lastBuyingPrice ?? p.costPrice ?? 0),
-    }));
+    addGrnItem(p, 1);
     toast.success(`${p.productName} added to GRN`);
     setProductSearch("");
     requestAnimationFrame(() => searchRef.current?.focus());
-  }, [onAddGrnItem]);
+  }, [addGrnItem]);
 
   const handleProductSearchEnter = React.useCallback(async () => {
     const q = productSearch.trim();
@@ -313,7 +353,7 @@ export function PosQuickGrnPanel({
       return;
     }
     if (grnLines.length === 0) {
-      toast.error("Cart is empty — load supplier items first");
+      toast.error("GRN bill is empty — add products first");
       return;
     }
     if (grnLines.some((l) => l.unitCost <= 0)) {
@@ -378,10 +418,40 @@ export function PosQuickGrnPanel({
           : {}),
       });
       const grnNo = res.data?.grnNumber ?? res.data?.id ?? "GRN";
+      const supplierName = suppliers.find((s) => s.id === supplierId)?.name ?? "Supplier";
+      const payAmt = payNow ? parseFloat(payAmount) : 0;
+      try {
+        await printGrnReceipt({
+          settings: receiptSettings,
+          data: {
+            grnNumber: grnNo,
+            supplierName,
+            source: "QUICK",
+            notes: notes || null,
+            cashierName: userName ?? null,
+            paymentMethod: payNow ? payMethod : null,
+            paymentAmount: payAmt > 0 ? payAmt : null,
+            items: grnLines.map((l) => ({
+              name: l.variantName && l.variantName !== "Default"
+                ? `${l.productName} · ${l.variantName}`
+                : l.productName,
+              sku: l.sku,
+              qty: l.quantity,
+              unitCost: l.unitCost,
+              lineTotal: l.lineTotal,
+              batchNumber: lineBatches[l.variantId] || null,
+              expiryDate: lineExpiries[l.variantId] || null,
+            })),
+          },
+        });
+      } catch (printErr: unknown) {
+        toast.error((printErr as Error).message ?? "GRN print failed — GRN was saved");
+      }
       toast.success(payNow ? `GRN posted & supplier paid — ${grnNo}` : `Quick GRN posted — ${grnNo}`);
       setNotes("");
       setSupplierId("");
       setSupplierProducts([]);
+      setGrnItems([]);
       setLineCosts({});
       setLineExpiries({});
       setLineBatches({});
@@ -578,7 +648,7 @@ export function PosQuickGrnPanel({
                           style={inCart
                             ? { border: "1px solid #4f6ef7", color: "#93c5fd", background: "transparent" }
                             : { background: "#4f6ef7", color: "#fff" }}
-                          onClick={() => onAddGrnItem(p, 1)}
+                          onClick={() => addGrnItem(p, 1)}
                         >
                           <Plus className="h-3 w-3" />
                           {inCart ? "Add +1" : "Add"}
@@ -654,16 +724,16 @@ export function PosQuickGrnPanel({
                           <p className="text-[10px] truncate" style={{ color: "#6a8ab8" }}>{l.sku}</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <button type="button" onClick={() => onUpdateQuantity(l.variantId, Math.max(1, l.quantity - 1))} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
+                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, Math.max(1, l.quantity - 1))} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
                             <Minus className="h-3.5 w-3.5 text-white" />
                           </button>
                           <span className="text-white text-sm font-bold w-7 text-center select-none tabular-nums">{l.quantity}</span>
-                          <button type="button" onClick={() => onUpdateQuantity(l.variantId, l.quantity + 1)} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
+                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, l.quantity + 1)} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
                             <Plus className="h-3.5 w-3.5 text-white" />
                           </button>
                           <button
                             type="button"
-                            onClick={() => onRemoveItem(l.variantId)}
+                            onClick={() => removeGrnItem(l.variantId)}
                             className="p-1 rounded hover:bg-white/10 ml-0.5"
                           >
                             <Trash2 className="h-3.5 w-3.5" style={{ color: "#ef4444" }} />

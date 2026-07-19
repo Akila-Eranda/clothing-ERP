@@ -26,6 +26,7 @@ import {
   roundAp,
   syncSupplierBalanceWithLedger,
 } from './supplier-ap.helper';
+import { recordSupplierCashOutflow } from '@/shared/cash-register.helper';
 import * as dayjs from 'dayjs';
 
 type ApTx = Prisma.TransactionClient;
@@ -767,6 +768,16 @@ export class SupplierApService {
           data: { currentBalance: { decrement: amount } },
         });
       }
+
+      // POS / counter: also deduct from this cashier's open cash drawer
+      await recordSupplierCashOutflow(tx, {
+        tenantId: opts.tenantId,
+        branchId: opts.branchId,
+        cashierId: opts.userId,
+        paymentId: opts.paymentId,
+        amount,
+        description: desc,
+      });
       return;
     }
 

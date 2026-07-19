@@ -956,23 +956,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [addItem, profile, taxRate, soundAlerts, allowNegativeStock]);
 
-  const handleAddGrnItem = React.useCallback((p: {
-    variantId: string; productName: string; variantName: string; sku: string; costPrice: number;
-  }, qty = 1) => {
-    addItem({
-      variantId: p.variantId,
-      productName: p.productName,
-      variantName: p.variantName,
-      sku: p.sku,
-      unitPrice: p.costPrice,
-      quantity: qty,
-      stock: 999999,
-      discountAmount: 0,
-      discountType: "percentage",
-      taxRate: 0,
-    });
-  }, [addItem]);
-
   const handleAddProduct = React.useCallback((p: ProductItem) => {
     openAddPopup(p);
   }, [openAddPopup]);
@@ -1823,32 +1806,11 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     if (activeNav === "quick-grn") {
       return (
         <PosQuickGrnPanel
-          items={items as unknown as Array<{ variantId: string; productName: string; variantName: string; sku: string; quantity: number }>}
           onBack={() => {
             setActiveNav("products");
           }}
-          onClearCart={clearCart}
-          onAddGrnItem={handleAddGrnItem}
-          onUpdateQuantity={updateQuantity}
-          onRemoveItem={removeItem}
           onPosted={() => {
-            clearCart();
-            setSelectedCartIdx(-1);
             setCheckoutOpen(false);
-            setLastAddedVariantId(undefined);
-            setThankYouSale(null);
-            setCartNotes("");
-            setDiscountInput("");
-            setPendingDiscountApproval(null);
-            setPayState({
-              splitMode: false,
-              paymentLines: [{ method: "CASH", amount: "" }],
-              allowPartial: false,
-              couponCode: "",
-              couponDiscount: 0,
-              tierDiscountPct: 0,
-              currency: payState.currency,
-            });
             setActiveNav("products");
             void loadProducts();
           }}

@@ -3,11 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ClipboardPlus, FileText, Loader2, PackageCheck, X } from "lucide-react";
+import { ArrowRight, ClipboardPlus, FileText, Loader2, PackageCheck, Printer, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printGrnReceipt } from "@/lib/grn-receipt-print";
+import { useAuthStore } from "@/stores/auth-store";
 
 export type GrnDetails = {
   id: string;
@@ -80,7 +83,45 @@ interface Props {
 export function GrnDetailsModal({ grnId, onClose }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const [grn, setGrn] = useState<GrnDetails | null>(null);
+  const { settings: receiptSettings } = useReceiptSettings();
+  const userName = useAuthStore((s) => s.user?.name);
+
+  const handlePrint = async () => {
+    if (!grn) return;
+    setPrinting(true);
+    try {
+      await printGrnReceipt({
+        settings: receiptSettings,
+        data: {
+          grnNumber: grn.grnNumber,
+          supplierName: grn.supplier.name,
+          receivedAt: grn.receivedAt,
+          notes: grn.notes,
+          source: sourceLabel(grn.source),
+          poNumber: grn.purchase?.poNumber ?? null,
+          cashierName: userName ?? null,
+          items: grn.items.map((i) => ({
+            name: i.variantName && i.variantName !== "Default"
+              ? `${i.productName} · ${i.variantName}`
+              : i.productName,
+            sku: i.sku,
+            qty: i.receivedQty,
+            unitCost: i.unitCost,
+            lineTotal: i.receivedQty * i.unitCost,
+            batchNumber: i.batchNumber,
+            expiryDate: i.expiryDate,
+          })),
+        },
+      });
+      toast.success(`Printed ${grn.grnNumber}`);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Print failed");
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   useEffect(() => {
     if (!grnId) {
@@ -314,6 +355,17 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
             <Button variant="ghost" onClick={onClose} className="h-10 px-4">
               Close
             </Button>
+            {grn && (
+              <Button
+                variant="outline"
+                onClick={() => void handlePrint()}
+                disabled={printing}
+                className="h-10 gap-2"
+              >
+                {printing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
+                Thermal Print
+              </Button>
+            )}
             {grn?.purchase?.id && (
               <Button variant="outline" asChild className="h-10 gap-2">
                 <Link href={`/purchases/${grn.purchase.id}`}>
