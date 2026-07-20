@@ -281,11 +281,11 @@ export function PosQuickExpensePanel({
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(245,158,11,0.15)" }}>
-            <TrendingDown className="h-4 w-4" style={{ color: "#f59e0b" }} />
+          <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--pos-warn-bg)" }}>
+            <TrendingDown className="h-4 w-4" style={{ color: "var(--pos-warn)" }} />
           </div>
           <h2 className="text-white font-bold text-base">Quick Expense</h2>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--pos-warn-bg)", color: "var(--pos-warn-soft)" }}>
             {profile.label}
           </span>
         </div>
@@ -312,8 +312,8 @@ export function PosQuickExpensePanel({
               onClick={() => setMode(tab.id)}
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold transition-all"
               style={{
-                background: active ? "rgba(79,110,247,0.25)" : "transparent",
-                color: active ? "#fff" : "var(--pos-muted)",
+                background: active ? "rgba(79,110,247,0.15)" : "transparent",
+                color: active ? "#4f6ef7" : "var(--pos-muted)",
                 border: active ? "1px solid rgba(79,110,247,0.4)" : "1px solid transparent",
               }}
             >
@@ -394,7 +394,7 @@ export function PosQuickExpensePanel({
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>Outstanding</p>
-                    <p className="text-sm font-bold tabular-nums" style={{ color: (selectedSupplier.balance ?? 0) > 0 ? "#fbbf24" : "#10b981" }}>
+                    <p className="text-sm font-bold tabular-nums" style={{ color: (selectedSupplier.balance ?? 0) > 0 ? "var(--pos-warn-soft)" : "#10b981" }}>
                       LKR {formatNumber(selectedSupplier.balance ?? 0)}
                     </p>
                   </div>
@@ -566,7 +566,7 @@ export function PosQuickExpensePanel({
             className="w-full h-12 gap-2 rounded-xl flex items-center justify-center text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
             style={{
               background: mode === "expense"
-                ? "linear-gradient(135deg,#f59e0b,#ea580c)"
+                ? "linear-gradient(135deg,var(--pos-warn),var(--pos-warn-soft))"
                 : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
               color: "#fff",
             }}
@@ -604,7 +604,7 @@ export function PosQuickExpensePanel({
                   >
                     <div className="flex justify-between gap-2">
                       <p className="text-xs font-bold text-white truncate">{e.description}</p>
-                      <p className="text-xs font-bold tabular-nums shrink-0" style={{ color: "#fbbf24" }}>
+                      <p className="text-xs font-bold tabular-nums shrink-0" style={{ color: "var(--pos-warn-soft)" }}>
                         LKR {formatNumber(e.amount)}
                       </p>
                     </div>
@@ -628,7 +628,7 @@ export function PosQuickExpensePanel({
                 >
                   <div className="flex justify-between gap-2">
                     <p className="text-xs font-bold text-white truncate">{p.supplier?.name ?? "Supplier"}</p>
-                    <p className="text-xs font-bold tabular-nums shrink-0" style={{ color: "#93c5fd" }}>
+                    <p className="text-xs font-bold tabular-nums shrink-0" style={{ color: "var(--pos-accent-soft)" }}>
                       LKR {formatNumber(p.amount)}
                     </p>
                   </div>

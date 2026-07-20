@@ -147,11 +147,11 @@ export function PosSalesReportPanel({
           <h2 className="text-white font-bold text-base">
             {viewAll ? "Sales Report" : "My Sales Report"}
           </h2>
-          <Badge className="text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}>
+          <Badge className="text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}>
             {profile.label}
           </Badge>
           {!viewAll && (
-            <Badge className="text-[10px]" style={{ background: "rgba(245,158,11,0.15)", color: "#fbbf24" }}>
+            <Badge className="text-[10px]" style={{ background: "var(--pos-warn-bg)", color: "var(--pos-warn-soft)" }}>
               Own sales only
             </Badge>
           )}
@@ -197,7 +197,7 @@ export function PosSalesReportPanel({
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#6ee7b7" }}>
+                <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "var(--pos-success-soft)" }}>
                   Cash in counter · {shiftLabel}
                 </p>
                 {shiftTime && (
@@ -213,8 +213,8 @@ export function PosSalesReportPanel({
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-4 pt-3 border-t" style={{ borderColor: "rgba(16,185,129,0.2)" }}>
               {[
-                { label: "Opening", value: openingBalance, color: "#6ee7b7" },
-                { label: "Cash sales", value: summary?.cash?.cashSalesNet ?? 0, color: "#34d399" },
+                { label: "Opening", value: openingBalance, color: "var(--pos-success-soft)" },
+                { label: "Cash sales", value: summary?.cash?.cashSalesNet ?? 0, color: "var(--pos-success-soft)" },
                 { label: "Cash out", value: summary?.cash?.cashOut ?? 0, color: "#f87171" },
                 { label: "Shift income", value: income, color: "#4f6ef7" },
               ].map((s) => (
@@ -231,7 +231,7 @@ export function PosSalesReportPanel({
           {/* Income vs expenses vs supplier (separate) — this shift only */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="rounded-xl border p-4" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
-              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#93c5fd" }}>Shift income</p>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "var(--pos-accent-soft)" }}>Shift income</p>
               <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#4f6ef7" }}>
                 LKR {formatNumber(income)}
               </p>
@@ -240,8 +240,8 @@ export function PosSalesReportPanel({
               </p>
             </div>
             <div className="rounded-xl border p-4" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
-              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#fbbf24" }}>Shift expenses</p>
-              <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#f59e0b" }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "var(--pos-warn-soft)" }}>Shift expenses</p>
+              <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "var(--pos-warn)" }}>
                 LKR {formatNumber(expenses)}
               </p>
               <p className="text-[10px] mt-1" style={{ color: "var(--pos-muted)" }}>
@@ -261,10 +261,10 @@ export function PosSalesReportPanel({
 
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
-              { label: "Net (income − expenses)", value: `LKR ${formatNumber(netIncome)}`, color: netIncome >= 0 ? "#34d399" : "#f87171" },
-              { label: "Bills", value: String(summary?.totalSales ?? 0), color: "#34d399" },
-              { label: "Avg bill", value: `LKR ${formatNumber(avgBill)}`, color: "#c4b5fd" },
-              { label: "Tax / discounts", value: `LKR ${formatNumber(summary?.totalTax ?? 0)} / ${formatNumber(summary?.totalDiscount ?? 0)}`, color: "#fbbf24" },
+              { label: "Net (income − expenses)", value: `LKR ${formatNumber(netIncome)}`, color: netIncome >= 0 ? "var(--pos-success-soft)" : "#f87171" },
+              { label: "Bills", value: String(summary?.totalSales ?? 0), color: "var(--pos-success-soft)" },
+              { label: "Avg bill", value: `LKR ${formatNumber(avgBill)}`, color: "var(--pos-violet-soft)" },
+              { label: "Tax / discounts", value: `LKR ${formatNumber(summary?.totalTax ?? 0)} / ${formatNumber(summary?.totalDiscount ?? 0)}`, color: "var(--pos-warn-soft)" },
             ].map((s) => (
               <div
                 key={s.label}
@@ -282,7 +282,7 @@ export function PosSalesReportPanel({
               className="rounded-xl border p-4 space-y-2"
               style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
             >
-              <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>Payment mix</p>
+              <p className="text-xs font-semibold" style={{ color: "var(--pos-accent-soft)" }}>Payment mix</p>
               {payMethods.length === 0 ? (
                 <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No payments</p>
               ) : (
@@ -304,7 +304,7 @@ export function PosSalesReportPanel({
                 </div>
                 <div className="flex justify-between text-xs">
                   <span style={{ color: "var(--pos-muted)" }}>Expenses</span>
-                  <span className="tabular-nums" style={{ color: "#f59e0b" }}>LKR {formatNumber(expenses)}</span>
+                  <span className="tabular-nums" style={{ color: "var(--pos-warn)" }}>LKR {formatNumber(expenses)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span style={{ color: "var(--pos-muted)" }}>Supplier paid</span>
@@ -318,7 +318,7 @@ export function PosSalesReportPanel({
               style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
             >
               <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "var(--pos-border)" }}>
-                <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>
+                <p className="text-xs font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
                   Bills · {shiftLabel}
                 </p>
                 <span className="text-[10px]" style={{ color: "var(--pos-muted)" }}>{sales.length} shown</span>
@@ -352,8 +352,8 @@ export function PosSalesReportPanel({
                             onClick={() => onOpenSale?.(s.id)}
                             className={onOpenSale ? "cursor-pointer hover:bg-white/5" : undefined}
                             style={{
-                              borderBottom: "1px solid #1a2b3a",
-                              background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)",
+                              borderBottom: "1px solid var(--pos-border)",
+                              background: i % 2 === 0 ? "transparent" : "var(--pos-hover)",
                             }}
                           >
                             <td className="px-3 py-2 font-mono font-semibold text-white">{s.invoiceNumber}</td>

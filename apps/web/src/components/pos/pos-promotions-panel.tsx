@@ -181,7 +181,7 @@ export function PosPromotionsPanel({
   const fieldStyle = {
     background: "var(--pos-input)",
     border: "1px solid var(--pos-border)",
-    color: "#fff",
+    color: "var(--pos-text)",
   } as const;
 
   const liveCount = promos.filter(isLive).length;
@@ -192,10 +192,10 @@ export function PosPromotionsPanel({
         <div className="flex items-center gap-2">
           <Tag className="h-4 w-4" style={{ color: "#4f6ef7" }} />
           <h2 className="text-white font-bold text-base">Discounts & Promotions</h2>
-          <Badge className="ml-1 text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}>
+          <Badge className="ml-1 text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}>
             {profile.label}
           </Badge>
-          <Badge className="text-[10px]" style={{ background: "rgba(16,185,129,0.15)", color: "#34d399" }}>
+          <Badge className="text-[10px]" style={{ background: "rgba(16,185,129,0.15)", color: "var(--pos-success-soft)" }}>
             {liveCount} live
           </Badge>
         </div>
@@ -224,11 +224,11 @@ export function PosPromotionsPanel({
           className="rounded-xl border p-4 space-y-3 overflow-y-auto"
           style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
-          <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>
+          <p className="text-xs font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
             Quick create coupon
           </p>
           {!canManage && (
-            <p className="text-[10px]" style={{ color: "#fbbf24" }}>
+            <p className="text-[10px]" style={{ color: "var(--pos-warn-soft)" }}>
               View & apply only — admin can create / toggle.
             </p>
           )}
@@ -370,7 +370,7 @@ export function PosPromotionsPanel({
                             className="text-[9px]"
                             style={{
                               background: live ? "rgba(16,185,129,0.15)" : "rgba(107,114,128,0.2)",
-                              color: live ? "#34d399" : "#9ca3af",
+                              color: live ? "var(--pos-success-soft)" : "#9ca3af",
                             }}
                           >
                             {live ? "Live" : p.isActive ? "Scheduled" : "Off"}
@@ -394,7 +394,7 @@ export function PosPromotionsPanel({
                             onClick={() => void toggle(p)}
                             className="h-8 w-8 rounded-lg flex items-center justify-center"
                             title="Toggle"
-                            style={{ color: p.isActive ? "#34d399" : "var(--pos-muted)", background: "var(--pos-input)" }}
+                            style={{ color: p.isActive ? "var(--pos-success-soft)" : "var(--pos-muted)", background: "var(--pos-input)" }}
                           >
                             <Power className="h-3.5 w-3.5" />
                           </button>
@@ -406,7 +406,7 @@ export function PosPromotionsPanel({
                           className="h-8 text-[10px] gap-1"
                           style={{
                             background: live && p.couponCode ? "#4f6ef7" : "var(--pos-input)",
-                            color: "#fff",
+                            color: live && p.couponCode ? "#fff" : "var(--pos-muted)",
                             opacity: live && p.couponCode ? 1 : 0.5,
                           }}
                         >

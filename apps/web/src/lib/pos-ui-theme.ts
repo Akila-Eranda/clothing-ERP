@@ -34,6 +34,16 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
       "--pos-sales-bg": "linear-gradient(135deg,#EFF6FF,#DBEAFE)",
       "--pos-sales-fg": "#1D4ED8",
       "--pos-sales-muted": "#64748B",
+      /* Warning / caution — rose instead of yellow in light mode */
+      "--pos-warn": "#E11D48",
+      "--pos-warn-soft": "#BE123C",
+      "--pos-warn-bg": "rgba(225,29,72,0.12)",
+      "--pos-warn-border": "rgba(225,29,72,0.35)",
+      "--pos-warn-pill": "#E11D48",
+      "--pos-accent": "#4f6ef7",
+      "--pos-accent-soft": "#1D4ED8",
+      "--pos-success-soft": "#047857",
+      "--pos-violet-soft": "#6D28D9",
     };
   }
   return {
@@ -59,5 +69,14 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
     "--pos-sales-bg": "linear-gradient(135deg,#4f6ef7,#7c3aed)",
     "--pos-sales-fg": "#ffffff",
     "--pos-sales-muted": "rgba(255,255,255,0.7)",
+    "--pos-warn": "#f59e0b",
+    "--pos-warn-soft": "#fbbf24",
+    "--pos-warn-bg": "rgba(245,158,11,0.15)",
+    "--pos-warn-border": "rgba(245,158,11,0.35)",
+    "--pos-warn-pill": "#d97706",
+    "--pos-accent": "#4f6ef7",
+    "--pos-accent-soft": "#93c5fd",
+    "--pos-success-soft": "#6ee7b7",
+    "--pos-violet-soft": "#c4b5fd",
   };
 }

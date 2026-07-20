@@ -63,7 +63,7 @@ export function PosDemoProductPanel({
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <Sparkles className="h-4 w-4" style={{ color: "#34d399" }} />
+          <Sparkles className="h-4 w-4" style={{ color: "var(--pos-success-soft)" }} />
           <h2 className="text-white font-bold text-base">Demo Product</h2>
           <span
             className="text-[10px] font-bold px-2 py-0.5 rounded-md"

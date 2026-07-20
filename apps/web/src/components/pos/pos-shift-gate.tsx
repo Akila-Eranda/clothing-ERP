@@ -105,7 +105,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
 
   if (checking) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }}>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "var(--pos-overlay)" }}>
         <Loader2 className="h-10 w-10 animate-spin text-white" />
       </div>
     );
@@ -113,7 +113,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
 
   if (pendingApproval) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "var(--pos-overlay)" }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -154,7 +154,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "var(--pos-overlay)" }}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}

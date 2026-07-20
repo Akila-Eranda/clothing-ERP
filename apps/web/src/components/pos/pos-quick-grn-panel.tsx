@@ -480,10 +480,10 @@ export function PosQuickGrnPanel({
             <PackageCheck className="h-4 w-4" style={{ color: "#4f6ef7" }} />
           </div>
           <h2 className="text-white font-bold text-base">Quick GRN (Cashier)</h2>
-          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(245,158,11,0.2)", color: "#fbbf24" }}>
+          <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--pos-warn-bg)", color: "var(--pos-warn-soft)" }}>
             Exception
           </span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}>
             {profile.label}
           </span>
         </div>
@@ -544,9 +544,9 @@ export function PosQuickGrnPanel({
             {openPos.length > 0 && (
               <div
                 className="rounded-lg border p-2.5 space-y-1.5"
-                style={{ background: "rgba(245,158,11,0.1)", borderColor: "rgba(245,158,11,0.35)" }}
+                style={{ background: "var(--pos-warn-bg)", borderColor: "var(--pos-warn-border)" }}
               >
-                <p className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: "#fbbf24" }}>
+                <p className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: "var(--pos-warn-soft)" }}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   Open PO(s) for this supplier — prefer Receive against PO
                 </p>
@@ -558,7 +558,7 @@ export function PosQuickGrnPanel({
                       target="_blank"
                       rel="noreferrer"
                       className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded border"
-                      style={{ color: "#93c5fd", borderColor: "var(--pos-border)", background: "var(--pos-panel)" }}
+                      style={{ color: "var(--pos-accent-soft)", borderColor: "var(--pos-border)", background: "var(--pos-panel)" }}
                     >
                       {p.poNumber}
                     </a>
@@ -656,7 +656,7 @@ export function PosQuickGrnPanel({
                           type="button"
                           className="h-7 px-2.5 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0 transition-all hover:opacity-90"
                           style={inCart
-                            ? { border: "1px solid #4f6ef7", color: "#93c5fd", background: "transparent" }
+                            ? { border: "1px solid #4f6ef7", color: "var(--pos-accent-soft)", background: "transparent" }
                             : { background: "#4f6ef7", color: "#fff" }}
                           onClick={() => addGrnItem(p, 1)}
                         >
@@ -669,20 +669,20 @@ export function PosQuickGrnPanel({
                         <span style={{ color: "var(--pos-muted)" }}>Current stock</span>
                         <span className="text-right font-bold text-white tabular-nums">{p.stock}</span>
                         <span style={{ color: "var(--pos-muted)" }}>Last GRN qty</span>
-                        <span className="text-right tabular-nums" style={{ color: "#c4b5fd" }}>{p.lastPurchaseQty ?? "-"}</span>
+                        <span className="text-right tabular-nums" style={{ color: "var(--pos-violet-soft)" }}>{p.lastPurchaseQty ?? "-"}</span>
                         <span style={{ color: "var(--pos-muted)" }}>Last GRN date</span>
-                        <span className="text-right" style={{ color: "#c4b5fd" }}>{fmtDate(p.lastPurchaseDate)}</span>
+                        <span className="text-right" style={{ color: "var(--pos-violet-soft)" }}>{fmtDate(p.lastPurchaseDate)}</span>
                         <span style={{ color: "var(--pos-muted)" }}>Stock after last GRN</span>
-                        <span className="text-right tabular-nums" style={{ color: "#c4b5fd" }}>{p.stockAtLastPurchase ?? "-"}</span>
+                        <span className="text-right tabular-nums" style={{ color: "var(--pos-violet-soft)" }}>{p.stockAtLastPurchase ?? "-"}</span>
                         <span style={{ color: "var(--pos-muted)" }}>Sold since last GRN</span>
-                        <span className="text-right tabular-nums" style={{ color: p.soldAfterLastPurchase ? "#f59e0b" : "var(--pos-muted)" }}>
+                        <span className="text-right tabular-nums" style={{ color: p.soldAfterLastPurchase ? "var(--pos-warn)" : "var(--pos-muted)" }}>
                           {p.soldAfterLastPurchase ?? "-"}
                         </span>
                       </div>
 
                       {p.stockDecreased && (
                         <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold rounded-md px-2 py-1"
-                          style={{ background: "rgba(245,158,11,0.12)", color: "#fbbf24" }}>
+                          style={{ background: "var(--pos-warn-bg)", color: "var(--pos-warn-soft)" }}>
                           <AlertTriangle className="h-3 w-3 shrink-0" />
                           Stock decreased since last GRN ({p.stockAtLastPurchase} → {p.stock})
                         </div>
@@ -793,7 +793,7 @@ export function PosQuickGrnPanel({
                         <p className="text-sm font-bold text-white tabular-nums">LKR {formatNumber(l.lineTotal)}</p>
                       </div>
                       {l.product?.stockDecreased && (
-                        <p className="text-[9px] flex items-center gap-1" style={{ color: "#fbbf24" }}>
+                        <p className="text-[9px] flex items-center gap-1" style={{ color: "var(--pos-warn-soft)" }}>
                           <AlertTriangle className="h-3 w-3" /> Stock down since last GRN
                         </p>
                       )}
@@ -818,7 +818,7 @@ export function PosQuickGrnPanel({
                   disabled={busy}
                   className="h-4 w-4 rounded accent-emerald-500"
                 />
-                <Banknote className="h-4 w-4" style={{ color: "#34d399" }} />
+                <Banknote className="h-4 w-4" style={{ color: "var(--pos-success-soft)" }} />
                 Pay supplier now
               </label>
               <span className="text-[10px]" style={{ color: "var(--pos-muted)" }}>

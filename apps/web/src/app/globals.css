@@ -575,11 +575,16 @@
 .pos-shell.pos-light .text-white {
   color: var(--pos-text) !important;
 }
-.pos-shell.pos-light .text-white\/60,
+.pos-shell.pos-light .text-white\/90,
+.pos-shell.pos-light .text-white\/80,
 .pos-shell.pos-light .text-white\/70,
-.pos-shell.pos-light .text-white\/50 {
+.pos-shell.pos-light .text-white\/60,
+.pos-shell.pos-light .text-white\/50,
+.pos-shell.pos-light .text-white\/45,
+.pos-shell.pos-light .text-white\/40 {
   color: var(--pos-muted) !important;
 }
+.pos-shell.pos-light .text-white\/35,
 .pos-shell.pos-light .text-white\/30,
 .pos-shell.pos-light .text-white\/20 {
   color: var(--pos-muted-2) !important;
@@ -611,5 +616,36 @@
 .pos-shell.pos-light [style*="background:#4f6ef7"],
 .pos-shell.pos-light [style*="background: #4f6ef7"] {
   color: #ffffff !important;
+}
+
+/* Solid status buttons — keep white label on dark fills in light mode */
+.pos-shell.pos-light button[style*="#DC2626"],
+.pos-shell.pos-light button[style*="#059669"],
+.pos-shell.pos-light button[style*="#334155"],
+.pos-shell.pos-light button[style*="#475569"] {
+  color: #ffffff !important;
+}
+
+/* Remap yellow / amber accents → rose warning palette in light mode */
+.pos-shell.pos-light .text-amber-400,
+.pos-shell.pos-light .text-amber-500,
+.pos-shell.pos-light .text-amber-600 {
+  color: var(--pos-warn) !important;
+}
+.pos-shell.pos-light .bg-amber-500,
+.pos-shell.pos-light .bg-amber-600 {
+  background-color: var(--pos-warn) !important;
+}
+.pos-shell.pos-light .hover\:bg-amber-700:hover {
+  background-color: var(--pos-warn-soft) !important;
+}
+.pos-shell.pos-light .bg-amber-50 {
+  background-color: var(--pos-warn-bg) !important;
+}
+.pos-shell.pos-light .text-amber-700 {
+  color: var(--pos-warn-soft) !important;
+}
+.pos-shell.pos-light .border-amber-200 {
+  border-color: var(--pos-warn-border) !important;
 }
 

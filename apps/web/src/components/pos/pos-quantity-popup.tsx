@@ -80,7 +80,7 @@ export function PosQuantityPopup({
   const lineTotal = qty * unitPriceValue;
   const lineDiscount = hasPriceCut ? priceCut * qty : 0;
   const btnH = touchMode ? "h-14" : "h-12";
-  const fieldStyle = { background: "#1a1f2a", borderColor: "#2a3140" } as const;
+  const fieldStyle = { background: "var(--pos-input)", borderColor: "var(--pos-border)" } as const;
   const crossProductPick = React.useMemo(
     () => hasVariants && new Set(variants.map((v) => v.productName)).size > 1,
     [hasVariants, variants],
@@ -263,15 +263,15 @@ export function PosQuantityPopup({
     >
       <div
         className="w-full max-w-md rounded-2xl border overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
-        style={{ background: "#12151c", borderColor: "#2a3140" }}
+        style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
       >
         {/* Header */}
-        <div className="px-4 pt-4 pb-3 border-b shrink-0 space-y-2" style={{ borderColor: "#2a3140" }}>
+        <div className="px-4 pt-4 pb-3 border-b shrink-0 space-y-2" style={{ borderColor: "var(--pos-border)" }}>
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-white font-bold text-lg leading-tight truncate">{headerTitle}</p>
               {!hasVariants && variantName ? (
-                <p className="text-xs mt-1 truncate" style={{ color: "#9ca3af" }}>{variantName}</p>
+                <p className="text-xs mt-1 truncate" style={{ color: "var(--pos-muted)" }}>{variantName}</p>
               ) : null}
             </div>
             <button
@@ -302,7 +302,7 @@ export function PosQuantityPopup({
           {/* Variants */}
           {hasVariants && (
             <div className="space-y-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 {crossProductPick ? "Same barcode — pick item" : "Pick variant"}
               </p>
               {variantLayout === "grid" ? (
@@ -318,8 +318,8 @@ export function PosQuantityPopup({
                         onClick={() => pickVariant(v)}
                         className="rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
                         style={{
-                          background: active ? "rgba(59,130,246,0.14)" : "#1a1f2a",
-                          borderColor: active ? "#3b82f6" : "#2a3140",
+                          background: active ? "rgba(59,130,246,0.14)" : "var(--pos-input)",
+                          borderColor: active ? "#3b82f6" : "var(--pos-border)",
                           boxShadow: active ? "0 0 0 1px rgba(59,130,246,0.35)" : undefined,
                         }}
                       >
@@ -328,7 +328,7 @@ export function PosQuantityPopup({
                             {crossProductPick ? (
                               <>
                                 <p className="text-sm font-semibold text-white leading-snug line-clamp-2">{v.productName}</p>
-                                <p className="text-[11px] mt-0.5 truncate" style={{ color: "#9ca3af" }}>
+                                <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--pos-muted)" }}>
                                   {variantDisplayLabel(v, profile) || v.variantName}
                                 </p>
                               </>
@@ -343,7 +343,7 @@ export function PosQuantityPopup({
                             style={{
                               borderColor: active ? "#3b82f6" : "#4b5563",
                               background: active ? "#3b82f6" : "transparent",
-                              boxShadow: active ? "inset 0 0 0 2px #12151c" : undefined,
+                              boxShadow: active ? "inset 0 0 0 2px var(--pos-panel)" : undefined,
                             }}
                           />
                         </div>
@@ -377,8 +377,8 @@ export function PosQuantityPopup({
                           onClick={() => pickVariant(v)}
                           className="shrink-0 w-[140px] rounded-xl border px-3 py-3 text-left transition-all disabled:opacity-40"
                           style={{
-                            background: active ? "rgba(59,130,246,0.14)" : "#1a1f2a",
-                            borderColor: active ? "#3b82f6" : "#2a3140",
+                            background: active ? "rgba(59,130,246,0.14)" : "var(--pos-input)",
+                            borderColor: active ? "#3b82f6" : "var(--pos-border)",
                           }}
                         >
                           <div className="flex items-start justify-between gap-1 mb-2">
@@ -390,7 +390,7 @@ export function PosQuantityPopup({
                               style={{
                                 borderColor: active ? "#3b82f6" : "#4b5563",
                                 background: active ? "#3b82f6" : "transparent",
-                                boxShadow: active ? "inset 0 0 0 2px #12151c" : undefined,
+                                boxShadow: active ? "inset 0 0 0 2px var(--pos-panel)" : undefined,
                               }}
                             />
                           </div>
@@ -407,14 +407,14 @@ export function PosQuantityPopup({
                   {canScrollRight && (
                     <div
                       className="pointer-events-none absolute right-0 top-0 bottom-1 w-10 flex items-center justify-end"
-                      style={{ background: "linear-gradient(90deg, transparent, #12151c 70%)" }}
+                      style={{ background: "linear-gradient(90deg, transparent, var(--pos-panel) 70%)" }}
                     >
                       <div
                         className="pointer-events-auto h-8 w-8 rounded-full flex items-center justify-center mr-0.5"
-                        style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
+                        style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
                         onClick={() => scrollRef.current?.scrollBy({ left: 140, behavior: "smooth" })}
                       >
-                        <ChevronRight className="h-4 w-4" style={{ color: "#9ca3af" }} />
+                        <ChevronRight className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
                       </div>
                     </div>
                   )}
@@ -426,7 +426,7 @@ export function PosQuantityPopup({
           {/* Quantity + price */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+              <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 Quantity
               </p>
               <div className="flex items-center rounded-xl overflow-hidden border h-12" style={fieldStyle}>
@@ -460,11 +460,11 @@ export function PosQuantityPopup({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-2 min-h-[16px]">
-                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                   Sale price
                 </p>
                 {hasPriceCut ? (
-                  <p className="text-[10px] tabular-nums truncate" style={{ color: "#9ca3af" }}>
+                  <p className="text-[10px] tabular-nums truncate" style={{ color: "var(--pos-muted)" }}>
                     List {money(listPrice)}
                   </p>
                 ) : null}
@@ -490,10 +490,10 @@ export function PosQuantityPopup({
           {/* Summary card */}
           <div
             className="rounded-xl border px-4 py-3.5 flex items-center justify-between gap-4"
-            style={{ background: "#1a1f2a", borderColor: "#2a3140" }}
+            style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
           >
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "#9ca3af" }}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 Line total
               </p>
               <p className="text-sm text-white/80 tabular-nums mt-1">
@@ -508,7 +508,7 @@ export function PosQuantityPopup({
                 )}
               </p>
               {hasPriceCut ? (
-                <p className="text-xs mt-1 tabular-nums font-medium" style={{ color: "#fbbf24" }}>
+                <p className="text-xs mt-1 tabular-nums font-medium" style={{ color: "var(--pos-warn-soft)" }}>
                   Discount −{money(lineDiscount)}
                 </p>
               ) : null}
@@ -522,7 +522,7 @@ export function PosQuantityPopup({
         </div>
 
         {/* Footer */}
-        <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "#2a3140" }}>
+        <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "var(--pos-border)" }}>
           <p className="text-[10px] text-center pt-2" style={{ color: "#6b7280" }}>
             {hasVariants ? "← → pick item · " : ""}↑/↓ qty · Q qty · P price · Enter add · Esc close
           </p>
@@ -531,7 +531,7 @@ export function PosQuantityPopup({
               type="button"
               onClick={onCancel}
               className={`flex-1 ${btnH} rounded-xl font-semibold text-white/90 hover:bg-white/5 transition-colors`}
-              style={{ background: "#1a1f2a", border: "1px solid #2a3140" }}
+              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
             >
               Cancel
             </button>

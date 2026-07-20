@@ -141,7 +141,7 @@ export function PosQuickProductPanel({
           <h2 className="text-white font-bold text-base">Quick Product</h2>
           <span
             className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-            style={{ background: "rgba(79,110,247,0.15)", color: "#c4b5fd" }}
+            style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}
           >
             {profile.label}
           </span>

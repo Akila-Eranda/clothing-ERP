@@ -284,7 +284,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                 </thead>
                 <tbody>
                   {searchResults.map((row) => (
-                    <tr key={row.id} style={{ borderBottom: "1px solid #1a2b3a" }}>
+                    <tr key={row.id} style={{ borderBottom: "1px solid var(--pos-border)" }}>
                       <td className="px-3 py-2 font-mono text-xs font-bold" style={{ color: "#4f6ef7" }}>
                         {row.invoiceNumber}
                       </td>

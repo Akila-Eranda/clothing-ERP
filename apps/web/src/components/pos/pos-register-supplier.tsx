@@ -78,7 +78,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
         onClick={() => setOpen(true)}
         disabled={disabled}
         className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[11px] font-bold transition-all hover:bg-white/10 disabled:opacity-50"
-        style={{ color: "#93c5fd", border: "1px solid rgba(147,197,253,0.35)" }}
+        style={{ color: "var(--pos-accent-soft)", border: "1px solid rgba(147,197,253,0.35)" }}
       >
         <Plus className="h-3.5 w-3.5" />
         New supplier
@@ -93,7 +93,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-white flex items-center gap-1.5">
-          <Truck className="h-3.5 w-3.5" style={{ color: "#93c5fd" }} />
+          <Truck className="h-3.5 w-3.5" style={{ color: "var(--pos-accent-soft)" }} />
           Register supplier
         </p>
         <button

@@ -25,7 +25,7 @@ const LOW_STOCK_AT = 5;
 
 function stockTone(stock: number) {
   if (stock <= 0) return { label: "Out of Stock", bg: "rgba(220,38,38,0.9)", text: "#fff", pill: "#dc2626" };
-  if (stock <= LOW_STOCK_AT) return { label: "Low Stock", bg: "rgba(217,119,6,0.9)", text: "#fff", pill: "#d97706" };
+  if (stock <= LOW_STOCK_AT) return { label: "Low Stock", bg: "var(--pos-warn-pill)", text: "#fff", pill: "var(--pos-warn-pill)" };
   return { label: "Available", bg: "rgba(22,163,74,0.2)", text: "#4ade80", pill: "#16a34a" };
 }
 

@@ -106,7 +106,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)" }}>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "var(--pos-overlay)" }}>
         <Loader2 className="h-10 w-10 animate-spin text-white" />
       </div>
     );
@@ -114,7 +114,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
 
   if (!active) {
     return (
-      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "var(--pos-overlay)" }}>
         <div className="rounded-2xl border p-6 text-center max-w-sm w-full" style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}>
           <p className="text-white text-sm mb-4">No open cash shift to close.</p>
           <Button onClick={onCancel} className="w-full">Back</Button>
@@ -124,7 +124,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)" }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "var(--pos-overlay)" }}>
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -200,7 +200,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
                 </span>
               </div>
               {needsApproval && (
-                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "#f59e0b" }}>
+                <p className="text-xs mt-2 flex items-center gap-1" style={{ color: "var(--pos-warn)" }}>
                   <AlertTriangle className="h-3.5 w-3.5" />
                   Manager approval required (over LKR {VARIANCE_THRESHOLD})
                 </p>

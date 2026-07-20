@@ -165,7 +165,7 @@ export function PosPaymentPanel({
 
       {state.allowPartial && hasCreditCustomer && !state.splitMode && (
         <div className="rounded-xl border px-3 py-2 space-y-2" style={{ background: "rgba(79,110,247,0.08)", borderColor: "rgba(79,110,247,0.25)" }}>
-          <p className="text-[10px] font-semibold" style={{ color: "#93c5fd" }}>
+          <p className="text-[10px] font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
             Pay part now — balance goes on customer credit account
           </p>
           <div className="space-y-1">
@@ -262,7 +262,7 @@ export function PosPaymentPanel({
                 </span>
               </div>
               {customerCreditBalance !== undefined && customerCreditBalance > 0 && (
-                <div className="flex items-center justify-between text-[10px]" style={{ color: "#fbbf24" }}>
+                <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--pos-warn-soft)" }}>
                   <span>Outstanding owed</span>
                   <span className="font-bold tabular-nums">LKR {formatNumber(customerCreditBalance)}</span>
                 </div>
