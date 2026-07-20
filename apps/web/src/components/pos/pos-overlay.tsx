@@ -1500,6 +1500,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         paymentMethod: saleSnapshot.paymentMethod,
         items: saleSnapshot.items,
         customerName: saleSnapshot.customerName,
+        manualDiscount: discount,
+        manualDiscountType: discountType,
+        couponDiscount: payState.couponDiscount,
+        loyaltyPoints: loyaltyPointsToRedeem,
+        customerTier: customer?.membershipTier ?? null,
       });
       setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);

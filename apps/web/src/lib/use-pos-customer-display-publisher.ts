@@ -16,6 +16,12 @@ interface ThankYouSale {
   paymentMethod: string;
   items: CartItem[];
   customerName?: string;
+  /** Snapshot so discount still shows after cart is cleared. */
+  manualDiscount?: number;
+  manualDiscountType?: "percentage" | "fixed";
+  couponDiscount?: number;
+  loyaltyPoints?: number;
+  customerTier?: string | null;
 }
 
 interface PublisherInput {
@@ -68,7 +74,7 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
   } = input;
 
   const itemsKey = React.useMemo(
-    () => items.map((i) => `${i.variantId}:${i.quantity}:${i.unitPrice}`).join("|"),
+    () => items.map((i) => `${i.variantId}:${i.quantity}:${i.unitPrice}:${i.discountAmount ?? 0}:${i.discountType ?? ""}`).join("|"),
     [items],
   );
 
@@ -122,11 +128,15 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
       logoUrl: receiptSettings.logoUrl,
       currency,
       items: thankYouSale?.items ?? items,
-      customer,
-      manualDiscount,
-      manualDiscountType,
-      couponDiscount,
-      loyaltyPoints,
+      customer: thankYouSale
+        ? (thankYouSale.customerName
+          ? ({ name: thankYouSale.customerName, membershipTier: thankYouSale.customerTier ?? undefined } as Customer)
+          : null)
+        : customer,
+      manualDiscount: thankYouSale?.manualDiscount ?? manualDiscount,
+      manualDiscountType: thankYouSale?.manualDiscountType ?? manualDiscountType,
+      couponDiscount: thankYouSale?.couponDiscount ?? couponDiscount,
+      loyaltyPoints: thankYouSale?.loyaltyPoints ?? loyaltyPoints,
       taxRate,
       productImages,
       lastAddedVariantId,

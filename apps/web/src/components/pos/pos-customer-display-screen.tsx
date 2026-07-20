@@ -71,16 +71,23 @@ function ProductImage({ url, name, className }: { url?: string; name: string; cl
 
 function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?: boolean }) {
   const { currency } = state;
+  const discLabel =
+    state.discountPercent && state.discountPercent > 0
+      ? `Discount (${state.discountPercent}%)`
+      : "Discount";
   return (
     <div className={cn("space-y-2", compact ? "text-base" : "text-lg")}>
       <div className="flex justify-between" style={{ color: "#94a3b8" }}>
         <span>Subtotal</span>
         <span>{currency} {formatNumber(state.subtotal)}</span>
       </div>
-      {state.discount > 0 && (
-        <div className="flex justify-between" style={{ color: "#34d399" }}>
-          <span>Discount</span>
-          <span>− {currency} {formatNumber(state.discount)}</span>
+      {state.discount > 0.001 && (
+        <div
+          className="flex justify-between items-center rounded-xl px-3 py-2"
+          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "#34d399" }}
+        >
+          <span className="font-bold">{discLabel}</span>
+          <span className="font-black tabular-nums">− {currency} {formatNumber(state.discount)}</span>
         </div>
       )}
       {state.taxRate > 0 && (
@@ -243,6 +250,19 @@ function ThankYouScreen({ state }: { state: CustomerDisplayState }) {
       <p className="text-5xl font-black mb-2" style={{ color: "#4f6ef7" }}>
         {state.currency} {formatNumber(state.total)}
       </p>
+      {state.discount > 0.001 && (
+        <div
+          className="px-6 py-3 rounded-2xl mb-4"
+          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)" }}
+        >
+          <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: "#6ee7b7" }}>
+            {state.discountPercent ? `You saved ${state.discountPercent}%` : "You saved"}
+          </p>
+          <p className="text-3xl font-black" style={{ color: "#34d399" }}>
+            {state.currency} {formatNumber(state.discount)}
+          </p>
+        </div>
+      )}
       {state.invoiceNumber && (
         <p className="text-base font-mono mb-2" style={{ color: "#6a8ab8" }}>{state.invoiceNumber}</p>
       )}
@@ -376,12 +396,22 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
                   <p className="text-sm truncate" style={{ color: "#6a8ab8" }}>
                     {item.variantName !== "Default" ? item.variantName : item.sku}
                   </p>
+                  {(item.lineDiscount ?? 0) > 0.001 && (
+                    <p className="text-xs font-semibold mt-0.5" style={{ color: "#34d399" }}>
+                      Disc −{state.currency} {formatNumber(item.lineDiscount ?? 0)}
+                    </p>
+                  )}
                 </div>
                 <div className="text-center shrink-0 w-10">
                   <p className="text-lg font-black text-white">{item.quantity}</p>
                   <p className="text-[10px]" style={{ color: "#4a6a8a" }}>qty</p>
                 </div>
                 <div className="text-right shrink-0 min-w-[100px]">
+                  {(item.lineDiscount ?? 0) > 0.001 && (
+                    <p className="text-xs line-through tabular-nums" style={{ color: "#6a8ab8" }}>
+                      {state.currency} {formatNumber(item.lineGross ?? item.lineTotal)}
+                    </p>
+                  )}
                   <p className="text-base font-bold text-white">{state.currency} {formatNumber(item.lineTotal)}</p>
                   <p className="text-xs" style={{ color: "#6a8ab8" }}>
                     @ {formatNumber(item.unitPrice)}
@@ -396,9 +426,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
           {state.phase === "checkout" ? (
             <>
               <CheckoutCashPanel state={state} />
-              {!state.paymentMethod?.toLowerCase().includes("cash") && (
-                <TotalsPanel state={state} compact />
-              )}
+              <TotalsPanel state={state} compact />
             </>
           ) : (
             <TotalsPanel state={state} />

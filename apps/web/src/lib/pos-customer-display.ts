@@ -19,6 +19,10 @@ export interface CustomerDisplayItem {
   unitPrice: number;
   quantity: number;
   lineTotal: number;
+  /** Gross before line discount (unitPrice × qty). */
+  lineGross?: number;
+  /** Line-level discount amount. */
+  lineDiscount?: number;
 }
 
 export interface CustomerDisplayState {
@@ -31,8 +35,15 @@ export interface CustomerDisplayState {
   items: CustomerDisplayItem[];
   customerName?: string;
   itemCount: number;
+  /** Gross merchandise total before any discounts. */
   subtotal: number;
+  /** All discounts combined (item + cart % + coupon + tier + loyalty). */
   discount: number;
+  /** Cart-level % when applied (e.g. 10). */
+  discountPercent?: number;
+  /** Breakdown for richer UI. */
+  itemDiscount?: number;
+  cartDiscount?: number;
   tax: number;
   taxRate: number;
   total: number;
@@ -46,13 +57,17 @@ export interface CustomerDisplayState {
 const CHANNEL = "hexaone-pos-customer-display";
 const LS_KEY = "hexaone-pos-customer-display-state";
 
-function lineTotal(item: CartItem) {
+function lineDiscountAmt(item: CartItem) {
   const gross = item.unitPrice * item.quantity;
   const disc =
     item.discountType === "percentage"
-      ? (gross * item.discountAmount) / 100
-      : item.discountAmount;
-  return gross - disc;
+      ? (gross * (item.discountAmount ?? 0)) / 100
+      : (item.discountAmount ?? 0);
+  return Math.max(0, disc);
+}
+
+function lineTotal(item: CartItem) {
+  return item.unitPrice * item.quantity - lineDiscountAmt(item);
 }
 
 export function buildCustomerDisplayState(input: {
@@ -77,12 +92,15 @@ export function buildCustomerDisplayState(input: {
   saleTotal?: number;
 }): CustomerDisplayState {
   const posLines = input.items as PosLineInput[];
-  const sub = calcPosSubtotal(posLines);
+  const netSub = calcPosSubtotal(posLines);
   const tax = calcPosTaxAmount(posLines, input.taxRate);
-  const manualDisc = calculateDiscount(sub, input.manualDiscount, input.manualDiscountType);
-  const tierDisc = calcTierDiscount(sub, input.customer?.membershipTier);
+  const itemDisc = input.items.reduce((sum, i) => sum + lineDiscountAmt(i), 0);
+  const grossSub = netSub + itemDisc;
+  const cartDisc = calculateDiscount(netSub, input.manualDiscount, input.manualDiscountType);
+  const tierDisc = calcTierDiscount(netSub, input.customer?.membershipTier);
   const loyaltyDisc = input.loyaltyPoints * 0.1;
-  const totalDiscount = manualDisc + input.couponDiscount + tierDisc + loyaltyDisc;
+  const cartLevelDisc = cartDisc + input.couponDiscount + tierDisc + loyaltyDisc;
+  const totalDiscount = itemDisc + cartLevelDisc;
   const total =
     input.saleTotal ??
     calcPosAmountDue(posLines, {
@@ -94,16 +112,22 @@ export function buildCustomerDisplayState(input: {
       posTaxRate: input.taxRate,
     });
 
-  const displayItems: CustomerDisplayItem[] = input.items.map((item) => ({
-    variantId: item.variantId,
-    productName: item.productName,
-    variantName: item.variantName,
-    sku: item.sku,
-    imageUrl: input.productImages?.get(item.variantId) ?? item.image,
-    unitPrice: item.unitPrice,
-    quantity: item.quantity,
-    lineTotal: lineTotal(item),
-  }));
+  const displayItems: CustomerDisplayItem[] = input.items.map((item) => {
+    const gross = item.unitPrice * item.quantity;
+    const disc = lineDiscountAmt(item);
+    return {
+      variantId: item.variantId,
+      productName: item.productName,
+      variantName: item.variantName,
+      sku: item.sku,
+      imageUrl: input.productImages?.get(item.variantId) ?? item.image,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      lineTotal: gross - disc,
+      lineGross: gross,
+      lineDiscount: disc,
+    };
+  });
 
   const lastAdded = input.lastAddedVariantId
     ? displayItems.find((i) => i.variantId === input.lastAddedVariantId) ??
@@ -120,8 +144,14 @@ export function buildCustomerDisplayState(input: {
     items: displayItems,
     customerName: input.customer?.name,
     itemCount: input.items.reduce((n, i) => n + i.quantity, 0),
-    subtotal: sub,
+    subtotal: grossSub,
     discount: totalDiscount,
+    discountPercent:
+      input.manualDiscountType === "percentage" && input.manualDiscount > 0
+        ? input.manualDiscount
+        : undefined,
+    itemDiscount: itemDisc,
+    cartDiscount: cartLevelDisc,
     tax,
     taxRate: input.taxRate,
     total,
