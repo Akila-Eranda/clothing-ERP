@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated } from "@/lib/use-receipt-settings";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
+import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -345,7 +346,12 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1em", fontWeight: 900, borderTop: "2px solid #000", paddingTop: 4, marginTop: 4 }}><span>TOTAL</span><span>LKR 2,940.00</span></div>
       <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Payment</span><span><b>CASH</b></span></div>
-      {s.showBarcode && <div style={{ textAlign: "center", fontSize: "0.75em", margin: "4px 0", fontFamily: "monospace", letterSpacing: 2 }}>||| ||| ||| INV-00001 ||| |||</div>}
+      {s.showBarcode && (
+        <div
+          style={{ textAlign: "center", margin: "8px 0 4px" }}
+          dangerouslySetInnerHTML={{ __html: receiptInvoiceBarcodeHtml("INV-00001", s.paperWidth) }}
+        />
+      )}
       <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6 }}>{s.footerText}</div>
     </div>
   );

@@ -43,7 +43,7 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
   showDiscount: true,
   showCashier: true,
   showCustomer: true,
-  showBarcode: false,
+  showBarcode: true,
   fontSize: "medium",
   printServerEnabled: false,
   printServerUrl: "",

@@ -102,6 +102,36 @@ export function barcodeSvgMarkup(value: string): string {
   }
 }
 
+/** Scannable invoice barcode for thermal sale receipts. */
+export function receiptInvoiceBarcodeHtml(
+  invoiceNumber: string,
+  paperWidth: "58mm" | "80mm" = "80mm",
+): string {
+  const safe = sanitizeBarcodeText(invoiceNumber);
+  if (!safe) return "";
+  if (typeof document === "undefined") {
+    return `<div class="bc"><span style="font-family:monospace;font-size:10px;font-weight:bold;letter-spacing:1px">${escapeHtml(safe)}</span></div>`;
+  }
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  const narrow = paperWidth === "58mm";
+  try {
+    JsBarcode(svg, safe, {
+      format: "CODE128",
+      width: narrow ? 1.05 : 1.3,
+      height: narrow ? 34 : 42,
+      displayValue: true,
+      fontSize: narrow ? 9 : 10,
+      margin: 0,
+      textMargin: 3,
+      background: "#ffffff",
+      lineColor: "#000000",
+    });
+    return `<div class="bc">${svg.outerHTML}</div>`;
+  } catch {
+    return `<div class="bc"><span style="font-family:monospace;font-size:10px;font-weight:bold;letter-spacing:1px">${escapeHtml(safe)}</span></div>`;
+  }
+}
+
 function labelPageSize(format: LabelFormat): string {
   if (format === "hangtag") return "60mm 100mm";
   if (format === "shelf") return "100mm 35mm";

@@ -18,6 +18,7 @@ import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
+import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
@@ -1145,7 +1146,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const taxHtml=(s.showTax&&r.tax>0)?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:"";
     const savingsAmt = r.savings ?? 0;
     const savingsHtml=savingsAmt>0?`<div class="save"><span>You saved</span><span>LKR ${savingsAmt.toFixed(2)}</span></div>`:"";
-    const barcodeHtml=s.showBarcode?`<div style="text-align:center;font-family:monospace;letter-spacing:2px;font-size:9px;margin:4px 0">${r.invoiceNumber}</div>`:"";
+    // Always print scannable invoice barcode (Code128) on sale receipts
+    const barcodeHtml=receiptInvoiceBarcodeHtml(r.invoiceNumber, pw==="58mm"?"58mm":"80mm");
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{background:#ffffff!important;color:#000000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -1157,7 +1159,9 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 .iname{font-size:0.9em;font-weight:bold;margin-top:4px;color:#000}
 .tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px;color:#000}
 .save{display:flex;justify-content:space-between;margin:6px 0 2px;font-size:0.95em;font-weight:900;color:#000;border:1px dashed #000;padding:4px 6px}
-.foot{text-align:center;margin-top:10px;font-size:0.8em;line-height:1.6;color:#000}
+.bc{text-align:center;margin:8px 0 4px;padding:2px 0}
+.bc svg{max-width:100%;height:auto;display:inline-block}
+.foot{text-align:center;margin-top:8px;font-size:0.8em;line-height:1.6;color:#000}
 @media print{@page{margin:0;size:${pw} auto}html,body{background:#fff!important;color:#000!important}body{padding:3mm}}
 </style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
   },[user, receiptSettings]);
