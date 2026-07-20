@@ -55,6 +55,9 @@ export async function ensureSystemRoles(db: Db, tenantId: string): Promise<void>
 
   await upsertRole('Cashier', RoleType.CASHIER, cashierPermIds);
 
+  // Full tenant scope — shop owner / tenant admin (idempotent backfill for older tenants)
+  await upsertRole('Tenant Admin', RoleType.TENANT_ADMIN, permissions.map((p) => p.id));
+
   await upsertRole('Branch Manager', RoleType.BRANCH_MANAGER, permIds(
     'inventory:read', 'inventory:update',
     'purchases:read', 'purchases:create', 'purchases:update',

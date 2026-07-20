@@ -94,6 +94,13 @@ async function tryRefresh(): Promise<string | null> {
   }
 }
 
+/** POS PIN unlock — attach only where the API attributes cash/sales to the unlocked cashier. */
+function needsPosCashierHeader(path: string): boolean {
+  if (path.startsWith('/pos') || path.startsWith('/cash')) return true;
+  if (path.startsWith('/accounting/expenses')) return true;
+  return /\/suppliers\/[^/]+\/ap\/payment/.test(path);
+}
+
 async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Promise<ApiResponse<T>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -103,8 +110,9 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  // Active POS cashier (PIN unlock) — sales attribute to this user
-  if (typeof window !== 'undefined') {
+  // Active POS cashier (PIN unlock) — only on routes that attribute sales/cash to the unlocked user
+  const needsPosCashier = needsPosCashierHeader(path);
+  if (needsPosCashier && typeof window !== 'undefined') {
     try {
       const posToken = sessionStorage.getItem('pos_cashier_unlock_token');
       if (posToken) headers['x-pos-cashier-token'] = posToken;
