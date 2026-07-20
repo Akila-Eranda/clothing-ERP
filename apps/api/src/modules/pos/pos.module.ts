@@ -332,7 +332,7 @@ export class PosService {
               return {
                 variantId: isCustom ? null : item.variantId,
                 productName: item.productName,
-                variantName: isCustom ? (item.variantName || 'Custom') : item.variantName,
+                variantName: isCustom ? (item.variantName || '') : item.variantName,
                 sku: isCustom ? (item.sku || 'CUSTOM') : item.sku,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,
@@ -693,24 +693,75 @@ export class PosService {
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const targetDate = date ? dayjs(date) : dayjs();
+    const dayStart = targetDate.startOf('day').toDate();
+    const dayEnd = targetDate.endOf('day').toDate();
     const where = {
       tenantId,
       branchId: resolvedBranchId,
       status: SaleStatus.COMPLETED,
       ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-      invoiceDate: {
-        gte: targetDate.startOf('day').toDate(),
-        lte: targetDate.endOf('day').toDate(),
-      },
+      invoiceDate: { gte: dayStart, lte: dayEnd },
     };
 
-    const [sales, totals] = await this.prisma.$transaction([
+    const [sales, totals, itemTotals, expenseRows, supplierPays, register] = await Promise.all([
       this.prisma.sale.findMany({ where, include: { payments: true } }),
       this.prisma.sale.aggregate({
         where,
         _sum: { total: true, taxAmount: true, discountAmount: true },
         _count: { id: true },
       }),
+      this.prisma.saleItem.aggregate({
+        where: {
+          sale: {
+            tenantId,
+            branchId: resolvedBranchId,
+            status: SaleStatus.COMPLETED,
+            ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
+            invoiceDate: { gte: dayStart, lte: dayEnd },
+          },
+        },
+        _sum: { quantity: true },
+      }),
+      this.prisma.expense.findMany({
+        where: {
+          tenantId,
+          date: { gte: dayStart, lte: dayEnd },
+          OR: [{ branchId: resolvedBranchId }, { branchId: null }],
+        },
+        select: { amount: true, paymentMethod: true },
+      }),
+      this.prisma.supplierPayment.findMany({
+        where: {
+          tenantId,
+          paidAt: { gte: dayStart, lte: dayEnd },
+        },
+        select: { amount: true, method: true },
+      }),
+      (async () => {
+        if (opts?.cashierId) {
+          const open = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, opts.cashierId);
+          if (open) return open;
+          return this.prisma.cashRegister.findFirst({
+            where: {
+              tenantId,
+              branchId: resolvedBranchId,
+              cashierId: opts.cashierId,
+              openingTime: { gte: dayStart, lte: dayEnd },
+            },
+            orderBy: { openingTime: 'desc' },
+            include: { movements: { orderBy: { createdAt: 'asc' } } },
+          });
+        }
+        return this.prisma.cashRegister.findFirst({
+          where: {
+            tenantId,
+            branchId: resolvedBranchId,
+            openingTime: { gte: dayStart, lte: dayEnd },
+          },
+          orderBy: { openingTime: 'desc' },
+          include: { movements: { orderBy: { createdAt: 'asc' } } },
+        });
+      })(),
     ]);
 
     const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
@@ -718,32 +769,69 @@ export class PosService {
         acc[payment.method] = (acc[payment.method] ?? 0) + payment.amount;
       }
       return acc;
-    }, {});
+    }, {} as Record<string, number>);
 
-    const itemTotals = await this.prisma.saleItem.aggregate({
-      where: {
-        sale: {
-          tenantId,
-          branchId: resolvedBranchId,
-          status: SaleStatus.COMPLETED,
-          ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-          invoiceDate: {
-            gte: targetDate.startOf('day').toDate(),
-            lte: targetDate.endOf('day').toDate(),
-          },
-        },
-      },
-      _sum: { quantity: true },
-    });
+    let cashSalesNet = 0;
+    for (const sale of sales) {
+      cashSalesNet += netCashFromSalePayments(sale.payments, sale.changeDue);
+    }
+    cashSalesNet = Math.round(cashSalesNet * 100) / 100;
+
+    const income = Math.round((totals._sum.total ?? 0) * 100) / 100;
+    const expenses = Math.round(expenseRows.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+    const cashExpenses = Math.round(
+      expenseRows.filter((e) => e.paymentMethod === PaymentMethod.CASH).reduce((s, e) => s + e.amount, 0) * 100,
+    ) / 100;
+    const supplierPayments = Math.round(
+      supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+    const cashSupplierPayments = Math.round(
+      supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+
+    const movementSummary = register ? summarizeMovements(register.movements) : null;
+    const openingBalance = register?.openingCash ?? 0;
+    const registerCashSales = movementSummary?.cashSales ?? cashSalesNet;
+    const movementCashOut = movementSummary?.cashExpenses ?? 0;
+    const refunds = movementSummary?.cashRefunds ?? 0;
+
+    // Prefer register movements for drawer; always subtract supplier cash AP (not always in movements).
+    const cashOutTotal = Math.round((Math.max(movementCashOut, cashExpenses) + cashSupplierPayments) * 100) / 100;
+    const expectedInDrawer = register
+      ? Math.round(
+          (computeExpectedCashFromMovements(register.openingCash, register.movements) - cashSupplierPayments) * 100,
+        ) / 100
+      : Math.round((openingBalance + cashSalesNet - cashExpenses - cashSupplierPayments - refunds) * 100) / 100;
 
     return {
       date: targetDate.format('YYYY-MM-DD'),
       totalSales: totals._count.id,
-      totalRevenue: totals._sum.total ?? 0,
+      totalRevenue: income,
       totalTax: totals._sum.taxAmount ?? 0,
       totalDiscount: totals._sum.discountAmount ?? 0,
       totalItems: itemTotals._sum.quantity ?? 0,
       byPaymentMethod,
+      /** Day opening float (cash register) */
+      openingBalance,
+      /** Day's income (sales) */
+      income,
+      /** Operating expenses (shop OpEx) */
+      expenses,
+      cashExpenses,
+      /** Supplier AP payments — cash-out, not OpEx */
+      supplierPayments,
+      cashSupplierPayments,
+      /** income − expenses (supplier payments excluded from P&L) */
+      netIncome: Math.round((income - expenses) * 100) / 100,
+      cash: {
+        openingFloat: openingBalance,
+        cashSalesNet: register ? registerCashSales : cashSalesNet,
+        cashExpenses,
+        cashSupplierPayments,
+        cashOut: cashOutTotal,
+        refunds,
+        expectedInDrawer,
+      },
     };
   }
 
@@ -1323,7 +1411,7 @@ export class PosService {
       invoiceDate: { gte: todayStart, lte: todayEnd },
     };
 
-    const [sales, totals, supplierPays] = await Promise.all([
+    const [sales, totals, supplierPays, expenseRows] = await Promise.all([
       this.prisma.sale.findMany({ where, include: { payments: true } }),
       this.prisma.sale.aggregate({
         where,
@@ -1336,6 +1424,14 @@ export class PosService {
           paidAt: { gte: todayStart, lte: todayEnd },
         },
         select: { amount: true, method: true },
+      }),
+      this.prisma.expense.findMany({
+        where: {
+          tenantId,
+          date: { gte: todayStart, lte: todayEnd },
+          OR: [{ branchId: resolvedBranchId }, { branchId: null }],
+        },
+        select: { amount: true, paymentMethod: true },
       }),
     ]);
 
@@ -1382,9 +1478,20 @@ export class PosService {
     cashTendered = Math.round(cashTendered * 100) / 100;
     changeGiven = Math.round(changeGiven * 100) / 100;
 
-    // Align drawer cash sales with register movements when shift exists
     const movementSummary = register ? summarizeMovements(register.movements) : null;
     const registerCashSales = movementSummary?.cashSales ?? cashSalesNet;
+
+    const supplierPaymentsTotal = Math.round(
+      supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+    const cashSupplierPayments = Math.round(
+      supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
+    ) / 100;
+    const expensesTotal = Math.round(expenseRows.reduce((s, e) => s + e.amount, 0) * 100) / 100;
+    const cashExpenses = Math.round(
+      expenseRows.filter((e) => e.paymentMethod === PaymentMethod.CASH).reduce((s, e) => s + e.amount, 0) * 100,
+    ) / 100;
+    const income = Math.round((totals._sum.total ?? 0) * 100) / 100;
 
     const cash = {
       shiftOpen: register?.status === CashRegisterStatus.OPEN,
@@ -1393,19 +1500,18 @@ export class PosService {
       cashTendered,
       changeGiven,
       cashIn: movementSummary?.cashReceived ?? 0,
-      cashOut: movementSummary?.cashExpenses ?? 0,
+      cashOut: Math.round(
+        ((movementSummary?.cashExpenses ?? cashExpenses) + cashSupplierPayments) * 100,
+      ) / 100,
+      cashExpenses,
+      cashSupplierPayments,
       refunds: movementSummary?.cashRefunds ?? 0,
       expectedInDrawer: register
-        ? computeExpectedCashFromMovements(register.openingCash, register.movements)
+        ? Math.round(
+            (computeExpectedCashFromMovements(register.openingCash, register.movements) - cashSupplierPayments) * 100,
+          ) / 100
         : null,
     };
-
-    const supplierPaymentsTotal = Math.round(
-      supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
-    ) / 100;
-    const cashSupplierPayments = Math.round(
-      supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
-    ) / 100;
 
     const summary = {
       date: now.format('YYYY-MM-DD'),
@@ -1413,11 +1519,15 @@ export class PosService {
       closedBy: cashierId,
       notes: notes ?? '',
       totalSales: totals._count.id,
-      totalRevenue: totals._sum.total ?? 0,
+      totalRevenue: income,
       totalTax: totals._sum.taxAmount ?? 0,
       totalDiscount: totals._sum.discountAmount ?? 0,
       byPaymentMethod,
       cash,
+      openingBalance: register?.openingCash ?? 0,
+      income,
+      expenses: expensesTotal,
+      netIncome: Math.round((income - expensesTotal) * 100) / 100,
       /** AP settlements — cash-out, not operating expense */
       supplierPayments: supplierPaymentsTotal,
       cashSupplierPayments,

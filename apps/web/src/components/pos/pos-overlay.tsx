@@ -108,9 +108,8 @@ interface SaleReceipt {
 
 function receiptItemName(productName: string, variantName?: string) {
   const variant = variantName?.trim();
-  return !variant || variant.toLowerCase() === "default"
-    ? productName
-    : `${productName} · ${variant}`;
+  const hide = !variant || ["default", "demo", "custom"].includes(variant.toLowerCase());
+  return hide ? productName : `${productName} · ${variant}`;
 }
 
 function cartLineToReceiptItem(i: {
@@ -318,6 +317,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     totalTax: number;
     totalDiscount: number;
     byPaymentMethod: Record<string, number>;
+    openingBalance?: number;
+    income?: number;
+    expenses?: number;
+    netIncome?: number;
+    supplierPayments?: number;
+    cashSupplierPayments?: number;
     cash?: {
       shiftOpen: boolean;
       openingFloat: number | null;
@@ -326,6 +331,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       changeGiven: number;
       cashIn: number;
       cashOut: number;
+      cashExpenses?: number;
+      cashSupplierPayments?: number;
       refunds: number;
       expectedInDrawer: number | null;
     };
@@ -1337,8 +1344,8 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           variantId: i.isCustom ? undefined : i.variantId,
           isCustom: !!i.isCustom,
           productName:i.productName,
-          variantName:i.isCustom ? (i.variantName || "Custom") : i.variantName,
-          sku:i.isCustom ? (i.sku || "CUSTOM") : i.sku,
+          variantName: i.isCustom ? "" : i.variantName,
+          sku: i.isCustom ? (i.sku || "CUSTOM") : i.sku,
           quantity:i.quantity,
           unitPrice:i.unitPrice,
           costPrice:i.isCustom ? (i.costPrice ?? 0) : (pm.get(i.variantId)?.costPrice??0),
@@ -3048,14 +3055,6 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
                           <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">
                             {item.productName}
-                            {item.isCustom && (
-                              <span
-                                className="ml-1.5 inline-flex align-middle text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded"
-                                style={{ background: "rgba(16,185,129,0.2)", color: "#6ee7b7" }}
-                              >
-                                Demo
-                              </span>
-                            )}
                           </p>
                           <div className="flex items-center gap-0.5 shrink-0">
                             <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
@@ -3391,12 +3390,14 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                       )}
                     </div>
                     {[
-                      dayEndSummary.cash.openingFloat != null && ["Opening float", dayEndSummary.cash.openingFloat],
+                      dayEndSummary.cash.openingFloat != null && ["Opening balance", dayEndSummary.cash.openingFloat],
                       ["Cash sales (net in drawer)", dayEndSummary.cash.cashSalesNet],
                       dayEndSummary.cash.cashTendered > 0 && ["Cash received (gross)", dayEndSummary.cash.cashTendered],
                       dayEndSummary.cash.changeGiven > 0 && ["Change given", dayEndSummary.cash.changeGiven],
                       dayEndSummary.cash.cashIn > 0 && ["Cash in", dayEndSummary.cash.cashIn],
-                      dayEndSummary.cash.cashOut > 0 && ["Cash out", dayEndSummary.cash.cashOut],
+                      (dayEndSummary.cash.cashExpenses ?? 0) > 0 && ["Cash expenses", dayEndSummary.cash.cashExpenses!],
+                      (dayEndSummary.cash.cashSupplierPayments ?? dayEndSummary.cashSupplierPayments ?? 0) > 0 && ["Supplier payments (cash)", dayEndSummary.cash.cashSupplierPayments ?? dayEndSummary.cashSupplierPayments ?? 0],
+                      dayEndSummary.cash.cashOut > 0 && ["Total cash out", dayEndSummary.cash.cashOut],
                       dayEndSummary.cash.refunds > 0 && ["Refunds", dayEndSummary.cash.refunds],
                     ].filter(Boolean).map((row) => {
                       const [label, amt] = row as [string, number];
@@ -3409,13 +3410,27 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     })}
                     {dayEndSummary.cash.expectedInDrawer != null && (
                       <div className="flex justify-between text-sm font-bold pt-2 mt-2 border-t" style={{borderColor:"rgba(16,185,129,0.2)"}}>
-                        <span style={{color:"#10b981"}}>Expected in drawer</span>
+                        <span style={{color:"#10b981"}}>Expected cash total</span>
                         <span style={{color:"#10b981"}} className="tabular-nums">LKR {formatNumber(dayEndSummary.cash.expectedInDrawer)}</span>
                       </div>
                     )}
                   </div>
                 )}
-                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"#fff"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"#f59e0b"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
+
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: "Day income", val: dayEndSummary.income ?? dayEndSummary.totalRevenue, color: "#4f6ef7" },
+                    { label: "Day expenses", val: dayEndSummary.expenses ?? 0, color: "#f59e0b" },
+                    { label: "Supplier paid", val: dayEndSummary.supplierPayments ?? 0, color: "#ef4444" },
+                  ].map((r) => (
+                    <div key={r.label} className="rounded-lg p-2.5 text-center" style={{ background: "#162338", border: "1px solid #1e3356" }}>
+                      <p className="text-[9px] uppercase tracking-wide" style={{ color: "#6a8ab8" }}>{r.label}</p>
+                      <p className="text-xs font-bold tabular-nums mt-1" style={{ color: r.color }}>LKR {formatNumber(r.val)}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"#fff"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Net (income − expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"#10b981"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"#f59e0b"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
                   <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"#1e3356"}}>
                     <span className="text-xs" style={{color:"#6a8ab8"}}>{r.label}</span>
                     <span className="text-sm font-bold" style={{color:r.color}}>{r.val}</span>

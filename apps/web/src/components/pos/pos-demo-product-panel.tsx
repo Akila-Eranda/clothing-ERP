@@ -39,8 +39,8 @@ export function PosDemoProductPanel({
     onAddToCart({
       variantId: id,
       productName: name.trim(),
-      variantName: "Demo",
-      sku: "DEMO",
+      variantName: "",
+      sku: "",
       unitPrice: sell,
       mrp: sell,
       quantity,
