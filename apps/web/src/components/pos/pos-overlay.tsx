@@ -2654,7 +2654,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         toast.success(v === 0 ? "Tax disabled — no tax on POS sales" : `Tax ${v}% — applied from POS settings`);
       };
       return (
-        <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        <div className="h-full min-h-0 overflow-y-auto p-6 space-y-5">
           <h2 className="text-white font-bold text-xl">POS Settings</h2>
           {/* Phase 6 UX toggles */}
           <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
