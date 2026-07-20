@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,8 +10,10 @@ import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
-import { useReceiptSettings, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { useReceiptSettings, notifyReceiptSettingsUpdated, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
@@ -242,6 +244,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(new Date());
   const [todayStats, setTodayStats] = React.useState({ sales: 0, orders: 0, items: 0 });
+  const [drawerCash, setDrawerCash] = React.useState<number | null>(null);
   const [liked, setLiked] = React.useState<Set<string>>(new Set());
   const [orders, setOrders] = React.useState<SaleRow[]>([]);
   const [ordersLoading, setOrdersLoading] = React.useState(false);
@@ -305,6 +308,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
+  const [pinBusy, setPinBusy] = React.useState(false);
+  const [hasServerPin, setHasServerPin] = React.useState(false);
+  const [activeCashier, setActiveCashier] = React.useState<PosActiveCashier | null>(null);
   const [settingNewPin, setSettingNewPin] = React.useState("");
   const [settingConfirmPin, setSettingConfirmPin] = React.useState("");
   const [dayEndLoading, setDayEndLoading] = React.useState(false);
@@ -520,17 +526,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const loadTodayStats = React.useCallback(async () => {
     try {
-      const r = await api.get<{ totalSales: number; totalRevenue: number; totalItems?: number }>("/pos/summary");
-      const d = r.data;
+      const [sumR, activeR] = await Promise.all([
+        api.get<{ totalSales: number; totalRevenue: number; totalItems?: number; cash?: { expectedInDrawer?: number } }>("/pos/summary"),
+        shiftReady ? api.get<{ status?: string; summary?: { expectedCash: number } } | null>("/cash/active").catch(() => ({ data: null })) : Promise.resolve({ data: null }),
+      ]);
+      const d = sumR.data;
       setTodayStats({
         sales: d.totalRevenue ?? 0,
         orders: d.totalSales ?? 0,
         items: d.totalItems ?? 0,
       });
+      const active = activeR.data;
+      if (active?.status === "OPEN" && active.summary?.expectedCash != null) {
+        setDrawerCash(active.summary.expectedCash);
+      } else if (d.cash?.expectedInDrawer != null) {
+        setDrawerCash(d.cash.expectedInDrawer);
+      } else {
+        setDrawerCash(null);
+      }
     } catch {
       /* keep last known stats */
     }
-  }, []);
+  }, [shiftReady]);
 
   const loadHeldBills = React.useCallback(async () => {
     setHoldsLoading(true);
@@ -680,19 +697,47 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   React.useEffect(() => { if (activeNav === "vouchers" && posOpen) loadVouchers(); }, [activeNav, posOpen, loadVouchers]);
 
-  React.useEffect(() => { if (posOpen) { loadProducts(); loadHeldBills(); loadTodayStats(); } }, [posOpen, loadProducts, loadHeldBills, loadTodayStats]);
+  React.useEffect(() => { if (posOpen && shiftReady) { loadProducts(); loadHeldBills(); loadTodayStats(); } }, [posOpen, shiftReady, loadProducts, loadHeldBills, loadTodayStats]);
   React.useEffect(() => {
-    if (!posOpen) return;
-    const t = setInterval(loadTodayStats, 120_000);
+    if (!posOpen || !shiftReady) return;
+    const t = setInterval(loadTodayStats, 30_000);
     return () => clearInterval(t);
-  }, [posOpen, loadTodayStats]);
+  }, [posOpen, shiftReady, loadTodayStats]);
   React.useEffect(() => { if (activeNav === "orders" && posOpen) loadOrders(); }, [activeNav, posOpen, loadOrders]);
   React.useEffect(() => {
-    if (posOpen) {
-      const stored = typeof window !== "undefined" ? localStorage.getItem("pos_pin") : null;
-      if (stored) { setPinLocked(true); setPinEntry(""); setPinError(false); }
-      else setPinLocked(false);
-    }
+    if (!posOpen) return;
+    let cancelled = false;
+    (async () => {
+      const cached = posCashierStorage.getCashier();
+      if (cached) setActiveCashier(cached);
+      try {
+        const r = await api.get<{ hasPin: boolean }>("/pos/pin/status");
+        if (cancelled) return;
+        setHasServerPin(!!r.data?.hasPin);
+        // Lock when opening POS if anyone might switch via PIN (current user has PIN)
+        // or legacy localStorage PIN exists
+        const legacy = typeof window !== "undefined" && !!localStorage.getItem("pos_pin");
+        if (r.data?.hasPin || legacy) {
+          posCashierStorage.clear();
+          setActiveCashier(null);
+          setPinLocked(true);
+          setPinEntry("");
+          setPinError(false);
+        } else {
+          setPinLocked(false);
+        }
+      } catch {
+        const legacy = typeof window !== "undefined" && !!localStorage.getItem("pos_pin");
+        if (legacy) {
+          posCashierStorage.clear();
+          setActiveCashier(null);
+          setPinLocked(true);
+          setPinEntry("");
+          setPinError(false);
+        } else setPinLocked(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [posOpen]);
 
   React.useEffect(() => { if (activeNav !== "returns") { setReturnStep("search"); setReturnQuery(""); setReturnSearchRes([]); setReturnSale(null); setReturnItems(new Map()); setReturnReason(""); setReturnNotes(""); setReturnRestock(true); setReturnResult(null); setReturnType("RETURN"); setExchangeItems(new Map()); setExchangeSearch(""); } }, [activeNav]);
@@ -1074,17 +1119,47 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
-  const handlePinEntry = React.useCallback((digit: string) => {
-    if (digit === "DEL") { setPinEntry(p => p.slice(0,-1)); setPinError(false); return; }
+  const handlePinEntry = React.useCallback(async (digit: string) => {
+    if (pinBusy) return;
+    if (digit === "DEL") { setPinEntry(p => p.slice(0, -1)); setPinError(false); return; }
     const next = pinEntry + digit;
     if (next.length > 4) return;
     setPinEntry(next);
-    if (next.length === 4) {
-      const stored = localStorage.getItem("pos_pin");
-      if (next === stored) { setPinLocked(false); setPinEntry(""); setPinError(false); }
-      else { setPinError(true); setPinEntry(""); }
+    if (next.length !== 4) return;
+
+    setPinBusy(true);
+    try {
+      const res = await api.post<{
+        unlockToken: string;
+        cashier: PosActiveCashier;
+        shiftReady?: boolean;
+      }>("/pos/pin/unlock", { pin: next });
+      const data = res.data;
+      posCashierStorage.set(data.unlockToken, data.cashier);
+      setActiveCashier(data.cashier);
+      setPinLocked(false);
+      setPinEntry("");
+      setPinError(false);
+      if (data.shiftReady) setShiftReady(true);
+      toast.success(`Cashier: ${data.cashier.name}`);
+      void loadTodayStats();
+    } catch (e: unknown) {
+      setPinError(true);
+      setPinEntry("");
+      toast.error((e as Error).message || "Incorrect PIN");
+    } finally {
+      setPinBusy(false);
     }
-  }, [pinEntry]);
+  }, [pinEntry, pinBusy, loadTodayStats]);
+
+  /** Lock POS for cashier switch — clear unlock token so API stops attributing to previous cashier. */
+  const lockCashier = React.useCallback(() => {
+    posCashierStorage.clear();
+    setActiveCashier(null);
+    setPinLocked(true);
+    setPinEntry("");
+    setPinError(false);
+  }, []);
 
 
 
@@ -1136,7 +1211,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const buildReceiptHtml = React.useCallback((r: SaleReceipt): string => {
     const s: ReceiptSettings = receiptSettings;
     const pw = s.paperWidth==="58mm"?"58mm":"80mm";
-    const fs = s.fontSize==="small"?"11px":s.fontSize==="large"?"14px":"12px";
     const rows=r.items.map(i=>{
       const listUnit=i.listUnit??(i.qty>0?i.price/i.qty:0);
       const disc=i.discount??0;
@@ -1147,7 +1221,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const addr=[s.address1,s.address2].filter(Boolean).map(a=>`<sub>${a}</sub>`).join("");
     const contactHtml=[s.phone&&`<sub>${s.phone}</sub>`,s.email&&`<sub>${s.email}</sub>`,s.website&&`<sub>${s.website}</sub>`].filter(Boolean).join("");
     const headerMsg=s.headerText?`<sub style="font-style:italic">${s.headerText}</sub>`:"";
-    const cashierHtml=s.showCashier?`<div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div>`:"";
+    const cashierHtml=s.showCashier?`<div class="row"><span>Cashier:</span><span>${activeCashier?.name ?? user?.name??"Admin"}</span></div>`:"";
     const customerHtml=(s.showCustomer&&r.customerName)?`<div class="row"><span>Customer:</span><span>${r.customerName}</span></div>`:"";
     const discountHtml=r.discount>0?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:"";
     const taxHtml=(s.showTax&&r.tax>0)?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:"";
@@ -1155,23 +1229,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const savingsHtml=savingsAmt>0?`<div class="save"><span>You saved</span><span>LKR ${savingsAmt.toFixed(2)}</span></div>`:"";
     // Always print scannable invoice barcode (Code128) on sale receipts
     const barcodeHtml=receiptInvoiceBarcodeHtml(r.invoiceNumber, pw==="58mm"?"58mm":"80mm");
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{background:#ffffff!important;color:#000000!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'Courier New',monospace;font-size:${fs};padding:6mm;max-width:${pw};margin:0 auto}
-h1{font-size:1.4em;font-weight:900;text-align:center;color:#000}
-sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#000}
-.d{border:none;border-top:1px dashed #000;margin:5px 0}
-.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em;color:#000}
-.iname{font-size:0.9em;font-weight:bold;margin-top:4px;color:#000}
-.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px;color:#000}
-.save{display:flex;justify-content:space-between;margin:6px 0 2px;font-size:0.95em;font-weight:900;color:#000;border:1px dashed #000;padding:4px 6px}
-.bc{text-align:center;margin:8px 0 4px;padding:2px 0}
-.bc svg{max-width:100%;height:auto;display:inline-block}
-.foot{text-align:center;margin-top:8px;font-size:0.8em;line-height:1.6;color:#000}
-@media print{@page{margin:0;size:${pw} auto}html,body{background:#fff!important;color:#000!important}body{padding:3mm}}
-</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
-  },[user, receiptSettings]);
+    const css = receiptThemeStyleBlock({
+      paperWidth: pw,
+      fontSize: s.fontSize,
+      theme: s.receiptTheme,
+    });
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>${css}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
+  },[user, activeCashier, receiptSettings]);
 
   const reprintSale = React.useCallback(async (saleId: string) => {
     setReprintingId(saleId);
@@ -1435,14 +1499,32 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     const s = receiptSettings;
     const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
     const rows = items.map(i => `<div class="iname">${receiptItemName(i.productName, i.variantName)}</div><div class="row"><span>${i.quantity} x LKR ${i.unitPrice.toFixed(2)}</span><span>LKR ${(i.quantity*i.unitPrice).toFixed(2)}</span></div>`).join("");
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:${pw};margin:0 auto}h1{font-size:1.4em;font-weight:900;text-align:center}sub{font-size:0.85em;display:block;text-align:center}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0;font-size:0.9em}.iname{font-size:0.9em;font-weight:bold;margin-top:4px}.tot{display:flex;justify-content:space-between;font-size:1.15em;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.foot{text-align:center;margin-top:10px;font-size:0.8em}@media print{@page{margin:0;size:${pw} auto}body{padding:3mm}}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
+    const css = receiptThemeStyleBlock({
+      paperWidth: pw,
+      fontSize: s.fontSize,
+      theme: s.receiptTheme,
+    });
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>${css}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${activeCashier?.name ?? user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
     try {
       await executeReceiptPrint({ html, printType: "PRE_BILL", settings: s, title: "Pre-Bill" });
       void refreshPrinterStatus();
     } catch (e) {
       toast.error((e as Error).message ?? "Print failed");
     }
-  }, [items, totalAmt, receiptSettings, user, refreshPrinterStatus]);
+  }, [items, totalAmt, receiptSettings, user, activeCashier, refreshPrinterStatus]);
+
+  const setReceiptTheme = React.useCallback(async (theme: "light" | "dark") => {
+    const next = { ...receiptSettings, receiptTheme: theme };
+    try { localStorage.setItem("receipt_settings_cache", JSON.stringify(next)); } catch { /* noop */ }
+    notifyReceiptSettingsUpdated();
+    try {
+      await api.put("/tenants/receipt-settings", next);
+      toast.success(theme === "dark" ? "Receipt: Dark" : "Receipt: Light");
+    } catch {
+      // Local theme still applies for this terminal (admin save may be required for others)
+      toast.success(theme === "dark" ? "Receipt: Dark (this terminal)" : "Receipt: Light (this terminal)");
+    }
+  }, [receiptSettings]);
 
   const loadCustomerInsight = React.useCallback(async (customerId: string) => {
     if (!customerId) { setCustomerInsight(null); setPreviewCustomerId(null); return; }
@@ -1658,6 +1740,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     setPinLocked,
     setPinEntry,
     setPinError,
+    lockCashier,
     closePos,
     handlePinEntry,
     scanAndAddProduct,
@@ -1704,7 +1787,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
-    closePos, handlePinEntry, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
+    closePos, handlePinEntry, lockCashier, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
@@ -1837,6 +1920,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
       return (
         <PosQuickExpensePanel
           onBack={() => setActiveNav("products")}
+          onSaved={() => void loadTodayStats()}
         />
       );
     }
@@ -2515,7 +2599,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 
     // SETTINGS PANEL
     if (activeNav === "settings") {
-      const pinIsSet = typeof window !== "undefined" && !!localStorage.getItem("pos_pin");
+      const pinIsSet = hasServerPin;
       const applyPosTax = (raw: number) => {
         const v = Math.min(100, Math.max(0, raw));
         setTaxRate(v);
@@ -2543,6 +2627,35 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 </button>
               </div>
             ))}
+          </div>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
+            <h3 className="text-white font-bold text-base mb-1">Thermal receipt theme</h3>
+            <p className="text-[11px]" style={{color:"#6a8ab8"}}>
+              Light = black on white (real thermal printers). Dark = white on navy (digital / browser print).
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: "light" as const, label: "Light" },
+                { value: "dark" as const, label: "Dark" },
+              ]).map((opt) => {
+                const active = (receiptSettings.receiptTheme ?? "light") === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => void setReceiptTheme(opt.value)}
+                    className="h-10 rounded-xl text-sm font-bold transition-all"
+                    style={{
+                      background: active ? (opt.value === "dark" ? "#0f172a" : "#fff") : "#1a2b4a",
+                      color: active ? (opt.value === "dark" ? "#f8fafc" : "#0f172a") : "#6a8ab8",
+                      border: active ? "2px solid #4f6ef7" : "1px solid #1e3356",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           {/* Inventory admin */}
           <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
@@ -2607,13 +2720,17 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"#1a2b4a",color:taxRate===v?"#fff":"#6a8ab8"}}>{v===0?"Off":`${v}%`}</button>))}</div>
             </div>
           </div>
-          {/* PIN Security */}
+          {/* PIN Security — per-user, switch cashiers without re-login */}
           <div className="rounded-2xl border p-5 space-y-4" style={{background:"#162338",borderColor:"#1e3356"}}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Lock className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
               <div>
-                <h3 className="text-white font-bold text-base">Screen Lock PIN</h3>
-                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>{pinIsSet?"PIN is active — POS requires PIN on every open":"No PIN set — POS opens freely"}</p>
+                <h3 className="text-white font-bold text-base">Your cashier PIN</h3>
+                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>
+                  {pinIsSet
+                    ? "Each cashier sets their own 4-digit PIN. Lock (F12) → next cashier enters their PIN → bills go to them."
+                    : "Set a 4-digit PIN so you can unlock POS and take over sales without logging in again."}
+                </p>
               </div>
               {pinIsSet&&<span className="ml-auto text-xs font-bold px-3 py-1 rounded-full" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active</span>}
             </div>
@@ -2627,10 +2744,53 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                 <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={()=>{if(settingNewPin.length!==4){toast.error("PIN must be 4 digits");return;}if(settingNewPin!==settingConfirmPin){toast.error("PINs do not match");return;}localStorage.setItem("pos_pin",settingNewPin);setSettingNewPin("");setSettingConfirmPin("");toast.success("PIN saved — screen will lock on next open");}} className="px-5 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>{pinIsSet?"Update PIN":"Save PIN"}</button>
-              {pinIsSet&&<button onClick={()=>{localStorage.removeItem("pos_pin");setSettingNewPin("");setSettingConfirmPin("");toast.success("PIN removed");}} className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#ef4444",color:"#ef4444"}}>Remove PIN</button>}
-              {pinIsSet&&<button onClick={()=>{setPinLocked(true);setPinEntry("");setPinError(false);}} className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10 ml-auto" style={{borderColor:"#1e3356",color:"#6a8ab8"}}><Lock className="h-3.5 w-3.5 inline mr-1.5"/>Lock Now</button>}
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={async () => {
+                  if (settingNewPin.length !== 4) { toast.error("PIN must be 4 digits"); return; }
+                  if (settingNewPin !== settingConfirmPin) { toast.error("PINs do not match"); return; }
+                  try {
+                    await api.post("/pos/pin/set", { pin: settingNewPin });
+                    localStorage.removeItem("pos_pin");
+                    setHasServerPin(true);
+                    setSettingNewPin("");
+                    setSettingConfirmPin("");
+                    toast.success("PIN saved — lock with F12; other cashiers unlock with their own PIN");
+                  } catch (e: unknown) {
+                    toast.error((e as Error).message || "Failed to save PIN");
+                  }
+                }}
+                className="px-5 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                style={{background:"#4f6ef7"}}
+              >
+                {pinIsSet ? "Update PIN" : "Save PIN"}
+              </button>
+              {pinIsSet && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await api.delete("/pos/pin");
+                      setHasServerPin(false);
+                      setSettingNewPin("");
+                      setSettingConfirmPin("");
+                      toast.success("PIN removed");
+                    } catch (e: unknown) {
+                      toast.error((e as Error).message || "Failed to remove PIN");
+                    }
+                  }}
+                  className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10"
+                  style={{borderColor:"#ef4444",color:"#ef4444"}}
+                >
+                  Remove PIN
+                </button>
+              )}
+              <button
+                onClick={lockCashier}
+                className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10 ml-auto"
+                style={{borderColor:"#1e3356",color:"#6a8ab8"}}
+              >
+                <Lock className="h-3.5 w-3.5 inline mr-1.5"/>Lock / Switch
+              </button>
             </div>
           </div>
           {/* Quick links */}
@@ -2724,8 +2884,10 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"#0d1b2e"}}>
             <div className="flex flex-col items-center gap-2">
               <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
-              <h2 className="text-white font-bold text-2xl">POS Terminal</h2>
-              <p className="text-sm" style={{color:"#6a8ab8"}}>Enter your PIN to unlock</p>
+              <h2 className="text-white font-bold text-2xl">Switch cashier</h2>
+              <p className="text-sm text-center max-w-xs" style={{color:"#6a8ab8"}}>
+                Enter your 4-digit PIN — bills will be assigned to you (no re-login)
+              </p>
             </div>
             <div className="flex gap-4 mb-2">
               {[0,1,2,3].map(i=>(
@@ -2733,15 +2895,16 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               ))}
             </div>
             {pinError&&<p className="text-sm font-semibold -mt-4" style={{color:"#ef4444"}}>Incorrect PIN. Try again.</p>}
+            {pinBusy&&<Loader2 className="h-5 w-5 animate-spin -mt-2" style={{color:"#4f6ef7"}}/>}
             <div className="grid gap-3" style={{gridTemplateColumns:"repeat(3,80px)"}}>
               {[1,2,3,4,5,6,7,8,9].map(n=>(
-                <button key={n} onClick={()=>handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>{n}</button>
+                <button key={n} disabled={pinBusy} onClick={()=>void handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356"}}>{n}</button>
               ))}
-              <button onClick={()=>handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center" style={{background:"#162338",border:"1px solid #1e3356",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
-              <button onClick={()=>handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10" style={{background:"#162338",border:"1px solid #1e3356"}}>0</button>
+              <button disabled={pinBusy} onClick={()=>void handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
+              <button disabled={pinBusy} onClick={()=>void handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356"}}>0</button>
               <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>Exit</button>
             </div>
-            <p className="text-xs" style={{color:"#2a3a5c"}}>Logged in as {user?.name??"Admin"}</p>
+            <p className="text-xs" style={{color:"#2a3a5c"}}>Terminal login: {user?.name??"Admin"}</p>
           </div>
         )}
 
@@ -2767,6 +2930,25 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
             ))}
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
+            {(() => {
+              const isDarkReceipt = (receiptSettings.receiptTheme ?? "light") === "dark";
+              return (
+                <button
+                  type="button"
+                  onClick={() => void setReceiptTheme(isDarkReceipt ? "light" : "dark")}
+                  title={isDarkReceipt ? "Switch receipt to Light (thermal)" : "Switch receipt to Dark"}
+                  className="flex items-center gap-1.5 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
+                  style={{
+                    background: isDarkReceipt ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.92)",
+                    color: isDarkReceipt ? "#f8fafc" : "#0f172a",
+                    border: isDarkReceipt ? "1px solid #475569" : "1px solid #e2e8f0",
+                  }}
+                >
+                  {isDarkReceipt ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+                  {isDarkReceipt ? "Dark" : "Light"}
+                </button>
+              );
+            })()}
             <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}><span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"/>Online</div>
             <button type="button" onClick={() => !posOnly && setActiveNav("settings")} title={taxRate > 0 ? `Tax ${taxRate}% from POS settings` : "Tax disabled in POS settings"} className={cn("flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold", !posOnly && "hover:opacity-90")} style={{background:taxRate>0?"rgba(79,110,247,0.15)":"rgba(107,114,128,0.15)",color:taxRate>0?"#93c5fd":"#9ca3af"}}>
               <Receipt className="h-3.5 w-3.5"/>
@@ -2785,8 +2967,13 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
             </a>
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
-              <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{user?.name?.[0]??"A"}</div>
-              <div><p className="text-white text-xs font-semibold leading-tight">{user?.name??"Admin"}</p><p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>{formatUserRole(user?.role)}</p></div>
+              <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{(activeCashier?.name ?? user?.name)?.[0]??"A"}</div>
+              <div>
+                <p className="text-white text-xs font-semibold leading-tight">{activeCashier?.name ?? user?.name ?? "Admin"}</p>
+                <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>
+                  {activeCashier ? "Active cashier" : formatUserRole(user?.role)}
+                </p>
+              </div>
             </div>
           </div>
         </div>
@@ -2860,7 +3047,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
               <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <p className="text-white/70 text-[10px] mt-1"> {todayStats.orders} Orders  {todayStats.items} Items</p>
             </div>
-            <button onClick={()=>{const st=localStorage.getItem("pos_pin");if(st){setPinLocked(true);setPinEntry("");setPinError(false);}else closePos();}} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"#6a8ab8"}}>
+            <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"#6a8ab8"}}>
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
             </button>
           </div>
@@ -3324,12 +3511,22 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
 
         {/* BOTTOM BAR */}
         <div className="flex items-center gap-5 px-5 h-14 border-t shrink-0" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-          {[{label:"Today Sales",value:`LKR ${formatNumber(todayStats.sales)}`,color:"#4f6ef7"},{label:"Orders",value:String(todayStats.orders)},{label:"Items Sold",value:String(todayStats.items)},{label:"Avg. Bill",value:todayStats.orders>0?`LKR ${formatNumber(todayStats.sales/todayStats.orders)}`:"LKR 0.00"}].map(s=>(
+          {[{label:"Shift Sales",value:`LKR ${formatNumber(todayStats.sales)}`,color:"#4f6ef7"},{label:"Orders",value:String(todayStats.orders)},{label:"Items Sold",value:String(todayStats.items)},{label:"Avg. Bill",value:todayStats.orders>0?`LKR ${formatNumber(todayStats.sales/todayStats.orders)}`:"LKR 0.00"}].map(s=>(
             <div key={s.label} className="flex items-center gap-2 shrink-0">
               <span className="text-xs font-medium" style={{color:"#4a6a8a"}}>{s.label}</span>
               <span className="text-sm font-bold" style={{color:s.color||"#fff"}}>{s.value}</span>
             </div>
           ))}
+          {drawerCash != null && (
+            <>
+              <div className="h-4 w-px shrink-0" style={{ background: "#1e3356" }} />
+              <div className="flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                <Banknote className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
+                <span className="text-xs font-medium" style={{ color: "#6ee7b7" }}>In drawer</span>
+                <span className="text-sm font-bold tabular-nums" style={{ color: "#10b981" }}>LKR {formatNumber(drawerCash)}</span>
+              </div>
+            </>
+          )}
           <div className="flex-1"/>
           {(() => {
             const scannerActive = isScannerActive(lastScanAt, scanFlash, now);

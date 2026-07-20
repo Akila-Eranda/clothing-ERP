@@ -94,6 +94,7 @@ export interface PosKeyboardContext {
   setPinLocked: React.Dispatch<React.SetStateAction<boolean>>;
   setPinEntry: React.Dispatch<React.SetStateAction<string>>;
   setPinError: React.Dispatch<React.SetStateAction<boolean>>;
+  lockCashier: () => void;
   closePos: () => void;
   handlePinEntry: (key: string) => void;
   scanAndAddProduct: (code: string) => Promise<void>;
@@ -367,9 +368,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (e.key === "F11") { e.preventDefault(); return; }
       if (e.key === "F12") {
         e.preventDefault();
-        const st = localStorage.getItem("pos_pin");
-        if (st) { ctx.setPinLocked(true); ctx.setPinEntry(""); ctx.setPinError(false); }
-        else ctx.closePos();
+        // Always lock for cashier switch — clear token so next PIN owns the session
+        ctx.lockCashier();
         return;
       }
 

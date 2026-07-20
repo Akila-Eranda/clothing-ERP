@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
@@ -21,8 +21,15 @@ import { assertCreditAvailable } from '@/modules/customers/customer-credit.helpe
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
 import { nanoid } from 'nanoid';
-import { recordSaleCashMovement, findOpenRegister, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
+import { recordSaleCashMovement, findOpenRegister, findAnyOpenRegisterOnBranch, summarizeMovements, computeExpectedCashFromMovements, netCashFromSalePayments } from '@/shared/cash-register.helper';
 import { canViewAllPosSales } from '@/shared/pos-sales-scope.helper';
+import {
+  assertValidPosPin,
+  hashPosPin,
+  resolveActingCashierId,
+  signPosUnlockToken,
+  verifyPosPinHash,
+} from './pos-pin.helper';
 import * as dayjs from 'dayjs';
 
 export class ReturnItemDto {
@@ -85,6 +92,14 @@ export class IssueGiftVoucherDto {
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }
 
+export class SetPosPinDto {
+  @ApiProperty({ example: '1234' }) @IsString() pin: string;
+}
+
+export class UnlockPosPinDto {
+  @ApiProperty({ example: '1234' }) @IsString() pin: string;
+}
+
 export class HoldBillDto {
   @ApiPropertyOptional() @IsOptional() @IsString() label?: string;
   @ApiProperty() @IsObject() data: Record<string, unknown>;
@@ -109,7 +124,10 @@ export class PosService {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
 
-    const openRegister = await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
+    let openRegister = await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
+    if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
+      openRegister = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId);
+    }
     if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
       throw new BadRequestException(
         'Open your cash shift before selling (POS → enter opening cash)',
@@ -585,6 +603,15 @@ export class PosService {
     const page  = parseInt(String(query.page  ?? 1),  10);
     const limit = parseInt(String(query.limit ?? 20), 10);
     const skip = (page - 1) * limit;
+    const targetDate = query.date ? dayjs(query.date) : dayjs();
+    const register = await this.resolveCashShiftRegister(
+      tenantId,
+      resolvedBranchId,
+      targetDate,
+      opts,
+    );
+    const { start: rangeStart, end: rangeEnd } = this.shiftDateRange(register, targetDate);
+
     const where = {
       tenantId,
       branchId: resolvedBranchId,
@@ -595,12 +622,9 @@ export class PosService {
           { customer: { phone: { contains: query.search } } },
         ],
       }),
-      ...(query.date && {
-        invoiceDate: {
-          gte: dayjs(query.date).startOf('day').toDate(),
-          lte: dayjs(query.date).endOf('day').toDate(),
-        },
-      }),
+      ...(query.date || register
+        ? { invoiceDate: { gte: rangeStart, lte: rangeEnd } }
+        : {}),
     };
 
     const [data, total] = await this.prisma.$transaction([
@@ -685,6 +709,74 @@ export class PosService {
     return this.prisma.heldBill.delete({ where: { id } });
   }
 
+  /** Cash shift for cashier (open first, else latest closed on that calendar day). */
+  private async resolveCashShiftRegister(
+    tenantId: string,
+    branchId: string,
+    targetDate: dayjs.Dayjs,
+    opts?: { cashierId?: string; scopeAll?: boolean },
+  ) {
+    const dayStart = targetDate.startOf('day').toDate();
+    const dayEnd = targetDate.endOf('day').toDate();
+    const include = { movements: { orderBy: { createdAt: 'asc' as const } } };
+
+    if (opts?.cashierId && !opts?.scopeAll) {
+      const open = await findOpenRegister(this.prisma, tenantId, branchId, opts.cashierId);
+      if (open && dayjs(open.openingTime).isSame(targetDate, 'day')) return open;
+      // PIN switch: use shared terminal float opened by another cashier
+      const shared = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId);
+      if (shared && dayjs(shared.openingTime).isSame(targetDate, 'day')) return shared;
+      return this.prisma.cashRegister.findFirst({
+        where: {
+          tenantId,
+          branchId,
+          cashierId: opts.cashierId,
+          openingTime: { gte: dayStart, lte: dayEnd },
+        },
+        orderBy: { openingTime: 'desc' },
+        include,
+      });
+    }
+
+    const openAny = await this.prisma.cashRegister.findFirst({
+      where: {
+        tenantId,
+        branchId,
+        status: CashRegisterStatus.OPEN,
+        openingTime: { gte: dayStart, lte: dayEnd },
+      },
+      orderBy: { openingTime: 'desc' },
+      include,
+    });
+    if (openAny) return openAny;
+
+    return this.prisma.cashRegister.findFirst({
+      where: {
+        tenantId,
+        branchId,
+        openingTime: { gte: dayStart, lte: dayEnd },
+      },
+      orderBy: { openingTime: 'desc' },
+      include,
+    });
+  }
+
+  private shiftDateRange(
+    register: { openingTime: Date; closingTime: Date | null; status: CashRegisterStatus } | null,
+    targetDate: dayjs.Dayjs,
+  ) {
+    const dayStart = targetDate.startOf('day').toDate();
+    const dayEnd = targetDate.endOf('day').toDate();
+    if (!register) return { start: dayStart, end: dayEnd, scoped: false as const };
+    return {
+      start: register.openingTime,
+      end:
+        register.closingTime
+        ?? (register.status === CashRegisterStatus.OPEN ? new Date() : dayEnd),
+      scoped: true as const,
+    };
+  }
+
   async getDailySummary(
     tenantId: string,
     branchId: string,
@@ -693,17 +785,26 @@ export class PosService {
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const targetDate = date ? dayjs(date) : dayjs();
-    const dayStart = targetDate.startOf('day').toDate();
-    const dayEnd = targetDate.endOf('day').toDate();
+    const register = await this.resolveCashShiftRegister(
+      tenantId,
+      resolvedBranchId,
+      targetDate,
+      opts,
+    );
+    const { start: rangeStart, end: rangeEnd, scoped: shiftScoped } = this.shiftDateRange(
+      register,
+      targetDate,
+    );
+
     const where = {
       tenantId,
       branchId: resolvedBranchId,
       status: SaleStatus.COMPLETED,
       ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-      invoiceDate: { gte: dayStart, lte: dayEnd },
+      invoiceDate: { gte: rangeStart, lte: rangeEnd },
     };
 
-    const [sales, totals, itemTotals, expenseRows, supplierPays, register] = await Promise.all([
+    const [sales, totals, itemTotals, expenseRows, supplierPays] = await Promise.all([
       this.prisma.sale.findMany({ where, include: { payments: true } }),
       this.prisma.sale.aggregate({
         where,
@@ -717,7 +818,7 @@ export class PosService {
             branchId: resolvedBranchId,
             status: SaleStatus.COMPLETED,
             ...(!opts?.scopeAll && opts?.cashierId ? { cashierId: opts.cashierId } : {}),
-            invoiceDate: { gte: dayStart, lte: dayEnd },
+            invoiceDate: { gte: rangeStart, lte: rangeEnd },
           },
         },
         _sum: { quantity: true },
@@ -725,7 +826,7 @@ export class PosService {
       this.prisma.expense.findMany({
         where: {
           tenantId,
-          date: { gte: dayStart, lte: dayEnd },
+          date: { gte: rangeStart, lte: rangeEnd },
           OR: [{ branchId: resolvedBranchId }, { branchId: null }],
         },
         select: { amount: true, paymentMethod: true },
@@ -733,35 +834,10 @@ export class PosService {
       this.prisma.supplierPayment.findMany({
         where: {
           tenantId,
-          paidAt: { gte: dayStart, lte: dayEnd },
+          paidAt: { gte: rangeStart, lte: rangeEnd },
         },
         select: { amount: true, method: true },
       }),
-      (async () => {
-        if (opts?.cashierId) {
-          const open = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, opts.cashierId);
-          if (open) return open;
-          return this.prisma.cashRegister.findFirst({
-            where: {
-              tenantId,
-              branchId: resolvedBranchId,
-              cashierId: opts.cashierId,
-              openingTime: { gte: dayStart, lte: dayEnd },
-            },
-            orderBy: { openingTime: 'desc' },
-            include: { movements: { orderBy: { createdAt: 'asc' } } },
-          });
-        }
-        return this.prisma.cashRegister.findFirst({
-          where: {
-            tenantId,
-            branchId: resolvedBranchId,
-            openingTime: { gte: dayStart, lte: dayEnd },
-          },
-          orderBy: { openingTime: 'desc' },
-          include: { movements: { orderBy: { createdAt: 'asc' } } },
-        });
-      })(),
     ]);
 
     const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
@@ -779,29 +855,33 @@ export class PosService {
 
     const income = Math.round((totals._sum.total ?? 0) * 100) / 100;
     const expenses = Math.round(expenseRows.reduce((s, e) => s + e.amount, 0) * 100) / 100;
-    const cashExpenses = Math.round(
+    const cashExpensesFromDb = Math.round(
       expenseRows.filter((e) => e.paymentMethod === PaymentMethod.CASH).reduce((s, e) => s + e.amount, 0) * 100,
     ) / 100;
     const supplierPayments = Math.round(
       supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
     ) / 100;
-    const cashSupplierPayments = Math.round(
+    const cashSupplierPaymentsFromDb = Math.round(
       supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
     ) / 100;
 
     const movementSummary = register ? summarizeMovements(register.movements) : null;
     const openingBalance = register?.openingCash ?? 0;
     const registerCashSales = movementSummary?.cashSales ?? cashSalesNet;
-    const movementCashOut = movementSummary?.cashExpenses ?? 0;
+    const registerCashOut = movementSummary?.cashExpenses ?? 0;
     const refunds = movementSummary?.cashRefunds ?? 0;
 
-    // Prefer register movements for drawer; always subtract supplier cash AP (not always in movements).
-    const cashOutTotal = Math.round((Math.max(movementCashOut, cashExpenses) + cashSupplierPayments) * 100) / 100;
+    // Drawer truth = register movements (includes supplier cash via recordSupplierCashOutflow).
+    const cashExpenses = register ? Math.round(registerCashOut * 100) / 100 : cashExpensesFromDb;
+    const cashSupplierPayments = register
+      ? Math.max(0, Math.round((registerCashOut - cashExpensesFromDb) * 100) / 100)
+      : cashSupplierPaymentsFromDb;
+    const cashOutTotal = register
+      ? Math.round(registerCashOut * 100) / 100
+      : Math.round((cashExpensesFromDb + cashSupplierPaymentsFromDb) * 100) / 100;
     const expectedInDrawer = register
-      ? Math.round(
-          (computeExpectedCashFromMovements(register.openingCash, register.movements) - cashSupplierPayments) * 100,
-        ) / 100
-      : Math.round((openingBalance + cashSalesNet - cashExpenses - cashSupplierPayments - refunds) * 100) / 100;
+      ? Math.round(computeExpectedCashFromMovements(register.openingCash, register.movements) * 100) / 100
+      : Math.round((openingBalance + cashSalesNet - cashExpensesFromDb - cashSupplierPaymentsFromDb - refunds) * 100) / 100;
 
     return {
       date: targetDate.format('YYYY-MM-DD'),
@@ -811,18 +891,23 @@ export class PosService {
       totalDiscount: totals._sum.discountAmount ?? 0,
       totalItems: itemTotals._sum.quantity ?? 0,
       byPaymentMethod,
-      /** Day opening float (cash register) */
       openingBalance,
-      /** Day's income (sales) */
       income,
-      /** Operating expenses (shop OpEx) */
       expenses,
       cashExpenses,
-      /** Supplier AP payments — cash-out, not OpEx */
       supplierPayments,
       cashSupplierPayments,
-      /** income − expenses (supplier payments excluded from P&L) */
       netIncome: Math.round((income - expenses) * 100) / 100,
+      shift: register
+        ? {
+            id: register.id,
+            scoped: shiftScoped,
+            status: register.status,
+            openingTime: register.openingTime,
+            closingTime: register.closingTime,
+            shiftOpen: register.status === CashRegisterStatus.OPEN,
+          }
+        : null,
       cash: {
         openingFloat: openingBalance,
         cashSalesNet: register ? registerCashSales : cashSalesNet,
@@ -1403,37 +1488,6 @@ export class PosService {
     const now = dayjs();
     const todayStart = now.startOf('day').toDate();
     const todayEnd = now.endOf('day').toDate();
-    const where = {
-      tenantId,
-      branchId: resolvedBranchId,
-      cashierId,
-      status: SaleStatus.COMPLETED,
-      invoiceDate: { gte: todayStart, lte: todayEnd },
-    };
-
-    const [sales, totals, supplierPays, expenseRows] = await Promise.all([
-      this.prisma.sale.findMany({ where, include: { payments: true } }),
-      this.prisma.sale.aggregate({
-        where,
-        _sum: { total: true, taxAmount: true, discountAmount: true },
-        _count: { id: true },
-      }),
-      this.prisma.supplierPayment.findMany({
-        where: {
-          tenantId,
-          paidAt: { gte: todayStart, lte: todayEnd },
-        },
-        select: { amount: true, method: true },
-      }),
-      this.prisma.expense.findMany({
-        where: {
-          tenantId,
-          date: { gte: todayStart, lte: todayEnd },
-          OR: [{ branchId: resolvedBranchId }, { branchId: null }],
-        },
-        select: { amount: true, paymentMethod: true },
-      }),
-    ]);
 
     let register = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
     if (!register) {
@@ -1452,6 +1506,41 @@ export class PosService {
         },
       });
     }
+
+    const shiftStart = register?.openingTime ?? todayStart;
+    const shiftEnd = now.toDate();
+
+    const where = {
+      tenantId,
+      branchId: resolvedBranchId,
+      cashierId,
+      status: SaleStatus.COMPLETED,
+      invoiceDate: { gte: shiftStart, lte: shiftEnd },
+    };
+
+    const [sales, totals, supplierPays, expenseRows] = await Promise.all([
+      this.prisma.sale.findMany({ where, include: { payments: true } }),
+      this.prisma.sale.aggregate({
+        where,
+        _sum: { total: true, taxAmount: true, discountAmount: true },
+        _count: { id: true },
+      }),
+      this.prisma.supplierPayment.findMany({
+        where: {
+          tenantId,
+          paidAt: { gte: shiftStart, lte: shiftEnd },
+        },
+        select: { amount: true, method: true },
+      }),
+      this.prisma.expense.findMany({
+        where: {
+          tenantId,
+          date: { gte: shiftStart, lte: shiftEnd },
+          OR: [{ branchId: resolvedBranchId }, { branchId: null }],
+        },
+        select: { amount: true, paymentMethod: true },
+      }),
+    ]);
 
     const byPaymentMethod = sales.reduce((acc: Record<string, number>, sale) => {
       for (const payment of sale.payments) {
@@ -1484,13 +1573,14 @@ export class PosService {
     const supplierPaymentsTotal = Math.round(
       supplierPays.reduce((s, p) => s + p.amount, 0) * 100,
     ) / 100;
-    const cashSupplierPayments = Math.round(
+    const cashSupplierPaymentsFromDb = Math.round(
       supplierPays.filter((p) => p.method === PaymentMethod.CASH).reduce((s, p) => s + p.amount, 0) * 100,
     ) / 100;
     const expensesTotal = Math.round(expenseRows.reduce((s, e) => s + e.amount, 0) * 100) / 100;
-    const cashExpenses = Math.round(
+    const cashExpensesFromDb = Math.round(
       expenseRows.filter((e) => e.paymentMethod === PaymentMethod.CASH).reduce((s, e) => s + e.amount, 0) * 100,
     ) / 100;
+    const registerCashOut = movementSummary?.cashExpenses ?? 0;
     const income = Math.round((totals._sum.total ?? 0) * 100) / 100;
 
     const cash = {
@@ -1500,16 +1590,16 @@ export class PosService {
       cashTendered,
       changeGiven,
       cashIn: movementSummary?.cashReceived ?? 0,
-      cashOut: Math.round(
-        ((movementSummary?.cashExpenses ?? cashExpenses) + cashSupplierPayments) * 100,
-      ) / 100,
-      cashExpenses,
-      cashSupplierPayments,
+      cashOut: register
+        ? Math.round(registerCashOut * 100) / 100
+        : Math.round((cashExpensesFromDb + cashSupplierPaymentsFromDb) * 100) / 100,
+      cashExpenses: register ? Math.round(registerCashOut * 100) / 100 : cashExpensesFromDb,
+      cashSupplierPayments: register
+        ? Math.max(0, Math.round((registerCashOut - cashExpensesFromDb) * 100) / 100)
+        : cashSupplierPaymentsFromDb,
       refunds: movementSummary?.cashRefunds ?? 0,
       expectedInDrawer: register
-        ? Math.round(
-            (computeExpectedCashFromMovements(register.openingCash, register.movements) - cashSupplierPayments) * 100,
-          ) / 100
+        ? Math.round(computeExpectedCashFromMovements(register.openingCash, register.movements) * 100) / 100
         : null,
     };
 
@@ -1524,13 +1614,20 @@ export class PosService {
       totalDiscount: totals._sum.discountAmount ?? 0,
       byPaymentMethod,
       cash,
+      shift: register
+        ? {
+            id: register.id,
+            openingTime: register.openingTime,
+            closingTime: register.closingTime,
+            shiftOpen: register.status === CashRegisterStatus.OPEN,
+          }
+        : null,
       openingBalance: register?.openingCash ?? 0,
       income,
       expenses: expensesTotal,
       netIncome: Math.round((income - expensesTotal) * 100) / 100,
-      /** AP settlements — cash-out, not operating expense */
       supplierPayments: supplierPaymentsTotal,
-      cashSupplierPayments,
+      cashSupplierPayments: cash.cashSupplierPayments,
     };
     this.eventEmitter.emit('pos.day.closed', { tenantId, branchId: resolvedBranchId, ...summary });
     return summary;
@@ -1677,6 +1774,117 @@ export class PosService {
       cashRegisterId: register?.id ?? null,
     };
   }
+
+  // ── POS cashier PIN (switch without re-login) ─────────────────────────
+
+  async getPosPinStatus(tenantId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, tenantId },
+      select: { id: true, posPinHash: true, firstName: true, lastName: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return {
+      hasPin: !!user.posPinHash,
+      userId: user.id,
+      name: `${user.firstName} ${user.lastName}`.trim(),
+    };
+  }
+
+  async setPosPin(tenantId: string, userId: string, pin: string) {
+    assertValidPosPin(pin);
+    const users = await this.prisma.user.findMany({
+      where: { tenantId, posPinHash: { not: null }, NOT: { id: userId } },
+      select: { id: true, posPinHash: true, firstName: true, lastName: true },
+    });
+    for (const u of users) {
+      if (u.posPinHash && (await verifyPosPinHash(pin, u.posPinHash))) {
+        throw new BadRequestException(
+          `PIN already used by ${u.firstName} ${u.lastName}`.trim(),
+        );
+      }
+    }
+    const posPinHash = await hashPosPin(pin);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { posPinHash },
+    });
+    return { ok: true, hasPin: true };
+  }
+
+  async clearPosPin(tenantId: string, userId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id: userId, tenantId }, select: { id: true } });
+    if (!user) throw new NotFoundException('User not found');
+    await this.prisma.user.update({ where: { id: userId }, data: { posPinHash: null } });
+    return { ok: true, hasPin: false };
+  }
+
+  async unlockWithPosPin(tenantId: string, branchId: string, pin: string) {
+    assertValidPosPin(pin);
+    const candidates = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        status: 'ACTIVE',
+        posPinHash: { not: null },
+        ...(branchId
+          ? { OR: [{ branchId }, { branchId: null }] }
+          : {}),
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        posPinHash: true,
+        branchId: true,
+        roles: { include: { role: { select: { name: true, type: true } } } },
+      },
+      take: 200,
+    });
+
+    let matched: (typeof candidates)[number] | null = null;
+    for (const u of candidates) {
+      if (u.posPinHash && (await verifyPosPinHash(pin, u.posPinHash))) {
+        matched = u;
+        break;
+      }
+    }
+    if (!matched) throw new BadRequestException('Incorrect PIN');
+
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const ownRegister = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, matched.id);
+    const sharedRegister =
+      ownRegister?.status === CashRegisterStatus.OPEN
+        ? ownRegister
+        : await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+
+    const unlockToken = signPosUnlockToken(tenantId, matched.id);
+    const name = `${matched.firstName} ${matched.lastName}`.trim();
+    return {
+      unlockToken,
+      cashier: {
+        id: matched.id,
+        name,
+        firstName: matched.firstName,
+        lastName: matched.lastName,
+        email: matched.email,
+        role: matched.roles[0]?.role?.name ?? matched.roles[0]?.role?.type ?? null,
+      },
+      shift: sharedRegister
+        ? {
+            id: sharedRegister.id,
+            status: sharedRegister.status,
+            openingCash: sharedRegister.openingCash,
+            openingTime: sharedRegister.openingTime,
+            ownerId: sharedRegister.cashierId,
+            ownerName: sharedRegister.cashier
+              ? `${sharedRegister.cashier.firstName} ${sharedRegister.cashier.lastName}`.trim()
+              : null,
+            isOwn: sharedRegister.cashierId === matched.id,
+          }
+        : null,
+      shiftReady: !!sharedRegister && sharedRegister.status === CashRegisterStatus.OPEN,
+    };
+  }
 }
 
 @ApiTags('POS')
@@ -1685,20 +1893,37 @@ export class PosService {
 export class PosController {
   constructor(private readonly posService: PosService) {}
 
+  private actingCashier(user: IAuthUser, unlockToken?: string) {
+    return resolveActingCashierId(user.tenantId, user.id, unlockToken);
+  }
+
   @Post('sale')
   @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Process a POS sale transaction' })
-  createSale(@CurrentUser() user: IAuthUser, @Body() dto: CreateSaleDto) {
-    return this.posService.createSale(user.tenantId, user.branchId ?? '', user.id, dto);
+  createSale(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: CreateSaleDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    return this.posService.createSale(
+      user.tenantId,
+      user.branchId ?? '',
+      this.actingCashier(user, unlockToken),
+      dto,
+    );
   }
 
   @Get('sales')
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'List sales for branch (cashiers see own bills only)' })
-  getSales(@CurrentUser() user: IAuthUser, @Query() query: { page?: number; limit?: number; search?: string; date?: string }) {
+  getSales(
+    @CurrentUser() user: IAuthUser,
+    @Query() query: { page?: number; limit?: number; search?: string; date?: string },
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.posService.getSales(user.tenantId, user.branchId ?? '', query, {
-      cashierId: user.id,
+      cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
   }
@@ -1706,26 +1931,42 @@ export class PosController {
   @Get('sales/:id')
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Get sale details (cashiers: own sales only)' })
-  getSaleById(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+  getSaleById(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.posService.getSaleById(id, user.tenantId, {
-      cashierId: user.id,
+      cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
   }
 
   @Post('hold')
   @ApiOperation({ summary: 'Hold a bill for later' })
-  holdBill(@CurrentUser() user: IAuthUser, @Body() dto: HoldBillDto) {
-    return this.posService.holdBill(user.tenantId, user.branchId ?? '', user.id, dto);
+  holdBill(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: HoldBillDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    return this.posService.holdBill(
+      user.tenantId,
+      user.branchId ?? '',
+      this.actingCashier(user, unlockToken),
+      dto,
+    );
   }
 
   @Get('hold')
   @ApiOperation({ summary: 'Get held bills (cashiers: own holds only)' })
-  getHeldBills(@CurrentUser() user: IAuthUser) {
+  getHeldBills(
+    @CurrentUser() user: IAuthUser,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.posService.getHeldBills(user.tenantId, user.branchId ?? '', {
-      cashierId: user.id,
+      cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
   }
@@ -1733,10 +1974,14 @@ export class PosController {
   @Delete('hold/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete held bill (cashiers: own holds only)' })
-  deleteHeldBill(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+  deleteHeldBill(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.posService.deleteHeldBill(id, user.tenantId, {
-      cashierId: user.id,
+      cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
   }
@@ -1744,10 +1989,14 @@ export class PosController {
   @Get('summary')
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Get daily sales summary (cashiers: own sales only)' })
-  getDailySummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
+  getDailySummary(
+    @CurrentUser() user: IAuthUser,
+    @Query('date') date?: string,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
     const scopeAll = canViewAllPosSales(user.roles ?? []);
     return this.posService.getDailySummary(user.tenantId, user.branchId ?? '', date, {
-      cashierId: user.id,
+      cashierId: this.actingCashier(user, unlockToken),
       scopeAll,
     });
   }
@@ -1770,8 +2019,17 @@ export class PosController {
   @Post('day-end')
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Close day session and get end-of-day summary' })
-  closeDaySession(@CurrentUser() user: IAuthUser, @Body('notes') notes?: string) {
-    return this.posService.closeDaySession(user.tenantId, user.branchId ?? '', user.id, notes);
+  closeDaySession(
+    @CurrentUser() user: IAuthUser,
+    @Body('notes') notes?: string,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    return this.posService.closeDaySession(
+      user.tenantId,
+      user.branchId ?? '',
+      this.actingCashier(user, unlockToken),
+      notes,
+    );
   }
 
   @Get('barcode/:code')
@@ -1822,8 +2080,46 @@ export class PosController {
   @Get('shift-summary')
   @RequirePermissions('sales:read')
   @ApiOperation({ summary: 'Cashier shift / current sales summary' })
-  shiftSummary(@CurrentUser() user: IAuthUser, @Query('date') date?: string) {
-    return this.posService.cashierShiftSummary(user.tenantId, user.branchId ?? '', user.id, date);
+  shiftSummary(
+    @CurrentUser() user: IAuthUser,
+    @Query('date') date?: string,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    return this.posService.cashierShiftSummary(
+      user.tenantId,
+      user.branchId ?? '',
+      this.actingCashier(user, unlockToken),
+      date,
+    );
+  }
+
+  @Get('pin/status')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'Whether current user has a POS PIN set' })
+  posPinStatus(@CurrentUser() user: IAuthUser) {
+    return this.posService.getPosPinStatus(user.tenantId, user.id);
+  }
+
+  @Post('pin/set')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Set or update your 4-digit POS unlock PIN' })
+  setPosPin(@CurrentUser() user: IAuthUser, @Body() dto: SetPosPinDto) {
+    return this.posService.setPosPin(user.tenantId, user.id, dto.pin);
+  }
+
+  @Delete('pin')
+  @RequirePermissions('sales:create')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Remove your POS unlock PIN' })
+  clearPosPin(@CurrentUser() user: IAuthUser) {
+    return this.posService.clearPosPin(user.tenantId, user.id);
+  }
+
+  @Post('pin/unlock')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Unlock POS / switch cashier with 4-digit PIN (no re-login)' })
+  unlockPosPin(@CurrentUser() user: IAuthUser, @Body() dto: UnlockPosPinDto) {
+    return this.posService.unlockWithPosPin(user.tenantId, user.branchId ?? '', dto.pin);
   }
 
   @Post('gift-vouchers')

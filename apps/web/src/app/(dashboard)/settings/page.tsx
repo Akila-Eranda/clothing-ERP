@@ -9,6 +9,7 @@ import {
   Printer, Image, Server, FileText, Upload,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated } from "@/lib/use-receipt-settings";
+import { receiptThemeColors } from "@/lib/receipt-theme";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -319,40 +320,43 @@ function AuditLogTab() {
 function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string }) {
   const fs = s.fontSize === "small" ? "10px" : s.fontSize === "large" ? "14px" : "12px";
   const logoSrc = resolvePublicAssetUrl(s.logoUrl);
+  const c = receiptThemeColors(s.receiptTheme);
+  const rule = { borderTop: `1px dashed ${c.rule}`, margin: "6px 0" } as const;
+  const row = { display: "flex", justifyContent: "space-between", fontSize: "0.85em", color: c.fg } as const;
   return (
-    <div style={{ fontFamily: "'Courier New', monospace", fontSize: fs, padding: "12px", background: "#fff", color: "#000", maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: "1px dashed #ccc" }}>
+    <div style={{ fontFamily: "'Courier New', monospace", fontSize: fs, padding: "12px", background: c.bg, color: c.fg, maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: `1px dashed ${c.rule}` }}>
       {logoSrc && <img src={logoSrc} alt="logo" style={{ maxWidth: "80px", display: "block", margin: "0 auto 4px" }} />}
       <div style={{ textAlign: "center", fontWeight: 900, fontSize: "1.3em" }}>{s.shopName || "Shop Name"}</div>
-      {s.tagline && <div style={{ textAlign: "center", fontSize: "0.85em", marginBottom: 2 }}>{s.tagline}</div>}
-      {s.address1 && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.address1}</div>}
-      {s.address2 && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.address2}</div>}
-      {s.phone && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.phone}</div>}
-      {s.email && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.email}</div>}
-      {s.website && <div style={{ textAlign: "center", fontSize: "0.85em" }}>{s.website}</div>}
-      {s.headerText && <div style={{ textAlign: "center", fontSize: "0.85em", marginTop: 4, fontStyle: "italic" }}>{s.headerText}</div>}
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Invoice:</span><span><b>INV-00001</b></span></div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Date:</span><span>{new Date().toLocaleDateString()}</span></div>
-      {s.showCashier && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Cashier:</span><span>{cashier || "Admin"}</span></div>}
-      {s.showCustomer && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Customer:</span><span>Walk-in</span></div>}
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
+      {s.tagline && <div style={{ textAlign: "center", fontSize: "0.85em", marginBottom: 2, color: c.muted }}>{s.tagline}</div>}
+      {s.address1 && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.address1}</div>}
+      {s.address2 && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.address2}</div>}
+      {s.phone && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.phone}</div>}
+      {s.email && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.email}</div>}
+      {s.website && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.website}</div>}
+      {s.headerText && <div style={{ textAlign: "center", fontSize: "0.85em", marginTop: 4, fontStyle: "italic", color: c.muted }}>{s.headerText}</div>}
+      <div style={rule} />
+      <div style={row}><span>Invoice:</span><span><b>INV-00001</b></span></div>
+      <div style={row}><span>Date:</span><span>{new Date().toLocaleDateString()}</span></div>
+      {s.showCashier && <div style={row}><span>Cashier:</span><span>{cashier || "Admin"}</span></div>}
+      {s.showCustomer && <div style={row}><span>Customer:</span><span>Walk-in</span></div>}
+      <div style={rule} />
       <div style={{ fontSize: "0.8em", fontWeight: "bold", marginBottom: 2 }}>ITEMS</div>
       <div style={{ fontSize: "0.85em", fontWeight: "bold" }}>Sample T-Shirt (Blue / L)</div>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>2 x LKR 1,500.00</span><span>LKR 3,000.00</span></div>
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Subtotal</span><span>LKR 3,000.00</span></div>
-      {s.showDiscount && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Discount</span><span>-LKR 200.00</span></div>}
-      {s.showTax && <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Tax (5%)</span><span>LKR 140.00</span></div>}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1em", fontWeight: 900, borderTop: "2px solid #000", paddingTop: 4, marginTop: 4 }}><span>TOTAL</span><span>LKR 2,940.00</span></div>
-      <div style={{ borderTop: "1px dashed #000", margin: "6px 0" }} />
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85em" }}><span>Payment</span><span><b>CASH</b></span></div>
+      <div style={row}><span>2 x LKR 1,500.00</span><span>LKR 3,000.00</span></div>
+      <div style={rule} />
+      <div style={row}><span>Subtotal</span><span>LKR 3,000.00</span></div>
+      {s.showDiscount && <div style={row}><span>Discount</span><span>-LKR 200.00</span></div>}
+      {s.showTax && <div style={row}><span>Tax (5%)</span><span>LKR 140.00</span></div>}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1em", fontWeight: 900, borderTop: `2px solid ${c.rule}`, paddingTop: 4, marginTop: 4, color: c.fg }}><span>TOTAL</span><span>LKR 2,940.00</span></div>
+      <div style={rule} />
+      <div style={row}><span>Payment</span><span><b>CASH</b></span></div>
       {s.showBarcode && (
         <div
-          style={{ textAlign: "center", margin: "8px 0 4px" }}
+          style={{ textAlign: "center", margin: "8px 0 4px", padding: 6, background: c.barcodePad, borderRadius: 2 }}
           dangerouslySetInnerHTML={{ __html: receiptInvoiceBarcodeHtml("INV-00001", s.paperWidth) }}
         />
       )}
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6 }}>{s.footerText}</div>
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6, color: c.muted }}>{s.footerText}</div>
     </div>
   );
 }
@@ -827,6 +831,28 @@ export default function SettingsPage() {
                         <option value="medium">Medium</option>
                         <option value="large">Large</option>
                       </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Receipt theme</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {([
+                        { value: "light" as const, label: "Light", desc: "Black on white — thermal printer" },
+                        { value: "dark" as const, label: "Dark", desc: "White on navy — digital / preview" },
+                      ]).map((opt) => {
+                        const active = (receiptForm.receiptTheme ?? "light") === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setReceiptForm((f) => ({ ...f, receiptTheme: opt.value }))}
+                            className={`rounded-xl border px-3 py-2.5 text-left transition-all ${active ? "border-primary bg-primary/10" : "border-border hover:border-primary/40"}`}
+                          >
+                            <p className={`text-sm font-semibold ${active ? "text-primary" : ""}`}>{opt.label}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</p>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 </CardContent>

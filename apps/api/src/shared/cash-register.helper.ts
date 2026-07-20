@@ -68,6 +68,27 @@ export async function findOpenRegister(
   });
 }
 
+/** Any open shift on the branch — shared terminal float when PIN-switching cashiers. */
+export async function findAnyOpenRegisterOnBranch(
+  db: Db,
+  tenantId: string,
+  branchId: string,
+) {
+  return db.cashRegister.findFirst({
+    where: {
+      tenantId,
+      branchId,
+      status: CashRegisterStatus.OPEN,
+    },
+    orderBy: { openingTime: 'desc' },
+    include: {
+      movements: { orderBy: { createdAt: 'asc' } },
+      cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
+      branch: { select: { id: true, name: true, code: true } },
+    },
+  });
+}
+
 export async function recordCashMovement(
   db: Db,
   data: {
@@ -119,7 +140,10 @@ export async function recordSaleCashMovement(
   const netCash = netCashFromSalePayments(payments, changeDue);
   if (netCash <= 0) return;
 
-  const register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
+  let register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
+  if (!register || register.status !== CashRegisterStatus.OPEN) {
+    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId);
+  }
   if (!register || register.status !== CashRegisterStatus.OPEN) return;
 
   await recordCashMovement(prisma, {
@@ -144,7 +168,10 @@ export async function recordRefundCashMovement(
 ) {
   if (amount <= 0) return;
 
-  const register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
+  let register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
+  if (!register || register.status !== CashRegisterStatus.OPEN) {
+    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId);
+  }
   if (!register || register.status !== CashRegisterStatus.OPEN) return;
 
   await recordCashMovement(prisma, {
@@ -159,9 +186,27 @@ export async function recordRefundCashMovement(
 }
 
 /**
+ * Resolve open drawer for cashier — own shift first, else shared terminal float (PIN switch).
+ */
+async function resolveOpenDrawerForCashier(
+  db: Db,
+  tenantId: string,
+  branchId: string,
+  cashierId: string,
+) {
+  let register = await findOpenRegister(db, tenantId, branchId, cashierId);
+  if (!register || register.status !== CashRegisterStatus.OPEN) {
+    register = await findAnyOpenRegisterOnBranch(db, tenantId, branchId);
+  }
+  if (!register || register.status !== CashRegisterStatus.OPEN) return null;
+  return register;
+}
+
+/**
  * When a cashier pays a supplier in cash from POS / counter,
  * deduct the amount from their open cash drawer (shift).
- * No-ops if they have no open register (e.g. office AP payment).
+ * Falls back to shared branch float when PIN-switching cashiers.
+ * No-ops if no open register (e.g. office AP payment).
  */
 export async function recordSupplierCashOutflow(
   db: Db,
@@ -176,8 +221,13 @@ export async function recordSupplierCashOutflow(
 ) {
   if (opts.amount <= 0.009 || !opts.branchId) return null;
 
-  const register = await findOpenRegister(db, opts.tenantId, opts.branchId, opts.cashierId);
-  if (!register || register.status !== CashRegisterStatus.OPEN) return null;
+  const register = await resolveOpenDrawerForCashier(
+    db,
+    opts.tenantId,
+    opts.branchId,
+    opts.cashierId,
+  );
+  if (!register) return null;
 
   return recordCashMovement(db, {
     tenantId: opts.tenantId,
@@ -185,6 +235,43 @@ export async function recordSupplierCashOutflow(
     type: CashMovementType.EXPENSE,
     amount: opts.amount,
     reference: opts.paymentId,
+    description: opts.description,
+    createdById: opts.cashierId,
+  });
+}
+
+/**
+ * When a cashier records a cash shop expense from POS / counter,
+ * deduct from the open drawer (own or shared float).
+ * No-ops if no open register (office expense without shift).
+ */
+export async function recordExpenseCashOutflow(
+  db: Db,
+  opts: {
+    tenantId: string;
+    branchId?: string;
+    cashierId: string;
+    expenseId: string;
+    amount: number;
+    description: string;
+  },
+) {
+  if (opts.amount <= 0.009 || !opts.branchId) return null;
+
+  const register = await resolveOpenDrawerForCashier(
+    db,
+    opts.tenantId,
+    opts.branchId,
+    opts.cashierId,
+  );
+  if (!register) return null;
+
+  return recordCashMovement(db, {
+    tenantId: opts.tenantId,
+    registerId: register.id,
+    type: CashMovementType.EXPENSE,
+    amount: opts.amount,
+    reference: opts.expenseId,
     description: opts.description,
     createdById: opts.cashierId,
   });

@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Headers, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsInt, IsArray, IsEnum, IsBoolean, IsDateString, Min, ValidateNested } from 'class-validator';
@@ -15,6 +15,7 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
+import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { ProcurementService } from './procurement.service';
 import { SupplierApService } from './supplier-ap.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
@@ -107,6 +108,7 @@ export class RecordPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
   /** When false, skip creating a Cheque row (e.g. extra PO lines under one cheque). Default true for CHEQUE. */
   @ApiPropertyOptional() @IsOptional() @IsBoolean() registerCheque?: boolean;
   /** Override cheque face amount when one cheque covers multiple PO payments. */
@@ -126,6 +128,8 @@ export class SupplierApPaymentDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() chequeDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() chequeBankAccountId?: string;
+  /** Our company bank account (BANK_TRANSFER / CHEQUE) — from Accounting → Banks */
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
 }
 
 export class AssignSupplierProductDto {
@@ -471,6 +475,7 @@ export class SuppliersService {
       chequeDueDate: dto.chequeDueDate,
       chequeBankName: dto.chequeBankName,
       chequeBankAccountId: dto.chequeBankAccountId,
+      bankAccountId: dto.bankAccountId,
     });
   }
 
@@ -714,12 +719,14 @@ export class SuppliersController {
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
     @Body() body: SupplierApPaymentDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
   ) {
+    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
     return this.apService.receivePayment(
       id,
       user.tenantId,
       user.branchId ?? '',
-      user.id,
+      cashierId,
       body,
     );
   }

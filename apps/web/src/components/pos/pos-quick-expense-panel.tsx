@@ -49,10 +49,24 @@ type PaymentRow = {
   supplier?: { id: string; name: string; code?: string } | null;
 };
 
+type BankAccountRow = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  bankName?: string | null;
+  currentBalance?: number;
+  isActive?: boolean;
+};
+
+const BANK_ACCOUNT_TYPES = new Set(["CURRENT", "SAVINGS"]);
+
 export function PosQuickExpensePanel({
   onBack,
+  onSaved,
 }: {
   onBack: () => void;
+  onSaved?: () => void;
 }) {
   const { profile } = useShopWorkspace();
   const today = new Date().toISOString().slice(0, 10);
@@ -64,8 +78,9 @@ export function PosQuickExpensePanel({
   const [method, setMethod] = React.useState("CASH");
   const [reference, setReference] = React.useState("");
   const [chequeDue, setChequeDue] = React.useState("");
-  const [chequeBank, setChequeBank] = React.useState("");
+  const [bankAccountId, setBankAccountId] = React.useState("");
   const [notes, setNotes] = React.useState("");
+  const [bankAccounts, setBankAccounts] = React.useState<BankAccountRow[]>([]);
 
   // Shop expense fields
   const [description, setDescription] = React.useState("");
@@ -84,12 +99,38 @@ export function PosQuickExpensePanel({
     [suppliers, supplierId],
   );
 
+  const selectableBanks = React.useMemo(
+    () => bankAccounts.filter((b) => b.isActive !== false && BANK_ACCOUNT_TYPES.has(b.type)),
+    [bankAccounts],
+  );
+
+  const selectedBank = React.useMemo(
+    () => selectableBanks.find((b) => b.id === bankAccountId) ?? null,
+    [selectableBanks, bankAccountId],
+  );
+
   const loadRecent = React.useCallback(async () => {
     try {
       const res = await api.get<{ data: ExpenseRow[] }>("/accounting/expenses?limit=10");
       setRecent(res.data?.data ?? []);
     } catch {
       /* ignore */
+    }
+  }, []);
+
+  const loadBankAccounts = React.useCallback(async () => {
+    try {
+      const res = await api.get<BankAccountRow[] | { data: BankAccountRow[] }>("/accounting/bank-accounts");
+      const raw = res.data;
+      const list = Array.isArray(raw) ? raw : raw?.data ?? [];
+      setBankAccounts(list);
+      setBankAccountId((prev) => {
+        if (prev && list.some((b) => b.id === prev)) return prev;
+        const banks = list.filter((b) => b.isActive !== false && BANK_ACCOUNT_TYPES.has(b.type));
+        return banks[0]?.id ?? "";
+      });
+    } catch {
+      /* ignore — cash payments still work */
     }
   }, []);
 
@@ -115,7 +156,8 @@ export function PosQuickExpensePanel({
 
   React.useEffect(() => {
     void loadRecent();
-  }, [loadRecent]);
+    void loadBankAccounts();
+  }, [loadRecent, loadBankAccounts]);
 
   React.useEffect(() => {
     if (mode === "supplier") void loadSuppliers();
@@ -125,7 +167,6 @@ export function PosQuickExpensePanel({
     setAmount("");
     setReference("");
     setChequeDue("");
-    setChequeBank("");
     setNotes("");
     setMethod("CASH");
   };
@@ -136,6 +177,10 @@ export function PosQuickExpensePanel({
     if (!description.trim()) { toast.error("Description required"); return; }
     if (method === "CHEQUE" && !reference.trim()) {
       toast.error("Enter cheque number");
+      return;
+    }
+    if (method === "CHEQUE" && !bankAccountId) {
+      toast.error("Select your bank account");
       return;
     }
 
@@ -152,11 +197,13 @@ export function PosQuickExpensePanel({
           ? {
               chequeNumber: reference.trim(),
               chequeDueDate: chequeDue || undefined,
-              chequeBankName: chequeBank.trim() || undefined,
+              chequeBankAccountId: bankAccountId || undefined,
+              chequeBankName: selectedBank?.bankName || selectedBank?.name || undefined,
             }
           : {}),
       });
       toast.success(`Expense recorded: LKR ${formatNumber(amt)}`);
+      onSaved?.();
       setDescription("");
       setDate(today);
       setCategoryId("Other Expenses");
@@ -181,6 +228,10 @@ export function PosQuickExpensePanel({
       toast.error("Cheque due date is required");
       return;
     }
+    if ((method === "CHEQUE" || method === "BANK_TRANSFER") && !bankAccountId) {
+      toast.error("Select your bank account");
+      return;
+    }
     const bal = selectedSupplier?.balance ?? 0;
     if (bal > 0 && amt > bal + 0.01) {
       toast.error(`Amount exceeds outstanding (LKR ${formatNumber(bal)})`);
@@ -194,16 +245,23 @@ export function PosQuickExpensePanel({
         method,
         reference: reference.trim() || undefined,
         notes: notes.trim() || undefined,
+        ...(method === "CHEQUE" || method === "BANK_TRANSFER"
+          ? {
+              bankAccountId,
+              chequeBankAccountId: bankAccountId,
+              chequeBankName: selectedBank?.bankName || selectedBank?.name || undefined,
+            }
+          : {}),
         ...(method === "CHEQUE"
           ? {
               chequeNumber: reference.trim(),
               chequeDueDate: chequeDue.trim(),
-              chequeBankName: chequeBank.trim() || undefined,
             }
           : {}),
       });
       const applied = res.data?.appliedTotal ?? amt;
       toast.success(`Supplier paid: LKR ${formatNumber(applied)} → ${selectedSupplier?.name ?? "supplier"}`);
+      onSaved?.();
       resetShared();
       setNotes("");
       void loadSuppliers();
@@ -454,27 +512,46 @@ export function PosQuickExpensePanel({
           </div>
 
           {method === "CHEQUE" && (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Cheque bank</label>
-                <input
-                  value={chequeBank}
-                  onChange={(e) => setChequeBank(e.target.value)}
-                  placeholder="e.g. BOC"
-                  className={INPUT_CLS}
-                  style={INPUT_STYLE}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date *</label>
-                <input
-                  type="date"
-                  value={chequeDue}
-                  onChange={(e) => setChequeDue(e.target.value)}
-                  className={INPUT_CLS}
-                  style={INPUT_STYLE}
-                />
-              </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date *</label>
+              <input
+                type="date"
+                value={chequeDue}
+                onChange={(e) => setChequeDue(e.target.value)}
+                className={INPUT_CLS}
+                style={INPUT_STYLE}
+              />
+            </div>
+          )}
+
+          {(method === "CHEQUE" || (mode === "supplier" && method === "BANK_TRANSFER")) && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>
+                Our bank account *
+              </label>
+              <select
+                value={bankAccountId}
+                onChange={(e) => setBankAccountId(e.target.value)}
+                disabled={busy}
+                className={INPUT_CLS}
+                style={INPUT_STYLE}
+              >
+                <option value="">
+                  {selectableBanks.length === 0 ? "No bank accounts — add in Accounting → Banks" : "Select bank account…"}
+                </option>
+                {selectableBanks.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.code} · {b.name}
+                    {b.bankName ? ` (${b.bankName})` : ""}
+                    {typeof b.currentBalance === "number" ? ` — LKR ${formatNumber(b.currentBalance)}` : ""}
+                  </option>
+                ))}
+              </select>
+              {selectedBank && (
+                <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                  Pays from {selectedBank.bankName || selectedBank.name}
+                </p>
+              )}
             </div>
           )}
 

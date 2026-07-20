@@ -48,6 +48,7 @@ export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsString() headerText?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() footerText?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() paperWidth?: string;
+  @ApiPropertyOptional({ enum: ['light', 'dark'] }) @IsOptional() @IsString() receiptTheme?: string;
   @ApiPropertyOptional() @IsOptional() showTax?: boolean;
   @ApiPropertyOptional() @IsOptional() showDiscount?: boolean;
   @ApiPropertyOptional() @IsOptional() showCashier?: boolean;
@@ -121,6 +122,7 @@ interface StoredReceiptSettings {
   headerText: string;
   footerText: string;
   paperWidth: string;
+  receiptTheme: string;
   showTax: boolean;
   showDiscount: boolean;
   showCashier: boolean;
@@ -957,6 +959,7 @@ export class TenantsService {
       headerText:   str(receipt['headerText']),
       footerText:   str(receipt['footerText'], 'Thank you for shopping with us!'),
       paperWidth:   str(receipt['paperWidth'], '80mm'),
+      receiptTheme: str(receipt['receiptTheme'], 'light') === 'dark' ? 'dark' : 'light',
       showTax:      bool(receipt['showTax'], true),
       showDiscount: bool(receipt['showDiscount'], true),
       showCashier:  bool(receipt['showCashier'], true),

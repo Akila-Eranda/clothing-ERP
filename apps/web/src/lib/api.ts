@@ -103,6 +103,16 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
   const token = tokenStorage.getAccess();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
+  // Active POS cashier (PIN unlock) — sales attribute to this user
+  if (typeof window !== 'undefined') {
+    try {
+      const posToken = sessionStorage.getItem('pos_cashier_unlock_token');
+      if (posToken) headers['x-pos-cashier-token'] = posToken;
+    } catch {
+      /* ignore */
+    }
+  }
+
   const tenantId = (init.headers as Record<string, string> | undefined)?.['x-tenant-id']
     || tokenStorage.getTenant()
     || getTenantFromToken()

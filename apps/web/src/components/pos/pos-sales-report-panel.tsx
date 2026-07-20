@@ -18,6 +18,44 @@ type Summary = {
   totalDiscount: number;
   totalItems: number;
   byPaymentMethod: Record<string, number>;
+  openingBalance?: number;
+  income?: number;
+  expenses?: number;
+  cashExpenses?: number;
+  supplierPayments?: number;
+  cashSupplierPayments?: number;
+  netIncome?: number;
+  shift?: {
+    id: string;
+    scoped: boolean;
+    status: string;
+    openingTime: string;
+    closingTime: string | null;
+    shiftOpen: boolean;
+  } | null;
+  cash?: {
+    openingFloat: number;
+    cashSalesNet: number;
+    cashExpenses: number;
+    cashSupplierPayments: number;
+    cashOut: number;
+    refunds: number;
+    expectedInDrawer: number;
+  };
+};
+
+type ActiveShift = {
+  id?: string;
+  status?: string;
+  openingCash?: number;
+  openingTime?: string;
+  summary?: {
+    expectedCash: number;
+    cashSales: number;
+    cashExpenses: number;
+    cashRefunds: number;
+    openingCash?: number;
+  };
 };
 
 type SaleRow = {
@@ -47,16 +85,19 @@ export function PosSalesReportPanel({
   const [loading, setLoading] = React.useState(true);
   const [summary, setSummary] = React.useState<Summary | null>(null);
   const [sales, setSales] = React.useState<SaleRow[]>([]);
+  const [activeShift, setActiveShift] = React.useState<ActiveShift | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [sumR, salesR] = await Promise.all([
+      const [sumR, salesR, activeR] = await Promise.all([
         api.get<Summary>(`/pos/summary?date=${encodeURIComponent(date)}`),
         api.get<{ data?: SaleRow[] }>(`/pos/sales?limit=100&date=${encodeURIComponent(date)}`),
+        api.get<ActiveShift | null>("/cash/active").catch(() => ({ data: null })),
       ]);
       setSummary(sumR.data ?? null);
       setSales(salesR.data?.data ?? []);
+      setActiveShift(activeR.data ?? null);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load sales report");
     } finally {
@@ -66,10 +107,34 @@ export function PosSalesReportPanel({
 
   React.useEffect(() => {
     void load();
+    const timer = setInterval(() => { void load(); }, 20000);
+    return () => clearInterval(timer);
   }, [load]);
 
+  const income = summary?.income ?? summary?.totalRevenue ?? 0;
+  const expenses = summary?.expenses ?? 0;
+  const supplierPayments = summary?.supplierPayments ?? 0;
+  const openingBalance = summary?.openingBalance ?? summary?.cash?.openingFloat ?? activeShift?.openingCash ?? 0;
+  const netIncome = summary?.netIncome ?? income - expenses;
+  const liveDrawer =
+    activeShift?.status === "OPEN"
+      ? (activeShift.summary?.expectedCash ?? summary?.cash?.expectedInDrawer ?? 0)
+      : (summary?.cash?.expectedInDrawer ?? 0);
+  const shiftLabel = summary?.shift?.scoped
+    ? summary.shift.shiftOpen
+      ? "Current shift (open)"
+      : "Closed shift"
+    : "No shift — calendar day";
+  const shiftTime =
+    summary?.shift?.openingTime
+      ? `${new Date(summary.shift.openingTime).toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" })} → ${
+          summary.shift.closingTime
+            ? new Date(summary.shift.closingTime).toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" })
+            : "now"
+        }`
+      : null;
   const avgBill = summary && summary.totalSales > 0
-    ? summary.totalRevenue / summary.totalSales
+    ? income / summary.totalSales
     : 0;
 
   const payMethods = Object.entries(summary?.byPaymentMethod ?? {}).sort((a, b) => b[1] - a[1]);
@@ -125,12 +190,81 @@ export function PosSalesReportPanel({
         </div>
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
+          {/* Live drawer — shift scoped */}
+          <div
+            className="rounded-xl border p-4"
+            style={{ background: "rgba(16,185,129,0.1)", borderColor: "rgba(16,185,129,0.35)" }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#6ee7b7" }}>
+                  Cash in counter · {shiftLabel}
+                </p>
+                {shiftTime && (
+                  <p className="text-[11px] mt-0.5" style={{ color: "#6a8ab8" }}>{shiftTime}</p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="text-2xl font-black tabular-nums" style={{ color: "#10b981" }}>
+                  LKR {formatNumber(liveDrawer)}
+                </p>
+                <p className="text-[10px]" style={{ color: "#6a8ab8" }}>Expected in drawer</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-4 pt-3 border-t" style={{ borderColor: "rgba(16,185,129,0.2)" }}>
+              {[
+                { label: "Opening", value: openingBalance, color: "#6ee7b7" },
+                { label: "Cash sales", value: summary?.cash?.cashSalesNet ?? 0, color: "#34d399" },
+                { label: "Cash out", value: summary?.cash?.cashOut ?? 0, color: "#f87171" },
+                { label: "Shift income", value: income, color: "#4f6ef7" },
+              ].map((s) => (
+                <div key={s.label}>
+                  <p className="text-[10px]" style={{ color: "#6a8ab8" }}>{s.label}</p>
+                  <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: s.color }}>
+                    LKR {formatNumber(s.value)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Income vs expenses vs supplier (separate) — this shift only */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#93c5fd" }}>Shift income</p>
+              <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#4f6ef7" }}>
+                LKR {formatNumber(income)}
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+                {summary?.totalSales ?? 0} bills · {summary?.totalItems ?? 0} items
+              </p>
+            </div>
+            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#fbbf24" }}>Shift expenses</p>
+              <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#f59e0b" }}>
+                LKR {formatNumber(expenses)}
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+                Shop OpEx (cash {formatNumber(summary?.cashExpenses ?? 0)})
+              </p>
+            </div>
+            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+              <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#fca5a5" }}>Supplier payments</p>
+              <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#ef4444" }}>
+                LKR {formatNumber(supplierPayments)}
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+                Cash-out · not expense · cash {formatNumber(summary?.cashSupplierPayments ?? 0)}
+              </p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             {[
-              { label: "Revenue", value: `LKR ${formatNumber(summary?.totalRevenue ?? 0)}`, color: "#4f6ef7" },
+              { label: "Net (income − expenses)", value: `LKR ${formatNumber(netIncome)}`, color: netIncome >= 0 ? "#34d399" : "#f87171" },
               { label: "Bills", value: String(summary?.totalSales ?? 0), color: "#34d399" },
-              { label: "Items sold", value: String(summary?.totalItems ?? 0), color: "#fbbf24" },
               { label: "Avg bill", value: `LKR ${formatNumber(avgBill)}`, color: "#c4b5fd" },
+              { label: "Tax / discounts", value: `LKR ${formatNumber(summary?.totalTax ?? 0)} / ${formatNumber(summary?.totalDiscount ?? 0)}`, color: "#fbbf24" },
             ].map((s) => (
               <div
                 key={s.label}
@@ -161,14 +295,20 @@ export function PosSalesReportPanel({
               )}
               <div className="pt-2 border-t space-y-1.5" style={{ borderColor: "#1e3356" }}>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Tax</span>
-                  <span className="text-white tabular-nums">LKR {formatNumber(summary?.totalTax ?? 0)}</span>
+                  <span style={{ color: "#6a8ab8" }}>Opening</span>
+                  <span className="text-white tabular-nums">LKR {formatNumber(openingBalance)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Discounts</span>
-                  <span className="tabular-nums" style={{ color: "#fbbf24" }}>
-                    LKR {formatNumber(summary?.totalDiscount ?? 0)}
-                  </span>
+                  <span style={{ color: "#6a8ab8" }}>Income</span>
+                  <span className="tabular-nums" style={{ color: "#4f6ef7" }}>LKR {formatNumber(income)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span style={{ color: "#6a8ab8" }}>Expenses</span>
+                  <span className="tabular-nums" style={{ color: "#f59e0b" }}>LKR {formatNumber(expenses)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span style={{ color: "#6a8ab8" }}>Supplier paid</span>
+                  <span className="tabular-nums" style={{ color: "#ef4444" }}>LKR {formatNumber(supplierPayments)}</span>
                 </div>
               </div>
             </div>
@@ -179,7 +319,7 @@ export function PosSalesReportPanel({
             >
               <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "#1e3356" }}>
                 <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>
-                  Bills · {date}
+                  Bills · {shiftLabel}
                 </p>
                 <span className="text-[10px]" style={{ color: "#6a8ab8" }}>{sales.length} shown</span>
               </div>

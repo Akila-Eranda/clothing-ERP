@@ -13,6 +13,8 @@ export interface ReceiptSettings {
   headerText: string;
   footerText: string;
   paperWidth: "58mm" | "80mm";
+  /** Thermal / browser receipt colors — light = black on white, dark = white on navy */
+  receiptTheme: "light" | "dark";
   showTax: boolean;
   showDiscount: boolean;
   showCashier: boolean;
@@ -39,6 +41,7 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
   headerText: "",
   footerText: "Thank you for shopping with us!",
   paperWidth: "80mm",
+  receiptTheme: "light",
   showTax: true,
   showDiscount: true,
   showCashier: true,
@@ -84,7 +87,11 @@ export function useReceiptSettings() {
   const load = React.useCallback(async () => {
     try {
       const r = await api.get<ReceiptSettings>("/tenants/receipt-settings");
-      const s = { ...RECEIPT_DEFAULTS, ...r.data } as ReceiptSettings;
+      const s = {
+        ...RECEIPT_DEFAULTS,
+        ...r.data,
+        receiptTheme: r.data?.receiptTheme === "dark" ? "dark" : "light",
+      } as ReceiptSettings;
       setSettings(s);
       toCache(s);
     } catch { /* use cache */ }

@@ -1,5 +1,5 @@
 import { Module, NotFoundException } from '@nestjs/common';
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res } from '@nestjs/common';
+import { Controller, Get, Post, Put, Delete, Body, Param, Query, Res, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -23,7 +23,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
-import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { FinanceService } from './finance.service';
@@ -46,6 +46,8 @@ import { chequeSourceNotes } from './finance.helper';
 import { AuditLogModule } from '@/modules/audit-log/audit-log.module';
 import { CustomersModule } from '@/modules/customers/customers.module';
 import { SuppliersModule } from '@/modules/suppliers/suppliers.module';
+import { recordExpenseCashOutflow } from '@/shared/cash-register.helper';
+import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import type { Response } from 'express';
 import {
   assertCodeInTypeRange,
@@ -868,6 +870,18 @@ export class AccountingService {
         });
       }
 
+      // POS / counter cash expense: deduct from open drawer (own or shared float)
+      if (method === PaymentMethod.CASH && branchId) {
+        await recordExpenseCashOutflow(tx, {
+          tenantId,
+          branchId,
+          cashierId: userId,
+          expenseId: expense.id,
+          amount: dto.amount,
+          description: `Expense — ${dto.description}`,
+        });
+      }
+
       return expense;
     }).then((expense) => {
       this.eventEmitter.emit('accounting.expense.created', {
@@ -1378,8 +1392,13 @@ export class AccountingController {
   @Post('expenses')
   @RequirePermissions('accounting:create')
   @ApiOperation({ summary: 'Record expense' })
-  createExpense(@CurrentUser() user: IAuthUser, @Body() dto: CreateExpenseDto) {
-    return this.accountingService.createExpense(user.tenantId, user.branchId ?? '', user.id, dto);
+  createExpense(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: CreateExpenseDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.accountingService.createExpense(user.tenantId, user.branchId ?? '', cashierId, dto);
   }
 
   @Get('expenses')
@@ -1590,7 +1609,7 @@ export class AccountingController {
   }
 
   @Get('bank-accounts')
-  @RequirePermissions('accounting:read')
+  @RequireAnyPermissions('accounting:read', 'suppliers:read', 'sales:read')
   @ApiOperation({ summary: 'List bank accounts' })
   listBankAccounts(
     @CurrentUser() user: IAuthUser,

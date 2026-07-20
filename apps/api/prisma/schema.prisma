@@ -607,6 +607,8 @@ model User {
   loginAttempts       Int        @default(0)
   lockedUntil         DateTime?
   passwordChangedAt   DateTime?
+  // 4-digit POS unlock PIN (bcrypt hash) — switch cashier without re-login
+  posPinHash          String?
   createdAt           DateTime   @default(now())
   updatedAt           DateTime   @updatedAt
 

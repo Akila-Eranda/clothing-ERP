@@ -26,6 +26,15 @@ type Payment = {
   purchase?: { poNumber: string } | null;
   allocations?: { purchase?: { poNumber: string } | null }[];
 };
+type BankAccount = {
+  id: string;
+  code: string;
+  name: string;
+  type: string;
+  bankName?: string | null;
+  currentBalance?: number;
+  isActive?: boolean;
+};
 
 const METHODS = [
   { value: "CASH", label: "Cash" },
@@ -34,6 +43,8 @@ const METHODS = [
   { value: "UPI", label: "UPI" },
   { value: "CARD", label: "Card" },
 ];
+
+const BANK_TYPES = new Set(["CURRENT", "SAVINGS"]);
 
 const today = () => new Date().toISOString().slice(0, 10);
 const monthStart = () => {
@@ -45,6 +56,7 @@ export default function SupplierPaymentsPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [unpaidPos, setUnpaidPos] = useState<UnpaidPo[]>([]);
+  const [banks, setBanks] = useState<BankAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadingPos, setLoadingPos] = useState(false);
@@ -58,19 +70,39 @@ export default function SupplierPaymentsPage() {
     paidAt: today(),
     reference: "",
     notes: "",
+    chequeDueDate: "",
+    bankAccountId: "",
   });
+
+  const bankOptions = useMemo(
+    () => banks.filter((b) => b.isActive !== false && BANK_TYPES.has(b.type)),
+    [banks],
+  );
+  const selectedBank = useMemo(
+    () => bankOptions.find((b) => b.id === form.bankAccountId) ?? null,
+    [bankOptions, form.bankAccountId],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [supplierRes, paymentRes] = await Promise.all([
+      const [supplierRes, paymentRes, bankRes] = await Promise.all([
         api.get<{ data: Supplier[] }>("/suppliers?limit=500"),
         api.get<{ payments: Payment[] }>(
           `/suppliers/ap/payments?startDate=${range.start}&endDate=${range.end}&limit=500`,
         ),
+        api.get<BankAccount[] | { data: BankAccount[] }>("/accounting/bank-accounts").catch(() => ({ data: [] })),
       ]);
       setSuppliers(supplierRes.data?.data ?? []);
       setPayments(paymentRes.data?.payments ?? []);
+      const rawBanks = bankRes.data;
+      const bankList = Array.isArray(rawBanks) ? rawBanks : rawBanks?.data ?? [];
+      setBanks(bankList);
+      setForm((f) => {
+        if (f.bankAccountId && bankList.some((b) => b.id === f.bankAccountId)) return f;
+        const first = bankList.find((b) => b.isActive !== false && BANK_TYPES.has(b.type));
+        return first ? { ...f, bankAccountId: first.id } : f;
+      });
     } catch (error) {
       toast.error((error as Error).message || "Failed to load supplier payments");
     } finally {
@@ -144,6 +176,14 @@ export default function SupplierPaymentsPage() {
       toast.error("Cheque number is required");
       return;
     }
+    if (form.method === "CHEQUE" && !form.chequeDueDate.trim()) {
+      toast.error("Cheque due date is required");
+      return;
+    }
+    if ((form.method === "CHEQUE" || form.method === "BANK_TRANSFER") && !form.bankAccountId) {
+      toast.error("Select your company bank account");
+      return;
+    }
     setSaving(true);
     try {
       const result = await api.post<{ supplierBalance: number; poSummary?: string }>(
@@ -155,13 +195,35 @@ export default function SupplierPaymentsPage() {
           reference: form.reference || undefined,
           notes: form.notes || undefined,
           purchaseIds: [...selected],
+          ...(form.method === "CHEQUE" || form.method === "BANK_TRANSFER"
+            ? {
+                bankAccountId: form.bankAccountId,
+                chequeBankAccountId: form.bankAccountId,
+                chequeBankName: selectedBank?.bankName || selectedBank?.name || undefined,
+              }
+            : {}),
+          ...(form.method === "CHEQUE"
+            ? {
+                chequeNumber: form.reference.trim(),
+                chequeDueDate: form.chequeDueDate.trim(),
+              }
+            : {}),
         },
       );
       toast.success(
         `Payment recorded${result.data.poSummary ? ` · ${result.data.poSummary}` : ""}. Balance due: LKR ${formatNumber(result.data.supplierBalance ?? 0)}`,
       );
       setOpen(false);
-      setForm({ supplierId: "", amount: "", method: "CASH", paidAt: today(), reference: "", notes: "" });
+      setForm((f) => ({
+        supplierId: "",
+        amount: "",
+        method: "CASH",
+        paidAt: today(),
+        reference: "",
+        notes: "",
+        chequeDueDate: "",
+        bankAccountId: f.bankAccountId,
+      }));
       setUnpaidPos([]);
       setSelected(new Set());
       await load();
@@ -376,9 +438,6 @@ export default function SupplierPaymentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {form.method === "CHEQUE" && (
-                  <p className="text-[11px] text-muted-foreground">Cheque settles via Main Bank (stored as bank transfer)</p>
-                )}
               </div>
 
               <div className="space-y-1.5">
@@ -389,6 +448,50 @@ export default function SupplierPaymentsPage() {
                   placeholder={form.method === "CHEQUE" ? "Cheque number" : "Optional"}
                 />
               </div>
+
+              {form.method === "CHEQUE" && (
+                <div className="space-y-1.5">
+                  <Label>Cheque due date *</Label>
+                  <Input
+                    type="date"
+                    value={form.chequeDueDate}
+                    onChange={(e) => setForm((f) => ({ ...f, chequeDueDate: e.target.value }))}
+                  />
+                </div>
+              )}
+
+              {(form.method === "CHEQUE" || form.method === "BANK_TRANSFER") && (
+                <div className="space-y-1.5">
+                  <Label>Our bank account *</Label>
+                  <Select
+                    value={form.bankAccountId || "_none"}
+                    onValueChange={(bankAccountId) =>
+                      setForm((f) => ({ ...f, bankAccountId: bankAccountId === "_none" ? "" : bankAccountId }))
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select bank account" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="_none">
+                        {bankOptions.length === 0 ? "No banks — add in Accounting → Banks" : "Select bank account…"}
+                      </SelectItem>
+                      {bankOptions.map((b) => (
+                        <SelectItem key={b.id} value={b.id}>
+                          {b.code} · {b.name}
+                          {b.bankName ? ` (${b.bankName})` : ""}
+                          {typeof b.currentBalance === "number" ? ` — LKR ${formatNumber(b.currentBalance)}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedBank && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Pays from {selectedBank.bankName || selectedBank.name}
+                    </p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-1.5">
                 <Label>Notes</Label>

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import {
-  Controller, Get, Post, Put, Body, Param, Query,
+  Controller, Get, Post, Put, Body, Param, Query, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
@@ -16,9 +16,11 @@ import {
   computeExpectedCashFromMovements,
   denominationTotal,
   findOpenRegister,
+  findAnyOpenRegisterOnBranch,
   recordCashMovement,
   summarizeMovements,
 } from '@/shared/cash-register.helper';
+import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { WorkflowService } from '@/modules/workflow/workflow.module';
 import { WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
@@ -59,9 +61,16 @@ export class CashManagementService {
 
   async getActiveRegister(tenantId: string, branchId: string | undefined, cashierId: string) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const register = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
-    if (!register) return null;
-    return this.buildRegisterView(register);
+    const own = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
+    if (own) return this.buildRegisterView(own);
+    // PIN switch: allow selling on shared terminal float opened by another cashier
+    const shared = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+    if (!shared) return null;
+    return {
+      ...this.buildRegisterView(shared),
+      sharedShift: true,
+      actingCashierId: cashierId,
+    };
   }
 
   async openRegister(
@@ -77,6 +86,13 @@ export class CashManagementService {
     }
     if (existing?.status === CashRegisterStatus.PENDING_APPROVAL) {
       throw new BadRequestException('Previous shift is pending manager approval. Contact your manager.');
+    }
+    // One float per branch terminal — PIN-switched cashiers share the open drawer
+    const otherOpen = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+    if (otherOpen) {
+      throw new BadRequestException(
+        'A cash shift is already open on this branch. Unlock with your PIN to use the shared float, or close the current shift first.',
+      );
     }
 
     const register = await this.prisma.$transaction(async (tx) => {
@@ -563,15 +579,24 @@ export class CashManagementController {
   @Get('active')
   @RequireAnyPermissions('cash:read', 'sales:read')
   @ApiOperation({ summary: 'Get current open cash shift for cashier' })
-  getActive(@CurrentUser() user: IAuthUser) {
-    return this.cashService.getActiveRegister(user.tenantId, user.branchId, user.id);
+  getActive(
+    @CurrentUser() user: IAuthUser,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.cashService.getActiveRegister(user.tenantId, user.branchId, cashierId);
   }
 
   @Post('open')
   @RequireAnyPermissions('cash:create', 'sales:create')
   @ApiOperation({ summary: 'Open cash shift with opening float' })
-  openShift(@CurrentUser() user: IAuthUser, @Body() dto: OpenCashRegisterDto) {
-    return this.cashService.openRegister(user.tenantId, user.branchId, user.id, dto);
+  openShift(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: OpenCashRegisterDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.cashService.openRegister(user.tenantId, user.branchId, cashierId, dto);
   }
 
   @Get('summary')

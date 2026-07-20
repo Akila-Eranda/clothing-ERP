@@ -311,6 +311,8 @@ export class SupplierApService {
       chequeDueDate?: string;
       chequeBankName?: string;
       chequeBankAccountId?: string;
+      /** Our company bank account for BANK_TRANSFER / CHEQUE */
+      bankAccountId?: string;
     },
   ) {
     if (dto.amount <= 0) throw new BadRequestException('Amount must be positive');
@@ -330,12 +332,17 @@ export class SupplierApService {
       throw new BadRequestException('Cheque due date is required');
     }
 
+    const ourBankAccountId = dto.bankAccountId || dto.chequeBankAccountId || undefined;
+    if ((uiMethod === 'BANK_TRANSFER' || uiMethod === 'CHEQUE') && !ourBankAccountId) {
+      throw new BadRequestException('Select your company bank account');
+    }
+
     const chequeOpts = uiMethod === 'CHEQUE'
       ? {
           chequeNumber: chequeNumber!,
           chequeDueDate: dto.chequeDueDate!,
           chequeBankName: dto.chequeBankName?.trim() || undefined,
-          chequeBankAccountId: dto.chequeBankAccountId || undefined,
+          chequeBankAccountId: ourBankAccountId,
         }
       : undefined;
 
@@ -420,6 +427,7 @@ export class SupplierApService {
         appliedTotal,
         supplierName: supplier.name,
         cheque: chequeOpts,
+        bankAccountId: ourBankAccountId,
       });
 
       this.eventEmitter.emit('accounting.supplier-payment.posted', {
@@ -546,6 +554,7 @@ export class SupplierApService {
         paidAt,
         reference: dto.reference ?? payment.reference ?? chequeNumber ?? undefined,
         cheque: chequeOpts,
+        bankAccountId: ourBankAccountId,
       });
 
       return { payment, allocations: allocationRows, balanceAfter, appliedTotal };
@@ -623,6 +632,7 @@ export class SupplierApService {
       chequeBankName?: string;
       chequeBankAccountId?: string;
     };
+    bankAccountId?: string;
   }) {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.supplierPayment.create({
@@ -677,6 +687,7 @@ export class SupplierApService {
         paidAt: opts.paidAt,
         reference: opts.reference ?? payment.reference ?? undefined,
         cheque: opts.cheque,
+        bankAccountId: opts.bankAccountId,
       });
 
       return { payment, allocations: allocationRows, balanceAfter };
@@ -710,6 +721,7 @@ export class SupplierApService {
         chequeBankName?: string;
         chequeBankAccountId?: string;
       };
+      bankAccountId?: string;
     },
   ) {
     const amount = roundAp(opts.amount);
@@ -785,15 +797,21 @@ export class SupplierApService {
       const chequeNumber =
         (opts.cheque?.chequeNumber || opts.reference || '').trim()
         || `SP-${opts.paymentId.slice(0, 8).toUpperCase()}`;
-      let bankAccountId = opts.cheque?.chequeBankAccountId;
+      let bankAccountId = opts.cheque?.chequeBankAccountId || opts.bankAccountId;
+      let selectedBank: { id: string; name: string; bankName: string | null } | null = null;
       if (bankAccountId) {
-        const selected = await tx.bankAccount.findFirst({
+        selectedBank = await tx.bankAccount.findFirst({
           where: { id: bankAccountId, tenantId: opts.tenantId, isActive: true },
+          select: { id: true, name: true, bankName: true },
         });
-        if (!selected) bankAccountId = undefined;
+        if (!selectedBank) bankAccountId = undefined;
       }
       if (!bankAccountId) {
-        bankAccountId = (await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK'))?.id;
+        const fallback = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
+        bankAccountId = fallback?.id;
+        selectedBank = fallback
+          ? { id: fallback.id, name: fallback.name, bankName: fallback.bankName }
+          : null;
       }
       await tx.cheque.create({
         data: {
@@ -802,7 +820,11 @@ export class SupplierApService {
           status: ChequeStatus.ISSUED,
           chequeNumber,
           amount,
-          bankName: opts.cheque?.chequeBankName,
+          bankName:
+            opts.cheque?.chequeBankName
+            || selectedBank?.bankName
+            || selectedBank?.name
+            || undefined,
           issueDate: opts.paidAt,
           dueDate: opts.cheque?.chequeDueDate
             ? new Date(opts.cheque.chequeDueDate)
@@ -820,7 +842,14 @@ export class SupplierApService {
 
     if (!isBankTransfer) return;
 
-    const bankAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
+    let bankAcct = opts.bankAccountId
+      ? await tx.bankAccount.findFirst({
+          where: { id: opts.bankAccountId, tenantId: opts.tenantId, isActive: true },
+        })
+      : null;
+    if (!bankAcct) {
+      bankAcct = await this.resolveTenderBankAccount(tx, opts.tenantId, 'BANK');
+    }
     if (!bankAcct) return;
 
     await tx.bankTransaction.create({
