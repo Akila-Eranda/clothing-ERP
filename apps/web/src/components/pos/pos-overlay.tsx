@@ -169,7 +169,41 @@ const BASE_NAV_ITEMS = [
   { id:"reports", label:"Reports", icon: BarChart2 },
   { id:"settings", label:"Settings", icon: Settings },
 ];
-function getCardBg(c="") { const m: Record<string,string> = { black:"linear-gradient(135deg,#1a1a2e,#16213e)", white:"linear-gradient(135deg,#e8eaf6,#c5cae9)", navy:"linear-gradient(135deg,#1a237e,#283593)", maroon:"linear-gradient(135deg,#4a0010,#880e4f)", red:"linear-gradient(135deg,#b71c1c,#c62828)", blue:"linear-gradient(135deg,#0d47a1,#1565c0)", "sky blue":"linear-gradient(135deg,#0277bd,#0288d1)", beige:"linear-gradient(135deg,#8d6e63,#a1887f)", green:"linear-gradient(135deg,#1b5e20,#2e7d32)", gray:"linear-gradient(135deg,#37474f,#455a64)", pink:"linear-gradient(135deg,#880e4f,#ad1457)", yellow:"linear-gradient(135deg,#f57f17,#f9a825)" }; return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)"; }
+function getCardBg(c = "", light = false) {
+  if (light) {
+    // Solid soft tints (no "linear-gradient" in style — avoids light-mode white-text override)
+    const m: Record<string, string> = {
+      black: "#E2E8F0",
+      white: "#F1F5F9",
+      navy: "#DBEAFE",
+      maroon: "#FCE7F3",
+      red: "#FEE2E2",
+      blue: "#DBEAFE",
+      "sky blue": "#E0F2FE",
+      beige: "#F5F5F4",
+      green: "#DCFCE7",
+      gray: "#F1F5F9",
+      pink: "#FCE7F3",
+      yellow: "#FEF9C3",
+    };
+    return m[c.toLowerCase()] ?? "var(--pos-thumb)";
+  }
+  const m: Record<string, string> = {
+    black: "linear-gradient(135deg,#1a1a2e,#16213e)",
+    white: "linear-gradient(135deg,#e8eaf6,#c5cae9)",
+    navy: "linear-gradient(135deg,#1a237e,#283593)",
+    maroon: "linear-gradient(135deg,#4a0010,#880e4f)",
+    red: "linear-gradient(135deg,#b71c1c,#c62828)",
+    blue: "linear-gradient(135deg,#0d47a1,#1565c0)",
+    "sky blue": "linear-gradient(135deg,#0277bd,#0288d1)",
+    beige: "linear-gradient(135deg,#8d6e63,#a1887f)",
+    green: "linear-gradient(135deg,#1b5e20,#2e7d32)",
+    gray: "linear-gradient(135deg,#37474f,#455a64)",
+    pink: "linear-gradient(135deg,#880e4f,#ad1457)",
+    yellow: "linear-gradient(135deg,#f57f17,#f9a825)",
+  };
+  return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)";
+}
 const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"rgba(245,158,11,0.15)",color:"#f59e0b"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"#f59e0b", platinum:"#8b5cf6", diamond:"#a78bfa" };
 
@@ -183,12 +217,14 @@ function PosProductThumb({
   className,
   fallbackBg,
   iconClassName = "h-5 w-5",
+  light = false,
 }: {
   url?: string | null;
   name: string;
   className?: string;
   fallbackBg?: string;
   iconClassName?: string;
+  light?: boolean;
 }) {
   const src = posImageSrc(url);
   if (src) {
@@ -198,8 +234,14 @@ function PosProductThumb({
     );
   }
   return (
-    <div className={cn("flex items-center justify-center", className)} style={fallbackBg ? { background: fallbackBg } : undefined}>
-      <Package className={cn("text-white/30", iconClassName)} />
+    <div
+      className={cn("flex items-center justify-center", className)}
+      style={{ background: fallbackBg || (light ? "var(--pos-thumb)" : undefined) }}
+    >
+      <Package
+        className={cn(iconClassName)}
+        style={{ color: light ? "var(--pos-thumb-icon)" : "rgba(255,255,255,0.25)" }}
+      />
     </div>
   );
 }
@@ -1817,6 +1859,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   //  Center content per nav 
   const renderCenter = () => {
+    const lightUi = resolvePosUiMode(receiptSettings.receiptTheme) === "light";
     // PRODUCTS
     if (activeNav === "products") return (
       <div className="flex flex-col h-full overflow-hidden">
@@ -1839,10 +1882,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 const priceLabel = multi && card.minPrice !== card.maxPrice
                   ? `LKR ${formatNumber(card.minPrice)}–${formatNumber(card.maxPrice)}`
                   : `LKR ${formatNumber(card.minPrice)}`;
+                const thumbBg = getCardBg(p.color, lightUi);
                 return (
                   <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
-                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":getCardBg(p.color)}}>
-                      <PosProductThumb url={p.imageUrl} name={p.productName} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={getCardBg(p.color)} iconClassName="h-10 w-10 text-white/20" />
+                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":thumbBg}}>
+                      <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={thumbBg} iconClassName="h-10 w-10" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
                       {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:allowNegativeStock?"rgba(245,158,11,0.9)":"rgba(220,38,38,0.85)",color:"#fff"}}>{allowNegativeStock?"Stock 0 — sell OK":"Out of Stock"}</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(217,119,6,0.9)",color:"#fff"}}>Low Stock</div>}
@@ -1858,7 +1902,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"var(--pos-border)"}}>
           <div className="flex-1 border-r flex flex-col min-w-0" style={{borderColor:"var(--pos-border)"}}>
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material, lightUi)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>}</div>
@@ -1870,7 +1914,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   type="button"
                   onClick={() => { if (product) handleAddProduct(product); else toast.info("Product not in catalog cache — scan again"); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b hover:bg-white/5 transition-colors text-left"
-                  style={{borderColor:"#1a2b3a"}}
+                  style={{borderColor:"var(--pos-border)"}}
                 >
                   <Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>
                   <div className="flex-1 min-w-0">
@@ -2203,7 +2247,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
             <table className="w-full text-sm">
               <thead style={{position:"sticky",top:0,background:"var(--pos-panel)"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"var(--pos-muted)",borderBottom:"1px solid var(--pos-border)"}}>{h}</th>)}</tr></thead>
-              <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid #1a2b3a",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
+              <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid var(--pos-border)",background:i%2===0?"transparent":"var(--pos-hover)"}}>
                 <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
                 <td className="px-3 py-2 text-xs text-white">{formatSaleCustomerName(o.customer)}</td>
                 <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>{o._count?.items??0}</td>
@@ -2272,7 +2316,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               </thead>
               <tbody>
                 {vouchers.map((v)=>(
-                  <tr key={v.id} className="border-t" style={{borderColor:"#1a2b3a"}}>
+                  <tr key={v.id} className="border-t" style={{borderColor:"var(--pos-border)"}}>
                     <td className="px-3 py-2 font-mono text-xs text-white">{v.code}</td>
                     <td className="px-3 py-2 text-xs text-emerald-400">LKR {formatNumber(v.balance)}</td>
                     <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(v.initialAmount)}</td>
@@ -2372,7 +2416,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
                   <div className="px-3 py-2 border-b" style={{borderColor:"var(--pos-border)"}}><p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
                   {returnSearchRes.map(row=>(
-                    <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"#1a2b3a"}}>
+                    <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"var(--pos-border)"}}>
                       {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>}
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
@@ -2437,7 +2481,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         const ex=exchangeItems.get(p.variantId);
                         return(
                           <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"var(--pos-card)",borderColor:(ex?.qty??0)>0?"#4f6ef7":"var(--pos-border)"}}>
-                            <PosProductThumb url={p.imageUrl} name={p.productName} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color)} iconClassName="h-4 w-4" />
+                            <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color, lightUi)} iconClassName="h-4 w-4" />
                             <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{p.variantName} · {p.sku}</p></div>
                             <div className="flex items-center gap-1 shrink-0">
                               <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
@@ -2938,7 +2982,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCustomerPopup()}].map((btn,i)=>(
-              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"var(--pos-input)",color:i===2&&customer?"#fff":"var(--pos-text-secondary)",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
+              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.15)":"var(--pos-input)",color:i===2&&customer?"#4f6ef7":"var(--pos-text-secondary)",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
                 <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
@@ -3045,7 +3089,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <button key={item.id} onClick={()=>{
                     if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
                     setActiveNav(item.id);
-                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"var(--pos-muted)",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
+                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#4f6ef7":"var(--pos-muted)",background:active?"rgba(79,110,247,0.15)":"transparent"}}>
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"var(--pos-muted)"}}/>
                     {item.label}
@@ -3056,13 +3100,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 );
               })}
             </nav>
-            <div className="mx-2 mb-2 p-3 rounded-xl overflow-hidden shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>
-              <p className="text-white/70 text-[10px] font-semibold uppercase tracking-wide mb-1">Today Sales</p>
-              <p className="text-white font-bold text-lg leading-tight">LKR {formatNumber(todayStats.sales)}</p>
-              <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              <p className="text-white/70 text-[10px] mt-1"> {todayStats.orders} Orders  {todayStats.items} Items</p>
+            <div className="mx-2 mb-2 p-3 rounded-xl overflow-hidden shrink-0 border" style={{background:"var(--pos-sales-bg)",borderColor:isPosLight?"var(--pos-border)":"transparent"}}>
+              <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{color:"var(--pos-sales-muted)"}}>Today Sales</p>
+              <p className="font-bold text-lg leading-tight" style={{color:"var(--pos-sales-fg)"}}>LKR {formatNumber(todayStats.sales)}</p>
+              <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{color:"var(--pos-sales-fg)"}}/></svg>
+              <p className="text-[10px] mt-1" style={{color:"var(--pos-sales-muted)"}}> {todayStats.orders} Orders  {todayStats.items} Items</p>
             </div>
-            <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"var(--pos-muted)"}}>
+            <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:isPosLight?"var(--pos-input)":"rgba(255,255,255,0.05)",color:"var(--pos-muted)"}}>
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
             </button>
           </div>
@@ -3571,7 +3615,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             onClick={() => void toggleFullscreen()}
             title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
-            style={{background: isFullscreen ? "rgba(79,110,247,0.2)" : "rgba(255,255,255,0.06)", color: isFullscreen ? "#93c5fd" : "var(--pos-text-secondary)", border: `1px solid ${isFullscreen ? "rgba(79,110,247,0.35)" : "var(--pos-border)"}`}}
+            style={{background: isFullscreen ? "rgba(79,110,247,0.15)" : "var(--pos-input)", color: isFullscreen ? "#4f6ef7" : "var(--pos-text-secondary)", border: `1px solid ${isFullscreen ? "rgba(79,110,247,0.35)" : "var(--pos-border)"}`}}
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             {isFullscreen ? "Exit Full" : "Fullscreen"}

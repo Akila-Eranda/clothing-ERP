@@ -599,10 +599,10 @@
   color: var(--pos-muted);
   opacity: 0.7;
 }
-/* Keep white text on accent / gradient surfaces */
-.pos-shell.pos-light [style*="linear-gradient"],
-.pos-shell.pos-light [style*="linear-gradient"] .text-white,
-.pos-shell.pos-light [style*="linear-gradient"] *,
+/* Keep white text on brand accent surfaces (not soft pastel placeholders) */
+.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"],
+.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"] .text-white,
+.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"] *,
 .pos-shell.pos-light button[style*="#4f6ef7"],
 .pos-shell.pos-light button[style*="#4f6ef7"] .text-white,
 .pos-shell.pos-light button[style*="#10b981"],
