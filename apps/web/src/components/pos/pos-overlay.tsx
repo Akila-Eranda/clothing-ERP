@@ -532,8 +532,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
     setPendingDiscountApproval(null);
     setDiscount(v, "percentage");
-    setDiscountInput("");
-    toast.success(`${v}% discount applied`);
+    setDiscountInput(String(v));
+    toast.success(`${v}% discount applied — LKR ${formatNumber(subtotal() * (v / 100))} off`);
   }, [discountInput, adminBypass, subtotal, setDiscount]);
 
   React.useEffect(() => {
@@ -549,7 +549,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         if (status === "APPROVED") {
           setDiscount(pendingDiscountApproval.percent, "percentage");
           setPendingDiscountApproval(null);
-          setDiscountInput("");
+          setDiscountInput(String(pendingDiscountApproval.percent));
           toast.success(`${pendingDiscountApproval.percent}% discount approved and applied`);
         } else if (status === "REJECTED" || status === "CANCELLED") {
           setPendingDiscountApproval(null);
@@ -905,6 +905,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   }, []);
   const tierDiscountAmt = calcTierDiscount(subtotal(), customer?.membershipTier);
   const loyaltyDiscountAmt = loyaltyPointsToRedeem * 0.1;
+  const cartDiscountAmt = discountAmount();
+  const itemDiscountTotal = React.useMemo(
+    () => items.reduce((sum, i) => sum + calcPosLineDiscount(i), 0),
+    [items],
+  );
+  const totalSavings = itemDiscountTotal + cartDiscountAmt + tierDiscountAmt + payState.couponDiscount + loyaltyDiscountAmt;
   const amountBeforeLoyalty = React.useMemo(
     () => calcPosAmountDue(
       items.map((i) => ({
@@ -3344,17 +3350,29 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   ):(
                     <div className="px-2 py-1.5 space-y-1">
                       <AnimatePresence>{items.map((item,idx)=>{
+                        const lineDisc = calcPosLineDiscount(item);
                         const afterDisc = calcPosLineNet(item);
                         const lineTax = afterDisc * ((item.taxRate || 0) / 100);
                         const lineTotal = afterDisc + lineTax;
+                        const lineGross = item.unitPrice * item.quantity;
                         const editing = editingCartQtyIdx === idx;
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
                           style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"var(--pos-card)",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"var(--pos-border)"}`}}>
-                          <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">
-                            {item.productName}
-                          </p>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-white truncate">
+                              {item.productName}
+                            </p>
+                            {lineDisc > 0.001 && (
+                              <p className="text-[10px] font-semibold truncate" style={{color:"#34d399"}}>
+                                Disc −LKR {formatNumber(lineDisc)}
+                                {item.discountType === "percentage" && item.discountAmount > 0
+                                  ? ` (${item.discountAmount}%)`
+                                  : ""}
+                              </p>
+                            )}
+                          </div>
                           <div className="flex items-center gap-0.5 shrink-0">
                             <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
                             {editing ? (
@@ -3396,7 +3414,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                             )}
                             <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-3 w-3 text-white"/></button>
                           </div>
-                          <p className="text-sm font-bold text-white tabular-nums leading-tight shrink-0 min-w-[4.5rem] text-right">LKR {formatNumber(lineTotal)}</p>
+                          <div className="shrink-0 min-w-[4.5rem] text-right">
+                            {lineDisc > 0.001 && (
+                              <p className="text-[10px] tabular-nums line-through leading-none mb-0.5" style={{color:"var(--pos-muted)"}}>
+                                LKR {formatNumber(lineGross)}
+                              </p>
+                            )}
+                            <p className="text-sm font-bold text-white tabular-nums leading-tight">LKR {formatNumber(lineTotal)}</p>
+                          </div>
                           <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className={`h-6 w-6 rounded flex items-center justify-center transition-opacity shrink-0 ${item.isCustom ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
                         </motion.div>
                         );
@@ -3410,6 +3435,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <input ref={discountInputRef} type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"var(--pos-input)",border:`1px solid ${pendingDiscountApproval?"var(--pos-warn)":discount>0?"#10b981":"var(--pos-border)"}`}}/>
                     <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
                   </div>
+                  {discount > 0 && cartDiscountAmt > 0 && !pendingDiscountApproval && (
+                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.35)",color:"#34d399"}}>
+                      <span className="font-semibold flex items-center gap-1.5"><Tag className="h-3.5 w-3.5"/>{discount}% cart discount applied</span>
+                      <span className="font-bold tabular-nums">−LKR {formatNumber(cartDiscountAmt)}</span>
+                    </div>
+                  )}
                   {pendingDiscountApproval && (
                     <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{background:"var(--pos-warn-bg)",border:"1px solid var(--pos-warn-border)",color:"var(--pos-warn-soft)"}}>
                       <Clock className="h-3.5 w-3.5 shrink-0"/>
@@ -3422,11 +3453,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </p>
                   )}
                   <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
-                    <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
-                    {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
-                    {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
-                    {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
-                    {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                    <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}>
+                      <span>Sub Total</span>
+                      <span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span>
+                    </div>
+                    {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
+                    {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"#34d399"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                    {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                    {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                    {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                    {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold pt-1" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                     <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                       <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
                       <span>LKR {formatNumber(taxAmount())}</span>
@@ -3470,11 +3506,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 </div>
               <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
                 <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"var(--pos-border)"}}>
-                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
-                  {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
-                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
-                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
-                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
+                  {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
+                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"#34d399"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                  {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                   <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                     <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
