@@ -604,28 +604,6 @@
   color: var(--pos-muted);
   opacity: 0.7;
 }
-/* Keep white text on brand accent surfaces (not soft pastel placeholders) */
-.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"],
-.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"] .text-white,
-.pos-shell.pos-light [style*="#4f6ef7"][style*="#7c3aed"] *,
-.pos-shell.pos-light button[style*="#4f6ef7"],
-.pos-shell.pos-light button[style*="#4f6ef7"] .text-white,
-.pos-shell.pos-light button[style*="#10b981"],
-.pos-shell.pos-light button[style*="#10b981"] .text-white,
-.pos-shell.pos-light button[style*="#059669"],
-.pos-shell.pos-light [style*="background:#4f6ef7"],
-.pos-shell.pos-light [style*="background: #4f6ef7"] {
-  color: #ffffff !important;
-}
-
-/* Solid status buttons — keep white label on dark fills in light mode */
-.pos-shell.pos-light button[style*="#DC2626"],
-.pos-shell.pos-light button[style*="#059669"],
-.pos-shell.pos-light button[style*="#334155"],
-.pos-shell.pos-light button[style*="#475569"] {
-  color: #ffffff !important;
-}
-
 /* Remap yellow / amber accents → rose warning palette in light mode */
 .pos-shell.pos-light .text-amber-400,
 .pos-shell.pos-light .text-amber-500,
@@ -647,5 +625,49 @@
 }
 .pos-shell.pos-light .border-amber-200 {
   border-color: var(--pos-warn-border) !important;
+}
+
+/* ── All POS buttons: white label + readable solid fills ── */
+.pos-shell button,
+.pos-shell button.text-white,
+.pos-shell.pos-light button.text-white,
+.pos-shell.pos-light button .text-white,
+.pos-shell button svg {
+  color: #ffffff !important;
+}
+
+.pos-shell.pos-light button[style*="var(--pos-input)"],
+.pos-shell.pos-light button[style*="var(--pos-elevated)"],
+.pos-shell.pos-light button[style*="var(--pos-card)"],
+.pos-shell.pos-light button[style*="var(--pos-panel)"],
+.pos-shell.pos-light button[style*="transparent"],
+.pos-shell.pos-light button[style*="rgba(255,255,255"] {
+  background-color: var(--pos-btn-bg) !important;
+}
+.pos-shell button[style*="rgba(79,110,247"],
+.pos-shell button[style*="#4f6ef7"],
+.pos-shell button[style*="#4338ca"] {
+  background-color: #4f6ef7 !important;
+}
+.pos-shell button[style*="rgba(16,185,129"],
+.pos-shell button[style*="#10b981"],
+.pos-shell button[style*="#059669"] {
+  background-color: #059669 !important;
+}
+.pos-shell button[style*="rgba(239,68,68"],
+.pos-shell button[style*="rgba(220,38,38"],
+.pos-shell button[style*="#ef4444"],
+.pos-shell button[style*="#DC2626"],
+.pos-shell button[style*="#B91C1C"] {
+  background-color: #DC2626 !important;
+}
+.pos-shell button[style*="var(--pos-warn"],
+.pos-shell button[style*="rgba(225,29,72"],
+.pos-shell button[style*="rgba(245,158,11"] {
+  background-color: var(--pos-warn) !important;
+}
+.pos-shell.pos-light button[style*="#334155"],
+.pos-shell.pos-light button[style*="#475569"] {
+  background-color: #334155 !important;
 }
 

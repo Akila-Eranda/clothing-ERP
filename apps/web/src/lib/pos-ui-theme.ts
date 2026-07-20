@@ -44,6 +44,7 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
       "--pos-accent-soft": "#1D4ED8",
       "--pos-success-soft": "#047857",
       "--pos-violet-soft": "#6D28D9",
+      "--pos-btn-bg": "#475569",
     };
   }
   return {
@@ -78,5 +79,6 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
     "--pos-accent-soft": "#93c5fd",
     "--pos-success-soft": "#6ee7b7",
     "--pos-violet-soft": "#c4b5fd",
+    "--pos-btn-bg": "#1a2b4a",
   };
 }
