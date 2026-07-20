@@ -41,7 +41,7 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
   headerText: "",
   footerText: "Thank you for shopping with us!",
   paperWidth: "80mm",
-  receiptTheme: "light",
+  receiptTheme: "dark",
   showTax: true,
   showDiscount: true,
   showCashier: true,

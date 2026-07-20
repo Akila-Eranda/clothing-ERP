@@ -563,3 +563,53 @@
     @apply bg-violet-50 text-violet-700 border border-violet-200;
   }
 }
+
+/* ── POS terminal Light / Dark shell ── */
+.pos-shell {
+  color: var(--pos-text);
+}
+.pos-shell .pos-input::placeholder {
+  color: var(--pos-muted);
+  opacity: 0.75;
+}
+.pos-shell.pos-light .text-white {
+  color: var(--pos-text) !important;
+}
+.pos-shell.pos-light .text-white\/60,
+.pos-shell.pos-light .text-white\/70,
+.pos-shell.pos-light .text-white\/50 {
+  color: var(--pos-muted) !important;
+}
+.pos-shell.pos-light .text-white\/30,
+.pos-shell.pos-light .text-white\/20 {
+  color: var(--pos-muted-2) !important;
+  opacity: 0.7;
+}
+.pos-shell.pos-light .hover\:bg-white\/10:hover,
+.pos-shell.pos-light .hover\:bg-white\/5:hover {
+  background-color: var(--pos-hover) !important;
+}
+.pos-shell.pos-light input:not([type=checkbox]):not([type=radio]),
+.pos-shell.pos-light textarea,
+.pos-shell.pos-light select {
+  color: var(--pos-text);
+}
+.pos-shell.pos-light input::placeholder,
+.pos-shell.pos-light textarea::placeholder {
+  color: var(--pos-muted);
+  opacity: 0.7;
+}
+/* Keep white text on accent / gradient surfaces */
+.pos-shell.pos-light [style*="linear-gradient"],
+.pos-shell.pos-light [style*="linear-gradient"] .text-white,
+.pos-shell.pos-light [style*="linear-gradient"] *,
+.pos-shell.pos-light button[style*="#4f6ef7"],
+.pos-shell.pos-light button[style*="#4f6ef7"] .text-white,
+.pos-shell.pos-light button[style*="#10b981"],
+.pos-shell.pos-light button[style*="#10b981"] .text-white,
+.pos-shell.pos-light button[style*="#059669"],
+.pos-shell.pos-light [style*="background:#4f6ef7"],
+.pos-shell.pos-light [style*="background: #4f6ef7"] {
+  color: #ffffff !important;
+}
+

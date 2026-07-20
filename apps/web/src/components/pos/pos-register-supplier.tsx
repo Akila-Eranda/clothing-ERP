@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
-const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
+const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 export type RegisteredSupplier = {
   id: string;
@@ -101,14 +101,14 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
           onClick={reset}
           disabled={busy}
           className="p-1 rounded-lg hover:bg-white/10 disabled:opacity-50"
-          style={{ color: "#6a8ab8" }}
+          style={{ color: "var(--pos-muted)" }}
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase" style={{ color: "#6a8ab8" }}>
+          <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>
             Name *
           </label>
           <input
@@ -122,7 +122,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
           />
         </div>
         <div className="space-y-1">
-          <label className="text-[10px] font-semibold uppercase" style={{ color: "#6a8ab8" }}>
+          <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>
             Phone *
           </label>
           <input
@@ -136,7 +136,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
         </div>
       </div>
       <div className="space-y-1">
-        <label className="text-[10px] font-semibold uppercase" style={{ color: "#6a8ab8" }}>
+        <label className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>
           Contact person
         </label>
         <input

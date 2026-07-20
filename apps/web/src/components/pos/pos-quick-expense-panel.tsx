@@ -10,8 +10,12 @@ import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
-  "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
-const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
+  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[#4f6ef7] transition-colors";
+const INPUT_STYLE = {
+  background: "var(--pos-input, var(--pos-input))",
+  border: "1px solid var(--pos-border, var(--pos-border))",
+  color: "var(--pos-text, #fff)",
+} as const;
 
 const PAY_METHODS = [
   { value: "CASH", label: "Cash" },
@@ -288,14 +292,14 @@ export function PosQuickExpensePanel({
         <button
           onClick={onBack}
           className="text-xs font-semibold px-3 h-8 rounded-lg transition-colors hover:bg-white/10"
-          style={{ color: "#6a8ab8" }}
+          style={{ color: "var(--pos-muted)" }}
         >
           ← Back
         </button>
       </div>
 
       {/* Mode tabs */}
-      <div className="flex gap-1.5 shrink-0 p-1 rounded-xl" style={{ background: "#0f1f3a", border: "1px solid #1e3356" }}>
+      <div className="flex gap-1.5 shrink-0 p-1 rounded-xl" style={{ background: "var(--pos-panel)", border: "1px solid var(--pos-border)" }}>
         {([
           { id: "expense" as const, label: "Shop Expense", icon: TrendingDown },
           { id: "supplier" as const, label: "Supplier Payment", icon: Truck },
@@ -309,11 +313,11 @@ export function PosQuickExpensePanel({
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold transition-all"
               style={{
                 background: active ? "rgba(79,110,247,0.25)" : "transparent",
-                color: active ? "#fff" : "#6a8ab8",
+                color: active ? "#fff" : "var(--pos-muted)",
                 border: active ? "1px solid rgba(79,110,247,0.4)" : "1px solid transparent",
               }}
             >
-              <tab.icon className="h-3.5 w-3.5" style={{ color: active ? "#4f6ef7" : "#6a8ab8" }} />
+              <tab.icon className="h-3.5 w-3.5" style={{ color: active ? "#4f6ef7" : "var(--pos-muted)" }} />
               {tab.label}
             </button>
           );
@@ -324,9 +328,9 @@ export function PosQuickExpensePanel({
         {/* Form */}
         <div
           className="rounded-xl border p-4 space-y-3 overflow-y-auto min-h-0"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
-          <p className="text-[11px]" style={{ color: "#6a8ab8" }}>
+          <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
             {mode === "expense"
               ? "Record shop expenses from the counter (petty cash, transport, etc.)."
               : "Pay supplier outstanding from the counter — applied FIFO across open bills."}
@@ -335,7 +339,7 @@ export function PosQuickExpensePanel({
           {mode === "supplier" && (
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier *</label>
+                <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Supplier *</label>
                 <PosRegisterSupplier
                   disabled={busy}
                   onRegistered={(s) => {
@@ -371,7 +375,7 @@ export function PosQuickExpensePanel({
                   onClick={() => void loadSuppliers()}
                   disabled={supplierLoading || busy}
                   className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-all hover:bg-white/10 disabled:opacity-50"
-                  style={{ border: "1px solid #1e3356", color: "#6a8ab8" }}
+                  style={{ border: "1px solid var(--pos-border)", color: "var(--pos-muted)" }}
                 >
                   <RefreshCw className={`h-4 w-4 ${supplierLoading ? "animate-spin" : ""}`} />
                 </button>
@@ -383,13 +387,13 @@ export function PosQuickExpensePanel({
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">{selectedSupplier.name}</p>
-                    <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                    <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                       {selectedSupplier.code ?? "—"}
                       {selectedSupplier.phone ? ` · ${selectedSupplier.phone}` : ""}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[10px] font-semibold uppercase" style={{ color: "#6a8ab8" }}>Outstanding</p>
+                    <p className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>Outstanding</p>
                     <p className="text-sm font-bold tabular-nums" style={{ color: (selectedSupplier.balance ?? 0) > 0 ? "#fbbf24" : "#10b981" }}>
                       LKR {formatNumber(selectedSupplier.balance ?? 0)}
                     </p>
@@ -401,7 +405,7 @@ export function PosQuickExpensePanel({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Amount (LKR) *</label>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Amount (LKR) *</label>
               <input
                 type="number"
                 min={0.01}
@@ -415,7 +419,7 @@ export function PosQuickExpensePanel({
             </div>
             {mode === "expense" ? (
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Date *</label>
+                <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Date *</label>
                 <input
                   type="date"
                   value={date}
@@ -426,7 +430,7 @@ export function PosQuickExpensePanel({
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Paid by</label>
+                <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Paid by</label>
                 <select
                   value={method}
                   onChange={(e) => setMethod(e.target.value)}
@@ -444,7 +448,7 @@ export function PosQuickExpensePanel({
           {mode === "expense" && (
             <>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Description *</label>
+                <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Description *</label>
                 <input
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
@@ -456,7 +460,7 @@ export function PosQuickExpensePanel({
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Category</label>
+                  <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Category</label>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
@@ -469,7 +473,7 @@ export function PosQuickExpensePanel({
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Paid by</label>
+                  <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Paid by</label>
                   <select
                     value={method}
                     onChange={(e) => setMethod(e.target.value)}
@@ -487,7 +491,7 @@ export function PosQuickExpensePanel({
 
           {mode === "supplier" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Notes</label>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Notes</label>
               <input
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -499,7 +503,7 @@ export function PosQuickExpensePanel({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>
               {method === "CHEQUE" ? "Cheque number *" : "Reference"}
             </label>
             <input
@@ -513,7 +517,7 @@ export function PosQuickExpensePanel({
 
           {method === "CHEQUE" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Due date *</label>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Due date *</label>
               <input
                 type="date"
                 value={chequeDue}
@@ -526,7 +530,7 @@ export function PosQuickExpensePanel({
 
           {(method === "CHEQUE" || (mode === "supplier" && method === "BANK_TRANSFER")) && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>
                 Our bank account *
               </label>
               <select
@@ -548,7 +552,7 @@ export function PosQuickExpensePanel({
                 ))}
               </select>
               {selectedBank && (
-                <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                   Pays from {selectedBank.bankName || selectedBank.name}
                 </p>
               )}
@@ -581,22 +585,22 @@ export function PosQuickExpensePanel({
         {/* Recent list */}
         <div
           className="rounded-xl border p-4 overflow-y-auto min-h-0 flex flex-col"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
-          <p className="text-xs font-bold uppercase tracking-wide mb-3 shrink-0" style={{ color: "#6a8ab8" }}>
+          <p className="text-xs font-bold uppercase tracking-wide mb-3 shrink-0" style={{ color: "var(--pos-muted)" }}>
             {mode === "expense" ? "Recent expenses" : "Recent supplier payments"}
           </p>
 
           {mode === "expense" ? (
             recent.length === 0 ? (
-              <p className="text-xs" style={{ color: "#4a6a8a" }}>No recent expenses</p>
+              <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No recent expenses</p>
             ) : (
               <div className="space-y-2">
                 {recent.map((e) => (
                   <div
                     key={e.id}
                     className="rounded-xl border p-2.5"
-                    style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+                    style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
                   >
                     <div className="flex justify-between gap-2">
                       <p className="text-xs font-bold text-white truncate">{e.description}</p>
@@ -604,7 +608,7 @@ export function PosQuickExpensePanel({
                         LKR {formatNumber(e.amount)}
                       </p>
                     </div>
-                    <p className="text-[10px] mt-0.5" style={{ color: "#6a8ab8" }}>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--pos-muted)" }}>
                       {e.categoryId || "—"} · {e.paymentMethod} ·{" "}
                       {new Date(e.date).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
                     </p>
@@ -613,14 +617,14 @@ export function PosQuickExpensePanel({
               </div>
             )
           ) : recentPayments.length === 0 ? (
-            <p className="text-xs" style={{ color: "#4a6a8a" }}>No recent supplier payments</p>
+            <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No recent supplier payments</p>
           ) : (
             <div className="space-y-2">
               {recentPayments.map((p) => (
                 <div
                   key={p.id}
                   className="rounded-xl border p-2.5"
-                  style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+                  style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
                 >
                   <div className="flex justify-between gap-2">
                     <p className="text-xs font-bold text-white truncate">{p.supplier?.name ?? "Supplier"}</p>
@@ -628,7 +632,7 @@ export function PosQuickExpensePanel({
                       LKR {formatNumber(p.amount)}
                     </p>
                   </div>
-                  <p className="text-[10px] mt-0.5" style={{ color: "#6a8ab8" }}>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--pos-muted)" }}>
                     {p.method}
                     {p.reference ? ` · ${p.reference}` : ""}
                     {" · "}

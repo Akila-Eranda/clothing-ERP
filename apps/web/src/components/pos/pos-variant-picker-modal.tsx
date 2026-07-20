@@ -95,17 +95,17 @@ export function PosVariantPickerModal({
     >
       <div
         className="w-full max-w-lg rounded-2xl border overflow-hidden shadow-2xl flex flex-col max-h-[80vh]"
-        style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+        style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ borderColor: "#1e3356" }}>
+        <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
           <div className="min-w-0">
             <p className="text-white font-bold text-sm truncate">{productName}</p>
-            <p className="text-[11px]" style={{ color: "#6a8ab8" }}>
+            <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
               Select variant · ↑↓←→ Enter · Esc · {variants.length} options
             </p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
-            <X className="h-4 w-4" style={{ color: "#6a8ab8" }} />
+            <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
           </button>
         </div>
 
@@ -123,8 +123,8 @@ export function PosVariantPickerModal({
                 onClick={() => onSelect(v)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: focused ? "rgba(79,110,247,0.18)" : "#162338",
-                  borderColor: focused ? "#4f6ef7" : "#1e3356",
+                  background: focused ? "rgba(79,110,247,0.18)" : "var(--pos-card)",
+                  borderColor: focused ? "#4f6ef7" : "var(--pos-border)",
                   boxShadow: focused ? "0 0 0 1px rgba(79,110,247,0.45)" : "none",
                 }}
               >
@@ -153,7 +153,7 @@ export function PosVariantPickerModal({
                       </span>
                     )}
                   </div>
-                  <p className="text-[10px] font-mono truncate" style={{ color: "#6a8ab8" }}>
+                  <p className="text-[10px] font-mono truncate" style={{ color: "var(--pos-muted)" }}>
                     {v.barcode || v.sku}
                     {v.barcode && v.sku !== v.barcode ? ` · ${v.sku}` : ""}
                   </p>
@@ -166,7 +166,7 @@ export function PosVariantPickerModal({
                     LKR {formatNumber(v.unitPrice)}
                   </p>
                   {idx < 9 && (
-                    <p className="text-[9px] font-mono mt-0.5" style={{ color: "#4a6a8a" }}>{idx + 1}</p>
+                    <p className="text-[9px] font-mono mt-0.5" style={{ color: "var(--pos-muted-2)" }}>{idx + 1}</p>
                   )}
                 </div>
               </button>

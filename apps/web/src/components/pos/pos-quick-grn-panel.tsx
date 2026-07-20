@@ -14,7 +14,7 @@ import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
-const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
+const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 type CartLine = {
   variantId: string;
@@ -490,7 +490,7 @@ export function PosQuickGrnPanel({
         <button
           onClick={onBack}
           className="text-xs font-semibold px-3 h-8 rounded-lg transition-colors hover:bg-white/10"
-          style={{ color: "#6a8ab8" }}
+          style={{ color: "var(--pos-muted)" }}
         >
           ← Back
         </button>
@@ -500,11 +500,11 @@ export function PosQuickGrnPanel({
         {/* Left: supplier + assigned products */}
         <div
           className="rounded-xl border p-4 space-y-3 overflow-y-auto min-h-0"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Supplier</label>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Supplier</label>
               <PosRegisterSupplier
                 disabled={busy}
                 onRegistered={(s) => {
@@ -519,7 +519,7 @@ export function PosQuickGrnPanel({
                 onChange={(e) => setSupplierId(e.target.value)}
                 disabled={supplierLoading || busy}
                 className="flex-1 h-10 rounded-xl text-sm px-3 text-white outline-none"
-                style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+                style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
               >
                 <option value="">{supplierLoading ? "Loading..." : "Select supplier..."}</option>
                 {suppliers.map((s) => (
@@ -531,13 +531,13 @@ export function PosQuickGrnPanel({
                 onClick={() => void loadSuppliers()}
                 disabled={supplierLoading || busy}
                 className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-all hover:bg-white/10 disabled:opacity-50"
-                style={{ border: "1px solid #1e3356", color: "#6a8ab8", background: "transparent" }}
+                style={{ border: "1px solid var(--pos-border)", color: "var(--pos-muted)", background: "transparent" }}
               >
                 <RefreshCw className={`h-4 w-4 ${supplierLoading ? "animate-spin" : ""}`} />
               </button>
             </div>
             {supplierId && (
-              <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+              <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                 Use for walk-in cash only. Planned orders → Purchases → Receive from PO.
               </p>
             )}
@@ -558,7 +558,7 @@ export function PosQuickGrnPanel({
                       target="_blank"
                       rel="noreferrer"
                       className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded border"
-                      style={{ color: "#93c5fd", borderColor: "#1e3356", background: "#0f1f3a" }}
+                      style={{ color: "#93c5fd", borderColor: "var(--pos-border)", background: "var(--pos-panel)" }}
                     >
                       {p.poNumber}
                     </a>
@@ -570,7 +570,7 @@ export function PosQuickGrnPanel({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#6a8ab8" }}>
+              <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 Assigned Products
               </p>
               {productsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />}
@@ -578,7 +578,7 @@ export function PosQuickGrnPanel({
 
             {supplierId && (
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style={{ color: "#6a8ab8" }} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" style={{ color: "var(--pos-muted)" }} />
                 <input
                   ref={searchRef}
                   value={productSearch}
@@ -596,13 +596,13 @@ export function PosQuickGrnPanel({
                   disabled={!supplierId || productsLoading || busy || scanBusy}
                   placeholder="Search name / SKU / barcode · Enter to add"
                   className="w-full h-10 pl-9 pr-16 rounded-xl text-sm text-white outline-none placeholder:text-white/30"
-                  style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+                  style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {scanBusy ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />
                   ) : (
-                    <Scan className="h-3.5 w-3.5" style={{ color: "#4a6a8a" }} />
+                    <Scan className="h-3.5 w-3.5" style={{ color: "var(--pos-muted-2)" }} />
                   )}
                   {productSearch ? (
                     <button
@@ -613,7 +613,7 @@ export function PosQuickGrnPanel({
                       }}
                       className="p-1 rounded hover:bg-white/10"
                     >
-                      <X className="h-3.5 w-3.5" style={{ color: "#6a8ab8" }} />
+                      <X className="h-3.5 w-3.5" style={{ color: "var(--pos-muted)" }} />
                     </button>
                   ) : null}
                 </div>
@@ -621,17 +621,17 @@ export function PosQuickGrnPanel({
             )}
 
             {!supplierId ? (
-              <p className="text-xs" style={{ color: "#4a6a8a" }}>Select a supplier to load assigned items.</p>
+              <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>Select a supplier to load assigned items.</p>
             ) : supplierProducts.length === 0 && !productsLoading ? (
-              <p className="text-xs" style={{ color: "#4a6a8a" }}>No products assigned to this supplier.</p>
+              <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No products assigned to this supplier.</p>
             ) : filteredProducts.length === 0 && !productsLoading ? (
-              <p className="text-xs" style={{ color: "#4a6a8a" }}>
+              <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>
                 No match for “{productSearch.trim()}”. Press Enter to lookup barcode.
               </p>
             ) : (
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {productSearch.trim() && (
-                  <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+                  <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                     Showing {filteredProducts.length} of {supplierProducts.length}
                   </p>
                 )}
@@ -641,12 +641,12 @@ export function PosQuickGrnPanel({
                     <div
                       key={p.variantId}
                       className="rounded-lg border p-3"
-                      style={{ background: "#0f1f3a", borderColor: inCart ? "#4f6ef7" : "#1e3356" }}
+                      style={{ background: "var(--pos-panel)", borderColor: inCart ? "#4f6ef7" : "var(--pos-border)" }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-bold text-white truncate">{p.productName}</p>
-                          <p className="text-[10px] truncate" style={{ color: "#6a8ab8" }}>
+                          <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>
                             {p.variantName !== "Default" ? p.variantName : p.sku}
                             {p.barcode ? ` · ${p.barcode}` : ""}
                             {p.supplierProductCode ? ` · ${p.supplierProductCode}` : ""}
@@ -666,16 +666,16 @@ export function PosQuickGrnPanel({
                       </div>
 
                       <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
-                        <span style={{ color: "#6a8ab8" }}>Current stock</span>
+                        <span style={{ color: "var(--pos-muted)" }}>Current stock</span>
                         <span className="text-right font-bold text-white tabular-nums">{p.stock}</span>
-                        <span style={{ color: "#6a8ab8" }}>Last GRN qty</span>
+                        <span style={{ color: "var(--pos-muted)" }}>Last GRN qty</span>
                         <span className="text-right tabular-nums" style={{ color: "#c4b5fd" }}>{p.lastPurchaseQty ?? "-"}</span>
-                        <span style={{ color: "#6a8ab8" }}>Last GRN date</span>
+                        <span style={{ color: "var(--pos-muted)" }}>Last GRN date</span>
                         <span className="text-right" style={{ color: "#c4b5fd" }}>{fmtDate(p.lastPurchaseDate)}</span>
-                        <span style={{ color: "#6a8ab8" }}>Stock after last GRN</span>
+                        <span style={{ color: "var(--pos-muted)" }}>Stock after last GRN</span>
                         <span className="text-right tabular-nums" style={{ color: "#c4b5fd" }}>{p.stockAtLastPurchase ?? "-"}</span>
-                        <span style={{ color: "#6a8ab8" }}>Sold since last GRN</span>
-                        <span className="text-right tabular-nums" style={{ color: p.soldAfterLastPurchase ? "#f59e0b" : "#6a8ab8" }}>
+                        <span style={{ color: "var(--pos-muted)" }}>Sold since last GRN</span>
+                        <span className="text-right tabular-nums" style={{ color: p.soldAfterLastPurchase ? "#f59e0b" : "var(--pos-muted)" }}>
                           {p.soldAfterLastPurchase ?? "-"}
                         </span>
                       </div>
@@ -698,10 +698,10 @@ export function PosQuickGrnPanel({
         {/* Right: GRN bill / cart lines */}
         <div
           className="rounded-xl border p-4 space-y-3 overflow-y-auto min-h-0 flex flex-col"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Notes (optional)</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Notes (optional)</label>
             <input
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -711,10 +711,10 @@ export function PosQuickGrnPanel({
             />
           </div>
 
-          <div className="flex-1 min-h-0 rounded-xl border flex flex-col" style={{ background: "#0f1f3a", borderColor: "#1e3356" }}>
+          <div className="flex-1 min-h-0 rounded-xl border flex flex-col" style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}>
             <div className="p-3 space-y-2 h-full flex flex-col">
               <div className="flex items-center justify-between shrink-0">
-                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "#6a8ab8" }}>GRN Bill (Cart)</p>
+                <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>GRN Bill (Cart)</p>
                 <p className="text-sm font-mono font-bold text-white">
                   LKR {formatNumber(total)}
                 </p>
@@ -722,23 +722,23 @@ export function PosQuickGrnPanel({
 
               <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
                 {grnLines.length === 0 ? (
-                  <p className="text-xs" style={{ color: "#4a6a8a" }}>
+                  <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>
                     Select supplier — assigned items will load here.
                   </p>
                 ) : (
                   grnLines.map((l) => (
-                    <div key={l.variantId} className="rounded-xl border p-3 space-y-2.5" style={{ background: "#162338", borderColor: "#1e3356" }}>
+                    <div key={l.variantId} className="rounded-xl border p-3 space-y-2.5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-bold text-white truncate">{l.productName}</p>
-                          <p className="text-[10px] truncate" style={{ color: "#6a8ab8" }}>{l.sku}</p>
+                          <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>{l.sku}</p>
                         </div>
                         <div className="flex items-center gap-1.5 shrink-0">
-                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, Math.max(1, l.quantity - 1))} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
+                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, Math.max(1, l.quantity - 1))} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "var(--pos-input)" }}>
                             <Minus className="h-3.5 w-3.5 text-white" />
                           </button>
                           <span className="text-white text-sm font-bold w-7 text-center select-none tabular-nums">{l.quantity}</span>
-                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, l.quantity + 1)} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "#1a2b4a" }}>
+                          <button type="button" onClick={() => updateGrnQuantity(l.variantId, l.quantity + 1)} className="h-7 w-7 rounded flex items-center justify-center transition-all hover:opacity-80" style={{ background: "var(--pos-input)" }}>
                             <Plus className="h-3.5 w-3.5 text-white" />
                           </button>
                           <button
@@ -752,7 +752,7 @@ export function PosQuickGrnPanel({
                       </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Buying</label>
+                          <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Buying</label>
                           <input
                             type="number"
                             min={0}
@@ -765,7 +765,7 @@ export function PosQuickGrnPanel({
                         </div>
                         {showExpiry && (
                           <div>
-                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Expiry</label>
+                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Expiry</label>
                             <input
                               type="date"
                               value={lineExpiries[l.variantId] ?? ""}
@@ -777,7 +777,7 @@ export function PosQuickGrnPanel({
                         )}
                         {showBatch && (
                           <div>
-                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Batch</label>
+                            <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Batch</label>
                             <input
                               value={lineBatches[l.variantId] ?? ""}
                               onChange={(e) => setLineBatches((prev) => ({ ...prev, [l.variantId]: e.target.value }))}
@@ -788,8 +788,8 @@ export function PosQuickGrnPanel({
                           </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "#1e3356" }}>
-                        <p className="text-[10px]" style={{ color: "#6a8ab8" }}>Line total</p>
+                      <div className="flex items-center justify-between pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                        <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>Line total</p>
                         <p className="text-sm font-bold text-white tabular-nums">LKR {formatNumber(l.lineTotal)}</p>
                       </div>
                       {l.product?.stockDecreased && (
@@ -807,7 +807,7 @@ export function PosQuickGrnPanel({
           {/* Pay supplier now */}
           <div
             className="rounded-xl border p-3 space-y-2.5 shrink-0"
-            style={{ background: "#0f1f3a", borderColor: payNow ? "rgba(16,185,129,0.45)" : "#1e3356" }}
+            style={{ background: "var(--pos-panel)", borderColor: payNow ? "rgba(16,185,129,0.45)" : "var(--pos-border)" }}
           >
             <div className="flex items-center justify-between gap-2">
               <label className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer select-none">
@@ -821,14 +821,14 @@ export function PosQuickGrnPanel({
                 <Banknote className="h-4 w-4" style={{ color: "#34d399" }} />
                 Pay supplier now
               </label>
-              <span className="text-[10px]" style={{ color: "#6a8ab8" }}>
+              <span className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                 GRN total <span className="font-bold text-white tabular-nums">LKR {formatNumber(total)}</span>
               </span>
             </div>
             {payNow && (
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Amount (LKR)</label>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Amount (LKR)</label>
                   <input
                     type="number"
                     min={0.01}
@@ -844,7 +844,7 @@ export function PosQuickGrnPanel({
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Method</label>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Method</label>
                   <select
                     value={payMethod}
                     onChange={(e) => setPayMethod(e.target.value)}
@@ -859,7 +859,7 @@ export function PosQuickGrnPanel({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Reference</label>
+                  <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Reference</label>
                   <input
                     value={payReference}
                     onChange={(e) => setPayReference(e.target.value)}
@@ -872,7 +872,7 @@ export function PosQuickGrnPanel({
                 {payMethod === "CHEQUE" && (
                   <>
                     <div>
-                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Cheque # *</label>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Cheque # *</label>
                       <input
                         value={chequeNumber}
                         onChange={(e) => setChequeNumber(e.target.value)}
@@ -882,7 +882,7 @@ export function PosQuickGrnPanel({
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Due date</label>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Due date</label>
                       <input
                         type="date"
                         value={chequeDueDate}
@@ -893,7 +893,7 @@ export function PosQuickGrnPanel({
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "#6a8ab8" }}>Bank</label>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Bank</label>
                       <input
                         value={chequeBankName}
                         onChange={(e) => setChequeBankName(e.target.value)}

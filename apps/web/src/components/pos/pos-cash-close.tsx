@@ -115,7 +115,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
   if (!active) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.85)" }}>
-        <div className="rounded-2xl border p-6 text-center max-w-sm w-full" style={{ background: "#0f1f3a", borderColor: "#1e3356" }}>
+        <div className="rounded-2xl border p-6 text-center max-w-sm w-full" style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}>
           <p className="text-white text-sm mb-4">No open cash shift to close.</p>
           <Button onClick={onCancel} className="w-full">Back</Button>
         </div>
@@ -129,9 +129,9 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-lg rounded-2xl border shadow-2xl overflow-hidden max-h-[92vh] flex flex-col"
-        style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+        style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: "#1e3356" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
           <div className="flex items-center gap-2">
             <StopCircle className="h-5 w-5" style={{ color: "#ef4444" }} />
             <span className="text-white font-bold">Close Cash Shift</span>
@@ -142,7 +142,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
         </div>
 
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
-          <div className="rounded-xl p-3 text-sm space-y-1.5" style={{ background: "#162338", border: "1px solid #1e3356" }}>
+          <div className="rounded-xl p-3 text-sm space-y-1.5" style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)" }}>
             {[
               ["Opening float", active.openingCash],
               ["Cash sales", active.summary?.cashSales ?? 0],
@@ -150,11 +150,11 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
               ["Refunds", active.summary?.cashRefunds ?? 0],
             ].map(([label, val]) => (
               <div key={String(label)} className="flex justify-between">
-                <span style={{ color: "#6a8ab8" }}>{label}</span>
+                <span style={{ color: "var(--pos-muted)" }}>{label}</span>
                 <span className="text-white font-semibold tabular-nums">LKR {formatNumber(Number(val))}</span>
               </div>
             ))}
-            <div className="flex justify-between pt-2 border-t font-bold" style={{ borderColor: "#1e3356" }}>
+            <div className="flex justify-between pt-2 border-t font-bold" style={{ borderColor: "var(--pos-border)" }}>
               <span style={{ color: "#10b981" }}>Expected in drawer</span>
               <span style={{ color: "#10b981" }} className="tabular-nums">LKR {formatNumber(expected)}</span>
             </div>
@@ -168,12 +168,12 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
                 const line = denom * qty;
                 return (
                   <div key={denom} className="flex items-center gap-2 text-sm">
-                    <span className="w-14 font-mono shrink-0" style={{ color: "#6a8ab8" }}>{denom.toLocaleString()}</span>
-                    <span style={{ color: "#4a6a8a" }}>×</span>
+                    <span className="w-14 font-mono shrink-0" style={{ color: "var(--pos-muted)" }}>{denom.toLocaleString()}</span>
+                    <span style={{ color: "var(--pos-muted-2)" }}>×</span>
                     <Input
                       type="number"
                       min={0}
-                      className="h-8 w-20 text-center bg-[#1a2b4a] border-[#1e3356] text-white"
+                      className="h-8 w-20 text-center bg-[var(--pos-input)] border-[var(--pos-border)]"
                       value={qty || ""}
                       placeholder="0"
                       onChange={(e) => setCount(denom, e.target.value)}
@@ -185,7 +185,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
                 );
               })}
             </div>
-            <div className="flex justify-between mt-3 pt-3 border-t" style={{ borderColor: "#1e3356" }}>
+            <div className="flex justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--pos-border)" }}>
               <span className="text-white font-semibold">Actual total</span>
               <span className="text-lg font-bold tabular-nums" style={{ color: "#4f6ef7" }}>LKR {formatNumber(actualTotal)}</span>
             </div>
@@ -194,7 +194,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
           {actualTotal > 0 && (
             <div className="rounded-xl p-3 text-sm" style={{ background: variance < 0 ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.08)", border: `1px solid ${variance < 0 ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.25)"}` }}>
               <div className="flex justify-between">
-                <span style={{ color: "#6a8ab8" }}>Variance</span>
+                <span style={{ color: "var(--pos-muted)" }}>Variance</span>
                 <span className="font-bold tabular-nums" style={{ color: variance < 0 ? "#ef4444" : "#10b981" }}>
                   {variance >= 0 ? "+" : ""}{formatNumber(variance)}
                 </span>
@@ -214,7 +214,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="End of day notes…"
-              className="bg-[#1a2b4a] border-[#1e3356] text-white"
+              className="bg-[var(--pos-input)] border-[var(--pos-border)]"
             />
           </div>
         </div>

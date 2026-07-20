@@ -162,7 +162,7 @@ export function PosSalesReportPanel({
             value={date}
             onChange={(e) => setDate(e.target.value)}
             className="h-8 w-[140px] rounded-lg border-0 text-white text-xs"
-            style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+            style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
           />
           <Button
             type="button"
@@ -170,14 +170,14 @@ export function PosSalesReportPanel({
             size="sm"
             onClick={() => void load()}
             className="h-8 gap-1.5"
-            style={{ borderColor: "#1e3356", color: "#6a8ab8", background: "transparent" }}
+            style={{ borderColor: "var(--pos-border)", color: "var(--pos-muted)", background: "transparent" }}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </Button>
           <button
             onClick={onBack}
             className="text-xs font-semibold px-3 h-8 rounded-lg"
-            style={{ color: "#6a8ab8" }}
+            style={{ color: "var(--pos-muted)" }}
           >
             ← Back
           </button>
@@ -201,14 +201,14 @@ export function PosSalesReportPanel({
                   Cash in counter · {shiftLabel}
                 </p>
                 {shiftTime && (
-                  <p className="text-[11px] mt-0.5" style={{ color: "#6a8ab8" }}>{shiftTime}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: "var(--pos-muted)" }}>{shiftTime}</p>
                 )}
               </div>
               <div className="text-right">
                 <p className="text-2xl font-black tabular-nums" style={{ color: "#10b981" }}>
                   LKR {formatNumber(liveDrawer)}
                 </p>
-                <p className="text-[10px]" style={{ color: "#6a8ab8" }}>Expected in drawer</p>
+                <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>Expected in drawer</p>
               </div>
             </div>
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mt-4 pt-3 border-t" style={{ borderColor: "rgba(16,185,129,0.2)" }}>
@@ -219,7 +219,7 @@ export function PosSalesReportPanel({
                 { label: "Shift income", value: income, color: "#4f6ef7" },
               ].map((s) => (
                 <div key={s.label}>
-                  <p className="text-[10px]" style={{ color: "#6a8ab8" }}>{s.label}</p>
+                  <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>{s.label}</p>
                   <p className="text-sm font-bold tabular-nums mt-0.5" style={{ color: s.color }}>
                     LKR {formatNumber(s.value)}
                   </p>
@@ -230,30 +230,30 @@ export function PosSalesReportPanel({
 
           {/* Income vs expenses vs supplier (separate) — this shift only */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+            <div className="rounded-xl border p-4" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
               <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#93c5fd" }}>Shift income</p>
               <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#4f6ef7" }}>
                 LKR {formatNumber(income)}
               </p>
-              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+              <p className="text-[10px] mt-1" style={{ color: "var(--pos-muted)" }}>
                 {summary?.totalSales ?? 0} bills · {summary?.totalItems ?? 0} items
               </p>
             </div>
-            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+            <div className="rounded-xl border p-4" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
               <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#fbbf24" }}>Shift expenses</p>
               <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#f59e0b" }}>
                 LKR {formatNumber(expenses)}
               </p>
-              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+              <p className="text-[10px] mt-1" style={{ color: "var(--pos-muted)" }}>
                 Shop OpEx (cash {formatNumber(summary?.cashExpenses ?? 0)})
               </p>
             </div>
-            <div className="rounded-xl border p-4" style={{ background: "#162338", borderColor: "#1e3356" }}>
+            <div className="rounded-xl border p-4" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}>
               <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: "#fca5a5" }}>Supplier payments</p>
               <p className="text-xl font-bold tabular-nums mt-1" style={{ color: "#ef4444" }}>
                 LKR {formatNumber(supplierPayments)}
               </p>
-              <p className="text-[10px] mt-1" style={{ color: "#6a8ab8" }}>
+              <p className="text-[10px] mt-1" style={{ color: "var(--pos-muted)" }}>
                 Cash-out · not expense · cash {formatNumber(summary?.cashSupplierPayments ?? 0)}
               </p>
             </div>
@@ -269,9 +269,9 @@ export function PosSalesReportPanel({
               <div
                 key={s.label}
                 className="rounded-xl border p-3"
-                style={{ background: "#162338", borderColor: "#1e3356" }}
+                style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
               >
-                <p className="text-[10px] uppercase tracking-wide" style={{ color: "#6a8ab8" }}>{s.label}</p>
+                <p className="text-[10px] uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>{s.label}</p>
                 <p className="text-lg font-bold tabular-nums mt-1" style={{ color: s.color }}>{s.value}</p>
               </div>
             ))}
@@ -280,34 +280,34 @@ export function PosSalesReportPanel({
           <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-3">
             <div
               className="rounded-xl border p-4 space-y-2"
-              style={{ background: "#162338", borderColor: "#1e3356" }}
+              style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
             >
               <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>Payment mix</p>
               {payMethods.length === 0 ? (
-                <p className="text-xs" style={{ color: "#4a6a8a" }}>No payments</p>
+                <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No payments</p>
               ) : (
                 payMethods.map(([method, amt]) => (
                   <div key={method} className="flex justify-between text-xs">
-                    <span style={{ color: "#6a8ab8" }}>{method.replace(/_/g, " ")}</span>
+                    <span style={{ color: "var(--pos-muted)" }}>{method.replace(/_/g, " ")}</span>
                     <span className="font-bold text-white tabular-nums">LKR {formatNumber(amt)}</span>
                   </div>
                 ))
               )}
-              <div className="pt-2 border-t space-y-1.5" style={{ borderColor: "#1e3356" }}>
+              <div className="pt-2 border-t space-y-1.5" style={{ borderColor: "var(--pos-border)" }}>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Opening</span>
+                  <span style={{ color: "var(--pos-muted)" }}>Opening</span>
                   <span className="text-white tabular-nums">LKR {formatNumber(openingBalance)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Income</span>
+                  <span style={{ color: "var(--pos-muted)" }}>Income</span>
                   <span className="tabular-nums" style={{ color: "#4f6ef7" }}>LKR {formatNumber(income)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Expenses</span>
+                  <span style={{ color: "var(--pos-muted)" }}>Expenses</span>
                   <span className="tabular-nums" style={{ color: "#f59e0b" }}>LKR {formatNumber(expenses)}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span style={{ color: "#6a8ab8" }}>Supplier paid</span>
+                  <span style={{ color: "var(--pos-muted)" }}>Supplier paid</span>
                   <span className="tabular-nums" style={{ color: "#ef4444" }}>LKR {formatNumber(supplierPayments)}</span>
                 </div>
               </div>
@@ -315,16 +315,16 @@ export function PosSalesReportPanel({
 
             <div
               className="rounded-xl border overflow-hidden flex flex-col min-h-[280px]"
-              style={{ background: "#162338", borderColor: "#1e3356" }}
+              style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
             >
-              <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "#1e3356" }}>
+              <div className="px-4 py-2.5 border-b flex items-center justify-between" style={{ borderColor: "var(--pos-border)" }}>
                 <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>
                   Bills · {shiftLabel}
                 </p>
-                <span className="text-[10px]" style={{ color: "#6a8ab8" }}>{sales.length} shown</span>
+                <span className="text-[10px]" style={{ color: "var(--pos-muted)" }}>{sales.length} shown</span>
               </div>
               {sales.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center" style={{ color: "#4a6a8a" }}>
+                <div className="flex-1 flex flex-col items-center justify-center" style={{ color: "var(--pos-muted-2)" }}>
                   <Receipt className="h-10 w-10 mb-2 opacity-30" />
                   <p className="text-sm">{viewAll ? "No sales this day" : "No bills by you this day"}</p>
                 </div>
@@ -332,7 +332,7 @@ export function PosSalesReportPanel({
                 <div className="overflow-y-auto flex-1">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr style={{ color: "#6a8ab8", borderBottom: "1px solid #1e3356" }}>
+                      <tr style={{ color: "var(--pos-muted)", borderBottom: "1px solid var(--pos-border)" }}>
                         <th className="text-left px-3 py-2 font-semibold">Invoice</th>
                         <th className="text-left px-3 py-2 font-semibold">Customer</th>
                         <th className="text-left px-3 py-2 font-semibold">Pay</th>
@@ -357,12 +357,12 @@ export function PosSalesReportPanel({
                             }}
                           >
                             <td className="px-3 py-2 font-mono font-semibold text-white">{s.invoiceNumber}</td>
-                            <td className="px-3 py-2 truncate max-w-[120px]" style={{ color: "#6a8ab8" }}>{cust}</td>
-                            <td className="px-3 py-2" style={{ color: "#6a8ab8" }}>{pay}</td>
+                            <td className="px-3 py-2 truncate max-w-[120px]" style={{ color: "var(--pos-muted)" }}>{cust}</td>
+                            <td className="px-3 py-2" style={{ color: "var(--pos-muted)" }}>{pay}</td>
                             <td className="px-3 py-2 text-right font-bold text-white tabular-nums">
                               LKR {formatNumber(s.total)}
                             </td>
-                            <td className="px-3 py-2 text-right" style={{ color: "#6a8ab8" }}>
+                            <td className="px-3 py-2 text-right" style={{ color: "var(--pos-muted)" }}>
                               {new Date(s.invoiceDate).toLocaleTimeString("en-LK", {
                                 hour: "2-digit",
                                 minute: "2-digit",

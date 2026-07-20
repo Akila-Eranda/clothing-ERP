@@ -179,8 +179,8 @@ export function PosPromotionsPanel({
   };
 
   const fieldStyle = {
-    background: "#1a2b4a",
-    border: "1px solid #1e3356",
+    background: "var(--pos-input)",
+    border: "1px solid var(--pos-border)",
     color: "#fff",
   } as const;
 
@@ -204,14 +204,14 @@ export function PosPromotionsPanel({
             type="button"
             onClick={() => void load()}
             className="h-8 w-8 rounded-lg flex items-center justify-center"
-            style={{ color: "#6a8ab8" }}
+            style={{ color: "var(--pos-muted)" }}
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
           <button
             onClick={onBack}
             className="text-xs font-semibold px-3 h-8 rounded-lg"
-            style={{ color: "#6a8ab8" }}
+            style={{ color: "var(--pos-muted)" }}
           >
             ← Back
           </button>
@@ -222,7 +222,7 @@ export function PosPromotionsPanel({
         {/* Create */}
         <div
           className="rounded-xl border p-4 space-y-3 overflow-y-auto"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
           <p className="text-xs font-semibold" style={{ color: "#93c5fd" }}>
             Quick create coupon
@@ -234,7 +234,7 @@ export function PosPromotionsPanel({
           )}
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Name *</label>
+            <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Name *</label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -247,7 +247,7 @@ export function PosPromotionsPanel({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Type</label>
+              <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Type</label>
               <select
                 value={discountType}
                 onChange={(e) => setDiscountType(e.target.value as "PERCENTAGE" | "FIXED")}
@@ -260,7 +260,7 @@ export function PosPromotionsPanel({
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Value *</label>
+              <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Value *</label>
               <Input
                 type="number"
                 min={0}
@@ -275,7 +275,7 @@ export function PosPromotionsPanel({
 
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Coupon code</label>
+              <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Coupon code</label>
               <Input
                 value={couponCode}
                 onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
@@ -286,7 +286,7 @@ export function PosPromotionsPanel({
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Min order</label>
+              <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Min order</label>
               <Input
                 type="number"
                 min={0}
@@ -300,7 +300,7 @@ export function PosPromotionsPanel({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold" style={{ color: "#6a8ab8" }}>Ends (optional)</label>
+            <label className="text-[10px] font-semibold" style={{ color: "var(--pos-muted)" }}>Ends (optional)</label>
             <Input
               type="date"
               value={endsAt}
@@ -321,7 +321,7 @@ export function PosPromotionsPanel({
             Create Promotion
           </Button>
 
-          <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+          <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
             Cart total now: LKR {formatNumber(cartSubtotal)}. Apply a live coupon to the bill.
           </p>
         </div>
@@ -329,7 +329,7 @@ export function PosPromotionsPanel({
         {/* List */}
         <div
           className="rounded-xl border p-4 flex flex-col min-h-0 overflow-hidden"
-          style={{ background: "#162338", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
         >
           <div className="flex items-center gap-2 mb-3 shrink-0">
             <Input
@@ -347,7 +347,7 @@ export function PosPromotionsPanel({
                 <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#4f6ef7" }} />
               </div>
             ) : filtered.length === 0 ? (
-              <p className="text-xs text-center py-10" style={{ color: "#4a6a8a" }}>
+              <p className="text-xs text-center py-10" style={{ color: "var(--pos-muted-2)" }}>
                 No promotions yet
               </p>
             ) : (
@@ -358,8 +358,8 @@ export function PosPromotionsPanel({
                     key={p.id}
                     className="rounded-lg border p-3"
                     style={{
-                      background: "#0f1f3a",
-                      borderColor: live ? "rgba(79,110,247,0.45)" : "#1e3356",
+                      background: "var(--pos-panel)",
+                      borderColor: live ? "rgba(79,110,247,0.45)" : "var(--pos-border)",
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -376,7 +376,7 @@ export function PosPromotionsPanel({
                             {live ? "Live" : p.isActive ? "Scheduled" : "Off"}
                           </Badge>
                         </div>
-                        <p className="text-[11px] mt-0.5 flex items-center gap-1.5" style={{ color: "#6a8ab8" }}>
+                        <p className="text-[11px] mt-0.5 flex items-center gap-1.5" style={{ color: "var(--pos-muted)" }}>
                           {p.discountType === "PERCENTAGE" ? (
                             <Percent className="h-3 w-3" />
                           ) : (
@@ -394,7 +394,7 @@ export function PosPromotionsPanel({
                             onClick={() => void toggle(p)}
                             className="h-8 w-8 rounded-lg flex items-center justify-center"
                             title="Toggle"
-                            style={{ color: p.isActive ? "#34d399" : "#6a8ab8", background: "#1a2b4a" }}
+                            style={{ color: p.isActive ? "#34d399" : "var(--pos-muted)", background: "var(--pos-input)" }}
                           >
                             <Power className="h-3.5 w-3.5" />
                           </button>
@@ -405,7 +405,7 @@ export function PosPromotionsPanel({
                           onClick={() => void applyPromo(p)}
                           className="h-8 text-[10px] gap-1"
                           style={{
-                            background: live && p.couponCode ? "#4f6ef7" : "#1a2b4a",
+                            background: live && p.couponCode ? "#4f6ef7" : "var(--pos-input)",
                             color: "#fff",
                             opacity: live && p.couponCode ? 1 : 0.5,
                           }}

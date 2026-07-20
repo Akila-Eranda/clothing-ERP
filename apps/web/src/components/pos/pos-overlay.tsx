@@ -14,6 +14,7 @@ import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { receiptThemeStyleBlock } from "@/lib/receipt-theme";
+import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
@@ -1819,15 +1820,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     // PRODUCTS
     if (activeNav === "products") return (
       <div className="flex flex-col h-full overflow-hidden">
-        <div className="flex items-center gap-2 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-none" style={{borderColor:"#1e3356"}}>
+        <div className="flex items-center gap-2 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-none" style={{borderColor:"var(--pos-border)"}}>
           {categories.map(cat=>(
-            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activeCategory===cat?"#fff":"#6a8ab8"}}>
+            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activeCategory===cat?"#fff":"var(--pos-muted)"}}>
               {cat}
             </button>
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
+          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
             <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
               {productCards.map((card, pIdx)=>{
                 const p = card.rep;
@@ -1839,29 +1840,29 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   ? `LKR ${formatNumber(card.minPrice)}–${formatNumber(card.maxPrice)}`
                   : `LKR ${formatNumber(card.minPrice)}`;
                 return (
-                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"#162338",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
-                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"#162338":getCardBg(p.color)}}>
+                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
+                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":getCardBg(p.color)}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={getCardBg(p.color)} iconClassName="h-10 w-10 text-white/20" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"#d97706":"#16a34a"}}>{varStock}</div>
                       {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:allowNegativeStock?"rgba(245,158,11,0.9)":"rgba(220,38,38,0.85)",color:"#fff"}}>{allowNegativeStock?"Stock 0 — sell OK":"Out of Stock"}</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(217,119,6,0.9)",color:"#fff"}}>Low Stock</div>}
                       <button onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
-                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"#6a8ab8"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
+                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"var(--pos-muted)"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
                   </motion.div>
                 );
               })}
             </div>
           )}
         </div>
-        <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"#1e3356"}}>
-          <div className="flex-1 border-r flex flex-col min-w-0" style={{borderColor:"#1e3356"}}>
-            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+        <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"var(--pos-border)"}}>
+          <div className="flex-1 border-r flex flex-col min-w-0" style={{borderColor:"var(--pos-border)"}}>
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
+            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>}</div>
-            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"#4a6a8a"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>{
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>}</div>
+            <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>{
               const product = products.find((p) => p.variantId === s.variantId);
               return (
                 <button
@@ -1874,11 +1875,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold truncate">{s.name}</p>
-                    <p className="text-xs truncate" style={{color:"#6a8ab8"}}>{s.variant} · ×{s.qty}</p>
+                    <p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{s.variant} · ×{s.qty}</p>
                   </div>
                   <div className="text-right shrink-0">
                     <span className="text-sm font-bold block" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span>
-                    <span className="text-[10px]" style={{color:"#4a6a8a"}}>{s.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
+                    <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{s.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
                   </div>
                 </button>
               );
@@ -1949,23 +1950,23 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* Search bar + Register button */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input value={inlineCustomerSearch} onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
+            <input value={inlineCustomerSearch} onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
             {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
           </div>
-          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold text-white shrink-0 transition-all hover:opacity-90" style={{background:showNewCust?"#162338":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none"}}>
+          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold text-white shrink-0 transition-all hover:opacity-90" style={{background:showNewCust?"var(--pos-card)":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none"}}>
             {showNewCust?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{showNewCust?"Cancel":"Register New"}
           </button>
         </div>
         {/* Register form */}
         {showNewCust&&(
-          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={{background:"#162338",borderColor:"#4f6ef7"}}>
+          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={{background:"var(--pos-card)",borderColor:"#4f6ef7"}}>
             <p className="text-white font-bold text-sm flex items-center gap-2"><User className="h-4 w-4" style={{color:"#4f6ef7"}}/>Register New Customer</p>
             <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>First Name *</label><input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Last Name</label><input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"#6a8ab8"}}>Email</label><input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>First Name *</label><input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Last Name</label><input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Email</label><input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
             </div>
             <button onClick={saveNewCustomer} disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()} className="w-full h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40" style={{background:"#4f6ef7"}}>
               {newCustSaving?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}{newCustSaving?"Saving...":"Save & Add to Bill"}
@@ -1976,22 +1977,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {customer ? (
           <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}>
             <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div>
-            <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
+            <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
             <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>On bill</span>
-            <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+            <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
           </div>
         ) : (
-          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border border-dashed" style={{borderColor:"#1e3356",background:"#162338"}}>
-            <User className="h-5 w-5 shrink-0" style={{color:"#6a8ab8"}}/>
-            <p className="text-sm flex-1" style={{color:"#6a8ab8"}}>No {workspace.customerLabel.toLowerCase()} on bill — tap <span className="font-bold text-white">Select</span> below</p>
+          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border border-dashed" style={{borderColor:"var(--pos-border)",background:"var(--pos-card)"}}>
+            <User className="h-5 w-5 shrink-0" style={{color:"var(--pos-muted)"}}/>
+            <p className="text-sm flex-1" style={{color:"var(--pos-muted)"}}>No {workspace.customerLabel.toLowerCase()} on bill — tap <span className="font-bold text-white">Select</span> below</p>
           </div>
         )}
         {/* List + insight */}
         <div className="flex-1 min-h-0 grid gap-3" style={{gridTemplateColumns:"minmax(260px,1fr) minmax(280px,1.1fr)"}}>
-          <div className="min-h-0 overflow-y-auto rounded-xl border p-2" style={{borderColor:"#1e3356",background:"#0f1f3a"}}>
-            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"#4a6a8a"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-2" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
+            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
             {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
-              <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"#4a6a8a"}}>
+              <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"var(--pos-muted-2)"}}>
                 <AlertCircle className="h-8 w-8 opacity-30"/>
                 <p className="text-sm">No customers found</p>
                 <button onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(inlineCustomerSearch.trim()))setNewCustPhone(inlineCustomerSearch.trim());setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
@@ -2003,17 +2004,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   onClick={() => { setFocusedCustomerIdx(cIdx); void loadCustomerInsight(c.id); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
                   className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
-                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(79,110,247,0.12)":"#162338",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"#4f6ef7":"#1e3356",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(79,110,247,0.12)":"var(--pos-card)",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"#4f6ef7":"var(--pos-border)",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
                   <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
-                  <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"#6a8ab8"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"#4a6a8a"}}>{c.loyaltyPoints} pts</span>}</div></div>
+                  <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{c.loyaltyPoints} pts</span>}</div></div>
                   <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
                 </div>
               ))}
             </div>
           </div>
-          <div className="min-h-0 overflow-y-auto rounded-xl border p-3 flex flex-col gap-3" style={{borderColor:"#1e3356",background:"#0f1f3a"}}>
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-3 flex flex-col gap-3" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
             {!previewCustomerId && !customer ? (
-              <div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}>
+              <div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}>
                 <FileText className="h-12 w-12 mb-2 opacity-20"/>
                 <p className="text-sm font-medium">Customer history</p>
                 <p className="text-xs mt-1 text-center opacity-70">Tap a customer to preview bills & top products, then Select to add to bill</p>
@@ -2024,7 +2025,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               <>
                 <div className="shrink-0">
                   <p className="text-white text-sm font-bold truncate">{insightCustomer?.name ?? "Customer"}</p>
-                  <p className="text-xs" style={{color:"#6a8ab8"}}>
+                  <p className="text-xs" style={{color:"var(--pos-muted)"}}>
                     {typeof customerInsight?.totalOrders === "number" ? `${customerInsight.totalOrders} orders` : `${customerInsight?.sales.length ?? 0} recent bills`}
                     {typeof customerInsight?.totalSpent === "number" ? ` · LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
                   </p>
@@ -2035,14 +2036,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </div>
                   )}
                   {(customerInsight?.creditLimit ?? 0) > 0 && (
-                    <p className="text-[10px] mt-1" style={{color:"#6a8ab8"}}>
+                    <p className="text-[10px] mt-1" style={{color:"var(--pos-muted)"}}>
                       Credit limit LKR {formatNumber(customerInsight!.creditLimit!)} · Available LKR {formatNumber(customerInsight!.creditAvailable ?? 0)}
                     </p>
                   )}
                 </div>
                 {(customerInsight?.creditBalance ?? 0) > 0 && previewCustomerId && (
-                  <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"#162338",borderColor:"#1e3356"}}>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Settle outstanding</p>
+                  <div className="shrink-0 rounded-xl border p-3 space-y-2" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Settle outstanding</p>
                     <div className="flex gap-2">
                       <input
                         type="number"
@@ -2052,13 +2053,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         onChange={(e) => setCreditPayAmount(e.target.value)}
                         placeholder={`Max ${formatNumber(customerInsight!.creditBalance!)}`}
                         className="flex-1 h-9 rounded-xl px-3 text-sm text-white outline-none"
-                        style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       />
                       <select
                         value={creditPayMethod}
                         onChange={(e) => setCreditPayMethod(e.target.value)}
                         className="h-9 rounded-xl px-2 text-xs text-white outline-none"
-                        style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                        style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       >
                         <option value="CASH">Cash</option>
                         <option value="CARD">Card</option>
@@ -2071,7 +2072,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         type="button"
                         onClick={() => setCreditPayAmount(String(customerInsight!.creditBalance!))}
                         className="flex-1 h-8 rounded-lg text-[10px] font-bold"
-                        style={{background:"#1a2b4a",color:"#93c5fd",border:"1px solid #1e3356"}}
+                        style={{background:"var(--pos-input)",color:"#93c5fd",border:"1px solid var(--pos-border)"}}
                       >
                         Pay full
                       </button>
@@ -2091,14 +2092,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <AlertCircle className="h-3.5 w-3.5" style={{color:"#fbbf24"}}/>
-                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Unpaid bills</p>
+                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Unpaid bills</p>
                     </div>
                     <div className="space-y-1.5">
                       {customerInsight!.outstandingSales!.map((sale) => (
                         <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.25)"}}>
                           <div className="min-w-0">
                             <p className="text-xs font-mono font-bold truncate" style={{color:"#fbbf24"}}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>
+                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>
                               {new Date(sale.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
                               {" · "}Due LKR {formatNumber(sale.balanceDue ?? sale.total - (sale.amountPaid ?? 0))}
                             </p>
@@ -2112,20 +2113,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Receipt className="h-3.5 w-3.5" style={{color:"#4f6ef7"}}/>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Previous bills</p>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Previous bills</p>
                   </div>
                   {(customerInsight?.sales.length ?? 0) === 0 ? (
-                    <p className="text-xs py-3 text-center" style={{color:"#4a6a8a"}}>No previous bills</p>
+                    <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No previous bills</p>
                   ) : (
                     <div className="space-y-1.5">
                       {customerInsight!.sales.slice(0, 10).map((sale) => {
                         const isPending = sale.paymentStatus === "PENDING";
                         const due = sale.balanceDue ?? (isPending ? sale.total - (sale.amountPaid ?? 0) : 0);
                         return (
-                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:isPending?"rgba(245,158,11,0.06)":"#162338",border:`1px solid ${isPending?"rgba(245,158,11,0.25)":"#1e3356"}`}}>
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:isPending?"rgba(245,158,11,0.06)":"var(--pos-card)",border:`1px solid ${isPending?"rgba(245,158,11,0.25)":"var(--pos-border)"}`}}>
                           <div className="min-w-0">
                             <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"#fbbf24":"#4f6ef7"}}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
+                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
                           </div>
                           <p className="text-xs font-bold font-mono text-white shrink-0">LKR {formatNumber(sale.total)}</p>
                         </div>
@@ -2137,18 +2138,18 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="h-3.5 w-3.5" style={{color:"#10b981"}}/>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"#6a8ab8"}}>Top products</p>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Top products</p>
                   </div>
                   {(customerInsight?.topProducts.length ?? 0) === 0 ? (
-                    <p className="text-xs py-3 text-center" style={{color:"#4a6a8a"}}>No purchase history yet</p>
+                    <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No purchase history yet</p>
                   ) : (
                     <div className="space-y-1.5">
                       {customerInsight!.topProducts.map((p, idx) => (
-                        <div key={`${p.variantId}-${idx}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{background:"#162338",border:"1px solid #1e3356"}}>
+                        <div key={`${p.variantId}-${idx}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>
                           <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-white font-semibold truncate">{p.productName}</p>
-                            <p className="text-[10px]" style={{color:"#6a8ab8"}}>{p.qty} sold · LKR {formatNumber(p.spent)}</p>
+                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{p.qty} sold · LKR {formatNumber(p.spent)}</p>
                           </div>
                         </div>
                       ))}
@@ -2166,19 +2167,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     // HOLD BILLS
     if (activeNav === "hold-bills") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
-        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"#6a8ab8"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#6a8ab8"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"#4f6ef7"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
-        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
+        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"var(--pos-muted)"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"#4f6ef7"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
+        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
           <div className="flex-1 overflow-y-auto grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",alignContent:"start"}}>
             {serverHeldBills.map((bill,idx)=>{
               const billItems = bill.data?.items ?? [];
               const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
               const kbFocus = focusedHeldIdx === idx;
               return (
-                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"#162338",borderColor:kbFocus?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
-                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span></div>
+                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"var(--pos-card)",borderColor:kbFocus?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                  <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span></div>
                   {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
-                  <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{billItems.length-3} more items</p>}</div>
-                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"#1e3356"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"#10b981"}}>Restore</button></div></div>
+                  <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more items</p>}</div>
+                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"#10b981"}}>Restore</button></div></div>
                 </div>
               );
             })}
@@ -2194,21 +2195,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <h2 className="text-white font-bold text-base">
             {viewAllSales ? "Current Sales (Today)" : "My Sales (Today)"}
           </h2>
-          <button onClick={loadOrders} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+          <button onClick={loadOrders} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
             <RefreshCw className={cn("h-3.5 w-3.5",ordersLoading&&"animate-spin")}/>Refresh
           </button>
         </div>
-        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
-          <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
+        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
+          <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
             <table className="w-full text-sm">
-              <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"#6a8ab8",borderBottom:"1px solid #1e3356"}}>{h}</th>)}</tr></thead>
+              <thead style={{position:"sticky",top:0,background:"var(--pos-panel)"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"var(--pos-muted)",borderBottom:"1px solid var(--pos-border)"}}>{h}</th>)}</tr></thead>
               <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid #1a2b3a",background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
                 <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
                 <td className="px-3 py-2 text-xs text-white">{formatSaleCustomerName(o.customer)}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o._count?.items??0}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>{o._count?.items??0}</td>
                 <td className="px-3 py-2 text-xs font-bold font-mono text-white">LKR {formatNumber(o.total)}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{o.payments?.[0]?.method ?? o.paymentMethod ?? "-"}</td>
-                <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>{new Date(o.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>{o.payments?.[0]?.method ?? o.paymentMethod ?? "-"}</td>
+                <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>{new Date(o.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</td>
                 <td className="px-3 py-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{o.status}</span></td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
@@ -2253,32 +2254,32 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return (
         <div className="flex flex-col h-full overflow-hidden p-4 gap-4">
           <h2 className="text-white font-bold text-base">Gift Vouchers</h2>
-          <div className="rounded-xl border p-4 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
-            <p className="text-xs" style={{color:"#6a8ab8"}}>Issue a new gift voucher (redeem at checkout via Voucher payment)</p>
+          <div className="rounded-xl border p-4 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+            <p className="text-xs" style={{color:"var(--pos-muted)"}}>Issue a new gift voucher (redeem at checkout via Voucher payment)</p>
             <div className="grid grid-cols-2 gap-2">
-              <Input type="number" placeholder="Amount (LKR)" value={voucherIssueAmt} onChange={(e)=>setVoucherIssueAmt(e.target.value)} className="bg-[#1a2b4a] border-[#1e3356] text-white" />
-              <Input placeholder="Recipient name (optional)" value={voucherIssueName} onChange={(e)=>setVoucherIssueName(e.target.value)} className="bg-[#1a2b4a] border-[#1e3356] text-white" />
+              <Input type="number" placeholder="Amount (LKR)" value={voucherIssueAmt} onChange={(e)=>setVoucherIssueAmt(e.target.value)} className="bg-[var(--pos-input)] border-[var(--pos-border)] text-white" />
+              <Input placeholder="Recipient name (optional)" value={voucherIssueName} onChange={(e)=>setVoucherIssueName(e.target.value)} className="bg-[var(--pos-input)] border-[var(--pos-border)] text-white" />
             </div>
             <button type="button" onClick={issueVoucher} disabled={voucherBusy} className="px-4 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{background:"#4f6ef7"}}>
               {voucherBusy ? <Loader2 className="h-4 w-4 animate-spin inline mr-2"/> : <Gift className="h-4 w-4 inline mr-2"/>}
               Issue Voucher
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
+          <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
             <table className="w-full text-sm">
-              <thead style={{position:"sticky",top:0,background:"#0f1f3a"}}>
-                <tr>{["Code","Balance","Initial","Status"].map(h=><th key={h} className="text-left px-3 py-2 text-[11px]" style={{color:"#6a8ab8"}}>{h}</th>)}</tr>
+              <thead style={{position:"sticky",top:0,background:"var(--pos-panel)"}}>
+                <tr>{["Code","Balance","Initial","Status"].map(h=><th key={h} className="text-left px-3 py-2 text-[11px]" style={{color:"var(--pos-muted)"}}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {vouchers.map((v)=>(
                   <tr key={v.id} className="border-t" style={{borderColor:"#1a2b3a"}}>
                     <td className="px-3 py-2 font-mono text-xs text-white">{v.code}</td>
                     <td className="px-3 py-2 text-xs text-emerald-400">LKR {formatNumber(v.balance)}</td>
-                    <td className="px-3 py-2 text-xs" style={{color:"#6a8ab8"}}>LKR {formatNumber(v.initialAmount)}</td>
-                    <td className="px-3 py-2 text-xs" style={{color:"#a0b4d4"}}>{v.status}</td>
+                    <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(v.initialAmount)}</td>
+                    <td className="px-3 py-2 text-xs" style={{color:"var(--pos-text-secondary)"}}>{v.status}</td>
                   </tr>
                 ))}
-                {!vouchers.length && <tr><td colSpan={4} className="px-3 py-8 text-center text-sm" style={{color:"#4a6a8a"}}>No vouchers yet</td></tr>}
+                {!vouchers.length && <tr><td colSpan={4} className="px-3 py-8 text-center text-sm" style={{color:"var(--pos-muted-2)"}}>No vouchers yet</td></tr>}
               </tbody>
             </table>
           </div>
@@ -2347,16 +2348,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 {["search","items","confirm","done"].map((s,i)=>(
                   <React.Fragment key={s}>
                     <div className="flex items-center gap-1">
-                      <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{background:["search","items","confirm","done"].indexOf(returnStep)>=i?"#4f6ef7":"#1a2b4a",color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#fff":"#4a6a8a"}}>{i+1}</div>
-                      <span className="text-[10px] capitalize" style={{color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#a0b4d4":"#4a6a8a"}}>{s=="search"?"Find Sale":s=="items"?"Select Items":s=="confirm"?"Confirm":"Done"}</span>
+                      <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{background:["search","items","confirm","done"].indexOf(returnStep)>=i?"#4f6ef7":"var(--pos-input)",color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#fff":"var(--pos-muted-2)"}}>{i+1}</div>
+                      <span className="text-[10px] capitalize" style={{color:["search","items","confirm","done"].indexOf(returnStep)>=i?"var(--pos-text-secondary)":"var(--pos-muted-2)"}}>{s=="search"?"Find Sale":s=="items"?"Select Items":s=="confirm"?"Confirm":"Done"}</span>
                     </div>
-                    {i<3&&<div className="w-6 h-px mx-1" style={{background:"#1e3356"}}/>}
+                    {i<3&&<div className="w-6 h-px mx-1" style={{background:"var(--pos-border)"}}/>}
                   </React.Fragment>
                 ))}
               </div>
             </div>
             {returnStep !== "search" && returnStep !== "done" && (
-              <button onClick={()=>{setReturnStep("search");setReturnSale(null);setReturnSearchRes([]);}} className="flex items-center gap-1.5 px-3 h-7 rounded-lg text-xs" style={{color:"#6a8ab8",border:"1px solid #1e3356"}}>? Back to Search</button>
+              <button onClick={()=>{setReturnStep("search");setReturnSale(null);setReturnSearchRes([]);}} className="flex items-center gap-1.5 px-3 h-7 rounded-lg text-xs" style={{color:"var(--pos-muted)",border:"1px solid var(--pos-border)"}}>? Back to Search</button>
             )}
           </div>
 
@@ -2364,30 +2365,30 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           {returnStep==="search"&&(
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex gap-2">
-                <input value={returnQuery} onChange={e=>setReturnQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&searchSale()} placeholder="Enter invoice number or customer phone..." className="flex-1 h-10 px-4 rounded-xl text-sm text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <input value={returnQuery} onChange={e=>setReturnQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&searchSale()} placeholder="Enter invoice number or customer phone..." className="flex-1 h-10 px-4 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
                 <button onClick={searchSale} disabled={returnSearchLoading||!returnQuery.trim()} className="px-5 h-10 rounded-xl text-sm font-bold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>{returnSearchLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Search className="h-4 w-4"/>}Search</button>
               </div>
               {returnSearchRes.length > 0 && (
-                <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"#1e3356"}}>
-                  <div className="px-3 py-2 border-b" style={{borderColor:"#1e3356"}}><p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
+                <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="px-3 py-2 border-b" style={{borderColor:"var(--pos-border)"}}><p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
                   {returnSearchRes.map(row=>(
                     <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"#1a2b3a"}}>
                       {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>}
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
-                        <p className="text-xs" style={{color:"#6a8ab8"}}>{formatSaleCustomerName(row.customer)} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
+                        <p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(row.customer)} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className="text-white font-bold text-sm">LKR {formatNumber(row.total)}</p>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:STATUS_STYLE[row.status]?.bg??"rgba(100,100,100,0.15)",color:STATUS_STYLE[row.status]?.color??"#9ca3af"}}>{row.status}</span>
                       </div>
-                      <ChevronRight className="h-4 w-4 shrink-0" style={{color:"#4a6a8a"}}/>
+                      <ChevronRight className="h-4 w-4 shrink-0" style={{color:"var(--pos-muted-2)"}}/>
                     </button>
                   ))}
                 </div>
               )}
               {returnSearchRes.length===0&&!returnSearchLoading&&(
-                <div className="flex flex-col items-center justify-center flex-1" style={{color:"#4a6a8a"}}><RotateCcw className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">Search a sale to start a return</p><p className="text-xs mt-1">Enter invoice number like INV-001 or customer phone</p></div>
+                <div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><RotateCcw className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">Search a sale to start a return</p><p className="text-xs mt-1">Enter invoice number like INV-001 or customer phone</p></div>
               )}
             </div>
           )}
@@ -2396,52 +2397,52 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           {returnStep==="items"&&returnSale&&(
             <div className="flex-1 flex gap-3 min-h-0 overflow-hidden">
               <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-                <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
-                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"#6a8ab8"}}>{formatSaleCustomerName(returnSale.customer)} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
+                <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                  <div><p className="text-white font-bold text-sm font-mono">{returnSale.invoiceNumber}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(returnSale.customer)} · {new Date(returnSale.invoiceDate).toLocaleDateString()}</p></div>
                   <div className="ml-auto text-right"><p className="text-white font-bold">LKR {formatNumber(returnSale.total)}</p><span className="text-[10px]" style={{color:STATUS_STYLE[returnSale.status]?.color??"#9ca3af"}}>{returnSale.status}</span></div>
                 </div>
-                <p className="text-xs font-semibold shrink-0" style={{color:"#6a8ab8"}}>SELECT ITEMS TO RETURN</p>
+                <p className="text-xs font-semibold shrink-0" style={{color:"var(--pos-muted)"}}>SELECT ITEMS TO RETURN</p>
                 <div className="flex-1 overflow-y-auto space-y-1">
                   {returnSale.items.map(it=>{
                     const sel=returnItems.get(it.variantId);
                     const isSelected=(sel?.qty??0)>0;
                     return(
-                      <div key={it.variantId} className="flex items-center gap-3 p-2.5 rounded-xl border transition-all" style={{background:isSelected?"rgba(79,110,247,0.1)":"#162338",borderColor:isSelected?"#4f6ef7":"#1e3356"}}>
-                        <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"#4f6ef7":"transparent",borderColor:isSelected?"#4f6ef7":"#2a3a5c"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
+                      <div key={it.variantId} className="flex items-center gap-3 p-2.5 rounded-xl border transition-all" style={{background:isSelected?"rgba(79,110,247,0.1)":"var(--pos-card)",borderColor:isSelected?"#4f6ef7":"var(--pos-border)"}}>
+                        <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"#4f6ef7":"transparent",borderColor:isSelected?"#4f6ef7":"var(--pos-border-strong)"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-xs font-semibold truncate">{it.productName}</p>
-                          <p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{it.variantName} · SKU: {it.sku}</p>
+                          <p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{it.variantName} · SKU: {it.sku}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
-                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty>0)n.set(it.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
+                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty>0)n.set(it.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
                           <span className="text-white text-xs font-bold w-6 text-center">{sel?.qty??0}</span>
-                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty<cur.maxQty)n.set(it.variantId,{...cur,qty:cur.qty+1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
+                          <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur&&cur.qty<cur.maxQty)n.set(it.variantId,{...cur,qty:cur.qty+1});return n;})} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-3 w-3 text-white"/></button>
                         </div>
                         <div className="text-right shrink-0 w-24">
                           <p className="text-white text-xs font-bold">LKR {formatNumber(it.unitPrice * (sel?.qty??0))}</p>
-                          <p className="text-[10px]" style={{color:"#6a8ab8"}}>of {it.quantity} · LKR {formatNumber(it.unitPrice)} ea</p>
+                          <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>of {it.quantity} · LKR {formatNumber(it.unitPrice)} ea</p>
                         </div>
                       </div>
                     );
                   })}
                 </div>
                 {returnType==="EXCHANGE"&&(
-                  <div className="shrink-0 rounded-xl border p-2 space-y-2" style={{background:"#0f1f3a",borderColor:"#1e3356",maxHeight:"230px"}}>
+                  <div className="shrink-0 rounded-xl border p-2 space-y-2" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)",maxHeight:"230px"}}>
                     <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold shrink-0" style={{color:"#6a8ab8"}}>EXCHANGE ITEM</p>
-                      <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                      <p className="text-xs font-semibold shrink-0" style={{color:"var(--pos-muted)"}}>EXCHANGE ITEM</p>
+                      <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
                     </div>
                     <div className="grid gap-1 overflow-y-auto" style={{gridTemplateColumns:"repeat(auto-fill,minmax(190px,1fr))",maxHeight:"170px"}}>
                       {exchangeProducts.map(p=>{
                         const ex=exchangeItems.get(p.variantId);
                         return(
-                          <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"#162338",borderColor:(ex?.qty??0)>0?"#4f6ef7":"#1e3356"}}>
+                          <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"var(--pos-card)",borderColor:(ex?.qty??0)>0?"#4f6ef7":"var(--pos-border)"}}>
                             <PosProductThumb url={p.imageUrl} name={p.productName} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color)} iconClassName="h-4 w-4" />
-                            <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"#6a8ab8"}}>{p.variantName} · {p.sku}</p></div>
+                            <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{p.variantName} · {p.sku}</p></div>
                             <div className="flex items-center gap-1 shrink-0">
-                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
+                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);if(cur&&cur.qty>0)n.set(p.variantId,{...cur,qty:cur.qty-1});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-2.5 w-2.5 text-white"/></button>
                               <span className="text-white text-xs font-bold w-4 text-center">{ex?.qty??0}</span>
-                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);n.set(p.variantId,{qty:(cur?.qty??0)+1,unitPrice:p.unitPrice,name:`${p.productName} ${p.variantName}`.trim(),maxQty:p.stock});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-2.5 w-2.5 text-white"/></button>
+                              <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);n.set(p.variantId,{qty:(cur?.qty??0)+1,unitPrice:p.unitPrice,name:`${p.productName} ${p.variantName}`.trim(),maxQty:p.stock});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-2.5 w-2.5 text-white"/></button>
                             </div>
                             <p className="text-[10px] font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p>
                           </div>
@@ -2452,34 +2453,34 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 )}
               </div>
               <div className="w-56 flex flex-col gap-2 shrink-0">
-                <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>RETURN TYPE</p>
+                <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>RETURN TYPE</p>
                 <div className="grid grid-cols-2 gap-1">
                   {[{v:"RETURN",l:"Refund"},{v:"EXCHANGE",l:"Exchange"}].map(t=>(
-                    <button key={t.v} onClick={()=>setReturnType(t.v as "RETURN"|"EXCHANGE")} className="h-8 rounded-xl text-xs font-bold transition-all border" style={{background:returnType===t.v?"#4f6ef7":"#162338",borderColor:returnType===t.v?"#4f6ef7":"#1e3356",color:returnType===t.v?"#fff":"#6a8ab8"}}>{t.l}</button>
+                    <button key={t.v} onClick={()=>setReturnType(t.v as "RETURN"|"EXCHANGE")} className="h-8 rounded-xl text-xs font-bold transition-all border" style={{background:returnType===t.v?"#4f6ef7":"var(--pos-card)",borderColor:returnType===t.v?"#4f6ef7":"var(--pos-border)",color:returnType===t.v?"#fff":"var(--pos-muted)"}}>{t.l}</button>
                   ))}
                 </div>
-                <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>RETURN REASON <span className="text-red-400">*</span></p>
+                <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>RETURN REASON <span className="text-red-400">*</span></p>
                 <div className="space-y-1">
                   {REASONS.map(r=>(
-                    <button key={r.v} onClick={()=>setReturnReason(r.v)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border" style={{background:returnReason===r.v?"rgba(79,110,247,0.2)":"#162338",borderColor:returnReason===r.v?"#4f6ef7":"#1e3356",color:returnReason===r.v?"#fff":"#6a8ab8"}}>
+                    <button key={r.v} onClick={()=>setReturnReason(r.v)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border" style={{background:returnReason===r.v?"rgba(79,110,247,0.2)":"var(--pos-card)",borderColor:returnReason===r.v?"#4f6ef7":"var(--pos-border)",color:returnReason===r.v?"#fff":"var(--pos-muted)"}}>
                       {returnReason===r.v&&<Check className="h-3.5 w-3.5 shrink-0" style={{color:"#4f6ef7"}}/>}
                       {r.l}
                     </button>
                   ))}
                 </div>
-                <p className="text-xs font-semibold mt-1" style={{color:"#6a8ab8"}}>NOTES (optional)</p>
-                <textarea value={returnNotes} onChange={e=>setReturnNotes(e.target.value)} rows={3} placeholder="Additional notes..." className="rounded-xl px-3 py-2 text-xs text-white outline-none resize-none" style={{background:"#162338",border:"1px solid #1e3356"}}/>
-                <label className="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer border" style={{background:returnRestock?"rgba(16,185,129,0.1)":"#162338",borderColor:returnRestock?"rgba(16,185,129,0.4)":"#1e3356"}}>
+                <p className="text-xs font-semibold mt-1" style={{color:"var(--pos-muted)"}}>NOTES (optional)</p>
+                <textarea value={returnNotes} onChange={e=>setReturnNotes(e.target.value)} rows={3} placeholder="Additional notes..." className="rounded-xl px-3 py-2 text-xs text-white outline-none resize-none" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}/>
+                <label className="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer border" style={{background:returnRestock?"rgba(16,185,129,0.1)":"var(--pos-card)",borderColor:returnRestock?"rgba(16,185,129,0.4)":"var(--pos-border)"}}>
                   <input type="checkbox" checked={returnRestock} onChange={e=>setReturnRestock(e.target.checked)} className="w-4 h-4 rounded accent-green-500"/>
-                  <span className="text-xs font-semibold" style={{color:returnRestock?"#10b981":"#6a8ab8"}}>Restock returned items</span>
+                  <span className="text-xs font-semibold" style={{color:returnRestock?"#10b981":"var(--pos-muted)"}}>Restock returned items</span>
                 </label>
-                <div className="mt-auto p-3 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
-                  <p className="text-xs" style={{color:"#6a8ab8"}}>Items selected: {selectedItems.length}</p>
+                <div className="mt-auto p-3 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                  <p className="text-xs" style={{color:"var(--pos-muted)"}}>Items selected: {selectedItems.length}</p>
                   <p className="text-white font-bold text-lg mt-1">LKR {formatNumber(refundTotal)}</p>
-                  <p className="text-[10px]" style={{color:"#6a8ab8"}}>{returnType==="EXCHANGE"?"Return item value":"Refund amount"}</p>
+                  <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{returnType==="EXCHANGE"?"Return item value":"Refund amount"}</p>
                   {returnType==="EXCHANGE"&&(
-                    <div className="mt-2 pt-2 border-t space-y-1" style={{borderColor:"#1e3356"}}>
-                      <div className="flex justify-between text-[10px]" style={{color:"#6a8ab8"}}><span>Exchange</span><span>LKR {formatNumber(exchangeTotal)}</span></div>
+                    <div className="mt-2 pt-2 border-t space-y-1" style={{borderColor:"var(--pos-border)"}}>
+                      <div className="flex justify-between text-[10px]" style={{color:"var(--pos-muted)"}}><span>Exchange</span><span>LKR {formatNumber(exchangeTotal)}</span></div>
                       <div className="flex justify-between text-[10px]" style={{color:exchangeDue>0?"#f59e0b":"#10b981"}}><span>{exchangeDue>0?"Customer Pays":"Refund"}</span><span>LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</span></div>
                     </div>
                   )}
@@ -2492,32 +2493,32 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           {/* STEP 3: CONFIRM */}
           {returnStep==="confirm"&&returnSale&&(
             <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
-              <div className="rounded-xl border p-4" style={{background:"#162338",borderColor:"#1e3356"}}>
-                <p className="text-xs font-semibold mb-3" style={{color:"#6a8ab8"}}>RETURN SUMMARY</p>
+              <div className="rounded-xl border p-4" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+                <p className="text-xs font-semibold mb-3" style={{color:"var(--pos-muted)"}}>RETURN SUMMARY</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:formatSaleCustomerName(returnSale.customer)},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},...(returnType==="EXCHANGE"?[{l:exchangeDue>0?"Customer Pays":"Refund",v:`LKR ${formatNumber(exchangeDue>0?exchangeDue:netRefund)}`}]:[])].map(f=>(
-                    <div key={f.l}><p className="text-[10px]" style={{color:"#6a8ab8"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"#f59e0b"}:f.l==="Refund"?{color:"#10b981"}:{}}>{f.v}</p></div>
+                    <div key={f.l}><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"#f59e0b"}:f.l==="Refund"?{color:"#10b981"}:{}}>{f.v}</p></div>
                   ))}
                 </div>
-                {returnNotes&&<div className="mt-2"><p className="text-[10px]" style={{color:"#6a8ab8"}}>Notes</p><p className="text-white text-xs mt-0.5">{returnNotes}</p></div>}
+                {returnNotes&&<div className="mt-2"><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>Notes</p><p className="text-white text-xs mt-0.5">{returnNotes}</p></div>}
               </div>
-              <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>ITEMS BEING RETURNED</p>
+              <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>ITEMS BEING RETURNED</p>
               <div className="space-y-1">
                 {selectedItems.map(([variantId,sel])=>(
-                  <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                  <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                     <p className="text-white text-xs font-semibold">{sel.name}</p>
-                    <p className="text-xs font-mono" style={{color:"#6a8ab8"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                    <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
                   </div>
                 ))}
               </div>
               {returnType==="EXCHANGE"&&(
                 <>
-                  <p className="text-xs font-semibold" style={{color:"#6a8ab8"}}>EXCHANGE ITEMS</p>
+                  <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>EXCHANGE ITEMS</p>
                   <div className="space-y-1">
                     {selectedExchangeItems.map(([variantId,sel])=>(
-                      <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"#162338",borderColor:"#1e3356"}}>
+                      <div key={variantId} className="flex items-center justify-between p-2.5 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                         <p className="text-white text-xs font-semibold">{sel.name}</p>
-                        <p className="text-xs font-mono" style={{color:"#6a8ab8"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
+                        <p className="text-xs font-mono" style={{color:"var(--pos-muted)"}}>×{sel.qty} · <span className="text-white font-bold">LKR {formatNumber(sel.unitPrice*sel.qty)}</span></p>
                       </div>
                     ))}
                   </div>
@@ -2527,7 +2528,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div>
                   <p className="text-xs" style={{color:exchangeDue>0?"#f59e0b":"#10b981"}}>{exchangeDue>0?"Customer Pays Balance":"Total Refund Amount"}</p>
                   <p className="text-2xl font-bold text-white mt-0.5">LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</p>
-                  {returnType==="EXCHANGE"&&<p className="text-[10px] mt-1" style={{color:"#6a8ab8"}}>Returned LKR {formatNumber(refundTotal)} - Exchange LKR {formatNumber(exchangeTotal)}</p>}
+                  {returnType==="EXCHANGE"&&<p className="text-[10px] mt-1" style={{color:"var(--pos-muted)"}}>Returned LKR {formatNumber(refundTotal)} - Exchange LKR {formatNumber(exchangeTotal)}</p>}
                 </div>
                 <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm {returnType==="EXCHANGE"?"Exchange":"Return"}</button>
               </div>
@@ -2542,30 +2543,30 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               </div>
               <div className="text-center">
                 <h3 className="text-white font-bold text-xl">{returnType==="EXCHANGE"?"Exchange":"Return"} Processed!</h3>
-                <p className="text-xs mt-1 font-mono" style={{color:"#6a8ab8"}}>{returnResult.returnNumber}</p>
+                <p className="text-xs mt-1 font-mono" style={{color:"var(--pos-muted)"}}>{returnResult.returnNumber}</p>
               </div>
-              <div className="rounded-2xl border w-full max-w-sm overflow-hidden" style={{background:"#162338",borderColor:"#1e3356"}}>
+              <div className="rounded-2xl border w-full max-w-sm overflow-hidden" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                 {returnType==="EXCHANGE"&&(
-                  <div className="px-5 pt-4 pb-3 space-y-2 border-b" style={{borderColor:"#1e3356"}}>
-                    <div className="flex justify-between text-sm"><span style={{color:"#6a8ab8"}}>Returned value</span><span className="text-white font-semibold">LKR {formatNumber(refundTotal)}</span></div>
-                    <div className="flex justify-between text-sm"><span style={{color:"#6a8ab8"}}>Exchange value</span><span className="text-white font-semibold">LKR {formatNumber(exchangeTotal)}</span></div>
+                  <div className="px-5 pt-4 pb-3 space-y-2 border-b" style={{borderColor:"var(--pos-border)"}}>
+                    <div className="flex justify-between text-sm"><span style={{color:"var(--pos-muted)"}}>Returned value</span><span className="text-white font-semibold">LKR {formatNumber(refundTotal)}</span></div>
+                    <div className="flex justify-between text-sm"><span style={{color:"var(--pos-muted)"}}>Exchange value</span><span className="text-white font-semibold">LKR {formatNumber(exchangeTotal)}</span></div>
                   </div>
                 )}
                 <div className="px-5 py-4 text-center">
                   {returnType==="EXCHANGE"&&exchangeDue>0&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"#f59e0b"}}>Customer Pays Balance</p>
                     <p className="text-4xl font-bold" style={{color:"#f59e0b"}}>LKR {formatNumber(exchangeDue)}</p>
-                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Collect from customer before completing exchange</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Collect from customer before completing exchange</p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund>0&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund to Customer</p>
                     <p className="text-4xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(netRefund)}</p>
-                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Return the difference to customer</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Return the difference to customer</p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund===0&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"#4f6ef7"}}>Even Exchange</p>
                     <p className="text-4xl font-bold" style={{color:"#4f6ef7"}}>LKR 0.00</p>
-                    <p className="text-xs mt-2" style={{color:"#6a8ab8"}}>Equal value — no money changes hands</p>
+                    <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Equal value — no money changes hands</p>
                   </>)}
                   {returnType!=="EXCHANGE"&&(<>
                     <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund Amount</p>
@@ -2588,7 +2589,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   const exchRows=isExc&&selectedExchangeItems.length>0?`<hr class="d"/><div class="label">EXCHANGE ITEMS</div>${selectedExchangeItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Exchange Total</span><span>LKR ${exchangeTotal.toFixed(2)}</span></div>`:"";
                   w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:#059669}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed · Awaiting Approval ***</div></body></html>`);
                   w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);
-                }} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"#1e3356",color:"#a0b4d4"}}><Printer className="h-4 w-4"/>Print Receipt</button>
+                }} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-text-secondary)"}}><Printer className="h-4 w-4"/>Print Receipt</button>
                 <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
               </div>
             </div>
@@ -2609,28 +2610,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         <div className="flex-1 overflow-y-auto p-6 space-y-5">
           <h2 className="text-white font-bold text-xl">POS Settings</h2>
           {/* Phase 6 UX toggles */}
-          <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Checkout Experience</h3>
             {([
               { key: "touch", label: "Touch Mode", desc: "Larger buttons & product tiles", icon: Hand, on: touchMode, set: (v: boolean) => { setTouchMode(writePosTouchMode(v)); } },
               { key: "sound", label: "Sound Alerts", desc: "Beep on scan / sale complete", icon: Volume2, on: soundAlerts, set: (v: boolean) => { setSoundAlerts(writePosSoundAlerts(v)); } },
               { key: "qty", label: "Add popup", desc: "Always confirms qty, selling price, and variant", icon: Package, on: true, set: () => toast.info("Add popup is always enabled") },
             ] as const).map((row) => (
-              <div key={row.key} className="flex items-center gap-3 py-2 border-b last:border-0" style={{borderColor:"#1e3356"}}>
+              <div key={row.key} className="flex items-center gap-3 py-2 border-b last:border-0" style={{borderColor:"var(--pos-border)"}}>
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><row.icon className="h-4 w-4" style={{color:"#4f6ef7"}}/></div>
                 <div className="flex-1">
                   <p className="text-white text-sm font-semibold">{row.label}</p>
-                  <p className="text-[11px]" style={{color:"#6a8ab8"}}>{row.desc}</p>
+                  <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>{row.desc}</p>
                 </div>
-                <button type="button" onClick={() => row.set(!row.on)} className="px-3 h-8 rounded-lg text-xs font-bold" style={{background: row.on ? "#10b981" : "#1a2b4a", color: row.on ? "#fff" : "#6a8ab8"}}>
+                <button type="button" onClick={() => row.set(!row.on)} className="px-3 h-8 rounded-lg text-xs font-bold" style={{background: row.on ? "#10b981" : "var(--pos-input)", color: row.on ? "#fff" : "var(--pos-muted)"}}>
                   {row.on ? "ON" : "OFF"}
                 </button>
               </div>
             ))}
           </div>
-          <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Thermal receipt theme</h3>
-            <p className="text-[11px]" style={{color:"#6a8ab8"}}>
+            <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
               Light = black on white (real thermal printers). Dark = white on navy (digital / browser print).
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -2646,9 +2647,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     onClick={() => void setReceiptTheme(opt.value)}
                     className="h-10 rounded-xl text-sm font-bold transition-all"
                     style={{
-                      background: active ? (opt.value === "dark" ? "#0f172a" : "#fff") : "#1a2b4a",
-                      color: active ? (opt.value === "dark" ? "#f8fafc" : "#0f172a") : "#6a8ab8",
-                      border: active ? "2px solid #4f6ef7" : "1px solid #1e3356",
+                      background: active ? (opt.value === "dark" ? "#0f172a" : "#fff") : "var(--pos-input)",
+                      color: active ? (opt.value === "dark" ? "#f8fafc" : "#0f172a") : "var(--pos-muted)",
+                      border: active ? "2px solid #4f6ef7" : "1px solid var(--pos-border)",
                     }}
                   >
                     {opt.label}
@@ -2658,7 +2659,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
           </div>
           {/* Inventory admin */}
-          <div className="rounded-2xl border p-5 space-y-3" style={{background:"#162338",borderColor:"#1e3356"}}>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Inventory (Admin)</h3>
             <div className="flex items-center gap-3 py-2">
               <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background: allowNegativeStock ? "rgba(245,158,11,0.15)" : "rgba(79,110,247,0.15)"}}>
@@ -2666,7 +2667,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold">Allow negative stock</p>
-                <p className="text-[11px]" style={{color:"#6a8ab8"}}>
+                <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
                   Sell when stock is 0 — inventory can go minus. Admin setting.
                 </p>
               </div>
@@ -2686,19 +2687,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     });
                 }}
                 className="px-3 h-8 rounded-lg text-xs font-bold shrink-0"
-                style={{background: allowNegativeStock ? "#f59e0b" : "#1a2b4a", color: allowNegativeStock ? "#fff" : "#6a8ab8"}}
+                style={{background: allowNegativeStock ? "#f59e0b" : "var(--pos-input)", color: allowNegativeStock ? "#fff" : "var(--pos-muted)"}}
               >
                 {allowNegativeStock ? "ON" : "OFF"}
               </button>
             </div>
           </div>
           {/* Tax Rate */}
-          <div className="rounded-2xl border p-5" style={{background:"#162338",borderColor:"#1e3356"}}>
+          <div className="rounded-2xl border p-5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Receipt className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
               <div className="flex-1">
                 <h3 className="text-white font-bold text-base">Tax Rate</h3>
-                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>
+                <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                   {taxRate > 0
                     ? `Tax is ON — ${taxRate}% added to every sale from this POS setting`
                     : "Tax is OFF — no tax added to sales (set a rate below to enable)"}
@@ -2711,22 +2712,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 {taxRate > 0 ? `${taxRate}% Active` : "Tax Off"}
               </span>
             </div>
-            <p className="text-[11px] mb-3 leading-relaxed" style={{color:"#4a6a8a"}}>
+            <p className="text-[11px] mb-3 leading-relaxed" style={{color:"var(--pos-muted-2)"}}>
               Product tax rates are ignored at POS checkout. Only this setting controls tax on bills.
             </p>
             <div className="flex items-center gap-3">
-              <input key={`pos-tax-${taxRate}`} type="number" min="0" max="100" step="0.01" defaultValue={taxRate} onBlur={e=>applyPosTax(parseFloat(e.target.value)||0)} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+              <input key={`pos-tax-${taxRate}`} type="number" min="0" max="100" step="0.01" defaultValue={taxRate} onBlur={e=>applyPosTax(parseFloat(e.target.value)||0)} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               <span className="text-white font-bold text-lg">%</span>
-              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"#1a2b4a",color:taxRate===v?"#fff":"#6a8ab8"}}>{v===0?"Off":`${v}%`}</button>))}</div>
+              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"var(--pos-input)",color:taxRate===v?"#fff":"var(--pos-muted)"}}>{v===0?"Off":`${v}%`}</button>))}</div>
             </div>
           </div>
           {/* PIN Security — per-user, switch cashiers without re-login */}
-          <div className="rounded-2xl border p-5 space-y-4" style={{background:"#162338",borderColor:"#1e3356"}}>
+          <div className="rounded-2xl border p-5 space-y-4" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Lock className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
               <div>
                 <h3 className="text-white font-bold text-base">Your cashier PIN</h3>
-                <p className="text-xs mt-0.5" style={{color:"#6a8ab8"}}>
+                <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                   {pinIsSet
                     ? "Each cashier sets their own 4-digit PIN. Lock (F12) → next cashier enters their PIN → bills go to them."
                     : "Set a 4-digit PIN so you can unlock POS and take over sales without logging in again."}
@@ -2736,12 +2737,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-semibold block mb-1.5" style={{color:"#6a8ab8"}}>{pinIsSet?"New PIN":"Create PIN"} (4 digits)</label>
-                <input type="password" maxLength={4} inputMode="numeric" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <label className="text-xs font-semibold block mb-1.5" style={{color:"var(--pos-muted)"}}>{pinIsSet?"New PIN":"Create PIN"} (4 digits)</label>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingNewPin} onChange={e=>setSettingNewPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               </div>
               <div>
-                <label className="text-xs font-semibold block mb-1.5" style={{color:"#6a8ab8"}}>Confirm PIN</label>
-                <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
+                <label className="text-xs font-semibold block mb-1.5" style={{color:"var(--pos-muted)"}}>Confirm PIN</label>
+                <input type="password" maxLength={4} inputMode="numeric" value={settingConfirmPin} onChange={e=>setSettingConfirmPin(e.target.value.replace(/\D/g,"").slice(0,4))} placeholder="••••" className="w-full h-10 px-4 rounded-xl text-white text-center text-lg tracking-widest outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               </div>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -2787,7 +2788,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               <button
                 onClick={lockCashier}
                 className="px-5 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10 ml-auto"
-                style={{borderColor:"#1e3356",color:"#6a8ab8"}}
+                style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}
               >
                 <Lock className="h-3.5 w-3.5 inline mr-1.5"/>Lock / Switch
               </button>
@@ -2797,10 +2798,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="grid grid-cols-2 gap-3">
             {([{icon:Monitor,title:"Customer Display",displayLink:true,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports/sales"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;displayLink?:boolean;onClick?:()=>void}[]).map((item,i)=>(
               item.displayLink
-                ?<a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
+                ?<a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"var(--pos-muted-2)"}}/></a>
                 : item.path
-                ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"#4a6a8a"}}/></a>
-                :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"#162338",borderColor:"#1e3356"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
+                ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"var(--pos-muted-2)"}}/></a>
+                :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
             ))}
           </div>
         </div>
@@ -2839,11 +2840,24 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   if (!posOpen) return null;
 
+  const posUiMode = resolvePosUiMode(receiptSettings.receiptTheme);
+  const isPosLight = posUiMode === "light";
+
   return (
     <AnimatePresence>
       <motion.div key="pos" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} transition={{duration:0.15}}
-        className={cn("fixed inset-0 z-[100] flex flex-col overflow-hidden", scanFlash && "ring-4 ring-inset ring-green-500/70", touchMode && "pos-touch-mode")}
-        style={{ background: "#0d1b2e", fontSize: touchMode ? "15px" : undefined }}>
+        className={cn(
+          "pos-shell fixed inset-0 z-[100] flex flex-col overflow-hidden",
+          isPosLight ? "pos-light" : "pos-dark",
+          scanFlash && "ring-4 ring-inset ring-green-500/70",
+          touchMode && "pos-touch-mode",
+        )}
+        style={{
+          ...posUiCssVars(posUiMode),
+          background: "var(--pos-bg)",
+          color: "var(--pos-text)",
+          fontSize: touchMode ? "15px" : undefined,
+        }}>
 
         {addPopup && (
           <PosQuantityPopup
@@ -2881,71 +2895,72 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
         {/* PIN LOCK SCREEN */}
         {pinLocked&&(
-          <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"#0d1b2e"}}>
+          <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"var(--pos-pin-bg)"}}>
             <div className="flex flex-col items-center gap-2">
               <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
-              <h2 className="text-white font-bold text-2xl">Switch cashier</h2>
-              <p className="text-sm text-center max-w-xs" style={{color:"#6a8ab8"}}>
+              <h2 className="font-bold text-2xl" style={{color:"var(--pos-text)"}}>Switch cashier</h2>
+              <p className="text-sm text-center max-w-xs" style={{color:"var(--pos-muted)"}}>
                 Enter your 4-digit PIN — bills will be assigned to you (no re-login)
               </p>
             </div>
             <div className="flex gap-4 mb-2">
               {[0,1,2,3].map(i=>(
-                <div key={i} className="h-4 w-4 rounded-full transition-all duration-150" style={{background:pinEntry.length>i?(pinError?"#ef4444":"#4f6ef7"):"#1e3356",transform:pinError&&pinEntry.length===0?"translateX(0)":"none"}}/>
+                <div key={i} className="h-4 w-4 rounded-full transition-all duration-150" style={{background:pinEntry.length>i?(pinError?"#ef4444":"#4f6ef7"):"var(--pos-border)",transform:pinError&&pinEntry.length===0?"translateX(0)":"none"}}/>
               ))}
             </div>
             {pinError&&<p className="text-sm font-semibold -mt-4" style={{color:"#ef4444"}}>Incorrect PIN. Try again.</p>}
             {pinBusy&&<Loader2 className="h-5 w-5 animate-spin -mt-2" style={{color:"#4f6ef7"}}/>}
             <div className="grid gap-3" style={{gridTemplateColumns:"repeat(3,80px)"}}>
               {[1,2,3,4,5,6,7,8,9].map(n=>(
-                <button key={n} disabled={pinBusy} onClick={()=>void handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356"}}>{n}</button>
+                <button key={n} disabled={pinBusy} onClick={()=>void handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>{n}</button>
               ))}
-              <button disabled={pinBusy} onClick={()=>void handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
-              <button disabled={pinBusy} onClick={()=>void handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"#162338",border:"1px solid #1e3356"}}>0</button>
-              <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"#162338",border:"1px solid #1e3356",color:"#6a8ab8"}}>Exit</button>
+              <button disabled={pinBusy} onClick={()=>void handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
+              <button disabled={pinBusy} onClick={()=>void handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>0</button>
+              <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)",color:"var(--pos-muted)"}}>Exit</button>
             </div>
-            <p className="text-xs" style={{color:"#2a3a5c"}}>Terminal login: {user?.name??"Admin"}</p>
+            <p className="text-xs" style={{color:"var(--pos-border-strong)"}}>Terminal login: {user?.name??"Admin"}</p>
           </div>
         )}
 
         {/* TOP BAR */}
-        <div className="flex h-12 items-center gap-3 px-4 shrink-0 border-b" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+        <div className="flex h-12 items-center gap-3 px-4 shrink-0 border-b" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
           <div className="flex items-center gap-2.5 shrink-0">
             <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
             <div className="flex items-center gap-2">
-              <AppLogo variant="sidebar" theme="dark" className="h-7 shrink-0" alt={APP_NAME} />
-              <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>POS Terminal</p>
+              <AppLogo variant="sidebar" theme={isPosLight ? "light" : "dark"} className="h-7 shrink-0" alt={APP_NAME} />
+              <p className="text-[10px] leading-none" style={{color:"var(--pos-muted)"}}>POS Terminal</p>
             </div>
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
-            <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"#6a8ab8"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode · search name / SKU / category..." className="w-full pl-9 pr-16 h-9 text-sm text-white placeholder:text-white/30 rounded-xl outline-none" style={{background:"#1a2b4a",border:"1px solid #1e3356"}}/>
-            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"#2a3a5c",color:"#6a8ab8"}}>F2</kbd>
+            <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
+            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode · search name / SKU / category..." className="pos-input w-full pl-9 pr-16 h-9 text-sm rounded-xl outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",color:"var(--pos-text)"}}/>
+            <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"var(--pos-kbd)",color:"var(--pos-muted)"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCustomerPopup()}].map((btn,i)=>(
-              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"#1a2b4a",color:i===2&&customer?"#fff":"#a0b4d4",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
+              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.2)":"var(--pos-input)",color:i===2&&customer?"#fff":"var(--pos-text-secondary)",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
                 <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             {(() => {
-              const isDarkReceipt = (receiptSettings.receiptTheme ?? "light") === "dark";
+              const isDarkUi = !isPosLight;
               return (
                 <button
                   type="button"
-                  onClick={() => void setReceiptTheme(isDarkReceipt ? "light" : "dark")}
-                  title={isDarkReceipt ? "Switch receipt to Light (thermal)" : "Switch receipt to Dark"}
+                  onClick={() => void setReceiptTheme(isDarkUi ? "light" : "dark")}
+                  title={isDarkUi ? "Switch POS to Light mode" : "Switch POS to Dark mode"}
                   className="flex items-center gap-1.5 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
                   style={{
-                    background: isDarkReceipt ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.92)",
-                    color: isDarkReceipt ? "#f8fafc" : "#0f172a",
-                    border: isDarkReceipt ? "1px solid #475569" : "1px solid #e2e8f0",
+                    background: isDarkUi ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.95)",
+                    color: isDarkUi ? "#f8fafc" : "#0f172a",
+                    border: isDarkUi ? "1px solid #475569" : "1px solid #cbd5e1",
+                    boxShadow: isPosLight ? "var(--pos-shadow)" : undefined,
                   }}
                 >
-                  {isDarkReceipt ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
-                  {isDarkReceipt ? "Dark" : "Light"}
+                  {isDarkUi ? <Moon className="h-3.5 w-3.5" /> : <Sun className="h-3.5 w-3.5" />}
+                  {isDarkUi ? "Dark" : "Light"}
                 </button>
               );
             })()}
@@ -2966,11 +2981,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             >
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
             </a>
-            <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"#1e3356"}}>
+            <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"var(--pos-border)"}}>
               <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{(activeCashier?.name ?? user?.name)?.[0]??"A"}</div>
               <div>
-                <p className="text-white text-xs font-semibold leading-tight">{activeCashier?.name ?? user?.name ?? "Admin"}</p>
-                <p className="text-[10px] leading-none" style={{color:"#6a8ab8"}}>
+                <p className="text-xs font-semibold leading-tight" style={{ color: "var(--pos-text)" }}>{activeCashier?.name ?? user?.name ?? "Admin"}</p>
+                <p className="text-[10px] leading-none" style={{color:"var(--pos-muted)"}}>
                   {activeCashier ? "Active cashier" : formatUserRole(user?.role)}
                 </p>
               </div>
@@ -2981,7 +2996,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* MAIN */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* SIDEBAR */}
-          <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+          <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
             <nav className="flex-1 py-2 overflow-y-auto">
               {navItems.map((item, navIdx)=>{
                 if (item.id === "demo-product") return null;
@@ -2997,12 +3012,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         title="New Product (Q)"
                         className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
                         style={{
-                          color: newActive ? "#fff" : "#6a8ab8",
+                          color: newActive ? "#fff" : "var(--pos-muted)",
                           background: newActive ? "rgba(79,110,247,0.25)" : "rgba(255,255,255,0.03)",
-                          border: `1px solid ${newActive ? "#4f6ef7" : "#1e3356"}`,
+                          border: `1px solid ${newActive ? "#4f6ef7" : "var(--pos-border)"}`,
                         }}
                       >
-                        <PackagePlus className="h-3.5 w-3.5 shrink-0" style={{ color: newActive ? "#4f6ef7" : "#6a8ab8" }} />
+                        <PackagePlus className="h-3.5 w-3.5 shrink-0" style={{ color: newActive ? "#4f6ef7" : "var(--pos-muted)" }} />
                         <span className="truncate w-full text-center">New</span>
                       </button>
                       {demoItem && (
@@ -3012,12 +3027,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                           title="Demo Product (Y)"
                           className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
                           style={{
-                            color: demoActive ? "#fff" : "#6a8ab8",
+                            color: demoActive ? "#fff" : "var(--pos-muted)",
                             background: demoActive ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.03)",
-                            border: `1px solid ${demoActive ? "#10b981" : "#1e3356"}`,
+                            border: `1px solid ${demoActive ? "#10b981" : "var(--pos-border)"}`,
                           }}
                         >
-                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: demoActive ? "#34d399" : "#6a8ab8" }} />
+                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: demoActive ? "#34d399" : "var(--pos-muted)" }} />
                           <span className="truncate w-full text-center">Demo</span>
                         </button>
                       )}
@@ -3030,9 +3045,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <button key={item.id} onClick={()=>{
                     if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
                     setActiveNav(item.id);
-                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"#6a8ab8",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
+                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#fff":"var(--pos-muted)",background:active?"rgba(79,110,247,0.2)":"transparent"}}>
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
-                    <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"#6a8ab8"}}/>
+                    <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"var(--pos-muted)"}}/>
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
                     {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#f59e0b",color:"#fff"}}>{serverHeldBills.length}</span>}
@@ -3047,7 +3062,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               <svg viewBox="0 0 80 24" className="w-full mt-1.5 opacity-60" fill="none"><polyline points="0,20 15,14 30,16 45,8 60,10 80,2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
               <p className="text-white/70 text-[10px] mt-1"> {todayStats.orders} Orders  {todayStats.items} Items</p>
             </div>
-            <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"#6a8ab8"}}>
+            <button onClick={lockCashier} className="flex items-center gap-2 mx-2 mb-2 px-3 py-2 rounded-xl text-xs font-medium transition-all hover:bg-white/10" style={{background:"rgba(255,255,255,0.05)",color:"var(--pos-muted)"}}>
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
             </button>
           </div>
@@ -3056,15 +3071,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <div className="flex-1 min-w-0 overflow-hidden">{renderCenter()}</div>
 
           {/* CART PANEL */}
-          <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-              <span className="text-white font-bold text-lg">Cart ({itemCount()} Items)</span>
+          <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
+            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
+              <span className="font-bold text-lg" style={{ color: "var(--pos-text)" }}>Cart ({itemCount()} Items)</span>
               <div className="flex items-center gap-2">
                 <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
               </div>
             </div>
             {/* Customer on bill — dropdown select / register */}
-            <div className="px-4 py-2 border-b shrink-0 relative" style={{borderColor:"#1e3356"}} ref={cartCustomerDropdownRef}>
+            <div className="px-4 py-2 border-b shrink-0 relative" style={{borderColor:"var(--pos-border)"}} ref={cartCustomerDropdownRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -3079,25 +3094,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-white/5 text-left"
                 style={{
-                  background: customer ? "rgba(79,110,247,0.1)" : "#162338",
-                  border: `1px solid ${cartCustomerOpen ? "#4f6ef7" : customer ? "rgba(79,110,247,0.35)" : "#1e3356"}`,
+                  background: customer ? "rgba(79,110,247,0.1)" : "var(--pos-card)",
+                  border: `1px solid ${cartCustomerOpen ? "#4f6ef7" : customer ? "rgba(79,110,247,0.35)" : "var(--pos-border)"}`,
                 }}
               >
                 <div
                   className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: customer ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : "#1a2b4a" }}
+                  style={{ background: customer ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : "var(--pos-input)" }}
                 >
                   {customer
                     ? <span className="text-white text-xs font-bold">{customer.name?.[0] ?? "?"}</span>
-                    : <User className="h-4 w-4" style={{ color: "#6a8ab8" }} />}
+                    : <User className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5" style={{ color: "#6a8ab8" }}>{workspace.customerLabel}</p>
-                  <p className="text-sm font-bold truncate leading-tight" style={{ color: customer ? "#fff" : "#6a8ab8" }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide leading-none mb-0.5" style={{ color: "var(--pos-muted)" }}>{workspace.customerLabel}</p>
+                  <p className="text-sm font-bold truncate leading-tight" style={{ color: customer ? "#fff" : "var(--pos-muted)" }}>
                     {customer ? customer.name : "Walk-In Customer"}
                   </p>
                   {customer?.phone && (
-                    <p className="text-[10px] truncate mt-0.5" style={{ color: "#6a8ab8" }}>{customer.phone}</p>
+                    <p className="text-[10px] truncate mt-0.5" style={{ color: "var(--pos-muted)" }}>{customer.phone}</p>
                   )}
                 </div>
                 {customer && !cartCustomerOpen ? (
@@ -3107,7 +3122,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     className="p-1.5 rounded-lg hover:bg-white/10 shrink-0"
                     title="Remove customer"
                   >
-                    <X className="h-3.5 w-3.5" style={{ color: "#6a8ab8" }} />
+                    <X className="h-3.5 w-3.5" style={{ color: "var(--pos-muted)" }} />
                   </button>
                 ) : (
                   <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", cartCustomerOpen && "rotate-180")} style={{ color: "#4f6ef7" }} />
@@ -3116,9 +3131,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               {cartCustomerOpen && (
                 <div
                   className="absolute left-4 right-4 top-full mt-1 z-50 rounded-xl border shadow-2xl overflow-hidden"
-                  style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+                  style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
                 >
-                  <div className="flex items-center gap-2 p-2 border-b" style={{ borderColor: "#1e3356" }}>
+                  <div className="flex items-center gap-2 p-2 border-b" style={{ borderColor: "var(--pos-border)" }}>
                     <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "#4f6ef7" }} />
                     <input
                       ref={cartCustomerSearchRef}
@@ -3134,19 +3149,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         if (!cartShowNewCust && /^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
                       }}
                       className="h-7 px-2 rounded-lg text-[10px] font-bold text-white shrink-0 flex items-center gap-1"
-                      style={{ background: cartShowNewCust ? "#162338" : "#4f6ef7", border: cartShowNewCust ? "1px solid #4f6ef7" : "none" }}
+                      style={{ background: cartShowNewCust ? "var(--pos-card)" : "#4f6ef7", border: cartShowNewCust ? "1px solid #4f6ef7" : "none" }}
                     >
                       {cartShowNewCust ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                       {cartShowNewCust ? "Cancel" : "Register"}
                     </button>
                   </div>
                   {cartShowNewCust && (
-                    <div className="p-2 border-b space-y-1.5" style={{ borderColor: "#1e3356", background: "#162338" }}>
+                    <div className="p-2 border-b space-y-1.5" style={{ borderColor: "var(--pos-border)", background: "var(--pos-card)" }}>
                       <div className="grid grid-cols-2 gap-1.5">
-                        <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "#1a2b4a", border: "1px solid #1e3356" }} />
-                        <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "#1a2b4a", border: "1px solid #1e3356" }} />
-                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "#1a2b4a", border: "1px solid #1e3356" }} />
-                        <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "#1a2b4a", border: "1px solid #1e3356" }} />
+                        <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
+                        <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
+                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
+                        <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
                       </div>
                       <button type="button" onClick={() => void saveNewCustomer()} disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()} className="w-full h-8 rounded-lg text-xs font-bold text-white disabled:opacity-40" style={{ background: "#4f6ef7" }}>
                         {newCustSaving ? "Saving…" : "Save & add to bill"}
@@ -3169,12 +3184,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-left"
                       style={{ background: !customer ? "rgba(79,110,247,0.1)" : "transparent" }}
                     >
-                      <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "#1a2b4a" }}>
-                        <User className="h-3.5 w-3.5" style={{ color: "#6a8ab8" }} />
+                      <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--pos-input)" }}>
+                        <User className="h-3.5 w-3.5" style={{ color: "var(--pos-muted)" }} />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-semibold text-white">Walk-In Customer</p>
-                        <p className="text-[10px]" style={{ color: "#6a8ab8" }}>No account on bill</p>
+                        <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>No account on bill</p>
                       </div>
                       {!customer && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />}
                     </button>
@@ -3183,7 +3198,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     )}
                     {!customerLoading && customers.length === 0 && customerSearch && !cartShowNewCust && (
                       <div className="text-center py-4 space-y-2">
-                        <p className="text-xs" style={{ color: "#4a6a8a" }}>No customers found</p>
+                        <p className="text-xs" style={{ color: "var(--pos-muted-2)" }}>No customers found</p>
                         <button
                           type="button"
                           onClick={() => {
@@ -3213,7 +3228,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-white truncate">{c.name}</p>
-                          <p className="text-[10px] truncate" style={{ color: "#6a8ab8" }}>{c.phone}</p>
+                          <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>{c.phone}</p>
                         </div>
                         {customer?.id === c.id ? (
                           <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />
@@ -3228,7 +3243,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
             <div className="flex-1 overflow-y-auto min-h-0">
                   {items.length===0?(
-                    <div className="flex flex-col items-center justify-center h-40" style={{color:"#4a6a8a"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Scan barcode to begin</p></div>
+                    <div className="flex flex-col items-center justify-center h-40" style={{color:"var(--pos-muted-2)"}}><ShoppingCart className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">Cart is empty</p><p className="text-xs mt-1 opacity-70">Scan barcode to begin</p></div>
                   ):(
                     <div className="px-2 py-1.5 space-y-1">
                       <AnimatePresence>{items.map((item,idx)=>{
@@ -3239,12 +3254,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
-                          style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"#162338",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"#1e3356"}`}}>
+                          style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"var(--pos-card)",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"var(--pos-border)"}`}}>
                           <p className="flex-1 min-w-0 text-sm font-semibold text-white truncate">
                             {item.productName}
                           </p>
                           <div className="flex items-center gap-0.5 shrink-0">
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Minus className="h-3 w-3 text-white"/></button>
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
                             {editing ? (
                               <input
                                 autoFocus
@@ -3267,7 +3282,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                                   }
                                 }}
                                 className="w-7 h-6 rounded text-center text-xs font-bold text-white outline-none"
-                                style={{ background: "#0f1f3a", border: "1px solid #4f6ef7" }}
+                                style={{ background: "var(--pos-panel)", border: "1px solid #4f6ef7" }}
                               />
                             ) : (
                               <span
@@ -3282,7 +3297,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                                 {item.quantity}
                               </span>
                             )}
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"#1a2b4a"}}><Plus className="h-3 w-3 text-white"/></button>
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-3 w-3 text-white"/></button>
                           </div>
                           <p className="text-sm font-bold text-white tabular-nums leading-tight shrink-0 min-w-[4.5rem] text-right">LKR {formatNumber(lineTotal)}</p>
                           <button type="button" onClick={e=>{e.stopPropagation();removeItem(item.variantId);if(selectedCartIdx===idx)setSelectedCartIdx(-1);}} className={`h-6 w-6 rounded flex items-center justify-center transition-opacity shrink-0 ${item.isCustom ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`} title="Remove"><X className="h-3 w-3" style={{color:"#ef4444"}}/></button>
@@ -3292,10 +3307,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </div>
                   )}
                 </div>
-                <div className="shrink-0 border-t" style={{borderColor:"#1e3356"}}>
-                  <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"#1e3356"}}>
-                    <span className="text-sm font-medium shrink-0" style={{color:"#6a8ab8"}}>Discount %</span>
-                    <input ref={discountInputRef} type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"#1a2b4a",border:`1px solid ${pendingDiscountApproval?"#f59e0b":discount>0?"#10b981":"#1e3356"}`}}/>
+                <div className="shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"var(--pos-border)"}}>
+                    <span className="text-sm font-medium shrink-0" style={{color:"var(--pos-muted)"}}>Discount %</span>
+                    <input ref={discountInputRef} type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"var(--pos-input)",border:`1px solid ${pendingDiscountApproval?"#f59e0b":discount>0?"#10b981":"var(--pos-border)"}`}}/>
                     <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
                   </div>
                   {pendingDiscountApproval && (
@@ -3305,21 +3320,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </div>
                   )}
                   {!adminBypass && !pendingDiscountApproval && (
-                    <p className="px-4 pb-2 text-[10px]" style={{color:"#6a8ab8"}}>
+                    <p className="px-4 pb-2 text-[10px]" style={{color:"var(--pos-muted)"}}>
                       Discounts over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% require manager approval via Workflows
                     </p>
                   )}
-                  <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"#1e3356"}}>
-                    <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
+                  <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
+                    <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Sub Total</span><span>LKR {formatNumber(subtotal())}</span></div>
                     {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
                     {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
                     {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
                     {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
-                    <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "#6a8ab8" : "#4a6a8a"}}>
+                    <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                       <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
                       <span>LKR {formatNumber(taxAmount())}</span>
                     </div>
-                    <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"#1e3356"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                    <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"var(--pos-border)"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
                   <div className="p-3 grid grid-cols-2 gap-2">
                     <button
@@ -3346,28 +3361,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 </div>
             {checkoutOpen && (
               <div className="fixed inset-0 z-[115] flex items-center justify-center p-3 md:p-6" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
-              <div className="w-full max-w-lg max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}} onClick={e=>e.stopPropagation()}>
-                <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+              <div className="w-full max-w-lg max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}} onClick={e=>e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
                   <div>
                     <h2 className="text-white font-bold text-base">Checkout</h2>
-                    <p className="text-xs" style={{color:"#6a8ab8"}}>LKR {formatNumber(totalAmt)} · {itemCount()} items</p>
+                    <p className="text-xs" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(totalAmt)} · {itemCount()} items</p>
                   </div>
                   <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
-                    <X className="h-4 w-4" style={{color:"#6a8ab8"}}/>
+                    <X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/>
                   </button>
                 </div>
               <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-                <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"#1e3356"}}>
-                  <div className="flex justify-between text-sm" style={{color:"#6a8ab8"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
+                <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal())}</span></div>
                   {discountAmount()>0&&<div className="flex justify-between text-sm text-green-400"><span>Discount</span><span>-LKR {formatNumber(discountAmount())}</span></div>}
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Tier discount</span><span>-LKR {formatNumber(tierDiscountAmt)}</span></div>}
                   {payState.couponDiscount>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Coupon</span><span>-LKR {formatNumber(payState.couponDiscount)}</span></div>}
                   {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm text-emerald-400"><span>Loyalty</span><span>-LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
-                  <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "#6a8ab8" : "#4a6a8a"}}>
+                  <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                     <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
-                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"#1e3356"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                 </div>
                 <PosPaymentPanel
                   totalAmt={totalAmt}
@@ -3389,8 +3404,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   partialPayInputRef={partialPayInputRef}
                 />
                 {showLoyalty && customer && (
-                  <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "#1e3356" }}>
-                    <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1.5" style={{ color: "#6a8ab8" }}>
+                  <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+                    <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1.5" style={{ color: "var(--pos-muted)" }}>
                       Redeem loyalty points ({customer.loyaltyPoints} available · LKR 0.10/pt)
                     </label>
                     <div className="flex gap-2">
@@ -3405,22 +3420,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         }}
                         placeholder="0"
                         className="h-8 text-xs text-white flex-1"
-                        style={{ background: "#1a2b4a", borderColor: "#1e3356" }}
+                        style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
                       />
                       <button
                         type="button"
                         onClick={() => setLoyaltyPoints(Math.min(customer.loyaltyPoints, Math.floor(amountBeforeLoyalty / 0.1)))}
                         className="px-2.5 h-8 rounded-lg text-[10px] font-bold text-white whitespace-nowrap"
-                        style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+                        style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
                       >
                         Max
                       </button>
                     </div>
                   </div>
                 )}
-                <div className="flex gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap" style={{borderColor:"#1e3356"}}>
+                <div className="flex gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap" style={{borderColor:"var(--pos-border)"}}>
                   {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>(
-                    <button key={value} type="button" title={`${label} (${idx + 1})`} onClick={()=>setActivePayment(value)} className={cn("flex-1 min-w-[72px] flex flex-col items-center gap-1 rounded-xl text-xs font-bold transition-all", touchMode ? "py-3" : "py-2")} style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"#1a2b4a",color:activePayment===value?"#fff":"#6a8ab8"}}>
+                    <button key={value} type="button" title={`${label} (${idx + 1})`} onClick={()=>setActivePayment(value)} className={cn("flex-1 min-w-[72px] flex flex-col items-center gap-1 rounded-xl text-xs font-bold transition-all", touchMode ? "py-3" : "py-2")} style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activePayment===value?"#fff":"var(--pos-muted)"}}>
                       <Icon className={touchMode ? "h-5 w-5" : "h-4 w-4"}/>
                       <span>{label}</span>
                       <span className="text-[9px] font-mono opacity-70">{idx + 1}</span>
@@ -3434,7 +3449,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     onChange={(e)=>setGiftVoucherCode(e.target.value.toUpperCase())}
                     placeholder="Gift voucher code"
                     className="mx-3 mb-2 w-[calc(100%-1.5rem)] h-10 px-3 rounded-xl text-sm text-white outline-none font-mono"
-                    style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                    style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                   />
                 )}
                 {activePayment==="CHEQUE"&&(
@@ -3444,17 +3459,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     onChange={(e)=>setChequeNumber(e.target.value)}
                     placeholder="Cheque number"
                     className="mx-3 mb-2 w-[calc(100%-1.5rem)] h-10 px-3 rounded-xl text-sm text-white outline-none font-mono"
-                    style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                    style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                   />
                 )}
                 {helpers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 pb-2">
-                    <UserCheck className="h-4 w-4 shrink-0" style={{color:"#6a8ab8"}}/>
+                    <UserCheck className="h-4 w-4 shrink-0" style={{color:"var(--pos-muted)"}}/>
                     <select
                       value={helperEmployeeId || ""}
                       onChange={(e)=>setHelperEmployeeId(e.target.value)}
                       className="flex-1 h-9 px-2 rounded-lg text-xs text-white outline-none"
-                      style={{background:"#1a2b4a",border:"1px solid #1e3356"}}
+                      style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                     >
                       <option value="">No helper / floor staff</option>
                       {helpers.map((h)=>(
@@ -3464,19 +3479,19 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 )}
                 {activePayment==="CASH"&&(
-                  <div ref={cashPanelRef} className="px-3 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
-                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"#6a8ab8"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono" style={{color:"#4a6a8a"}}>Type amount · F9 confirm</span><button onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button></div>
+                  <div ref={cashPanelRef} className="px-3 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
+                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"var(--pos-muted)"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono" style={{color:"var(--pos-muted-2)"}}>Type amount · F9 confirm</span><button onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button></div>
                     <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                     {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
-                        <span style={{color:"#6a8ab8"}}>Balance on credit</span>
+                        <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
                         <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
                     <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
-                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"#1e3356":isDel?"rgba(239,68,68,0.15)":"#1a2b4a",color:isQuick?"#6a8ab8":isDel?"#ef4444":"#fff"}}>
+                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"var(--pos-border)":isDel?"rgba(239,68,68,0.15)":"var(--pos-input)",color:isQuick?"var(--pos-muted)":isDel?"#ef4444":"#fff"}}>
                           {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
                         </button>);
                       }))}
@@ -3484,22 +3499,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+                  <div className="flex justify-between items-center px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
                     <span className="text-sm font-semibold text-green-400">Change</span>
                     <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
                 <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0">
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
                     Split Bill
                   </button>
                   <button ref={checkoutConfirmRef} type="button" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
                     {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                     Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"#1e3356"}} title="Print (F10)"><Printer className="h-5 w-5" style={{color:"#6a8ab8"}}/></button>
+                  <button type="button" onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)"}} title="Print (F10)"><Printer className="h-5 w-5" style={{color:"var(--pos-muted)"}}/></button>
                 </div>
-                <p className="px-4 py-2 text-[10px] text-center border-t shrink-0" style={{ color: "#6a8ab8", borderColor: "#1e3356" }}>
+                <p className="px-4 py-2 text-[10px] text-center border-t shrink-0" style={{ color: "var(--pos-muted)", borderColor: "var(--pos-border)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split pay · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
               </div>
@@ -3510,16 +3525,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="flex items-center gap-5 px-5 h-14 border-t shrink-0" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+        <div className="flex items-center gap-5 px-5 h-14 border-t shrink-0" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
           {[{label:"Shift Sales",value:`LKR ${formatNumber(todayStats.sales)}`,color:"#4f6ef7"},{label:"Orders",value:String(todayStats.orders)},{label:"Items Sold",value:String(todayStats.items)},{label:"Avg. Bill",value:todayStats.orders>0?`LKR ${formatNumber(todayStats.sales/todayStats.orders)}`:"LKR 0.00"}].map(s=>(
             <div key={s.label} className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-medium" style={{color:"#4a6a8a"}}>{s.label}</span>
+              <span className="text-xs font-medium" style={{color:"var(--pos-muted-2)"}}>{s.label}</span>
               <span className="text-sm font-bold" style={{color:s.color||"#fff"}}>{s.value}</span>
             </div>
           ))}
           {drawerCash != null && (
             <>
-              <div className="h-4 w-px shrink-0" style={{ background: "#1e3356" }} />
+              <div className="h-4 w-px shrink-0" style={{ background: "var(--pos-border)" }} />
               <div className="flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
                 <Banknote className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
                 <span className="text-xs font-medium" style={{ color: "#6ee7b7" }}>In drawer</span>
@@ -3531,46 +3546,46 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           {(() => {
             const scannerActive = isScannerActive(lastScanAt, scanFlash, now);
             const scannerDetail = formatScannerDetail(lastScanAt, now);
-            const scannerColor = scannerActive ? "#10b981" : "#6a8ab8";
+            const scannerColor = scannerActive ? "#10b981" : "var(--pos-muted)";
             return (
               <div className="flex items-center gap-2 shrink-0" style={{ color: scannerColor }}>
-                <div className={cn("h-2 w-2 rounded-full bg-green-400", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "#4a6a8a" }} />
+                <div className={cn("h-2 w-2 rounded-full bg-green-400", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "var(--pos-muted-2)" }} />
                 <Scan className="h-3.5 w-3.5" />
                 <span className="text-xs font-semibold">Barcode Scanner</span>
-                <span className="text-xs" style={{ color: "#6a8ab8" }}>{scannerDetail}</span>
+                <span className="text-xs" style={{ color: "var(--pos-muted)" }}>{scannerDetail}</span>
               </div>
             );
           })()}
-          <div className="h-4 w-px" style={{ background: "#1e3356" }} />
+          <div className="h-4 w-px" style={{ background: "var(--pos-border)" }} />
           <div className="flex items-center gap-1.5 shrink-0" style={{ color: printerStatus.color }}>
             <Printer className="h-3.5 w-3.5" />
             <span className="text-xs font-semibold">{printerStatus.label}</span>
-            <span className="text-xs" style={{ color: "#6a8ab8" }}>{printerStatus.detail}</span>
+            <span className="text-xs" style={{ color: "var(--pos-muted)" }}>{printerStatus.detail}</span>
           </div>
-          <div className="h-4 w-px" style={{ background: "#1e3356" }} />
+          <div className="h-4 w-px" style={{ background: "var(--pos-border)" }} />
           <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })}</div>
-          <div className="text-xs shrink-0" style={{ color: "#6a8ab8" }}>{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
-          <div className="h-4 w-px" style={{background:"#1e3356"}}/>
+          <div className="text-xs shrink-0" style={{ color: "var(--pos-muted)" }}>{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
+          <div className="h-4 w-px" style={{background:"var(--pos-border)"}}/>
           <button
             type="button"
             onClick={() => void toggleFullscreen()}
             title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
-            style={{background: isFullscreen ? "rgba(79,110,247,0.2)" : "rgba(255,255,255,0.06)", color: isFullscreen ? "#93c5fd" : "#a0b4d4", border: `1px solid ${isFullscreen ? "rgba(79,110,247,0.35)" : "#1e3356"}`}}
+            style={{background: isFullscreen ? "rgba(79,110,247,0.2)" : "rgba(255,255,255,0.06)", color: isFullscreen ? "#93c5fd" : "var(--pos-text-secondary)", border: `1px solid ${isFullscreen ? "rgba(79,110,247,0.35)" : "var(--pos-border)"}`}}
           >
             {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
             {isFullscreen ? "Exit Full" : "Fullscreen"}
           </button>
           <button onClick={handleDayEnd} disabled={dayEndLoading} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444",border:"1px solid rgba(239,68,68,0.3)"}}>{dayEndLoading?<Loader2 className="h-3.5 w-3.5 animate-spin"/>:<TrendingUp className="h-3.5 w-3.5"/>}Day End</button>
           <button onClick={()=>setShowCashClose(true)} className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90" style={{background:"rgba(16,185,129,0.12)",color:"#10b981",border:"1px solid rgba(16,185,129,0.3)"}}><Banknote className="h-3.5 w-3.5"/>Close Shift</button>
-          <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"#4a6a8a"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
+          <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:"var(--pos-muted-2)"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
         </div>
 
 
         {/* DAY END MODAL */}
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.75)"}}>
-            <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-md" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
+            <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-md" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
               <div className="p-5 text-white text-center" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)"}}>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{background:"rgba(255,255,255,0.2)"}}><TrendingUp className="h-6 w-6"/></div>
                 <h2 className="text-base font-bold">Day End Summary</h2>
@@ -3600,7 +3615,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       const [label, amt] = row as [string, number];
                       return (
                         <div key={label} className="flex justify-between text-xs py-0.5">
-                          <span style={{color:"#6a8ab8"}}>{label}</span>
+                          <span style={{color:"var(--pos-muted)"}}>{label}</span>
                           <span className="font-bold text-white tabular-nums">LKR {formatNumber(amt)}</span>
                         </div>
                       );
@@ -3620,22 +3635,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     { label: "Day expenses", val: dayEndSummary.expenses ?? 0, color: "#f59e0b" },
                     { label: "Supplier paid", val: dayEndSummary.supplierPayments ?? 0, color: "#ef4444" },
                   ].map((r) => (
-                    <div key={r.label} className="rounded-lg p-2.5 text-center" style={{ background: "#162338", border: "1px solid #1e3356" }}>
-                      <p className="text-[9px] uppercase tracking-wide" style={{ color: "#6a8ab8" }}>{r.label}</p>
+                    <div key={r.label} className="rounded-lg p-2.5 text-center" style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)" }}>
+                      <p className="text-[9px] uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>{r.label}</p>
                       <p className="text-xs font-bold tabular-nums mt-1" style={{ color: r.color }}>LKR {formatNumber(r.val)}</p>
                     </div>
                   ))}
                 </div>
 
                 {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"#fff"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Net (income − expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"#10b981"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"#f59e0b"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
-                  <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"#1e3356"}}>
-                    <span className="text-xs" style={{color:"#6a8ab8"}}>{r.label}</span>
+                  <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
+                    <span className="text-xs" style={{color:"var(--pos-muted)"}}>{r.label}</span>
                     <span className="text-sm font-bold" style={{color:r.color}}>{r.val}</span>
                   </div>
                 ))}
                 {Object.entries(dayEndSummary.byPaymentMethod).length>0&&(
                   <div className="pt-1">
-                    <p className="text-xs font-semibold mb-2" style={{color:"#6a8ab8"}}>By Payment Method</p>
+                    <p className="text-xs font-semibold mb-2" style={{color:"var(--pos-muted)"}}>By Payment Method</p>
                     {Object.entries(dayEndSummary.byPaymentMethod).map(([method,amt])=>(
                       <div key={method} className="flex justify-between text-xs py-1">
                         <span className="text-white">{method.replace(/_/g, " ")}</span>
@@ -3665,7 +3680,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     if (w) { w.document.write(html); w.document.close(); }
                   }}
                   className="w-full h-10 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border"
-                  style={{ borderColor: "#1e3356", color: "#a0b4d4" }}
+                  style={{ borderColor: "var(--pos-border)", color: "var(--pos-text-secondary)" }}
                 >
                   <Printer className="h-4 w-4" /> Print Shift Summary
                 </button>
@@ -3679,25 +3694,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* HELD BILLS MODAL */}
         <AnimatePresence>{showHeldBills&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>setShowHeldBills(false)}>
-            <motion.div initial={{scale:0.95,y:12}} animate={{scale:1,y:0}} exit={{scale:0.95,y:12}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{borderColor:"#1e3356"}}>
+            <motion.div initial={{scale:0.95,y:12}} animate={{scale:1,y:0}} exit={{scale:0.95,y:12}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl overflow-hidden max-h-[85vh] flex flex-col" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
                 <div className="flex items-center gap-2">
                   <PauseCircle className="h-4 w-4" style={{color:"#f59e0b"}}/>
                   <h2 className="text-white font-bold text-sm">Held Bills ({serverHeldBills.length})</h2>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={()=>void loadHeldBills()} className="h-8 px-3 rounded-lg text-xs font-semibold border" style={{borderColor:"#1e3356",color:"#6a8ab8"}}>
+                  <button onClick={()=>void loadHeldBills()} className="h-8 px-3 rounded-lg text-xs font-semibold border" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
                     <RefreshCw className={cn("h-3.5 w-3.5 inline mr-1",holdsLoading&&"animate-spin")}/>Refresh
                   </button>
                   <button onClick={()=>{if(items.length>0){void handleHoldBill();setShowHeldBills(false);}else toast.info("Cart is empty");}} className="h-8 px-3 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>
                     Hold current
                   </button>
-                  <button onClick={()=>setShowHeldBills(false)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+                  <button onClick={()=>setShowHeldBills(false)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {holdsLoading?(<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(
-                  <div className="flex flex-col items-center justify-center py-12" style={{color:"#4a6a8a"}}>
+                  <div className="flex flex-col items-center justify-center py-12" style={{color:"var(--pos-muted-2)"}}>
                     <PauseCircle className="h-12 w-12 mb-2 opacity-20"/>
                     <p className="text-sm">No bills on hold</p>
                     <p className="text-xs mt-1">Press F3 to hold the current cart</p>
@@ -3709,17 +3724,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
                       const kbFocus = focusedHeldIdx === idx;
                       return (
-                        <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"#162338",borderColor:kbFocus?"#4f6ef7":"#1e3356",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                        <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"var(--pos-card)",borderColor:kbFocus?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p>
-                              <p className="text-[10px]" style={{color:"#6a8ab8"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} · {billItems.length} item(s)</p>
+                              <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})} · {billItems.length} item(s)</p>
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"rgba(245,158,11,0.15)",color:"#f59e0b"}}>Reserved</span>
                           </div>
                           {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
-                          <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"#a0b4d4"}}>{i.productName} ×{i.quantity}</span><span className="font-mono" style={{color:"#6a8ab8"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"#4a6a8a"}}>+{billItems.length-3} more</p>}</div>
-                          <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"#1e3356"}}>
+                          <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more</p>}</div>
+                          <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}>
                             <span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span>
                             <div className="flex gap-2">
                               <button onClick={()=>void handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button>
@@ -3739,22 +3754,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* SHORTCUTS */}
         <AnimatePresence>{showShortcuts&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[120] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.7)"}} onClick={()=>setShowShortcuts(false)}>
-            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl p-5 max-h-[88vh] overflow-y-auto" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
-              <div className="flex items-center justify-between mb-4 sticky top-0 z-10 pb-2" style={{background:"#0f1f3a"}}>
+            <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl p-5 max-h-[88vh] overflow-y-auto" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
+              <div className="flex items-center justify-between mb-4 sticky top-0 z-10 pb-2" style={{background:"var(--pos-panel)"}}>
                 <div className="flex items-center gap-2">
                   <Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/>
                   <span className="text-white font-bold text-sm">Keyboard — full POS</span>
                 </div>
-                <button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"#6a8ab8"}}/></button>
+                <button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
               </div>
               <div className="grid sm:grid-cols-2 gap-5">
                 {POS_SHORTCUT_SECTIONS.map((section) => (
                   <div key={section.title}>
-                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{color:"#6a8ab8"}}>{section.title}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{color:"var(--pos-muted)"}}>{section.title}</p>
                     <div className="space-y-1">
                       {section.items.map(([k, d]) => (
                         <div key={`${section.title}-${k}`} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-white/5 gap-3">
-                          <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5 shrink-0" style={{background:"#1a2b4a",color:"#a0b4d4",border:"1px solid #1e3356"}}>{k}</kbd>
+                          <kbd className="text-[10px] font-mono font-bold rounded px-2 py-0.5 shrink-0" style={{background:"var(--pos-input)",color:"var(--pos-text-secondary)",border:"1px solid var(--pos-border)"}}>{k}</kbd>
                           <span className="text-xs text-right flex-1" style={{color:"#94a3b8"}}>{d}</span>
                         </div>
                       ))}
@@ -3762,7 +3777,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 ))}
               </div>
-              <p className="text-[10px] mt-4 text-center" style={{color:"#4a6a8a"}}>Tip: Ctrl+Enter = Pay Cash instantly · F9 = checkout popup</p>
+              <p className="text-[10px] mt-4 text-center" style={{color:"var(--pos-muted-2)"}}>Tip: Ctrl+Enter = Pay Cash instantly · F9 = checkout popup</p>
             </motion.div>
           </motion.div>
         )}</AnimatePresence>

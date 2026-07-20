@@ -118,9 +118,9 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
-          style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+          style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
         >
-          <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "#1e3356" }}>
+          <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--pos-border)" }}>
             <AlertTriangle className="h-5 w-5 text-amber-500" />
             <span className="text-white font-bold">Awaiting Manager Approval</span>
           </div>
@@ -138,12 +138,12 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                 Approve variance & continue
               </Button>
             ) : (
-              <p className="text-xs" style={{ color: "#6a8ab8" }}>
+              <p className="text-xs" style={{ color: "var(--pos-muted)" }}>
                 Ask your branch manager or admin to approve from Cash Management → Variance.
               </p>
             )}
             {onClose && (
-              <Button onClick={onClose} variant="outline" className="w-full border-[#1e3356] text-white/70">
+              <Button onClick={onClose} variant="outline" className="w-full border-[var(--pos-border)] text-white/70">
                 Exit POS
               </Button>
             )}
@@ -159,9 +159,9 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
-        style={{ background: "#0f1f3a", borderColor: "#1e3356" }}
+        style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#1e3356" }}>
+        <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--pos-border)" }}>
           <div className="flex items-center gap-2">
             <Banknote className="h-5 w-5" style={{ color: "#10b981" }} />
             <span className="text-white font-bold">Opening Cash</span>
@@ -211,7 +211,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                   onClose();
                 }
               }}
-              className="h-12 text-lg font-bold bg-[#1a2b4a] border-[#1e3356] text-white"
+              className="h-12 text-lg font-bold bg-[var(--pos-input)] border-[var(--pos-border)]"
             />
             <div className="flex flex-wrap gap-2">
               {FLOAT_PRESETS.map((p) => (
@@ -221,9 +221,9 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                   onClick={() => setOpeningCash(String(p))}
                   className="px-2.5 py-1 text-[10px] rounded-lg border font-medium transition-all"
                   style={{
-                    background: openingCash === String(p) ? "#10b981" : "#162338",
-                    borderColor: openingCash === String(p) ? "#10b981" : "#1e3356",
-                    color: openingCash === String(p) ? "#fff" : "#6a8ab8",
+                    background: openingCash === String(p) ? "#10b981" : "var(--pos-card)",
+                    borderColor: openingCash === String(p) ? "#10b981" : "var(--pos-border)",
+                    color: openingCash === String(p) ? "#fff" : "var(--pos-muted)",
                   }}
                 >
                   {formatNumber(p)}

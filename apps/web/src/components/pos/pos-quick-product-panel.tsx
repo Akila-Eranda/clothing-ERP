@@ -10,8 +10,8 @@ type Category = { id: string; name: string };
 type SupplierRow = { id: string; name: string };
 
 const INPUT_CLS =
-  "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors placeholder:text-white/30";
-const INPUT_STYLE = { background: "#1a2b4a", border: "1px solid #1e3356" } as const;
+  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[#4f6ef7] transition-colors";
+const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 export function PosQuickProductPanel({
   onBack,
@@ -149,7 +149,7 @@ export function PosQuickProductPanel({
         <button
           onClick={onBack}
           className="text-xs font-semibold px-3 h-8 rounded-lg transition-colors hover:bg-white/10"
-          style={{ color: "#6a8ab8" }}
+          style={{ color: "var(--pos-muted)" }}
         >
           ← Back
         </button>
@@ -157,14 +157,14 @@ export function PosQuickProductPanel({
 
       <div
         className="rounded-xl border p-4 space-y-3 overflow-y-auto max-w-xl"
-        style={{ background: "#162338", borderColor: "#1e3356" }}
+        style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}
       >
-        <p className="text-[11px]" style={{ color: "#6a8ab8" }}>
+        <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
           Create a simple product fast (no variants). Opens with selling / cost / MRP.
         </p>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Name *</label>
+          <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Name *</label>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -177,7 +177,7 @@ export function PosQuickProductPanel({
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Barcode</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Barcode</label>
             <input
               value={barcode}
               onChange={(e) => setBarcode(e.target.value)}
@@ -187,7 +187,7 @@ export function PosQuickProductPanel({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Category</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Category</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
@@ -203,7 +203,7 @@ export function PosQuickProductPanel({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "#6a8ab8" }}>
+          <label className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--pos-muted)" }}>
             <Truck className="h-3.5 w-3.5" />
             Supplier (assign for Quick GRN)
           </label>
@@ -225,13 +225,13 @@ export function PosQuickProductPanel({
               onClick={() => void loadSuppliers()}
               disabled={suppliersLoading || busy}
               className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-all hover:bg-white/10 disabled:opacity-50"
-              style={{ border: "1px solid #1e3356", color: "#6a8ab8", background: "transparent" }}
+              style={{ border: "1px solid var(--pos-border)", color: "var(--pos-muted)", background: "transparent" }}
             >
               <RefreshCw className={`h-4 w-4 ${suppliersLoading ? "animate-spin" : ""}`} />
             </button>
           </div>
           {supplierId && (
-            <p className="text-[10px]" style={{ color: "#6a8ab8" }}>
+            <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
               Buying price (cost) will be saved as last buying price for this supplier.
             </p>
           )}
@@ -239,7 +239,7 @@ export function PosQuickProductPanel({
 
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Selling *</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Selling *</label>
             <input
               type="number"
               min={0}
@@ -253,7 +253,7 @@ export function PosQuickProductPanel({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Cost *</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Cost *</label>
             <input
               type="number"
               min={0}
@@ -264,7 +264,7 @@ export function PosQuickProductPanel({
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>MRP</label>
+            <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>MRP</label>
             <input
               type="number"
               min={0}
@@ -277,7 +277,7 @@ export function PosQuickProductPanel({
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-xs font-semibold" style={{ color: "#6a8ab8" }}>Opening stock (optional)</label>
+          <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Opening stock (optional)</label>
           <input
             type="number"
             min={0}

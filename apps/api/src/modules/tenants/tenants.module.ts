@@ -959,7 +959,7 @@ export class TenantsService {
       headerText:   str(receipt['headerText']),
       footerText:   str(receipt['footerText'], 'Thank you for shopping with us!'),
       paperWidth:   str(receipt['paperWidth'], '80mm'),
-      receiptTheme: str(receipt['receiptTheme'], 'light') === 'dark' ? 'dark' : 'light',
+      receiptTheme: str(receipt['receiptTheme'], 'dark') === 'light' ? 'light' : 'dark',
       showTax:      bool(receipt['showTax'], true),
       showDiscount: bool(receipt['showDiscount'], true),
       showCashier:  bool(receipt['showCashier'], true),

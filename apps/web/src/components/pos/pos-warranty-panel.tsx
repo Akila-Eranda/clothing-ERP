@@ -229,7 +229,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             type="button"
             onClick={reset}
             className="text-xs font-semibold px-3 h-8 rounded-xl border hover:bg-white/10"
-            style={{ borderColor: "#1e3356", color: "#6a8ab8" }}
+            style={{ borderColor: "var(--pos-border)", color: "var(--pos-muted)" }}
           >
             New claim
           </button>
@@ -238,7 +238,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
 
       {step === "search" && (
         <>
-          <p className="text-xs shrink-0" style={{ color: "#6a8ab8" }}>
+          <p className="text-xs shrink-0" style={{ color: "var(--pos-muted)" }}>
             Find the original invoice, then select the defective part to file a warranty claim.
           </p>
           <div className="flex gap-2 shrink-0">
@@ -248,7 +248,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               onKeyDown={(e) => e.key === "Enter" && searchSales()}
               placeholder="Invoice #, customer phone or name…"
               className="flex-1 h-10 px-3 rounded-xl text-sm text-white outline-none"
-              style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
             />
             <button
               type="button"
@@ -261,21 +261,21 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               Search
             </button>
           </div>
-          <div className="flex-1 overflow-y-auto rounded-xl border" style={{ borderColor: "#1e3356" }}>
+          <div className="flex-1 overflow-y-auto rounded-xl border" style={{ borderColor: "var(--pos-border)" }}>
             {searchResults.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full py-12" style={{ color: "#4a6a8a" }}>
+              <div className="flex flex-col items-center justify-center h-full py-12" style={{ color: "var(--pos-muted-2)" }}>
                 <Wrench className="h-12 w-12 mb-2 opacity-20" />
                 <p className="text-sm">Search for a completed sale</p>
               </div>
             ) : (
               <table className="w-full text-sm">
-                <thead style={{ position: "sticky", top: 0, background: "#0f1f3a" }}>
+                <thead style={{ position: "sticky", top: 0, background: "var(--pos-panel)" }}>
                   <tr>
                     {["Invoice", "Customer", "Total", "Date", ""].map((h) => (
                       <th
                         key={h}
                         className="text-left px-3 py-2 text-[11px] font-semibold"
-                        style={{ color: "#6a8ab8", borderBottom: "1px solid #1e3356" }}
+                        style={{ color: "var(--pos-muted)", borderBottom: "1px solid var(--pos-border)" }}
                       >
                         {h}
                       </th>
@@ -292,7 +292,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                       <td className="px-3 py-2 text-xs font-mono text-white">
                         LKR {formatNumber(row.total)}
                       </td>
-                      <td className="px-3 py-2 text-xs" style={{ color: "#6a8ab8" }}>
+                      <td className="px-3 py-2 text-xs" style={{ color: "var(--pos-muted)" }}>
                         {new Date(row.invoiceDate).toLocaleDateString()}
                       </td>
                       <td className="px-3 py-2">
@@ -318,10 +318,10 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
         <>
           <div
             className="rounded-xl p-3 shrink-0 border text-xs space-y-1"
-            style={{ borderColor: "#1e3356", background: "#162338" }}
+            style={{ borderColor: "var(--pos-border)", background: "var(--pos-card)" }}
           >
             <p className="text-white font-semibold font-mono">{sale.invoiceNumber}</p>
-            <p style={{ color: "#6a8ab8" }}>
+            <p style={{ color: "var(--pos-muted)" }}>
               {customerLabel(sale.customer)} · Sold {new Date(sale.invoiceDate).toLocaleDateString()}
             </p>
             {!customerId && (
@@ -332,7 +332,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
           {eligibleItems.length === 0 ? (
             <div
               className="flex-1 flex flex-col items-center justify-center rounded-xl border p-6 text-center"
-              style={{ borderColor: "#1e3356", color: "#6a8ab8" }}
+              style={{ borderColor: "var(--pos-border)", color: "var(--pos-muted)" }}
             >
               <p className="text-sm text-white font-medium">No warranty-covered parts on this invoice</p>
               <p className="text-xs mt-2 max-w-sm">
@@ -354,14 +354,14 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                     active && "ring-2 ring-[#4f6ef7]",
                   )}
                   style={{
-                    borderColor: active ? "#4f6ef7" : "#1e3356",
-                    background: active ? "rgba(79,110,247,0.12)" : "#162338",
+                    borderColor: active ? "#4f6ef7" : "var(--pos-border)",
+                    background: active ? "rgba(79,110,247,0.12)" : "var(--pos-card)",
                   }}
                 >
                   <p className="text-sm font-semibold text-white">
                     {it.productName} {it.variantName}
                   </p>
-                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "#6a8ab8" }}>
+                  <p className="text-[11px] font-mono mt-0.5" style={{ color: "var(--pos-muted)" }}>
                     {it.sku} · Qty {it.quantity} · {warrantyPeriodLabel(wm)}
                   </p>
                 </button>
@@ -383,9 +383,9 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
 
       {step === "confirm" && sale && selectedItem && (
         <>
-          <div className="rounded-xl p-3 border text-xs space-y-2 shrink-0" style={{ borderColor: "#1e3356", background: "#162338" }}>
+          <div className="rounded-xl p-3 border text-xs space-y-2 shrink-0" style={{ borderColor: "var(--pos-border)", background: "var(--pos-card)" }}>
             <p className="text-white font-semibold">{selectedItem.productName} {selectedItem.variantName}</p>
-            <p style={{ color: "#6a8ab8" }}>
+            <p style={{ color: "var(--pos-muted)" }}>
               Invoice {sale.invoiceNumber} · Purchase {purchaseDate} · Warranty {warrantyMonths} months
             </p>
           </div>
@@ -396,14 +396,14 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             rows={4}
             placeholder="e.g. Alternator failed after 2 weeks, grinding noise…"
             className="flex-1 min-h-[100px] w-full p-3 rounded-xl text-sm text-white resize-none outline-none"
-            style={{ background: "#1a2b4a", border: "1px solid #1e3356" }}
+            style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
           />
           <div className="flex gap-2 shrink-0">
             <button
               type="button"
               onClick={() => setStep("item")}
               className="flex-1 h-10 rounded-xl text-sm font-semibold border"
-              style={{ borderColor: "#1e3356", color: "#a0b4d4" }}
+              style={{ borderColor: "var(--pos-border)", color: "var(--pos-text-secondary)" }}
             >
               Back
             </button>
@@ -434,7 +434,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             <p className="text-sm mt-1 font-mono" style={{ color: "#4f6ef7" }}>
               {claimNumber}
             </p>
-            <p className="text-xs mt-2" style={{ color: "#6a8ab8" }}>
+            <p className="text-xs mt-2" style={{ color: "var(--pos-muted)" }}>
               Manager can approve from Warranty page or Workflows.
             </p>
           </div>
