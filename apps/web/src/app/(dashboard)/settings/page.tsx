@@ -8,7 +8,7 @@ import {
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
   Printer, Image, Server, FileText, Upload,
 } from "lucide-react";
-import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated } from "@/lib/use-receipt-settings";
+import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
 import { receiptThemeColors } from "@/lib/receipt-theme";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
@@ -452,6 +452,9 @@ export default function SettingsPage() {
     try {
       await api.put("/tenants/receipt-settings", receiptForm);
       try { localStorage.setItem("receipt_settings_cache", JSON.stringify(receiptForm)); } catch { /* noop */ }
+      if (receiptForm.receiptTheme === "light" || receiptForm.receiptTheme === "dark") {
+        setLocalPosTheme(receiptForm.receiptTheme);
+      }
       notifyReceiptSettingsUpdated();
       toast.success("Receipt settings saved");
     } catch { toast.error("Failed to save receipt settings"); }

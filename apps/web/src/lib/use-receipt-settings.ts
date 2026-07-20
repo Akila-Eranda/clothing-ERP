@@ -57,6 +57,8 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
 };
 
 const LS_KEY = "receipt_settings_cache";
+/** Terminal POS UI theme preference — wins over server until user toggles again. */
+const POS_THEME_KEY = "pos_ui_theme";
 
 /** Fired after receipt settings are saved so live consumers (sidebar, POS) refresh instantly. */
 export const RECEIPT_SETTINGS_EVENT = "receipt-settings-updated";
@@ -80,35 +82,68 @@ function toCache(s: ReceiptSettings) {
   try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch { /* noop */ }
 }
 
+function getLocalPosTheme(): "light" | "dark" | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const t = localStorage.getItem(POS_THEME_KEY);
+    return t === "light" || t === "dark" ? t : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLocalPosTheme(theme: "light" | "dark") {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(POS_THEME_KEY, theme);
+  } catch { /* noop */ }
+}
+
+function normalizeTheme(value: unknown, fallback: "light" | "dark" = "dark"): "light" | "dark" {
+  if (value === "light") return "light";
+  if (value === "dark") return "dark";
+  return fallback;
+}
+
+function applyLocalTheme(s: ReceiptSettings): ReceiptSettings {
+  const local = getLocalPosTheme();
+  if (!local) return s;
+  return { ...s, receiptTheme: local };
+}
+
 export function useReceiptSettings() {
-  const [settings, setSettings] = React.useState<ReceiptSettings>(() => fromCache() ?? RECEIPT_DEFAULTS);
+  const [settings, setSettings] = React.useState<ReceiptSettings>(() =>
+    applyLocalTheme(fromCache() ?? RECEIPT_DEFAULTS),
+  );
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(async () => {
     try {
       const r = await api.get<ReceiptSettings>("/tenants/receipt-settings");
-      const s = {
+      const s = applyLocalTheme({
         ...RECEIPT_DEFAULTS,
         ...r.data,
-        receiptTheme: r.data?.receiptTheme === "dark" ? "dark" : "light",
-      } as ReceiptSettings;
+        // Missing/unknown → dark (matches API + RECEIPT_DEFAULTS). Do NOT map to light.
+        receiptTheme: normalizeTheme(r.data?.receiptTheme, "dark"),
+      } as ReceiptSettings);
       setSettings(s);
       toCache(s);
     } catch { /* use cache */ }
     finally { setLoading(false); }
   }, []);
 
-  React.useEffect(() => { load(); }, [load]);
+  React.useEffect(() => { void load(); }, [load]);
 
   React.useEffect(() => {
     const onUpdated = () => {
+      // Optimistic: apply cache only. Do NOT call load() here — it races with PUT
+      // and snaps the theme back to the previous server value.
       const cached = fromCache();
-      if (cached) setSettings(cached);
-      load();
+      if (cached) setSettings(applyLocalTheme(cached));
     };
     window.addEventListener(RECEIPT_SETTINGS_EVENT, onUpdated);
     return () => window.removeEventListener(RECEIPT_SETTINGS_EVENT, onUpdated);
-  }, [load]);
+  }, []);
 
   return { settings, loading, reload: load };
 }

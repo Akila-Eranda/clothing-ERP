@@ -12,7 +12,7 @@ import { formatNumber, formatUserRole } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
-import { useReceiptSettings, notifyReceiptSettingsUpdated, type ReceiptSettings } from "@/lib/use-receipt-settings";
+import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
@@ -1558,14 +1558,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const setReceiptTheme = React.useCallback(async (theme: "light" | "dark") => {
     const next = { ...receiptSettings, receiptTheme: theme };
-    try { localStorage.setItem("receipt_settings_cache", JSON.stringify(next)); } catch { /* noop */ }
+    try {
+      localStorage.setItem("receipt_settings_cache", JSON.stringify(next));
+    } catch { /* noop */ }
+    setLocalPosTheme(theme);
     notifyReceiptSettingsUpdated();
     try {
       await api.put("/tenants/receipt-settings", next);
-      toast.success(theme === "dark" ? "Receipt: Dark" : "Receipt: Light");
+      toast.success(theme === "dark" ? "POS: Dark" : "POS: Light");
     } catch {
-      // Local theme still applies for this terminal (admin save may be required for others)
-      toast.success(theme === "dark" ? "Receipt: Dark (this terminal)" : "Receipt: Light (this terminal)");
+      // Keep terminal preference even if cashier can't save tenant settings
+      toast.success(theme === "dark" ? "POS: Dark (this terminal)" : "POS: Light (this terminal)");
     }
   }, [receiptSettings]);
 
@@ -2982,8 +2985,24 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCustomerPopup()}].map((btn,i)=>(
-              <button key={i} onClick={btn.onClick} className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:bg-white/10", i===2&&"max-w-[180px]")} style={{background:i===2&&customer?"rgba(79,110,247,0.15)":"var(--pos-input)",color:i===2&&customer?"#4f6ef7":"var(--pos-text-secondary)",border:i===2&&customer?"1px solid rgba(79,110,247,0.35)":"none"}} title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}>
-                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-50 ml-0.5 shrink-0">{btn.key}</span>}
+              <button
+                key={i}
+                onClick={btn.onClick}
+                className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", i===2&&"max-w-[180px]")}
+                style={{
+                  background: i === 2 && customer
+                    ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                    : (isPosLight ? "#334155" : "var(--pos-input)"),
+                  color: i === 2 && customer
+                    ? "#ffffff"
+                    : (isPosLight ? "#ffffff" : "var(--pos-text-secondary)"),
+                  border: i === 2 && customer
+                    ? (isPosLight ? "1px solid #4338ca" : "1px solid rgba(79,110,247,0.35)")
+                    : (isPosLight ? "1px solid #1E293B" : "none"),
+                }}
+                title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}
+              >
+                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-70 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
           </div>
@@ -2997,9 +3016,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   title={isDarkUi ? "Switch POS to Light mode" : "Switch POS to Dark mode"}
                   className="flex items-center gap-1.5 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90"
                   style={{
-                    background: isDarkUi ? "rgba(15,23,42,0.9)" : "rgba(255,255,255,0.95)",
-                    color: isDarkUi ? "#f8fafc" : "#0f172a",
-                    border: isDarkUi ? "1px solid #475569" : "1px solid #cbd5e1",
+                    background: isDarkUi ? "rgba(15,23,42,0.9)" : "#334155",
+                    color: "#ffffff",
+                    border: isDarkUi ? "1px solid #475569" : "1px solid #1E293B",
                     boxShadow: isPosLight ? "var(--pos-shadow)" : undefined,
                   }}
                 >
@@ -3008,12 +3027,43 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 </button>
               );
             })()}
-            <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}><span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse"/>Online</div>
-            <button type="button" onClick={() => !posOnly && setActiveNav("settings")} title={taxRate > 0 ? `Tax ${taxRate}% from POS settings` : "Tax disabled in POS settings"} className={cn("flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold", !posOnly && "hover:opacity-90")} style={{background:taxRate>0?"rgba(79,110,247,0.15)":"rgba(107,114,128,0.15)",color:taxRate>0?"var(--pos-accent-soft)":"var(--pos-muted)"}}>
+            <div
+              className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold"
+              style={{
+                background: isPosLight ? "#059669" : "rgba(16,185,129,0.15)",
+                color: isPosLight ? "#ffffff" : "#10b981",
+              }}
+            >
+              <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: isPosLight ? "#ffffff" : "#4ade80" }} />
+              Online
+            </div>
+            <button
+              type="button"
+              onClick={() => !posOnly && setActiveNav("settings")}
+              title={taxRate > 0 ? `Tax ${taxRate}% from POS settings` : "Tax disabled in POS settings"}
+              className={cn("flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold", !posOnly && "hover:opacity-90")}
+              style={{
+                background: taxRate > 0
+                  ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                  : (isPosLight ? "#475569" : "rgba(107,114,128,0.15)"),
+                color: isPosLight ? "#ffffff" : (taxRate > 0 ? "var(--pos-accent-soft)" : "var(--pos-muted)"),
+              }}
+            >
               <Receipt className="h-3.5 w-3.5"/>
               {taxRate > 0 ? `Tax ${taxRate}%` : "No Tax"}
             </button>
-            {serverHeldBills.length>0&&<button onClick={openHeldBillsPopup} className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn)"}}><PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held</button>}
+            {serverHeldBills.length>0&&(
+              <button
+                onClick={openHeldBillsPopup}
+                className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold"
+                style={{
+                  background: isPosLight ? "var(--pos-warn)" : "var(--pos-warn-bg)",
+                  color: isPosLight ? "#ffffff" : "var(--pos-warn)",
+                }}
+              >
+                <PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held
+              </button>
+            )}
             <a
               href={getCustomerDisplayUrl()}
               target={CUSTOMER_DISPLAY_WINDOW_NAME}
@@ -3021,7 +3071,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               onClick={handleOpenCustomerDisplay}
               title="Open customer-facing display on second screen"
               className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90 no-underline"
-              style={{background:"rgba(124,58,237,0.15)",color:"var(--pos-violet-soft)"}}
+              style={{
+                background: isPosLight ? "#6D28D9" : "rgba(124,58,237,0.15)",
+                color: isPosLight ? "#ffffff" : "var(--pos-violet-soft)",
+              }}
             >
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
             </a>
