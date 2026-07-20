@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { posCashierStorage } from "@/lib/pos-cashier";
 
 interface UIStore {
   sidebarCollapsed: boolean;
@@ -53,7 +54,10 @@ export const useUIStore = create<UIStore>()(
 
       openPos: () => set({ posOpen: true }),
 
-      closePos: () => set({ posOpen: false }),
+      closePos: () => {
+        posCashierStorage.clear();
+        set({ posOpen: false });
+      },
     }),
     {
       name: "fashion-erp-ui-v2",
@@ -63,6 +67,9 @@ export const useUIStore = create<UIStore>()(
         theme: state.theme,
         posOpen: state.posOpen,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && !state.posOpen) posCashierStorage.clear();
+      },
     }
   )
 );

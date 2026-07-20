@@ -1,3 +1,5 @@
+import { posCashierStorage } from '@/lib/pos-cashier';
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
 // ── Response shape from NestJS ResponseInterceptor ─────────────────────────
@@ -112,13 +114,9 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
 
   // Active POS cashier (PIN unlock) — only on routes that attribute sales/cash to the unlocked user
   const needsPosCashier = needsPosCashierHeader(path);
-  if (needsPosCashier && typeof window !== 'undefined') {
-    try {
-      const posToken = sessionStorage.getItem('pos_cashier_unlock_token');
-      if (posToken) headers['x-pos-cashier-token'] = posToken;
-    } catch {
-      /* ignore */
-    }
+  if (needsPosCashier) {
+    const posToken = posCashierStorage.getToken();
+    if (posToken) headers['x-pos-cashier-token'] = posToken;
   }
 
   const tenantId = (init.headers as Record<string, string> | undefined)?.['x-tenant-id']
