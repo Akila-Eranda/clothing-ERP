@@ -2786,7 +2786,48 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
           <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"#0f1f3a",borderColor:"#1e3356"}}>
             <nav className="flex-1 py-2 overflow-y-auto">
               {navItems.map((item, navIdx)=>{
+                if (item.id === "demo-product") return null;
+                if (item.id === "quick-product") {
+                  const demoItem = navItems.find((n) => n.id === "demo-product");
+                  const newActive = activeNav === "quick-product";
+                  const demoActive = activeNav === "demo-product";
+                  return (
+                    <div key="product-create-row" className="flex items-stretch gap-1 px-1.5 py-1">
+                      <button
+                        type="button"
+                        onClick={() => setActiveNav("quick-product")}
+                        title="New Product (Q)"
+                        className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
+                        style={{
+                          color: newActive ? "#fff" : "#6a8ab8",
+                          background: newActive ? "rgba(79,110,247,0.25)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${newActive ? "#4f6ef7" : "#1e3356"}`,
+                        }}
+                      >
+                        <PackagePlus className="h-3.5 w-3.5 shrink-0" style={{ color: newActive ? "#4f6ef7" : "#6a8ab8" }} />
+                        <span className="truncate w-full text-center">New</span>
+                      </button>
+                      {demoItem && (
+                        <button
+                          type="button"
+                          onClick={() => setActiveNav("demo-product")}
+                          title="Demo Product (Y)"
+                          className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
+                          style={{
+                            color: demoActive ? "#fff" : "#6a8ab8",
+                            background: demoActive ? "rgba(16,185,129,0.25)" : "rgba(255,255,255,0.03)",
+                            border: `1px solid ${demoActive ? "#10b981" : "#1e3356"}`,
+                          }}
+                        >
+                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: demoActive ? "#34d399" : "#6a8ab8" }} />
+                          <span className="truncate w-full text-center">Demo</span>
+                        </button>
+                      )}
+                    </div>
+                  );
+                }
                 const active=activeNav===item.id;
+                const shortcutIdx = navItems.filter((n) => n.id !== "demo-product").findIndex((n) => n.id === item.id);
                 return (
                   <button key={item.id} onClick={()=>{
                     if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
@@ -2797,7 +2838,7 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:#00
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
                     {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#f59e0b",color:"#fff"}}>{serverHeldBills.length}</span>}
-                    {navIdx<9&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{navIdx+1}</span>}
+                    {shortcutIdx>=0&&shortcutIdx<9&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
                   </button>
                 );
               })}
