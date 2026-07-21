@@ -148,15 +148,15 @@ export function AccountingSettingsHub() {
   ];
 
   return (
-    <div className="space-y-4 p-4 md:p-6 max-w-[1200px] mx-auto">
-      <div>
-        <h1 className="text-xl font-bold tracking-tight">Accounting Settings</h1>
-        <p className="text-sm text-muted-foreground">
-          {profile.label} · Fiscal year, currency, number series, tax, approvals, preferences
+    <div className="page-shell w-full">
+      <div className="min-w-0">
+        <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Accounting Settings</h1>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+          {profile.label} · Fiscal year · currency · number series · tax · approvals · preferences
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1 border-b pb-px">
+      <div className="flex flex-wrap gap-1.5 p-1 rounded-[14px] border bg-muted/40 w-fit max-w-full">
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -165,10 +165,10 @@ export function AccountingSettingsHub() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              className={`inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[10px] text-sm font-semibold transition-all ${
                 active
-                  ? "border-primary text-foreground"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -278,15 +278,15 @@ function FiscalPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-muted-foreground">
           Configure the current fiscal year and retained earnings account.
         </p>
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" onClick={() => setFyOpen(true)} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Create fiscal year
+          <Button onClick={() => setFyOpen(true)} className="h-10 rounded-[12px] gap-1.5">
+            <Plus className="h-[18px] w-[18px]" /> Create fiscal year
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild variant="outline" className="h-10 rounded-[12px]">
             <Link href="/accounting/periods">Open period management</Link>
           </Button>
         </div>
@@ -321,11 +321,17 @@ function FiscalPanel() {
       </Dialog>
 
       {selected && (
-        <Card>
-          <CardContent className="p-4 space-y-3 max-w-xl">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+            <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+              <CalendarRange className="h-4 w-4" />
+            </div>
+            <h3 className="text-sm font-semibold">Current fiscal year</h3>
+          </div>
+          <CardContent className="p-5 space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={selected.id} onValueChange={setSelectedId}>
-                <SelectTrigger className="h-9 w-56"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-[12px] w-64"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {years.map((y) => (
                     <SelectItem key={y.id} value={y.id}>
@@ -334,41 +340,43 @@ function FiscalPanel() {
                   ))}
                 </SelectContent>
               </Select>
-              <Badge variant="outline" className="text-[10px]">{selected.status}</Badge>
+              <Badge variant="outline" className="text-[10px] rounded-full">{selected.status}</Badge>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Name</Label>
-              <Input className="h-9" value={editName} onChange={(e) => setEditName(e.target.value)} disabled={selected.status === "CLOSED"} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid lg:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <Label className="text-xs">Name</Label>
+                <Input className="h-10 rounded-[12px]" value={editName} onChange={(e) => setEditName(e.target.value)} disabled={selected.status === "CLOSED"} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Retained Earnings account</Label>
+                <Select value={editReId || "__auto__"} onValueChange={(v) => setEditReId(v === "__auto__" ? "" : v)}>
+                  <SelectTrigger className="h-10 rounded-[12px]"><SelectValue placeholder="Auto-detect" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__auto__">Auto-detect</SelectItem>
+                    {accounts.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="space-y-1">
                 <Label className="text-xs">Start</Label>
-                <Input className="h-9 font-mono" value={fmt(selected.startDate)} disabled />
+                <Input className="h-10 rounded-[12px] font-mono" value={fmt(selected.startDate)} disabled />
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">End</Label>
-                <Input className="h-9 font-mono" value={fmt(selected.endDate)} disabled />
+                <Input className="h-10 rounded-[12px] font-mono" value={fmt(selected.endDate)} disabled />
               </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Retained Earnings account</Label>
-              <Select value={editReId || "__auto__"} onValueChange={(v) => setEditReId(v === "__auto__" ? "" : v)}>
-                <SelectTrigger className="h-9"><SelectValue placeholder="Auto-detect" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__auto__">Auto-detect</SelectItem>
-                  {accounts.map((a) => (
-                    <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <p className="text-xs text-muted-foreground">
+                {selected.periods?.length ?? 0} periods · open:{" "}
+                {selected.periods?.filter((p) => p.status === "OPEN").length ?? 0}
+              </p>
+              <Button className="h-10 rounded-[12px]" disabled={busy || selected.status === "CLOSED"} onClick={() => void saveFy()}>
+                Save & set current
+              </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              {selected.periods?.length ?? 0} periods · open:{" "}
-              {selected.periods?.filter((p) => p.status === "OPEN").length ?? 0}
-            </p>
-            <Button size="sm" disabled={busy || selected.status === "CLOSED"} onClick={() => void saveFy()}>
-              Save & set current
-            </Button>
           </CardContent>
         </Card>
       )}
@@ -415,26 +423,31 @@ function CurrencyPanel() {
   }
 
   return (
-    <Card>
-      <CardContent className="p-4 space-y-4 max-w-md">
-        <div>
-          <h3 className="text-sm font-semibold">Base currency</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            Single-currency ledger for {tenant?.name ?? "this shop"}. Multi-currency FX is not enabled.
-          </p>
+    <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+      <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+        <div className="h-8 w-8 rounded-[10px] bg-amber-500/15 text-amber-600 flex items-center justify-center">
+          <Coins className="h-4 w-4" />
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Currency</Label>
-          <Select value={currency} onValueChange={setCurrency}>
-            <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CURRENCIES.map((c) => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <h3 className="text-sm font-semibold">Base currency</h3>
+      </div>
+      <CardContent className="p-5 space-y-4">
+        <p className="text-xs text-muted-foreground">
+          Single-currency ledger for {tenant?.name ?? "this shop"}. Multi-currency FX is not enabled.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-4 items-end max-w-xl">
+          <div className="space-y-1">
+            <Label className="text-xs">Currency</Label>
+            <Select value={currency} onValueChange={setCurrency}>
+              <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CURRENCIES.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Button className="h-10 rounded-[12px]" disabled={busy} onClick={() => void save()}>Save currency</Button>
         </div>
-        <Button size="sm" disabled={busy} onClick={() => void save()}>Save currency</Button>
       </CardContent>
     </Card>
   );
@@ -492,129 +505,130 @@ function NumberSeriesPanel() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-muted-foreground">
           Document prefixes and next sequence. Journals use the JOURNAL series automatically.
         </p>
-        <Button size="sm" variant="outline" className="gap-1" onClick={() => void load()}>
-          <RefreshCw className="h-3.5 w-3.5" /> Refresh
+        <Button variant="outline" className="h-10 rounded-[12px] gap-1.5" onClick={() => void load()}>
+          <RefreshCw className="h-[18px] w-[18px]" /> Refresh
         </Button>
       </div>
-      {rows.map((r) => {
-        const d = draftOf(r);
-        const dirty = !!drafts[r.key];
-        return (
-          <Card key={r.key}>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <div>
-                  <p className="text-sm font-semibold">{r.name}</p>
-                  <p className="text-[11px] text-muted-foreground font-mono">{r.key}</p>
+      <div className="grid lg:grid-cols-2 gap-3">
+        {rows.map((r) => {
+          const d = draftOf(r);
+          const dirty = !!drafts[r.key];
+          return (
+            <Card key={r.key} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <p className="text-sm font-semibold">{r.name}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">{r.key}</p>
+                  </div>
+                  <Badge variant="outline" className="font-mono text-[10px] rounded-full">{d.preview ?? r.preview}</Badge>
                 </div>
-                <Badge variant="outline" className="font-mono text-[10px]">{d.preview ?? r.preview}</Badge>
-              </div>
-              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs">Prefix</Label>
-                  <Input
-                    className="h-9 font-mono"
-                    value={d.prefix ?? ""}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), prefix: e.target.value.toUpperCase() },
-                    }))}
-                  />
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Prefix</Label>
+                    <Input
+                      className="h-10 rounded-[12px] font-mono"
+                      value={d.prefix ?? ""}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), prefix: e.target.value.toUpperCase() },
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Pad length</Label>
+                    <Input
+                      type="number"
+                      className="h-10 rounded-[12px]"
+                      value={d.padLength ?? 5}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), padLength: parseInt(e.target.value, 10) || 5 },
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Next value</Label>
+                    <Input
+                      type="number"
+                      className="h-10 rounded-[12px]"
+                      value={d.nextValue ?? 1}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), nextValue: parseInt(e.target.value, 10) || 1 },
+                      }))}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Reset</Label>
+                    <Select
+                      value={d.resetPolicy ?? "YEARLY"}
+                      onValueChange={(v) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), resetPolicy: v },
+                      }))}
+                    >
+                      <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {RESET_POLICIES.map((p) => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Pad length</Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={d.padLength ?? 5}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), padLength: parseInt(e.target.value, 10) || 5 },
-                    }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Next value</Label>
-                  <Input
-                    type="number"
-                    className="h-9"
-                    value={d.nextValue ?? 1}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), nextValue: parseInt(e.target.value, 10) || 1 },
-                    }))}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Reset</Label>
-                  <Select
-                    value={d.resetPolicy ?? "YEARLY"}
-                    onValueChange={(v) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), resetPolicy: v },
-                    }))}
+                <div className="flex items-center gap-4 text-xs flex-wrap">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!d.includeYear}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), includeYear: e.target.checked },
+                      }))}
+                    />
+                    Year
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={!!d.includeMonth}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), includeMonth: e.target.checked },
+                      }))}
+                    />
+                    Month
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={d.isActive !== false}
+                      onChange={(e) => setDrafts((prev) => ({
+                        ...prev,
+                        [r.key]: { ...draftOf(r), isActive: e.target.checked },
+                      }))}
+                    />
+                    Active
+                  </label>
+                  <Button
+                    className="ml-auto h-9 rounded-[10px]"
+                    disabled={!dirty || busyKey === r.key}
+                    onClick={() => void save(r.key)}
                   >
-                    <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {RESET_POLICIES.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    {busyKey === r.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
+                  </Button>
                 </div>
-              </div>
-              <div className="flex items-center gap-4 text-xs">
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={!!d.includeYear}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), includeYear: e.target.checked },
-                    }))}
-                  />
-                  Year
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={!!d.includeMonth}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), includeMonth: e.target.checked },
-                    }))}
-                  />
-                  Month
-                </label>
-                <label className="flex items-center gap-1.5">
-                  <input
-                    type="checkbox"
-                    checked={d.isActive !== false}
-                    onChange={(e) => setDrafts((prev) => ({
-                      ...prev,
-                      [r.key]: { ...draftOf(r), isActive: e.target.checked },
-                    }))}
-                  />
-                  Active
-                </label>
-                <Button
-                  size="sm"
-                  className="ml-auto h-8"
-                  disabled={!dirty || busyKey === r.key}
-                  onClick={() => void save(r.key)}
-                >
-                  {busyKey === r.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -688,14 +702,14 @@ function TaxSettingsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-muted-foreground">Tax master used for VAT and invoices.</p>
         <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void seed()}>Seed defaults</Button>
-          <Button size="sm" onClick={() => setRateOpen(true)} className="gap-1.5">
-            <Plus className="h-3.5 w-3.5" /> Add rate
+          <Button variant="outline" className="h-10 rounded-[12px]" disabled={busy} onClick={() => void seed()}>Seed defaults</Button>
+          <Button onClick={() => setRateOpen(true)} className="h-10 rounded-[12px] gap-1.5">
+            <Plus className="h-[18px] w-[18px]" /> Add rate
           </Button>
-          <Button asChild size="sm" variant="outline">
+          <Button asChild variant="outline" className="h-10 rounded-[12px]">
             <Link href="/accounting/vat">VAT returns & reports</Link>
           </Button>
         </div>
@@ -730,28 +744,39 @@ function TaxSettingsPanel() {
       {loading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
       ) : (
-        <div className="rounded-lg border divide-y">
-          {rates.map((r) => (
-            <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-              <div>
-                <p className="font-medium">{r.code} · {r.name}</p>
-                <p className="text-[11px] text-muted-foreground">{r.rate}% · {r.direction}</p>
+        <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+            <div className="flex items-center gap-2.5">
+              <div className="h-8 w-8 rounded-[10px] bg-teal-500/15 text-teal-600 flex items-center justify-center">
+                <Settings2 className="h-4 w-4" />
               </div>
-              <div className="flex items-center gap-2">
-                {r.isDefault && <Badge className="text-[10px]">Default</Badge>}
-                <Badge variant={r.isActive ? "default" : "secondary"} className="text-[10px]">
-                  {r.isActive ? "Active" : "Inactive"}
-                </Badge>
-                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => void toggle(r)}>
-                  {r.isActive ? "Disable" : "Enable"}
-                </Button>
-              </div>
+              <h3 className="text-sm font-semibold">Tax rates</h3>
             </div>
-          ))}
-          {!rates.length && (
-            <p className="text-sm text-muted-foreground text-center py-8">No tax rates — seed defaults to start</p>
-          )}
-        </div>
+            <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">{rates.length}</Badge>
+          </div>
+          <div className="divide-y">
+            {rates.map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-muted/20 transition-colors">
+                <div>
+                  <p className="font-medium">{r.code} · {r.name}</p>
+                  <p className="text-[11px] text-muted-foreground">{r.rate}% · {r.direction}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {r.isDefault && <Badge className="text-[10px] rounded-full">Default</Badge>}
+                  <Badge variant={r.isActive ? "default" : "secondary"} className="text-[10px] rounded-full">
+                    {r.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  <Button size="sm" variant="ghost" className="h-8 text-xs rounded-[10px]" onClick={() => void toggle(r)}>
+                    {r.isActive ? "Disable" : "Enable"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+            {!rates.length && (
+              <p className="text-sm text-muted-foreground text-center py-10">No tax rates — seed defaults to start</p>
+            )}
+          </div>
+        </Card>
       )}
     </div>
   );
@@ -833,95 +858,96 @@ function WorkflowPanel() {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between flex-wrap gap-2">
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <p className="text-sm text-muted-foreground">
           Configure approval steps and roles. Journal approval is controlled under Preferences.
         </p>
-        <Button asChild size="sm" variant="outline">
+        <Button asChild variant="outline" className="h-10 rounded-[12px]">
           <Link href="/workflows">Open task inbox</Link>
         </Button>
       </div>
-      {defs.map((d) => {
-        const open = expanded === d.key;
-        return (
-          <Card key={d.key}>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <button type="button" className="text-left" onClick={() => setExpanded(open ? null : d.key)}>
-                  <p className="text-sm font-semibold">{d.name}</p>
-                  <p className="text-[11px] text-muted-foreground font-mono">{d.key} · {d.steps.length} steps</p>
-                </button>
-                <div className="flex items-center gap-2">
-                  <Badge variant={d.isActive ? "default" : "secondary"} className="text-[10px]">
-                    {d.isActive ? "Active" : "Inactive"}
-                  </Badge>
-                  <Button size="sm" variant="outline" className="h-8" onClick={() => setExpanded(open ? null : d.key)}>
-                    {open ? "Collapse" : "Edit"}
-                  </Button>
-                </div>
-              </div>
-              {open && (
-                <div className="space-y-3 border-t pt-3">
-                  <div className="space-y-1 max-w-md">
-                    <Label className="text-xs">Display name</Label>
-                    <Input
-                      className="h-9"
-                      value={d.name}
-                      onChange={(e) => setDefs((prev) => prev.map((x) => (x.key === d.key ? { ...x, name: e.target.value } : x)))}
-                    />
+      <div className="grid lg:grid-cols-2 gap-3">
+        {defs.map((d) => {
+          const open = expanded === d.key;
+          return (
+            <Card key={d.key} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] ${open ? "lg:col-span-2" : ""}`}>
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <button type="button" className="text-left" onClick={() => setExpanded(open ? null : d.key)}>
+                    <p className="text-sm font-semibold">{d.name}</p>
+                    <p className="text-[11px] text-muted-foreground font-mono">{d.key} · {d.steps.length} steps</p>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={d.isActive ? "default" : "secondary"} className="text-[10px] rounded-full">
+                      {d.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                    <Button variant="outline" className="h-9 rounded-[10px]" onClick={() => setExpanded(open ? null : d.key)}>
+                      {open ? "Collapse" : "Edit"}
+                    </Button>
                   </div>
-                  {d.steps.map((s, idx) => (
-                    <div key={idx} className="grid sm:grid-cols-3 gap-2 items-end">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Step {idx + 1}</Label>
-                        <Input
-                          className="h-9"
-                          value={s.name}
-                          onChange={(e) => updateStep(d.key, idx, { name: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Approver role</Label>
-                        <Select
-                          value={s.approverRole || "BRANCH_MANAGER"}
-                          onValueChange={(v) => updateStep(d.key, idx, { approverRole: v })}
-                        >
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            {APPROVER_ROLES.map((r) => (
-                              <SelectItem key={r} value={r}>{r}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-9"
-                          disabled={d.steps.length <= 1}
-                          onClick={() => removeStep(d.key, idx)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                </div>
+                {open && (
+                  <div className="space-y-3 border-t pt-3">
+                    <div className="space-y-1 max-w-md">
+                      <Label className="text-xs">Display name</Label>
+                      <Input
+                        className="h-10 rounded-[12px]"
+                        value={d.name}
+                        onChange={(e) => setDefs((prev) => prev.map((x) => (x.key === d.key ? { ...x, name: e.target.value } : x)))}
+                      />
                     </div>
-                  ))}
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" className="h-8 gap-1" onClick={() => addStep(d.key)}>
-                      <Plus className="h-3.5 w-3.5" /> Add step
-                    </Button>
-                    <Button size="sm" className="h-8" disabled={busyKey === d.key} onClick={() => void save(d)}>
-                      {busyKey === d.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save workflow"}
-                    </Button>
+                    {d.steps.map((s, idx) => (
+                      <div key={idx} className="grid sm:grid-cols-3 gap-2 items-end">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Step {idx + 1}</Label>
+                          <Input
+                            className="h-10 rounded-[12px]"
+                            value={s.name}
+                            onChange={(e) => updateStep(d.key, idx, { name: e.target.value })}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Approver role</Label>
+                          <Select
+                            value={s.approverRole || "BRANCH_MANAGER"}
+                            onValueChange={(v) => updateStep(d.key, idx, { approverRole: v })}
+                          >
+                            <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {APPROVER_ROLES.map((r) => (
+                                <SelectItem key={r} value={r}>{r}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button
+                            variant="ghost"
+                            className="h-10 rounded-[12px]"
+                            disabled={d.steps.length <= 1}
+                            onClick={() => removeStep(d.key, idx)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="h-9 rounded-[10px] gap-1" onClick={() => addStep(d.key)}>
+                        <Plus className="h-3.5 w-3.5" /> Add step
+                      </Button>
+                      <Button className="h-9 rounded-[10px]" disabled={busyKey === d.key} onClick={() => void save(d)}>
+                        {busyKey === d.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save workflow"}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })}
+                )}
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -975,7 +1001,7 @@ function PreferencesPanel() {
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
       <Select value={value || "__none__"} onValueChange={(v) => onChange(v === "__none__" ? null : v)}>
-        <SelectTrigger className="h-9"><SelectValue placeholder="Not set" /></SelectTrigger>
+        <SelectTrigger className="h-10 rounded-[12px]"><SelectValue placeholder="Not set" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="__none__">Not set</SelectItem>
           {accounts
@@ -993,124 +1019,138 @@ function PreferencesPanel() {
   }
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Journal & posting</h3>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={prefs.requireJournalApproval}
-              onChange={(e) => setPrefs({ ...prefs, requireJournalApproval: e.target.checked })}
-            />
-            <span>
-              Require journal approval
-              <span className="block text-xs text-muted-foreground">Submit goes to pending unless admin bypass</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={prefs.allowPostDraft}
-              onChange={(e) => setPrefs({ ...prefs, allowPostDraft: e.target.checked })}
-            />
-            <span>
-              Allow direct post without approval
-              <span className="block text-xs text-muted-foreground">Non-admins can post journals immediately</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={prefs.blockPostingClosedPeriod}
-              onChange={(e) => setPrefs({ ...prefs, blockPostingClosedPeriod: e.target.checked })}
-            />
-            <span>
-              Block posting in closed / locked periods
-              <span className="block text-xs text-muted-foreground">Recommended for compliance</span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={prefs.autoPostEnabled !== false}
-              onChange={(e) => setPrefs({ ...prefs, autoPostEnabled: e.target.checked })}
-            />
-            <span>
-              Auto-post commerce events
-              <span className="block text-xs text-muted-foreground">
-                When off, events stay queued until Sync → Process
-              </span>
-            </span>
-          </label>
-          <label className="flex items-start gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={prefs.repairVatEnabled === true}
-              onChange={(e) => setPrefs({ ...prefs, repairVatEnabled: e.target.checked })}
-            />
-            <span>
-              Split 18% VAT on repair journals
-              <span className="block text-xs text-muted-foreground">
-                Off = full amount to Repair Income (default)
-              </span>
-            </span>
-          </label>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h3 className="text-sm font-semibold">Defaults</h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Fiscal year start month</Label>
-              <Select
-                value={String(prefs.fiscalYearStartMonth)}
-                onValueChange={(v) => setPrefs({ ...prefs, fiscalYearStartMonth: parseInt(v, 10) })}
-              >
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <div className="space-y-4">
+      <div className="grid lg:grid-cols-2 gap-4">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+            <div className="h-8 w-8 rounded-[10px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
+              <ShieldCheck className="h-4 w-4" />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Decimal places</Label>
-              <Select
-                value={String(prefs.decimalPlaces)}
-                onValueChange={(v) => setPrefs({ ...prefs, decimalPlaces: parseInt(v, 10) })}
-              >
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {[0, 1, 2, 3, 4].map((n) => (
-                    <SelectItem key={n} value={String(n)}>{n}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <h3 className="text-sm font-semibold">Journal & posting</h3>
           </div>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {accountSelect("Default cash", prefs.defaultCashAccountId, (v) => setPrefs({ ...prefs, defaultCashAccountId: v }), ["ASSET"])}
-            {accountSelect("Default AR", prefs.defaultArAccountId, (v) => setPrefs({ ...prefs, defaultArAccountId: v }), ["ASSET"])}
-            {accountSelect("Default AP", prefs.defaultApAccountId, (v) => setPrefs({ ...prefs, defaultApAccountId: v }), ["LIABILITY"])}
-            {accountSelect("Default sales", prefs.defaultSalesAccountId, (v) => setPrefs({ ...prefs, defaultSalesAccountId: v }), ["REVENUE"])}
-            {accountSelect("Default purchases", prefs.defaultPurchaseAccountId, (v) => setPrefs({ ...prefs, defaultPurchaseAccountId: v }), ["EXPENSE", "ASSET"])}
-            {accountSelect("Retained earnings", prefs.defaultRetainedEarningsId, (v) => setPrefs({ ...prefs, defaultRetainedEarningsId: v }), ["EQUITY"])}
-          </div>
-        </CardContent>
-      </Card>
+          <CardContent className="p-4 space-y-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={prefs.requireJournalApproval}
+                onChange={(e) => setPrefs({ ...prefs, requireJournalApproval: e.target.checked })}
+              />
+              <span>
+                Require journal approval
+                <span className="block text-xs text-muted-foreground">Submit goes to pending unless admin bypass</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={prefs.allowPostDraft}
+                onChange={(e) => setPrefs({ ...prefs, allowPostDraft: e.target.checked })}
+              />
+              <span>
+                Allow direct post without approval
+                <span className="block text-xs text-muted-foreground">Non-admins can post journals immediately</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={prefs.blockPostingClosedPeriod}
+                onChange={(e) => setPrefs({ ...prefs, blockPostingClosedPeriod: e.target.checked })}
+              />
+              <span>
+                Block posting in closed / locked periods
+                <span className="block text-xs text-muted-foreground">Recommended for compliance</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={prefs.autoPostEnabled !== false}
+                onChange={(e) => setPrefs({ ...prefs, autoPostEnabled: e.target.checked })}
+              />
+              <span>
+                Auto-post commerce events
+                <span className="block text-xs text-muted-foreground">
+                  When off, events stay queued until Sync → Process
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={prefs.repairVatEnabled === true}
+                onChange={(e) => setPrefs({ ...prefs, repairVatEnabled: e.target.checked })}
+              />
+              <span>
+                Split 18% VAT on repair journals
+                <span className="block text-xs text-muted-foreground">
+                  Off = full amount to Repair Income (default)
+                </span>
+              </span>
+            </label>
+          </CardContent>
+        </Card>
 
-      <Button size="sm" disabled={busy} onClick={() => void save()}>
-        {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save preferences"}
-      </Button>
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+          <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+            <div className="h-8 w-8 rounded-[10px] bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+              <Settings2 className="h-4 w-4" />
+            </div>
+            <h3 className="text-sm font-semibold">Defaults</h3>
+          </div>
+          <CardContent className="p-4 space-y-3">
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-xs">Fiscal year start month</Label>
+                <Select
+                  value={String(prefs.fiscalYearStartMonth)}
+                  onValueChange={(v) => setPrefs({ ...prefs, fiscalYearStartMonth: parseInt(v, 10) })}
+                >
+                  <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((m, i) => (
+                      <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Decimal places</Label>
+                <Select
+                  value={String(prefs.decimalPlaces)}
+                  onValueChange={(v) => setPrefs({ ...prefs, decimalPlaces: parseInt(v, 10) })}
+                >
+                  <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[0, 1, 2, 3, 4].map((n) => (
+                      <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid sm:grid-cols-2 gap-3">
+              {accountSelect("Default cash", prefs.defaultCashAccountId, (v) => setPrefs({ ...prefs, defaultCashAccountId: v }), ["ASSET"])}
+              {accountSelect("Default AR", prefs.defaultArAccountId, (v) => setPrefs({ ...prefs, defaultArAccountId: v }), ["ASSET"])}
+              {accountSelect("Default AP", prefs.defaultApAccountId, (v) => setPrefs({ ...prefs, defaultApAccountId: v }), ["LIABILITY"])}
+              {accountSelect("Default sales", prefs.defaultSalesAccountId, (v) => setPrefs({ ...prefs, defaultSalesAccountId: v }), ["REVENUE"])}
+              {accountSelect("Default purchases", prefs.defaultPurchaseAccountId, (v) => setPrefs({ ...prefs, defaultPurchaseAccountId: v }), ["EXPENSE", "ASSET"])}
+              {accountSelect("Retained earnings", prefs.defaultRetainedEarningsId, (v) => setPrefs({ ...prefs, defaultRetainedEarningsId: v }), ["EQUITY"])}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="flex justify-end">
+        <Button className="h-10 rounded-[12px]" disabled={busy} onClick={() => void save()}>
+          {busy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : "Save preferences"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1182,35 +1222,44 @@ function MappingsPanel() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-2 justify-between items-center">
+      <div className="flex flex-wrap gap-3 justify-between items-center">
         <p className="text-sm text-muted-foreground">
           Map commerce posting keys to GL accounts. Missing keys fall back to default codes.
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void seed()}>
+          <Button variant="outline" className="h-10 rounded-[12px]" disabled={busy} onClick={() => void seed()}>
             Seed defaults
           </Button>
-          <Button size="sm" disabled={busy} onClick={() => void save()}>
-            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save mappings"}
+          <Button className="h-10 rounded-[12px]" disabled={busy} onClick={() => void save()}>
+            {busy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : "Save mappings"}
           </Button>
         </div>
       </div>
-      <Card>
+      <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+              <Settings2 className="h-4 w-4" />
+            </div>
+            <h3 className="text-sm font-semibold">GL mappings</h3>
+          </div>
+          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">{rows.length}</Badge>
+        </div>
         <CardContent className="p-0 overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-muted/70 text-xs text-muted-foreground text-left">
+            <thead className="bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground text-left">
               <tr>
-                <th className="p-3">Key</th>
-                <th className="p-3">Label</th>
-                <th className="p-3">Account</th>
+                <th className="px-4 py-3 font-semibold">Key</th>
+                <th className="px-4 py-3 font-semibold">Label</th>
+                <th className="px-4 py-3 font-semibold">Account</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.key} className="border-t">
-                  <td className="p-3 font-mono text-xs">{r.key}</td>
-                  <td className="p-3">{r.label}</td>
-                  <td className="p-3 min-w-[240px]">
+                <tr key={r.key} className="border-t border-border/40 hover:bg-muted/20 transition-colors">
+                  <td className="px-4 py-2.5 font-mono text-xs">{r.key}</td>
+                  <td className="px-4 py-2.5">{r.label}</td>
+                  <td className="px-4 py-2.5 min-w-[280px]">
                     <Select
                       value={draft[r.key] || "__none__"}
                       onValueChange={(v) =>
@@ -1222,7 +1271,7 @@ function MappingsPanel() {
                         })
                       }
                     >
-                      <SelectTrigger className="h-9"><SelectValue placeholder="Not set" /></SelectTrigger>
+                      <SelectTrigger className="h-10 rounded-[12px]"><SelectValue placeholder="Not set" /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__none__">Not set</SelectItem>
                         {accounts.map((a) => (

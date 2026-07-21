@@ -79,12 +79,12 @@ function fmt(d?: string | null) {
 
 function statusBadge(status: string) {
   if (status === "OPEN") {
-    return <Badge className="text-[10px] gap-1"><Unlock className="h-3 w-3" /> Open</Badge>;
+    return <Badge className="text-[10px] gap-1 rounded-full"><Unlock className="h-3 w-3" /> Open</Badge>;
   }
   if (status === "LOCKED") {
-    return <Badge variant="secondary" className="text-[10px] gap-1"><ShieldCheck className="h-3 w-3" /> Locked</Badge>;
+    return <Badge variant="secondary" className="text-[10px] gap-1 rounded-full"><ShieldCheck className="h-3 w-3" /> Locked</Badge>;
   }
-  return <Badge variant="outline" className="text-[10px] gap-1"><Lock className="h-3 w-3" /> Closed</Badge>;
+  return <Badge variant="outline" className="text-[10px] gap-1 rounded-full"><Lock className="h-3 w-3" /> Closed</Badge>;
 }
 
 export function FinancialPeriodsHub() {
@@ -286,47 +286,47 @@ export function FinancialPeriodsHub() {
   const closedCount = selected?.periods.filter((p) => p.status !== "OPEN").length ?? 0;
 
   return (
-    <div className="p-6 space-y-5 max-w-[1200px] mx-auto">
+    <div className="page-shell w-full">
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <CalendarRange className="h-6 w-6 text-primary" />
-            Financial Periods
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {profile.label} · Phase 01 Sprint 2 · Fiscal years, open/close, year-end
+        <div className="min-w-0">
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Financial Periods</h1>
+          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+            {profile.label} · Fiscal years · open / close periods · year-end close
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
           <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setShowCreate(true)}>
             <Plus className="h-[18px] w-[18px]" /> New Fiscal Year
           </Button>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b">
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-semibold border-b-2 -mb-px ${
-            tab === "periods" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
-          }`}
-          onClick={() => setTab("periods")}
-        >
-          Period Management
-        </button>
-        <button
-          type="button"
-          className={`px-3 py-2 text-sm font-semibold border-b-2 -mb-px inline-flex items-center gap-1.5 ${
-            tab === "settings" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
-          }`}
-          onClick={() => setTab("settings")}
-        >
-          <Settings2 className="h-3.5 w-3.5" /> Fiscal Year Settings
-        </button>
+      <div className="flex flex-wrap gap-1.5 p-1 rounded-[14px] border bg-muted/40 w-fit max-w-full">
+        {([
+          { id: "periods" as Tab, label: "Period Management", icon: CalendarRange },
+          { id: "settings" as Tab, label: "Fiscal Year Settings", icon: Settings2 },
+        ]).map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[10px] text-sm font-semibold transition-all ${
+                active
+                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {loading && !years.length ? (
@@ -334,21 +334,24 @@ export function FinancialPeriodsHub() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : !years.length ? (
-        <Card>
-          <CardContent className="p-10 text-center space-y-3">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <CardContent className="p-12 text-center space-y-3">
+            <div className="mx-auto h-12 w-12 rounded-[14px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+              <CalendarRange className="h-6 w-6" />
+            </div>
             <p className="text-sm text-muted-foreground">No fiscal year yet. Create one to generate 12 monthly periods.</p>
-            <Button onClick={() => setShowCreate(true)} className="gap-1.5">
-              <Plus className="h-3.5 w-3.5" /> Create Fiscal Year
+            <Button onClick={() => setShowCreate(true)} className="h-10 rounded-[12px] gap-1.5">
+              <Plus className="h-[18px] w-[18px]" /> Create Fiscal Year
             </Button>
           </CardContent>
         </Card>
       ) : (
         <>
           <div className="flex flex-wrap gap-3 items-end">
-            <div className="space-y-1 min-w-[220px]">
+            <div className="space-y-1 min-w-[240px]">
               <Label className="text-xs">Fiscal year</Label>
               <Select value={selected?.id ?? ""} onValueChange={setSelectedId}>
-                <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-10 rounded-[12px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {years.map((y) => (
                     <SelectItem key={y.id} value={y.id}>
@@ -359,42 +362,86 @@ export function FinancialPeriodsHub() {
               </Select>
             </div>
             {selected && (
-              <div className="flex gap-2 items-center text-xs text-muted-foreground pb-1">
-                <span>{fmt(selected.startDate)} → {fmt(selected.endDate)}</span>
+              <div className="flex gap-2 items-center text-xs text-muted-foreground pb-1.5 flex-wrap">
+                <span className="font-mono">{fmt(selected.startDate)} → {fmt(selected.endDate)}</span>
                 {statusBadge(selected.status)}
-                {selected.isCurrent && <Badge className="text-[10px] gap-1"><CheckCircle2 className="h-3 w-3" /> Current</Badge>}
+                {selected.isCurrent && (
+                  <Badge className="text-[10px] gap-1 rounded-full">
+                    <CheckCircle2 className="h-3 w-3" /> Current
+                  </Badge>
+                )}
               </div>
             )}
           </div>
 
           {tab === "periods" && selected && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Card><CardContent className="p-3"><p className="text-[10px] text-muted-foreground">Open periods</p><p className="text-xl font-bold">{openCount}</p></CardContent></Card>
-                <Card><CardContent className="p-3"><p className="text-[10px] text-muted-foreground">Closed / locked</p><p className="text-xl font-bold">{closedCount}</p></CardContent></Card>
-                <Card><CardContent className="p-3"><p className="text-[10px] text-muted-foreground">Total</p><p className="text-xl font-bold">{selected.periods.length}</p></CardContent></Card>
-                <Card>
-                  <CardContent className="p-3 flex items-center justify-between gap-2">
-                    <div>
-                      <p className="text-[10px] text-muted-foreground">Bulk</p>
-                      <p className="text-xs font-semibold">Close all open</p>
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                <Card className="rounded-[18px] border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+                  <CardContent className="h-[72px] p-4 flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-[12px] bg-emerald-500/15 flex items-center justify-center shrink-0">
+                      <Unlock className="h-[18px] w-[18px] text-emerald-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none tabular-nums">{openCount}</p>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-1">Open periods</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-[18px] border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
+                  <CardContent className="h-[72px] p-4 flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-[12px] bg-amber-500/15 flex items-center justify-center shrink-0">
+                      <Lock className="h-[18px] w-[18px] text-amber-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none tabular-nums">{closedCount}</p>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-1">Closed / locked</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-[18px] border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent">
+                  <CardContent className="h-[72px] p-4 flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-[12px] bg-indigo-500/15 flex items-center justify-center shrink-0">
+                      <CalendarRange className="h-[18px] w-[18px] text-indigo-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-lg font-bold leading-none tabular-nums">{selected.periods.length}</p>
+                      <p className="text-[11px] text-muted-foreground font-medium mt-1">Total periods</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-[18px] border-slate-200/70 bg-gradient-to-br from-slate-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
+                  <CardContent className="h-[72px] p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-muted-foreground font-medium">Bulk action</p>
+                      <p className="text-sm font-semibold mt-0.5">Close all open</p>
                     </div>
                     <Button
-                      size="sm"
                       variant="outline"
-                      className="h-8"
+                      className="h-10 w-10 rounded-[12px] p-0 shrink-0"
                       disabled={selected.status === "CLOSED" || openCount === 0 || busy === "close-all"}
                       onClick={closeAllPeriods}
                     >
-                      {busy === "close-all" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
+                      {busy === "close-all" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Lock className="h-[18px] w-[18px]" />}
                     </Button>
                   </CardContent>
                 </Card>
               </div>
 
-              <Card>
+              <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+                <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+                  <div className="flex items-center gap-2.5">
+                    <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+                      <CalendarRange className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-sm font-semibold">Monthly periods</h3>
+                  </div>
+                  <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">
+                    {selected.periods.length}
+                  </Badge>
+                </div>
                 <CardContent className="p-0">
-                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b bg-muted/30 text-[10px] font-semibold uppercase text-muted-foreground">
+                  <div className="grid grid-cols-12 gap-2 px-4 py-2.5 border-b bg-muted/20 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     <span className="col-span-1">#</span>
                     <span className="col-span-4">Period</span>
                     <span className="col-span-3">Range</span>
@@ -403,8 +450,8 @@ export function FinancialPeriodsHub() {
                   </div>
                   <div className="divide-y">
                     {selected.periods.map((p) => (
-                      <div key={p.id} className="grid grid-cols-12 gap-2 items-center px-4 py-2.5 text-sm">
-                        <span className="col-span-1 text-xs text-muted-foreground">{p.sequence}</span>
+                      <div key={p.id} className="grid grid-cols-12 gap-2 items-center px-4 py-2.5 text-sm hover:bg-muted/20 transition-colors">
+                        <span className="col-span-1 text-xs text-muted-foreground tabular-nums">{p.sequence}</span>
                         <span className="col-span-4 font-medium">{p.name}</span>
                         <span className="col-span-3 text-xs font-mono text-muted-foreground">
                           {fmt(p.startDate)} → {fmt(p.endDate)}
@@ -417,7 +464,7 @@ export function FinancialPeriodsHub() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs gap-1"
+                              className="h-8 text-xs gap-1 rounded-[10px]"
                               disabled={busy === p.id}
                               onClick={() => togglePeriod(p, true)}
                             >
@@ -428,7 +475,7 @@ export function FinancialPeriodsHub() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs gap-1"
+                              className="h-8 text-xs gap-1 rounded-[10px]"
                               disabled={busy === p.id}
                               onClick={() => togglePeriod(p, false)}
                             >
@@ -444,21 +491,21 @@ export function FinancialPeriodsHub() {
               </Card>
 
               {selected.status === "CLOSED" && (
-                <Card>
-                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-2">
+                <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+                  <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <h3 className="text-sm font-semibold">Year closed</h3>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         Reopen reverses the year-end closing journal and unlocks periods
                       </p>
                     </div>
                     <Button
-                      size="sm"
                       variant="outline"
+                      className="h-10 rounded-[12px] gap-1.5"
                       disabled={busy === "year-reopen"}
                       onClick={() => void runYearEndReopen()}
                     >
-                      {busy === "year-reopen" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlock className="h-3.5 w-3.5" />}
+                      {busy === "year-reopen" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Unlock className="h-[18px] w-[18px]" />}
                       Reopen year
                     </Button>
                   </CardContent>
@@ -466,112 +513,132 @@ export function FinancialPeriodsHub() {
               )}
 
               {selected.status === "OPEN" && (
-                <Card>
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div>
+                <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+                  <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b bg-muted/30">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-[10px] bg-red-500/15 text-red-600 flex items-center justify-center shrink-0">
+                        <ShieldCheck className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
                         <h3 className="text-sm font-semibold">Year-end closing</h3>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] text-muted-foreground truncate">
                           Close P&amp;L into Retained Earnings and lock all periods
                         </p>
                       </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" disabled={busy === "preview"} onClick={loadPreview}>
-                          {busy === "preview" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                          Preview rules
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          disabled={busy === "year-end"}
-                          onClick={runYearEndClose}
-                        >
-                          {busy === "year-end" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                          Close year
-                        </Button>
-                      </div>
                     </div>
-                    {preview && (
-                      <div className="rounded-xl border p-3 space-y-2 text-sm">
-                        {preview.rules.ok ? (
-                          <p className="text-emerald-600 text-xs font-semibold flex items-center gap-1">
-                            <CheckCircle2 className="h-3.5 w-3.5" /> Ready for year-end close
-                          </p>
-                        ) : (
-                          <div className="text-amber-600 text-xs space-y-1">
-                            <p className="font-semibold flex items-center gap-1">
-                              <AlertTriangle className="h-3.5 w-3.5" /> Not ready
-                            </p>
-                            {preview.rules.reasons.map((r) => (
-                              <p key={r}>• {r}</p>
-                            ))}
-                          </div>
-                        )}
-                        <div className="grid grid-cols-3 gap-2 text-xs">
-                          <div>Revenue: <b>LKR {formatNumber(preview.closing.revenueTotal)}</b></div>
-                          <div>Expenses: <b>LKR {formatNumber(preview.closing.expenseTotal)}</b></div>
-                          <div>Net income: <b className={preview.closing.netIncome < 0 ? "text-red-500" : "text-emerald-600"}>
-                            LKR {formatNumber(preview.closing.netIncome)}
-                          </b></div>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground">
-                          RE account: {preview.retainedEarningsAccount
-                            ? `${preview.retainedEarningsAccount.code} — ${preview.retainedEarningsAccount.name}`
-                            : "Not found — seed COA or set in Settings"}
+                    <div className="flex gap-2">
+                      <Button variant="outline" className="h-10 rounded-[12px] gap-1.5" disabled={busy === "preview"} onClick={loadPreview}>
+                        {busy === "preview" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : null}
+                        Preview rules
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="h-10 rounded-[12px] gap-1.5"
+                        disabled={busy === "year-end"}
+                        onClick={runYearEndClose}
+                      >
+                        {busy === "year-end" ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : null}
+                        Close year
+                      </Button>
+                    </div>
+                  </div>
+                  {preview && (
+                    <CardContent className="p-4 space-y-3">
+                      {preview.rules.ok ? (
+                        <p className="text-emerald-600 text-xs font-semibold flex items-center gap-1.5">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Ready for year-end close
                         </p>
+                      ) : (
+                        <div className="text-amber-600 text-xs space-y-1">
+                          <p className="font-semibold flex items-center gap-1.5">
+                            <AlertTriangle className="h-3.5 w-3.5" /> Not ready
+                          </p>
+                          {preview.rules.reasons.map((r) => (
+                            <p key={r}>• {r}</p>
+                          ))}
+                        </div>
+                      )}
+                      <div className="grid sm:grid-cols-3 gap-3">
+                        <div className="rounded-[14px] border bg-muted/20 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Revenue</p>
+                          <p className="text-sm font-bold tabular-nums mt-1">LKR {formatNumber(preview.closing.revenueTotal)}</p>
+                        </div>
+                        <div className="rounded-[14px] border bg-muted/20 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Expenses</p>
+                          <p className="text-sm font-bold tabular-nums mt-1">LKR {formatNumber(preview.closing.expenseTotal)}</p>
+                        </div>
+                        <div className="rounded-[14px] border bg-muted/20 p-3">
+                          <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Net income</p>
+                          <p className={`text-sm font-bold tabular-nums mt-1 ${preview.closing.netIncome < 0 ? "text-red-500" : "text-emerald-600"}`}>
+                            LKR {formatNumber(preview.closing.netIncome)}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </CardContent>
+                      <p className="text-[11px] text-muted-foreground">
+                        RE account: {preview.retainedEarningsAccount
+                          ? `${preview.retainedEarningsAccount.code} — ${preview.retainedEarningsAccount.name}`
+                          : "Not found — seed COA or set in Settings"}
+                      </p>
+                    </CardContent>
+                  )}
                 </Card>
               )}
             </div>
           )}
 
           {tab === "settings" && selected && (
-            <Card>
-              <CardContent className="p-5 space-y-4 max-w-xl">
-                <div className="space-y-1">
-                  <Label className="text-xs">Fiscal year name</Label>
-                  <Input
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    disabled={selected.status === "CLOSED"}
-                    className="h-9"
-                  />
+            <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+                <div className="h-8 w-8 rounded-[10px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
+                  <Settings2 className="h-4 w-4" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <h3 className="text-sm font-semibold">Fiscal year settings</h3>
+              </div>
+              <CardContent className="p-5 space-y-4">
+                <div className="grid lg:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Fiscal year name</Label>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      disabled={selected.status === "CLOSED"}
+                      className="h-10 rounded-[12px]"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Retained Earnings account (year-end)</Label>
+                    <Select value={editReId || "__auto__"} onValueChange={(v) => setEditReId(v === "__auto__" ? "" : v)}>
+                      <SelectTrigger className="h-10 rounded-[12px]"><SelectValue placeholder="Auto (3100 / name match)" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__auto__">Auto-detect (code 3100)</SelectItem>
+                        {equityAccounts.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">
+                      Used when closing the year to transfer net income from Income / Expense accounts.
+                    </p>
+                  </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Start</Label>
-                    <Input value={fmt(selected.startDate)} disabled className="h-9 font-mono" />
+                    <Input value={fmt(selected.startDate)} disabled className="h-10 rounded-[12px] font-mono" />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">End</Label>
-                    <Input value={fmt(selected.endDate)} disabled className="h-9 font-mono" />
+                    <Input value={fmt(selected.endDate)} disabled className="h-10 rounded-[12px] font-mono" />
                   </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Retained Earnings account (year-end)</Label>
-                  <Select value={editReId || "__auto__"} onValueChange={(v) => setEditReId(v === "__auto__" ? "" : v)}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Auto (3100 / name match)" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__auto__">Auto-detect (code 3100)</SelectItem>
-                      {equityAccounts.map((a) => (
-                        <SelectItem key={a.id} value={a.id}>{a.code} — {a.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-[10px] text-muted-foreground">
-                    Used when closing the year to transfer net income from Income / Expense accounts.
-                  </p>
+                <div className="flex items-center justify-between flex-wrap gap-3 pt-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    {statusBadge(selected.status)}
+                    <span>Dates are fixed after create. Set this year as current when saving.</span>
+                  </div>
+                  <Button onClick={saveSettings} disabled={busy === "settings"} className="h-10 rounded-[12px] gap-1.5">
+                    {busy === "settings" && <Loader2 className="h-[18px] w-[18px] animate-spin" />}
+                    Save settings
+                  </Button>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {statusBadge(selected.status)}
-                  <span>Dates are fixed after create. Set this year as current when saving.</span>
-                </div>
-                <Button onClick={saveSettings} disabled={busy === "settings"} className="gap-1.5">
-                  {busy === "settings" && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                  Save settings
-                </Button>
               </CardContent>
             </Card>
           )}
