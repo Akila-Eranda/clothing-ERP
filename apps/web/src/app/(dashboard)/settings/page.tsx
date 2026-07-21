@@ -9,7 +9,7 @@ import {
   Printer, Image, Server, FileText, Upload, MessageCircle,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
-import { receiptThemeColors } from "@/lib/receipt-theme";
+import { RECEIPT_SOFTWARE_CREDIT, receiptThemeColors } from "@/lib/receipt-theme";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -358,6 +358,7 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
         />
       )}
       <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6, color: c.muted }}>{s.footerText}</div>
+      <div style={{ textAlign: "center", marginTop: 6, fontSize: "0.65em", lineHeight: 1.35, color: c.muted, opacity: 0.9 }}>{RECEIPT_SOFTWARE_CREDIT}</div>
     </div>
   );
 }

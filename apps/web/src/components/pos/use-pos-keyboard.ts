@@ -132,6 +132,10 @@ export interface PosKeyboardContext {
   openCashClose: () => void;
   showCashClose: boolean;
   closeCashClose: () => void;
+  /** WhatsApp send-bill modal after sale */
+  waBillOfferOpen: boolean;
+  closeWaBillOffer: () => void;
+  sendWaBill: () => void;
   /** Fill cash tender = bill total */
   setExactCashTender: () => void;
   focusCheckoutGiftOrCheque: () => void;
@@ -156,6 +160,7 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.showShortcuts
     || ctx.showDayEnd
     || ctx.showCashClose
+    || ctx.waBillOfferOpen
     || ctx.qtyPopupOpen
     || !!ctx.selectedProductName
   );
@@ -216,6 +221,21 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      // WhatsApp bill modal — Esc skip, Enter send; block POS shortcuts so it doesn't stack
+      if (ctx.waBillOfferOpen) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.closeWaBillOffer();
+          return;
+        }
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          ctx.sendWaBill();
+          return;
+        }
+        return;
+      }
+
       // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
@@ -265,6 +285,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         e.preventDefault();
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
         if (ctx.showCashClose) { ctx.closeCashClose(); return; }
+        if (ctx.waBillOfferOpen) { ctx.closeWaBillOffer(); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }

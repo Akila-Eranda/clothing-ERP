@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
-import { receiptThemeStyleBlock } from "@/lib/receipt-theme";
+import { receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
@@ -25,7 +25,6 @@ import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
-import { AppLogo } from "@/components/brand/app-logo";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { PosQuantityPopup } from "@/components/pos/pos-quantity-popup";
@@ -525,6 +524,42 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const openCashClose = React.useCallback(() => setShowCashClose(true), []);
   const closeCashClose = React.useCallback(() => setShowCashClose(false), []);
+  const waPhoneRef = React.useRef<HTMLInputElement>(null);
+  const closeWaBillOffer = React.useCallback(() => {
+    setWaBillOffer(null);
+    setWaSending(false);
+    setTimeout(() => searchRef.current?.focus(), 80);
+  }, []);
+  const sendWaBill = React.useCallback(() => {
+    if (!waBillOffer || waSending) return;
+    const phone = waPhoneEdit.trim();
+    if (!phone) {
+      toast.error("Enter customer WhatsApp number");
+      waPhoneRef.current?.focus();
+      return;
+    }
+    void (async () => {
+      setWaSending(true);
+      try {
+        await api.post("/whatsapp/send-bill", {
+          phone,
+          invoiceNumber: waBillOffer.invoiceNumber,
+          customerName: waBillOffer.customerName,
+          total: waBillOffer.total,
+          paymentMethod: waBillOffer.paymentMethod,
+          itemsSummary: waBillOffer.itemsSummary,
+          shopName: receiptSettings.shopName || APP_NAME,
+        });
+        toast.success("Bill sent on WhatsApp");
+        setWaBillOffer(null);
+        setTimeout(() => searchRef.current?.focus(), 80);
+      } catch (e) {
+        toast.error((e as Error).message ?? "WhatsApp send failed");
+      } finally {
+        setWaSending(false);
+      }
+    })();
+  }, [waBillOffer, waSending, waPhoneEdit, receiptSettings.shopName]);
 
   const applyCartDiscount = React.useCallback(async () => {
     const v = parseFloat(discountInput) || 0;
@@ -1375,7 +1410,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       // Thermal receipts must always stay printer-friendly (black on white).
       theme: "light",
     });
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>${css}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>${css}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div>${receiptSoftwareCreditHtml()}</body></html>`;
   },[user, activeCashier, receiptSettings]);
 
   const reprintSale = React.useCallback(async (saleId: string) => {
@@ -1946,6 +1981,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     openCashClose,
     showCashClose,
     closeCashClose,
+    waBillOfferOpen: !!waBillOffer,
+    closeWaBillOffer,
+    sendWaBill,
     setExactCashTender,
     focusCheckoutGiftOrCheque,
     getFilteredProduct: (idx: number) => productCards[idx]?.rep,
@@ -1954,7 +1992,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
     posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose,
-    addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
+    waBillOffer, addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
     closePos, handlePinEntry, lockCashier, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
@@ -1962,7 +2000,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
-    openCartCustomerDropdown, openCashClose, closeCashClose, setExactCashTender, focusCheckoutGiftOrCheque,
+    openCartCustomerDropdown, openCashClose, closeCashClose, closeWaBillOffer, sendWaBill, setExactCashTender, focusCheckoutGiftOrCheque,
     payState.allowPartial, payState.splitMode,
   ]);
 
@@ -1973,11 +2011,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   usePosKeyboard(keyboardCtx as Parameters<typeof usePosKeyboard>[0]);
 
   React.useEffect(() => {
-    if (posOpen && !pinLocked) {
+    if (posOpen && !pinLocked && !waBillOffer) {
       const t = setTimeout(() => searchRef.current?.focus(), 120);
       return () => clearTimeout(t);
     }
-  }, [posOpen, pinLocked]);
+  }, [posOpen, pinLocked, waBillOffer]);
+
+  React.useEffect(() => {
+    if (!waBillOffer) return;
+    const t = setTimeout(() => {
+      waPhoneRef.current?.focus();
+      waPhoneRef.current?.select();
+    }, 80);
+    return () => clearTimeout(t);
+  }, [waBillOffer]);
 
   React.useEffect(() => {
     if (activeNav !== "customers") return;
@@ -3159,10 +3206,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             >
               {sidebarHidden ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </button>
-            <div className="flex items-center gap-2">
-              <AppLogo variant="sidebar" theme={isPosLight ? "light" : "dark"} className="h-7 shrink-0" alt={APP_NAME} />
-              <p className="text-[10px] leading-none" style={{color:"var(--pos-muted)"}}>POS Terminal</p>
-            </div>
+            <p className="text-[10px] leading-none font-semibold tracking-wide" style={{color:"var(--pos-muted)"}}>POS Terminal</p>
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
@@ -3411,29 +3455,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             />
             <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 gap-2" style={{borderColor:"var(--pos-border)"}}>
               <span className="font-bold text-lg truncate" style={{ color: "var(--pos-text)" }}>Cart ({itemCount()} Items)</span>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <div className="hidden sm:flex items-center rounded-lg overflow-hidden border" style={{ borderColor: "var(--pos-border)" }}>
-                  {POS_CART_WIDTH_PRESETS.map((p) => {
-                    const active = Math.abs(cartWidth - p.px) < 8;
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        title={`Cart ${p.label} (${p.px}px)`}
-                        onClick={() => applyCartWidth(p.px)}
-                        className="h-7 w-8 text-[10px] font-bold transition-colors"
-                        style={{
-                          background: active ? "#4f6ef7" : "var(--pos-input)",
-                          color: active ? "#fff" : "var(--pos-muted)",
-                        }}
-                      >
-                        {p.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
-              </div>
+              <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors shrink-0" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
             </div>
             {/* Customer on bill — dropdown select / register */}
             <div className="px-4 py-2 border-b shrink-0 relative" style={{borderColor:"var(--pos-border)"}} ref={cartCustomerDropdownRef}>
@@ -3762,20 +3784,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 </div>
             {checkoutOpen && (
-              <div className="fixed inset-0 z-[115] flex items-center justify-center p-3 md:p-6" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
-              <div className="w-full max-w-lg max-h-[92vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}} onClick={e=>e.stopPropagation()}>
-                <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
-                  <div>
+              <div className="fixed inset-0 z-[115] flex items-center justify-center p-2 sm:p-4" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
+              <div className="w-full max-w-5xl max-h-[96vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}} onClick={e=>e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="min-w-0">
                     <h2 className="text-white font-bold text-base">Checkout</h2>
-                    <p className="text-xs" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(totalAmt)} · {itemCount()} items</p>
+                    <p className="text-xs" style={{color:"var(--pos-muted)"}}>{itemCount()} items · Tax {taxEnabled ? `${taxRate}%` : "off"}</p>
                   </div>
-                  <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
-                    <X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/>
-                  </button>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-[10px] uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Pay</p>
+                      <p className="text-lg font-bold tabular-nums leading-none" style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</p>
+                    </div>
+                    <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                      <X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/>
+                    </button>
+                  </div>
                 </div>
-              <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-                <div className="px-4 py-3 border-b shrink-0 space-y-1.5" style={{borderColor:"var(--pos-border)"}}>
-                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>{itemCount()} items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
+              <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+                {/* Left: bill + options */}
+                <div className="lg:w-[42%] lg:max-w-md lg:border-r lg:overflow-y-auto shrink-0 flex flex-col" style={{borderColor:"var(--pos-border)"}}>
+                <div className="px-4 py-2.5 border-b space-y-1" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
                   {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
                   {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"#34d399"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
@@ -3786,52 +3816,54 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
-                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
-                  <div className="pt-2 space-y-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-white">Tax</p>
-                        <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
-                          {taxEnabled ? `${taxRate}% on this bill` : "No tax on this bill"}
-                        </p>
+                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t sm:hidden" style={{borderColor:"var(--pos-border)"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div className="rounded-xl border px-3 py-2 space-y-2" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-white">Tax</p>
+                          <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                            {taxEnabled ? `${taxRate}% on bill` : "Off"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={taxEnabled}
+                          onClick={() => setCheckoutTaxEnabled(!taxEnabled)}
+                          className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
+                          style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-panel)" }}
+                        >
+                          <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${taxEnabled ? "translate-x-5" : ""}`} />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={taxEnabled}
-                        onClick={() => setCheckoutTaxEnabled(!taxEnabled)}
-                        className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                        style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-input)" }}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${taxEnabled ? "translate-x-5" : ""}`} />
-                      </button>
+                      {taxEnabled && (
+                        <div className="flex flex-wrap gap-1">
+                          {[5, 8, 10, 12, 15, 18].map((r) => (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => { writePosSavedTaxRate(r); setTaxRate(r); }}
+                              className="rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors"
+                              style={{
+                                background: taxRate === r ? "#4f6ef7" : "var(--pos-panel)",
+                                color: taxRate === r ? "#fff" : "var(--pos-muted)",
+                                border: `1px solid ${taxRate === r ? "#4f6ef7" : "var(--pos-border)"}`,
+                              }}
+                            >
+                              {r}%
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {taxEnabled && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {[5, 8, 10, 12, 15, 18].map((r) => (
-                          <button
-                            key={r}
-                            type="button"
-                            onClick={() => { writePosSavedTaxRate(r); setTaxRate(r); }}
-                            className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
-                            style={{
-                              background: taxRate === r ? "#4f6ef7" : "var(--pos-input)",
-                              color: taxRate === r ? "#fff" : "var(--pos-muted)",
-                              border: `1px solid ${taxRate === r ? "#4f6ef7" : "var(--pos-border)"}`,
-                            }}
-                          >
-                            {r}%
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between gap-3 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                    <div className="rounded-xl border px-3 py-2 flex items-center justify-between gap-2" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
                       <div className="min-w-0 flex items-center gap-2">
                         <MessageCircle className="h-4 w-4 shrink-0" style={{ color: waBillEnabled ? "#10b981" : "var(--pos-muted)" }} />
                         <div>
-                          <p className="text-sm font-semibold text-white">WhatsApp bill</p>
-                          <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
-                            {waBillEnabled ? "Ask after sale" : "Skip after sale"}
+                          <p className="text-sm font-semibold text-white">WhatsApp</p>
+                          <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                            {waBillEnabled ? "Ask after sale" : "Skip"}
                           </p>
                         </div>
                       </div>
@@ -3841,7 +3873,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         aria-checked={waBillEnabled}
                         onClick={() => setCheckoutWaBillEnabled(!waBillEnabled)}
                         className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-input)" }}
+                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-panel)" }}
                       >
                         <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${waBillEnabled ? "translate-x-5" : ""}`} />
                       </button>
@@ -3897,9 +3929,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </div>
                   </div>
                 )}
+                </div>
+
+                {/* Right: methods + keypad + confirm */}
+                <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto">
                 <div className="flex gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap" style={{borderColor:"var(--pos-border)"}}>
                   {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>(
-                    <button key={value} type="button" title={`${label} (${idx + 1})`} onClick={()=>setActivePayment(value)} className={cn("flex-1 min-w-[72px] flex flex-col items-center gap-1 rounded-xl text-xs font-bold transition-all", touchMode ? "py-3" : "py-2")} style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activePayment===value?"#fff":"var(--pos-muted)"}}>
+                    <button key={value} type="button" title={`${label} (${idx + 1})`} onClick={()=>setActivePayment(value)} className={cn("flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all", touchMode ? "py-2.5" : "py-1.5")} style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activePayment===value?"#fff":"var(--pos-muted)"}}>
                       <Icon className={touchMode ? "h-5 w-5" : "h-4 w-4"}/>
                       <span>{label}</span>
                       <span className="text-[9px] font-mono opacity-70">{idx + 1}</span>
@@ -3912,7 +3948,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     value={giftVoucherCode}
                     onChange={(e)=>setGiftVoucherCode(e.target.value.toUpperCase())}
                     placeholder="Gift voucher code"
-                    className="mx-3 mb-2 w-[calc(100%-1.5rem)] h-10 px-3 rounded-xl text-sm text-white outline-none font-mono"
+                    className="mx-3 mt-2 w-[calc(100%-1.5rem)] h-9 px-3 rounded-xl text-sm text-white outline-none font-mono"
                     style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                   />
                 )}
@@ -3922,17 +3958,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     value={chequeNumber}
                     onChange={(e)=>setChequeNumber(e.target.value)}
                     placeholder="Cheque number"
-                    className="mx-3 mb-2 w-[calc(100%-1.5rem)] h-10 px-3 rounded-xl text-sm text-white outline-none font-mono"
+                    className="mx-3 mt-2 w-[calc(100%-1.5rem)] h-9 px-3 rounded-xl text-sm text-white outline-none font-mono"
                     style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                   />
                 )}
                 {helpers.length > 0 && (
-                  <div className="flex items-center gap-2 px-3 pb-2">
+                  <div className="flex items-center gap-2 px-3 pt-2">
                     <UserCheck className="h-4 w-4 shrink-0" style={{color:"var(--pos-muted)"}}/>
                     <select
                       value={helperEmployeeId || ""}
                       onChange={(e)=>setHelperEmployeeId(e.target.value)}
-                      className="flex-1 h-9 px-2 rounded-lg text-xs text-white outline-none"
+                      className="flex-1 h-8 px-2 rounded-lg text-xs text-white outline-none"
                       style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                     >
                       <option value="">No helper / floor staff</option>
@@ -3943,44 +3979,52 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 )}
                 {activePayment==="CASH"&&(
-                  <div ref={cashPanelRef} className="px-3 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
-                    <div className="flex items-center justify-between mb-1.5"><span className="text-sm font-semibold" style={{color:"var(--pos-muted)"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono" style={{color:"var(--pos-muted-2)"}}>Type amount · F9 confirm</span><button onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button></div>
-                    <div className="h-11 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
+                  <div ref={cashPanelRef} className="px-3 py-2 flex-1 flex flex-col min-h-0" style={{borderColor:"var(--pos-border)"}}>
+                    <div className="flex items-center justify-between mb-1.5 gap-2"><span className="text-sm font-semibold" style={{color:"var(--pos-muted)"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono shrink-0" style={{color:"var(--pos-muted-2)"}}>F9 confirm</span><button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button></div>
+                    <div className="h-12 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                     {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
                         <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
-                    <div className="grid gap-1" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
+                    <div className="grid gap-1.5 flex-1 content-start" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
-                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-10 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"var(--pos-border)":isDel?"rgba(239,68,68,0.15)":"var(--pos-input)",color:isQuick?"var(--pos-muted)":isDel?"#ef4444":"var(--pos-text)"}}>
+                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"var(--pos-border)":isDel?"rgba(239,68,68,0.15)":"var(--pos-input)",color:isQuick?"var(--pos-muted)":isDel?"#ef4444":"var(--pos-text)"}}>
                           {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
                         </button>);
                       }))}
                     </div>
                   </div>
                 )}
+                {activePayment!=="CASH"&&(
+                  <div className="flex-1 px-4 py-6 flex items-center justify-center">
+                    <p className="text-sm text-center" style={{color:"var(--pos-muted)"}}>
+                      Pay <span className="font-bold text-white">LKR {formatNumber(totalAmt)}</span> via {activePayment.replace(/_/g, " ").toLowerCase()}
+                    </p>
+                  </div>
+                )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="flex justify-between items-center px-4 py-2 border-t shrink-0" style={{borderColor:"var(--pos-border)"}}>
                     <span className="text-sm font-semibold text-green-400">Change</span>
                     <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
-                <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0">
+                <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
                   <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
                     Split Bill
                   </button>
-                  <button ref={checkoutConfirmRef} type="button" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[52px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                  <button ref={checkoutConfirmRef} type="button" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
                     {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                     Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-[52px] w-[52px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)"}} title="Print (F10)"><Printer className="h-5 w-5" style={{color:"var(--pos-muted)"}}/></button>
+                  <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)"}} title="Print (F10)"><Printer className="h-5 w-5" style={{color:"var(--pos-muted)"}}/></button>
                 </div>
-                <p className="px-4 py-2 text-[10px] text-center border-t shrink-0" style={{ color: "var(--pos-muted)", borderColor: "var(--pos-border)" }}>
-                  ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split pay · Ctrl+1–4 quick cash · F9 confirm · Esc close
+                <p className="px-3 py-1.5 text-[10px] text-center border-t shrink-0" style={{ color: "var(--pos-muted)", borderColor: "var(--pos-border)" }}>
+                  ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
+                </div>
               </div>
               </div>
               </div>
@@ -4112,7 +4156,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               exit={{ opacity: 0 }}
               className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-4"
               style={{ background: "var(--pos-overlay)" }}
-              onClick={() => setWaBillOffer(null)}
+              onClick={closeWaBillOffer}
             >
               <motion.div
                 initial={{ y: 24, opacity: 0 }}
@@ -4128,59 +4172,45 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <p className="text-sm font-bold" style={{ color: "var(--pos-text)" }}>Send bill on WhatsApp</p>
                     <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>{waBillOffer.invoiceNumber} · LKR {waBillOffer.total}</p>
                   </div>
-                  <button type="button" onClick={() => setWaBillOffer(null)} className="p-1.5 rounded-lg hover:bg-white/10">
+                  <button type="button" onClick={closeWaBillOffer} className="p-1.5 rounded-lg hover:bg-white/10">
                     <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
                   </button>
                 </div>
-                <div className="p-4 space-y-3">
+                <form
+                  className="p-4 space-y-3"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    sendWaBill();
+                  }}
+                >
                   <div>
                     <label className="text-[11px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Customer WhatsApp number</label>
                     <input
+                      ref={waPhoneRef}
                       value={waPhoneEdit}
                       onChange={(e) => setWaPhoneEdit(e.target.value)}
                       placeholder="077 123 4567"
+                      inputMode="tel"
+                      autoComplete="tel"
                       className="w-full h-10 px-3 rounded-xl text-sm outline-none"
                       style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" }}
                     />
                   </div>
                   <p className="text-[11px]" style={{ color: "var(--pos-muted-2)" }}>
-                    Connect shop WhatsApp in Settings → WhatsApp (scan QR) before sending.
+                    Connect shop WhatsApp in Settings → WhatsApp (scan QR) before sending. Press Enter to send, Esc to skip.
                   </p>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => setWaBillOffer(null)}
+                      onClick={closeWaBillOffer}
                       className="flex-1 h-10 rounded-xl text-sm font-semibold"
                       style={{ background: "var(--pos-input)", color: "var(--pos-muted)" }}
                     >
                       Skip
                     </button>
                     <button
-                      type="button"
+                      type="submit"
                       disabled={waSending || !waPhoneEdit.trim()}
-                      onClick={() => {
-                        void (async () => {
-                          if (!waBillOffer) return;
-                          setWaSending(true);
-                          try {
-                            await api.post("/whatsapp/send-bill", {
-                              phone: waPhoneEdit.trim(),
-                              invoiceNumber: waBillOffer.invoiceNumber,
-                              customerName: waBillOffer.customerName,
-                              total: waBillOffer.total,
-                              paymentMethod: waBillOffer.paymentMethod,
-                              itemsSummary: waBillOffer.itemsSummary,
-                              shopName: receiptSettings.shopName || APP_NAME,
-                            });
-                            toast.success("Bill sent on WhatsApp");
-                            setWaBillOffer(null);
-                          } catch (e) {
-                            toast.error((e as Error).message ?? "WhatsApp send failed");
-                          } finally {
-                            setWaSending(false);
-                          }
-                        })();
-                      }}
                       className="flex-[1.4] h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
                       style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
                     >
@@ -4188,7 +4218,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       Send bill
                     </button>
                   </div>
-                </div>
+                </form>
               </motion.div>
             </motion.div>
           )}

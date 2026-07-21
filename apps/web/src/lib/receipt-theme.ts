@@ -1,5 +1,12 @@
 /** Thermal / browser receipt color themes — light = black on white (printer default), dark = white on navy. */
 
+/** Fixed credit line printed at the bottom of every thermal sale receipt. */
+export const RECEIPT_SOFTWARE_CREDIT = "Software by Hexalyte Innovation 0703130100";
+
+export function receiptSoftwareCreditHtml(): string {
+  return `<div class="soft">${RECEIPT_SOFTWARE_CREDIT}</div>`;
+}
+
 export type ReceiptThemeMode = "light" | "dark";
 
 export type ReceiptThemeColors = {
@@ -59,5 +66,6 @@ sub{font-size:0.85em;display:block;text-align:center;margin-bottom:1px;color:${c
 .bc{text-align:center;margin:8px 0 4px;padding:6px 4px;background:${c.barcodePad};border-radius:2px}
 .bc svg{max-width:100%;height:auto;display:inline-block}
 .foot{text-align:center;margin-top:8px;font-size:0.8em;line-height:1.6;color:${c.muted}}
+.soft{text-align:center;margin-top:6px;font-size:0.65em;line-height:1.35;color:${c.muted};opacity:0.9}
 @media print{@page{margin:0;size:${pw} auto}html,body{background:${c.bg}!important;color:${c.fg}!important}body{padding:3mm}}`;
 }
