@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -45,9 +45,20 @@ import {
   readPosSoundAlerts, writePosSoundAlerts,
   readPosTouchMode, writePosTouchMode,
   readPosAllowNegativeStock, writePosAllowNegativeStock,
+  readPosWaBillOffer, writePosWaBillOffer,
+  readPosSavedTaxRate, writePosSavedTaxRate,
+  readPosCartWidth, writePosCartWidth,
+  POS_CART_WIDTH_PRESETS, POS_CART_WIDTH_MIN, POS_CART_WIDTH_MAX,
   type PosTenantSettings,
 } from "@/lib/pos-settings";
 import { playPosSound } from "@/lib/pos-sound";
+import {
+  cartQtyToGrams,
+  formatPosWeightQty,
+  gramsToCartQty,
+  isPosWeightedProduct,
+  parseGramsInput,
+} from "@/lib/pos-weight";
 import type { Customer } from "@/types";
 
 interface POSOverlayProps {
@@ -55,7 +66,7 @@ interface POSOverlayProps {
   posOnly?: boolean;
 }
 
-interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; mrp?: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; }
+interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; mrp?: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; productKind?: string; unit?: string | null; allowDecimalSelling?: boolean; weightScaleReady?: boolean; }
 type AddPopupState = { productName: string; selected: ProductItem; variants: ProductItem[] };
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
@@ -266,6 +277,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [activeCategory, setActiveCategory] = React.useState("All");
   const [search, setSearch] = React.useState("");
   const [activeNav, setActiveNav] = React.useState("products");
+  const [sidebarHidden, setSidebarHidden] = React.useState(() => {
+    if (typeof window === "undefined") return false;
+    try { return localStorage.getItem("pos_sidebar_hidden") === "1"; } catch { return false; }
+  });
+  const toggleSidebar = React.useCallback(() => {
+    setSidebarHidden((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("pos_sidebar_hidden", next ? "1" : "0"); } catch { /* noop */ }
+      return next;
+    });
+  }, []);
   const [activePayment, setActivePayment] = React.useState("CASH");
   const [numpad, setNumpad] = React.useState("");
   const [checkoutLoading, setCheckoutLoading] = React.useState(false);
@@ -294,6 +316,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   } | null>(null);
   const [waPhoneEdit, setWaPhoneEdit] = React.useState("");
   const [waSending, setWaSending] = React.useState(false);
+  const [waBillEnabled, setWaBillEnabled] = React.useState(() => readPosWaBillOffer());
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(new Date());
@@ -304,6 +327,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [ordersLoading, setOrdersLoading] = React.useState(false);
   const [reprintingId, setReprintingId] = React.useState<string | null>(null);
   const [touchMode, setTouchMode] = React.useState(false);
+  const [cartWidth, setCartWidth] = React.useState(() => readPosCartWidth());
+  const cartResizeRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const [soundAlerts, setSoundAlerts] = React.useState(true);
   const [addPopup, setAddPopup] = React.useState<AddPopupState | null>(null);
   const [editingCartQtyIdx, setEditingCartQtyIdx] = React.useState<number | null>(null);
@@ -419,6 +444,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const checkoutConfirmRef = React.useRef<HTMLButtonElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount, allowNegativeStock, setAllowNegativeStock } = useCartStore();
+  const taxEnabled = taxRate > 0;
 
   React.useEffect(() => { if (!posOpen) setShiftReady(false); }, [posOpen]);
   const markShiftReady = React.useCallback(() => setShiftReady(true), []);
@@ -719,6 +745,49 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   React.useEffect(() => {
     setTouchMode(readPosTouchMode());
     setSoundAlerts(readPosSoundAlerts());
+    setWaBillEnabled(readPosWaBillOffer());
+    setCartWidth(readPosCartWidth());
+  }, []);
+
+  const applyCartWidth = React.useCallback((px: number) => {
+    setCartWidth(writePosCartWidth(px));
+  }, []);
+
+  const onCartResizeStart = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    cartResizeRef.current = { startX: e.clientX, startW: cartWidth };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }, [cartWidth]);
+
+  const onCartResizeMove = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = cartResizeRef.current;
+    if (!drag) return;
+    // Dragging left edge: move left → wider cart
+    const next = drag.startW + (drag.startX - e.clientX);
+    setCartWidth(Math.min(POS_CART_WIDTH_MAX, Math.max(POS_CART_WIDTH_MIN, next)));
+  }, []);
+
+  const onCartResizeEnd = React.useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!cartResizeRef.current) return;
+    cartResizeRef.current = null;
+    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { /* noop */ }
+    setCartWidth((w) => writePosCartWidth(w));
+  }, []);
+
+  const setCheckoutTaxEnabled = React.useCallback((on: boolean) => {
+    if (on) {
+      const restored = readPosSavedTaxRate() || 10;
+      writePosSavedTaxRate(restored);
+      setTaxRate(restored);
+      return;
+    }
+    if (taxRate > 0) writePosSavedTaxRate(taxRate);
+    setTaxRate(0);
+  }, [setTaxRate, taxRate]);
+
+  const setCheckoutWaBillEnabled = React.useCallback((on: boolean) => {
+    setWaBillEnabled(on);
+    writePosWaBillOffer(on);
   }, []);
 
   React.useEffect(() => {
@@ -1030,11 +1099,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       playPosSound("scan_fail", soundAlerts);
       return;
     }
+    const weighted = isPosWeightedProduct(p);
     const listPrice = posListPrice(p);
     const finalPrice = opts?.unitPrice ?? p.unitPrice;
+    const minQty = weighted ? 0.001 : 1;
     const qtyClamped = allowNegativeStock
-      ? Math.max(1, qty)
-      : Math.min(Math.max(1, qty), Math.max(1, p.stock));
+      ? Math.max(minQty, qty)
+      : Math.min(Math.max(minQty, qty), Math.max(minQty, p.stock));
     const priceCut = listPrice - finalPrice;
     const hasPriceDiscount = priceCut > 0.001;
     const lineTax = taxRate;
@@ -1047,6 +1118,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       discountType: hasPriceDiscount ? "fixed" : "percentage",
       taxRate: lineTax,
       image: p.imageUrl,
+      productKind: p.productKind,
+      unit: p.unit,
+      allowDecimalSelling: weighted || !!p.allowDecimalSelling,
     });
     setLastAddedVariantId(p.variantId);
     setRecentScans((prev) => [{
@@ -1059,10 +1133,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       time: new Date(),
     }, ...prev].slice(0, 8));
     playPosSound("scan_ok", soundAlerts);
+    const qtyLabel = weighted ? formatPosWeightQty(qtyClamped, p) : `×${qtyClamped}`;
     if (hasPriceDiscount) {
       toast.success(`Price discount LKR ${formatNumber(priceCut * qtyClamped)} applied`, { duration: 900 });
     } else {
-      toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ×${qtyClamped}`, { duration: 700 });
+      toast.success(`${p.productName} · ${variantDisplayLabel(p, profile)} ${qtyLabel}`, { duration: 700 });
     }
     if (opts?.keepSearchFocus !== false) {
       requestAnimationFrame(() => {
@@ -1144,6 +1219,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (!found) {
       playPosSound("scan_fail", soundAlerts);
       toast.error(`Barcode/SKU not found: ${trimmed}`);
+      setSearch("");
       requestAnimationFrame(() => searchRef.current?.focus());
       return;
     }
@@ -1162,10 +1238,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       matchesCachedBarcode(q, products) ||
       !!findProductByBarcodeCode(q, products);
     if (barcodeLike) {
+      setSearch("");
+      requestAnimationFrame(() => searchRef.current?.focus());
       void scanAndAddProduct(q);
       return;
     }
     if (productCards.length === 0) {
+      setSearch("");
+      requestAnimationFrame(() => searchRef.current?.focus());
       void scanAndAddProduct(q);
       return;
     }
@@ -1518,7 +1598,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         loyaltyPoints: loyaltyPointsToRedeem,
         customerTier: customer?.membershipTier ?? null,
       });
-      {
+      if (waBillEnabled) {
         const phone = (customer?.phone ?? "").trim();
         const itemsSummary = saleSnapshot.items
           .slice(0, 12)
@@ -1533,6 +1613,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           itemsSummary,
         });
         setWaPhoneEdit(phone);
+      } else {
+        setWaBillOffer(null);
       }
       setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
@@ -1574,7 +1656,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -1763,7 +1845,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const it = items[selectedCartIdx];
     if (!it) return;
     setEditingCartQtyIdx(selectedCartIdx);
-    setEditingCartQtyRaw(String(it.quantity));
+    setEditingCartQtyRaw(
+      isPosWeightedProduct(it) ? String(cartQtyToGrams(it.quantity, it)) : String(it.quantity),
+    );
   }, [selectedCartIdx, items]);
 
   const closeQtyPopup = React.useCallback(() => setAddPopup(null), []);
@@ -2690,6 +2774,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const pinIsSet = hasServerPin;
       const applyPosTax = (raw: number) => {
         const v = Math.min(100, Math.max(0, raw));
+        if (v > 0) writePosSavedTaxRate(v);
         setTaxRate(v);
         toast.success(v === 0 ? "Tax disabled — no tax on POS sales" : `Tax ${v}% — applied from POS settings`);
       };
@@ -2715,6 +2800,45 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 </button>
               </div>
             ))}
+          </div>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+            <h3 className="text-white font-bold text-base mb-1">Cart panel size</h3>
+            <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
+              Make the right cart wider or narrower. You can also drag the cart&apos;s left edge.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {POS_CART_WIDTH_PRESETS.map((p) => {
+                const active = Math.abs(cartWidth - p.px) < 8;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => applyCartWidth(p.px)}
+                    className="h-10 min-w-[64px] px-3 rounded-xl text-sm font-bold transition-all"
+                    style={{
+                      background: active ? "#4f6ef7" : "var(--pos-input)",
+                      color: active ? "#fff" : "var(--pos-muted)",
+                      border: `1px solid ${active ? "#4f6ef7" : "var(--pos-border)"}`,
+                    }}
+                  >
+                    {p.label}
+                    <span className="block text-[10px] font-mono opacity-70">{p.px}px</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-3 pt-1">
+              <input
+                type="range"
+                min={POS_CART_WIDTH_MIN}
+                max={POS_CART_WIDTH_MAX}
+                step={10}
+                value={cartWidth}
+                onChange={(e) => applyCartWidth(parseInt(e.target.value, 10))}
+                className="flex-1 accent-blue-500"
+              />
+              <span className="text-xs font-mono font-bold tabular-nums w-14 text-right" style={{ color: "var(--pos-text)" }}>{cartWidth}px</span>
+            </div>
           </div>
           <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Thermal receipt theme</h3>
@@ -2958,11 +3082,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <PosQuantityPopup
             productName={addPopup.productName}
             variantName={variantDisplayLabel(addPopup.selected, profile)}
-            maxQty={allowNegativeStock ? Math.max(9999, addPopup.selected.stock) : Math.max(1, addPopup.selected.stock)}
+            maxQty={allowNegativeStock
+              ? Math.max(9999, addPopup.selected.stock)
+              : Math.max(isPosWeightedProduct(addPopup.selected) ? 0.001 : 1, addPopup.selected.stock)}
             unitPrice={addPopup.selected.unitPrice}
             mrp={addPopup.selected.mrp}
             variants={addPopup.variants.length > 1 ? addPopup.variants : undefined}
             allowNegativeStock={allowNegativeStock}
+            productKind={addPopup.selected.productKind}
+            unit={addPopup.selected.unit}
+            allowDecimalSelling={addPopup.selected.allowDecimalSelling}
             touchMode={touchMode}
             onCancel={() => setAddPopup(null)}
             onConfirm={({ qty, unitPrice, variant }) => {
@@ -3020,7 +3149,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* TOP BAR */}
         <div className="flex h-12 items-center gap-3 px-4 shrink-0 border-b" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
           <div className="flex items-center gap-2.5 shrink-0">
-            <button onClick={closePos} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
+            <button onClick={closePos} title="Exit POS" className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"><Menu className="h-4 w-4 text-white/60"/></button>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title={sidebarHidden ? "Show sidebar" : "Hide sidebar"}
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: "var(--pos-muted)" }}
+            >
+              {sidebarHidden ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            </button>
             <div className="flex items-center gap-2">
               <AppLogo variant="sidebar" theme={isPosLight ? "light" : "dark"} className="h-7 shrink-0" alt={APP_NAME} />
               <p className="text-[10px] leading-none" style={{color:"var(--pos-muted)"}}>POS Terminal</p>
@@ -3141,8 +3279,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {/* MAIN */}
         <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* SIDEBAR */}
+          {!sidebarHidden ? (
           <div className="w-44 flex flex-col shrink-0 border-r" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
-            <nav className="flex-1 py-2 overflow-y-auto">
+            <div className="flex items-center justify-between px-2 pt-2 pb-1 shrink-0">
+              <span className="text-[10px] font-semibold uppercase tracking-wide px-1" style={{ color: "var(--pos-muted-2)" }}>Menu</span>
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Hide sidebar"
+                className="p-1 rounded-lg hover:bg-white/10 transition-colors"
+                style={{ color: "var(--pos-muted)" }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+            </div>
+            <nav className="flex-1 py-1 overflow-y-auto">
               {navItems.map((item, navIdx)=>{
                 if (item.id === "demo-product") return null;
                 if (item.id === "quick-product") {
@@ -3211,15 +3362,76 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               <Lock className="h-3.5 w-3.5"/>Lock Screen<span className="ml-auto text-[10px] opacity-50 font-mono">F12</span>
             </button>
           </div>
+          ) : (
+          <div className="w-9 flex flex-col items-center shrink-0 border-r py-2 gap-2" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              title="Show sidebar"
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: "var(--pos-muted)" }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={lockCashier}
+              title="Lock Screen (F12)"
+              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+              style={{ color: "var(--pos-muted)" }}
+            >
+              <Lock className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          )}
 
           {/* CENTER  dynamic content */}
           <div className="flex-1 min-w-0 overflow-hidden">{renderCenter()}</div>
 
           {/* CART PANEL */}
-          <div className="w-[420px] flex flex-col shrink-0 border-l" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
-            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
-              <span className="font-bold text-lg" style={{ color: "var(--pos-text)" }}>Cart ({itemCount()} Items)</span>
-              <div className="flex items-center gap-2">
+          <div
+            className="relative flex flex-col shrink-0 border-l min-w-0"
+            style={{
+              width: cartWidth,
+              maxWidth: "48vw",
+              background: "var(--pos-panel)",
+              borderColor: "var(--pos-border)",
+            }}
+          >
+            <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize cart"
+              title="Drag to resize cart"
+              onPointerDown={onCartResizeStart}
+              onPointerMove={onCartResizeMove}
+              onPointerUp={onCartResizeEnd}
+              onPointerCancel={onCartResizeEnd}
+              className="absolute left-0 top-0 bottom-0 w-1.5 -translate-x-1/2 z-20 cursor-col-resize hover:bg-blue-500/40 active:bg-blue-500/60"
+            />
+            <div className="flex items-center justify-between px-4 py-3 border-b shrink-0 gap-2" style={{borderColor:"var(--pos-border)"}}>
+              <span className="font-bold text-lg truncate" style={{ color: "var(--pos-text)" }}>Cart ({itemCount()} Items)</span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <div className="hidden sm:flex items-center rounded-lg overflow-hidden border" style={{ borderColor: "var(--pos-border)" }}>
+                  {POS_CART_WIDTH_PRESETS.map((p) => {
+                    const active = Math.abs(cartWidth - p.px) < 8;
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        title={`Cart ${p.label} (${p.px}px)`}
+                        onClick={() => applyCartWidth(p.px)}
+                        className="h-7 w-8 text-[10px] font-bold transition-colors"
+                        style={{
+                          background: active ? "#4f6ef7" : "var(--pos-input)",
+                          color: active ? "#fff" : "var(--pos-muted)",
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button onClick={()=>{clearCart();setSelectedCartIdx(-1);setCheckoutOpen(false);setLastAddedVariantId(undefined);setThankYouSale(null);}} className="flex items-center gap-1.5 text-sm font-semibold hover:text-red-400 transition-colors" style={{color:"#ef4444"}}><Trash2 className="h-4 w-4"/>Clear</button>
               </div>
             </div>
@@ -3398,6 +3610,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         const lineTotal = afterDisc + lineTax;
                         const lineGross = item.unitPrice * item.quantity;
                         const editing = editingCartQtyIdx === idx;
+                        const weighted = isPosWeightedProduct(item);
+                        const qtyStep = weighted ? gramsToCartQty(10, item) : 1;
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
@@ -3406,6 +3620,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                             <p className="text-sm font-semibold text-white truncate">
                               {item.productName}
                             </p>
+                            {weighted && (
+                              <p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>
+                                Weight · edit grams
+                              </p>
+                            )}
                             {lineDisc > 0.001 && (
                               <p className="text-[10px] font-semibold truncate" style={{color:"#34d399"}}>
                                 Disc −LKR {formatNumber(lineDisc)}
@@ -3416,16 +3635,21 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                             )}
                           </div>
                           <div className="flex items-center gap-0.5 shrink-0">
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity-qtyStep);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Minus className="h-3 w-3 text-white"/></button>
                             {editing ? (
                               <input
                                 autoFocus
                                 value={editingCartQtyRaw}
                                 onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(/[^\d]/g, ""))}
+                                onChange={(e) => setEditingCartQtyRaw(e.target.value.replace(weighted ? /[^\d]/g : /[^\d.]/g, ""))}
                                 onBlur={() => {
-                                  const n = parseInt(editingCartQtyRaw, 10);
-                                  if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
+                                  if (weighted) {
+                                    const g = parseGramsInput(editingCartQtyRaw);
+                                    if (g >= 1) updateQuantity(item.variantId, gramsToCartQty(g, item));
+                                  } else {
+                                    const n = parseFloat(editingCartQtyRaw);
+                                    if (!Number.isNaN(n) && n > 0) updateQuantity(item.variantId, n);
+                                  }
                                   setEditingCartQtyIdx(null);
                                 }}
                                 onKeyDown={(e) => {
@@ -3438,23 +3662,26 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                                     setEditingCartQtyIdx(null);
                                   }
                                 }}
-                                className="w-7 h-6 rounded text-center text-xs font-bold text-white outline-none"
+                                className="w-10 h-6 rounded text-center text-xs font-bold text-white outline-none"
                                 style={{ background: "var(--pos-panel)", border: "1px solid #4f6ef7" }}
+                                title={weighted ? "Grams" : "Qty"}
                               />
                             ) : (
                               <span
-                                title="Double-click to edit"
+                                title={weighted ? "Double-click to edit grams" : "Double-click to edit"}
                                 onDoubleClick={(e) => {
                                   e.stopPropagation();
                                   setEditingCartQtyIdx(idx);
-                                  setEditingCartQtyRaw(String(item.quantity));
+                                  setEditingCartQtyRaw(
+                                    weighted ? String(cartQtyToGrams(item.quantity, item)) : String(item.quantity),
+                                  );
                                 }}
-                                className="text-white text-xs font-bold w-6 text-center select-none tabular-nums"
+                                className="text-white text-xs font-bold min-w-[2rem] px-0.5 text-center select-none tabular-nums"
                               >
-                                {item.quantity}
+                                {weighted ? formatPosWeightQty(item.quantity, item) : item.quantity}
                               </span>
                             )}
-                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+1);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-3 w-3 text-white"/></button>
+                            <button type="button" onClick={e=>{e.stopPropagation();updateQuantity(item.variantId,item.quantity+qtyStep);}} className="h-6 w-6 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-3 w-3 text-white"/></button>
                           </div>
                           <div className="shrink-0 min-w-[4.5rem] text-right">
                             {lineDisc > 0.001 && (
@@ -3555,11 +3782,71 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
                   {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
                   {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
-                  <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
-                    <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
+                  <div className="flex justify-between text-sm" style={{color: taxEnabled ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
+                    <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-white pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  <div className="pt-2 space-y-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-white">Tax</p>
+                        <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
+                          {taxEnabled ? `${taxRate}% on this bill` : "No tax on this bill"}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={taxEnabled}
+                        onClick={() => setCheckoutTaxEnabled(!taxEnabled)}
+                        className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
+                        style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-input)" }}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${taxEnabled ? "translate-x-5" : ""}`} />
+                      </button>
+                    </div>
+                    {taxEnabled && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {[5, 8, 10, 12, 15, 18].map((r) => (
+                          <button
+                            key={r}
+                            type="button"
+                            onClick={() => { writePosSavedTaxRate(r); setTaxRate(r); }}
+                            className="rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors"
+                            style={{
+                              background: taxRate === r ? "#4f6ef7" : "var(--pos-input)",
+                              color: taxRate === r ? "#fff" : "var(--pos-muted)",
+                              border: `1px solid ${taxRate === r ? "#4f6ef7" : "var(--pos-border)"}`,
+                            }}
+                          >
+                            {r}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between gap-3 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                      <div className="min-w-0 flex items-center gap-2">
+                        <MessageCircle className="h-4 w-4 shrink-0" style={{ color: waBillEnabled ? "#10b981" : "var(--pos-muted)" }} />
+                        <div>
+                          <p className="text-sm font-semibold text-white">WhatsApp bill</p>
+                          <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>
+                            {waBillEnabled ? "Ask after sale" : "Skip after sale"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={waBillEnabled}
+                        onClick={() => setCheckoutWaBillEnabled(!waBillEnabled)}
+                        className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
+                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-input)" }}
+                      >
+                        <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${waBillEnabled ? "translate-x-5" : ""}`} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <PosPaymentPanel
                   totalAmt={totalAmt}
@@ -3702,91 +3989,117 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         </div>
 
         {/* BOTTOM BAR */}
-        <div className="flex items-center gap-5 px-5 h-14 border-t shrink-0" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
-          {[{label:"Shift Sales",value:`LKR ${formatNumber(todayStats.sales)}`,color:"#4f6ef7"},{label:"Orders",value:String(todayStats.orders)},{label:"Items Sold",value:String(todayStats.items)},{label:"Avg. Bill",value:todayStats.orders>0?`LKR ${formatNumber(todayStats.sales/todayStats.orders)}`:"LKR 0.00"}].map(s=>(
-            <div key={s.label} className="flex items-center gap-2 shrink-0">
-              <span className="text-xs font-medium" style={{color:"var(--pos-muted-2)"}}>{s.label}</span>
-              <span className="text-sm font-bold" style={{color:s.color||"var(--pos-text)"}}>{s.value}</span>
-            </div>
-          ))}
-          {drawerCash != null && (
-            <>
-              <div className="h-4 w-px shrink-0" style={{ background: "var(--pos-border)" }} />
-              <div className="flex items-center gap-2 shrink-0 px-2.5 py-1 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                <Banknote className="h-3.5 w-3.5" style={{ color: "#10b981" }} />
-                <span className="text-xs font-medium" style={{ color: "var(--pos-success-soft)" }}>In drawer</span>
-                <span className="text-sm font-bold tabular-nums" style={{ color: "#10b981" }}>LKR {formatNumber(drawerCash)}</span>
+        <div
+          className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-2 min-h-14 border-t shrink-0 overflow-x-auto"
+          style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+        >
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
+            {[{ label: "Shift Sales", value: `LKR ${formatNumber(todayStats.sales)}`, color: "#4f6ef7", short: "Sales" }, { label: "Orders", value: String(todayStats.orders), short: "Ord" }, { label: "Items Sold", value: String(todayStats.items), short: "Items" }, { label: "Avg. Bill", value: todayStats.orders > 0 ? `LKR ${formatNumber(todayStats.sales / todayStats.orders)}` : "LKR 0.00", short: "Avg" }].map((s) => (
+              <div key={s.label} className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] sm:text-xs font-medium whitespace-nowrap" style={{ color: "var(--pos-muted-2)" }}>
+                  <span className="sm:hidden">{s.short}</span>
+                  <span className="hidden sm:inline">{s.label}</span>
+                </span>
+                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap" style={{ color: s.color || "var(--pos-text)" }}>{s.value}</span>
               </div>
-            </>
-          )}
-          <div className="flex-1"/>
-          {(() => {
-            const scannerActive = isScannerActive(lastScanAt, scanFlash, now);
-            const scannerDetail = formatScannerDetail(lastScanAt, now);
-            const scannerColor = scannerActive ? "#10b981" : "var(--pos-muted)";
-            return (
-              <div className="flex items-center gap-2 shrink-0" style={{ color: scannerColor }}>
-                <div className={cn("h-2 w-2 rounded-full bg-green-400", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "var(--pos-muted-2)" }} />
-                <Scan className="h-3.5 w-3.5" />
-                <span className="text-xs font-semibold">Barcode Scanner</span>
-                <span className="text-xs" style={{ color: "var(--pos-muted)" }}>{scannerDetail}</span>
+            ))}
+            {drawerCash != null && (
+              <div className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
+                <Banknote className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />
+                <span className="text-[10px] sm:text-xs font-medium hidden md:inline" style={{ color: "var(--pos-success-soft)" }}>
+                  <span className="lg:hidden">Drawer</span>
+                  <span className="hidden lg:inline">In drawer</span>
+                </span>
+                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap" style={{ color: "#10b981" }}>LKR {formatNumber(drawerCash)}</span>
               </div>
-            );
-          })()}
-          <div className="h-4 w-px" style={{ background: "var(--pos-border)" }} />
-          <div className="flex items-center gap-1.5 shrink-0" style={{ color: printerStatus.color }}>
-            <Printer className="h-3.5 w-3.5" />
-            <span className="text-xs font-semibold">{printerStatus.label}</span>
-            <span className="text-xs" style={{ color: "var(--pos-muted)" }}>{printerStatus.detail}</span>
+            )}
           </div>
-          <div className="h-4 w-px" style={{ background: "var(--pos-border)" }} />
-          <div className="text-sm font-mono font-bold text-white shrink-0">{now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })}</div>
-          <div className="text-xs shrink-0" style={{ color: "var(--pos-muted)" }}>{now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</div>
-          <div className="h-4 w-px" style={{background:"var(--pos-border)"}}/>
-          <button
-            type="button"
-            onClick={() => void toggleFullscreen()}
-            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
-            style={{
-              background: isFullscreen
-                ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
-                : (isPosLight ? "#334155" : "var(--pos-input)"),
-              color: isPosLight ? "#ffffff" : (isFullscreen ? "#4f6ef7" : "var(--pos-text-secondary)"),
-              border: `1px solid ${isFullscreen
-                ? (isPosLight ? "#4338ca" : "rgba(79,110,247,0.35)")
-                : (isPosLight ? "#1E293B" : "var(--pos-border)")}`,
-            }}
-          >
-            {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-            {isFullscreen ? "Exit Full" : "Fullscreen"}
-          </button>
-          <button
-            onClick={handleDayEnd}
-            disabled={dayEndLoading}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50"
-            style={{
-              background: isPosLight ? "#DC2626" : "rgba(239,68,68,0.15)",
-              color: isPosLight ? "#ffffff" : "#ef4444",
-              border: `1px solid ${isPosLight ? "#B91C1C" : "rgba(239,68,68,0.3)"}`,
-            }}
-          >
-            {dayEndLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
-            Day End
-          </button>
-          <button
-            onClick={() => setShowCashClose(true)}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
-            style={{
-              background: isPosLight ? "#059669" : "rgba(16,185,129,0.12)",
-              color: isPosLight ? "#ffffff" : "#10b981",
-              border: `1px solid ${isPosLight ? "#047857" : "rgba(16,185,129,0.3)"}`,
-            }}
-          >
-            <Banknote className="h-3.5 w-3.5" />
-            Close Shift
-          </button>
-          <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:isPosLight?"#ffffff":"var(--pos-muted-2)",background:isPosLight?"#475569":"transparent"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
+
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 ml-auto min-w-0">
+            {(() => {
+              const scannerActive = isScannerActive(lastScanAt, scanFlash, now);
+              const scannerDetail = formatScannerDetail(lastScanAt, now);
+              const scannerColor = scannerActive ? "#10b981" : "var(--pos-muted)";
+              return (
+                <div className="flex items-center gap-1.5 shrink-0 max-w-[200px] lg:max-w-none" style={{ color: scannerColor }} title={`Barcode Scanner · ${scannerDetail}`}>
+                  <div className={cn("h-2 w-2 rounded-full shrink-0", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "var(--pos-muted-2)" }} />
+                  <Scan className="h-3.5 w-3.5 shrink-0" />
+                  <span className="text-xs font-semibold hidden xl:inline whitespace-nowrap">Barcode Scanner</span>
+                  <span className="text-[10px] sm:text-xs truncate" style={{ color: "var(--pos-muted)" }}>{scannerDetail}</span>
+                </div>
+              );
+            })()}
+            <div className="h-4 w-px shrink-0 hidden md:block" style={{ background: "var(--pos-border)" }} />
+            <div className="flex items-center gap-1.5 shrink-0 max-w-[160px] lg:max-w-none" style={{ color: printerStatus.color }} title={`${printerStatus.label} · ${printerStatus.detail}`}>
+              <Printer className="h-3.5 w-3.5 shrink-0" />
+              <span className="text-xs font-semibold hidden lg:inline whitespace-nowrap">{printerStatus.label}</span>
+              <span className="text-[10px] sm:text-xs truncate hidden sm:inline" style={{ color: "var(--pos-muted)" }}>{printerStatus.detail}</span>
+            </div>
+            <div className="h-4 w-px shrink-0 hidden md:block" style={{ background: "var(--pos-border)" }} />
+            <div className="text-xs sm:text-sm font-mono font-bold text-white shrink-0 whitespace-nowrap">
+              {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: true })}
+            </div>
+            <div className="text-[10px] sm:text-xs shrink-0 whitespace-nowrap hidden md:block" style={{ color: "var(--pos-muted)" }}>
+              {now.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" })}
+            </div>
+            <div className="h-4 w-px shrink-0 hidden sm:block" style={{ background: "var(--pos-border)" }} />
+            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+              <button
+                type="button"
+                onClick={() => void toggleFullscreen()}
+                title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: isFullscreen
+                    ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                    : (isPosLight ? "#334155" : "var(--pos-input)"),
+                  color: isPosLight ? "#ffffff" : (isFullscreen ? "#4f6ef7" : "var(--pos-text-secondary)"),
+                  border: `1px solid ${isFullscreen
+                    ? (isPosLight ? "#4338ca" : "rgba(79,110,247,0.35)")
+                    : (isPosLight ? "#1E293B" : "var(--pos-border)")}`,
+                }}
+              >
+                {isFullscreen ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">{isFullscreen ? "Exit Full" : "Fullscreen"}</span>
+              </button>
+              <button
+                onClick={handleDayEnd}
+                disabled={dayEndLoading}
+                title="Day End"
+                className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+                style={{
+                  background: isPosLight ? "#DC2626" : "rgba(239,68,68,0.15)",
+                  color: isPosLight ? "#ffffff" : "#ef4444",
+                  border: `1px solid ${isPosLight ? "#B91C1C" : "rgba(239,68,68,0.3)"}`,
+                }}
+              >
+                {dayEndLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
+                <span className="hidden sm:inline">Day End</span>
+              </button>
+              <button
+                onClick={() => setShowCashClose(true)}
+                title="Close Shift"
+                className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: isPosLight ? "#059669" : "rgba(16,185,129,0.12)",
+                  color: isPosLight ? "#ffffff" : "#10b981",
+                  border: `1px solid ${isPosLight ? "#047857" : "rgba(16,185,129,0.3)"}`,
+                }}
+              >
+                <Banknote className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Close Shift</span>
+              </button>
+              <button
+                onClick={() => setShowShortcuts((s) => !s)}
+                title="Shortcuts (F1)"
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                style={{ color: isPosLight ? "#ffffff" : "var(--pos-muted-2)", background: isPosLight ? "#475569" : "transparent" }}
+              >
+                <Keyboard className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">F1</span>
+              </button>
+            </div>
+          </div>
         </div>
 
 

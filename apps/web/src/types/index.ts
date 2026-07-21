@@ -272,6 +272,9 @@ export interface CartItem {
   isCustom?: boolean;
   /** Cost for margin on custom lines (optional). */
   costPrice?: number;
+  productKind?: string;
+  unit?: string | null;
+  allowDecimalSelling?: boolean;
 }
 
 export interface Payment {

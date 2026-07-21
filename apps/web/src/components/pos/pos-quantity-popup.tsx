@@ -6,6 +6,13 @@ import { formatNumber } from "@/lib/utils";
 import { posListPrice } from "@/lib/pos-totals";
 import { variantDisplayLabel } from "@/lib/shop-vertical";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import {
+  cartQtyToGrams,
+  formatPosWeightQty,
+  gramsToCartQty,
+  isPosWeightedProduct,
+  parseGramsInput,
+} from "@/lib/pos-weight";
 
 export type PosAddPopupVariant = {
   variantId: string;
@@ -21,6 +28,9 @@ export type PosAddPopupVariant = {
   material?: string;
   style?: string;
   imageUrl?: string;
+  productKind?: string;
+  unit?: string | null;
+  allowDecimalSelling?: boolean;
 };
 
 type Props = {
@@ -31,6 +41,9 @@ type Props = {
   mrp?: number;
   variants?: PosAddPopupVariant[];
   allowNegativeStock?: boolean;
+  productKind?: string;
+  unit?: string | null;
+  allowDecimalSelling?: boolean;
   onConfirm: (payload: { qty: number; unitPrice: number; variant?: PosAddPopupVariant }) => void;
   onCancel: () => void;
   touchMode?: boolean;
@@ -50,6 +63,9 @@ export function PosQuantityPopup({
   mrp,
   variants = EMPTY_VARIANTS,
   allowNegativeStock = false,
+  productKind,
+  unit,
+  allowDecimalSelling,
   onConfirm,
   onCancel,
   touchMode,
@@ -57,7 +73,12 @@ export function PosQuantityPopup({
   const { profile } = useShopWorkspace();
   const hasVariants = variants.length > 1;
   const [selectedVariantId, setSelectedVariantId] = React.useState(() => variants[0]?.variantId ?? "");
-  const [qtyRaw, setQtyRaw] = React.useState("1");
+  const weightSeed = {
+    productKind: productKind ?? variants[0]?.productKind,
+    unit: unit ?? variants[0]?.unit,
+    allowDecimalSelling: allowDecimalSelling ?? variants[0]?.allowDecimalSelling,
+  };
+  const [qtyRaw, setQtyRaw] = React.useState(isPosWeightedProduct(weightSeed) ? "100" : "1");
   const [priceRaw, setPriceRaw] = React.useState(String(unitPrice));
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const qtyInputRef = React.useRef<HTMLInputElement>(null);
@@ -69,10 +90,22 @@ export function PosQuantityPopup({
     [variants, selectedVariantId],
   );
 
+  const activeWeight = {
+    productKind: selectedVariant?.productKind ?? productKind,
+    unit: selectedVariant?.unit ?? unit,
+    allowDecimalSelling: selectedVariant?.allowDecimalSelling ?? allowDecimalSelling,
+  };
+  const isWeighted = isPosWeightedProduct(activeWeight);
+
   const stockLimit = allowNegativeStock
     ? Math.max(9999, selectedVariant?.stock ?? maxQty, maxQty)
-    : Math.max(1, selectedVariant?.stock ?? maxQty);
-  const qty = Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
+    : Math.max(isWeighted ? 0.001 : 1, selectedVariant?.stock ?? maxQty);
+  const gramsLimit = Math.max(1, Math.floor(cartQtyToGrams(stockLimit, activeWeight)));
+  const gramsTyped = isWeighted ? parseGramsInput(qtyRaw) : 0;
+  const grams = isWeighted ? Math.min(gramsLimit, Math.max(0, gramsTyped)) : 0;
+  const qty = isWeighted
+    ? Math.min(stockLimit, Math.max(0.001, gramsToCartQty(Math.max(1, grams || 1), activeWeight)))
+    : Math.min(stockLimit, Math.max(1, parseInt(qtyRaw, 10) || 1));
   const listPrice = posListPrice(selectedVariant ?? { unitPrice, mrp });
   const unitPriceValue = Math.max(0, parseFloat(priceRaw) || 0);
   const priceCut = Math.max(0, listPrice - unitPriceValue);
@@ -96,15 +129,20 @@ export function PosQuantityPopup({
 
   React.useEffect(() => {
     const next = variants[0];
+    const w = isPosWeightedProduct({
+      productKind: next?.productKind ?? productKind,
+      unit: next?.unit ?? unit,
+      allowDecimalSelling: next?.allowDecimalSelling ?? allowDecimalSelling,
+    });
     if (!next) {
       setPriceRaw(String(unitPrice));
-      setQtyRaw("1");
+      setQtyRaw(w ? "100" : "1");
       return;
     }
     setSelectedVariantId(next.variantId);
-    setQtyRaw("1");
+    setQtyRaw(w ? "100" : "1");
     setPriceRaw(String(next.unitPrice));
-  }, [productKey, variants, unitPrice]);
+  }, [productKey, variants, unitPrice, productKind, unit, allowDecimalSelling]);
 
   const refreshScrollHint = React.useCallback(() => {
     const el = scrollRef.current;
@@ -127,15 +165,23 @@ export function PosQuantityPopup({
     };
   }, [refreshScrollHint, variants.length]);
 
-  const clampQty = (n: number) => Math.min(stockLimit, Math.max(1, n));
+  const clampQty = (n: number) => Math.min(stockLimit, Math.max(isWeighted ? 0.001 : 1, n));
 
   const pickVariant = (variant: PosAddPopupVariant) => {
     setSelectedVariantId(variant.variantId);
-    setQtyRaw("1");
+    setQtyRaw(isPosWeightedProduct(variant) ? "100" : "1");
     setPriceRaw(String(variant.unitPrice));
   };
 
-  const bump = (delta: number) => setQtyRaw(String(clampQty(qty + delta)));
+  const bump = (delta: number) => {
+    if (isWeighted) {
+      const step = Math.abs(delta) >= 10 ? delta : delta * 10;
+      const nextG = Math.min(gramsLimit, Math.max(1, (grams || 100) + step));
+      setQtyRaw(String(nextG));
+      return;
+    }
+    setQtyRaw(String(clampQty(qty + delta)));
+  };
 
   const moveVariant = React.useCallback((direction: -1 | 1) => {
     if (!variants.length) return;
@@ -156,6 +202,10 @@ export function PosQuantityPopup({
   }, [selectedVariantId, variants]);
 
   const onQtyInput = (value: string) => {
+    if (isWeighted) {
+      setQtyRaw(value.replace(/[^\d]/g, ""));
+      return;
+    }
     const cleaned = value.replace(/[^\d]/g, "");
     if (!cleaned) {
       setQtyRaw("");
@@ -172,12 +222,13 @@ export function PosQuantityPopup({
 
   const submit = React.useCallback(() => {
     if (unitPriceValue <= 0) return;
+    if (isWeighted && grams < 1) return;
     onConfirm({
       qty,
       unitPrice: unitPriceValue,
       variant: selectedVariant ?? undefined,
     });
-  }, [unitPriceValue, qty, selectedVariant, onConfirm]);
+  }, [unitPriceValue, qty, selectedVariant, onConfirm, isWeighted, grams]);
 
   React.useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -287,13 +338,15 @@ export function PosQuantityPopup({
               className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
               style={{ background: "rgba(79,110,247,0.18)", color: "#93b4ff" }}
             >
-              Max qty {stockLimit}
+              {isWeighted ? `Max ${gramsLimit} g` : `Max qty ${stockLimit}`}
             </span>
             <span
               className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
               style={{ background: "rgba(16,185,129,0.15)", color: "#4ade80" }}
             >
-              {selectedVariant?.stock ?? maxQty} in stock
+              {isWeighted
+                ? `${formatPosWeightQty(selectedVariant?.stock ?? maxQty, activeWeight)} in stock`
+                : `${selectedVariant?.stock ?? maxQty} in stock`}
             </span>
           </div>
         </div>
@@ -427,13 +480,13 @@ export function PosQuantityPopup({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
-                Quantity
+                {isWeighted ? "Weight (g)" : "Quantity"}
               </p>
               <div className="flex items-center rounded-xl overflow-hidden border h-12" style={fieldStyle}>
                 <button
                   type="button"
-                  onClick={() => bump(-1)}
-                  disabled={qty <= 1}
+                  onClick={() => bump(isWeighted ? -10 : -1)}
+                  disabled={isWeighted ? grams <= 1 : qty <= 1}
                   className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Minus className="h-4 w-4" />
@@ -444,18 +497,23 @@ export function PosQuantityPopup({
                   inputMode="numeric"
                   value={qtyRaw}
                   onChange={(e) => onQtyInput(e.target.value)}
-                  onBlur={() => setQtyRaw(String(qty))}
+                  onBlur={() => setQtyRaw(isWeighted ? String(Math.max(1, grams || 1)) : String(qty))}
                   className="flex-1 min-w-0 h-full bg-transparent text-center text-lg font-bold text-white tabular-nums outline-none"
                 />
                 <button
                   type="button"
-                  onClick={() => bump(1)}
-                  disabled={qty >= stockLimit}
+                  onClick={() => bump(isWeighted ? 10 : 1)}
+                  disabled={isWeighted ? grams >= gramsLimit : qty >= stockLimit}
                   className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
               </div>
+              {isWeighted ? (
+                <p className="text-[10px] tabular-nums" style={{ color: "var(--pos-muted)" }}>
+                  = {formatPosWeightQty(qty, activeWeight)} · {money(unitPriceValue)}/kg
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-2">
@@ -501,10 +559,10 @@ export function PosQuantityPopup({
                   <>
                     <span className="line-through text-white/45">{money(listPrice)}</span>
                     <span className="mx-1.5 text-white/35">→</span>
-                    {money(unitPriceValue)} × {qty}
+                    {money(unitPriceValue)} × {isWeighted ? formatPosWeightQty(qty, activeWeight) : qty}
                   </>
                 ) : (
-                  <>{money(unitPriceValue)} × {qty}</>
+                  <>{money(unitPriceValue)} × {isWeighted ? formatPosWeightQty(qty, activeWeight) : qty}</>
                 )}
               </p>
               {hasPriceCut ? (
@@ -524,7 +582,9 @@ export function PosQuantityPopup({
         {/* Footer */}
         <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "var(--pos-border)" }}>
           <p className="text-[10px] text-center pt-2" style={{ color: "#6b7280" }}>
-            {hasVariants ? "← → pick item · " : ""}↑/↓ qty · Q qty · P price · Enter add · Esc close
+            {hasVariants ? "← → pick item · " : ""}
+            {isWeighted ? "Weight in grams · " : "↑/↓ qty · "}
+            Q qty · P price · Enter add · Esc close
           </p>
           <div className="flex gap-2.5">
             <button

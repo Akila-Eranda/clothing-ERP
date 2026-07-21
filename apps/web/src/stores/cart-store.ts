@@ -76,7 +76,10 @@ export const useCartStore = create<CartStore>()(
 
       addItem: (newItem) =>
         set((state) => {
-          const qtyToAdd = Math.max(1, newItem.quantity || 1);
+          const decimal = !!newItem.allowDecimalSelling || newItem.productKind === "WEIGHTED";
+          const qtyToAdd = decimal
+            ? Math.max(0.001, newItem.quantity || 0.001)
+            : Math.max(1, newItem.quantity || 1);
           const existing = newItem.isCustom
             ? state.items.find(
                 (i) =>
@@ -105,6 +108,9 @@ export const useCartStore = create<CartStore>()(
                   ? {
                       ...i,
                       quantity: newQty,
+                      allowDecimalSelling: existing.allowDecimalSelling || decimal,
+                      productKind: existing.productKind || newItem.productKind,
+                      unit: existing.unit ?? newItem.unit,
                       ...(perUnitDisc > 0
                         ? { discountAmount: perUnitDisc * newQty, discountType: "fixed" as const }
                         : {}),
@@ -115,11 +121,11 @@ export const useCartStore = create<CartStore>()(
           }
           const initialQty = state.allowNegativeStock || newItem.isCustom
             ? qtyToAdd
-            : Math.min(qtyToAdd, Math.max(1, newItem.stock || qtyToAdd));
+            : Math.min(qtyToAdd, Math.max(decimal ? 0.001 : 1, newItem.stock || qtyToAdd));
           return {
             items: [
               ...state.items,
-              { ...newItem, quantity: initialQty },
+              { ...newItem, quantity: initialQty, allowDecimalSelling: decimal || newItem.allowDecimalSelling },
             ],
           };
         }),

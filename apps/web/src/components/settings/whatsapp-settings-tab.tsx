@@ -159,8 +159,16 @@ export function WhatsappSettingsTab() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 bg-background/40 py-10 text-center">
-                  <QrCode className="h-8 w-8 text-muted-foreground/70" />
-                  <p className="text-sm text-muted-foreground">QR will appear here after you connect</p>
+                  {(status?.status === "connecting" || busy) ? (
+                    <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                  ) : (
+                    <QrCode className="h-8 w-8 text-muted-foreground/70" />
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    {status?.status === "connecting" || busy
+                      ? "Connecting to WhatsApp… QR appears in a few seconds"
+                      : "QR will appear here after you connect"}
+                  </p>
                 </div>
               )}
 

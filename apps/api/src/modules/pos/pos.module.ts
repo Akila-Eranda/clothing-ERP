@@ -60,7 +60,7 @@ export class SaleItemDto {
   @ApiPropertyOptional() @IsOptional() @IsString() variantId?: string;
   /** When true (or variantId omitted), line is bill-only — no catalog / stock. */
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isCustom?: boolean;
-  @ApiProperty() @IsInt() @Min(1) quantity: number;
+  @ApiProperty() @IsNumber() @Min(0.001) quantity: number;
   @ApiProperty() @IsNumber() @Min(0) unitPrice: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
   @ApiPropertyOptional() @IsOptional() @IsString() discountType?: string;
@@ -941,6 +941,10 @@ export class PosService {
         barcode: string | null;
         taxRate: number | null;
         images: string[];
+        productKind?: string;
+        unit?: string | null;
+        allowDecimalSelling?: boolean;
+        weightScaleReady?: boolean;
         category: { name?: string } | null;
         brand: { name?: string } | null;
       };
@@ -981,6 +985,10 @@ export class PosService {
         style: variant.style ?? undefined,
         category: variant.product.category?.name ?? 'Other',
         brand: variant.product.brand?.name ?? null,
+        productKind: variant.product.productKind,
+        unit: variant.product.unit ?? null,
+        allowDecimalSelling: variant.product.allowDecimalSelling ?? variant.product.productKind === 'WEIGHTED',
+        weightScaleReady: variant.product.weightScaleReady ?? false,
         stock: available,
         currentStock: onHand,
         reservedStock: reserved,
@@ -1414,6 +1422,10 @@ export class PosService {
         size:        v.size  ?? undefined,
         material:    v.material ?? undefined,
         style:       v.style ?? undefined,
+        productKind: v.product.productKind,
+        unit:        v.product.unit ?? null,
+        allowDecimalSelling: v.product.allowDecimalSelling ?? v.product.productKind === 'WEIGHTED',
+        weightScaleReady: v.product.weightScaleReady ?? false,
         /** Available to sell (on hand − reserved) — kept as `stock` for POS compatibility */
         stock: available,
         currentStock: onHand,

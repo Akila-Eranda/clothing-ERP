@@ -953,8 +953,8 @@ model Inventory {
   branchId      String
   warehouseId   String
   variantId     String
-  quantity      Int      @default(0)
-  reservedQty   Int      @default(0)
+  quantity      Float    @default(0)
+  reservedQty   Float    @default(0)
   damagedQty    Int      @default(0)
   returnedQty   Int      @default(0)
   avgCost       Float    @default(0)
@@ -984,11 +984,11 @@ model InventoryLog {
   branchId        String
   variantId       String
   movementType    StockMovementType
-  quantityChange  Int
-  quantityBefore  Int
-  quantityAfter   Int
-  reservedBefore  Int                @default(0)
-  reservedAfter   Int                @default(0)
+  quantityChange  Float
+  quantityBefore  Float
+  quantityAfter   Float
+  reservedBefore  Float              @default(0)
+  reservedAfter   Float              @default(0)
   damagedBefore   Int                @default(0)
   damagedAfter    Int                @default(0)
   unitCost        Float?
@@ -1771,7 +1771,7 @@ model SaleItem {
   productName   String
   variantName   String
   sku           String
-  quantity      Int
+  quantity      Float
   unitPrice     Float
   costPrice     Float    @default(0)
   discount      Float    @default(0)

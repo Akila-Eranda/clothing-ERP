@@ -7,7 +7,7 @@ import { StockMovementType } from '@prisma/client';
 
 export class AdjustStockDto {
   @ApiProperty() @IsString() variantId: string;
-  @ApiProperty() @IsInt() quantity: number;
+  @ApiProperty() @IsNumber() quantity: number;
   @ApiProperty({ enum: StockMovementType }) @IsEnum(StockMovementType) movementType: StockMovementType;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() referenceId?: string;
