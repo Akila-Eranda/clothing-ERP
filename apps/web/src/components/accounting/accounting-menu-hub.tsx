@@ -24,17 +24,17 @@ export function AccountingMenuHub({
   const { profile } = useShopWorkspace();
 
   return (
-    <div className="p-6 space-y-6 max-w-[1200px] mx-auto">
+    <div className="page-shell w-full">
       <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="text-sm text-muted-foreground">
+        <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">{title}</h1>
+        <p className="text-xs text-muted-foreground mt-0.5">
           {profile.label} · {description}
         </p>
       </div>
-      <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
         {links.map((link) => (
           <Link key={link.href} href={link.href} className="group">
-            <Card className="h-full transition-colors hover:border-primary/40">
+            <Card className="h-full rounded-[18px] transition-all hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)]">
               <CardContent className="p-5 flex gap-3 items-start">
                 <div className="p-2.5 rounded-xl bg-primary/10 text-primary shrink-0">
                   <link.icon className="h-5 w-5" />
