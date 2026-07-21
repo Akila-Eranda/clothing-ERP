@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 
 type WhatsappStatus = {
   status: "disconnected" | "connecting" | "qr" | "connected" | "logged_out" | "error";
@@ -17,6 +17,19 @@ type WhatsappStatus = {
   connectedAt?: string | null;
   provider?: string;
 };
+
+function statusBadgeClass(status?: string | null, connected?: boolean) {
+  if (connected) {
+    return "border-emerald-500/30 bg-emerald-500/15 text-emerald-400";
+  }
+  if (status === "qr" || status === "connecting") {
+    return "border-amber-500/30 bg-amber-500/15 text-amber-400";
+  }
+  if (status === "error" || status === "logged_out") {
+    return "border-red-500/30 bg-red-500/15 text-red-400";
+  }
+  return "border-border bg-muted/50 text-muted-foreground";
+}
 
 export function WhatsappSettingsTab() {
   const [status, setStatus] = React.useState<WhatsappStatus | null>(null);
@@ -38,7 +51,6 @@ export function WhatsappSettingsTab() {
     void refresh();
   }, [refresh]);
 
-  // Poll while waiting for QR / connect
   React.useEffect(() => {
     if (!status) return;
     if (status.status !== "qr" && status.status !== "connecting") return;
@@ -75,61 +87,56 @@ export function WhatsappSettingsTab() {
   const connected = status?.status === "connected";
 
   return (
-    <div className="space-y-4 max-w-2xl">
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MessageCircle className="h-4 w-4 text-emerald-600" />
-                WhatsApp connect
-              </CardTitle>
-              <CardDescription className="mt-1">
-                Scan QR with your shop WhatsApp. Then send bills &amp; messages from POS.
-              </CardDescription>
+    <div className="w-full space-y-4">
+      <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+        <div className="flex items-start justify-between gap-3 flex-wrap px-5 py-4 border-b bg-muted/30">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="h-10 w-10 rounded-[12px] bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0">
+              <MessageCircle className="h-5 w-5" />
             </div>
-            <Badge
-              variant="outline"
-              className={
-                connected
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                  : status?.status === "qr" || status?.status === "connecting"
-                    ? "border-amber-300 bg-amber-50 text-amber-800"
-                    : "border-slate-200 bg-slate-50 text-slate-600"
-              }
-            >
-              {connected ? "Connected" : status?.status ?? "…"}
-            </Badge>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold leading-tight">WhatsApp connect</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Scan QR with your shop WhatsApp. Then send bills &amp; messages from POS.
+              </p>
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
+          <Badge
+            variant="outline"
+            className={`h-7 rounded-full px-3 text-[11px] font-semibold capitalize shrink-0 ${statusBadgeClass(status?.status, connected)}`}
+          >
+            {connected ? "Connected" : status?.status ?? "…"}
+          </Badge>
+        </div>
+
+        <div className="p-5 space-y-4">
           {loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground py-8 justify-center">
-              <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+            <div className="flex items-center gap-2 text-sm text-muted-foreground py-10 justify-center">
+              <Loader2 className="h-[18px] w-[18px] animate-spin" /> Loading…
             </div>
           ) : (
             <>
               {connected ? (
-                <div className="rounded-xl border bg-emerald-50/60 border-emerald-100 p-4 space-y-1">
-                  <p className="text-sm font-semibold text-emerald-900 flex items-center gap-2">
+                <div className="rounded-[14px] border border-emerald-500/25 bg-emerald-500/10 p-4 space-y-1">
+                  <p className="text-sm font-semibold text-emerald-400 flex items-center gap-2">
                     <Wifi className="h-4 w-4" /> Linked to WhatsApp
                   </p>
                   {status?.displayName && (
-                    <p className="text-sm text-emerald-800">{status.displayName}</p>
+                    <p className="text-sm text-foreground">{status.displayName}</p>
                   )}
                   {status?.phone && (
-                    <p className="text-xs font-mono text-emerald-700">+{status.phone}</p>
+                    <p className="text-xs font-mono text-muted-foreground">+{status.phone}</p>
                   )}
                   {status?.connectedAt && (
-                    <p className="text-[11px] text-emerald-600/80">
+                    <p className="text-[11px] text-muted-foreground">
                       Connected {new Date(status.connectedAt).toLocaleString()}
                     </p>
                   )}
                 </div>
               ) : (
-                <div className="rounded-xl border p-4 space-y-3">
+                <div className="rounded-[14px] border bg-muted/20 p-4 space-y-3">
                   <ol className="text-sm text-muted-foreground space-y-1.5 list-decimal pl-4">
-                    <li>Click <strong>Show QR</strong></li>
+                    <li>Click <strong className="text-foreground">Show QR</strong></li>
                     <li>Open WhatsApp on phone → Linked devices → Link a device</li>
                     <li>Scan this QR — shop WhatsApp stays connected to send bills</li>
                   </ol>
@@ -139,49 +146,69 @@ export function WhatsappSettingsTab() {
                       <img
                         src={status.qrDataUrl}
                         alt="WhatsApp QR"
-                        className="h-56 w-56 rounded-lg border bg-white p-2 shadow-sm"
+                        className="h-56 w-56 rounded-[14px] border bg-white p-2 shadow-sm"
                       />
-                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                         <QrCode className="h-3.5 w-3.5" /> Waiting for scan…
                       </p>
                     </div>
                   ) : null}
                   {status?.lastError && (
-                    <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                    <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-[12px] px-3 py-2">
                       {status.lastError}
                     </p>
                   )}
                 </div>
               )}
-
-              <div className="flex flex-wrap gap-2">
-                {!connected ? (
-                  <Button onClick={() => void connect()} disabled={busy} className="gap-2">
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                    Show QR / Connect
-                  </Button>
-                ) : (
-                  <Button variant="destructive" onClick={() => void disconnect()} disabled={busy} className="gap-2">
-                    {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}
-                    Disconnect
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => void refresh()} disabled={busy} className="gap-2">
-                  <RefreshCw className="h-4 w-4" /> Refresh
-                </Button>
-              </div>
             </>
           )}
-        </CardContent>
+        </div>
+
+        {!loading && (
+          <div className="flex flex-wrap items-center gap-2 px-5 py-4 border-t bg-muted/20">
+            {!connected ? (
+              <Button
+                type="button"
+                onClick={() => void connect()}
+                disabled={busy}
+                className="h-10 min-h-10 rounded-[12px] px-4 gap-1.5 shrink-0"
+              >
+                {busy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <QrCode className="h-[18px] w-[18px]" />}
+                Show QR / Connect
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                variant="destructive"
+                onClick={() => void disconnect()}
+                disabled={busy}
+                className="h-10 min-h-10 rounded-[12px] px-4 gap-1.5 shrink-0"
+              >
+                {busy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Unplug className="h-[18px] w-[18px]" />}
+                Disconnect
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void refresh()}
+              disabled={busy}
+              className="h-10 min-h-10 rounded-[12px] px-4 gap-1.5 shrink-0"
+            >
+              <RefreshCw className="h-[18px] w-[18px]" />
+              Refresh
+            </Button>
+          </div>
+        )}
       </Card>
 
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm">After connect</CardTitle>
-          <CardDescription>
+      <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <div className="px-5 py-4">
+          <h3 className="text-sm font-semibold">After connect</h3>
+          <p className="text-xs text-muted-foreground mt-1">
             From POS checkout you can send the bill to the customer&apos;s WhatsApp number.
-          </CardDescription>
-        </CardHeader>
+          </p>
+        </div>
       </Card>
     </div>
   );
