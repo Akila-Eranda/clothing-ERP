@@ -252,7 +252,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
-    if (posOnly && (item.id === "reports" || item.id === "settings")) return false;
+    // Cashier POS: hide ERP reports; keep Settings so cashiers can set PIN / touch / sound / tax
+    if (posOnly && item.id === "reports") return false;
     if (!item.module) return true;
     return hasShopModule(profile, item.module);
   }).map((item) => item.id === 'customers'
@@ -2854,12 +2855,20 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           {/* Quick links */}
           <div className="grid grid-cols-2 gap-3">
-            {([{icon:Monitor,title:"Customer Display",displayLink:true,path:""},{icon:Tag,title:"Discounts & Promotions",path:"/promotions"},{icon:BarChart2,title:"Sales Reports",path:"/reports/sales"},{icon:Settings,title:"System Settings",path:"/settings"},{icon:RefreshCw,title:"Reload Products",onClick:loadProducts,path:""}] as {icon:React.ElementType;title:string;path:string;displayLink?:boolean;onClick?:()=>void}[]).map((item,i)=>(
+            {([
+              { icon: Monitor, title: "Customer Display", displayLink: true, path: "" },
+              ...(!posOnly ? [
+                { icon: Tag, title: "Discounts & Promotions", path: "/promotions" },
+                { icon: BarChart2, title: "Sales Reports", path: "/reports/sales" },
+                { icon: Settings, title: "System Settings", path: "/settings" },
+              ] as const : []),
+              { icon: RefreshCw, title: "Reload Products", onClick: loadProducts, path: "" },
+            ] as { icon: React.ElementType; title: string; path: string; displayLink?: boolean; onClick?: () => void }[]).map((item, i) => (
               item.displayLink
-                ?<a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"var(--pos-muted-2)"}}/></a>
+                ? <a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
                 : item.path
-                ?<a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{color:"var(--pos-muted-2)"}}/></a>
-                :<button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}><item.icon className="h-5 w-5 shrink-0" style={{color:"#4f6ef7"}}/><span className="text-white text-sm font-semibold">{item.title}</span></button>
+                  ? <a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
+                  : <button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span></button>
             ))}
           </div>
         </div>
@@ -3050,9 +3059,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             </div>
             <button
               type="button"
-              onClick={() => !posOnly && setActiveNav("settings")}
+              onClick={() => setActiveNav("settings")}
               title={taxRate > 0 ? `Tax ${taxRate}% from POS settings` : "Tax disabled in POS settings"}
-              className={cn("flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold", !posOnly && "hover:opacity-90")}
+              className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold hover:opacity-90"
               style={{
                 background: taxRate > 0
                   ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
