@@ -21,6 +21,7 @@ Thumbs.db
 # WhatsApp Web session credentials (per-tenant QR link)
 apps/api/data/whatsapp-sessions/
 data/whatsapp-sessions/
+storage/whatsapp-sessions/
 
 # Debug
 npm-debug.log*

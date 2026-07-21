@@ -50,16 +50,41 @@ export class WhatsappService implements OnModuleDestroy {
   }
 
   private authDir(tenantId: string) {
-    const root =
-      this.config.get<string>('WHATSAPP_AUTH_DIR') ||
-      path.join(process.cwd(), 'data', 'whatsapp-sessions');
-    return path.join(root, tenantId);
+    const configured = this.config.get<string>('WHATSAPP_AUTH_DIR')?.trim();
+    if (configured) return path.join(configured, tenantId);
+
+    // Prefer the writable uploads volume in Docker (nestjs user owns /app/uploads).
+    const uploadRoot =
+      this.config.get<string>('LOCAL_UPLOAD_DIR')?.trim() ||
+      this.config.get<string>('UPLOAD_DIR')?.trim() ||
+      path.join(process.cwd(), 'uploads');
+    return path.join(uploadRoot, 'whatsapp-sessions', tenantId);
   }
 
   private ensureAuthDir(tenantId: string) {
     const dir = this.authDir(tenantId);
-    fs.mkdirSync(dir, { recursive: true });
-    return dir;
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      return dir;
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException)?.code;
+      if (code === 'EACCES' || code === 'EPERM') {
+        // Last-resort writable path (session won't survive container recreate).
+        const fallback = path.join('/tmp', 'whatsapp-sessions', tenantId);
+        try {
+          fs.mkdirSync(fallback, { recursive: true });
+          this.logger.warn(
+            `WhatsApp auth dir not writable (${dir}); using ${fallback}`,
+          );
+          return fallback;
+        } catch {
+          /* fall through */
+        }
+      }
+      throw new ServiceUnavailableException(
+        `Cannot create WhatsApp session folder (${dir}): ${(e as Error).message}`,
+      );
+    }
   }
 
   private getOrCreate(tenantId: string): SessionState {
