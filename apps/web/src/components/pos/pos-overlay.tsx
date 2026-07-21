@@ -1292,7 +1292,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const css = receiptThemeStyleBlock({
       paperWidth: pw,
       fontSize: s.fontSize,
-      theme: s.receiptTheme,
+      // Thermal receipts must always stay printer-friendly (black on white).
+      theme: "light",
     });
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>${css}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div></body></html>`;
   },[user, activeCashier, receiptSettings]);
@@ -1583,7 +1584,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const css = receiptThemeStyleBlock({
       paperWidth: pw,
       fontSize: s.fontSize,
-      theme: s.receiptTheme,
+      // Thermal receipts must always stay printer-friendly (black on white).
+      theme: "light",
     });
     const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>${css}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${activeCashier?.name ?? user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
     try {

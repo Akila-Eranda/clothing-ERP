@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { X, ArrowLeftRight, Plus, Trash2, Loader2, Search, ChevronDown } from "lucide-react";
+import { X, ArrowLeftRight, Plus, Trash2, Loader2, Search, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { useBranchStore } from "@/stores/branch-store";
+import { cn } from "@/lib/utils";
 
 interface Branch {
   id: string;
@@ -43,10 +44,10 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
   const [toBranchId, setToBranchId] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([]);
-  const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerSearch, setPickerSearch] = useState("");
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -63,22 +64,12 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
       setToBranchId("");
       setNotes("");
       setItems([]);
-      setPickerOpen(false);
       setPickerSearch("");
+      setSelectedIds(new Set());
+    } else {
+      setTimeout(() => searchRef.current?.focus(), 80);
     }
   }, [open]);
-
-  useEffect(() => {
-    if (!pickerOpen) return;
-    const closeOnOutside = (e: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
-        setPickerOpen(false);
-        setPickerSearch("");
-      }
-    };
-    document.addEventListener("mousedown", closeOnOutside);
-    return () => document.removeEventListener("mousedown", closeOnOutside);
-  }, [pickerOpen]);
 
   const destinationBranches = useMemo(
     () => branches.filter((b) => b.id !== fromBranchId),
@@ -105,7 +96,57 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
     );
   }, [pickableStock, pickerSearch]);
 
-  const addItem = (row: InventoryItem) => {
+  const visiblePickerStock = filteredPickerStock.slice(0, 100);
+
+  const toggleSelect = (variantId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(variantId)) next.delete(variantId);
+      else next.add(variantId);
+      return next;
+    });
+  };
+
+  const selectAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const row of visiblePickerStock) next.add(row.variantId);
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const addSelected = () => {
+    if (selectedIds.size === 0) {
+      toast.error("Select at least one product");
+      return;
+    }
+    const toAdd: LineItem[] = [];
+    for (const row of pickableStock) {
+      if (!selectedIds.has(row.variantId)) continue;
+      const available = Math.max(0, row.quantity - (row.reservedQty ?? 0));
+      if (available <= 0) continue;
+      toAdd.push({
+        variantId: row.variantId,
+        productName: row.variant.product.name,
+        variantName: row.variant.name,
+        sku: row.variant.sku,
+        available,
+        requestedQty: 1,
+      });
+    }
+    if (!toAdd.length) {
+      toast.error("No available stock for selected items");
+      return;
+    }
+    setItems((prev) => [...prev, ...toAdd]);
+    setSelectedIds(new Set());
+    setPickerSearch("");
+    toast.success(`Added ${toAdd.length} product${toAdd.length === 1 ? "" : "s"}`);
+  };
+
+  const addOne = (row: InventoryItem) => {
     if (items.some((i) => i.variantId === row.variantId)) return;
     const available = Math.max(0, row.quantity - (row.reservedQty ?? 0));
     if (available <= 0) {
@@ -123,7 +164,11 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
         requestedQty: 1,
       },
     ]);
-    setPickerSearch("");
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.delete(row.variantId);
+      return next;
+    });
   };
 
   const updateQty = (idx: number, qty: number) =>
@@ -183,7 +228,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold">New Stock Transfer</h2>
-            <p className="text-xs text-muted-foreground">Move stock from this branch to another location</p>
+            <p className="text-xs text-muted-foreground">Select multiple products and transfer quantities</p>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted transition-colors shrink-0">
             <X className="h-4 w-4" />
@@ -214,69 +259,118 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs font-semibold">Add Items</Label>
-            <div className="relative" ref={pickerRef}>
-              <button
-                type="button"
-                onClick={() => setPickerOpen((v) => !v)}
-                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background hover:bg-muted/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <span className="text-muted-foreground">Select product to add...</span>
-                <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${pickerOpen ? "rotate-180" : ""}`} />
-              </button>
+            <div className="flex items-center justify-between gap-2">
+              <Label className="text-xs font-semibold">Select Products</Label>
+              <span className="text-[10px] text-muted-foreground">
+                {pickableStock.length} available · tick many, then Add
+              </span>
+            </div>
 
-              {pickerOpen && (
-                <div className="absolute z-20 mt-1 w-full rounded-lg border bg-background shadow-lg overflow-hidden">
-                  <div className="p-2 border-b bg-muted/20">
-                    <div className="relative">
-                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                      <Input
-                        autoFocus
-                        className="pl-8 h-9 text-sm"
-                        placeholder="Search product name or SKU..."
-                        value={pickerSearch}
-                        onChange={(e) => setPickerSearch(e.target.value)}
-                        onKeyDown={(e) => e.key === "Escape" && setPickerOpen(false)}
-                      />
-                    </div>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto p-1">
-                    {filteredPickerStock.length === 0 ? (
-                      <p className="text-xs text-muted-foreground text-center py-6">
-                        {pickableStock.length === 0 ? "All available items added" : "No matching products"}
-                      </p>
-                    ) : (
-                      filteredPickerStock.slice(0, 50).map((row) => {
-                        const avail = Math.max(0, row.quantity - (row.reservedQty ?? 0));
-                        return (
-                          <button
-                            key={row.id}
-                            type="button"
-                            onClick={() => addItem(row)}
-                            className="w-full flex items-center justify-between gap-2 rounded-md px-2.5 py-2 text-left hover:bg-muted/50 text-sm"
-                          >
-                            <div className="min-w-0">
-                              <p className="font-medium truncate">{row.variant.product.name}</p>
-                              <p className="text-[10px] text-muted-foreground truncate">
-                                {row.variant.name !== row.variant.product.name ? `${row.variant.name} · ` : ""}
-                                {row.variant.sku} · avail {avail}
-                              </p>
-                            </div>
-                            <Plus className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
+            <div className="rounded-xl border overflow-hidden">
+              <div className="p-2 border-b bg-muted/20 space-y-2">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Input
+                    ref={searchRef}
+                    className="pl-8 h-9 text-sm"
+                    placeholder="Search name or SKU..."
+                    value={pickerSearch}
+                    onChange={(e) => setPickerSearch(e.target.value)}
+                  />
                 </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={selectAllVisible} disabled={!visiblePickerStock.length}>
+                    Select visible
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" className="h-8 text-xs" onClick={clearSelection} disabled={!selectedIds.size}>
+                    Clear
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-8 text-xs gap-1 ml-auto"
+                    onClick={addSelected}
+                    disabled={!selectedIds.size}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add selected ({selectedIds.size})
+                  </Button>
+                </div>
+              </div>
+
+              <div className="max-h-56 overflow-y-auto">
+                {visiblePickerStock.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-8">
+                    {pickableStock.length === 0 ? "All available items already added" : "No matching products"}
+                  </p>
+                ) : (
+                  visiblePickerStock.map((row) => {
+                    const avail = Math.max(0, row.quantity - (row.reservedQty ?? 0));
+                    const checked = selectedIds.has(row.variantId);
+                    return (
+                      <div
+                        key={row.id}
+                        className={cn(
+                          "flex items-center gap-2 px-2.5 py-2 border-b last:border-0 hover:bg-muted/40",
+                          checked && "bg-emerald-500/5",
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => toggleSelect(row.variantId)}
+                          className={cn(
+                            "h-5 w-5 rounded border flex items-center justify-center shrink-0",
+                            checked ? "bg-emerald-600 border-emerald-600 text-white" : "border-input bg-background",
+                          )}
+                          aria-label={checked ? "Deselect" : "Select"}
+                        >
+                          {checked ? <Check className="h-3 w-3" /> : null}
+                        </button>
+                        <button
+                          type="button"
+                          className="min-w-0 flex-1 text-left"
+                          onClick={() => toggleSelect(row.variantId)}
+                        >
+                          <p className="text-sm font-medium truncate">{row.variant.product.name}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">
+                            {row.variant.name !== row.variant.product.name ? `${row.variant.name} · ` : ""}
+                            {row.variant.sku} · avail {avail}
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => addOne(row)}
+                          className="h-7 px-2 rounded-md text-[11px] font-semibold text-emerald-700 hover:bg-emerald-500/10 shrink-0"
+                          title="Add this product now"
+                        >
+                          + Add
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              {filteredPickerStock.length > visiblePickerStock.length && (
+                <p className="text-[10px] text-muted-foreground px-3 py-2 border-t bg-muted/10">
+                  Showing {visiblePickerStock.length} of {filteredPickerStock.length} — type to narrow search
+                </p>
               )}
             </div>
           </div>
 
           {items.length > 0 && (
             <div className="space-y-2">
-              <Label className="text-xs font-semibold">Transfer Items ({items.length})</Label>
-              <div className="rounded-lg border divide-y">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Transfer Items ({items.length})</Label>
+                <button
+                  type="button"
+                  className="text-[11px] text-red-500 hover:underline"
+                  onClick={() => setItems([])}
+                >
+                  Clear all
+                </button>
+              </div>
+              <div className="rounded-lg border divide-y max-h-52 overflow-y-auto">
                 {items.map((item, idx) => (
                   <div key={item.variantId} className="flex items-center gap-2 px-3 py-2">
                     <div className="flex-1 min-w-0">
@@ -310,7 +404,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button onClick={submit} disabled={loading || !items.length || !toBranchId} className="gap-1.5 min-w-[140px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
-            Create Transfer
+            Create Transfer ({items.length})
           </Button>
         </div>
       </div>

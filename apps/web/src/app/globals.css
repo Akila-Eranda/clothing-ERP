@@ -436,6 +436,15 @@
   /* Inner table frame sits on the same card surface */
   [data-table-craft] table {
     background: hsl(var(--card));
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  /* Prevent long cell text from spilling into neighbouring columns */
+  [data-table-craft] th,
+  [data-table-craft] td {
+    overflow: hidden;
+    vertical-align: middle;
   }
 
   /* Search boxes + filter inputs: solid fill + clear outline in both themes */

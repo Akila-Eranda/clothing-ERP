@@ -133,7 +133,7 @@ export function WarehouseTransferModal({ open, onClose, onCreated, warehouses, d
         requestedQty: 1,
       },
     ]);
-    setPickerOpen(false);
+    // Keep picker open so multiple products can be added in one go
     setPickerSearch("");
   };
 

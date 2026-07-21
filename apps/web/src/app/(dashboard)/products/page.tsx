@@ -19,6 +19,7 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { OpenRecordButton } from "@/components/table/open-record-button";
+import { resolvePublicAssetUrl } from "@/lib/upload";
 
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
   ACTIVE: "success",
@@ -171,59 +172,102 @@ function buildColumns(
   return [
     {
       accessorKey: "productName",
+      size: 280,
+      minSize: 200,
+      maxSize: 360,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
+      cell: ({ row }) => {
+        const img = row.original.product.images?.[0];
+        const src = img ? resolvePublicAssetUrl(img) : "";
+        return (
+          <div className="flex min-w-0 max-w-[280px] items-center gap-3">
+            <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
+              {src ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+              ) : (
+                <Package className="h-4 w-4 text-muted-foreground/40" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <OpenRecordButton
+                onClick={() => onView(row.original.product)}
+                title={row.original.productName}
+                className="block w-full truncate text-sm font-medium"
+              >
+                {row.original.productName}
+              </OpenRecordButton>
+              <p className="truncate text-xs text-muted-foreground" title={row.original.brandName}>
+                {row.original.brandName ?? "—"}
+              </p>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      accessorKey: "variantName",
+      size: 110,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Variant" />,
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-muted flex items-center justify-center shrink-0">
-            <Package className="h-4 w-4 text-muted-foreground/40" />
-          </div>
-          <div>
-            <OpenRecordButton
-              onClick={() => onView(row.original.product)}
-              className="text-sm font-medium"
-            >
-              {row.original.productName}
-            </OpenRecordButton>
-            <p className="text-xs text-muted-foreground">{row.original.brandName ?? "—"}</p>
-          </div>
+        <div className="whitespace-nowrap">
+          {row.original.isVariant ? (
+            <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
+              {row.original.variantName}
+            </Badge>
+          ) : (
+            <span className="text-xs text-muted-foreground">—</span>
+          )}
         </div>
       ),
     },
     {
-      accessorKey: "variantName",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Variant" />,
+      accessorKey: "sku",
+      size: 130,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
       cell: ({ row }) => (
-        row.original.isVariant ? (
-          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.variantName}</Badge>
-        ) : (
-          <span className="text-xs text-muted-foreground">—</span>
-        )
+        <span className="block max-w-[140px] truncate font-mono text-xs text-muted-foreground" title={row.original.sku}>
+          {row.original.sku}
+        </span>
       ),
     },
     {
-      accessorKey: "sku",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="SKU" />,
-      cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.sku}</span>,
-    },
-    {
       accessorKey: "barcode",
+      size: 140,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Barcode" />,
-      cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.barcode || "—"}</span>,
+      cell: ({ row }) => (
+        <span className="block max-w-[150px] truncate font-mono text-xs text-muted-foreground" title={row.original.barcode}>
+          {row.original.barcode || "—"}
+        </span>
+      ),
     },
     {
       id: "category",
+      size: 130,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
       cell: ({ row }) => (
-        <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.categoryName ?? "—"}</Badge>
+        <Badge
+          variant="secondary"
+          className="h-6 max-w-[140px] truncate rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center"
+          title={row.original.categoryName}
+        >
+          {row.original.categoryName ?? "—"}
+        </Badge>
       ),
     },
     {
       accessorKey: "sellingPrice",
+      size: 110,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Selling" />,
-      cell: ({ row }) => <span className="text-sm font-semibold text-blue-600">LKR {row.original.sellingPrice.toFixed(2)}</span>,
+      cell: ({ row }) => (
+        <span className="whitespace-nowrap text-sm font-semibold text-blue-600">
+          LKR {row.original.sellingPrice.toFixed(2)}
+        </span>
+      ),
     },
     {
       accessorKey: "status",
+      size: 100,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
         <Badge variant={STATUS_BADGE[row.original.status] ?? "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
@@ -233,6 +277,7 @@ function buildColumns(
     },
     {
       id: "actions",
+      size: 56,
       cell: ({ row }) => (
         <TableActionsRow
           showAction={{ action: () => onView(row.original.product) }}
@@ -259,7 +304,7 @@ export default function ProductsPage() {
   const fetch = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get<{ data: Product[] }>("/products?limit=500");
+      const res = await api.get<{ data: Product[] }>("/products?limit=10000");
       setProducts(parseApiList<Product>(res.data));
     } catch { toast.error("Failed to load products"); }
     finally { setLoading(false); }

@@ -497,7 +497,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     try {
       if (section === "stock" || section === "transfers") {
         const [stockRes, summaryRes] = await Promise.all([
-          api.get<{ data: InventoryItem[] }>("/inventory?limit=500"),
+          api.get<{ data: InventoryItem[] }>("/inventory?limit=10000"),
           api.get<LedgerSummary>("/inventory/ledger/summary"),
         ]);
         setStock(stockRes.data?.data ?? (stockRes.data as unknown as InventoryItem[]) ?? []);

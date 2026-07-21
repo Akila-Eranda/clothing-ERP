@@ -22,7 +22,7 @@ export function paginate<T>(
 
 export function getPaginationArgs(page: number | string = 1, limit: number | string = 20): { skip: number; take: number } {
   const p = Math.max(1, parseInt(String(page), 10) || 1);
-  const l = Math.min(500, Math.max(1, parseInt(String(limit), 10) || 20));
+  const l = Math.min(20000, Math.max(1, parseInt(String(limit), 10) || 20));
   return { skip: (p - 1) * l, take: l };
 }
 

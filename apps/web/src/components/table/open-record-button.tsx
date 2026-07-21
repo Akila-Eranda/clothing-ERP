@@ -24,7 +24,7 @@ export function OpenRecordButton({
         onClick();
       }}
       className={cn(
-        "inline text-left font-semibold text-primary",
+        "inline-block max-w-full text-left font-semibold text-primary",
         "hover:text-primary/80 transition-colors duration-150",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 rounded-sm",
         "decoration-none no-underline",
