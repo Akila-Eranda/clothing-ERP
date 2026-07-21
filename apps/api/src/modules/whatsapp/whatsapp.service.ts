@@ -180,12 +180,21 @@ export class WhatsappService implements OnModuleDestroy {
     const { state, saveCreds } = await useMultiFileAuthState(authPath);
     const { version } = await fetchLatestBaileysVersion();
 
+    let quietLogger: any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      quietLogger = require('pino')({ level: 'silent' });
+    } catch {
+      quietLogger = undefined;
+    }
+
     const sock = makeWASocket({
       version,
       auth: state,
       printQRInTerminal: false,
       syncFullHistory: false,
       markOnlineOnConnect: false,
+      ...(quietLogger ? { logger: quietLogger } : {}),
     });
     session.sock = sock;
 

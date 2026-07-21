@@ -26,10 +26,27 @@ export class AuditLogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async log(payload: AuditLogPayload) {
+    const data = { ...payload };
     try {
-      return await this.prisma.auditLog.create({ data: payload });
+      if (data.userId) {
+        const userOk = await this.prisma.user.findUnique({
+          where: { id: data.userId },
+          select: { id: true },
+        });
+        if (!userOk) data.userId = undefined;
+      }
+      return await this.prisma.auditLog.create({ data });
     } catch {
-      // audit logging should never break the main flow
+      // Retry without userId (orphan JWT / soft-deleted user must never break writes)
+      if (data.userId) {
+        try {
+          return await this.prisma.auditLog.create({
+            data: { ...data, userId: null },
+          });
+        } catch {
+          /* audit must never break main flow */
+        }
+      }
     }
   }
 

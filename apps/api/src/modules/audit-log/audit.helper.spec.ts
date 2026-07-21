@@ -39,7 +39,9 @@ describe('Audit Engine', () => {
   it('skips auth noise and audit-logs recursion', () => {
     expect(shouldSkipAuditPath('/api/v1/audit-logs')).toBe(true);
     expect(shouldSkipAuditPath('/api/v1/auth/login')).toBe(true);
+    expect(shouldSkipAuditPath('/api/v1/whatsapp/connect')).toBe(true);
     expect(shouldAuditHttpRequest('POST', '/api/v1/auth/refresh')).toBe(false);
+    expect(shouldAuditHttpRequest('POST', '/api/v1/whatsapp/status')).toBe(false);
     expect(shouldAuditHttpRequest('GET', '/api/v1/products')).toBe(false);
   });
 

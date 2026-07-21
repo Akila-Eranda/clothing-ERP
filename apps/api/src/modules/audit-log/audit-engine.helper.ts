@@ -30,6 +30,9 @@ export const AUDIT_SKIP_PATH_FRAGMENTS = [
   '/auth/forgot-password',
   '/auth/reset-password',
   '/health',
+  '/whatsapp/status',
+  '/whatsapp/connect',
+  '/whatsapp/disconnect',
 ] as const;
 
 const SENSITIVE_KEYS = new Set([
