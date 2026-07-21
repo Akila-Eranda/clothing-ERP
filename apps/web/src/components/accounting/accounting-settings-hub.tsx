@@ -6,7 +6,7 @@ import {
   CalendarRange, Coins, FileDigit, GitBranch, Loader2, Plus, RefreshCw,
   Settings2, ShieldCheck, Trash2,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type Tab =
@@ -282,13 +283,19 @@ function FiscalPanel() {
         <p className="text-sm text-muted-foreground">
           Configure the current fiscal year and retained earnings account.
         </p>
-        <div className="flex gap-2 flex-wrap">
-          <Button onClick={() => setFyOpen(true)} className="h-10 rounded-[12px] gap-1.5">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <Button onClick={() => setFyOpen(true)} className="h-10 rounded-[12px] px-4 gap-1.5 shrink-0">
             <Plus className="h-[18px] w-[18px]" /> Create fiscal year
           </Button>
-          <Button asChild variant="outline" className="h-10 rounded-[12px]">
-            <Link href="/accounting/periods">Open period management</Link>
-          </Button>
+          <Link
+            href="/accounting/periods"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-10 rounded-[12px] px-4 shrink-0 inline-flex items-center justify-center",
+            )}
+          >
+            Open period management
+          </Link>
         </div>
       </div>
 
@@ -321,14 +328,14 @@ function FiscalPanel() {
       </Dialog>
 
       {selected && (
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
-          <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
+        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <div className="flex items-center gap-2.5 px-5 py-3 border-b bg-muted/30 rounded-t-[18px]">
             <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
               <CalendarRange className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Current fiscal year</h3>
           </div>
-          <CardContent className="p-5 space-y-4">
+          <div className="p-5 space-y-4">
             <div className="flex items-center gap-2 flex-wrap">
               <Select value={selected.id} onValueChange={setSelectedId}>
                 <SelectTrigger className="h-10 rounded-[12px] w-64"><SelectValue /></SelectTrigger>
@@ -368,16 +375,20 @@ function FiscalPanel() {
                 <Input className="h-10 rounded-[12px] font-mono" value={fmt(selected.endDate)} disabled />
               </div>
             </div>
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <p className="text-xs text-muted-foreground">
-                {selected.periods?.length ?? 0} periods · open:{" "}
-                {selected.periods?.filter((p) => p.status === "OPEN").length ?? 0}
-              </p>
-              <Button className="h-10 rounded-[12px]" disabled={busy || selected.status === "CLOSED"} onClick={() => void saveFy()}>
-                Save & set current
-              </Button>
-            </div>
-          </CardContent>
+          </div>
+          <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-t bg-muted/20 rounded-b-[18px]">
+            <p className="text-xs text-muted-foreground">
+              {selected.periods?.length ?? 0} periods · open:{" "}
+              {selected.periods?.filter((p) => p.status === "OPEN").length ?? 0}
+            </p>
+            <Button
+              className="h-10 rounded-[12px] px-4 shrink-0"
+              disabled={busy || selected.status === "CLOSED"}
+              onClick={() => void saveFy()}
+            >
+              Save & set current
+            </Button>
+          </div>
         </Card>
       )}
     </div>
@@ -706,12 +717,18 @@ function TaxSettingsPanel() {
         <p className="text-sm text-muted-foreground">Tax master used for VAT and invoices.</p>
         <div className="flex gap-2 flex-wrap">
           <Button variant="outline" className="h-10 rounded-[12px]" disabled={busy} onClick={() => void seed()}>Seed defaults</Button>
-          <Button onClick={() => setRateOpen(true)} className="h-10 rounded-[12px] gap-1.5">
+          <Button onClick={() => setRateOpen(true)} className="h-10 rounded-[12px] px-4 gap-1.5 shrink-0">
             <Plus className="h-[18px] w-[18px]" /> Add rate
           </Button>
-          <Button asChild variant="outline" className="h-10 rounded-[12px]">
-            <Link href="/accounting/vat">VAT returns & reports</Link>
-          </Button>
+          <Link
+            href="/accounting/vat"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "h-10 rounded-[12px] px-4 shrink-0 inline-flex items-center justify-center",
+            )}
+          >
+            VAT returns & reports
+          </Link>
         </div>
       </div>
 
@@ -863,9 +880,15 @@ function WorkflowPanel() {
         <p className="text-sm text-muted-foreground">
           Configure approval steps and roles. Journal approval is controlled under Preferences.
         </p>
-        <Button asChild variant="outline" className="h-10 rounded-[12px]">
-          <Link href="/workflows">Open task inbox</Link>
-        </Button>
+        <Link
+          href="/workflows"
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "h-10 rounded-[12px] px-4 shrink-0 inline-flex items-center justify-center",
+          )}
+        >
+          Open task inbox
+        </Link>
       </div>
       <div className="grid lg:grid-cols-2 gap-3">
         {defs.map((d) => {
