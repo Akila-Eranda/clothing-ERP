@@ -6,7 +6,7 @@ import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
-  Printer, Image, Server, FileText, Upload,
+  Printer, Image, Server, FileText, Upload, MessageCircle,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
 import { receiptThemeColors } from "@/lib/receipt-theme";
@@ -26,6 +26,7 @@ import { useTheme } from "next-themes";
 import { api } from "@/lib/api";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
+import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
 import {
   ACCENT_PRESETS,
   type AccentId,
@@ -49,7 +50,7 @@ const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 const SETTINGS_TAB_VALUES = [
-  "general", "receipt", "payslip", "profile", "security", "branches",
+  "general", "receipt", "whatsapp", "payslip", "profile", "security", "branches",
   "notifications", "appearance", "billing", "audit-log",
 ] as const;
 
@@ -582,6 +583,7 @@ export default function SettingsPage() {
         <TabsList className="flex-wrap h-auto gap-1">
           <TabsTrigger value="general" className="gap-1.5"><Store className="h-3.5 w-3.5" />General</TabsTrigger>
           <TabsTrigger value="receipt" className="gap-1.5"><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
+          <TabsTrigger value="whatsapp" className="gap-1.5"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</TabsTrigger>
           <TabsTrigger value="payslip" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
           <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
           <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
@@ -1000,6 +1002,10 @@ export default function SettingsPage() {
             </div>
           </div>
           <ReceiptPrintLogCard />
+        </TabsContent>
+
+        <TabsContent value="whatsapp" className="mt-6">
+          <WhatsappSettingsTab />
         </TabsContent>
 
         <TabsContent value="payslip">

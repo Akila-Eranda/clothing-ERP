@@ -3,13 +3,17 @@ import {
   extractAuditResource,
   isClientAuditAction,
   normalizeClientAuditAction,
+  normalizeJournalAuditAction,
   resolveAuditAction,
   sanitizeAuditData,
   shouldAuditHttpRequest,
   shouldSkipAuditPath,
-} from './audit.helper';
+  buildPosSaleAudit,
+  buildDayClosedAudit,
+  buildWorkflowApprovedAudit,
+} from './audit-engine.helper';
 
-describe('Phase 06 Sprint 12 — Audit Trail', () => {
+describe('Audit Engine', () => {
   it('maps CRUD methods to standard actions', () => {
     expect(resolveAuditAction('POST', '/api/v1/products')).toBe(AUDIT_ACTIONS.CREATE);
     expect(resolveAuditAction('PUT', '/api/v1/customers/abc')).toBe(AUDIT_ACTIONS.UPDATE);
@@ -68,5 +72,52 @@ describe('Phase 06 Sprint 12 — Audit Trail', () => {
     expect(isClientAuditAction('CREATE')).toBe(false);
     expect(normalizeClientAuditAction('export')).toBe('EXPORT');
     expect(normalizeClientAuditAction('login')).toBeNull();
+  });
+
+  it('normalizes journal domain actions', () => {
+    expect(normalizeJournalAuditAction('journal.approve')).toBe(AUDIT_ACTIONS.APPROVE);
+    expect(normalizeJournalAuditAction('journal.reject')).toBe(AUDIT_ACTIONS.REJECT);
+    expect(normalizeJournalAuditAction('journal.draft')).toBe(AUDIT_ACTIONS.CREATE);
+    expect(normalizeJournalAuditAction('journal.post')).toBe(AUDIT_ACTIONS.UPDATE);
+    expect(normalizeJournalAuditAction('journal.void')).toBe(AUDIT_ACTIONS.UPDATE);
+  });
+
+  it('builds domain event audit payloads', () => {
+    expect(
+      buildPosSaleAudit({
+        saleId: 's1',
+        tenantId: 't1',
+        branchId: 'b1',
+        total: 100,
+      }),
+    ).toMatchObject({
+      action: AUDIT_ACTIONS.CREATE,
+      resource: 'Sale',
+      resourceId: 's1',
+    });
+
+    expect(
+      buildDayClosedAudit({
+        tenantId: 't1',
+        branchId: 'b1',
+        closedBy: 'u1',
+        totalRevenue: 500,
+      }).action,
+    ).toBe(AUDIT_ACTIONS.DAY_END);
+
+    expect(
+      buildWorkflowApprovedAudit({
+        tenantId: 't1',
+        userId: 'u1',
+        taskId: 'task1',
+        entityType: 'PurchaseOrder',
+        entityId: 'po1',
+        final: true,
+      }),
+    ).toMatchObject({
+      action: AUDIT_ACTIONS.APPROVE,
+      resource: 'PurchaseOrder',
+      resourceId: 'po1',
+    });
   });
 });

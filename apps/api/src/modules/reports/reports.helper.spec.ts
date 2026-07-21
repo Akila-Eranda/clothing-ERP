@@ -1,10 +1,14 @@
-import {
+﻿import {
   assertTotalsMatch,
   crossCheckGroupedRevenue,
   crossCheckPurchaseLine,
   crossCheckSalesPayments,
   crossCheckTaxBreakdown,
   crossCheckTotals,
+  dayRange,
+  groupByKey,
+  marginPct,
+  pctChange,
   round2,
   summarizeChequeRows,
   summarizeCommissionRows,
@@ -12,9 +16,43 @@ import {
   summarizeInventoryRows,
   summarizePurchaseRows,
   sumField,
-} from './reports.helper';
+} from './report-engine.helper';
 
-describe('Phase 11 Reports — cross-check report totals', () => {
+describe('Report Engine', () => {
+  describe('date windows', () => {
+    it('builds inclusive dayRange', () => {
+      const range = dayRange('2026-07-01', '2026-07-15');
+      expect(range.gte.getFullYear()).toBe(2026);
+      expect(range.gte.getMonth()).toBe(6);
+      expect(range.gte.getDate()).toBe(1);
+      expect(range.lte.getDate()).toBe(15);
+      expect(range.gte.getTime()).toBeLessThan(range.lte.getTime());
+    });
+  });
+
+  describe('grouping / margins', () => {
+    it('groups rows by key', () => {
+      const groups = groupByKey(
+        [
+          { brand: 'A', qty: 1 },
+          { brand: 'B', qty: 2 },
+          { brand: 'A', qty: 3 },
+        ],
+        (r) => r.brand,
+      );
+      expect(groups.A).toHaveLength(2);
+      expect(groups.B).toHaveLength(1);
+    });
+
+    it('computes margin and pct change', () => {
+      expect(marginPct(200, 50)).toBe(75);
+      expect(marginPct(0, 10)).toBe(0);
+      expect(pctChange(150, 100)).toBe(50);
+      expect(pctChange(10, 0)).toBe(100);
+      expect(pctChange(0, 0)).toBe(0);
+    });
+  });
+
   describe('money helpers', () => {
     it('rounds to 2 decimals stably', () => {
       expect(round2(10.005)).toBe(10.01);
@@ -39,26 +77,18 @@ describe('Phase 11 Reports — cross-check report totals', () => {
     });
 
     it('flags overpayment vs sales total', () => {
-      const check = crossCheckSalesPayments([
-        { total: 100, payments: [{ amount: 120 }] },
-      ]);
+      const check = crossCheckSalesPayments([{ total: 100, payments: [{ amount: 120 }] }]);
       expect(check.ok).toBe(false);
     });
 
     it('cashier revenue rows reconcile to overall', () => {
-      const rows = [
-        { totalRevenue: 1200 },
-        { totalRevenue: 800.5 },
-      ];
+      const rows = [{ totalRevenue: 1200 }, { totalRevenue: 800.5 }];
       expect(crossCheckGroupedRevenue(rows, 2000.5).ok).toBe(true);
       expect(crossCheckGroupedRevenue(rows, 2000).ok).toBe(false);
     });
 
     it('tax breakdown reconciles to summary tax', () => {
-      const byTaxRate = [
-        { _sum: { taxAmount: 100 } },
-        { _sum: { taxAmount: 50.25 } },
-      ];
+      const byTaxRate = [{ _sum: { taxAmount: 100 } }, { _sum: { taxAmount: 50.25 } }];
       expect(crossCheckTaxBreakdown(byTaxRate, 150.25).ok).toBe(true);
       expect(() => assertTotalsMatch('tax', 150, 150.25)).toThrow(/tax mismatch/);
     });

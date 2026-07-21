@@ -6,6 +6,7 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { BarcodeMode, ProductKind, ProductStatus, TubeType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { InventoryService } from '@/modules/inventory/inventory.module';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { nanoid } from 'nanoid';
@@ -108,7 +109,10 @@ export class CreateBrandDto {
 
 @Injectable()
 export class ProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly inventory: InventoryService,
+  ) {}
 
   private generateEAN13(): string {
     const digits = [2, ...Array.from({ length: 11 }, () => Math.floor(Math.random() * 10))];
@@ -218,8 +222,8 @@ export class ProductsService {
       }
     }
 
-    await this.prisma.inventory.createMany({
-      data: branchIds.flatMap((bid) =>
+    await this.inventory.seedOpeningStock(
+      branchIds.flatMap((bid) =>
         variantIds.map((variantId) => ({
           tenantId,
           branchId: bid,
@@ -231,19 +235,15 @@ export class ProductsService {
           maxStockLevel,
         })),
       ),
-      skipDuplicates: true,
-    });
+    );
 
     // If rows already existed (skipDuplicates), still apply stock prefs
     if (openingQty > 0 || opts?.reorderLevel != null || opts?.minStock != null || opts?.maxStock != null) {
-      await this.prisma.inventory.updateMany({
-        where: { tenantId, variantId: { in: variantIds }, branchId: { in: branchIds } },
-        data: {
-          ...(opts?.openingStock != null ? { quantity: openingQty } : {}),
-          ...(opts?.reorderLevel != null ? { reorderPoint } : {}),
-          ...(opts?.minStock != null ? { minStockLevel } : {}),
-          ...(opts?.maxStock != null ? { maxStockLevel } : {}),
-        },
+      await this.inventory.applyInventoryStockPrefs(tenantId, variantIds, branchIds, {
+        ...(opts?.openingStock != null ? { quantity: openingQty } : {}),
+        ...(opts?.reorderLevel != null ? { reorderPoint } : {}),
+        ...(opts?.minStock != null ? { minStockLevel } : {}),
+        ...(opts?.maxStock != null ? { maxStockLevel } : {}),
       });
     }
   }
@@ -809,16 +809,15 @@ export class ProductsService {
           const warehouse = await this.ensureDefaultWarehouse(tenantId, branchId);
           warehouseByBranch.set(branchId, warehouse.id);
         }
-        await this.prisma.inventory.createMany({
-          data: branchIds.map((branchId) => ({
+        await this.inventory.seedOpeningStock(
+          branchIds.map((branchId) => ({
             tenantId,
             branchId,
             variantId: variant.id,
             warehouseId: warehouseByBranch.get(branchId)!,
             quantity: 0,
           })),
-          skipDuplicates: true,
-        });
+        );
       }
       seeded++;
     }

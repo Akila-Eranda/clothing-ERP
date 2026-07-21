@@ -19,7 +19,22 @@ import {
   planReorderAlert,
   planSupplierDueAlert,
   shouldSendNotification,
+  defaultChannelFor,
+  recipientRoleTypes,
+  MANAGER_ROLE_TYPES,
 } from './notification-triggers.helper';
+
+describe('Notification Engine — channel / roles', () => {
+  it('defaults planned alerts to IN_APP', () => {
+    expect(defaultChannelFor('LOW_STOCK')).toBe('IN_APP');
+    expect(defaultChannelFor()).toBe('IN_APP');
+  });
+
+  it('resolves manager role sets', () => {
+    expect(recipientRoleTypes(false)).toEqual([...MANAGER_ROLE_TYPES]);
+    expect(recipientRoleTypes(true)).toContain('CASHIER');
+  });
+});
 
 describe('Phase 12 Notifications — trigger eligibility', () => {
   const now = new Date('2026-07-16T10:00:00');

@@ -18,6 +18,8 @@ import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
 import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { ProcurementService } from './procurement.service';
 import { SupplierApService } from './supplier-ap.service';
+import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
+import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
 import type { GrnLineInput, PrItemInput } from './procurement.service';
 import {
   assertSupplierCreditLimit,
@@ -149,6 +151,7 @@ export class SuppliersService {
     private readonly workflowService: WorkflowService,
     private readonly procurementService: ProcurementService,
     private readonly apService: SupplierApService,
+    private readonly numbering: DocumentNumberingService,
   ) {}
 
   async createSupplier(tenantId: string, dto: CreateSupplierDto) {
@@ -256,7 +259,9 @@ export class SuppliersService {
   }
 
   async createPurchaseOrder(tenantId: string, branchId: string, userId: string, dto: CreatePurchaseOrderDto) {
-    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const poNumber = this.numbering.isEngineEnabled()
+      ? await this.numbering.allocateStandalone(tenantId, 'PURCHASE_ORDER')
+      : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const itemsData = dto.items.map((item) => {
       const lineTotal = item.unitCost * item.orderedQty;
       const disc = item.discount ?? 0;
@@ -1055,7 +1060,7 @@ export class ProcurementController {
 }
 
 @Module({
-  imports: [InventoryModule, WorkflowModule],
+  imports: [InventoryModule, WorkflowModule, DocumentNumberingModule],
   controllers: [SuppliersController, PurchasesController, ProcurementController],
   providers: [SuppliersService, ProcurementService, SupplierApService],
   exports: [SuppliersService, ProcurementService, SupplierApService],

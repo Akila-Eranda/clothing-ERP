@@ -13,7 +13,7 @@ import {
   sanitizeAuditData,
   shouldAuditHttpRequest,
   resolveAuditAction,
-} from '@/modules/audit-log/audit.helper';
+} from '@/modules/audit-log/audit-engine.helper';
 
 interface AuthenticatedRequest extends Request {
   user?: { id: string; tenantId: string };

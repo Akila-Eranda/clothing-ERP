@@ -32,6 +32,8 @@ import {
 } from './supplier-ap.helper';
 import { SupplierApService } from './supplier-ap.service';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
+import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
+import type { NumberSeriesKey } from '@/modules/document-numbering/document-numbering.helper';
 
 export type PrItemInput = {
   variantId: string;
@@ -66,9 +68,19 @@ export class ProcurementService {
     private readonly workflowService: WorkflowService,
     private readonly eventEmitter: EventEmitter2,
     private readonly apService: SupplierApService,
+    private readonly numbering: DocumentNumberingService,
   ) {}
 
   private async nextNumber(tenantId: string, prefix: string, table: 'pr' | 'grn' | 'sret' | 'sinv') {
+    if (this.numbering.isEngineEnabled()) {
+      const keyMap: Record<typeof table, NumberSeriesKey> = {
+        pr: 'PURCHASE_REQUEST',
+        grn: 'GRN',
+        sret: 'SUPPLIER_RETURN',
+        sinv: 'SUPPLIER_INVOICE',
+      };
+      return this.numbering.allocateStandalone(tenantId, keyMap[table]);
+    }
     const year = new Date().getFullYear();
     const count =
       table === 'pr'
@@ -79,6 +91,13 @@ export class ProcurementService {
             ? await this.prisma.supplierReturn.count({ where: { tenantId } })
             : await this.prisma.supplierInvoice.count({ where: { tenantId } });
     return `${prefix}-${year}-${String(count + 1).padStart(5, '0')}`;
+  }
+
+  private async nextPoNumber(tenantId: string): Promise<string> {
+    if (this.numbering.isEngineEnabled()) {
+      return this.numbering.allocateStandalone(tenantId, 'PURCHASE_ORDER');
+    }
+    return `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
   }
 
   // ── Purchase Requests ─────────────────────────────────────────────
@@ -183,7 +202,7 @@ export class ProcurementService {
     const supplier = await this.prisma.supplier.findFirst({ where: { id: supplierId, tenantId } });
     if (!supplier) throw new NotFoundException('Supplier not found');
 
-    const poNumber = `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
+    const poNumber = await this.nextPoNumber(tenantId);
     const itemsData = pr.items.map((item) => {
       const unitCost = item.unitCostHint || 0;
       const lineTotal = unitCost * item.requestedQty;

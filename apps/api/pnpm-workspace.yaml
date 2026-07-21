@@ -2,6 +2,8 @@ allowBuilds:
   '@nestjs/core': set this to true or false
   '@prisma/client': set this to true or false
   '@prisma/engines': set this to true or false
+  '@whiskeysockets/baileys': set this to true or false
   msgpackr-extract: set this to true or false
   prisma: set this to true or false
+  protobufjs: set this to true or false
   sharp: set this to true or false

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -284,6 +284,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
   const [lastAddedVariantId, setLastAddedVariantId] = React.useState<string | undefined>();
   const [thankYouSale, setThankYouSale] = React.useState<ThankYouSale | null>(null);
+  const [waBillOffer, setWaBillOffer] = React.useState<{
+    invoiceNumber: string;
+    total: string;
+    paymentMethod: string;
+    customerName?: string;
+    phone: string;
+    itemsSummary: string;
+  } | null>(null);
+  const [waPhoneEdit, setWaPhoneEdit] = React.useState("");
+  const [waSending, setWaSending] = React.useState(false);
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
   const [now, setNow] = React.useState(new Date());
@@ -1507,6 +1517,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         loyaltyPoints: loyaltyPointsToRedeem,
         customerTier: customer?.membershipTier ?? null,
       });
+      {
+        const phone = (customer?.phone ?? "").trim();
+        const itemsSummary = saleSnapshot.items
+          .slice(0, 12)
+          .map((i) => `• ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} ×${i.quantity}`)
+          .join("\n");
+        setWaBillOffer({
+          invoiceNumber: s.invoiceNumber,
+          total: formatNumber(s.total),
+          paymentMethod: saleSnapshot.paymentMethod,
+          customerName: saleSnapshot.customerName,
+          phone,
+          itemsSummary,
+        });
+        setWaPhoneEdit(phone);
+      }
       setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber("");
@@ -3761,6 +3787,97 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           <button onClick={()=>setShowShortcuts(s=>!s)} className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg hover:bg-white/10 transition-colors" style={{color:isPosLight?"#ffffff":"var(--pos-muted-2)",background:isPosLight?"#475569":"transparent"}}><Keyboard className="h-3.5 w-3.5"/>F1</button>
         </div>
 
+
+        {/* WHATSAPP SEND BILL (after sale) */}
+        <AnimatePresence>
+          {waBillOffer && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-4"
+              style={{ background: "var(--pos-overlay)" }}
+              onClick={() => setWaBillOffer(null)}
+            >
+              <motion.div
+                initial={{ y: 24, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: 16, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
+                style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+              >
+                <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: "var(--pos-border)", background: "rgba(16,185,129,0.12)" }}>
+                  <MessageCircle className="h-4 w-4" style={{ color: "#10b981" }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold" style={{ color: "var(--pos-text)" }}>Send bill on WhatsApp</p>
+                    <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>{waBillOffer.invoiceNumber} · LKR {waBillOffer.total}</p>
+                  </div>
+                  <button type="button" onClick={() => setWaBillOffer(null)} className="p-1.5 rounded-lg hover:bg-white/10">
+                    <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
+                  </button>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div>
+                    <label className="text-[11px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Customer WhatsApp number</label>
+                    <input
+                      value={waPhoneEdit}
+                      onChange={(e) => setWaPhoneEdit(e.target.value)}
+                      placeholder="077 123 4567"
+                      className="w-full h-10 px-3 rounded-xl text-sm outline-none"
+                      style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" }}
+                    />
+                  </div>
+                  <p className="text-[11px]" style={{ color: "var(--pos-muted-2)" }}>
+                    Connect shop WhatsApp in Settings → WhatsApp (scan QR) before sending.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setWaBillOffer(null)}
+                      className="flex-1 h-10 rounded-xl text-sm font-semibold"
+                      style={{ background: "var(--pos-input)", color: "var(--pos-muted)" }}
+                    >
+                      Skip
+                    </button>
+                    <button
+                      type="button"
+                      disabled={waSending || !waPhoneEdit.trim()}
+                      onClick={() => {
+                        void (async () => {
+                          if (!waBillOffer) return;
+                          setWaSending(true);
+                          try {
+                            await api.post("/whatsapp/send-bill", {
+                              phone: waPhoneEdit.trim(),
+                              invoiceNumber: waBillOffer.invoiceNumber,
+                              customerName: waBillOffer.customerName,
+                              total: waBillOffer.total,
+                              paymentMethod: waBillOffer.paymentMethod,
+                              itemsSummary: waBillOffer.itemsSummary,
+                              shopName: receiptSettings.shopName || APP_NAME,
+                            });
+                            toast.success("Bill sent on WhatsApp");
+                            setWaBillOffer(null);
+                          } catch (e) {
+                            toast.error((e as Error).message ?? "WhatsApp send failed");
+                          } finally {
+                            setWaSending(false);
+                          }
+                        })();
+                      }}
+                      className="flex-[1.4] h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
+                      style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+                    >
+                      {waSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
+                      Send bill
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* DAY END MODAL */}
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(

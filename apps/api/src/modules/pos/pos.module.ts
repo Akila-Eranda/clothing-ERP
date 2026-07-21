@@ -14,8 +14,16 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService } from '@/modules/inventory/inventory.module';
 import { InventoryModule } from '@/modules/inventory/inventory.module';
+import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
+import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
+import { PricingModule } from '@/modules/pricing/pricing.module';
+import { PricingService } from '@/modules/pricing/pricing.service';
+import {
+  breakdownCartLine,
+  resolveUnitPrice,
+} from '@/modules/pricing/pricing.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
-import { tierDiscountAmount, computePromotionDiscount, buildPaymentsSummary } from './pos-sale.helpers';
+import { buildPaymentsSummary } from './pos-sale.helpers';
 import { applyGiftVoucherRedeem, computeHelperCommission, generateGiftVoucherCode } from './pos-phase6.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
@@ -110,6 +118,8 @@ export class PosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
+    private readonly numbering: DocumentNumberingService,
+    private readonly pricing: PricingService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -134,7 +144,11 @@ export class PosService {
       );
     }
 
-    const invoiceNumber = await this.generateInvoiceNumber(tenantId);
+    // Invoice number allocated inside the sale transaction (engine) or just before (legacy)
+    let invoiceNumber: string | null = null;
+    if (!this.numbering.isEngineEnabled()) {
+      invoiceNumber = await this.generateInvoiceNumberLegacy(tenantId);
+    }
 
     for (const item of dto.items) {
       const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
@@ -146,33 +160,6 @@ export class PosService {
       }
     }
 
-    const subtotal = dto.items.reduce((sum, item) => {
-      const lineTotal = item.unitPrice * item.quantity;
-      const discount = item.discountType === 'PERCENTAGE'
-        ? (lineTotal * (item.discount ?? 0)) / 100
-        : (item.discount ?? 0);
-      return sum + lineTotal - discount;
-    }, 0);
-
-    const taxAmount = dto.items.reduce((sum, item) => {
-      const lineTotal = item.unitPrice * item.quantity;
-      const discount = item.discountType === 'PERCENTAGE'
-        ? (lineTotal * (item.discount ?? 0)) / 100
-        : (item.discount ?? 0);
-      const taxable = lineTotal - discount;
-      return sum + (taxable * (item.taxRate ?? 0)) / 100;
-    }, 0);
-
-    let couponDiscount = 0;
-    let promotionId: string | null = null;
-    if (dto.couponCode?.trim()) {
-      const promoResult = await this.resolveCouponDiscount(tenantId, dto.couponCode.trim(), subtotal);
-      if (!promoResult.valid) throw new BadRequestException(promoResult.reason ?? 'Invalid coupon');
-      couponDiscount = promoResult.discountAmount ?? 0;
-      promotionId = promoResult.promotionId ?? null;
-    }
-
-    let tierDiscount = 0;
     let customerRecord: { id: string; firstName: string; lastName: string | null; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
     if (dto.customerId) {
       customerRecord = await this.prisma.customer.findFirst({
@@ -180,30 +167,45 @@ export class PosService {
         select: { id: true, firstName: true, lastName: true, loyaltyPoints: true, walletBalance: true, creditLimit: true, creditBalance: true, creditDays: true, tier: true },
       });
       if (!customerRecord) throw new BadRequestException('Customer not found');
-      if (dto.applyTierDiscount !== false) {
-        tierDiscount = tierDiscountAmount(subtotal, customerRecord.tier);
-      }
     }
-
-    const manualDiscount = dto.discountAmount ?? 0;
-    const totalDiscount = manualDiscount + couponDiscount + tierDiscount;
-    const total = subtotal + taxAmount - totalDiscount;
-    const roundOff = Math.round(total) - total;
-    const finalTotal = total + roundOff;
-
-    let loyaltyDiscount = 0;
-    let pointsRedeemed = 0;
-    let pointsEarned = 0;
 
     if (dto.customerId && dto.loyaltyPointsToRedeem) {
       await assertShopModule(this.prisma, tenantId, 'loyalty');
-      if (customerRecord && customerRecord.loyaltyPoints >= dto.loyaltyPointsToRedeem) {
-        loyaltyDiscount = dto.loyaltyPointsToRedeem * 0.1;
-        pointsRedeemed = dto.loyaltyPointsToRedeem;
-      }
     }
 
-    const amountDue = Math.max(0, finalTotal - loyaltyDiscount);
+    let priced;
+    try {
+      priced = await this.pricing.calculateCheckout(tenantId, {
+        items: dto.items.map((item) => ({
+          unitPrice: item.unitPrice,
+          quantity: item.quantity,
+          discount: item.discount,
+          discountType: item.discountType,
+          taxRate: item.taxRate,
+        })),
+        manualDiscount: dto.discountAmount ?? 0,
+        couponCode: dto.couponCode,
+        customerTier: customerRecord?.tier,
+        applyTierDiscount: dto.applyTierDiscount !== false && !!customerRecord,
+        loyaltyPointsToRedeem: dto.loyaltyPointsToRedeem,
+        availableLoyaltyPoints: customerRecord?.loyaltyPoints ?? 0,
+      });
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+
+    const subtotal = priced.subtotal;
+    const taxAmount = priced.taxAmount;
+    const couponDiscount = priced.couponDiscount;
+    const tierDiscount = priced.tierDiscount;
+    const totalDiscount = priced.orderDiscountTotal;
+    const roundOff = priced.roundOff;
+    const finalTotal = priced.finalTotal;
+    const loyaltyDiscount = priced.loyaltyDiscount;
+    const pointsRedeemed = priced.pointsRedeemed;
+    let pointsEarned = priced.pointsEarned;
+    const amountDue = priced.amountDue;
+    const promotionId = priced.promotionId;
     const totalPaid = dto.payments.reduce((s, p) => s + p.amount, 0);
     const walletPayments = dto.payments.filter((p) => p.method === PaymentMethod.WALLET);
     const walletTotal = walletPayments.reduce((s, p) => s + p.amount, 0);
@@ -308,6 +310,10 @@ export class PosService {
         tx,
       );
 
+      const resolvedInvoice =
+        invoiceNumber ??
+        (await this.numbering.allocate(tx, tenantId, 'INVOICE', new Date()));
+
       const created = await tx.sale.create({
         data: {
           tenantId,
@@ -317,7 +323,7 @@ export class PosService {
           helperEmployeeId,
           helperName,
           helperCommission,
-          invoiceNumber,
+          invoiceNumber: resolvedInvoice,
           status: SaleStatus.COMPLETED,
           subtotal,
           discountAmount: totalDiscount,
@@ -341,11 +347,13 @@ export class PosService {
           },
           items: {
             create: dto.items.map((item) => {
-              const lineTotal = item.unitPrice * item.quantity;
-              const discount = item.discountType === 'PERCENTAGE'
-                ? (lineTotal * (item.discount ?? 0)) / 100
-                : (item.discount ?? 0);
-              const taxAmt = ((lineTotal - discount) * (item.taxRate ?? 0)) / 100;
+              const line = breakdownCartLine({
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                discount: item.discount,
+                discountType: item.discountType,
+                taxRate: item.taxRate,
+              });
               const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
               return {
                 variantId: isCustom ? null : item.variantId,
@@ -358,8 +366,8 @@ export class PosService {
                 discount: item.discount ?? 0,
                 discountType: item.discountType ?? 'FIXED',
                 taxRate: item.taxRate ?? 0,
-                taxAmount: taxAmt,
-                total: lineTotal - discount + taxAmt,
+                taxAmount: line.taxAmount,
+                total: line.net,
               };
             }),
           },
@@ -390,10 +398,7 @@ export class PosService {
       }
 
       if (promotionId) {
-        await tx.promotion.update({
-          where: { id: promotionId },
-          data: { usageCount: { increment: 1 } },
-        });
+        await this.pricing.recordCouponUsage(tx, promotionId);
       }
 
       if (dto.heldBillId) {
@@ -413,7 +418,6 @@ export class PosService {
       }
 
       if (dto.customerId && customerRecord) {
-        pointsEarned = Math.floor(amountDue / 100);
         const creditIncrement = creditPayTotal + partialCredit;
         await tx.customer.update({
           where: { id: dto.customerId },
@@ -516,47 +520,15 @@ export class PosService {
       branchId,
       cashierId,
       sale.id,
-      invoiceNumber,
+      sale.invoiceNumber,
       dto.payments,
       changeDue,
     );
     return sale;
   }
 
-  private async resolveCouponDiscount(tenantId: string, couponCode: string, orderAmount: number) {
-    try {
-      await assertShopModule(this.prisma, tenantId, 'promotions');
-    } catch {
-      return { valid: false as const, reason: 'Promotions module not enabled' };
-    }
-    const now = new Date();
-    const promo = await this.prisma.promotion.findFirst({
-      where: {
-        tenantId,
-        couponCode: couponCode.toUpperCase(),
-        isActive: true,
-        startsAt: { lte: now },
-        OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-      },
-    });
-    if (!promo) return { valid: false as const, reason: 'Coupon or gift voucher not found or expired' };
-    if (promo.minOrderAmount > 0 && orderAmount < promo.minOrderAmount) {
-      return { valid: false as const, reason: `Minimum order LKR ${promo.minOrderAmount} required` };
-    }
-    if (promo.usageLimit && promo.usageCount >= promo.usageLimit) {
-      return { valid: false as const, reason: 'Voucher usage limit reached' };
-    }
-    const discountAmount = computePromotionDiscount(
-      promo.discountType,
-      promo.discountValue,
-      orderAmount,
-      promo.maxDiscount,
-    );
-    return { valid: true as const, discountAmount, promotionId: promo.id, name: promo.name };
-  }
-
   async validateCoupon(tenantId: string, code: string, amount: number) {
-    return this.resolveCouponDiscount(tenantId, code, amount);
+    return this.pricing.validateCoupon(tenantId, code, amount);
   }
 
   async searchCustomers(tenantId: string, search?: string, limit = 20) {
@@ -986,7 +958,7 @@ export class PosService {
       const reserved = variant.inventory[0]?.reservedQty ?? 0;
       const available = Math.max(0, onHand - reserved);
       const effectiveBarcode = variant.barcode ?? variant.product.barcode ?? null;
-      const unitPrice = scale && scale.asPrice >= 1 ? scale.asPrice : variant.sellingPrice;
+      const unitPrice = resolveUnitPrice(variant.sellingPrice, scale?.asPrice);
       const scaleQty = scale && scale.asPrice < 1 && scale.asWeightKg > 0
         ? scale.asWeightKg
         : undefined;
@@ -1633,7 +1605,7 @@ export class PosService {
     return summary;
   }
 
-  private async generateInvoiceNumber(tenantId: string): Promise<string> {
+  private async generateInvoiceNumberLegacy(tenantId: string): Promise<string> {
     const prefix = 'INV';
     const date = dayjs().format('YYYYMMDD');
     const count = await this.prisma.sale.count({
@@ -2151,7 +2123,7 @@ export class PosController {
 }
 
 @Module({
-  imports: [InventoryModule],
+  imports: [InventoryModule, DocumentNumberingModule, PricingModule],
   controllers: [PosController],
   providers: [PosService],
   exports: [PosService],

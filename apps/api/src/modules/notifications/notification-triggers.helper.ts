@@ -1,4 +1,4 @@
-/** Phase 12 — pure notification trigger helpers (eligibility + dedupe). */
+/** Notification Engine — pure trigger eligibility, templates, channel/role routing. */
 
 export type TriggerKind =
   | 'LOW_STOCK'
@@ -11,6 +11,28 @@ export type TriggerKind =
   | 'PO_PENDING'
   | 'DAILY_SUMMARY';
 
+/** Default delivery channel for engine-planned alerts (IN_APP only for now). */
+export function defaultChannelFor(_kind?: TriggerKind | string): 'IN_APP' {
+  return 'IN_APP';
+}
+
+/** Role types that receive operational alerts (managers). Include cashiers for birthday-style blasts. */
+export const MANAGER_ROLE_TYPES = [
+  'SUPER_ADMIN',
+  'TENANT_ADMIN',
+  'BRANCH_MANAGER',
+  'INVENTORY_MANAGER',
+  'ACCOUNTANT',
+] as const;
+
+export const MANAGER_PLUS_CASHIER_ROLE_TYPES = [
+  ...MANAGER_ROLE_TYPES,
+  'CASHIER',
+] as const;
+
+export function recipientRoleTypes(includeCashier = false): readonly string[] {
+  return includeCashier ? MANAGER_PLUS_CASHIER_ROLE_TYPES : MANAGER_ROLE_TYPES;
+}
 export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }

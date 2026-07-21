@@ -44,6 +44,7 @@
     "@nestjs/throttler": "^6.2.1",
     "@nestjs/websockets": "^10.4.4",
     "@prisma/client": "^5.22.0",
+    "@whiskeysockets/baileys": "6.7.22",
     "axios": "^1.7.7",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.3",

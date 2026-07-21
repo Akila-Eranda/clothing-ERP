@@ -10,7 +10,7 @@ import {
   Prisma,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
-import { AUDIT_ACTIONS } from '@/modules/audit-log/audit.helper';
+import { normalizeJournalAuditAction } from '@/modules/audit-log/audit.helper';
 import { AuditLogService } from '@/modules/audit-log/audit-log.module';
 import { FinancialPeriodsService } from './financial-periods.service';
 import { AccountingSettingsService } from './accounting-settings.service';
@@ -137,15 +137,7 @@ export class JournalEntriesService {
     newData?: object,
     oldData?: object,
   ) {
-    const normalized =
-      action.includes('approve') ? AUDIT_ACTIONS.APPROVE
-      : action.includes('reject') ? AUDIT_ACTIONS.REJECT
-      : action.includes('create') || action === 'journal.draft' || action === 'journal.posted'
-        ? AUDIT_ACTIONS.CREATE
-      : action.includes('update') || action.includes('submit') || action.includes('post') || action.includes('void')
-        ? AUDIT_ACTIONS.UPDATE
-      : action.includes('delete') ? AUDIT_ACTIONS.DELETE
-      : AUDIT_ACTIONS.UPDATE;
+    const normalized = normalizeJournalAuditAction(action);
 
     await this.audit.log({
       tenantId,

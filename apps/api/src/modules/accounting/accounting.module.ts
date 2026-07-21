@@ -46,6 +46,7 @@ import { chequeSourceNotes } from './finance.helper';
 import { AuditLogModule } from '@/modules/audit-log/audit-log.module';
 import { CustomersModule } from '@/modules/customers/customers.module';
 import { SuppliersModule } from '@/modules/suppliers/suppliers.module';
+import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
 import { recordExpenseCashOutflow } from '@/shared/cash-register.helper';
 import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import type { Response } from 'express';
@@ -2521,7 +2522,7 @@ export class AccountingController {
 }
 
 @Module({
-  imports: [AuditLogModule, CustomersModule, SuppliersModule],
+  imports: [AuditLogModule, CustomersModule, SuppliersModule, DocumentNumberingModule],
   controllers: [AccountingController, AdvancedAccountingController],
   providers: [
     AccountingService,

@@ -36,6 +36,7 @@ import { HrModule } from './modules/hr/hr.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { FilesModule } from './modules/files/files.module';
@@ -104,6 +105,7 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
     DashboardModule,
     ReportsModule,
     NotificationsModule,
+    WhatsappModule,
     BranchesModule,
     TenantsModule,
     FilesModule,

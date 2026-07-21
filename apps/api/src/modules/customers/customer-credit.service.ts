@@ -8,6 +8,7 @@ import {
   NotificationType,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
+import { NotificationsService } from '@/modules/notifications/notifications.service';
 import {
   allocatePaymentFifo,
   buildCustomerLedger,
@@ -40,6 +41,7 @@ export class CustomerCreditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async listCreditCustomers(tenantId: string) {
@@ -573,7 +575,7 @@ export class CustomerCreditService {
     if (!reminder) throw new NotFoundException('Reminder not found');
 
     try {
-      // Notify staff (actor + managers) in-app; SMS queue can be extended later
+      // Notify staff (actor + managers) via Notification Engine
       const staff = await this.prisma.user.findMany({
         where: { tenantId },
         select: { id: true },
@@ -581,20 +583,12 @@ export class CustomerCreditService {
       });
       const recipientIds = [...new Set([actorUserId, ...staff.map((u) => u.id)])];
 
-      await this.prisma.notification.create({
-        data: {
-          tenantId,
-          title: reminder.title,
-          message: `${reminder.customer.firstName} ${reminder.customer.lastName ?? ''} (${reminder.customer.phone}): ${reminder.message}`,
-          type: NotificationType.PAYMENT_DUE,
-          channel: reminder.channel,
-          recipients: recipientIds,
-        },
-      }).then(async (notification) => {
-        await this.prisma.userNotification.createMany({
-          data: recipientIds.map((userId) => ({ userId, notificationId: notification.id })),
-          skipDuplicates: true,
-        });
+      await this.notifications.send(tenantId, {
+        title: reminder.title,
+        message: `${reminder.customer.firstName} ${reminder.customer.lastName ?? ''} (${reminder.customer.phone}): ${reminder.message}`,
+        type: NotificationType.PAYMENT_DUE,
+        channel: reminder.channel,
+        recipientIds,
       });
 
       return this.prisma.customerCreditReminder.update({

@@ -13,6 +13,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { CustomerCreditService } from './customer-credit.service';
+import { NotificationsModule } from '@/modules/notifications/notifications.module';
 
 export class CreateCustomerDto {
   @ApiProperty() @IsString() firstName: string;
@@ -565,6 +566,7 @@ export class CustomersController {
 }
 
 @Module({
+  imports: [NotificationsModule],
   controllers: [CustomersController],
   providers: [CustomersService, CustomerCreditService],
   exports: [CustomersService, CustomerCreditService],

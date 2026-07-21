@@ -18,6 +18,8 @@ import { recordRefundCashMovement } from '@/shared/cash-register.helper';
 import { PaymentMethod } from '@prisma/client';
 import { CustomersModule } from '@/modules/customers/customers.module';
 import { CustomerCreditService } from '@/modules/customers/customer-credit.service';
+import { DocumentNumberingModule } from '@/modules/document-numbering/document-numbering.module';
+import { DocumentNumberingService } from '@/modules/document-numbering/document-numbering.service';
 
 export class ReturnItemDto {
   @ApiProperty() @IsString() variantId: string;
@@ -50,6 +52,7 @@ export class ReturnsService {
     private readonly prisma: PrismaService,
     private readonly inventoryService: InventoryService,
     private readonly creditService: CustomerCreditService,
+    private readonly numbering: DocumentNumberingService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
@@ -80,7 +83,12 @@ export class ReturnsService {
     }
 
     const returnType = dto.returnType ?? 'RETURN';
-    const returnNumber = `${returnType === 'EXCHANGE' ? 'EXC' : 'RET'}-${Date.now().toString(36).toUpperCase()}`;
+    const returnNumber = this.numbering.isEngineEnabled()
+      ? await this.numbering.allocateStandalone(
+          tenantId,
+          returnType === 'EXCHANGE' ? 'EXCHANGE' : 'RETURN',
+        )
+      : `${returnType === 'EXCHANGE' ? 'EXC' : 'RET'}-${Date.now().toString(36).toUpperCase()}`;
     const totalAmount    = dto.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
     const exchangeAmount = (dto.exchangeItems ?? []).reduce((s, i) => s + i.unitPrice * i.quantity, 0);
     const refundAmount   = returnType === 'EXCHANGE' ? Math.max(0, totalAmount - exchangeAmount) : totalAmount;
@@ -304,7 +312,7 @@ export class ReturnsController {
 }
 
 @Module({
-  imports: [InventoryModule, CustomersModule],
+  imports: [InventoryModule, CustomersModule, DocumentNumberingModule],
   controllers: [ReturnsController],
   providers: [ReturnsService],
   exports: [ReturnsService],

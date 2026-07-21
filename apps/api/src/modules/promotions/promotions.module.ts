@@ -11,6 +11,8 @@ import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { PricingModule } from '@/modules/pricing/pricing.module';
+import { PricingService } from '@/modules/pricing/pricing.service';
 
 // ── DTOs ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +48,10 @@ export class UpdatePromotionDto {
 
 @Injectable()
 export class PromotionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly pricing: PricingService,
+  ) {}
 
   async create(tenantId: string, dto: CreatePromotionDto) {
     await assertShopModule(this.prisma, tenantId, 'promotions');
@@ -117,32 +122,16 @@ export class PromotionsService {
   }
 
   async validate(couponCode: string, tenantId: string, orderAmount: number) {
-    await assertShopModule(this.prisma, tenantId, 'promotions');
-    const now = new Date();
-    const promo = await this.prisma.promotion.findFirst({
-      where: {
-        tenantId,
-        couponCode: couponCode.toUpperCase(),
-        isActive: true,
-        startsAt: { lte: now },
-        OR: [{ endsAt: null }, { endsAt: { gte: now } }],
-      },
+    const result = await this.pricing.validateCoupon(tenantId, couponCode, orderAmount, {
+      requireModule: true,
     });
-    if (!promo) return { valid: false, reason: 'Coupon not found or expired' };
-    if (promo.minOrderAmount > 0 && orderAmount < promo.minOrderAmount)
-      return { valid: false, reason: `Minimum order LKR ${promo.minOrderAmount} required` };
-    if (promo.usageLimit && promo.usageCount >= promo.usageLimit)
-      return { valid: false, reason: 'Coupon usage limit reached' };
-
-    let discountAmount = 0;
-    if (promo.discountType === DiscountType.PERCENTAGE) {
-      discountAmount = (orderAmount * promo.discountValue) / 100;
-      if (promo.maxDiscount) discountAmount = Math.min(discountAmount, promo.maxDiscount);
-    } else if (promo.discountType === DiscountType.FIXED) {
-      discountAmount = promo.discountValue;
-    }
-
-    return { valid: true, promo, discountAmount };
+    if (!result.valid) return { valid: false as const, reason: result.reason };
+    const promo = await this.findOne(result.promotionId, tenantId);
+    return {
+      valid: true as const,
+      promo,
+      discountAmount: result.discountAmount,
+    };
   }
 }
 
@@ -211,6 +200,7 @@ export class PromotionsController {
 // ── Module ────────────────────────────────────────────────────────────────────
 
 @Module({
+  imports: [PricingModule],
   controllers: [PromotionsController],
   providers: [PromotionsService],
   exports: [PromotionsService],

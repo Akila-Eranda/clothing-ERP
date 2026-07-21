@@ -9,6 +9,7 @@ import { ProductsService, CreateProductDto, CreateCategoryDto, CreateBrandDto, C
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { InventoryModule } from '@/modules/inventory/inventory.module';
 
 @ApiTags('Products')
 @ApiBearerAuth('access-token')
@@ -146,6 +147,7 @@ export class BrandsController {
 }
 
 @Module({
+  imports: [InventoryModule],
   controllers: [ProductsController, CategoriesController, BrandsController],
   providers: [ProductsService],
   exports: [ProductsService],
