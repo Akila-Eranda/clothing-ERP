@@ -5,6 +5,8 @@
  * so search, filters, pagination, export, and `[data-table-craft]` styles stay
  * consistent across the product.
  *
+ * Stack order: toolbar → filters → sticky header body → pagination footer.
+ *
  * Use for: dashboard list pages, admin lists, hub data grids.
  * Do NOT use for: print/receipt HTML, POS cart line editors, financial
  * statement layouts that need custom row/column spanning.
