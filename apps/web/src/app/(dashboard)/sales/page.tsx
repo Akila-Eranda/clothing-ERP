@@ -4,11 +4,10 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, ShoppingCart, DollarSign, Percent, RefreshCw, X, Package, Loader2,
-  User, CalendarDays, CreditCard, Hash, CheckCircle2, Wallet, ClipboardList,
-  Banknote, Receipt, type LucideIcon,
+  User, CalendarDays, CreditCard, Hash, ClipboardList,
+  Banknote, Receipt, ArrowUpRight, type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { cn, formatNumber } from "@/lib/utils";
@@ -93,6 +92,16 @@ function methodTone(method?: string | null) {
   return "bg-muted text-muted-foreground border-border";
 }
 
+function methodBarColor(method?: string | null) {
+  const key = (method ?? "").toUpperCase();
+  if (key === "CASH") return "bg-emerald-500";
+  if (key === "CARD") return "bg-blue-500";
+  if (key === "BANK_TRANSFER") return "bg-sky-500";
+  if (key === "UPI" || key === "QR") return "bg-violet-500";
+  if (key === "WALLET") return "bg-amber-500";
+  return "bg-slate-400";
+}
+
 function paymentLabel(sale: Sale): { label: string; paid: boolean; className: string } {
   const remaining = Math.max(0, (sale.total ?? 0) - (sale.amountPaid ?? 0));
   const status = (sale.paymentStatus ?? "").toUpperCase();
@@ -160,42 +169,51 @@ function SaleDetailModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-3 sm:p-4"
+      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
-        <div className="flex items-start justify-between gap-4 px-5 sm:px-6 py-4 border-b shrink-0 bg-card/40">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Receipt className="h-4 w-4" />
-              </span>
-              <h2 className="font-bold text-lg sm:text-xl tracking-tight">Sale details</h2>
+        <div className="relative shrink-0 overflow-hidden border-b">
+          <div
+            className="absolute inset-0 opacity-90"
+            style={{
+              background:
+                "radial-gradient(ellipse 80% 120% at 0% 0%, rgba(16,185,129,0.18), transparent 55%), radial-gradient(ellipse 60% 80% at 100% 0%, rgba(59,130,246,0.12), transparent 50%), linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)",
+            }}
+          />
+          <div className="relative flex items-start justify-between gap-4 px-5 sm:px-6 py-5">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground mb-1.5">
+                Sale document
+              </p>
+              <h2 className="font-bold text-xl sm:text-2xl tracking-tight font-mono">
+                {loading ? "…" : sale?.invoiceNumber}
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1 truncate">
+                {loading ? "Loading…" : (
+                  <>
+                    {sale?.customer?.name ?? shopLabel}
+                    <span className="mx-1.5 text-border">·</span>
+                    {fmtDateTime(sale?.invoiceDate)}
+                  </>
+                )}
+              </p>
             </div>
-            <p className="text-sm text-muted-foreground truncate">
-              {loading ? "Loading…" : (
-                <>
-                  <span className="font-mono font-semibold text-foreground">{sale?.invoiceNumber}</span>
-                  <span className="mx-1.5 text-border">·</span>
-                  {sale?.customer?.name ?? shopLabel}
-                </>
+            <div className="flex items-center gap-2 shrink-0">
+              {sale && pay && (
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${pay.className}`}>
+                  {pay.label}
+                </span>
               )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {sale && pay && (
-              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${pay.className}`}>
-                {pay.label}
-              </span>
-            )}
-            {sale && (
-              <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(sale.status)}`}>
-                {sale.status?.toLowerCase()}
-              </span>
-            )}
-            <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
-              <X className="h-4 w-4" />
-            </Button>
+              {sale && (
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(sale.status)}`}>
+                  {sale.status?.toLowerCase()}
+                </span>
+              )}
+              <Button type="button" variant="ghost" size="icon" onClick={onClose} aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -205,136 +223,118 @@ function SaleDetailModal({
           <div className="flex justify-center py-16 text-sm text-muted-foreground">Sale not found</div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-4">
-              <div className="flex flex-col lg:flex-row gap-4 lg:gap-5">
+            <div className="flex-1 overflow-y-auto px-5 sm:px-6 py-5">
+              <div className="flex flex-col lg:flex-row gap-5">
                 <div className="flex-1 min-w-0 space-y-4">
-                  <div className="grid sm:grid-cols-2 gap-x-8 gap-y-3 text-sm rounded-xl border bg-muted/20 px-4 py-3.5">
-                    <MetaRow icon={CalendarDays} label="Invoice date" value={fmtDateTime(sale.invoiceDate)} />
-                    <MetaRow icon={User} label="Customer" value={customerName} />
-                    <MetaRow icon={Hash} label="Invoice number" value={sale.invoiceNumber} mono />
-                    <MetaRow icon={CreditCard} label="Payment method" value={methodLabel(sale.paymentMethod)} />
-                    <MetaRow icon={CheckCircle2} label="Status" value={sale.status} />
-                    <MetaRow
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <MetaCard icon={User} label="Customer" value={customerName} />
+                    <MetaCard icon={CreditCard} label="Method" value={methodLabel(sale.paymentMethod)} />
+                    <MetaCard
                       icon={User}
                       label="Cashier"
                       value={sale.cashier ? `${sale.cashier.firstName} ${sale.cashier.lastName}` : "—"}
                     />
-                    <MetaRow icon={Wallet} label="Payment status" value={pay?.label ?? "—"} />
-                    <MetaRow icon={Package} label="Items" value={String(items.length)} />
+                    <MetaCard icon={Package} label="Line items" value={String(items.length)} />
                   </div>
 
-                  <div className="rounded-xl border overflow-hidden">
-                    <div className="bg-primary text-primary-foreground px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between">
-                      <span>Items ({items.length})</span>
-                    </div>
+                  <section className="rounded-2xl border overflow-hidden bg-card/40">
+                    <header className="px-4 py-3 border-b flex items-center justify-between bg-muted/30">
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Items</h3>
+                      <span className="text-[11px] tabular-nums text-muted-foreground">{items.length}</span>
+                    </header>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b bg-muted/30 text-[11px] uppercase tracking-wide text-muted-foreground">
-                            <th className="px-3 py-2 text-left font-semibold w-10">#</th>
-                            <th className="px-3 py-2 text-left font-semibold">Product</th>
-                            <th className="px-3 py-2 text-right font-semibold">Qty</th>
-                            <th className="px-3 py-2 text-right font-semibold">Unit price</th>
-                            <th className="px-3 py-2 text-right font-semibold">Subtotal</th>
+                          <tr className="border-b text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-4 py-2.5 text-left font-semibold w-10">#</th>
+                            <th className="px-4 py-2.5 text-left font-semibold">Product</th>
+                            <th className="px-4 py-2.5 text-right font-semibold">Qty</th>
+                            <th className="px-4 py-2.5 text-right font-semibold">Unit</th>
+                            <th className="px-4 py-2.5 text-right font-semibold">Total</th>
                           </tr>
                         </thead>
                         <tbody>
                           {items.length === 0 ? (
-                            <tr><td colSpan={5} className="px-3 py-8 text-center text-muted-foreground text-xs">No items</td></tr>
+                            <tr><td colSpan={5} className="px-4 py-10 text-center text-muted-foreground text-xs">No items</td></tr>
                           ) : items.map((item, i) => (
-                            <tr key={item.id} className="border-b last:border-0">
-                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
-                              <td className="px-3 py-2.5">
+                            <tr key={item.id} className="border-b last:border-0 hover:bg-muted/20 transition-colors">
+                              <td className="px-4 py-3 text-muted-foreground text-xs">{i + 1}</td>
+                              <td className="px-4 py-3">
                                 <p className="font-semibold text-sm leading-tight">{item.productName}</p>
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
                                   {[item.sku, item.variantName].filter(Boolean).join(" · ")}
                                 </p>
                               </td>
-                              <td className="px-3 py-2.5 text-right tabular-nums">{item.quantity}</td>
-                              <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{fmtMoney(item.unitPrice)}</td>
-                              <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(item.total)}</td>
+                              <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
+                              <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap text-muted-foreground">{fmtMoney(item.unitPrice)}</td>
+                              <td className="px-4 py-3 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(item.total)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
+                  </section>
 
-                  <div className="rounded-xl border overflow-hidden">
-                    <div className="bg-emerald-600 text-white px-3.5 py-2 text-xs font-bold tracking-wide uppercase flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5">
+                  <section className="rounded-2xl border overflow-hidden bg-card/40">
+                    <header className="px-4 py-3 border-b flex items-center justify-between gap-2 bg-emerald-600/90 text-white">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider">
                         <ClipboardList className="h-3.5 w-3.5" />
                         Payments
                       </span>
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold border border-white/30 ${
-                        pay?.paid ? "bg-white/20" : "bg-rose-500/80"
-                      }`}>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-bold bg-white/15 border border-white/25">
                         {pay?.label?.toUpperCase() ?? "—"}
                       </span>
-                    </div>
-                    <div className="grid sm:grid-cols-3 gap-3 px-3.5 py-2.5 border-b bg-muted/20 text-xs">
-                      <div>
-                        <p className="text-muted-foreground">Invoice</p>
-                        <p className="font-mono font-semibold mt-0.5">{sale.invoiceNumber}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Paid date</p>
-                        <p className="font-semibold mt-0.5">{fmtDate(sale.invoiceDate)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground">Paid / Total</p>
-                        <p className="font-semibold mt-0.5">{fmtMoney(sale.amountPaid || 0)} / {fmtMoney(sale.total)}</p>
-                      </div>
-                    </div>
+                    </header>
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b bg-muted/30 text-[11px] uppercase tracking-wide text-muted-foreground">
-                            <th className="px-3 py-2 text-left font-semibold w-10">#</th>
-                            <th className="px-3 py-2 text-left font-semibold">Method</th>
-                            <th className="px-3 py-2 text-left font-semibold">Reference</th>
-                            <th className="px-3 py-2 text-right font-semibold">Amount</th>
+                          <tr className="border-b bg-muted/20 text-[11px] uppercase tracking-wide text-muted-foreground">
+                            <th className="px-4 py-2.5 text-left font-semibold w-10">#</th>
+                            <th className="px-4 py-2.5 text-left font-semibold">Method</th>
+                            <th className="px-4 py-2.5 text-left font-semibold">Reference</th>
+                            <th className="px-4 py-2.5 text-right font-semibold">Amount</th>
                           </tr>
                         </thead>
                         <tbody>
                           {payments.map((p, i) => (
                             <tr key={p.id ?? `${p.method}-${i}`} className="border-b last:border-0">
-                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{i + 1}</td>
-                              <td className="px-3 py-2.5 font-medium">{methodLabel(p.method)}</td>
-                              <td className="px-3 py-2.5 text-muted-foreground text-xs">{p.reference || "—"}</td>
-                              <td className="px-3 py-2.5 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(p.amount)}</td>
+                              <td className="px-4 py-3 text-muted-foreground text-xs">{i + 1}</td>
+                              <td className="px-4 py-3 font-medium">{methodLabel(p.method)}</td>
+                              <td className="px-4 py-3 text-muted-foreground text-xs">{p.reference || "—"}</td>
+                              <td className="px-4 py-3 text-right font-semibold tabular-nums whitespace-nowrap">{fmtMoney(p.amount)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  </div>
+                  </section>
 
                   {sale.notes?.trim() ? (
-                    <div className="rounded-xl border px-3.5 py-3">
-                      <p className="text-xs font-semibold text-muted-foreground mb-1">Sale note</p>
-                      <p className="text-sm text-foreground/80">{sale.notes.trim()}</p>
+                    <div className="rounded-2xl border px-4 py-3.5 bg-muted/20">
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Note</p>
+                      <p className="text-sm text-foreground/85 leading-relaxed">{sale.notes.trim()}</p>
                     </div>
                   ) : null}
                 </div>
 
-                <div className="w-full lg:w-64 shrink-0">
-                  <div className="rounded-xl border p-3.5 space-y-2 sticky top-0 bg-card">
+                <aside className="w-full lg:w-72 shrink-0">
+                  <div className="rounded-2xl border p-4 space-y-3 sticky top-0 bg-gradient-to-b from-card to-muted/20">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Totals</p>
-                      <span className="text-[10px] font-semibold text-muted-foreground">LKR</span>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">Settlement</p>
+                      <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                     </div>
-                    <TotRow label="Subtotal" value={fmtMoney(sale.subtotal)} />
-                    {sale.discountAmount > 0 && <TotRow label="Discount" value={`-${fmtMoney(sale.discountAmount)}`} muted />}
-                    <TotRow label="Tax" value={fmtMoney(sale.taxAmount)} />
-                    <div className="border-t pt-2 space-y-2">
-                      <TotRow label="Total" value={fmtMoney(sale.total)} bold />
+                    <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">{fmtMoney(sale.total)}</p>
+                    <p className="text-xs text-muted-foreground">Invoice total</p>
+                    <div className="border-t pt-3 space-y-2.5">
+                      <TotRow label="Subtotal" value={fmtMoney(sale.subtotal)} />
+                      {sale.discountAmount > 0 && <TotRow label="Discount" value={`−${fmtMoney(sale.discountAmount)}`} muted />}
+                      <TotRow label="Tax" value={fmtMoney(sale.taxAmount)} />
                       <TotRow label="Paid" value={fmtMoney(sale.amountPaid || 0)} />
                       <TotRow label="Remaining" value={fmtMoney(remaining)} accent={!pay?.paid && remaining > 0} />
-                      {sale.changeDue > 0 && <TotRow label="Change due" value={fmtMoney(sale.changeDue)} muted />}
+                      {sale.changeDue > 0 && <TotRow label="Change" value={fmtMoney(sale.changeDue)} muted />}
                     </div>
                   </div>
-                </div>
+                </aside>
               </div>
             </div>
 
@@ -359,25 +359,23 @@ function SaleDetailModal({
   );
 }
 
-function MetaRow({
+function MetaCard({
   icon: Icon,
   label,
   value,
-  mono,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
-  mono?: boolean;
 }) {
   return (
-    <div className="flex items-start gap-2.5 min-w-0">
-      <Icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+    <div className="rounded-xl border bg-card/50 px-3.5 py-3 flex items-start gap-3 min-w-0">
+      <span className="h-8 w-8 rounded-lg bg-muted/80 flex items-center justify-center shrink-0">
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </span>
       <div className="min-w-0">
         <p className="text-[11px] text-muted-foreground leading-none">{label}</p>
-        <p className={`text-sm font-medium mt-0.5 truncate ${mono ? "font-mono text-xs" : ""}`}>
-          {value}
-        </p>
+        <p className="text-sm font-semibold mt-1 truncate">{value}</p>
       </div>
     </div>
   );
@@ -386,20 +384,22 @@ function MetaRow({
 function TotRow({
   label,
   value,
-  bold,
   muted,
   accent,
 }: {
   label: string;
   value: string;
-  bold?: boolean;
   muted?: boolean;
   accent?: boolean;
 }) {
   return (
-    <div className={`flex items-center justify-between gap-3 text-sm ${bold ? "font-bold" : ""} ${muted ? "text-emerald-600 dark:text-emerald-400" : ""} ${accent ? "text-rose-600 dark:text-rose-400 font-semibold" : ""}`}>
-      <span className={bold || accent ? "" : "text-muted-foreground"}>{label}</span>
-      <span className="tabular-nums whitespace-nowrap">{value}</span>
+    <div className={cn(
+      "flex items-center justify-between gap-3 text-sm",
+      muted && "text-emerald-600 dark:text-emerald-400",
+      accent && "text-rose-600 dark:text-rose-400 font-semibold",
+    )}>
+      <span className={accent ? "" : "text-muted-foreground"}>{label}</span>
+      <span className="tabular-nums whitespace-nowrap font-medium">{value}</span>
     </div>
   );
 }
@@ -445,40 +445,17 @@ export default function SalesPage() {
     return fmtDate(dateFilter);
   }, [dateFilter, today]);
 
-  const STATS = [
-    {
-      label: "Revenue",
-      value: fmtMoney(summary?.totalRevenue ?? 0),
-      icon: DollarSign,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/15",
-      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
-    },
-    {
-      label: "Orders",
-      value: summary?.totalSales ?? 0,
-      icon: ShoppingCart,
-      color: "text-blue-600 dark:text-blue-400",
-      bg: "bg-blue-500/15",
-      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
-    },
-    {
-      label: "Avg order",
-      value: fmtMoney(avgOrder),
-      icon: TrendingUp,
-      color: "text-violet-600 dark:text-violet-400",
-      bg: "bg-violet-500/15",
-      tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
-    },
-    {
-      label: "Discounts",
-      value: fmtMoney(summary?.totalDiscount ?? 0),
-      icon: Percent,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/15",
-      tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
-    },
-  ];
+  const paymentMix = useMemo(() => {
+    const entries = Object.entries(summary?.byPaymentMethod ?? {});
+    const total = entries.reduce((s, [, v]) => s + v, 0) || 1;
+    return entries
+      .map(([method, amount]) => ({
+        method,
+        amount,
+        pct: Math.round((amount / total) * 100),
+      }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [summary]);
 
   const paymentMethodsInData = useMemo(() => {
     const fromSummary = Object.keys(summary?.byPaymentMethod ?? {});
@@ -599,133 +576,191 @@ export default function SalesPage() {
   ] as const;
 
   return (
-    <div className="page-shell">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Sales</h1>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            Transactions for <span className="font-medium text-foreground/80">{dateLabel}</span>
-            {summary ? (
-              <>
-                <span className="mx-1.5 text-border">·</span>
-                Tax {fmtMoney(summary.totalTax)}
-              </>
-            ) : null}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="inline-flex items-center rounded-xl border bg-card p-0.5">
-            {datePresets.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setDateFilter(p.value)}
-                className={cn(
-                  "h-8 px-3 rounded-[10px] text-xs font-semibold transition-colors",
-                  dateFilter === p.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-background text-sm cursor-pointer hover:bg-muted/40 transition-colors">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-full bg-transparent border-0 outline-none text-sm text-foreground leading-none [color-scheme:dark] dark:[color-scheme:dark]"
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={() => { void fetchSales(); void fetchSummary(); }}
-            className="gap-1.5"
-          >
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {STATS.map((s) => (
-          <Card
-            key={s.label}
-            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
-          >
-            <CardContent className="h-[68px] p-4 flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
-                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+    <div className="page-shell gap-5">
+      {/* Hero day board */}
+      <section className="relative overflow-hidden rounded-2xl border bg-card">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(ellipse 70% 90% at 0% 0%, rgba(16,185,129,0.16), transparent 50%), radial-gradient(ellipse 50% 70% at 100% 10%, rgba(59,130,246,0.10), transparent 45%), linear-gradient(135deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)",
+          }}
+        />
+        <div className="relative p-5 sm:p-6 flex flex-col gap-5">
+          <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground mb-2">
+                <Receipt className="h-3.5 w-3.5" />
+                Sales ledger
               </div>
-              <div className="min-w-0">
-                <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums truncate`}>
-                  {s.value}
-                </p>
-                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Payment mix */}
-      {summary && Object.keys(summary.byPaymentMethod).length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
-            <div
-              key={method}
-              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium"
-            >
-              <Banknote className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.75} />
-              <span className="text-muted-foreground">{methodLabel(method)}</span>
-              <span className="font-bold tabular-nums text-foreground">{fmtMoney(amount)}</span>
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-none">Sales</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                {dateLabel}
+                {summary ? (
+                  <>
+                    <span className="mx-1.5 text-border">·</span>
+                    Tax {fmtMoney(summary.totalTax)}
+                  </>
+                ) : null}
+              </p>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* Table */}
-      <ClientSideTable
-        data={sales}
-        columns={columns}
-        searchableColumns={[{ id: "invoice", title: "Invoice / customer" }]}
-        filterableColumns={[
-          {
-            id: "status",
-            title: "Status",
-            options: [
-              { label: "Completed", value: "COMPLETED" },
-              { label: "Refunded", value: "REFUNDED" },
-              { label: "Pending", value: "PENDING" },
-            ],
-          },
-          {
-            id: "paymentMethod",
-            title: "Method",
-            options: (paymentMethodsInData.length
-              ? paymentMethodsInData
-              : ["CASH", "CARD", "BANK_TRANSFER", "UPI", "WALLET", "QR"]
-            ).map((m) => ({ label: methodLabel(m), value: m })),
-          },
-          {
-            id: "payStatus",
-            title: "Payment",
-            options: [
-              { label: "Paid", value: "Paid" },
-              { label: "Partial", value: "Partial" },
-              { label: "Unpaid", value: "Unpaid" },
-              { label: "Refunded", value: "Refunded" },
-            ],
-          },
-        ]}
-        isShowExportButtons={{ isShow: true, fileName: `sales-${dateFilter}` }}
-      />
+            <div className="flex items-center gap-2 flex-wrap shrink-0">
+              <div className="inline-flex items-center rounded-xl border bg-background/80 backdrop-blur-sm p-0.5">
+                {datePresets.map((p) => (
+                  <button
+                    key={p.key}
+                    type="button"
+                    onClick={() => setDateFilter(p.value)}
+                    className={cn(
+                      "h-9 px-3.5 rounded-[10px] text-xs font-semibold transition-colors",
+                      dateFilter === p.value
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                    )}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <label className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-background/80 text-sm cursor-pointer hover:bg-muted/40 transition-colors">
+                <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+                <input
+                  type="date"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                  className="h-full bg-transparent border-0 outline-none text-sm text-foreground leading-none [color-scheme:dark] dark:[color-scheme:dark]"
+                />
+              </label>
+              <Button
+                variant="outline"
+                onClick={() => { void fetchSales(); void fetchSummary(); }}
+                className="gap-1.5 bg-background/80"
+              >
+                <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+            <div className="lg:col-span-5 rounded-2xl border bg-background/70 backdrop-blur-sm p-5 flex flex-col justify-between min-h-[140px]">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground">Revenue</p>
+                <span className="h-8 w-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 inline-flex items-center justify-center">
+                  <DollarSign className="h-4 w-4" />
+                </span>
+              </div>
+              <div>
+                <p className="text-3xl sm:text-4xl font-bold tracking-tight tabular-nums leading-none mt-3">
+                  {fmtMoney(summary?.totalRevenue ?? 0)}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2 inline-flex items-center gap-1">
+                  <ArrowUpRight className="h-3.5 w-3.5" />
+                  {summary?.totalSales ?? 0} completed order{(summary?.totalSales ?? 0) === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7 grid grid-cols-3 gap-3">
+              {[
+                { label: "Orders", value: String(summary?.totalSales ?? 0), icon: ShoppingCart, tone: "text-blue-600 dark:text-blue-400 bg-blue-500/12" },
+                { label: "Avg order", value: fmtMoney(avgOrder), icon: TrendingUp, tone: "text-sky-600 dark:text-sky-400 bg-sky-500/12" },
+                { label: "Discounts", value: fmtMoney(summary?.totalDiscount ?? 0), icon: Percent, tone: "text-amber-600 dark:text-amber-400 bg-amber-500/12" },
+              ].map((s) => (
+                <div key={s.label} className="rounded-2xl border bg-background/70 backdrop-blur-sm p-4 flex flex-col justify-between min-h-[140px]">
+                  <span className={cn("h-8 w-8 rounded-xl inline-flex items-center justify-center", s.tone)}>
+                    <s.icon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <p className="text-lg sm:text-xl font-bold tabular-nums leading-none truncate">{s.value}</p>
+                    <p className="text-[11px] text-muted-foreground font-medium mt-1.5">{s.label}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {paymentMix.length > 0 && (
+            <div className="rounded-2xl border bg-background/60 backdrop-blur-sm p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted-foreground inline-flex items-center gap-1.5">
+                  <Banknote className="h-3.5 w-3.5" />
+                  Payment mix
+                </p>
+              </div>
+              <div className="h-2.5 rounded-full overflow-hidden flex bg-muted/60">
+                {paymentMix.map((m) => (
+                  <div
+                    key={m.method}
+                    className={cn("h-full first:rounded-l-full last:rounded-r-full", methodBarColor(m.method))}
+                    style={{ width: `${Math.max(m.pct, 2)}%` }}
+                    title={`${methodLabel(m.method)} ${m.pct}%`}
+                  />
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 mt-3">
+                {paymentMix.map((m) => (
+                  <div key={m.method} className="inline-flex items-center gap-2 text-xs">
+                    <span className={cn("h-2 w-2 rounded-full", methodBarColor(m.method))} />
+                    <span className="text-muted-foreground">{methodLabel(m.method)}</span>
+                    <span className="font-semibold tabular-nums">{fmtMoney(m.amount)}</span>
+                    <span className="text-muted-foreground tabular-nums">{m.pct}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Transactions */}
+      <section className="space-y-3">
+        <div className="flex items-end justify-between gap-3 flex-wrap">
+          <div>
+            <h2 className="text-lg font-bold tracking-tight">Transactions</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {loading ? "Loading…" : `${sales.length} sale${sales.length === 1 ? "" : "s"} on ${dateLabel.toLowerCase()}`}
+            </p>
+          </div>
+        </div>
+
+        <ClientSideTable
+          data={sales}
+          columns={columns}
+          searchableColumns={[{ id: "invoice", title: "Invoice / customer" }]}
+          filterableColumns={[
+            {
+              id: "status",
+              title: "Status",
+              options: [
+                { label: "Completed", value: "COMPLETED" },
+                { label: "Refunded", value: "REFUNDED" },
+                { label: "Pending", value: "PENDING" },
+              ],
+            },
+            {
+              id: "paymentMethod",
+              title: "Method",
+              options: (paymentMethodsInData.length
+                ? paymentMethodsInData
+                : ["CASH", "CARD", "BANK_TRANSFER", "UPI", "WALLET", "QR"]
+              ).map((m) => ({ label: methodLabel(m), value: m })),
+            },
+            {
+              id: "payStatus",
+              title: "Payment",
+              options: [
+                { label: "Paid", value: "Paid" },
+                { label: "Partial", value: "Partial" },
+                { label: "Unpaid", value: "Unpaid" },
+                { label: "Refunded", value: "Refunded" },
+              ],
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: `sales-${dateFilter}` }}
+        />
+      </section>
 
       {viewId && (
         <SaleDetailModal
