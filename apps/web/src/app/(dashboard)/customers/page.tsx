@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Plus, Star, Crown,
-  Users, Gift, RefreshCw, Download, Diamond, Wallet,
+  Users, Gift, RefreshCw, Diamond, Wallet,
   UserCheck, UserMinus, UserPlus, CreditCard, TrendingUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,11 @@ import { AddCustomerModal, type Customer } from "@/components/customers/add-cust
 import { ViewCustomerModal } from "@/components/customers/view-customer-modal";
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  BRONZE:   { label: "Bronze",   color: "text-amber-800",  bg: "bg-amber-50 border border-amber-200",  icon: Star },
-  SILVER:   { label: "Silver",   color: "text-slate-700",  bg: "bg-slate-100 border border-slate-300", icon: Star },
-  GOLD:     { label: "Gold",     color: "text-amber-700",  bg: "bg-amber-50 border border-amber-200",  icon: Crown },
-  PLATINUM: { label: "Platinum", color: "text-violet-700", bg: "bg-violet-50 border border-violet-200", icon: Crown },
-  DIAMOND:  { label: "Diamond",  color: "text-cyan-700",   bg: "bg-cyan-50 border border-cyan-200",   icon: Diamond },
+  BRONZE:   { label: "Bronze",   color: "text-amber-800 dark:text-amber-300",  bg: "bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",  icon: Star },
+  SILVER:   { label: "Silver",   color: "text-slate-700 dark:text-slate-300",  bg: "bg-slate-100 border border-slate-300 dark:bg-slate-500/10 dark:border-slate-500/30", icon: Star },
+  GOLD:     { label: "Gold",     color: "text-amber-700 dark:text-amber-300",  bg: "bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",  icon: Crown },
+  PLATINUM: { label: "Platinum", color: "text-violet-700 dark:text-violet-300", bg: "bg-violet-50 border border-violet-200 dark:bg-violet-500/10 dark:border-violet-500/30", icon: Crown },
+  DIAMOND:  { label: "Diamond",  color: "text-cyan-700 dark:text-cyan-300",   bg: "bg-cyan-50 border border-cyan-200 dark:bg-cyan-500/10 dark:border-cyan-500/30",   icon: Diamond },
 };
 
 const SEGMENT_ICON: Record<string, React.ElementType> = {
@@ -34,17 +34,6 @@ const SEGMENT_ICON: Record<string, React.ElementType> = {
   new: UserPlus,
   credit: CreditCard,
 };
-
-// ── CSV export ────────────────────────────────────────────────────────────
-function exportCsv(customers: Customer[]) {
-  const rows = customers.map((c) => [
-    `"${c.firstName} ${c.lastName ?? ""}"`, `"${c.phone}"`, `"${c.email ?? ""}"`,
-    c.tier, c.totalSpent, c.totalOrders, c.loyaltyPoints, c.walletBalance,
-  ].join(","));
-  const csv = ["Name,Phone,Email,Tier,TotalSpent,Orders,Points,Wallet", ...rows].join("\n");
-  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "customers-export.csv" });
-  a.click();
-}
 
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
@@ -56,6 +45,7 @@ function buildColumns(
   const cols: ColumnDef<Customer>[] = [
     {
       id: "customer",
+      accessorFn: (c) => `${c.firstName} ${c.lastName ?? ""} ${c.phone} ${c.email ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title={opts.customerLabel.replace(/s$/, "")} />,
       cell: ({ row }) => {
         const c = row.original;
@@ -63,7 +53,7 @@ function buildColumns(
         const tierConf = TIER_CONF[c.tier] ?? TIER_CONF.BRONZE;
         const TierIcon = tierConf.icon;
         return (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0" data-cell-wrap>
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
                 {getInitials(name)}
@@ -114,7 +104,7 @@ function buildColumns(
       accessorKey: "loyaltyPoints",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Points" />,
       cell: ({ row }) => (
-        <span className="text-sm font-semibold text-amber-700 tabular-nums">
+        <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 tabular-nums">
           {formatNumber(row.original.loyaltyPoints)}
         </span>
       ),
@@ -125,13 +115,14 @@ function buildColumns(
       accessorKey: "walletBalance",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Wallet" />,
       cell: ({ row }) => (
-        <span className={`text-sm font-semibold tabular-nums ${row.original.walletBalance > 0 ? "text-emerald-700" : "text-muted-foreground"}`}>
+        <span className={`text-sm font-semibold tabular-nums ${row.original.walletBalance > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
           LKR {formatNumber(row.original.walletBalance)}
         </span>
       ),
     },
     {
       id: "actions",
+      enableSorting: false,
       cell: ({ row }) => (
         <TableActionsRow
           showAction={{ action: () => onView(row.original), tooltip: "View Profile" }}
@@ -254,24 +245,13 @@ export default function CustomersPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={fetchCustomers} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => exportCsv(customers)}
-              disabled={!customers.length}
-              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
-            >
-              <Download className="h-[18px] w-[18px]" />
-              Export
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => void fetchCustomers()} className="gap-1.5">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
           <Button
-            className="h-10 rounded-[12px] gap-1.5 text-sm px-4 shadow-button"
+            className="gap-1.5"
             onClick={() => {
               setEditCustomer(undefined);
               setAddOpen(true);
@@ -283,8 +263,8 @@ export default function CustomersPage() {
         </div>
       </div>
 
-      {/* Primary KPIs */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 ${showLoyalty ? "xl:grid-cols-4" : "xl:grid-cols-2"}`}>
+      {/* KPIs — one clean row */}
+      <div className={`grid grid-cols-2 gap-3 ${showLoyalty ? "xl:grid-cols-4" : "xl:grid-cols-2"}`}>
         {STATS.map((s) => (
           <Card
             key={s.label}
@@ -303,52 +283,41 @@ export default function CustomersPage() {
         ))}
       </div>
 
-      {/* Segments */}
+      {/* Segments — compact chips (not a second card grid) */}
       {segments.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="flex flex-wrap gap-2">
           {segments.map((s) => {
             const Icon = SEGMENT_ICON[s.key] ?? Users;
             return (
-              <Card
+              <div
                 key={s.key}
-                className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent"
+                className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium"
               >
-                <CardContent className="h-[68px] p-4 flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-[12px] bg-muted border border-border flex items-center justify-center shrink-0">
-                    <Icon className="h-[18px] w-[18px] text-muted-foreground" strokeWidth={1.75} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[22px] font-bold tabular-nums leading-none">{s.count}</p>
-                    <p className="text-[11px] font-medium text-muted-foreground mt-1 leading-tight truncate">
-                      {s.label}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+                <Icon className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.75} />
+                <span className="text-muted-foreground">{s.label}</span>
+                <span className="font-bold tabular-nums text-foreground">{s.count}</span>
+              </div>
             );
           })}
         </div>
       )}
 
-      {/* Table */}
+      {/* Table — single search, tier filter, one export */}
       <ClientSideTable
-          fillHeight
-          data={customers}
-          columns={columns}
-          pageCount={Math.ceil(customers.length / 10)}
-          searchableColumns={[
-            { id: "phone", title: "Phone" },
-            { id: "email", title: "Email" },
-          ]}
-          filterableColumns={[
-            {
-              id: "tier",
-              title: "Tier",
-              options: Object.entries(TIER_CONF).map(([v, c]) => ({ value: v, label: c.label })),
-            },
-          ]}
-          isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
-        />
+        data={customers}
+        columns={columns}
+        searchableColumns={[
+          { id: "customer", title: "Customer / phone / email" },
+        ]}
+        filterableColumns={[
+          {
+            id: "tier",
+            title: "Tier",
+            options: Object.entries(TIER_CONF).map(([v, c]) => ({ value: v, label: c.label })),
+          },
+        ]}
+        isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
+      />
 
       <AddCustomerModal
         open={addOpen}
@@ -357,7 +326,7 @@ export default function CustomersPage() {
           setEditCustomer(undefined);
         }}
         onSaved={() => {
-          fetchCustomers();
+          void fetchCustomers();
           setAddOpen(false);
           setEditCustomer(undefined);
         }}
