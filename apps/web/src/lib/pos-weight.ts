@@ -15,6 +15,21 @@ export function isPosWeightedProduct(p?: PosWeightProduct | null): boolean {
   return u === "kg" || u === "g" || u === "gram" || u === "grams";
 }
 
+/** Scan must open gram/qty popup (scale / kg items only — not plain piece goods with allowDecimalSelling). */
+export function needsPosWeightPopup(p?: PosWeightProduct | null): boolean {
+  if (!p) return false;
+  if (p.productKind === "WEIGHTED") return true;
+  const u = (p.unit ?? "").trim().toLowerCase();
+  return (
+    u === "kg" ||
+    u === "g" ||
+    u === "gram" ||
+    u === "grams" ||
+    u === "kilogram" ||
+    u === "kilograms"
+  );
+}
+
 /** Product catalog unit is kilograms (price typically per kg). */
 export function isPosKgUnit(p?: PosWeightProduct | null): boolean {
   const u = (p?.unit ?? "").trim().toLowerCase();

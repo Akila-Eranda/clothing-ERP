@@ -145,11 +145,14 @@ export interface PosKeyboardContext {
   getInlineCustomer: (idx: number) => PosCustomerRow | undefined;
 }
 
-function isInputFocused() {
-  const el = document.activeElement as HTMLElement | null;
+function isInputFocused(target?: EventTarget | null) {
+  const el = (target as HTMLElement | null) ?? (document.activeElement as HTMLElement | null);
   if (!el) return false;
+  if (el.isContentEditable) return true;
   const tag = el.tagName;
-  return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  // Capture-phase: event target may be a child; also cover wrapped fields
+  return !!el.closest?.("input, textarea, select, [contenteditable='true']");
 }
 
 function anyModalOpen(ctx: PosKeyboardContext) {
@@ -200,8 +203,9 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
 
     const onKey = (e: KeyboardEvent) => {
       const ctx = ctxRef.current;
-      const inInput = isInputFocused();
-      const isSearch = document.activeElement === ctx.searchRef.current;
+      const inInput = isInputFocused(e.target) || isInputFocused(document.activeElement);
+      const isSearch = document.activeElement === ctx.searchRef.current
+        || e.target === ctx.searchRef.current;
       const searchValue = ctx.searchRef.current?.value ?? "";
       const searchEmpty = isSearch && !searchValue.trim();
 
@@ -577,27 +581,27 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           ctx.setQuickCash(amounts[parseInt(e.key, 10) - 1]!);
           return;
         }
-        if (e.key === "ArrowLeft" && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (!inInput && e.key === "ArrowLeft" && !e.ctrlKey && !e.shiftKey && !e.altKey) {
           e.preventDefault();
           cyclePayment(ctx, -1);
           return;
         }
-        if (e.key === "ArrowRight" && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+        if (!inInput && e.key === "ArrowRight" && !e.ctrlKey && !e.shiftKey && !e.altKey) {
           e.preventDefault();
           cyclePayment(ctx, 1);
           return;
         }
-        if (e.key === "Tab" && e.shiftKey) {
+        if (!inInput && e.key === "Tab" && e.shiftKey) {
           e.preventDefault();
           cyclePayment(ctx, -1);
           return;
         }
-        if (e.key === "Tab") {
+        if (!inInput && e.key === "Tab") {
           e.preventDefault();
           cyclePayment(ctx, 1);
           return;
         }
-        if (ctx.activePayment === "CASH") {
+        if (!inInput && ctx.activePayment === "CASH") {
           if (/^\d$/.test(e.key)) {
             e.preventDefault();
             ctx.handleNumpad(e.key);
@@ -614,7 +618,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
             return;
           }
         }
-        if ((e.altKey || ctx.activePayment !== "CASH") && /^[1-9]$/.test(e.key)) {
+        if (!inInput && (e.altKey || ctx.activePayment !== "CASH") && /^[1-9]$/.test(e.key)) {
           const idx = parseInt(e.key, 10) - 1;
           if (idx < POS_PAY_METHODS.length) {
             e.preventDefault();
@@ -657,7 +661,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (ctx.activeNav === "products" && ctx.focusedProductIdx >= 0 && !ctx.checkoutOpen && !ctx.showCustomerSearch && !ctx.showHeldBills) {
           e.preventDefault();
           const p = ctx.getFilteredProduct(ctx.focusedProductIdx);
-          if (p) ctx.handleCardClick(p);
+          if (p) ctx.handleAddProduct(p);
           return;
         }
         if (ctx.activeNav === "customers" && ctx.focusedCustomerIdx >= 0 && !ctx.showCustomerSearch) {

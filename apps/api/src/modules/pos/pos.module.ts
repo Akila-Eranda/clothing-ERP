@@ -1137,7 +1137,18 @@ export class PosService {
             },
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           }) as VariantRow[];
-          if (siblings.length > 1) return pickMulti(siblings);
+          // Shared product barcode: auto-pick best stocked sibling (POS scan must stay instant)
+          if (siblings.length >= 1) {
+            const ranked = siblings
+              .map((v) => ({ v, stock: Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0)) }))
+              .sort((a, b) => b.stock - a.stock);
+            return this.enrichBarcodeResult(
+              tenantId,
+              resolvedBranchId,
+              mapVariant(ranked[0].v),
+              supplierId,
+            );
+          }
         }
         return pickMulti(exactBarcodeHits);
       }
@@ -1163,7 +1174,20 @@ export class PosService {
             },
             orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
           }) as VariantRow[];
-          if (siblings.length > 1) return pickMulti(siblings);
+          if (siblings.length > 1) {
+            const rankedSiblings = siblings
+              .map((v) => ({
+                v,
+                stock: Math.max(0, (v.inventory[0]?.quantity ?? 0) - (v.inventory[0]?.reservedQty ?? 0)),
+              }))
+              .sort((a, b) => b.stock - a.stock);
+            return this.enrichBarcodeResult(
+              tenantId,
+              resolvedBranchId,
+              mapVariant(rankedSiblings[0].v),
+              supplierId,
+            );
+          }
         }
         return this.enrichBarcodeResult(tenantId, resolvedBranchId, mapVariant(only), supplierId);
       }
@@ -1394,7 +1418,8 @@ export class PosService {
 
   async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number; supplierId?: string }) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const take = Math.min(Math.max(opts?.limit ?? 1500, 1), 2000);
+    // Supermarket catalogs can be 5k–10k SKUs; keep local POS cache complete for instant scan.
+    const take = Math.min(Math.max(opts?.limit ?? 10000, 1), 15000);
     const search = opts?.search?.trim();
     const variants = await this.prisma.productVariant.findMany({
       where: {
@@ -1437,8 +1462,35 @@ export class PosService {
             }
           : {}),
       },
-      include: {
-        product: { include: { category: true, brand: true } },
+      select: {
+        id: true,
+        productId: true,
+        name: true,
+        sku: true,
+        barcode: true,
+        sellingPrice: true,
+        costPrice: true,
+        mrp: true,
+        color: true,
+        size: true,
+        material: true,
+        style: true,
+        images: true,
+        sortOrder: true,
+        product: {
+          select: {
+            name: true,
+            barcode: true,
+            taxRate: true,
+            images: true,
+            productKind: true,
+            unit: true,
+            allowDecimalSelling: true,
+            weightScaleReady: true,
+            warrantyMonths: true,
+            category: { select: { name: true } },
+          },
+        },
         supplierAssignments: opts?.supplierId
           ? {
               where: { tenantId, supplierId: opts.supplierId },
@@ -1485,8 +1537,8 @@ export class PosService {
         costPrice:   v.costPrice,
         mrp:         v.mrp,
         taxRate:     v.product.taxRate ?? 0,
-        category:    (v.product.category as { name?: string } | null)?.name ?? 'Other',
-        brand:       (v.product.brand as { name?: string } | null)?.name ?? null,
+        category:    v.product.category?.name ?? 'Other',
+        brand:       null as string | null,
         color:       v.color ?? undefined,
         size:        v.size  ?? undefined,
         material:    v.material ?? undefined,

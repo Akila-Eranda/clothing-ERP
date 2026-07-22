@@ -47,6 +47,7 @@ import {
   readPosWaBillOffer, writePosWaBillOffer,
   readPosSavedTaxRate, writePosSavedTaxRate,
   readPosCartWidth, writePosCartWidth,
+  readPosQtyPopup, writePosQtyPopup,
   POS_CART_WIDTH_PRESETS, POS_CART_WIDTH_MIN, POS_CART_WIDTH_MAX,
   type PosTenantSettings,
 } from "@/lib/pos-settings";
@@ -56,6 +57,7 @@ import {
   formatPosWeightQty,
   gramsToCartQty,
   isPosWeightedProduct,
+  needsPosWeightPopup,
   parseGramsInput,
 } from "@/lib/pos-weight";
 import type { Customer } from "@/types";
@@ -336,6 +338,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [touchMode, setTouchMode] = React.useState(false);
   const [cartWidth, setCartWidth] = React.useState(() => readPosCartWidth());
   const cartResizeRef = React.useRef<{ startX: number; startW: number } | null>(null);
+  const [confirmQtyPopup, setConfirmQtyPopup] = React.useState(() => readPosQtyPopup());
   const [soundAlerts, setSoundAlerts] = React.useState(true);
   const [addPopup, setAddPopup] = React.useState<AddPopupState | null>(null);
   const [editingCartQtyIdx, setEditingCartQtyIdx] = React.useState<number | null>(null);
@@ -536,8 +539,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   React.useEffect(() => {
     if (!checkoutOpen || activePayment !== "CARD") return;
     const t = setTimeout(() => {
-      cardLast3Ref.current?.focus();
-      cardLast3Ref.current?.select();
+      const el = cardLast3Ref.current;
+      if (!el) return;
+      el.focus();
+      // Only select-all when empty so ← → can move the caret while editing
+      if (!el.value) el.select();
     }, 50);
     return () => clearTimeout(t);
   }, [checkoutOpen, activePayment]);
@@ -743,10 +749,34 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     return () => { cancelled = true; };
   }, [checkoutOpen]);
 
-  const loadProducts = React.useCallback(async () => {
-    setLoading(true);
-    try { const r = await api.get<ProductItem[]>("/pos/products"); const raw = Array.isArray(r.data) ? r.data : []; setProducts(raw); setCategories(["All",...Array.from(new Set(raw.map(p=>p.category).filter(Boolean)))]); }
-    catch { toast.error("Failed to load products"); } finally { setLoading(false); }
+  const loadProducts = React.useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
+    try {
+      const r = await api.get<ProductItem[]>("/pos/products?limit=12000");
+      const raw = Array.isArray(r.data) ? r.data : [];
+      setProducts(raw);
+      setCategories(["All", ...Array.from(new Set(raw.map((p) => p.category).filter(Boolean)))]);
+    } catch {
+      if (!opts?.silent) toast.error("Failed to load products");
+    } finally {
+      if (!opts?.silent) setLoading(false);
+    }
+  }, []);
+
+  const applySoldStockLocally = React.useCallback((sold: { variantId: string; quantity: number }[]) => {
+    if (!sold.length) return;
+    const byId = new Map<string, number>();
+    for (const row of sold) {
+      byId.set(row.variantId, (byId.get(row.variantId) ?? 0) + row.quantity);
+    }
+    setProducts((prev) =>
+      prev.map((p) => {
+        const qty = byId.get(p.variantId);
+        if (!qty) return p;
+        const next = Math.max(0, p.stock - qty);
+        return { ...p, stock: next };
+      }),
+    );
   }, []);
 
   const handleHoldBill = React.useCallback(async () => {
@@ -827,6 +857,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   React.useEffect(() => {
     setTouchMode(readPosTouchMode());
     setSoundAlerts(readPosSoundAlerts());
+    setConfirmQtyPopup(readPosQtyPopup());
     setWaBillEnabled(readPosWaBillOffer());
     setCartWidth(readPosCartWidth());
   }, []);
@@ -1229,8 +1260,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   }, [addItem, profile, taxRate, soundAlerts, allowNegativeStock]);
 
   const handleAddProduct = React.useCallback((p: ProductItem) => {
-    openAddPopup(p);
-  }, [openAddPopup]);
+    // Keyboard / recent-scan add: skip popup unless setting ON or weighted
+    if (confirmQtyPopup || needsPosWeightPopup(p)) {
+      openAddPopup(p);
+      return;
+    }
+    commitAddProduct(p, 1, { keepSearchFocus: true });
+  }, [openAddPopup, commitAddProduct, confirmQtyPopup]);
 
   const scanAndAddProduct = React.useCallback(async (code: string) => {
     const trimmed = code.trim();
@@ -1241,15 +1277,76 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       variants?: ProductItem[];
     };
 
-    const finishScanOpen = (pick: ProductItem, matches?: ProductItem[]) => {
+    const finishScan = (pick: ProductItem, matches?: ProductItem[]) => {
       setSelectedProductName(null);
-      openAddPopup(pick, matches);
       setSearch("");
       setLastScanAt(new Date());
       setScanFlash(true);
       setTimeout(() => setScanFlash(false), 500);
-      playPosSound("scan_ok", soundAlerts);
+
+      // Weight (kg/g) always needs gram entry. Qty popup only when setting is ON.
+      // Multi-variant / shared-barcode: auto-pick best match → cart (no slow popup).
+      if (needsPosWeightPopup(pick) || confirmQtyPopup) {
+        openAddPopup(pick, matches);
+        playPosSound("scan_ok", soundAlerts);
+        return;
+      }
+
+      let chosen = pick;
+      if (matches && matches.length > 1) {
+        const codeLower = trimmed.toLowerCase();
+        const exactSku = matches.find((p) => p.sku.toLowerCase() === codeLower);
+        const exactBarcode = matches.find((p) => (p.barcode ?? "").toLowerCase() === codeLower);
+        chosen =
+          exactSku
+          ?? exactBarcode
+          ?? matches.find((p) => p.stock > 0)
+          ?? matches[0]
+          ?? pick;
+      }
+      commitAddProduct(chosen, 1, { keepSearchFocus: true });
     };
+
+    // Fast path: resolve from local catalog cache before waiting on the API
+    const localMatches = findAllProductsByBarcodeCode(trimmed, products);
+    if (localMatches.length > 1) {
+      const pick = localMatches.find((p) => p.stock > 0) ?? localMatches[0];
+      finishScan(pick, localMatches);
+      return;
+    }
+    if (localMatches.length === 1) {
+      let found = localMatches[0];
+      const siblings = getVariants(found.productName);
+      if (siblings.length > 1) {
+        const codeLower = trimmed.toLowerCase();
+        const exactSku = siblings.find((p) => p.sku.toLowerCase() === codeLower);
+        const exactBarcode = siblings.find((p) => p.barcode?.toLowerCase() === codeLower);
+        if (!exactSku && !exactBarcode) {
+          finishScan(found, siblings);
+          return;
+        }
+        found = exactSku ?? exactBarcode ?? found;
+      }
+      finishScan(found);
+      // Refresh live stock in background (do not block scan)
+      void (async () => {
+        for (const key of barcodeLookupCandidates(trimmed)) {
+          try {
+            const r = await api.get<BarcodeLookup>(`/pos/barcode/${encodeURIComponent(key)}`);
+            const fromApi = r.data;
+            if (fromApi?.variantId) {
+              setProducts((prev) =>
+                prev.map((p) => (p.variantId === fromApi.variantId ? { ...p, stock: fromApi.stock } : p)),
+              );
+            }
+            break;
+          } catch {
+            /* try next */
+          }
+        }
+      })();
+      return;
+    }
 
     let found: BarcodeLookup | undefined;
     for (const key of barcodeLookupCandidates(trimmed)) {
@@ -1260,7 +1357,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         if (fromApi.requiresVariantPick || apiVariants.length > 1) {
           const matches = apiVariants.length > 0 ? apiVariants : [fromApi as ProductItem];
           const pick = matches.find((v) => v.stock > 0) ?? matches[0];
-          finishScanOpen(pick, matches);
+          finishScan(pick, matches);
           return;
         }
         const cached = products.find((p) => p.variantId === fromApi.variantId);
@@ -1275,22 +1372,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
 
     if (!found) {
-      const localMatches = findAllProductsByBarcodeCode(trimmed, products);
-      if (localMatches.length > 1) {
-        const pick = localMatches.find((p) => p.stock > 0) ?? localMatches[0];
-        finishScanOpen(pick, localMatches);
-        return;
-      }
-      found = localMatches[0] ?? findProductByBarcodeCode(trimmed, products);
+      found = findProductByBarcodeCode(trimmed, products);
       if (found) {
         const siblings = getVariants(found.productName);
         if (siblings.length > 1) {
           const codeLower = trimmed.toLowerCase();
           const exactSku = siblings.find((p) => p.sku.toLowerCase() === codeLower);
           const exactBarcode = siblings.find((p) => p.barcode?.toLowerCase() === codeLower);
-          // Shared product barcode (no unique variant match) → picker
           if (!exactSku && !exactBarcode) {
-            finishScanOpen(found, siblings);
+            finishScan(found, siblings);
             return;
           }
           found = exactSku ?? exactBarcode ?? found;
@@ -1305,8 +1395,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       requestAnimationFrame(() => searchRef.current?.focus());
       return;
     }
-    finishScanOpen(found);
-  }, [products, openAddPopup, soundAlerts, getVariants]);
+    finishScan(found);
+  }, [products, openAddPopup, commitAddProduct, soundAlerts, getVariants, confirmQtyPopup]);
 
   const handleCardClick = React.useCallback((p: ProductItem) => {
     openAddPopup(p);
@@ -1315,29 +1405,43 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const handleSearchEnter = React.useCallback(() => {
     const q = search.trim();
     if (!q) return;
+    // Always treat Enter in search as barcode/SKU scan when possible — never open the slow qty popup via card click.
     const barcodeLike =
       isLikelyBarcodeScan(q) ||
       matchesCachedBarcode(q, products) ||
       !!findProductByBarcodeCode(q, products);
-    if (barcodeLike) {
+    if (barcodeLike || productCards.length === 0) {
       setSearch("");
       requestAnimationFrame(() => searchRef.current?.focus());
       void scanAndAddProduct(q);
       return;
     }
-    if (productCards.length === 0) {
+    // Name search with one clear match → still scan-add (instant cart), not qty popup
+    if (productCards.length === 1) {
+      const only = productCards[0].rep;
       setSearch("");
       requestAnimationFrame(() => searchRef.current?.focus());
-      void scanAndAddProduct(q);
+      // Prefer barcode path if the typed text looks like an id; else add the focused card directly
+      if (isLikelyBarcodeScan(q) || matchesCachedBarcode(q, products)) {
+        void scanAndAddProduct(q);
+      } else if (confirmQtyPopup) {
+        handleCardClick(only);
+      } else {
+        commitAddProduct(only, 1, { keepSearchFocus: true });
+      }
       return;
     }
     const idx = focusedProductIdx >= 0 && focusedProductIdx < productCards.length
       ? focusedProductIdx
       : 0;
-    handleCardClick(productCards[idx].rep);
+    if (confirmQtyPopup) {
+      handleCardClick(productCards[idx].rep);
+    } else {
+      commitAddProduct(productCards[idx].rep, 1, { keepSearchFocus: true });
+    }
     setSearch("");
     requestAnimationFrame(() => searchRef.current?.focus());
-  }, [search, products, productCards, focusedProductIdx, scanAndAddProduct, handleCardClick]);
+  }, [search, products, productCards, focusedProductIdx, scanAndAddProduct, handleCardClick, confirmQtyPopup, commitAddProduct]);
 
   const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
 
@@ -1736,7 +1840,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         setWaBillOffer(null);
       }
       setTimeout(() => setThankYouSale(null), 12_000);
-      clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
+      // Checkout tax is per-bill: remember rate for next toggle, then turn OFF for the next sale
+      if (taxRate > 0) writePosSavedTaxRate(taxRate);
+      clearCart();
+      setTaxRate(0);
+      setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber(""); setCardLast3(""); setPayBankAccountId("");
       setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
@@ -1766,16 +1874,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           title: `Receipt ${s.invoiceNumber}`,
         }).catch((e) => toast.error((e as Error).message ?? "Receipt print failed"));
       }
-      // Reset for next sale immediately — do not block scanner on product reload
+      // Reset for next sale immediately — do not block scanner on full catalog reload
       setTimeout(() => searchRef.current?.focus(), 80);
       void loadHeldBills();
-      void loadProducts();
+      applySoldStockLocally(saleSnapshot.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })));
       void loadTodayStats();
       void refreshPrinterStatus();
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -2158,10 +2266,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           )}
         </div>
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"var(--pos-border)"}}>
-          <div className="flex-1 border-r flex flex-col min-w-0" style={{borderColor:"var(--pos-border)"}}>
+          <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
             <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material, lightUi)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
+          <div className="w-px shrink-0 self-stretch" style={{ background: "var(--pos-border)" }} aria-hidden />
           <div className="flex-1 flex flex-col min-w-0">
             <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Recent Scan</span>{recentScans.length>0&&<button onClick={()=>setRecentScans([])} className="p-1 rounded hover:bg-white/10"><Trash2 className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>}</div>
             <div className="overflow-y-auto flex-1">{recentScans.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Scan className="h-10 w-10 mb-2 opacity-30"/><p className="text-sm font-semibold">No recent scans</p></div>:recentScans.map(s=>{
@@ -2918,7 +3027,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             {([
               { key: "touch", label: "Touch Mode", desc: "Larger buttons & product tiles", icon: Hand, on: touchMode, set: (v: boolean) => { setTouchMode(writePosTouchMode(v)); } },
               { key: "sound", label: "Sound Alerts", desc: "Beep on scan / sale complete", icon: Volume2, on: soundAlerts, set: (v: boolean) => { setSoundAlerts(writePosSoundAlerts(v)); } },
-              { key: "qty", label: "Add popup", desc: "Always confirms qty, selling price, and variant", icon: Package, on: true, set: () => toast.info("Add popup is always enabled") },
+              { key: "qty", label: "Add popup", desc: "After scan, confirm qty & selling price (OFF = instant cart)", icon: Package, on: confirmQtyPopup, set: (v: boolean) => { setConfirmQtyPopup(writePosQtyPopup(v)); } },
             ] as const).map((row) => (
               <div key={row.key} className="flex items-center gap-3 py-2 border-b last:border-0" style={{borderColor:"var(--pos-border)"}}>
                 <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><row.icon className="h-4 w-4" style={{color:"#4f6ef7"}}/></div>
@@ -3848,8 +3957,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <button
                       onClick={() => void handleCheckout("CASH")}
                       disabled={items.length === 0 || checkoutLoading || !!pendingDiscountApproval}
-                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
-                      style={{background:"linear-gradient(135deg,#10b981,#059669)"}}
+                      data-pos-accent=""
+                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
                     >
                       {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />}
                       Pay Cash
@@ -3858,8 +3968,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <button
                       onClick={() => { setActivePayment("CASH"); setCheckoutOpen(true); }}
                       disabled={items.length === 0}
-                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-40"
-                      style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}
+                      data-pos-accent=""
+                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                      style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#ffffff" }}
                     >
                       <ChevronRight className="h-4 w-4"/>
                       Pay / Card
@@ -4019,13 +4130,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 {/* Right: methods + keypad + confirm */}
                 <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto">
                 <div className="flex gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap" style={{borderColor:"var(--pos-border)"}}>
-                  {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>(
-                    <button key={value} type="button" title={`${label} (${idx + 1})`} onClick={()=>setActivePayment(value)} className={cn("flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all", touchMode ? "py-2.5" : "py-1.5")} style={{background:activePayment===value?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activePayment===value?"#fff":"var(--pos-muted)"}}>
-                      <Icon className={touchMode ? "h-5 w-5" : "h-4 w-4"}/>
+                  {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>{
+                    const active = activePayment === value;
+                    return (
+                    <button
+                      key={value}
+                      type="button"
+                      title={`${label} (${idx + 1})`}
+                      onClick={()=>setActivePayment(value)}
+                      className={cn("flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all border", touchMode ? "py-2.5" : "py-1.5")}
+                      style={{
+                        background: active ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
+                        borderColor: active ? "transparent" : (isPosLight ? "#94A3B8" : "var(--pos-border)"),
+                        color: active ? "#fff" : (isPosLight ? "#0F172A" : "var(--pos-text-secondary)"),
+                      }}
+                    >
+                      <Icon className={touchMode ? "h-5 w-5" : "h-4 w-4"} strokeWidth={2.25} />
                       <span>{label}</span>
-                      <span className="text-[9px] font-mono opacity-70">{idx + 1}</span>
+                      <span className="text-[9px] font-mono" style={{ opacity: active ? 0.7 : (isPosLight ? 0.55 : 0.7) }}>{idx + 1}</span>
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
                 {activePayment==="GIFT_VOUCHER"&&(
                   <input
@@ -4054,6 +4179,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     </label>
                     <input
                       ref={cardLast3Ref}
+                      data-pos-field="card-last3"
                       value={cardLast3}
                       onChange={(e)=>setCardLast3(e.target.value.replace(/\D/g, "").slice(0, 3))}
                       inputMode="numeric"
@@ -4062,6 +4188,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       className="w-full h-11 px-3 rounded-xl text-center text-xl text-white outline-none font-mono tracking-[0.35em]"
                       style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       onKeyDown={(e)=>{
+                        // Let ← → Home End move the caret — don't bubble to POS payment cycling
+                        if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End") {
+                          e.stopPropagation();
+                          return;
+                        }
                         if (e.key === "Enter") {
                           e.preventDefault();
                           void handleCheckout();
@@ -4110,7 +4241,13 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 )}
                 {activePayment==="CASH"&&(
                   <div ref={cashPanelRef} className="px-3 py-2 flex-1 flex flex-col min-h-0" style={{borderColor:"var(--pos-border)"}}>
-                    <div className="flex items-center justify-between mb-1.5 gap-2"><span className="text-sm font-semibold" style={{color:"var(--pos-muted)"}}>{payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}</span><span className="text-[10px] font-mono shrink-0" style={{color:"var(--pos-muted-2)"}}>F9 confirm</span><button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button></div>
+                    <div className="flex items-center justify-between mb-1.5 gap-2">
+                      <span className="text-base font-bold" style={{color:"var(--pos-text)"}}>
+                        {payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}
+                      </span>
+                      <span className="text-[10px] font-mono shrink-0" style={{color:"var(--pos-muted-2)"}}>F9 confirm</span>
+                      <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
+                    </div>
                     <div className="h-12 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                     {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
@@ -4121,8 +4258,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <div className="grid gap-1.5 flex-1 content-start" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
-                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95" style={{background:isQuick?"var(--pos-border)":isDel?"rgba(239,68,68,0.15)":"var(--pos-input)",color:isQuick?"var(--pos-muted)":isDel?"#ef4444":"var(--pos-text)"}}>
-                          {isDel?<Delete className="h-4 w-4 mx-auto"/>:k}
+                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95 border" style={{
+                          background: isQuick ? (isPosLight ? "#CBD5E1" : "var(--pos-border)") : isDel ? "rgba(239,68,68,0.15)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
+                          borderColor: isDel ? "rgba(239,68,68,0.35)" : (isPosLight ? "#94A3B8" : "var(--pos-border)"),
+                          color: isQuick ? (isPosLight ? "#0F172A" : "var(--pos-text)") : isDel ? "#DC2626" : "var(--pos-text)",
+                        }}>
+                          {isDel?<Delete className="h-4 w-4 mx-auto" strokeWidth={2.25}/>:k}
                         </button>);
                       }))}
                     </div>
@@ -4136,20 +4277,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2 border-t shrink-0" style={{borderColor:"var(--pos-border)"}}>
-                    <span className="text-sm font-semibold text-green-400">Change</span>
-                    <span className="text-green-400 font-bold font-mono text-base">LKR {formatNumber(changeAmt)}</span>
+                  <div className="flex justify-between items-center px-4 py-2.5 border-t shrink-0" style={{borderColor:"var(--pos-border)"}}>
+                    <span className="text-base font-bold text-green-500 dark:text-green-400">Change</span>
+                    <span className="text-green-500 dark:text-green-400 font-bold font-mono text-xl">LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
                 <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{
+                    borderColor: isPosLight ? "#64748B" : "var(--pos-border)",
+                    color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)",
+                    background: isPosLight ? "#E2E8F0" : "transparent",
+                  }}>
                     Split Bill
                   </button>
                   <button ref={checkoutConfirmRef} type="button" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
                     {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                     Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)"}} title="Print (F10)"><Printer className="h-5 w-5" style={{color:"var(--pos-muted)"}}/></button>
+                  <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{
+                    borderColor: isPosLight ? "#64748B" : "var(--pos-border)",
+                    background: isPosLight ? "#E2E8F0" : "transparent",
+                  }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)"}} strokeWidth={2.25}/></button>
                 </div>
                 <p className="px-3 py-1.5 text-[10px] text-center border-t shrink-0" style={{ color: "var(--pos-muted)", borderColor: "var(--pos-border)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
@@ -4178,13 +4326,22 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
               </div>
             ))}
             {drawerCash != null && (
-              <div className="flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.3)" }}>
-                <Banknote className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />
-                <span className="text-[10px] sm:text-xs font-medium hidden md:inline" style={{ color: "var(--pos-success-soft)" }}>
+              <div
+                className="flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full"
+                style={{
+                  background: isPosLight ? "#047857" : "rgba(16,185,129,0.2)",
+                  border: isPosLight ? "1px solid #065F46" : "1px solid rgba(16,185,129,0.35)",
+                  color: "#ffffff",
+                }}
+              >
+                <Banknote className="h-3.5 w-3.5 shrink-0" style={{ color: "#ffffff" }} strokeWidth={2.25} />
+                <span className="text-[10px] sm:text-xs font-medium hidden md:inline" style={{ color: "#ffffff" }}>
                   <span className="lg:hidden">Drawer</span>
                   <span className="hidden lg:inline">In drawer</span>
                 </span>
-                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap" style={{ color: "#10b981" }}>LKR {formatNumber(drawerCash)}</span>
+                <span className="text-xs sm:text-sm font-bold tabular-nums whitespace-nowrap" style={{ color: "#ffffff" }}>
+                  LKR {formatNumber(drawerCash)}
+                </span>
               </div>
             )}
           </div>

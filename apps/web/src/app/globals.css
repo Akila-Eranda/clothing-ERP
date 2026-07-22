@@ -731,6 +731,12 @@
 .pos-shell.pos-light [style*="linear-gradient(135deg,#4f6ef7"] *,
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"],
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"] *,
+.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"],
+.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"] *,
+.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"],
+.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"] *,
+.pos-shell.pos-light button[data-pos-accent],
+.pos-shell.pos-light button[data-pos-accent] *,
 .pos-shell.pos-light button[style*="background:#4f6ef7"],
 .pos-shell.pos-light button[style*="background: #4f6ef7"],
 .pos-shell.pos-light button[style*="background:#10b981"],
@@ -745,12 +751,14 @@
 .pos-shell.pos-light button[style*="#475569"] {
   color: #ffffff !important;
 }
+.pos-shell.pos-light button[data-pos-accent] svg,
 .pos-shell.pos-light button[style*="#DC2626"] svg,
 .pos-shell.pos-light button[style*="#059669"] svg,
 .pos-shell.pos-light button[style*="#334155"] svg,
 .pos-shell.pos-light button[style*="#475569"] svg,
-.pos-shell.pos-light button[style*="#4f6ef7"][style*="linear-gradient"] svg,
+.pos-shell.pos-light button[style*="#4f6ef7"] svg,
 .pos-shell.pos-light button[style*="#10b981"] svg {
   color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
