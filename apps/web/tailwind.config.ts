@@ -9,6 +9,8 @@ const config: Config = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
     "./node_modules/react-table-craft/dist/**/*.{js,mjs}",
   ],
+  // TableCraft responsive toolbars — keep these utilities even if scan misses the package
+  safelist: ["md:hidden", "max-md:hidden"],
   theme: {
     container: {
       center: true,

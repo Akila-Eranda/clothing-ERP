@@ -437,36 +437,49 @@
     box-shadow: none;
   }
 
-  /* Inner craft root — height follows content (no forced empty gap) */
-  [data-table-craft] > div {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    min-width: 0;
-    width: 100%;
-  }
-  [data-table-craft] > div > div {
+  [data-table-craft] > * {
     min-width: 0;
   }
 
-  /* Toolbar row spacing */
-  [data-table-craft] > .flex,
-  [data-table-craft] > div > .flex.items-center {
+  /*
+   * TableCraft always mounts BOTH toolbars:
+   *   1) desktop  — div.max-md:hidden
+   *   2) mobile   — div.flex.items-center.justify-between.md:hidden  (Filter + Export)
+   * Package classes in node_modules are not always emitted by Tailwind, so the
+   * mobile bar leaks on every desktop list page. Force the responsive split here.
+   */
+  @media (min-width: 768px) {
+    [data-table-craft] > .flex.items-center.justify-between {
+      display: none !important;
+    }
+  }
+  @media (max-width: 767.98px) {
+    [data-table-craft] > .max-md\:hidden {
+      display: none !important;
+    }
+  }
+
+  /* Desktop toolbar chrome */
+  [data-table-craft] > .max-md\:hidden {
     padding: 0.75rem 0.875rem;
     border-bottom: 1px solid hsl(var(--border));
     background: hsl(var(--card));
-    flex-wrap: wrap;
-    row-gap: 0.5rem;
-    column-gap: 0.5rem;
   }
-  .dark [data-table-craft] > .flex,
-  .dark [data-table-craft] > div > .flex.items-center {
+  .dark [data-table-craft] > .max-md\:hidden {
     border-bottom-color: rgba(255, 255, 255, 0.06);
   }
 
-  /* Long lists only: scroll the body; short lists stay compact */
-  [data-table-craft][data-fill-height="true"] .overflow-auto,
-  [data-table-craft][data-fill-height="true"] .relative.w-full.overflow-auto {
+  /* Flatten nested Card from TableCraft — outer [data-table-craft] is the only chrome */
+  [data-table-craft] > .mt-3 {
+    margin-top: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Long lists: scroll the table body only; short lists stay compact */
+  [data-table-craft][data-fill-height="true"] .relative.w-full.overflow-auto:has(table) {
     max-height: min(56vh, calc(100dvh - 320px));
   }
 
@@ -556,15 +569,7 @@
     background: hsl(var(--secondary));
   }
 
-  [data-table-craft] > div:last-child {
-    border-top: 1px solid hsl(var(--border));
-    padding: 0.625rem 0.875rem;
-    background: hsl(var(--secondary-background) / 0.55);
-  }
-  .dark [data-table-craft] > div:last-child {
-    border-top-color: rgba(255, 255, 255, 0.06);
-    background: hsl(var(--secondary) / 0.45);
-  }
+  /* Pagination already ships with border-t + padding from TableCraft */
 
   .enterprise-table {
     width: 100%;
