@@ -179,11 +179,11 @@ export default function SuppliersPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchSuppliers} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={fetchSuppliers} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => router.push("/suppliers/new")}>
+          <Button className="gap-1.5" onClick={() => router.push("/suppliers/new")}>
             <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
           </Button>
         </div>
@@ -211,10 +211,8 @@ export default function SuppliersPage() {
 
       {/* Table — fills remaining viewport */}
       <ClientSideTable
-          fillHeight
           data={suppliers}
           columns={columns}
-          pageCount={Math.ceil(suppliers.length / 10)}
           searchableColumns={[{ id: "name", title: copy.nameLabel }]}
           filterableColumns={[
             {
@@ -229,17 +227,16 @@ export default function SuppliersPage() {
           isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
         />
 
-      {/* Tips */}
-      <div className="grid md:grid-cols-3 gap-3">
+      {/* Tips — compact chips */}
+      <div className="flex flex-wrap gap-2">
         {copy.tips.map((tip) => (
-          <Card key={tip} className="rounded-[18px] border border-dashed border-border shadow-none bg-muted/40">
-            <CardContent className="p-4 flex gap-3 items-start">
-              <div className="h-9 w-9 rounded-[12px] bg-amber-50 flex items-center justify-center shrink-0">
-                <Lightbulb className="h-4 w-4 text-amber-600" />
-              </div>
-              <p className="text-sm font-normal text-muted-foreground leading-relaxed">{tip}</p>
-            </CardContent>
-          </Card>
+          <div
+            key={tip}
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium text-muted-foreground max-w-full"
+          >
+            <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" strokeWidth={1.75} />
+            <span className="truncate">{tip}</span>
+          </div>
         ))}
       </div>
     </div>

@@ -330,7 +330,7 @@ export default function WarehousePage() {
   const stockColumns = useMemo<ColumnDef<StockRow>[]>(() => [
     {
       id: "product",
-      accessorFn: (r) => r.variant.product.name,
+      accessorFn: (r) => `${r.variant.product.name} ${r.variant.sku}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Product" />,
       cell: ({ row }) => (
         <div>
@@ -499,16 +499,16 @@ export default function WarehousePage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => void load()} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={() => void load()} className="gap-1.5">
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" onClick={() => setTransferOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" disabled={warehouses.length < 2}>
+            <Button variant="outline" onClick={() => setTransferOpen(true)} className="gap-1.5" disabled={warehouses.length < 2}>
               <ArrowRightLeft className="h-[18px] w-[18px]" /> Transfer
             </Button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
           <Button
-            className="h-10 rounded-[12px] gap-1.5 text-sm px-4"
+            className="gap-1.5"
             onClick={() => {
               setEditWh(undefined);
               setAddOpen(true);
@@ -578,7 +578,6 @@ export default function WarehousePage() {
           <ClientSideTable
             data={locationRows}
             columns={warehouseColumns}
-            pageCount={Math.ceil(locationRows.length / 10) || 1}
             searchableColumns={[
               { id: "name", title: "Warehouse" },
             ]}
@@ -625,10 +624,8 @@ export default function WarehousePage() {
             <ClientSideTable
               data={stock}
               columns={stockColumns}
-              pageCount={Math.ceil(stock.length / 10) || 1}
               searchableColumns={[
-                { id: "product", title: "Product" },
-                { id: "sku", title: "SKU" },
+                { id: "product", title: "Product / SKU" },
               ]}
               filterableColumns={[]}
               isShowExportButtons={{ isShow: true, fileName: "warehouse-stock" }}
@@ -645,10 +642,8 @@ export default function WarehousePage() {
           <ClientSideTable
             data={transfers}
             columns={transferColumns}
-            pageCount={Math.ceil(transfers.length / 10) || 1}
             searchableColumns={[
               { id: "route", title: "Route" },
-              { id: "status", title: "Status" },
             ]}
             filterableColumns={[
               {

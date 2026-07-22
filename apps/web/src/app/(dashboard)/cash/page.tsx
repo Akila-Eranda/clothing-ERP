@@ -1006,7 +1006,6 @@ export default function CashManagementPage() {
             <ClientSideTable
               data={history}
               columns={historyColumns}
-              pageCount={Math.max(1, Math.ceil(history.length / 10))}
               searchableColumns={[{ id: "cashierName", title: "Cashier" }]}
               filterableColumns={[{
                 id: "status",

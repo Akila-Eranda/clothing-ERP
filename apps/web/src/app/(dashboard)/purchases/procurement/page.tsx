@@ -221,7 +221,7 @@ export default function ProcurementHubPage() {
   const grnColumns = useMemo<ColumnDef<GrnRow>[]>(() => [
     {
       id: "grnNumber",
-      accessorKey: "grnNumber",
+      accessorFn: (r) => `${r.grnNumber} ${r.supplier?.name ?? ""} ${r.source}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="GRN #" />,
       cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.grnNumber}</span>,
     },
@@ -264,7 +264,7 @@ export default function ProcurementHubPage() {
   const returnColumns = useMemo<ColumnDef<ReturnRow>[]>(() => [
     {
       id: "returnNumber",
-      accessorKey: "returnNumber",
+      accessorFn: (r) => `${r.returnNumber} ${r.supplier?.name ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Return #" />,
       cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.returnNumber}</span>,
     },
@@ -303,7 +303,7 @@ export default function ProcurementHubPage() {
   const invoiceColumns = useMemo<ColumnDef<InvoiceRow>[]>(() => [
     {
       id: "invoiceNumber",
-      accessorKey: "invoiceNumber",
+      accessorFn: (r) => `${r.invoiceNumber} ${r.supplier?.name ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice #" />,
       cell: ({ row }) => <span className="font-mono text-xs font-medium">{row.original.invoiceNumber}</span>,
     },
@@ -407,24 +407,24 @@ export default function ProcurementHubPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={load} className="gap-1.5">
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" onClick={() => setQuickGrnOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={() => setQuickGrnOpen(true)} className="gap-1.5">
               <Zap className="h-[18px] w-[18px] text-amber-500" /> Quick GRN
             </Button>
-            <Button variant="outline" onClick={() => setInvoiceOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={() => setInvoiceOpen(true)} className="gap-1.5">
               <FileText className="h-[18px] w-[18px]" /> Post Invoice
             </Button>
-            <Button variant="outline" onClick={() => { setPayInvoiceId(undefined); setPayOpen(true); }} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={() => { setPayInvoiceId(undefined); setPayOpen(true); }} className="gap-1.5">
               <Wallet className="h-[18px] w-[18px]" /> Pay Invoice
             </Button>
-            <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={() => router.push("/purchases")} className="gap-1.5">
               <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
             </Button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => router.push("/purchases/new")}>
+          <Button className="gap-1.5" onClick={() => router.push("/purchases/new")}>
             <Plus className="h-[18px] w-[18px]" /> New PO
           </Button>
         </div>
@@ -491,12 +491,23 @@ export default function ProcurementHubPage() {
             <ClientSideTable
               data={prs}
               columns={prColumns}
-              pageCount={Math.ceil(prs.length / 10) || 1}
               searchableColumns={[
                 { id: "requestNumber", title: "PR #" },
-                { id: "status", title: "Status" },
               ]}
-              filterableColumns={[]}
+              filterableColumns={[
+                {
+                  id: "status",
+                  title: "Status",
+                  options: [
+                    { value: "DRAFT", label: "Draft" },
+                    { value: "SUBMITTED", label: "Submitted" },
+                    { value: "APPROVED", label: "Approved" },
+                    { value: "REJECTED", label: "Rejected" },
+                    { value: "ORDERED", label: "Ordered" },
+                    { value: "CANCELLED", label: "Cancelled" },
+                  ],
+                },
+              ]}
               isShowExportButtons={{ isShow: true, fileName: "purchase-requests" }}
             />
           )}
@@ -517,13 +528,20 @@ export default function ProcurementHubPage() {
             <ClientSideTable
               data={grns}
               columns={grnColumns}
-              pageCount={Math.ceil(grns.length / 10) || 1}
               searchableColumns={[
-                { id: "grnNumber", title: "GRN #" },
-                { id: "supplier", title: "Supplier" },
-                { id: "source", title: "Source" },
+                { id: "grnNumber", title: "GRN / supplier" },
               ]}
-              filterableColumns={[]}
+              filterableColumns={[
+                {
+                  id: "source",
+                  title: "Source",
+                  options: [
+                    { value: "FROM_PO", label: "From PO" },
+                    { value: "QUICK", label: "Quick" },
+                    { value: "DIRECT", label: "Direct" },
+                  ],
+                },
+              ]}
               isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
             />
           )}
@@ -537,13 +555,20 @@ export default function ProcurementHubPage() {
             <ClientSideTable
               data={returns}
               columns={returnColumns}
-              pageCount={Math.ceil(returns.length / 10) || 1}
               searchableColumns={[
-                { id: "returnNumber", title: "Return #" },
-                { id: "supplier", title: "Supplier" },
-                { id: "status", title: "Status" },
+                { id: "returnNumber", title: "Return / supplier" },
               ]}
-              filterableColumns={[]}
+              filterableColumns={[
+                {
+                  id: "status",
+                  title: "Status",
+                  options: [
+                    { value: "DRAFT", label: "Draft" },
+                    { value: "POSTED", label: "Posted" },
+                    { value: "CANCELLED", label: "Cancelled" },
+                  ],
+                },
+              ]}
               isShowExportButtons={{ isShow: true, fileName: "supplier-returns" }}
             />
           )}
@@ -569,13 +594,22 @@ export default function ProcurementHubPage() {
             <ClientSideTable
               data={invoices}
               columns={invoiceColumns}
-              pageCount={Math.ceil(invoices.length / 10) || 1}
               searchableColumns={[
-                { id: "invoiceNumber", title: "Invoice #" },
-                { id: "supplier", title: "Supplier" },
-                { id: "status", title: "Status" },
+                { id: "invoiceNumber", title: "Invoice / supplier" },
               ]}
-              filterableColumns={[]}
+              filterableColumns={[
+                {
+                  id: "status",
+                  title: "Status",
+                  options: [
+                    { value: "DRAFT", label: "Draft" },
+                    { value: "POSTED", label: "Posted" },
+                    { value: "PARTIAL", label: "Partial" },
+                    { value: "PAID", label: "Paid" },
+                    { value: "CANCELLED", label: "Cancelled" },
+                  ],
+                },
+              ]}
               isShowExportButtons={{ isShow: true, fileName: "supplier-invoices" }}
             />
           )}

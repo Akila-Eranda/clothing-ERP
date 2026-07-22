@@ -56,7 +56,8 @@ export default function GrnPage() {
     () => [
       {
         id: "grnNumber",
-        accessorKey: "grnNumber",
+        accessorFn: (r) =>
+          `${r.grnNumber} ${r.supplier?.name ?? ""} ${r.purchase?.poNumber ?? ""} ${r.source}`.trim(),
         header: ({ column }) => <DataTableColumnHeader column={column} title="GRN #" />,
         cell: ({ row }) => (
           <OpenRecordButton
@@ -189,20 +190,20 @@ export default function GrnPage() {
               variant="outline"
               onClick={load}
               disabled={loading}
-              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
+              className="gap-1.5"
             >
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
             <Button
               variant="outline"
-              className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
+              className="gap-1.5"
               onClick={() => setAddOpen(true)}
             >
               <Plus className="h-[18px] w-[18px]" /> Quick GRN (no PO)
             </Button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button asChild className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
+          <Button asChild className="gap-1.5">
             <Link href="/purchases">
               <ShoppingBag className="h-[18px] w-[18px]" /> Receive from PO
             </Link>
@@ -244,16 +245,21 @@ export default function GrnPage() {
           </div>
         ) : (
           <ClientSideTable
-            fillHeight
             data={grns}
             columns={grnColumns}
             searchableColumns={[
-              { id: "grnNumber", title: "GRN #" },
-              { id: "supplier", title: "Supplier" },
-              { id: "source", title: "Source" },
-              { id: "po", title: "PO" },
+              { id: "grnNumber", title: "GRN / supplier / PO" },
             ]}
-            filterableColumns={[]}
+            filterableColumns={[
+              {
+                id: "source",
+                title: "Source",
+                options: [
+                  { value: "FROM_PO", label: "From PO" },
+                  { value: "QUICK", label: "Quick" },
+                ],
+              },
+            ]}
             isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
           />
         )}

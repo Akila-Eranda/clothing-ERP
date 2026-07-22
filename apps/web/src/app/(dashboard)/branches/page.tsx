@@ -164,11 +164,11 @@ export default function BranchesPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">Manage all store locations and branches</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchBranches} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={fetchBranches} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { setEditBranch(undefined); setAddOpen(true); }}>
+          <Button className="gap-1.5" onClick={() => { setEditBranch(undefined); setAddOpen(true); }}>
             <Plus className="h-[18px] w-[18px]" /> Add Branch
           </Button>
         </div>
@@ -196,10 +196,8 @@ export default function BranchesPage() {
 
       {/* Table */}
       <ClientSideTable
-          fillHeight
           data={branches}
           columns={columns}
-          pageCount={Math.ceil(branches.length / 10)}
           searchableColumns={[{ id: "name", title: "Branch Name" }]}
           filterableColumns={[{
             id: "isActive", title: "Status",

@@ -109,6 +109,8 @@ function buildColumns(
   return [
     {
       id: "workflow",
+      accessorFn: (t) =>
+        `${t.instance.definition.name} ${t.instance.definition.key} ${referenceLabel(t)}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Workflow" />,
       cell: ({ row }) => {
         const cfg = workflowCfg(row.original.instance.definition.key);
@@ -288,10 +290,10 @@ export default function WorkflowsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchTasks} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={fetchTasks} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+          <Button variant="outline" className="gap-1.5" asChild>
             <Link href="/purchases"><ExternalLink className="h-[18px] w-[18px]" /> Purchases</Link>
           </Button>
         </div>
@@ -386,51 +388,35 @@ export default function WorkflowsPage() {
         <ClientSideTable
           data={displayed}
           columns={columns}
-          pageCount={Math.ceil(displayed.length / 10)}
+          searchableColumns={[{ id: "workflow", title: "Workflow / reference" }]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "workflow-tasks-export" }}
         />
       )}
 
       {/* Workflow guide */}
-      <div className="space-y-3">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold leading-tight">Supported Workflows</h2>
-          <p className="text-xs text-muted-foreground">All paths are live — submit from the linked module to start approval</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          {GUIDE.map((g) => {
-            const cfg = workflowCfg(g.key);
-            const Icon = cfg.icon;
-            const live = catalog?.workflows.find((w) => w.key === g.key);
-            return (
-              <Card key={g.key} className="hover:shadow-md transition-shadow border-emerald-500/10">
-                <CardContent className="p-4 space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`p-2 rounded-lg shrink-0 ${cfg.bg}`}>
-                        <Icon className={`h-4 w-4 ${cfg.color}`} />
-                      </div>
-                      <p className="text-sm font-semibold leading-tight">{g.title}</p>
-                    </div>
-                    <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-600 shrink-0">
-                      Active
-                    </Badge>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{g.steps}</p>
-                  {live && (
-                    <p className="text-[10px] text-emerald-600/90 font-medium">
-                      {live.stepCount} step{live.stepCount !== 1 ? "s" : ""} · {live.triggerFrom}
-                    </p>
-                  )}
-                  <Button size="sm" variant="ghost" className="h-7 px-2 text-xs gap-1 -ml-2" asChild>
-                    <Link href={g.href}>
-                      Open module <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {GUIDE.map((g) => {
+          const cfg = workflowCfg(g.key);
+          const Icon = cfg.icon;
+          const live = catalog?.workflows.find((w) => w.key === g.key);
+          return (
+            <Link
+              key={g.key}
+              href={g.href}
+              title={g.steps}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium max-w-full hover:bg-muted/40 transition-colors"
+            >
+              <Icon className={`h-3.5 w-3.5 shrink-0 ${cfg.color}`} strokeWidth={1.75} />
+              <span className="font-semibold text-foreground shrink-0">{g.title}</span>
+              {live && (
+                <span className="text-muted-foreground tabular-nums">
+                  {live.stepCount} step{live.stepCount !== 1 ? "s" : ""}
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </div>
   );

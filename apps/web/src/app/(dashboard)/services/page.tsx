@@ -119,27 +119,15 @@ function customerName(c: { firstName: string; lastName?: string | null }) {
 function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[] {
   return [
     {
-      accessorKey: "code",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Code" />,
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2.5 min-w-[100px]">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Wrench className="h-4 w-4 text-primary" />
-          </div>
-          <OpenRecordButton onClick={() => onView(row.original)} className="font-mono text-xs" title="View service">
-            {row.original.code}
-          </OpenRecordButton>
-        </div>
-      ),
-    },
-    {
-      accessorKey: "name",
+      id: "name",
+      accessorFn: (s) => `${s.code} ${s.name}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Service" />,
       cell: ({ row }) => (
         <div>
-          <OpenRecordButton onClick={() => onView(row.original)} className="text-sm" title="View service">
+          <OpenRecordButton onClick={() => onView(row.original)} className="text-sm font-medium" title="View service">
             {row.original.name}
           </OpenRecordButton>
+          <p className="text-[10px] text-muted-foreground font-mono">{row.original.code}</p>
           {row.original.description && (
             <p className="text-[10px] text-muted-foreground truncate max-w-[200px]">{row.original.description}</p>
           )}
@@ -575,17 +563,17 @@ export default function ServicesPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Button variant="outline" onClick={load} className="gap-1.5">
                 <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
               </Button>
-              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+              <Button variant="outline" className="gap-1.5" asChild>
                 <Link href="/job-cards"><ClipboardList className="h-[18px] w-[18px]" /> Job Cards</Link>
               </Button>
-              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+              <Button variant="outline" className="gap-1.5" asChild>
                 <Link href="/appointments"><Clock className="h-[18px] w-[18px]" /> Appointments</Link>
               </Button>
               {tab === "services" && services.length === 0 && (
-                <Button variant="outline" onClick={seedServices} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Button variant="outline" onClick={seedServices} className="gap-1.5">
                   <Package className="h-[18px] w-[18px]" /> Load Defaults
                 </Button>
               )}
@@ -593,7 +581,7 @@ export default function ServicesPage() {
             {primaryLabel && (
               <>
                 <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={primaryAction}>
+                <Button className="gap-1.5" onClick={primaryAction}>
                   <Plus className="h-[18px] w-[18px]" /> {primaryLabel}
                 </Button>
               </>
@@ -742,10 +730,8 @@ export default function ServicesPage() {
             <ClientSideTable
               data={displayedServices}
               columns={serviceColumns}
-              pageCount={Math.ceil(displayedServices.length / 10)}
               searchableColumns={[
-                { id: "code", title: "Code" },
-                { id: "name", title: "Service" },
+                { id: "name", title: "Service / code" },
               ]}
               isShowExportButtons={{ isShow: true, fileName: "workshop-services-export" }}
             />
@@ -772,7 +758,6 @@ export default function ServicesPage() {
             <ClientSideTable
               data={displayedReminders}
               columns={reminderColumns}
-              pageCount={Math.ceil(displayedReminders.length / 10)}
               searchableColumns={[{ id: "message", title: "Message" }]}
               isShowExportButtons={{ isShow: true, fileName: "service-reminders-export" }}
             />
@@ -799,7 +784,6 @@ export default function ServicesPage() {
             <ClientSideTable
               data={customers}
               columns={fleetColumns}
-              pageCount={Math.ceil(customers.length / 10)}
               searchableColumns={[{ id: "name", title: "Customer" }]}
               isShowExportButtons={{ isShow: true, fileName: "fleet-customers-export" }}
             />
@@ -826,7 +810,6 @@ export default function ServicesPage() {
             <ClientSideTable
               data={displayedSerials}
               columns={serialColumns}
-              pageCount={Math.ceil(displayedSerials.length / 10)}
               searchableColumns={[{ id: "serialNumber", title: "Serial #" }]}
               isShowExportButtons={{ isShow: true, fileName: "tyre-serials-export" }}
             />
@@ -834,14 +817,16 @@ export default function ServicesPage() {
         )}
 
         {/* Guide */}
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="flex flex-wrap gap-2">
           {GUIDE.map((g) => (
-            <Card key={g.title} className="border-dashed">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-sm font-semibold">{g.title}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{g.desc}</p>
-              </CardContent>
-            </Card>
+            <div
+              key={g.title}
+              title={g.desc}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium max-w-full"
+            >
+              <span className="font-semibold text-foreground shrink-0">{g.title}</span>
+              <span className="text-muted-foreground truncate hidden sm:inline">{g.desc}</span>
+            </div>
           ))}
         </div>
 

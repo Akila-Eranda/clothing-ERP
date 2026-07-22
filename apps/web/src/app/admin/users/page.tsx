@@ -67,7 +67,8 @@ export default function UsersPage() {
   const columns = useMemo<ColumnDef<UserRow>[]>(() => [
     {
       id: 'name',
-      accessorFn: (u) => `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim(),
+      accessorFn: (u) =>
+        `${u.firstName ?? ''} ${u.lastName ?? ''} ${u.email ?? ''} ${u.tenant?.name ?? ''}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="User" />,
       cell: ({ row }) => {
         const u = row.original
@@ -199,11 +200,8 @@ export default function UsersPage() {
       <ClientSideTable
         data={users}
         columns={columns}
-        pageCount={Math.max(1, Math.ceil(users.length / 10))}
         searchableColumns={[
-          { id: 'name', title: 'User' },
-          { id: 'email', title: 'Email' },
-          { id: 'tenant', title: 'Tenant' },
+          { id: 'name', title: 'User / email / tenant' },
         ]}
         filterableColumns={[
           {

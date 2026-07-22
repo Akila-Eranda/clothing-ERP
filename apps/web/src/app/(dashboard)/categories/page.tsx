@@ -17,7 +17,8 @@ function buildColumns(
 ): ColumnDef<CategoryItem>[] {
   return [
     {
-      accessorKey: "name",
+      id: "name",
+      accessorFn: (c) => `${c.name} ${c.slug ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
       cell: ({ row }) => (
         <div className="flex items-center gap-2.5">
@@ -134,11 +135,11 @@ export default function CategoriesPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">Organize products into categories and subcategories</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchCategories} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={fetchCategories} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
+          <Button className="gap-1.5" onClick={() => { setSubParentId(undefined); setModalOpen(true); }}>
             <Plus className="h-[18px] w-[18px]" /> Add Category
           </Button>
         </div>
@@ -161,14 +162,22 @@ export default function CategoriesPage() {
       </div>
 
       <ClientSideTable
-          fillHeight
           data={flatRows}
           columns={columns}
-          pageCount={Math.ceil(flatRows.length / 10)}
           searchableColumns={[
-            { id: "name", title: "Category" },
-            { id: "slug", title: "Slug" },
+            { id: "name", title: "Category / slug" },
           ]}
+          filterableColumns={[
+            {
+              id: "isActive",
+              title: "Status",
+              options: [
+                { label: "Active", value: "true" },
+                { label: "Inactive", value: "false" },
+              ],
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "categories-export" }}
         />
 
       <AddCategoryModal

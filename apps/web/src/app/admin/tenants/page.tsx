@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Search, Plus, RefreshCw,
+  Plus, RefreshCw,
   Building2, Users, CheckCircle,
   AlertCircle, X, Check,
 } from 'lucide-react'
@@ -46,28 +46,24 @@ export default function TenantsPage() {
   const [total, setTotal]                   = useState(0)
   const [stats, setStats]                   = useState<PlatformStats | null>(null)
   const [loading, setLoading]               = useState(true)
-  const [search, setSearch]                 = useState('')
   const [statusFilter, setStatusFilter]     = useState('ALL')
   const [planFilter, setPlanFilter]         = useState('ALL')
   const [editTenant, setEditTenant]         = useState<TenantRow | null>(null)
   const [showCreate, setShowCreate]         = useState(false)
   const [actionLoading, setActionLoading]   = useState<string | null>(null)
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = useCallback((params: { search?: string; status?: string; plan?: string } = {}) => {
+  const load = useCallback((params: { status?: string; plan?: string } = {}) => {
     setLoading(true)
     const p: Record<string, string> = { page: '1', limit: String(FETCH_LIMIT) }
-    const s = params.search  ?? search
     const st = params.status ?? statusFilter
     const pl = params.plan   ?? planFilter
-    if (s)         p.search = s
     if (st !== 'ALL') p.status = st
     if (pl !== 'ALL') p.plan   = pl
     fetchTenants(p)
       .then(d => { setTenants(d.data); setTotal(d.total) })
       .catch((e: unknown) => { console.error(e) })
       .finally(() => setLoading(false))
-  }, [search, statusFilter, planFilter])
+  }, [statusFilter, planFilter])
 
   useEffect(() => {
     load()
@@ -80,12 +76,6 @@ export default function TenantsPage() {
     }
   }, [])
 
-  function handleSearch(v: string) {
-    setSearch(v)
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => load({ search: v }), 350)
-  }
-
   const handleStatusToggle = useCallback(async (t: TenantRow) => {
     setActionLoading(t.id)
     const newStatus = t.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
@@ -95,7 +85,8 @@ export default function TenantsPage() {
 
   const columns = useMemo<ColumnDef<TenantRow>[]>(() => [
     {
-      accessorKey: 'name',
+      id: 'name',
+      accessorFn: (t) => `${t.name} ${t.subdomain ?? ''} ${t.email ?? ''}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Tenant" />,
       cell: ({ row }) => {
         const t = row.original
@@ -242,17 +233,8 @@ export default function TenantsPage() {
         ))}
       </div>
 
-      {/* Filters */}
+      {/* Filters — server-side status/plan; table search covers identity */}
       <div className="flex flex-wrap gap-3">
-        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-2 flex-1 min-w-[200px]">
-          <Search size={14} className="text-gray-400" />
-          <input
-            className="bg-transparent text-sm text-gray-700 placeholder-gray-400 outline-none flex-1"
-            placeholder="Search name, subdomain, email…"
-            value={search}
-            onChange={e => handleSearch(e.target.value)}
-          />
-        </div>
         <select
           className="px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg outline-none text-gray-700"
           value={statusFilter}
@@ -278,11 +260,8 @@ export default function TenantsPage() {
       <ClientSideTable
         data={tenants}
         columns={columns}
-        pageCount={Math.max(1, Math.ceil(tenants.length / 10))}
         searchableColumns={[
-          { id: 'name', title: 'Tenant' },
-          { id: 'subdomain', title: 'Subdomain' },
-          { id: 'email', title: 'Email' },
+          { id: 'name', title: 'Tenant / subdomain / email' },
         ]}
         filterableColumns={[
           {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Upload, Download, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
+import { Plus, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -42,8 +42,6 @@ type ProductListRow = {
   isVariant: boolean;
   product: Product;
 };
-
-const CSV_HEADERS = ["name", "sellingPrice", "costPrice", "mrp", "taxRate", "description", "tags", "status"];
 
 function flattenProducts(products: Product[]): ProductListRow[] {
   const rows: ProductListRow[] = [];
@@ -115,21 +113,6 @@ function printLabels(rows: ProductListRow[], brandName: string) {
   w.document.close();
 }
 
-function exportToCsv(products: Product[]) {
-  const rows = products.map((p) => [
-    `"${p.name.replace(/"/g, '""')}"`,
-    p.sellingPrice, p.costPrice, p.mrp, p.taxRate,
-    `"${(p.description ?? "").replace(/"/g, '""')}"`,
-    `"${(p.tags ?? []).join("|")}"`,
-    p.status,
-  ].join(","));
-  const csv = [CSV_HEADERS.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = "products-export.csv"; a.click();
-  URL.revokeObjectURL(url);
-}
-
 async function parseCsvAndImport(
   file: File,
   onProgress: (done: number, total: number) => void,
@@ -168,7 +151,9 @@ function buildColumns(
 ): ColumnDef<ProductListRow>[] {
   return [
     {
-      accessorKey: "productName",
+      id: "productName",
+      accessorFn: (r) =>
+        `${r.productName} ${r.variantName} ${r.sku} ${r.barcode} ${r.brandName ?? ""} ${r.categoryName ?? ""}`.trim(),
       size: 280,
       minSize: 200,
       maxSize: 360,
@@ -363,24 +348,23 @@ export default function ProductsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => fetch()} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-            <Button variant="outline" onClick={() => exportToCsv(products)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" disabled={!products.length}>
-              <Download className="h-[18px] w-[18px]" /> Export CSV
-            </Button>
-            <Button variant="outline" onClick={() => printLabels(listRows, brandName)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" disabled={!listRows.length}>
-              <Tag className="h-[18px] w-[18px]" /> {printLabel}
-            </Button>
-            <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-              <Upload className="h-[18px] w-[18px]" /> Import CSV
-            </Button>
-            <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-          </div>
+          <Button variant="outline" onClick={() => fetch()} className="gap-1.5">
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" onClick={() => printLabels(listRows, brandName)} className="gap-1.5" disabled={!listRows.length}>
+            <Tag className="h-[18px] w-[18px]" />
+            {printLabel}
+          </Button>
+          <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
+            <Upload className="h-[18px] w-[18px]" />
+            Import CSV
+          </Button>
+          <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button onClick={() => router.push("/products/new")} className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
-            <Plus className="h-[18px] w-[18px]" /> Add New
+          <Button onClick={() => router.push("/products/new")} className="gap-1.5">
+            <Plus className="h-[18px] w-[18px]" />
+            Add New
           </Button>
         </div>
       </div>
@@ -405,15 +389,10 @@ export default function ProductsPage() {
       </div>
 
       <ClientSideTable
-          fillHeight
           data={listRows}
           columns={columns}
-          pageCount={Math.ceil(listRows.length / 10) || 1}
           searchableColumns={[
-            { id: "productName", title: "Product" },
-            { id: "variantName", title: "Variant" },
-            { id: "sku", title: "SKU" },
-            { id: "barcode", title: "Barcode" },
+            { id: "productName", title: "Product / SKU / barcode" },
           ]}
           filterableColumns={[
             {

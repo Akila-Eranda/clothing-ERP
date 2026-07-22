@@ -492,7 +492,7 @@ export default function SalesPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">View and manage all sales transactions</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <label className="inline-flex items-center gap-2 h-10 px-3 rounded-[12px] border bg-background text-sm cursor-pointer hover:bg-muted/40 transition-colors">
+          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-background text-sm cursor-pointer hover:bg-muted/40 transition-colors">
             <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
             <input
               type="date"
@@ -504,9 +504,9 @@ export default function SalesPage() {
           <Button
             variant="outline"
             onClick={() => { fetchSales(); fetchSummary(); }}
-            className="h-10 px-4 rounded-[12px] gap-2 text-sm font-medium shrink-0"
+            className="gap-1.5"
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
         </div>
@@ -546,7 +546,6 @@ export default function SalesPage() {
 
       {/* Table */}
       <ClientSideTable
-        fillHeight
         data={sales}
         columns={columns}
         searchableColumns={[{ id: "invoiceNumber", title: "Invoice" }]}

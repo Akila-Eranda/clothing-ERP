@@ -397,21 +397,21 @@ export default function AppointmentsPage() {
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" onClick={fetchItems} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Button variant="outline" onClick={fetchItems} className="gap-1.5">
                 <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
               </Button>
-              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+              <Button variant="outline" className="gap-1.5" asChild>
                 <Link href="/customers"><Users className="h-[18px] w-[18px]" /> Customers</Link>
               </Button>
-              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+              <Button variant="outline" className="gap-1.5" asChild>
                 <Link href="/job-cards"><ClipboardList className="h-[18px] w-[18px]" /> Job Cards</Link>
               </Button>
-              <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+              <Button variant="outline" className="gap-1.5" asChild>
                 <Link href="/services"><Wrench className="h-[18px] w-[18px]" /> Services</Link>
               </Button>
             </div>
             <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-            <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { resetForm(); setCreateOpen(true); }}>
+            <Button className="gap-1.5" onClick={() => { resetForm(); setCreateOpen(true); }}>
               <Plus className="h-[18px] w-[18px]" /> Book Appointment
             </Button>
           </div>
@@ -477,7 +477,6 @@ export default function AppointmentsPage() {
           <ClientSideTable
             data={displayed}
             columns={columns}
-            pageCount={Math.ceil(displayed.length / 10)}
             searchableColumns={[
               { id: "appointmentNumber", title: "Appt #" },
             ]}
@@ -495,14 +494,16 @@ export default function AppointmentsPage() {
           />
         )}
 
-        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="flex flex-wrap gap-2">
           {GUIDE.map((g) => (
-            <Card key={g.title} className="border-dashed">
-              <CardContent className="p-4 space-y-1">
-                <p className="text-sm font-semibold">{g.title}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed">{g.desc}</p>
-              </CardContent>
-            </Card>
+            <div
+              key={g.title}
+              title={g.desc}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium max-w-full"
+            >
+              <span className="font-semibold text-foreground shrink-0">{g.title}</span>
+              <span className="text-muted-foreground truncate hidden sm:inline">{g.desc}</span>
+            </div>
           ))}
         </div>
 

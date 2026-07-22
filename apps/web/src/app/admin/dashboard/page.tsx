@@ -297,11 +297,8 @@ export default function AdminDashboardPage() {
               <ClientSideTable
                 data={recentTenants}
                 columns={recentColumns}
-                pageCount={Math.max(1, Math.ceil(recentTenants.length / 10))}
                 searchableColumns={[
-                  { id: 'name', title: 'Name' },
-                  { id: 'subdomain', title: 'Subdomain' },
-                  { id: 'plan', title: 'Plan' },
+                  { id: 'name', title: 'Name / subdomain' },
                 ]}
                 filterableColumns={[]}
                 isShowExportButtons={{ isShow: true, fileName: 'recent-tenants' }}

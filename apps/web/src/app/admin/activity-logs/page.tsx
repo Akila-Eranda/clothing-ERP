@@ -92,7 +92,9 @@ export default function ActivityLogsPage() {
       },
     },
     {
-      accessorKey: 'action',
+      id: 'action',
+      accessorFn: (l) =>
+        `${l.action} ${l.resource ?? ''} ${l.tenant?.name ?? ''} ${l._actor ?? ''}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Action" />,
       cell: ({ row }) => <span className="font-mono text-xs text-gray-800">{row.original.action}</span>,
     },
@@ -156,12 +158,8 @@ export default function ActivityLogsPage() {
       <ClientSideTable
         data={logs}
         columns={columns}
-        pageCount={Math.max(1, Math.ceil(logs.length / 10))}
         searchableColumns={[
-          { id: 'action', title: 'Action' },
-          { id: 'resource', title: 'Resource' },
-          { id: 'tenant', title: 'Tenant' },
-          { id: 'actor', title: 'User' },
+          { id: 'action', title: 'Action / resource / tenant / user' },
         ]}
         filterableColumns={[
           {

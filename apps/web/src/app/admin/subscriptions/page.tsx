@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { RefreshCw, CreditCard, TrendingUp, Edit2, X, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { RefreshCw, TrendingUp, Edit2, X, CheckCircle, AlertCircle, FileText } from 'lucide-react'
 import { ColumnDef } from '@tanstack/react-table'
 import { ClientSideTable, DataTableColumnHeader } from '@/components/table'
 import { fetchTenants, fetchPlans, fetchBillingSummary, updateTenant, type TenantRow, type PlanDef } from '@/lib/admin-api'
@@ -110,7 +110,7 @@ export default function SubscriptionsPage() {
   const columns = useMemo<ColumnDef<TenantRow>[]>(() => [
     {
       id: 'name',
-      accessorFn: (t) => `${t.name} ${t.email}`,
+      accessorFn: (t) => `${t.name} ${t.subdomain ?? ''} ${t.email ?? ''}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Tenant" />,
       cell: ({ row }) => (
         <div>
@@ -253,24 +253,15 @@ export default function SubscriptionsPage() {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 gap-4 ${breakdown.length <= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2 lg:grid-cols-4'}`}>
+      <div className="flex flex-wrap gap-2">
         {breakdown.map(p => (
-          <div key={p.id} className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${p.color}`}>{p.label}</span>
-              <CreditCard size={16} className="text-gray-300" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{p.count}</p>
-            <p className="text-xs text-gray-500 mt-1">{p.active} active / trial · {p.price}</p>
-            <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gray-900 rounded-full transition-all"
-                style={{ width: `${tenants.length > 0 ? (p.count / tenants.length) * 100 : 0}%` }}
-              />
-            </div>
-            <p className="text-[10px] text-gray-400 mt-1">
-              {tenants.length > 0 ? Math.round((p.count / tenants.length) * 100) : 0}% of total
-            </p>
+          <div
+            key={p.id}
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium"
+          >
+            <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${p.color}`}>{p.label}</span>
+            <span className="font-bold tabular-nums text-foreground">{p.count}</span>
+            <span className="text-muted-foreground">{p.active} active · {p.price}</span>
           </div>
         ))}
       </div>
@@ -292,10 +283,8 @@ export default function SubscriptionsPage() {
       <ClientSideTable
         data={filtered}
         columns={columns}
-        pageCount={Math.max(1, Math.ceil(filtered.length / 10))}
         searchableColumns={[
-          { id: 'name', title: 'Tenant' },
-          { id: 'subdomain', title: 'Subdomain' },
+          { id: 'name', title: 'Tenant / subdomain' },
         ]}
         filterableColumns={[
           {

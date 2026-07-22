@@ -153,7 +153,11 @@ export default function ExpensesPage() {
   // ── Table columns ──────────────────────────────────────────────────────────
   const columns: ColumnDef<Expense>[] = [
     { accessorKey: "reference",    header: ({ column }) => <DataTableColumnHeader column={column} title="Ref" />,         cell: ({ row }) => <span className="font-mono text-xs text-muted-foreground">{row.original.reference ?? "—"}</span> },
-    { accessorKey: "description",  header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => (
+    {
+      id: "description",
+      accessorFn: (e) => `${e.description ?? ""} ${e.reference ?? ""}`.trim(),
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+      cell: ({ row }) => (
       <OpenRecordButton onClick={() => setEditItem(row.original)} className="text-sm" title="Edit expense">
         {row.original.description}
       </OpenRecordButton>
@@ -185,11 +189,11 @@ export default function ExpensesPage() {
           <p className="text-xs text-muted-foreground mt-0.5 truncate">Track and manage all business expenses</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={load} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button variant="danger" className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setAddOpen(true)}>
+          <Button variant="danger" className="gap-1.5" onClick={() => setAddOpen(true)}>
             <Plus className="h-[18px] w-[18px]" /> Record Expense
           </Button>
         </div>
@@ -311,40 +315,28 @@ export default function ExpensesPage() {
         )}
 
         {/* ── Expenses Table ───────────────────────────────────────────────── */}
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-          <CardHeader className="pb-3 flex-row items-center justify-between">
-            <CardTitle className="text-lg font-semibold leading-tight text-foreground">All Expenses</CardTitle>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{expenses.length} records · LKR {formatNumber(total)}</span>
-              <Button size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={() => setAddOpen(true)}><Plus className="h-3 w-3" />Add</Button>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="h-40 flex items-center justify-center text-muted-foreground">
-                <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
-              </div>
-            ) : expenses.length === 0 ? (
-              <div className="h-40 flex flex-col items-center justify-center text-muted-foreground">
-                <TrendingDown className="h-10 w-10 mb-2 opacity-20" />
-                <p className="text-sm font-medium text-muted-foreground">No expenses for this period</p>
-                <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-red-500 hover:underline">Record the first one →</button>
-              </div>
-            ) : (
-              <ClientSideTable
-                data={expenses}
-                columns={columns}
-                pageCount={Math.ceil(expenses.length / 20)}
-                searchableColumns={[{ id: "description", title: "Description" }, { id: "reference", title: "Reference" }]}
-                filterableColumns={[
-                  { id: "paymentMethod", title: "Method",   options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g, " "), value: m })) },
-                  { id: "categoryId",    title: "Category", options: EXPENSE_CATEGORIES.map((c) => ({ label: c, value: c })) },
-                ]}
-                isShowExportButtons={{ isShow: true, fileName: "expenses-export" }}
-              />
-            )}
-          </CardContent>
-        </Card>
+        {loading ? (
+          <div className="h-40 flex items-center justify-center text-muted-foreground rounded-[18px] border bg-card">
+            <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
+          </div>
+        ) : expenses.length === 0 ? (
+          <div className="h-40 flex flex-col items-center justify-center text-muted-foreground rounded-[18px] border bg-card">
+            <TrendingDown className="h-10 w-10 mb-2 opacity-20" />
+            <p className="text-sm font-medium text-muted-foreground">No expenses for this period</p>
+            <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-red-500 hover:underline">Record the first one →</button>
+          </div>
+        ) : (
+          <ClientSideTable
+            data={expenses}
+            columns={columns}
+            searchableColumns={[{ id: "description", title: "Description / reference" }]}
+            filterableColumns={[
+              { id: "paymentMethod", title: "Method",   options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g, " "), value: m })) },
+              { id: "categoryId",    title: "Category", options: EXPENSE_CATEGORIES.map((c) => ({ label: c, value: c })) },
+            ]}
+            isShowExportButtons={{ isShow: true, fileName: "expenses-export" }}
+          />
+        )}
 
       </div>
 

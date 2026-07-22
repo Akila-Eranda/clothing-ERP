@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Plus, Package, Upload, Download, RefreshCw } from "lucide-react";
+import { Plus, Package, Upload, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
@@ -14,22 +14,6 @@ import { getBrandPageCopy, type BrandPageCopy } from "@/lib/shop-vertical";
 import { AddBrandModal, type BrandItem } from "@/components/brands/add-brand-modal";
 
 // ── CSV helpers ───────────────────────────────────────────────────────────
-function exportToCsv(brands: BrandItem[], fileName: string) {
-  const headers = ["name", "description", "logo", "isActive", "products"];
-  const rows = brands.map((b) => [
-    `"${b.name.replace(/"/g, '""')}"`,
-    `"${(b.description ?? "").replace(/"/g, '""')}"`,
-    `"${b.logo ?? ""}"`,
-    b.isActive,
-    b._count.products,
-  ].join(","));
-  const csv = [headers.join(","), ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
-  const url  = URL.createObjectURL(blob);
-  const a = document.createElement("a"); a.href = url; a.download = `${fileName}.csv`; a.click();
-  URL.revokeObjectURL(url);
-}
-
 async function parseCsvAndImport(file: File, onProgress: (d: number, t: number) => void) {
   const text    = await file.text();
   const lines   = text.trim().split("\n");
@@ -58,7 +42,8 @@ function buildColumns(
 ): ColumnDef<BrandItem>[] {
   return [
     {
-      accessorKey: "name",
+      id: "name",
+      accessorFn: (b) => `${b.name} ${b.slug}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title={copy.singular} />,
       cell: ({ row }) => {
         const b = row.original;
@@ -193,21 +178,19 @@ export default function BrandsPage() {
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap shrink-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" onClick={fetchBrands} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-                <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
-              </Button>
-              <Button variant="outline" onClick={() => exportToCsv(brands, copy.csvFileName)} disabled={!brands.length} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-                <Download className="h-[18px] w-[18px]" /> Export CSV
-              </Button>
-              <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
-                <Upload className="h-[18px] w-[18px]" /> Import CSV
-              </Button>
-              <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
-            </div>
+            <Button variant="outline" onClick={fetchBrands} className="gap-1.5">
+              <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </Button>
+            <Button variant="outline" onClick={() => importRef.current?.click()} disabled={importing} className="gap-1.5">
+              <Upload className="h-[18px] w-[18px]" />
+              Import CSV
+            </Button>
+            <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
             <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-            <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
-              <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
+            <Button className="gap-1.5" onClick={() => { setEditBrand(undefined); setModalOpen(true); }}>
+              <Plus className="h-[18px] w-[18px]" />
+              {copy.addButton}
             </Button>
           </div>
         </div>
@@ -236,10 +219,8 @@ export default function BrandsPage() {
         <ClientSideTable
           data={brands}
           columns={columns}
-          pageCount={Math.ceil(brands.length / 10)}
           searchableColumns={[
-            { id: "name", title: copy.singular },
-            { id: "slug", title: "Slug" },
+            { id: "name", title: `${copy.singular} / slug` },
           ]}
           filterableColumns={[
             {

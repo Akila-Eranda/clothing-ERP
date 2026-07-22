@@ -74,6 +74,7 @@ function buildModelColumns(): ColumnDef<VehicleModel>[] {
   return [
     {
       id: "vehicle",
+      accessorFn: (m) => `${m.brand.name} ${m.name} ${m.engineCapacity ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Vehicle" />,
       cell: ({ row }) => {
         const m = row.original;
@@ -116,6 +117,8 @@ function buildPartColumns(
   return [
     {
       id: "product",
+      accessorFn: (r) =>
+        `${r.product.name} ${r.variant.name} ${r.variant.sku} ${r.vehicle} ${r.product.oemNumber ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Part" />,
       cell: ({ row }) => (
         <div className="min-w-[160px]">
@@ -338,15 +341,15 @@ export default function VehiclesPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={fetchAll} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="outline" onClick={fetchAll} className="gap-1.5">
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            <Button variant="outline" className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5" asChild>
+            <Button variant="outline" className="gap-1.5" asChild>
               <Link href="/products"><ExternalLink className="h-[18px] w-[18px]" /> Parts Catalog</Link>
             </Button>
           </div>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setActiveTab("mapping")}>
+          <Button className="gap-1.5" onClick={() => setActiveTab("mapping")}>
             <Plus className="h-[18px] w-[18px]" /> New Mapping
           </Button>
         </div>
@@ -483,8 +486,7 @@ export default function VehiclesPage() {
             <ClientSideTable
               data={parts}
               columns={partColumns}
-              pageCount={Math.ceil(parts.length / 10)}
-              searchableColumns={[]}
+              searchableColumns={[{ id: "product", title: "Part / SKU / vehicle" }]}
               filterableColumns={[]}
               isShowExportButtons={{ isShow: true, fileName: "compatible-parts" }}
             />
@@ -543,11 +545,23 @@ export default function VehiclesPage() {
             <div className="grid xl:grid-cols-2 gap-3">
               <div className="space-y-2">
                 <h2 className="text-sm font-semibold">Brands ({brands.length})</h2>
-                <ClientSideTable data={brands} columns={brandColumns} pageCount={Math.ceil(brands.length / 10) || 1} searchableColumns={[]} filterableColumns={[]} />
+                <ClientSideTable
+                  data={brands}
+                  columns={brandColumns}
+                  searchableColumns={[{ id: "name", title: "Brand" }]}
+                  filterableColumns={[]}
+                  isShowExportButtons={{ isShow: true, fileName: "vehicle-brands" }}
+                />
               </div>
               <div className="space-y-2">
                 <h2 className="text-sm font-semibold">Models ({models.length})</h2>
-                <ClientSideTable data={models} columns={modelColumns} pageCount={Math.ceil(models.length / 10) || 1} searchableColumns={[]} filterableColumns={[]} />
+                <ClientSideTable
+                  data={models}
+                  columns={modelColumns}
+                  searchableColumns={[{ id: "vehicle", title: "Model / brand" }]}
+                  filterableColumns={[]}
+                  isShowExportButtons={{ isShow: true, fileName: "vehicle-models" }}
+                />
               </div>
             </div>
           )}
@@ -618,8 +632,7 @@ export default function VehiclesPage() {
               <ClientSideTable
                 data={allMappings}
                 columns={mappingColumns}
-                pageCount={Math.ceil(allMappings.length / 10)}
-                searchableColumns={[]}
+                searchableColumns={[{ id: "product", title: "Part / SKU / vehicle" }]}
                 filterableColumns={[]}
                 isShowExportButtons={{ isShow: true, fileName: "vehicle-mappings" }}
               />
@@ -629,26 +642,18 @@ export default function VehiclesPage() {
       )}
 
       {/* Guide */}
-      <div className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold">How Vehicle Compatibility Works</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">Set up your catalog once — staff can find the right part in seconds</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          {GUIDE.map((g) => (
-            <Card key={g.title} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-lg bg-emerald-500/10">
-                    <Car className="h-4 w-4 text-emerald-600" />
-                  </div>
-                  <p className="text-sm font-semibold">{g.title}</p>
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">{g.desc}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      <div className="flex flex-wrap gap-2">
+        {GUIDE.map((g) => (
+          <div
+            key={g.title}
+            title={g.desc}
+            className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium max-w-full"
+          >
+            <Car className="h-3.5 w-3.5 text-emerald-600 shrink-0" strokeWidth={1.75} />
+            <span className="font-semibold text-foreground shrink-0">{g.title}</span>
+            <span className="text-muted-foreground truncate hidden sm:inline">{g.desc}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
