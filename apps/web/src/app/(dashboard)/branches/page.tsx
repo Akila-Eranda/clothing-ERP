@@ -6,10 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
-import { OpenRecordButton } from "@/components/table/open-record-button";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddBranchModal, type Branch } from "@/components/branches/add-branch-modal";
@@ -198,8 +195,8 @@ export default function BranchesPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={branches}
           columns={columns}
           pageCount={Math.ceil(branches.length / 10)}
@@ -210,7 +207,6 @@ export default function BranchesPage() {
           }]}
           isShowExportButtons={{ isShow: true, fileName: "branches-export" }}
         />
-      </div>
 
       {/* Modal */}
       <AddBranchModal

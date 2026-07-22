@@ -2,8 +2,11 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, CreditCard, TrendingUp, Edit2, X, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
+import { ClientSideTable, DataTableColumnHeader } from '@/components/table'
 import { fetchTenants, fetchPlans, fetchBillingSummary, updateTenant, type TenantRow, type PlanDef } from '@/lib/admin-api'
 import SubscriptionInvoiceModal from '@/components/admin/SubscriptionInvoiceModal'
+import { Button } from '@/components/ui/button'
 
 const PLAN_BADGE: Record<string, string> = {
   STARTER:      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600',
@@ -29,6 +32,10 @@ function formatLimit(n?: number) {
   if (n === undefined || n === null) return '—'
   if (n >= 999_999 || n < 0) return '∞'
   return String(n)
+}
+
+function fmtDate(s: string) {
+  return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
 export default function SubscriptionsPage() {
@@ -100,19 +107,126 @@ export default function SubscriptionsPage() {
 
   const filterOptions = ['ALL', ...catalogPlans.map(p => p.key)]
 
+  const columns = useMemo<ColumnDef<TenantRow>[]>(() => [
+    {
+      id: 'name',
+      accessorFn: (t) => `${t.name} ${t.email}`,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Tenant" />,
+      cell: ({ row }) => (
+        <div>
+          <p className="text-xs font-semibold text-gray-900">{row.original.name}</p>
+          <p className="text-[10px] text-gray-400">{row.original.email}</p>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'subdomain',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Subdomain" />,
+      cell: ({ row }) => (
+        <span className="text-xs font-mono text-gray-500">{row.original.subdomain}</span>
+      ),
+    },
+    {
+      accessorKey: 'plan',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
+      cell: ({ row }) => (
+        <span className={PLAN_BADGE[row.original.plan] ?? PLAN_BADGE.STARTER}>{row.original.plan}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => (
+        <span className={STATUS_BADGE[row.original.status] ?? STATUS_BADGE.CANCELLED}>{row.original.status}</span>
+      ),
+    },
+    {
+      id: 'trialEndsAt',
+      accessorFn: (t) => t.trialEndsAt ?? '',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Trial ends" />,
+      cell: ({ row }) => {
+        const t = row.original
+        return (
+          <span className="text-xs text-gray-600 whitespace-nowrap">
+            {t.plan === 'STARTER' && t.trialEndsAt ? fmtDate(t.trialEndsAt) : '—'}
+          </span>
+        )
+      },
+    },
+    {
+      id: 'users',
+      accessorFn: (t) => t._count?.users ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Users" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-600">
+          {row.original._count?.users ?? 0} / {formatLimit(row.original.maxUsers)}
+        </span>
+      ),
+    },
+    {
+      id: 'branches',
+      accessorFn: (t) => t._count?.branches ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Branches" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-600">
+          {row.original._count?.branches ?? 0} / {formatLimit(row.original.maxBranches)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          {fmtDate(row.original.createdAt)}
+        </span>
+      ),
+    },
+    {
+      id: 'actions',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const t = row.original
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setInvoiceTenant(t)}
+              title="Generate invoice"
+              className="text-gray-400 hover:text-emerald-600 hover:bg-emerald-50"
+            >
+              <FileText size={13} />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setEditTenant(t)}
+              className="text-gray-400 hover:text-blue-600 hover:bg-blue-50"
+            >
+              <Edit2 size={13} />
+            </Button>
+          </div>
+        )
+      },
+    },
+  ], [])
+
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
         <div>
           <h1 className="text-base font-bold text-gray-900">Subscriptions</h1>
           <p className="text-sm text-gray-500">
-            {filtered.length} tenant{filtered.length === 1 ? '' : 's'}
-            {planFilter !== 'ALL' ? ` · ${planFilter}` : ''}
+            {loading ? 'Loading…' : `${filtered.length} tenant${filtered.length === 1 ? '' : 's'}`}
+            {!loading && planFilter !== 'ALL' ? ` · ${planFilter}` : ''}
           </p>
         </div>
-        <button onClick={() => load(planFilter === 'ALL' ? undefined : planFilter)} disabled={loading} className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+        <Button variant="outline" className="ml-auto" onClick={() => load(planFilter === 'ALL' ? undefined : planFilter)} disabled={loading}>
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
@@ -164,78 +278,44 @@ export default function SubscriptionsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium text-gray-600">Filter:</span>
         {filterOptions.map(f => (
-          <button
+          <Button
             key={f}
+            size="sm"
+            variant={planFilter === f ? 'default' : 'chip'}
             onClick={() => { setPlanFilter(f); load(f === 'ALL' ? undefined : f) }}
-            className={`px-3 py-1.5 text-xs rounded-lg font-medium transition-colors ${planFilter === f ? 'bg-gray-900 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
           >
             {f === 'ALL' ? 'All Plans' : (catalogPlans.find(p => p.key === f)?.name ?? f)}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {['Tenant', 'Subdomain', 'Plan', 'Status', 'Trial ends', 'Users', 'Branches', 'Joined', ''].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading && (
-                <tr><td colSpan={9} className="px-4 py-12 text-center">
-                  <RefreshCw size={18} className="animate-spin mx-auto text-gray-300" />
-                </td></tr>
-              )}
-              {!loading && filtered.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-400">No tenants for this plan</td></tr>
-              )}
-              {!loading && filtered.map(t => (
-                <tr key={t.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <p className="text-xs font-semibold text-gray-900">{t.name}</p>
-                    <p className="text-[10px] text-gray-400">{t.email}</p>
-                  </td>
-                  <td className="px-4 py-3 text-xs font-mono text-gray-500">{t.subdomain}</td>
-                  <td className="px-4 py-3"><span className={PLAN_BADGE[t.plan] ?? PLAN_BADGE.STARTER}>{t.plan}</span></td>
-                  <td className="px-4 py-3"><span className={STATUS_BADGE[t.status] ?? STATUS_BADGE.CANCELLED}>{t.status}</span></td>
-                  <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">
-                    {t.plan === 'STARTER' && t.trialEndsAt
-                      ? new Date(t.trialEndsAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
-                      : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
-                    {t._count?.users ?? 0} / {formatLimit(t.maxUsers)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-600">
-                    {t._count?.branches ?? 0} / {formatLimit(t.maxBranches)}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
-                    {new Date(t.createdAt).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => setInvoiceTenant(t)}
-                        title="Generate invoice"
-                        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                      >
-                        <FileText size={13} />
-                      </button>
-                      <button onClick={() => setEditTenant(t)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg">
-                        <Edit2 size={13} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <ClientSideTable
+        data={filtered}
+        columns={columns}
+        pageCount={Math.max(1, Math.ceil(filtered.length / 10))}
+        searchableColumns={[
+          { id: 'name', title: 'Tenant' },
+          { id: 'subdomain', title: 'Subdomain' },
+        ]}
+        filterableColumns={[
+          {
+            id: 'status',
+            title: 'Status',
+            options: [
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'TRIAL', label: 'Trial' },
+              { value: 'SUSPENDED', label: 'Suspended' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ],
+          },
+          {
+            id: 'plan',
+            title: 'Plan',
+            options: catalogPlans.map((p) => ({ value: p.key, label: p.name })),
+          },
+        ]}
+        isShowExportButtons={{ isShow: true, fileName: 'admin-subscriptions-export' }}
+      />
 
       {editTenant && (
         <EditPlanModal
@@ -294,7 +374,7 @@ function EditPlanModal({
             <p className="text-xs text-gray-500">{tenant.name}</p>
             <p className="text-[10px] text-gray-400 mt-0.5">Limits update automatically from plan catalog</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"><X size={16} /></button>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></Button>
         </div>
         {done ? (
           <div className="text-center py-4">
@@ -316,10 +396,10 @@ function EditPlanModal({
             </div>
             {error && <p className="text-xs text-red-600 mb-3">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-              <button onClick={save} disabled={loading || plan === tenant.plan} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-40">
+              <Button variant="outline" onClick={onClose}>Cancel</Button>
+              <Button variant="default" onClick={save} disabled={loading || plan === tenant.plan}>
                 <TrendingUp size={13} />{loading ? 'Saving…' : 'Update Plan'}
-              </button>
+              </Button>
             </div>
           </>
         )}

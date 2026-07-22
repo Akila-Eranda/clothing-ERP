@@ -15,8 +15,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { ModuleGate } from "@/components/shop/module-gate";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
+import { OpenRecordButton } from "@/components/table";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Promotion {
   id: string;

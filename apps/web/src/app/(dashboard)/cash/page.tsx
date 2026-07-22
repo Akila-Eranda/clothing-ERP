@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   Banknote, PlayCircle, StopCircle, History, AlertTriangle,
   RefreshCw, Loader2, CheckCircle2, ArrowDownCircle, ArrowUpCircle,
-  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye,
+  Clock, DollarSign, Activity, Plus, LayoutDashboard, Zap, Eye, Monitor,
 } from "lucide-react";
 import { toast } from "sonner";
 import { ColumnDef } from "@tanstack/react-table";
@@ -21,21 +21,21 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
-import { OpenRecordButton } from "@/components/table/open-record-button";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { DenominationInput, denominationTotal } from "@/components/cash/denomination-input";
 import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-movement-ledger";
 import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
+import { PosCountersPanel } from "@/components/cash/pos-counters-panel";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
+import { readPosCounterId, writePosCounterId } from "@/lib/pos-counter";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "open", label: "Cash Open", icon: PlayCircle },
   { id: "close", label: "Cash Close", icon: StopCircle },
   { id: "movements", label: "Cash In / Out", icon: ArrowUpCircle },
+  { id: "counters", label: "Counters", icon: Monitor },
   { id: "history", label: "History", icon: History },
   { id: "variance", label: "Variance", icon: AlertTriangle },
 ] as const;
@@ -149,8 +149,26 @@ export default function CashManagementPage() {
   const [detailShiftId, setDetailShiftId] = React.useState<string | null>(null);
   const [autoRouted, setAutoRouted] = React.useState(false);
   const [lastRefreshed, setLastRefreshed] = React.useState<Date | null>(null);
+  const [counters, setCounters] = React.useState<{ id: string; name: string; code: string }[]>([]);
+  const [counterId, setCounterId] = React.useState(() => readPosCounterId());
 
   const setTab = (id: string) => router.push(`/cash?tab=${id}`);
+
+  const loadCounters = React.useCallback(async () => {
+    try {
+      const res = await api.get<{ id: string; name: string; code: string }[]>("/cash/counters");
+      const list = Array.isArray(res.data) ? res.data : [];
+      setCounters(list);
+      setCounterId((prev) => {
+        const saved = prev || readPosCounterId();
+        const next = saved && list.some((c) => c.id === saved) ? saved : list[0]?.id ?? "";
+        if (next) writePosCounterId(next);
+        return next;
+      });
+    } catch {
+      setCounters([]);
+    }
+  }, []);
 
   const loadActive = React.useCallback(async () => {
     try {
@@ -207,10 +225,10 @@ export default function CashManagementPage() {
 
   const refresh = React.useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
-    await Promise.all([loadActive(), loadToday(), loadSuggestion(), loadHistory(), loadVariance()]);
+    await Promise.all([loadActive(), loadToday(), loadSuggestion(), loadHistory(), loadVariance(), loadCounters()]);
     setLastRefreshed(new Date());
     if (!silent) setLoading(false);
-  }, [loadActive, loadToday, loadSuggestion, loadHistory, loadVariance]);
+  }, [loadActive, loadToday, loadSuggestion, loadHistory, loadVariance, loadCounters]);
 
   React.useEffect(() => { void refresh(); }, [refresh]);
 
@@ -263,6 +281,10 @@ export default function CashManagementPage() {
   }, [shiftOpen, isViewingToday, loadActive, loadToday]);
 
   const handleOpenShift = async () => {
+    if (!counterId) {
+      toast.error("Select a cashier counter");
+      return;
+    }
     const amount = parseFloat(openingCash);
     if (!Number.isFinite(amount) || amount < 0) {
       toast.error("Enter a valid opening amount");
@@ -270,7 +292,8 @@ export default function CashManagementPage() {
     }
     setOpening(true);
     try {
-      await api.post("/cash/open", { openingCash: amount, notes: openingNotes || undefined });
+      writePosCounterId(counterId);
+      await api.post("/cash/open", { openingCash: amount, counterId, notes: openingNotes || undefined });
       toast.success("Shift started");
       setOpeningCash("");
       setOpeningNotes("");
@@ -522,17 +545,17 @@ export default function CashManagementPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap shrink-0">
-              <Button variant="outline" onClick={() => void refresh()} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+              <Button variant="outline" onClick={() => void refresh()} className="gap-1.5">
                 <RefreshCw className={cn("h-[18px] w-[18px]", loading && "animate-spin")} /> Refresh
               </Button>
               <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
               {!shiftOpen && !shiftPending && (
-                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4 bg-emerald-600 hover:bg-emerald-700" onClick={() => setTab("open")}>
+                <Button variant="success" className="gap-1.5" onClick={() => setTab("open")}>
                   <Plus className="h-[18px] w-[18px]" /> Start Shift
                 </Button>
               )}
               {shiftOpen && (
-                <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>
+                <Button variant="danger" className="gap-1.5" onClick={() => setTab("close")}>
                   <StopCircle className="h-[18px] w-[18px]" /> Cash Close
                 </Button>
               )}
@@ -560,19 +583,15 @@ export default function CashManagementPage() {
           {/* Date filter — auto-applies to KPI, history & variance */}
           <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">
             {DATE_PRESETS.map((p) => (
-              <button
+              <Button
                 key={p.label}
                 type="button"
+                size="sm"
+                variant={dateRange.from === p.from && dateRange.to === p.to ? "success" : "chip"}
                 onClick={() => applyPreset(p.from, p.to)}
-                className={cn(
-                  "px-3 py-1.5 text-xs rounded-lg border font-medium transition-all",
-                  dateRange.from === p.from && dateRange.to === p.to
-                    ? "bg-emerald-600 text-white border-emerald-600"
-                    : "bg-background text-muted-foreground hover:bg-muted border",
-                )}
               >
                 {p.label}
-              </button>
+              </Button>
             ))}
             <div className="w-px h-4 bg-border" />
             <Input
@@ -614,15 +633,16 @@ export default function CashManagementPage() {
               <div className="flex flex-wrap gap-2">
                 {canApproveVariance && pendingItems[0] && (
                   <Button
+                    variant="warning"
                     size="sm"
-                    className="bg-amber-600 hover:bg-amber-700"
+                    className="h-9 px-4 rounded-xl gap-1.5"
                     onClick={() => void handleApprove(pendingItems[0].id)}
                   >
-                    <CheckCircle2 className="h-4 w-4 mr-1.5" />
+                    <CheckCircle2 className="h-4 w-4" />
                     Approve now
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="border-amber-500 text-amber-700" onClick={() => setTab("variance")}>
+                <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl border-amber-500/60 text-amber-700 dark:text-amber-400" onClick={() => setTab("variance")}>
                   Review variances
                 </Button>
               </div>
@@ -663,15 +683,15 @@ export default function CashManagementPage() {
                       : "No active shift. Open cash to start tracking POS sales automatically."}
                   </p>
                   {shiftPending && active && canApproveVariance ? (
-                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 gap-1.5" onClick={() => void handleApprove(active.id)}>
+                    <Button variant="warning" className="h-10 px-5 rounded-xl gap-1.5" onClick={() => void handleApprove(active.id)}>
                       <CheckCircle2 className="h-4 w-4" /> Approve variance & continue
                     </Button>
                   ) : !shiftPending ? (
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 gap-1.5" onClick={() => setTab("open")}>
+                    <Button variant="success" className="h-10 px-5 rounded-xl gap-1.5" onClick={() => setTab("open")}>
                       <PlayCircle className="h-4 w-4" /> Start Shift
                     </Button>
                   ) : (
-                    <Button size="sm" variant="outline" onClick={() => setTab("variance")}>
+                    <Button variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setTab("variance")}>
                       View pending variances
                     </Button>
                   )}
@@ -715,7 +735,7 @@ export default function CashManagementPage() {
                     </p>
                     <div className="flex gap-2 pt-1">
                       <Button size="sm" variant="outline" className="flex-1" onClick={() => setTab("movements")}>Cash In/Out</Button>
-                      <Button size="sm" className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => setTab("close")}>Close Shift</Button>
+                      <Button size="sm" variant="danger" className="flex-1" onClick={() => setTab("close")}>Close Shift</Button>
                     </div>
                   </CardContent>
                 </Card>
@@ -752,7 +772,7 @@ export default function CashManagementPage() {
                       Opened with LKR {formatNumber(active!.openingCash)} at{" "}
                       {new Date(active!.openingTime).toLocaleTimeString("en-LK")}
                     </p>
-                    <Button className="mt-4" size="sm" onClick={() => setTab("overview")}>Go to Overview</Button>
+                    <Button className="mt-4 h-10 px-5 rounded-xl" variant="outline" onClick={() => setTab("overview")}>Go to Overview</Button>
                   </div>
                 ) : shiftPending ? (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3">
@@ -764,7 +784,7 @@ export default function CashManagementPage() {
                       )}.
                     </p>
                     {canApproveVariance && active ? (
-                      <Button size="sm" className="bg-amber-600 hover:bg-amber-700 gap-1.5" onClick={() => void handleApprove(active.id)}>
+                      <Button variant="warning" className="h-10 px-5 rounded-xl gap-1.5" onClick={() => void handleApprove(active.id)}>
                         <CheckCircle2 className="h-4 w-4" /> Approve variance
                       </Button>
                     ) : (
@@ -788,7 +808,7 @@ export default function CashManagementPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="mt-2 h-7 text-xs border-blue-500/50"
+                            className="mt-2 h-9 px-3.5 rounded-xl text-xs border-blue-500/50"
                             onClick={() => setOpeningCash(String(suggestion.suggestedOpening))}
                           >
                             Use LKR {formatNumber(suggestion.suggestedOpening)}
@@ -807,6 +827,38 @@ export default function CashManagementPage() {
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <Label className="text-xs font-semibold flex items-center gap-1.5">
+                        <Monitor className="h-3.5 w-3.5" /> Cashier counter
+                      </Label>
+                      {counters.length === 0 ? (
+                        <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground space-y-2">
+                          <p>No counters yet.</p>
+                          <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl" onClick={() => setTab("counters")}>
+                            Create counters
+                          </Button>
+                        </div>
+                      ) : (
+                        <Select
+                          value={counterId}
+                          onValueChange={(v) => {
+                            setCounterId(v);
+                            writePosCounterId(v);
+                          }}
+                        >
+                          <SelectTrigger className="h-11">
+                            <SelectValue placeholder="Select counter…" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {counters.map((c) => (
+                              <SelectItem key={c.id} value={c.id}>
+                                {c.name} ({c.code})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                    <div className="space-y-2">
                       <Label className="text-xs font-semibold">Opening amount (LKR)</Label>
                       <Input
                         type="number"
@@ -819,19 +871,15 @@ export default function CashManagementPage() {
                       />
                       <div className="flex flex-wrap gap-2">
                         {FLOAT_PRESETS.map((p) => (
-                          <button
+                          <Button
                             key={p}
                             type="button"
+                            size="sm"
+                            variant={openingCash === String(p) ? "success" : "chip"}
                             onClick={() => setOpeningCash(String(p))}
-                            className={cn(
-                              "px-3 py-1 text-xs rounded-lg border font-medium transition-all",
-                              openingCash === String(p)
-                                ? "bg-emerald-600 text-white border-emerald-600"
-                                : "bg-background text-muted-foreground hover:bg-muted",
-                            )}
                           >
                             {formatNumber(p)}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -839,7 +887,13 @@ export default function CashManagementPage() {
                       <Label className="text-xs font-semibold">Notes (optional)</Label>
                       <Textarea value={openingNotes} onChange={(e) => setOpeningNotes(e.target.value)} rows={2} />
                     </div>
-                    <Button onClick={() => void handleOpenShift()} disabled={opening} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                    <Button
+                      variant="success"
+                      size="lg"
+                      onClick={() => void handleOpenShift()}
+                      disabled={opening || !counterId}
+                      className="w-full h-11 rounded-xl gap-2"
+                    >
                       {opening ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
                       Start Shift
                     </Button>
@@ -849,6 +903,11 @@ export default function CashManagementPage() {
             </Card>
           </TabsContent>
 
+          {/* Counters */}
+          <TabsContent value="counters" className="m-0 mt-0">
+            <PosCountersPanel />
+          </TabsContent>
+
           {/* Cash Close */}
           <TabsContent value="close" className="m-0 mt-0">
             {!shiftOpen ? (
@@ -856,7 +915,7 @@ export default function CashManagementPage() {
                 <CardContent className="py-10 text-center text-muted-foreground">
                   <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open shift. Start a shift from Cash Open first.</p>
-                  <Button className="mt-4" size="sm" variant="outline" onClick={() => setTab("open")}>Cash Open</Button>
+                  <Button className="mt-4 h-10 px-5 rounded-xl" variant="outline" onClick={() => setTab("open")}>Cash Open</Button>
                 </CardContent>
               </Card>
             ) : (
@@ -929,7 +988,9 @@ export default function CashManagementPage() {
                     <Button
                       onClick={() => void handleCloseShift()}
                       disabled={closing || actualTotal <= 0}
-                      className="w-full mt-4 h-11 gap-2 bg-red-600 hover:bg-red-700"
+                      variant="danger"
+                      size="lg"
+                      className="w-full mt-4 gap-2"
                     >
                       {closing ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="h-4 w-4" />}
                       Close Shift
@@ -1048,11 +1109,11 @@ export default function CashManagementPage() {
                             )}>
                               {(r.variance ?? 0) >= 0 ? "+" : ""}{formatNumber(r.variance ?? 0)}
                             </span>
-                            <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setDetailShiftId(r.id)}>
+                            <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={() => setDetailShiftId(r.id)}>
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
                             {r.status === "PENDING_APPROVAL" && (
-                              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => void handleApprove(r.id)}>
+                              <Button size="sm" variant="outline" className="h-9 px-3 rounded-xl text-xs" onClick={() => void handleApprove(r.id)}>
                                 Approve
                               </Button>
                             )}
@@ -1089,8 +1150,8 @@ export default function CashManagementPage() {
                           <Button
                             key={t}
                             size="sm"
-                            variant={movementType === t ? "default" : "outline"}
-                            className={movementType === t ? "bg-emerald-600 hover:bg-emerald-700" : ""}
+                            variant={movementType === t ? "success" : "outline"}
+                            className="h-10 px-4 rounded-xl"
                             onClick={() => setMovementType(t)}
                           >
                             {t === "DEPOSIT" ? "Cash In" : t === "WITHDRAWAL" ? "Cash Out" : "Petty Expense"}
@@ -1107,7 +1168,13 @@ export default function CashManagementPage() {
                           <Input value={movementDesc} onChange={(e) => setMovementDesc(e.target.value)} placeholder="Reason…" />
                         </div>
                       </div>
-                      <Button onClick={() => void handleMovement()} disabled={moving} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                      <Button
+                        variant="success"
+                        size="lg"
+                        onClick={() => void handleMovement()}
+                        disabled={moving}
+                        className="w-full h-11 rounded-xl gap-2"
+                      >
                         {moving ? <Loader2 className="h-4 w-4 animate-spin" /> : movementType === "DEPOSIT" ? <ArrowDownCircle className="h-4 w-4" /> : <ArrowUpCircle className="h-4 w-4" />}
                         Record Movement
                       </Button>

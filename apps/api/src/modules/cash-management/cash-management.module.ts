@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import {
-  Controller, Get, Post, Put, Body, Param, Query, Headers,
+  Controller, Get, Post, Put, Delete, Body, Param, Query, Headers,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
-import { IsString, IsOptional, IsNumber, IsEnum, IsObject, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsEnum, IsObject, IsBoolean, Min, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CashMovementType, CashRegisterStatus, PaymentMethod, RoleType } from '@prisma/client';
@@ -28,6 +28,7 @@ import * as dayjs from 'dayjs';
 
 export class OpenCashRegisterDto {
   @ApiProperty() @IsNumber() @Min(0) openingCash: number;
+  @ApiPropertyOptional() @IsOptional() @IsString() counterId?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
 }
 
@@ -42,6 +43,19 @@ export class CloseCashRegisterDto {
   @ApiProperty() @IsNumber() @Min(0) actualCash: number;
   @ApiPropertyOptional() @IsOptional() @IsObject() denominations?: Record<string, number>;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
+}
+
+export class CreatePosCounterDto {
+  @ApiProperty({ example: 'Counter 4' }) @IsString() @MaxLength(80) name: string;
+  @ApiPropertyOptional({ example: 'C4' }) @IsOptional() @IsString() @MaxLength(20) code?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() sortOrder?: number;
+}
+
+export class UpdatePosCounterDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(20) code?: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() sortOrder?: number;
 }
 
 @Injectable()
@@ -59,18 +73,151 @@ export class CashManagementService {
     return branch.id;
   }
 
-  async getActiveRegister(tenantId: string, branchId: string | undefined, cashierId: string) {
+  async getActiveRegister(
+    tenantId: string,
+    branchId: string | undefined,
+    cashierId: string,
+    counterId?: string | null,
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const own = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
-    if (own) return this.buildRegisterView(own);
-    // PIN switch: allow selling on shared terminal float opened by another cashier
-    const shared = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+    if (own) {
+      if (!(counterId && own.counterId && own.counterId !== counterId)) {
+        return this.buildRegisterView(own);
+      }
+    }
+    const shared = await findAnyOpenRegisterOnBranch(
+      this.prisma,
+      tenantId,
+      resolvedBranchId,
+      counterId || undefined,
+    );
     if (!shared) return null;
     return {
       ...this.buildRegisterView(shared),
       sharedShift: true,
       actingCashierId: cashierId,
     };
+  }
+
+  async listCounters(
+    tenantId: string,
+    branchId: string | undefined,
+    opts?: { includeInactive?: boolean; seedDefaults?: boolean },
+  ) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    if (opts?.seedDefaults !== false) {
+      await this.ensureDefaultCounters(tenantId, resolvedBranchId);
+    }
+    return this.prisma.posCounter.findMany({
+      where: {
+        tenantId,
+        branchId: resolvedBranchId,
+        ...(opts?.includeInactive ? {} : { isActive: true }),
+      },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, code: true, sortOrder: true, isActive: true },
+    });
+  }
+
+  private async ensureDefaultCounters(tenantId: string, branchId: string) {
+    const count = await this.prisma.posCounter.count({ where: { tenantId, branchId } });
+    if (count > 0) return;
+    const defaults = [
+      { name: 'Counter 1', code: 'C1', sortOrder: 1 },
+      { name: 'Counter 2', code: 'C2', sortOrder: 2 },
+      { name: 'Counter 3', code: 'C3', sortOrder: 3 },
+    ];
+    await this.prisma.posCounter.createMany({
+      data: defaults.map((d) => ({ tenantId, branchId, ...d })),
+      skipDuplicates: true,
+    });
+  }
+
+  private normalizeCounterCode(raw: string) {
+    return raw.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
+  }
+
+  private async nextCounterCode(tenantId: string, branchId: string) {
+    const existing = await this.prisma.posCounter.findMany({
+      where: { tenantId, branchId },
+      select: { code: true, sortOrder: true },
+    });
+    let n = existing.length + 1;
+    const used = new Set(existing.map((c) => c.code.toUpperCase()));
+    while (used.has(`C${n}`)) n += 1;
+    return { code: `C${n}`, sortOrder: Math.max(0, ...existing.map((c) => c.sortOrder), 0) + 1 };
+  }
+
+  async createCounter(tenantId: string, branchId: string | undefined, dto: CreatePosCounterDto) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException('Counter name is required');
+
+    const auto = await this.nextCounterCode(tenantId, resolvedBranchId);
+    const code = this.normalizeCounterCode(dto.code || auto.code);
+    if (!code) throw new BadRequestException('Counter code is required');
+
+    const dup = await this.prisma.posCounter.findFirst({
+      where: { tenantId, branchId: resolvedBranchId, code },
+    });
+    if (dup) throw new BadRequestException(`Counter code ${code} already exists`);
+
+    return this.prisma.posCounter.create({
+      data: {
+        tenantId,
+        branchId: resolvedBranchId,
+        name,
+        code,
+        sortOrder: dto.sortOrder ?? auto.sortOrder,
+        isActive: true,
+      },
+      select: { id: true, name: true, code: true, sortOrder: true, isActive: true },
+    });
+  }
+
+  async updateCounter(
+    tenantId: string,
+    branchId: string | undefined,
+    id: string,
+    dto: UpdatePosCounterDto,
+  ) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const existing = await this.prisma.posCounter.findFirst({
+      where: { id, tenantId, branchId: resolvedBranchId },
+    });
+    if (!existing) throw new NotFoundException('Counter not found');
+
+    const code = dto.code != null ? this.normalizeCounterCode(dto.code) : undefined;
+    if (code !== undefined && !code) throw new BadRequestException('Counter code is required');
+    if (code && code !== existing.code) {
+      const dup = await this.prisma.posCounter.findFirst({
+        where: { tenantId, branchId: resolvedBranchId, code, NOT: { id } },
+      });
+      if (dup) throw new BadRequestException(`Counter code ${code} already exists`);
+    }
+
+    if (dto.isActive === false) {
+      const open = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId, id);
+      if (open) {
+        throw new BadRequestException('Close the open shift on this counter before deactivating it');
+      }
+    }
+
+    return this.prisma.posCounter.update({
+      where: { id },
+      data: {
+        ...(dto.name != null ? { name: dto.name.trim() } : {}),
+        ...(code != null ? { code } : {}),
+        ...(dto.isActive != null ? { isActive: dto.isActive } : {}),
+        ...(dto.sortOrder != null ? { sortOrder: dto.sortOrder } : {}),
+      },
+      select: { id: true, name: true, code: true, sortOrder: true, isActive: true },
+    });
+  }
+
+  async deactivateCounter(tenantId: string, branchId: string | undefined, id: string) {
+    return this.updateCounter(tenantId, branchId, id, { isActive: false });
   }
 
   async openRegister(
@@ -80,6 +227,22 @@ export class CashManagementService {
     dto: OpenCashRegisterDto,
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    await this.ensureDefaultCounters(tenantId, resolvedBranchId);
+    let counterId = dto.counterId?.trim();
+    if (!counterId) {
+      const first = await this.prisma.posCounter.findFirst({
+        where: { tenantId, branchId: resolvedBranchId, isActive: true },
+        orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      });
+      counterId = first?.id;
+    }
+    if (!counterId) throw new BadRequestException('Select a cashier counter');
+
+    const counter = await this.prisma.posCounter.findFirst({
+      where: { id: counterId, tenantId, branchId: resolvedBranchId, isActive: true },
+    });
+    if (!counter) throw new BadRequestException('Invalid or inactive cashier counter');
+
     const existing = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
     if (existing?.status === CashRegisterStatus.OPEN) {
       throw new BadRequestException('You already have an open cash shift. Close it before starting a new one.');
@@ -87,11 +250,15 @@ export class CashManagementService {
     if (existing?.status === CashRegisterStatus.PENDING_APPROVAL) {
       throw new BadRequestException('Previous shift is pending manager approval. Contact your manager.');
     }
-    // One float per branch terminal — PIN-switched cashiers share the open drawer
-    const otherOpen = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+    const otherOpen = await findAnyOpenRegisterOnBranch(
+      this.prisma,
+      tenantId,
+      resolvedBranchId,
+      counterId,
+    );
     if (otherOpen) {
       throw new BadRequestException(
-        'A cash shift is already open on this branch. Unlock with your PIN to use the shared float, or close the current shift first.',
+        `${counter.name} already has an open shift. Unlock with your PIN to use that float, or close it first.`,
       );
     }
 
@@ -100,6 +267,7 @@ export class CashManagementService {
         data: {
           tenantId,
           branchId: resolvedBranchId,
+          counterId,
           cashierId,
           openingCash: dto.openingCash,
           notes: dto.notes,
@@ -111,7 +279,7 @@ export class CashManagementService {
         registerId: created.id,
         type: CashMovementType.OPENING,
         amount: dto.openingCash,
-        description: 'Opening float',
+        description: `Opening float · ${counter.name}`,
         createdById: cashierId,
       });
       return created;
@@ -122,6 +290,7 @@ export class CashManagementService {
       branchId: resolvedBranchId,
       registerId: register.id,
       cashierId,
+      counterId,
       openingCash: dto.openingCash,
     });
 
@@ -518,6 +687,7 @@ export class CashManagementService {
         movements: { orderBy: { createdAt: 'asc' } },
         cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
         branch: { select: { id: true, name: true, code: true } },
+        counter: { select: { id: true, name: true, code: true } },
         approvedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
@@ -576,15 +746,59 @@ export class CashManagementService {
 export class CashManagementController {
   constructor(private readonly cashService: CashManagementService) {}
 
+  @Get('counters')
+  @RequireAnyPermissions('cash:read', 'sales:read', 'sales:create', 'cash:create')
+  @ApiOperation({ summary: 'List POS cashier counters for branch' })
+  listCounters(
+    @CurrentUser() user: IAuthUser,
+    @Query('all') all?: string,
+  ) {
+    return this.cashService.listCounters(user.tenantId, user.branchId, {
+      includeInactive: all === '1' || all === 'true',
+    });
+  }
+
+  @Post('counters')
+  @RequireAnyPermissions('cash:create', 'cash:update')
+  @ApiOperation({ summary: 'Create a cashier counter' })
+  createCounter(@CurrentUser() user: IAuthUser, @Body() dto: CreatePosCounterDto) {
+    return this.cashService.createCounter(user.tenantId, user.branchId, dto);
+  }
+
+  @Put('counters/:id')
+  @RequireAnyPermissions('cash:create', 'cash:update')
+  @ApiOperation({ summary: 'Update a cashier counter' })
+  updateCounter(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdatePosCounterDto,
+  ) {
+    return this.cashService.updateCounter(user.tenantId, user.branchId, id, dto);
+  }
+
+  @Delete('counters/:id')
+  @RequireAnyPermissions('cash:create', 'cash:update')
+  @ApiOperation({ summary: 'Deactivate a cashier counter' })
+  deactivateCounter(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.cashService.deactivateCounter(user.tenantId, user.branchId, id);
+  }
+
   @Get('active')
   @RequireAnyPermissions('cash:read', 'sales:read')
   @ApiOperation({ summary: 'Get current open cash shift for cashier' })
   getActive(
     @CurrentUser() user: IAuthUser,
     @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-pos-counter-id') counterHeader?: string,
+    @Query('counterId') counterId?: string,
   ) {
     const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
-    return this.cashService.getActiveRegister(user.tenantId, user.branchId, cashierId);
+    return this.cashService.getActiveRegister(
+      user.tenantId,
+      user.branchId,
+      cashierId,
+      counterId || counterHeader || undefined,
+    );
   }
 
   @Post('open')

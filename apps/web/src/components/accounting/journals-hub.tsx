@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   CheckCircle2, Eye, FilePlus2, Loader2, Pencil, Printer, RefreshCw,
   Send, ShieldCheck, Sparkles, Trash2, X, XCircle,
@@ -21,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -631,6 +633,81 @@ export function JournalsHub() {
     return c;
   }, [entries]);
 
+  const columns = useMemo<ColumnDef<JournalEntry>[]>(
+    () => [
+      {
+        id: "entryNumber",
+        accessorKey: "entryNumber",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Number" />,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs font-medium">{row.original.entryNumber}</span>
+        ),
+      },
+      {
+        id: "date",
+        accessorFn: (e) => fmtDate(e.date),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{fmtDate(row.original.date)}</span>
+        ),
+      },
+      {
+        id: "description",
+        accessorKey: "description",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => (
+          <span className="max-w-[280px] truncate block">{row.original.description}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      },
+      {
+        id: "lines",
+        accessorFn: (e) => e.lines?.length ?? 0,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{row.original.lines?.length ?? 0}</span>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const e = row.original;
+          return (
+            <div className="flex justify-end gap-1">
+              <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => void openView(e.id)}>
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+              {e.status === "DRAFT" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2"
+                  onClick={async () => {
+                    const res = await api.get<JournalEntry>(`/accounting/journal-entries/${e.id}`);
+                    setEditEntry(res.data);
+                    setFormOpen(true);
+                  }}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    // openView is stable enough for this hub; recreate when entries identity matters for drafts
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
   return (
     <div className="space-y-4 p-4 md:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -711,70 +788,43 @@ export function JournalsHub() {
         </div>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="text-center py-16 text-sm text-muted-foreground">
-              No journal entries yet. Create one to start posting GL activity.
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-semibold">Number</th>
-                    <th className="text-left px-4 py-3 font-semibold">Date</th>
-                    <th className="text-left px-4 py-3 font-semibold">Description</th>
-                    <th className="text-left px-4 py-3 font-semibold">Status</th>
-                    <th className="text-right px-4 py-3 font-semibold">Lines</th>
-                    <th className="text-right px-4 py-3 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e) => (
-                    <tr key={e.id} className="border-b border-border/40 hover:bg-muted/20">
-                      <td className="px-4 py-3 font-mono text-xs font-medium">{e.entryNumber}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{fmtDate(e.date)}</td>
-                      <td className="px-4 py-3 max-w-[280px] truncate">{e.description}</td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={e.status} />
-                      </td>
-                      <td className="px-4 py-3 text-right tabular-nums">{e.lines?.length ?? 0}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => void openView(e.id)}>
-                            <Eye className="h-3.5 w-3.5" />
-                          </Button>
-                          {e.status === "DRAFT" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 px-2"
-                              onClick={async () => {
-                                const res = await api.get<JournalEntry>(
-                                  `/accounting/journal-entries/${e.id}`,
-                                );
-                                setEditEntry(res.data);
-                                setFormOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : entries.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-16 text-sm text-muted-foreground">
+            No journal entries yet. Create one to start posting GL activity.
+          </CardContent>
+        </Card>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={entries}
+          columns={columns}
+          pageCount={Math.max(1, Math.ceil(entries.length / 10))}
+          searchableColumns={[
+            { id: "entryNumber", title: "Number" },
+            { id: "description", title: "Description" },
+          ]}
+          filterableColumns={[
+            {
+              id: "status",
+              title: "Status",
+              options: [
+                { value: "DRAFT", label: "Draft" },
+                { value: "PENDING_APPROVAL", label: "Pending" },
+                { value: "APPROVED", label: "Approved" },
+                { value: "POSTED", label: "Posted" },
+                { value: "VOID", label: "Void" },
+              ],
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "gl-journals" }}
+        />
+      )}
+      {/* TODO: remaining tables → ClientSideTable — journal voucher line table in view modal is a print layout; form lines are nested editors */}
 
       {formOpen && (
         <JournalFormModal

@@ -28,8 +28,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -832,6 +831,7 @@ export function PayableSection() {
         </div>
       ) : (
         <ClientSideTable
+          fillHeight={false}
           data={ap?.suppliers ?? []}
           columns={apColumns}
           pageCount={Math.ceil((ap?.suppliers?.length ?? 0) / 10) || 1}
@@ -855,6 +855,7 @@ export function ReceivableSection() {
         </div>
       ) : (
         <ClientSideTable
+          fillHeight={false}
           data={ar?.customers ?? []}
           columns={arColumns}
           pageCount={Math.ceil((ar?.customers?.length ?? 0) / 10) || 1}
@@ -894,6 +895,7 @@ export function CashBookSection() {
         </CardContent>
       </Card>
       <ClientSideTable
+          fillHeight={false}
         data={cashRows}
         columns={cashColumns}
         pageCount={Math.ceil(cashRows.length / 10) || 1}
@@ -949,6 +951,7 @@ export function BanksSection() {
         </CardContent>
       </Card>
       <ClientSideTable
+          fillHeight={false}
         data={banks}
         columns={bankColumns}
         pageCount={Math.ceil(banks.length / 10) || 1}
@@ -1009,6 +1012,7 @@ export function ReconciliationSection() {
         </CardContent>
       </Card>
       <ClientSideTable
+          fillHeight={false}
         data={recons}
         columns={reconColumns}
         pageCount={Math.ceil(recons.length / 10) || 1}

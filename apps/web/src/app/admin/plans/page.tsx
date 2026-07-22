@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Edit2, X, Check, Users, GitBranch, Plus, RefreshCw, Tag, TrendingUp } from 'lucide-react'
 import { fetchPlans, updatePlanCatalog, DEFAULT_PLANS, type PlanDef } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
 const PLAN_COLOR: Record<string, { badge: string; ring: string; bar: string }> = {
@@ -39,13 +40,14 @@ export default function PlansPage() {
           <h1 className="text-base font-bold text-gray-900">Subscription Plans</h1>
           <p className="text-sm text-gray-500">Manage pricing tiers and feature sets</p>
         </div>
-        <button
+        <Button
+          variant="outline"
+          className="ml-auto"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Plan Cards */}
@@ -58,12 +60,14 @@ export default function PlansPage() {
                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold ${c.badge}`}>
                   <Tag size={11} />{plan.name}
                 </span>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setEditPlan(plan)}
-                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                  className="text-gray-400 hover:text-blue-600 hover:bg-blue-50"
                 >
                   <Edit2 size={13} />
-                </button>
+                </Button>
               </div>
 
               <div className="mb-1">
@@ -176,7 +180,7 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
       <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-sm font-bold text-gray-900">Edit Plan — {plan.name}</h3>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"><X size={16} /></button>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></Button>
         </div>
 
         <div className="space-y-4">
@@ -236,9 +240,9 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
               {form.features.map((feat, i) => (
                 <div key={i} className="flex items-center gap-2">
                   <div className="flex-1 px-2.5 py-1.5 text-xs bg-gray-50 border border-gray-100 rounded-lg text-gray-700">{feat}</div>
-                  <button onClick={() => removeFeature(i)} className="p-1 text-gray-400 hover:text-red-500 transition-colors">
+                  <Button variant="ghost" size="icon-sm" onClick={() => removeFeature(i)} className="h-7 w-7 text-gray-400 hover:text-red-500">
                     <X size={12} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -250,9 +254,9 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
                 onChange={e => setFeatInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addFeature()}
               />
-              <button onClick={addFeature} className="px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+              <Button variant="default" size="icon-sm" onClick={addFeature}>
                 <Plus size={14} />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -260,10 +264,10 @@ function EditPlanModal({ plan, onClose, onSaved }: { plan: PlanDef; onClose: () 
         {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
 
         <div className="flex justify-end gap-2 mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-          <button onClick={save} disabled={saving} className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="default" onClick={save} disabled={saving}>
             <TrendingUp size={13} />{saving ? 'Saving…' : 'Save Changes'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

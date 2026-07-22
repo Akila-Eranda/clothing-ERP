@@ -1,4 +1,5 @@
 import { posCashierStorage } from '@/lib/pos-cashier';
+import { readPosCounterId } from '@/lib/pos-counter';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001/api/v1';
 
@@ -117,6 +118,8 @@ async function request<T>(path: string, init: RequestInit = {}, attempt = 0): Pr
   if (needsPosCashier) {
     const posToken = posCashierStorage.getToken();
     if (posToken) headers['x-pos-cashier-token'] = posToken;
+    const counterId = readPosCounterId();
+    if (counterId) headers['x-pos-counter-id'] = counterId;
   }
 
   const tenantId = (init.headers as Record<string, string> | undefined)?.['x-tenant-id']

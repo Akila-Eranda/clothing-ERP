@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield, Plus, MoreHorizontal, CheckCircle, XCircle,
-  User, RefreshCw, Search, Trash2, Key,
+  User, RefreshCw, Trash2, Key, Loader2,
 } from "lucide-react";
+import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { modalInlineFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
@@ -15,8 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
+import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Role {
   id: string;
@@ -94,7 +94,6 @@ export default function UsersPage() {
   const [roles, setRoles]             = useState<Role[]>([]);
   const [branches, setBranches]       = useState<Branch[]>([]);
   const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState("");
 
   const [userModal, setUserModal]     = useState(false);
   const [roleAssignModal, setRoleAssignModal] = useState<AppUser | null>(null);
@@ -121,7 +120,7 @@ export default function UsersPage() {
       ]);
       setUsers(parseList<AppUser>(uRes.data?.data ?? uRes.data));
       setRoles(parseList<Role>(rRes.data));
-      setBranches(parseList<Branch>(bRes.data?.data ?? bRes.data));
+      setBranches(parseList<Branch>(bRes.data));
     } catch { toast.error("Failed to load data"); }
     finally { setLoading(false); }
   }, []);
@@ -185,11 +184,138 @@ export default function UsersPage() {
     finally { setSaving(false); }
   };
 
-  // ── Filtered users ────────────────────────────────────────────────────────
-  const filtered = useMemo(() => users.filter((u) => {
-    const q = search.toLowerCase();
-    return `${u.firstName} ${u.lastName}`.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
-  }), [users, search]);
+  // ── Columns ───────────────────────────────────────────────────────────────
+  const columns = useMemo<ColumnDef<AppUser>[]>(
+    () => [
+      {
+        id: "user",
+        accessorFn: (u) => `${u.firstName} ${u.lastName} ${u.email}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="User" />,
+        cell: ({ row }) => {
+          const u = row.original;
+          const initials = `${u.firstName[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase();
+          return (
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
+                {initials}
+              </div>
+              <div>
+                <OpenRecordButton
+                  onClick={() => {
+                    setRoleAssignModal(u);
+                    setSelectedRoleId(u.roles?.[0]?.role?.id ?? "");
+                  }}
+                  className="text-sm"
+                  title="Change role"
+                >
+                  {u.firstName} {u.lastName}
+                </OpenRecordButton>
+                <p className="text-xs text-muted-foreground">{u.email}</p>
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: "role",
+        accessorFn: (u) => u.roles?.[0]?.role?.name ?? "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Role" />,
+        cell: ({ row }) => {
+          const primaryRole = row.original.roles?.[0]?.role;
+          return primaryRole ? (
+            <span
+              className={`h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center border ${
+                ROLE_COLORS[primaryRole.type] ?? ROLE_COLORS.CUSTOM
+              }`}
+            >
+              {primaryRole.name}
+            </span>
+          ) : (
+            <span className="text-xs text-muted-foreground">No role</span>
+          );
+        },
+      },
+      {
+        id: "branch",
+        accessorFn: (u) => u.branch?.name ?? "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
+        cell: ({ row }) => (
+          <span className="text-sm text-muted-foreground">{row.original.branch?.name ?? "—"}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) =>
+          row.original.status === "ACTIVE" ? (
+            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
+              <CheckCircle className="h-3.5 w-3.5" />
+              Active
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <XCircle className="h-3.5 w-3.5" />
+              Inactive
+            </span>
+          ),
+      },
+      {
+        id: "joined",
+        accessorFn: (u) => new Date(u.createdAt).toLocaleDateString(),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-muted-foreground">
+            {new Date(row.original.createdAt).toLocaleDateString()}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => {
+          const u = row.original;
+          const isActive = u.status === "ACTIVE";
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => {
+                    setRoleAssignModal(u);
+                    setSelectedRoleId(u.roles?.[0]?.role?.id ?? "");
+                  }}
+                >
+                  <Key className="h-3.5 w-3.5 mr-2" /> Change Role
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => void handleToggleStatus(u)}>
+                  {isActive ? (
+                    <>
+                      <XCircle className="h-3.5 w-3.5 mr-2" />
+                      Deactivate
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-3.5 w-3.5 mr-2" />
+                      Activate
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuItem className="text-destructive" onClick={() => void handleDeleteUser(u.id)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    [],
+  );
 
   const activeCount = users.filter((u) => u.status === "ACTIVE").length;
 
@@ -241,86 +367,24 @@ export default function UsersPage() {
 
         {/* ── Users Tab ──────────────────────────────────────────────────── */}
         <TabsContent value="users" className="mt-4 space-y-3">
-          <div className="relative max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-            <Input placeholder="Search users…" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-8 text-sm" />
-          </div>
-
-          <div className="rounded-[18px] border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b bg-muted/30">
-                  {["User","Role","Branch","Status","Joined",""].map((h, i) => (
-                    <th key={h + i} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 4 ? "text-right" : "text-left"}`}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {loading ? (
-                  [...Array(5)].map((_, i) => (
-                    <tr key={i}><td colSpan={6} className="px-4 py-3"><div className="h-6 rounded bg-muted animate-pulse" /></td></tr>
-                  ))
-                ) : filtered.length === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-10 text-center text-sm text-muted-foreground">No users found</td></tr>
-                ) : filtered.map((u) => {
-                  const initials = `${u.firstName[0] ?? ""}${u.lastName?.[0] ?? ""}`.toUpperCase();
-                  const primaryRole = u.roles?.[0]?.role;
-                  const isActive = u.status === "ACTIVE";
-                  return (
-                    <tr key={u.id} className="hover:bg-muted/40 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">{initials}</div>
-                          <div>
-                            <OpenRecordButton
-                              onClick={() => { setRoleAssignModal(u); setSelectedRoleId(u.roles?.[0]?.role?.id ?? ""); }}
-                              className="text-sm"
-                              title="Change role"
-                            >
-                              {u.firstName} {u.lastName}
-                            </OpenRecordButton>
-                            <p className="text-xs text-muted-foreground">{u.email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {primaryRole ? (
-                          <span className={`h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center border ${ROLE_COLORS[primaryRole.type] ?? ROLE_COLORS.CUSTOM}`}>
-                            {primaryRole.name}
-                          </span>
-                        ) : <span className="text-xs text-muted-foreground">No role</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-muted-foreground">{u.branch?.name ?? "—"}</td>
-                      <td className="px-4 py-3">
-                        {isActive
-                          ? <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium"><CheckCircle className="h-3.5 w-3.5" />Active</span>
-                          : <span className="flex items-center gap-1 text-xs text-muted-foreground"><XCircle className="h-3.5 w-3.5" />Inactive</span>}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon-sm"><MoreHorizontal className="h-3.5 w-3.5" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
-                            <DropdownMenuItem onClick={() => { setRoleAssignModal(u); setSelectedRoleId(u.roles?.[0]?.role?.id ?? ""); }}>
-                              <Key className="h-3.5 w-3.5 mr-2" /> Change Role
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleToggleStatus(u)}>
-                              {isActive ? <><XCircle className="h-3.5 w-3.5 mr-2" />Deactivate</> : <><CheckCircle className="h-3.5 w-3.5 mr-2" />Activate</>}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteUser(u.id)}>
-                              <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ClientSideTable
+              data={users}
+              columns={columns}
+              pageCount={Math.max(1, Math.ceil(users.length / 10))}
+              searchableColumns={[
+                { id: "user", title: "User" },
+                { id: "role", title: "Role" },
+                { id: "branch", title: "Branch" },
+              ] as { id: keyof AppUser; title: string }[]}
+              filterableColumns={[]}
+              isShowExportButtons={{ isShow: true, fileName: "users" }}
+            />
+          )}
         </TabsContent>
 
         {/* ── Roles Tab (read-only) ──────────────────────────────────────── */}

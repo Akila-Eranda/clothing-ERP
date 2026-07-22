@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Building2, CalendarRange, Loader2, Plus, RefreshCw,
 } from "lucide-react";
@@ -12,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -237,6 +239,100 @@ function AssetListPanel({ onOpenSchedule }: { onOpenSchedule: () => void }) {
     }
   };
 
+  const assetColumns = useMemo<ColumnDef<Asset>[]>(
+    () => [
+      {
+        id: "code",
+        accessorKey: "code",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Code" />,
+        cell: ({ row }) => <span className="font-mono text-xs">{row.original.code}</span>,
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+        cell: ({ row }) => (
+          <span>
+            {row.original.name}
+            {row.original.location && (
+              <span className="text-xs text-muted-foreground ml-1">({row.original.location})</span>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: "acquired",
+        accessorFn: (a) => fmt(a.acquisitionDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Acquired" />,
+        cell: ({ row }) => <span>{fmt(row.original.acquisitionDate)}</span>,
+      },
+      {
+        id: "cost",
+        accessorKey: "cost",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Cost" />,
+        cell: ({ row }) => <span className="tabular-nums">{formatNumber(row.original.cost)}</span>,
+      },
+      {
+        id: "accumDep",
+        accessorKey: "accumulatedDep",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Accum Dep" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.accumulatedDep)}</span>
+        ),
+      },
+      {
+        id: "bookValue",
+        accessorKey: "bookValue",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Book Value" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.bookValue)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <Badge className="text-[10px]">{row.original.status}</Badge>,
+      },
+      {
+        id: "actions",
+        header: () => <span className="text-xs font-medium">Actions</span>,
+        cell: ({ row }) => {
+          const a = row.original;
+          if (a.status === "DISPOSED") return null;
+          return (
+            <div className="flex justify-end gap-1 flex-wrap">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8"
+                onClick={() => {
+                  setTransferId(a.id);
+                  setDisposeId(null);
+                  setToLocation(a.location || "");
+                }}
+              >
+                Transfer
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => {
+                  setDisposeId(a.id);
+                  setTransferId(null);
+                }}
+              >
+                Dispose
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       {summary && (
@@ -338,63 +434,23 @@ function AssetListPanel({ onOpenSchedule }: { onOpenSchedule: () => void }) {
         </Card>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">Code</th>
-                  <th className="text-left px-4 py-3">Name</th>
-                  <th className="text-left px-4 py-3">Acquired</th>
-                  <th className="text-right px-4 py-3">Cost</th>
-                  <th className="text-right px-4 py-3">Accum Dep</th>
-                  <th className="text-right px-4 py-3">Book Value</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assets.map((a) => (
-                  <tr key={a.id} className="border-b border-border/40">
-                    <td className="px-4 py-2.5 font-mono text-xs">{a.code}</td>
-                    <td className="px-4 py-2.5">
-                      {a.name}
-                      {a.location && <span className="text-xs text-muted-foreground ml-1">({a.location})</span>}
-                    </td>
-                    <td className="px-4 py-2.5">{fmt(a.acquisitionDate)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(a.cost)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(a.accumulatedDep)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(a.bookValue)}</td>
-                    <td className="px-4 py-2.5"><Badge className="text-[10px]">{a.status}</Badge></td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex justify-end gap-1 flex-wrap">
-                        {a.status !== "DISPOSED" && (
-                          <>
-                            <Button variant="ghost" size="sm" className="h-8" onClick={() => { setTransferId(a.id); setDisposeId(null); setToLocation(a.location || ""); }}>
-                              Transfer
-                            </Button>
-                            <Button variant="outline" size="sm" className="h-8" onClick={() => { setDisposeId(a.id); setTransferId(null); }}>
-                              Dispose
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!assets.length && (
-                  <tr>
-                    <td colSpan={8} className="text-center text-muted-foreground py-10">No fixed assets yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={assets}
+          columns={assetColumns}
+          pageCount={Math.max(1, Math.ceil(assets.length / 10))}
+          searchableColumns={[
+            { id: "code", title: "Code" },
+            { id: "name", title: "Name" },
+            { id: "status", title: "Status" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "fixed-assets" }}
+        />
+      )}
     </div>
   );
 }
@@ -499,6 +555,69 @@ function SchedulePanel() {
     }
   };
 
+  const scheduleRows = useMemo(
+    () => rows.map((r) => ({ ...r, id: r.periodLabel })),
+    [rows],
+  );
+
+  const scheduleColumns = useMemo<ColumnDef<ScheduleRow & { id: string }>[]>(
+    () => [
+      {
+        id: "periodIndex",
+        accessorKey: "periodIndex",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="#" />,
+        cell: ({ row }) => <span className="tabular-nums">{row.original.periodIndex}</span>,
+      },
+      {
+        id: "periodLabel",
+        accessorKey: "periodLabel",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.periodLabel}</span>
+        ),
+      },
+      {
+        id: "depreciation",
+        accessorKey: "depreciation",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Depreciation" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.depreciation)}</span>
+        ),
+      },
+      {
+        id: "accumulated",
+        accessorKey: "accumulated",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Accumulated" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.accumulated)}</span>
+        ),
+      },
+      {
+        id: "bookValue",
+        accessorKey: "bookValue",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Book Value" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.bookValue)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorFn: (r) => (r.posted ? "Posted" : "Projected"),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => (
+          <Badge
+            className={`text-[10px] ${
+              row.original.posted ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {row.original.posted ? "Posted" : "Projected"}
+          </Badge>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <Card>
@@ -554,49 +673,19 @@ function SchedulePanel() {
         </div>
       )}
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">#</th>
-                  <th className="text-left px-4 py-3">Period</th>
-                  <th className="text-right px-4 py-3">Depreciation</th>
-                  <th className="text-right px-4 py-3">Accumulated</th>
-                  <th className="text-right px-4 py-3">Book Value</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.periodLabel} className="border-b border-border/40">
-                    <td className="px-4 py-2.5 tabular-nums">{r.periodIndex}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs">{r.periodLabel}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.depreciation)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.accumulated)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(r.bookValue)}</td>
-                    <td className="px-4 py-2.5">
-                      <Badge className={`text-[10px] ${r.posted ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
-                        {r.posted ? "Posted" : "Projected"}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))}
-                {!rows.length && (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted-foreground py-10">
-                      {assetId ? "No schedule" : "Select an asset"}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={scheduleRows}
+          columns={scheduleColumns}
+          pageCount={Math.max(1, Math.ceil(scheduleRows.length / 10))}
+          searchableColumns={[{ id: "periodLabel", title: "Period" }]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "depreciation-schedule" }}
+        />
+      )}
     </div>
   );
 }

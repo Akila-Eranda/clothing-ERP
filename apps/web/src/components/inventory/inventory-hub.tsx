@@ -9,9 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { StockAdjustModal, type InventoryItem } from "@/components/inventory/stock-adjust-modal";
@@ -697,7 +695,8 @@ export function InventoryHub({ section }: { section: InventorySection }) {
               </Card>
             ))}
           </div>
-          <ClientSideTable data={stock} columns={columns} pageCount={Math.ceil(stock.length / 10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{ isShow: true, fileName: "inventory" }} />
+          <ClientSideTable
+          fillHeight={false} data={stock} columns={columns} pageCount={Math.ceil(stock.length / 10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{ isShow: true, fileName: "inventory" }} />
         </>
       )}
 
@@ -761,6 +760,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </div>
 
           <ClientSideTable
+          fillHeight={false}
             data={abc}
             columns={ABC_COLUMNS}
             pageCount={Math.max(1, Math.ceil(abc.length / 10))}
@@ -821,6 +821,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </div>
 
           <ClientSideTable
+          fillHeight={false}
             data={agingRows}
             columns={AGING_COLUMNS}
             pageCount={Math.max(1, Math.ceil(agingRows.length / 10))}
@@ -864,6 +865,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </div>
 
           <ClientSideTable
+          fillHeight={false}
             data={transfers}
             columns={transferColumns}
             pageCount={Math.max(1, Math.ceil(transfers.length / 10))}

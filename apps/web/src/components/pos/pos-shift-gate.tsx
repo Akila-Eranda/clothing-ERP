@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { motion } from "framer-motion";
-import { Banknote, Loader2, PlayCircle, X, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Banknote, Loader2, PlayCircle, X, AlertTriangle, CheckCircle2, Monitor } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,14 @@ import { Label } from "@/components/ui/label";
 import { formatNumber } from "@/lib/utils";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
+import { readPosCounterId, writePosCounterId } from "@/lib/pos-counter";
 
 interface PosShiftGateProps {
   onShiftReady: () => void;
   onClose?: () => void;
 }
+
+type CounterRow = { id: string; name: string; code: string; sortOrder?: number };
 
 export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const { user } = useAuthStore();
@@ -26,6 +29,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const [openingCash, setOpeningCash] = React.useState("");
   const [submitting, setSubmitting] = React.useState(false);
   const [suggested, setSuggested] = React.useState<number | null>(null);
+  const [counters, setCounters] = React.useState<CounterRow[]>([]);
+  const [counterId, setCounterId] = React.useState(() => readPosCounterId());
   const onShiftReadyRef = React.useRef(onShiftReady);
   onShiftReadyRef.current = onShiftReady;
   const canApprove =
@@ -35,17 +40,30 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     let cancelled = false;
     (async () => {
       try {
+        const countersRes = await api.get<CounterRow[]>("/cash/counters").catch(() => ({ data: [] as CounterRow[] }));
+        if (cancelled) return;
+        const list = Array.isArray(countersRes.data) ? countersRes.data : [];
+        setCounters(list);
+        let selected = readPosCounterId();
+        if (!selected || !list.some((c) => c.id === selected)) {
+          selected = list[0]?.id ?? "";
+        }
+        setCounterId(selected);
+        if (selected) writePosCounterId(selected);
+
         const [activeRes, suggestRes] = await Promise.all([
-          api.get<{ id?: string; status?: string; variance?: number } | null>("/cash/active"),
+          api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(
+            selected ? `/cash/active?counterId=${encodeURIComponent(selected)}` : "/cash/active",
+          ),
           api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
         ]);
         if (cancelled) return;
         if (suggestRes.data?.suggestedOpening != null) {
           setSuggested(suggestRes.data.suggestedOpening);
-          // Prefill once only — never overwrite what the cashier is typing
           setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
         }
         if (activeRes.data?.status === "OPEN") {
+          if (activeRes.data.counterId) writePosCounterId(activeRes.data.counterId);
           onShiftReadyRef.current();
           return;
         }
@@ -64,6 +82,10 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   }, []);
 
   const handleStart = async () => {
+    if (!counterId) {
+      toast.error("Select a cashier counter");
+      return;
+    }
     const amount = parseFloat(openingCash);
     if (!Number.isFinite(amount) || amount < 0) {
       toast.error("Enter opening cash amount");
@@ -71,7 +93,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
     }
     setSubmitting(true);
     try {
-      await api.post("/cash/open", { openingCash: amount });
+      writePosCounterId(counterId);
+      await api.post("/cash/open", { openingCash: amount, counterId });
       toast.success("Shift started");
       onShiftReady();
     } catch (e: unknown) {
@@ -102,6 +125,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   const cashierName = user?.name ?? "Cashier";
   const today = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "2-digit", year: "numeric" });
   const FLOAT_PRESETS = [5000, 10000, 15000, 20000];
+  const selectedCounter = counters.find((c) => c.id === counterId);
 
   if (checking) {
     return (
@@ -120,31 +144,32 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
           style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
         >
-          <div className="px-5 py-4 border-b flex items-center gap-2" style={{ borderColor: "var(--pos-border)" }}>
-            <AlertTriangle className="h-5 w-5 text-amber-500" />
-            <span className="text-white font-bold">Awaiting Manager Approval</span>
-          </div>
-          <div className="p-5 space-y-4 text-sm">
-            <p className="text-white/80">
-              Your previous cash shift has a variance pending manager approval. You cannot start a new shift until it is approved.
-            </p>
-            {canApprove && pendingRegisterId ? (
+          <div className="p-6 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(245,158,11,0.15)" }}>
+                <AlertTriangle className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-white font-bold text-lg">Variance pending approval</h2>
+                <p className="text-xs" style={{ color: "var(--pos-muted)" }}>Manager must approve before a new shift</p>
+              </div>
+            </div>
+            {canApprove ? (
               <Button
                 onClick={() => void handleApprovePending()}
                 disabled={approving}
-                className="w-full gap-2 bg-amber-600 hover:bg-amber-700"
+                className="w-full h-11 gap-2 font-bold"
+                style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
               >
                 {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-                Approve variance & continue
+                Approve variance
               </Button>
             ) : (
-              <p className="text-xs" style={{ color: "var(--pos-muted)" }}>
-                Ask your branch manager or admin to approve from Cash Management → Variance.
-              </p>
+              <p className="text-sm text-amber-300/90">Ask a manager to approve in Cash Management.</p>
             )}
             {onClose && (
-              <Button onClick={onClose} variant="outline" className="w-full border-[var(--pos-border)] text-white/70">
-                Exit POS
+              <Button type="button" variant="outline" className="w-full" onClick={onClose}>
+                Close
               </Button>
             )}
           </div>
@@ -162,13 +187,18 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
       >
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--pos-border)" }}>
-          <div className="flex items-center gap-2">
-            <Banknote className="h-5 w-5" style={{ color: "#10b981" }} />
-            <span className="text-white font-bold">Opening Cash</span>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.15)" }}>
+              <Banknote className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-white font-bold text-lg">Start cash shift</h2>
+              <p className="text-xs" style={{ color: "var(--pos-muted)" }}>Select counter & opening float</p>
+            </div>
           </div>
           {onClose && (
-            <button type="button" onClick={onClose} className="p-1 rounded hover:bg-white/10">
-              <X className="h-4 w-4 text-white/60" />
+            <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10">
+              <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
             </button>
           )}
         </div>
@@ -176,13 +206,56 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <p className="text-white/50 text-xs">Cashier</p>
-              <p className="text-white font-semibold">{cashierName}</p>
+              <p className="text-white font-semibold truncate">{cashierName}</p>
             </div>
             <div>
               <p className="text-white/50 text-xs">Date</p>
               <p className="text-white font-semibold">{today}</p>
             </div>
           </div>
+
+          <div className="space-y-2">
+            <Label className="text-white/70 flex items-center gap-1.5">
+              <Monitor className="h-3.5 w-3.5" /> Cashier counter
+            </Label>
+            <select
+              value={counterId}
+              onChange={(e) => {
+                const next = e.target.value;
+                setCounterId(next);
+                writePosCounterId(next);
+                if (!next) return;
+                void (async () => {
+                  try {
+                    const activeRes = await api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(
+                      `/cash/active?counterId=${encodeURIComponent(next)}`,
+                    );
+                    if (activeRes.data?.status === "OPEN") {
+                      if (activeRes.data.counterId) writePosCounterId(activeRes.data.counterId);
+                      onShiftReadyRef.current();
+                    }
+                  } catch {
+                    /* keep open form */
+                  }
+                })();
+              }}
+              className="w-full h-11 px-3 rounded-xl text-sm text-white outline-none"
+              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+            >
+              <option value="">Select counter…</option>
+              {counters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} ({c.code})
+                </option>
+              ))}
+            </select>
+            {selectedCounter && (
+              <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                Sales on this terminal will use {selectedCounter.name}
+              </p>
+            )}
+          </div>
+
           {suggested != null && (
             <p className="text-[10px] text-emerald-400/80">Suggested from last close: LKR {formatNumber(suggested)}</p>
           )}
@@ -234,7 +307,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           <p className="text-xs text-white/40">Count your drawer float before starting sales. Cash sales auto-track in drawer.</p>
           <Button
             onClick={() => void handleStart()}
-            disabled={submitting}
+            disabled={submitting || !counterId}
             className="w-full h-11 gap-2 font-bold"
             style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
           >

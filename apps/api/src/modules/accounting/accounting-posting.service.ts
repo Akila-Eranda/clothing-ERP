@@ -258,6 +258,7 @@ export class AccountingPostingService {
       case 'WALLET':
         return accounts.upi;
       case 'BANK_TRANSFER':
+      case 'QR':
         return accounts.bank;
       case 'CHEQUE':
         return accounts.chequeRecv;
@@ -281,6 +282,7 @@ export class AccountingPostingService {
       case 'WALLET':
         return accounts.upi;
       case 'BANK_TRANSFER':
+      case 'QR':
       case 'CHEQUE': // CHEQUE settles via Main Bank (stored as BANK_TRANSFER)
         return accounts.bank;
       default:
@@ -311,13 +313,38 @@ export class AccountingPostingService {
     const accounts = await this.resolveAccounts(tenantId);
     if (!accounts) return null;
 
+    const bankIds = [
+      ...new Set(
+        sale.payments
+          .map((p) => p.bankAccountId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    const bankGlById = new Map<string, string>();
+    if (bankIds.length > 0) {
+      const banks = await this.prisma.bankAccount.findMany({
+        where: { tenantId, id: { in: bankIds } },
+        select: { id: true, glAccountId: true },
+      });
+      for (const b of banks) {
+        if (b.glAccountId) bankGlById.set(b.id, b.glAccountId);
+      }
+    }
+
     const lines: GlLine[] = [];
     const tenderTotals = new Map<string, number>();
 
     for (const p of sale.payments) {
       if (p.amount <= 0.009) continue;
       if (String(p.method).toUpperCase() === 'LOYALTY_POINTS') continue;
-      const key = this.tenderAccount(accounts, p.method);
+      let key = this.tenderAccount(accounts, p.method);
+      if (
+        p.bankAccountId &&
+        (String(p.method).toUpperCase() === 'BANK_TRANSFER' ||
+          String(p.method).toUpperCase() === 'QR')
+      ) {
+        key = bankGlById.get(p.bankAccountId) ?? key;
+      }
       tenderTotals.set(key, round2((tenderTotals.get(key) ?? 0) + p.amount));
     }
 

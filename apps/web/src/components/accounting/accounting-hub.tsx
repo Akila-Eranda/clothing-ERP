@@ -15,9 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRouter } from "next/navigation";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -746,7 +744,8 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                 <Plus className="h-3.5 w-3.5" /> Record Expense
               </Button>
             </div>
-            <ClientSideTable data={expenses} columns={expenseCols} pageCount={Math.ceil(expenses.length / 20)}
+            <ClientSideTable
+          fillHeight={false} data={expenses} columns={expenseCols} pageCount={Math.ceil(expenses.length / 20)}
               searchableColumns={[{ id: "description", title: "Description" }]}
               filterableColumns={[{ id: "paymentMethod", title: "Method", options: PAY_METHODS.map((m) => ({ label: m.replace(/_/g," "), value: m })) }, { id: "categoryId", title: "Category", options: EXPENSE_CATEGORIES.map((c) => ({ label: c, value: c })) }]}
               isShowExportButtons={{ isShow: true, fileName: "expenses-export" }} />
@@ -754,7 +753,8 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
               <h2 className="text-sm font-semibold text-foreground">Journal Entries</h2>
               <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddJournalOpen(true)}><Plus className="h-3.5 w-3.5" /> New Entry</Button>
             </div>
-            <ClientSideTable data={journalEntries} columns={journalCols} pageCount={Math.ceil(journalEntries.length / 20)}
+            <ClientSideTable
+          fillHeight={false} data={journalEntries} columns={journalCols} pageCount={Math.ceil(journalEntries.length / 20)}
               searchableColumns={[{ id: "entryNumber", title: "Entry #" }, { id: "description", title: "Description" }]}
               isShowExportButtons={{ isShow: true, fileName: "journal-export" }} />
           </div>

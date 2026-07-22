@@ -28,8 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -522,6 +521,7 @@ export function ChequesHub() {
         </div>
       ) : (
         <ClientSideTable
+          fillHeight={false}
           data={filtered}
           columns={columns}
           pageCount={Math.ceil(filtered.length / 15) || 1}

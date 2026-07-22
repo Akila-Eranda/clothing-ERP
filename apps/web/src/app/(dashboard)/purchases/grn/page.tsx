@@ -9,9 +9,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { OpenRecordButton } from "@/components/table/open-record-button";
+import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -241,28 +239,23 @@ export default function GrnPage() {
           </p>
         </div>
         {loading ? (
-          <div
-            className="flex items-center justify-center rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
-            style={{ height: "calc(100vh - 240px)" }}
-          >
+          <div className="flex min-h-[420px] h-[min(72vh,calc(100dvh-200px))] items-center justify-center rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-            <ClientSideTable
-              data={grns}
-              columns={grnColumns}
-              pageCount={Math.ceil(grns.length / 10) || 1}
-              searchableColumns={[
-                { id: "grnNumber", title: "GRN #" },
-                { id: "supplier", title: "Supplier" },
-                { id: "source", title: "Source" },
-                { id: "po", title: "PO" },
-              ]}
-              filterableColumns={[]}
-              isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
-            />
-          </div>
+          <ClientSideTable
+            fillHeight
+            data={grns}
+            columns={grnColumns}
+            searchableColumns={[
+              { id: "grnNumber", title: "GRN #" },
+              { id: "supplier", title: "Supplier" },
+              { id: "source", title: "Source" },
+              { id: "po", title: "PO" },
+            ]}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "grn-documents" }}
+          />
         )}
       </div>
 

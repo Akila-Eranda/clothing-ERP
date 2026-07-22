@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -16,8 +14,6 @@ import { type Supplier } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy, type SupplierPageCopy } from "@/lib/shop-vertical";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
   copy: SupplierPageCopy,
@@ -214,8 +210,8 @@ export default function SuppliersPage() {
       </div>
 
       {/* Table — fills remaining viewport */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={suppliers}
           columns={columns}
           pageCount={Math.ceil(suppliers.length / 10)}
@@ -232,7 +228,6 @@ export default function SuppliersPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
         />
-      </div>
 
       {/* Tips */}
       <div className="grid md:grid-cols-3 gap-3">

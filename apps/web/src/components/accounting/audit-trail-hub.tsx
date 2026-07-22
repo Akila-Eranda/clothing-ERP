@@ -16,8 +16,7 @@ import {
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api, logClientAuditEvent } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -311,6 +310,7 @@ export function AuditTrailHub() {
       ) : (
         <>
           <ClientSideTable
+          fillHeight={false}
             data={rows}
             columns={columns}
             pageCount={1}

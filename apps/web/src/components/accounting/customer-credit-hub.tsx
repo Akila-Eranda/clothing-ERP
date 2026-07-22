@@ -10,8 +10,7 @@ import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -285,7 +284,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
         return (
           <div className="flex gap-1.5 justify-end">
             {(c.creditBalance > 0 || (c.walletBalance ?? 0) > 0) && (
-              <Button size="sm" className="h-7 text-xs gap-1 bg-amber-600 hover:bg-amber-700" onClick={() => openSettle(c)}>
+              <Button size="sm" variant="warning" className="h-7 text-xs gap-1" onClick={() => openSettle(c)}>
                 <Wallet className="h-3 w-3" /> Settle
               </Button>
             )}
@@ -470,6 +469,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <ClientSideTable
+          fillHeight={false}
               data={customers}
               columns={customerColumns}
               pageCount={Math.ceil(customers.length / 10) || 1}
@@ -576,6 +576,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
             <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
           ) : (
             <ClientSideTable
+          fillHeight={false}
               data={reminders}
               columns={reminderColumns}
               pageCount={Math.ceil(reminders.length / 10) || 1}
@@ -613,6 +614,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
             <div className="space-y-2">
               <p className="text-sm font-semibold">Payments received</p>
               <ClientSideTable
+          fillHeight={false}
                 data={report?.payments ?? []}
                 columns={paymentColumns}
                 pageCount={Math.ceil((report?.payments?.length ?? 0) / 10) || 1}
@@ -624,6 +626,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
             <div className="space-y-2">
               <p className="text-sm font-semibold">Overdue charges</p>
               <ClientSideTable
+          fillHeight={false}
                 data={report?.overdue ?? []}
                 columns={overdueColumns}
                 pageCount={Math.ceil((report?.overdue?.length ?? 0) / 10) || 1}
@@ -737,7 +740,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
               <Button variant="outline" size="sm" disabled={payBusy} onClick={() => setPayCustomer(null)}>
                 Cancel
               </Button>
-              <Button size="sm" disabled={payBusy} onClick={submitSettle} className="gap-1.5 bg-amber-600 hover:bg-amber-700">
+              <Button size="sm" variant="warning" disabled={payBusy} onClick={submitSettle} className="gap-1.5">
                 {payBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wallet className="h-3.5 w-3.5" />}
                 Confirm
               </Button>

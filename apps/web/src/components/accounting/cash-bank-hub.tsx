@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   ArrowLeftRight, ArrowDownCircle, ArrowUpCircle, Banknote, BookOpen, Building2,
   Landmark, LayoutGrid, Loader2, Plus, RefreshCw, Scale, Wallet,
@@ -21,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -718,6 +720,67 @@ function CashBookPanel() {
     }
   };
 
+  const cashRows = useMemo(
+    () => (book?.entries ?? []).map((e, i) => ({ ...e, id: e.id ?? `cb-${i}` })),
+    [book],
+  );
+
+  const cashColumns = useMemo<ColumnDef<CashEntry & { id: string }>[]>(
+    () => [
+      {
+        id: "entryDate",
+        accessorFn: (e) => fmt(e.entryDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{fmt(row.original.entryDate)}</span>
+        ),
+      },
+      {
+        id: "type",
+        accessorKey: "type",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-[10px] rounded-full">{row.original.type}</Badge>
+        ),
+      },
+      {
+        id: "description",
+        accessorKey: "description",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => <span>{row.original.description}</span>,
+      },
+      {
+        id: "debit",
+        accessorKey: "debit",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Debit" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-emerald-600">
+            {row.original.debit ? formatNumber(row.original.debit) : ""}
+          </span>
+        ),
+      },
+      {
+        id: "credit",
+        accessorKey: "credit",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Credit" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-red-600">
+            {row.original.credit ? formatNumber(row.original.credit) : ""}
+          </span>
+        ),
+      },
+      {
+        id: "balance",
+        accessorFn: (e) => e.balanceAfter ?? 0,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.balanceAfter ?? 0)}</span>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
@@ -852,53 +915,22 @@ function CashBookPanel() {
         </DialogContent>
       </Dialog>
 
-      <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-[10px] bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
-              <BookOpen className="h-4 w-4" />
-            </div>
-            <h3 className="text-sm font-semibold">Cash movements</h3>
-          </div>
-          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">
-            {book?.entries?.length ?? 0}
-          </Badge>
-        </div>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : !book?.entries?.length ? (
-            <p className="text-center text-sm text-muted-foreground py-12">No cash movements in range</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-semibold">Date</th>
-                    <th className="text-left px-4 py-3 font-semibold">Type</th>
-                    <th className="text-left px-4 py-3 font-semibold">Description</th>
-                    <th className="text-right px-4 py-3 font-semibold">Debit</th>
-                    <th className="text-right px-4 py-3 font-semibold">Credit</th>
-                    <th className="text-right px-4 py-3 font-semibold">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {book.entries.map((e, i) => (
-                    <tr key={e.id ?? i} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5 text-muted-foreground">{fmt(e.entryDate)}</td>
-                      <td className="px-4 py-2.5"><Badge variant="outline" className="text-[10px] rounded-full">{e.type}</Badge></td>
-                      <td className="px-4 py-2.5">{e.description}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">{e.debit ? formatNumber(e.debit) : ""}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-red-600">{e.credit ? formatNumber(e.credit) : ""}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(e.balanceAfter ?? 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={cashRows}
+          columns={cashColumns}
+          pageCount={Math.max(1, Math.ceil(cashRows.length / 10))}
+          searchableColumns={[
+            { id: "description", title: "Description" },
+            { id: "type", title: "Type" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "cash-book" }}
+        />
+      )}
     </div>
   );
 }
@@ -1071,6 +1103,62 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
   };
 
   const otherBanks = useMemo(() => banks.filter((b) => b.id !== accountId), [banks, accountId]);
+
+  const bankColumns = useMemo<ColumnDef<BankBookEntry>[]>(
+    () => [
+      {
+        id: "txnDate",
+        accessorFn: (e) => fmt(e.txnDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{fmt(row.original.txnDate)}</span>
+        ),
+      },
+      {
+        id: "type",
+        accessorKey: "type",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-[10px] rounded-full">{row.original.type}</Badge>
+        ),
+      },
+      {
+        id: "description",
+        accessorFn: (e) => e.description || e.reference || "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => <span>{row.original.description || row.original.reference || "—"}</span>,
+      },
+      {
+        id: "in",
+        accessorFn: (e) => (e.inflow ? e.amount : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="In" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-emerald-600">
+            {row.original.inflow ? formatNumber(row.original.amount) : ""}
+          </span>
+        ),
+      },
+      {
+        id: "out",
+        accessorFn: (e) => (!e.inflow ? e.amount : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Out" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-red-600">
+            {!row.original.inflow ? formatNumber(row.original.amount) : ""}
+          </span>
+        ),
+      },
+      {
+        id: "balanceAfter",
+        accessorKey: "balanceAfter",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.balanceAfter)}</span>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-4">
@@ -1306,57 +1394,22 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
           </DialogContent>
         </Dialog>
 
-      <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-[10px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
-              <Landmark className="h-4 w-4" />
-            </div>
-            <h3 className="text-sm font-semibold">Bank ledger</h3>
-          </div>
-          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">
-            {book?.entries?.length ?? 0}
-          </Badge>
-        </div>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : !book?.entries?.length ? (
-            <p className="text-center text-sm text-muted-foreground py-12">No transactions in range</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-semibold">Date</th>
-                    <th className="text-left px-4 py-3 font-semibold">Type</th>
-                    <th className="text-left px-4 py-3 font-semibold">Description</th>
-                    <th className="text-right px-4 py-3 font-semibold">In</th>
-                    <th className="text-right px-4 py-3 font-semibold">Out</th>
-                    <th className="text-right px-4 py-3 font-semibold">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {book.entries.map((e) => (
-                    <tr key={e.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5 text-muted-foreground">{fmt(e.txnDate)}</td>
-                      <td className="px-4 py-2.5"><Badge variant="outline" className="text-[10px] rounded-full">{e.type}</Badge></td>
-                      <td className="px-4 py-2.5">{e.description || e.reference || "—"}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-600">
-                        {e.inflow ? formatNumber(e.amount) : ""}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-red-600">
-                        {!e.inflow ? formatNumber(e.amount) : ""}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(e.balanceAfter)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={book?.entries ?? []}
+          columns={bankColumns}
+          pageCount={Math.max(1, Math.ceil((book?.entries?.length ?? 0) / 10))}
+          searchableColumns={[
+            { id: "description", title: "Description" },
+            { id: "type", title: "Type" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "bank-ledger" }}
+        />
+      )}
     </div>
   );
 }
@@ -1468,6 +1521,74 @@ function ReconciliationPanel() {
   };
 
   const unmatched = active?.unmatchedTxns ?? [];
+
+  const reconColumns = useMemo<ColumnDef<Recon>[]>(
+    () => [
+      {
+        id: "account",
+        accessorFn: (r) => `${r.bankAccount?.code ?? ""} ${r.bankAccount?.name ?? ""}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+        cell: ({ row }) => (
+          <span>
+            {row.original.bankAccount?.code} — {row.original.bankAccount?.name}
+          </span>
+        ),
+      },
+      {
+        id: "date",
+        accessorFn: (r) => fmt(r.statementDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{fmt(row.original.statementDate)}</span>
+        ),
+      },
+      {
+        id: "statement",
+        accessorKey: "statementBalance",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Statement" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.statementBalance)}</span>
+        ),
+      },
+      {
+        id: "system",
+        accessorKey: "systemBalance",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="System" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.systemBalance)}</span>
+        ),
+      },
+      {
+        id: "diff",
+        accessorKey: "difference",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Diff" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.difference)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <Badge className="text-[10px] rounded-full">{row.original.status}</Badge>,
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 rounded-[10px]"
+            onClick={() => void openRecon(row.original.id)}
+          >
+            Open
+          </Button>
+        ),
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="space-y-4">
@@ -1594,64 +1715,22 @@ function ReconciliationPanel() {
         </Card>
       )}
 
-      <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-        <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-[10px] bg-teal-500/15 text-teal-600 flex items-center justify-center">
-              <BookOpen className="h-4 w-4" />
-            </div>
-            <h3 className="text-sm font-semibold">Reconciliation history</h3>
-          </div>
-          <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold">
-            {recons.length}
-          </Badge>
-        </div>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/20 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <th className="text-left px-4 py-3 font-semibold">Account</th>
-                    <th className="text-left px-4 py-3 font-semibold">Date</th>
-                    <th className="text-right px-4 py-3 font-semibold">Statement</th>
-                    <th className="text-right px-4 py-3 font-semibold">System</th>
-                    <th className="text-right px-4 py-3 font-semibold">Diff</th>
-                    <th className="text-left px-4 py-3 font-semibold">Status</th>
-                    <th className="text-right px-4 py-3 font-semibold" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {recons.map((r) => (
-                    <tr key={r.id} className="border-b border-border/40 hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-2.5">{r.bankAccount?.code} — {r.bankAccount?.name}</td>
-                      <td className="px-4 py-2.5 text-muted-foreground">{fmt(r.statementDate)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.statementBalance)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.systemBalance)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.difference)}</td>
-                      <td className="px-4 py-2.5"><Badge className="text-[10px] rounded-full">{r.status}</Badge></td>
-                      <td className="px-4 py-2.5 text-right">
-                        <Button variant="ghost" size="sm" className="h-8 rounded-[10px]" onClick={() => void openRecon(r.id)}>
-                          Open
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                  {!recons.length && (
-                    <tr>
-                      <td colSpan={7} className="text-center text-muted-foreground py-10 text-sm">
-                        No reconciliations yet
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={recons}
+          columns={reconColumns}
+          pageCount={Math.max(1, Math.ceil(recons.length / 10))}
+          searchableColumns={[
+            { id: "account", title: "Account" },
+            { id: "status", title: "Status" },
+          ] as { id: keyof Recon; title: string }[]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "bank-reconciliations" }}
+        />
+      )}
     </div>
   );
 }

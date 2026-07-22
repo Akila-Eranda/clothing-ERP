@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
-  Search, Plus, MoreHorizontal, RefreshCw,
-  ChevronLeft, ChevronRight, Building2, Users, CheckCircle,
-  AlertCircle, Ban, Edit2, X, Check, Eye,
+  Search, Plus, RefreshCw,
+  Building2, Users, CheckCircle,
+  AlertCircle, X, Check,
 } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
+import {
+  ClientSideTable,
+  DataTableColumnHeader,
+  OpenRecordButton,
+  TableActionsRow,
+} from '@/components/table'
 import {
   fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans,
   plansForOnboarding, formatPlanLimit, DEFAULT_PLANS, STARTER_TRIAL_DAYS,
@@ -16,6 +22,7 @@ import {
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from '@/lib/shop-profiles'
 import { getVerticalFeatures } from '@/lib/shop-features'
 import { ShopFeatureList } from '@/components/shop/shop-feature-list'
+import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -31,7 +38,7 @@ const PLAN_BADGE: Record<string, string> = {
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
-const PER_PAGE = 20
+const FETCH_LIMIT = 500
 
 export default function TenantsPage() {
   const router = useRouter()
@@ -42,16 +49,14 @@ export default function TenantsPage() {
   const [search, setSearch]                 = useState('')
   const [statusFilter, setStatusFilter]     = useState('ALL')
   const [planFilter, setPlanFilter]         = useState('ALL')
-  const [page, setPage]                     = useState(1)
-  const [menuOpen, setMenuOpen]             = useState<string | null>(null)
   const [editTenant, setEditTenant]         = useState<TenantRow | null>(null)
   const [showCreate, setShowCreate]         = useState(false)
   const [actionLoading, setActionLoading]   = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const load = useCallback((params: { search?: string; status?: string; plan?: string; page?: number } = {}) => {
+  const load = useCallback((params: { search?: string; status?: string; plan?: string } = {}) => {
     setLoading(true)
-    const p: Record<string, string> = { page: String(params.page ?? page), limit: String(PER_PAGE) }
+    const p: Record<string, string> = { page: '1', limit: String(FETCH_LIMIT) }
     const s = params.search  ?? search
     const st = params.status ?? statusFilter
     const pl = params.plan   ?? planFilter
@@ -62,7 +67,7 @@ export default function TenantsPage() {
       .then(d => { setTenants(d.data); setTotal(d.total) })
       .catch((e: unknown) => { console.error(e) })
       .finally(() => setLoading(false))
-  }, [search, statusFilter, planFilter, page])
+  }, [search, statusFilter, planFilter])
 
   useEffect(() => {
     load()
@@ -71,24 +76,133 @@ export default function TenantsPage() {
       const params = new URLSearchParams(window.location.search)
       if (params.get('create') === '1') setShowCreate(true)
       const status = params.get('status')
-      if (status) { setStatusFilter(status); load({ status, page: 1 }) }
+      if (status) { setStatusFilter(status); load({ status }) }
     }
   }, [])
 
   function handleSearch(v: string) {
-    setSearch(v); setPage(1)
+    setSearch(v)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => load({ search: v, page: 1 }), 350)
+    debounceRef.current = setTimeout(() => load({ search: v }), 350)
   }
 
-  async function handleStatusToggle(t: TenantRow) {
-    setActionLoading(t.id); setMenuOpen(null)
+  const handleStatusToggle = useCallback(async (t: TenantRow) => {
+    setActionLoading(t.id)
     const newStatus = t.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE'
     try { await updateTenant(t.id, { status: newStatus }); load() } catch { toast.error('Failed to update tenant status') }
     setActionLoading(null)
-  }
+  }, [load])
 
-  const totalPages = Math.ceil(total / PER_PAGE)
+  const columns = useMemo<ColumnDef<TenantRow>[]>(() => [
+    {
+      accessorKey: 'name',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Tenant" />,
+      cell: ({ row }) => {
+        const t = row.original
+        return (
+          <div className={`flex items-center gap-2 ${actionLoading === t.id ? 'opacity-50' : ''}`}>
+            <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+              {t.name.charAt(0)}
+            </div>
+            <OpenRecordButton
+              onClick={() => router.push(`/admin/tenants/${t.id}`)}
+              className="text-xs"
+              title="View tenant"
+            >
+              {t.name}
+            </OpenRecordButton>
+          </div>
+        )
+      },
+    },
+    {
+      id: 'type',
+      accessorFn: (t) => getShopProfile(t.shopType).label,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+      cell: ({ row }) => {
+        const profile = getShopProfile(row.original.shopType)
+        return (
+          <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+            <span>{profile.emoji}</span>
+            <span className="whitespace-nowrap">{profile.label.replace(' Shop', '')}</span>
+          </span>
+        )
+      },
+    },
+    {
+      accessorKey: 'subdomain',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Subdomain" />,
+      cell: ({ row }) => (
+        <span className="text-xs font-mono text-gray-500">{row.original.subdomain}</span>
+      ),
+    },
+    {
+      accessorKey: 'email',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-500">{row.original.email}</span>
+      ),
+    },
+    {
+      accessorKey: 'plan',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
+      cell: ({ row }) => (
+        <span className={PLAN_BADGE[row.original.plan] ?? PLAN_BADGE.STARTER}>{row.original.plan}</span>
+      ),
+    },
+    {
+      accessorKey: 'status',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+      cell: ({ row }) => (
+        <span className={STATUS_BADGE[row.original.status] ?? STATUS_BADGE.INACTIVE}>{row.original.status}</span>
+      ),
+    },
+    {
+      id: 'users',
+      accessorFn: (t) => t._count?.users ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Users" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-600">{row.original._count?.users ?? '—'}</span>
+      ),
+    },
+    {
+      id: 'branches',
+      accessorFn: (t) => t._count?.branches ?? 0,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Branches" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-600">{row.original._count?.branches ?? '—'}</span>
+      ),
+    },
+    {
+      accessorKey: 'createdAt',
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-gray-500 whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>
+      ),
+    },
+    {
+      id: 'actions',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const t = row.original
+        return (
+          <TableActionsRow
+            showAction={{
+              action: () => router.push(`/admin/tenants/${t.id}`),
+              tooltip: 'View details',
+            }}
+            editAction={{ action: () => setEditTenant(t) }}
+            dropMoreActions={[
+              {
+                text: t.status === 'ACTIVE' ? 'Suspend' : 'Reactivate',
+                function: () => { void handleStatusToggle(t) },
+              },
+            ]}
+          />
+        )
+      },
+    },
+  ], [actionLoading, handleStatusToggle, router])
 
   return (
     <div className="space-y-5">
@@ -99,12 +213,12 @@ export default function TenantsPage() {
           <p className="text-sm text-gray-500">{loading ? 'Loading…' : `${total.toLocaleString()} tenants`}</p>
         </div>
         <div className="sm:ml-auto flex gap-2">
-          <button onClick={() => load()} disabled={loading} className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+          <Button variant="outline" onClick={() => load()} disabled={loading}>
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </button>
-          <button onClick={() => setShowCreate(true)} className="flex items-center gap-1.5 px-3 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800">
+          </Button>
+          <Button variant="default" onClick={() => setShowCreate(true)}>
             <Plus size={14} />Onboard Tenant
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -142,7 +256,7 @@ export default function TenantsPage() {
         <select
           className="px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg outline-none text-gray-700"
           value={statusFilter}
-          onChange={e => { setStatusFilter(e.target.value); setPage(1); load({ status: e.target.value, page: 1 }) }}
+          onChange={e => { setStatusFilter(e.target.value); load({ status: e.target.value }) }}
         >
           <option value="ALL">All Status</option>
           <option value="ACTIVE">Active</option>
@@ -152,7 +266,7 @@ export default function TenantsPage() {
         <select
           className="px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg outline-none text-gray-700"
           value={planFilter}
-          onChange={e => { setPlanFilter(e.target.value); setPage(1); load({ plan: e.target.value, page: 1 }) }}
+          onChange={e => { setPlanFilter(e.target.value); load({ plan: e.target.value }) }}
         >
           <option value="ALL">All Plans</option>
           <option value="STARTER">Starter</option>
@@ -161,122 +275,37 @@ export default function TenantsPage() {
         </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-100">
-                {['Tenant','Type','Subdomain','Plan','Status','Users','Branches','Joined','Actions'].map(h => (
-                  <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading && (
-                <tr><td colSpan={9} className="px-4 py-12 text-center">
-                  <RefreshCw size={18} className="animate-spin mx-auto text-gray-300" />
-                </td></tr>
-              )}
-              {!loading && tenants.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-400">No tenants match filters.</td></tr>
-              )}
-              {!loading && tenants.map(t => (
-                <tr key={t.id} className={`hover:bg-gray-50 transition-colors cursor-pointer ${actionLoading === t.id ? 'opacity-50' : ''}`}
-                  onClick={() => router.push(`/admin/tenants/${t.id}`)}>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                        {t.name.charAt(0)}
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold text-gray-900">{t.name}</p>
-                        <p className="text-[10px] text-gray-400">{t.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-1 text-xs text-gray-600">
-                      <span>{getShopProfile(t.shopType).emoji}</span>
-                      <span className="whitespace-nowrap">{getShopProfile(t.shopType).label.replace(' Shop', '')}</span>
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs font-mono text-gray-500">{t.subdomain}</td>
-                  <td className="px-4 py-3"><span className={PLAN_BADGE[t.plan] ?? PLAN_BADGE.STARTER}>{t.plan}</span></td>
-                  <td className="px-4 py-3"><span className={STATUS_BADGE[t.status] ?? STATUS_BADGE.INACTIVE}>{t.status}</span></td>
-                  <td className="px-4 py-3 text-xs text-gray-600 text-center">{t._count?.users ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-600 text-center">{t._count?.branches ?? '—'}</td>
-                  <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">{fmtDate(t.createdAt)}</td>
-                  <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                    <div className="relative flex items-center justify-center gap-1">
-                      <Link href={`/admin/tenants/${t.id}`}
-                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                        title="View details">
-                        <Eye size={13} />
-                      </Link>
-                      <button
-                        onClick={() => setEditTenant(t)}
-                        className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg"
-                      >
-                        <Edit2 size={13} />
-                      </button>
-                      <button
-                        onClick={() => setMenuOpen(menuOpen === t.id ? null : t.id)}
-                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
-                      >
-                        <MoreHorizontal size={13} />
-                      </button>
-                      {menuOpen === t.id && (
-                        <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-xl py-1 z-20">
-                          <Link href={`/admin/tenants/${t.id}`}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 text-gray-700"
-                            onClick={() => setMenuOpen(null)}>
-                            <Eye size={13} /> View Details
-                          </Link>
-                          <button
-                            onClick={() => handleStatusToggle(t)}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-gray-50 ${t.status === 'ACTIVE' ? 'text-amber-600' : 'text-green-600'}`}
-                          >
-                            <Ban size={13} />
-                            {t.status === 'ACTIVE' ? 'Suspend' : 'Reactivate'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <p className="text-xs text-gray-500">
-              Showing {((page - 1) * PER_PAGE + 1)}–{Math.min(page * PER_PAGE, total)} of {total}
-            </p>
-            <div className="flex items-center gap-1">
-              <button onClick={() => { setPage(p => p - 1); load({ page: page - 1 }) }} disabled={page === 1}
-                className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 rounded-lg hover:bg-gray-100">
-                <ChevronLeft size={16} />
-              </button>
-              {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
-                const n = i + 1
-                return (
-                  <button key={n} onClick={() => { setPage(n); load({ page: n }) }}
-                    className={`w-7 h-7 text-xs rounded-lg ${n === page ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
-                    {n}
-                  </button>
-                )
-              })}
-              <button onClick={() => { setPage(p => p + 1); load({ page: page + 1 }) }} disabled={page === totalPages}
-                className="p-1.5 text-gray-400 hover:text-gray-700 disabled:opacity-30 rounded-lg hover:bg-gray-100">
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
+      <ClientSideTable
+        data={tenants}
+        columns={columns}
+        pageCount={Math.max(1, Math.ceil(tenants.length / 10))}
+        searchableColumns={[
+          { id: 'name', title: 'Tenant' },
+          { id: 'subdomain', title: 'Subdomain' },
+          { id: 'email', title: 'Email' },
+        ]}
+        filterableColumns={[
+          {
+            id: 'status',
+            title: 'Status',
+            options: [
+              { value: 'ACTIVE', label: 'Active' },
+              { value: 'SUSPENDED', label: 'Suspended' },
+              { value: 'INACTIVE', label: 'Inactive' },
+            ],
+          },
+          {
+            id: 'plan',
+            title: 'Plan',
+            options: [
+              { value: 'STARTER', label: 'Starter' },
+              { value: 'PROFESSIONAL', label: 'Professional' },
+              { value: 'ENTERPRISE', label: 'Enterprise' },
+            ],
+          },
+        ]}
+        isShowExportButtons={{ isShow: true, fileName: 'admin-tenants-export' }}
+      />
 
       {editTenant && <EditTenantModal tenant={editTenant} onClose={() => setEditTenant(null)} onSaved={load} />}
       {showCreate  && <OnboardTenantWizard onClose={() => setShowCreate(false)} onCreated={load} />}
@@ -315,7 +344,7 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onCl
       <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-sm font-bold text-gray-900">Edit Tenant — {tenant.name}</h3>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"><X size={16} /></button>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></Button>
         </div>
         <div className="space-y-4">
           <div>
@@ -350,10 +379,10 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onCl
         </div>
         {error && <p className="text-xs text-red-600 mt-3">{error}</p>}
         <div className="flex justify-end gap-2 mt-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-          <button onClick={save} disabled={loading} className="px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+          <Button variant="outline" onClick={onClose}>Cancel</Button>
+          <Button variant="default" onClick={save} disabled={loading}>
             {loading ? 'Saving…' : 'Save Changes'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -474,19 +503,21 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 <label className="block text-sm font-medium mb-1.5" style={{color:'rgba(255,255,255,0.6)'}}>Business Type *</label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {SHOP_TYPE_LIST.map((p) => (
-                    <button
+                    <Button
                       key={p.type}
                       type="button"
+                      size="sm"
+                      variant={form.shopType === p.type ? 'default' : 'chip'}
                       onClick={() => setForm(f => ({ ...f, shopType: p.type }))}
-                      className="rounded-xl p-2.5 text-left transition-all"
+                      className="h-auto rounded-xl p-2.5 text-left flex-col items-start gap-0 whitespace-normal"
                       style={form.shopType === p.type
                         ? { border: '2px solid #4f46e5', background: 'rgba(79,70,229,0.12)' }
                         : { border: '2px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}
                     >
                       <span className="text-base">{p.emoji}</span>
                       <p className="text-xs font-semibold text-white mt-0.5 leading-tight">{p.label}</p>
-                      <p className="text-[9px] mt-0.5 leading-tight line-clamp-1" style={{color:'rgba(255,255,255,0.4)'}}>{p.description}</p>
-                    </button>
+                      <p className="text-[9px] mt-0.5 leading-tight line-clamp-1 font-normal" style={{color:'rgba(255,255,255,0.4)'}}>{p.description}</p>
+                    </Button>
                   ))}
                 </div>
                 <div className="rounded-xl px-3 py-2 mt-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -544,13 +575,13 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                   </label>
                   <div className="relative max-w-md">
                     <input type={showPass ? 'text' : 'password'} className={inp + ' pr-14 py-2'} placeholder="Min 8 characters" value={form.password} onChange={e => setForm(f => ({...f, password: e.target.value}))}/>
-                    <button type="button" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-medium" style={{color:'rgba(255,255,255,0.4)'}}>{showPass ? 'Hide' : 'Show'}</button>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setShowPass(s => !s)} className="absolute right-4 top-1/2 -translate-y-1/2 h-auto px-0 text-xs font-medium hover:bg-transparent" style={{color:'rgba(255,255,255,0.4)'}}>{showPass ? 'Hide' : 'Show'}</Button>
                   </div>
                 </div>
               </div>
               <div className="flex justify-between pt-1">
-                <button onClick={onClose} className="px-5 py-2.5 text-sm rounded-xl transition-colors" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>Cancel</button>
-                <button onClick={() => setStep(2)} disabled={!canNext} className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl transition-colors disabled:opacity-40" style={{background:'#4f46e5'}}>Next →</button>
+                <Button variant="outline" onClick={onClose} className="rounded-xl" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)',background:'transparent'}}>Cancel</Button>
+                <Button variant="default" onClick={() => setStep(2)} disabled={!canNext} className="rounded-xl" style={{background:'#4f46e5'}}>Next →</Button>
               </div>
             </div>
           )}
@@ -583,8 +614,8 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 ))}
               </div>
               <div className="flex justify-between pt-2">
-                <button onClick={() => setStep(1)} className="px-5 py-2.5 text-sm rounded-xl" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>← Back</button>
-                <button onClick={() => setStep(3)} className="px-5 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Next →</button>
+                <Button variant="outline" onClick={() => setStep(1)} className="rounded-xl" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)',background:'transparent'}}>← Back</Button>
+                <Button variant="default" onClick={() => setStep(3)} className="rounded-xl" style={{background:'#4f46e5'}}>Next →</Button>
               </div>
             </div>
           )}
@@ -619,10 +650,10 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
               </div>
               {error && <p className="text-xs px-3 py-2 rounded-lg" style={{color:'#f87171',background:'rgba(239,68,68,0.1)',border:'1px solid rgba(239,68,68,0.2)'}}>{error}</p>}
               <div className="flex justify-between pt-2">
-                <button onClick={() => setStep(2)} disabled={provisioning} className="px-5 py-2.5 text-sm rounded-xl disabled:opacity-50" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)'}}>← Back</button>
-                <button onClick={provision} disabled={provisioning} className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl disabled:opacity-70" style={{background:'#4f46e5'}}>
+                <Button variant="outline" onClick={() => setStep(2)} disabled={provisioning} className="rounded-xl" style={{border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)',background:'transparent'}}>← Back</Button>
+                <Button variant="default" onClick={provision} disabled={provisioning} className="rounded-xl" style={{background:'#4f46e5'}}>
                   {provisioning ? <><RefreshCw size={13} className="animate-spin"/>Provisioning…</> : 'Provision Tenant'}
-                </button>
+                </Button>
               </div>
             </div>
           )}
@@ -666,7 +697,7 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
                 </div>
               </div>
               <p className="text-xs mb-4" style={{color:'rgba(251,191,36,0.9)'}}>HTTPS is provisioned automatically (DNS + SSL). If the shop URL shows a certificate warning, wait 2–3 minutes and refresh.</p>
-              <button onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-white rounded-xl" style={{background:'#4f46e5'}}>Done</button>
+              <Button variant="default" onClick={onClose} className="rounded-xl" style={{background:'#4f46e5'}}>Done</Button>
             </div>
           )}
 

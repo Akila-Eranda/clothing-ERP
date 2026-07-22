@@ -120,6 +120,8 @@ export const PRODUCT_GRID_COLS = 4;
 export const POS_PAY_METHODS = [
   "CASH",
   "CARD",
+  "BANK_TRANSFER",
+  "QR",
   "CHEQUE",
   "CUSTOMER_CREDIT",
   "GIFT_VOUCHER",

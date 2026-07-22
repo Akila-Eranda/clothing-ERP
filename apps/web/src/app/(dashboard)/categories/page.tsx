@@ -5,9 +5,7 @@ import { Tag, Plus, Package, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddCategoryModal, type CategoryItem } from "@/components/categories/add-category-modal";
@@ -162,8 +160,8 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={flatRows}
           columns={columns}
           pageCount={Math.ceil(flatRows.length / 10)}
@@ -172,7 +170,6 @@ export default function CategoriesPage() {
             { id: "slug", title: "Slug" },
           ]}
         />
-      </div>
 
       <AddCategoryModal
         open={modalOpen}

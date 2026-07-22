@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Calculator, FileText, Loader2, Plus, RefreshCw, Settings2,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -225,6 +227,66 @@ function ConfigPanel() {
     }
   };
 
+  const rateColumns = useMemo<ColumnDef<TaxRate>[]>(
+    () => [
+      {
+        id: "code",
+        accessorKey: "code",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Code" />,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">
+            {row.original.code}
+            {row.original.isDefault && <Badge className="ml-2 text-[9px]">Default</Badge>}
+          </span>
+        ),
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+        cell: ({ row }) => <span>{row.original.name}</span>,
+      },
+      {
+        id: "rate",
+        accessorKey: "rate",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Rate" />,
+        cell: ({ row }) => <span className="tabular-nums">{row.original.rate}%</span>,
+      },
+      {
+        id: "direction",
+        accessorKey: "direction",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Direction" />,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-[10px]">{row.original.direction}</Badge>
+        ),
+      },
+      {
+        id: "status",
+        accessorFn: (r) => (r.isActive ? "Active" : "Inactive"),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => (
+          <Badge
+            className={`text-[10px] ${
+              row.original.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {row.original.isActive ? "Active" : "Inactive"}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => (
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => void toggleActive(row.original)}>
+            {row.original.isActive ? "Disable" : "Enable"}
+          </Button>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 justify-end">
@@ -318,56 +380,23 @@ function ConfigPanel() {
           </CardContent>
         </Card>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">Code</th>
-                  <th className="text-left px-4 py-3">Name</th>
-                  <th className="text-right px-4 py-3">Rate</th>
-                  <th className="text-left px-4 py-3">Direction</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {rates.map((r) => (
-                  <tr key={r.id} className="border-b border-border/40">
-                    <td className="px-4 py-2.5 font-mono text-xs">
-                      {r.code}
-                      {r.isDefault && <Badge className="ml-2 text-[9px]">Default</Badge>}
-                    </td>
-                    <td className="px-4 py-2.5">{r.name}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{r.rate}%</td>
-                    <td className="px-4 py-2.5"><Badge variant="outline" className="text-[10px]">{r.direction}</Badge></td>
-                    <td className="px-4 py-2.5">
-                      <Badge className={`text-[10px] ${r.isActive ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-600"}`}>
-                        {r.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Button variant="ghost" size="sm" className="h-8" onClick={() => void toggleActive(r)}>
-                        {r.isActive ? "Disable" : "Enable"}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {!rates.length && (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted-foreground py-10">
-                      No tax rates — seed defaults or create one
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={rates}
+          columns={rateColumns}
+          pageCount={Math.max(1, Math.ceil(rates.length / 10))}
+          searchableColumns={[
+            { id: "code", title: "Code" },
+            { id: "name", title: "Name" },
+            { id: "direction", title: "Direction" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "tax-rates" }}
+        />
+      )}
     </div>
   );
 }
@@ -459,6 +488,7 @@ function ReportsPanel() {
               <div className="px-4 py-3 border-b">
                 <h3 className="text-sm font-semibold">Output VAT by rate</h3>
               </div>
+              {/* TODO: remaining tables → ClientSideTable — output-by-rate is a report summary layout */}
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
@@ -545,6 +575,78 @@ function ReturnsPanel() {
     }
   };
 
+  const returnColumns = useMemo<ColumnDef<VatReturn>[]>(
+    () => [
+      {
+        id: "period",
+        accessorFn: (r) => `${fmt(r.periodStart)} ${fmt(r.periodEnd)}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
+        cell: ({ row }) => (
+          <span>
+            {fmt(row.original.periodStart)} → {fmt(row.original.periodEnd)}
+          </span>
+        ),
+      },
+      {
+        id: "output",
+        accessorKey: "outputVat",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Output" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.outputVat)}</span>
+        ),
+      },
+      {
+        id: "input",
+        accessorKey: "inputVat",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Input" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.inputVat)}</span>
+        ),
+      },
+      {
+        id: "net",
+        accessorKey: "netVat",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Net" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.netVat)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <Badge className="text-[10px]">{row.original.status}</Badge>,
+      },
+      {
+        id: "actions",
+        header: () => <span className="text-xs font-medium">Actions</span>,
+        cell: ({ row }) => {
+          const r = row.original;
+          return (
+            <div className="flex justify-end gap-1 flex-wrap">
+              {(r.status === "DRAFT" || r.status === "SUBMITTED") && (
+                <>
+                  {r.status === "DRAFT" && (
+                    <>
+                      <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "refresh")}>Refresh</Button>
+                      <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "submit")}>Submit</Button>
+                    </>
+                  )}
+                  <Button size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "file")}>File</Button>
+                  <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "cancel")}>Cancel</Button>
+                </>
+              )}
+              {r.journalEntryId && (
+                <Badge variant="outline" className="text-[9px]">JE linked</Badge>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    [busy],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -582,61 +684,22 @@ function ReturnsPanel() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">Period</th>
-                  <th className="text-right px-4 py-3">Output</th>
-                  <th className="text-right px-4 py-3">Input</th>
-                  <th className="text-right px-4 py-3">Net</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {returns.map((r) => (
-                  <tr key={r.id} className="border-b border-border/40">
-                    <td className="px-4 py-2.5">{fmt(r.periodStart)} → {fmt(r.periodEnd)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.outputVat)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(r.inputVat)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(r.netVat)}</td>
-                    <td className="px-4 py-2.5"><Badge className="text-[10px]">{r.status}</Badge></td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex justify-end gap-1 flex-wrap">
-                        {(r.status === "DRAFT" || r.status === "SUBMITTED") && (
-                          <>
-                            {r.status === "DRAFT" && (
-                              <>
-                                <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "refresh")}>Refresh</Button>
-                                <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "submit")}>Submit</Button>
-                              </>
-                            )}
-                            <Button size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "file")}>File</Button>
-                            <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "cancel")}>Cancel</Button>
-                          </>
-                        )}
-                        {r.journalEntryId && (
-                          <Badge variant="outline" className="text-[9px]">JE linked</Badge>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!returns.length && (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted-foreground py-10">No VAT returns yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={returns}
+          columns={returnColumns}
+          pageCount={Math.max(1, Math.ceil(returns.length / 10))}
+          searchableColumns={[
+            { id: "period", title: "Period" },
+            { id: "status", title: "Status" },
+          ] as { id: keyof VatReturn; title: string }[]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "vat-returns" }}
+        />
+      )}
     </div>
   );
 }

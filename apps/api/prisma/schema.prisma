@@ -88,6 +88,7 @@ enum PaymentMethod {
   CARD
   UPI
   BANK_TRANSFER
+  QR
   WALLET
   CUSTOMER_CREDIT
   LOYALTY_POINTS
@@ -486,6 +487,7 @@ model Tenant {
   tyreSerials      TyreSerial[]
   receiptPrintLogs ReceiptPrintLog[]
   cashRegisters    CashRegister[]
+  posCounters      PosCounter[]
   cashMovements    CashMovement[]
   giftVouchers     GiftVoucher[]
   creditSchedules  CustomerCreditSchedule[]
@@ -576,6 +578,7 @@ model Branch {
   transfers   StockTransfer[]
   warehouses  Warehouse[]
   cashRegisters CashRegister[]
+  posCounters PosCounter[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1828,12 +1831,15 @@ model SalePayment {
   method        PaymentMethod
   amount        Float
   reference     String?
+  bankAccountId String?
   status        PaymentStatus @default(COMPLETED)
   processedAt   DateTime      @default(now())
 
   sale          Sale          @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  bankAccount   BankAccount?  @relation(fields: [bankAccountId], references: [id])
 
   @@index([saleId])
+  @@index([bankAccountId])
   @@map("sale_payments")
 }
 
@@ -2903,6 +2909,7 @@ model BankAccount {
   transactions   BankTransaction[]
   cheques        Cheque[]
   reconciliations BankReconciliation[]
+  salePayments   SalePayment[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -3757,10 +3764,32 @@ enum CashMovementType {
   WITHDRAWAL
 }
 
+// Physical POS till / cashier counter within a branch.
+model PosCounter {
+  id        String   @id @default(cuid())
+  tenantId  String
+  branchId  String
+  name      String
+  code      String
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  registers CashRegister[]
+
+  @@unique([tenantId, branchId, code])
+  @@index([tenantId, branchId])
+  @@map("pos_counters")
+}
+
 model CashRegister {
   id                 String             @id @default(cuid())
   tenantId           String
   branchId           String
+  counterId          String?
   cashierId          String
   openingCash        Float
   openingTime        DateTime           @default(now())
@@ -3779,11 +3808,13 @@ model CashRegister {
 
   tenant             Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   branch             Branch             @relation(fields: [branchId], references: [id])
+  counter            PosCounter?        @relation(fields: [counterId], references: [id])
   cashier            User               @relation("CashierRegisters", fields: [cashierId], references: [id])
   approvedBy         User?              @relation("CashRegisterApprover", fields: [approvedById], references: [id])
   movements          CashMovement[]
 
   @@index([tenantId, branchId, status])
+  @@index([tenantId, counterId, status])
   @@index([tenantId, cashierId, status])
   @@index([openingTime])
   @@map("cash_registers")

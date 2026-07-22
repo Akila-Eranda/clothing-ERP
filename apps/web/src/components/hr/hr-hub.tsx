@@ -13,9 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -117,7 +115,7 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
         </div>
         <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button onClick={submit} disabled={loading} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 min-w-[140px]">
+          <Button variant="success" onClick={submit} disabled={loading} className="gap-1.5 min-w-[140px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DollarSign className="h-3.5 w-3.5" />} Generate All
           </Button>
         </div>
@@ -731,6 +729,7 @@ export function HrHub({ section }: { section: HrSection }) {
         {section === "employees" && (
         <div className="mt-0">
           <ClientSideTable
+          fillHeight={false}
             data={employeeList}
             columns={empColumns}
             pageCount={Math.ceil(employeeList.length / 10)}
@@ -781,7 +780,8 @@ export function HrHub({ section }: { section: HrSection }) {
                 <div className="text-center py-12 text-muted-foreground border rounded-xl"><Users className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load to fetch employees for this date</p></div>
               ) : (
                 <>
-                  <ClientSideTable data={attnRows} columns={attnColumns} pageCount={Math.ceil(attnRows.length/10)} searchableColumns={[{id:"designation",title:"Employee / Role"}]} filterableColumns={[]} isShowExportButtons={{isShow:false,fileName:""}} />
+                  <ClientSideTable
+          fillHeight={false} data={attnRows} columns={attnColumns} pageCount={Math.ceil(attnRows.length/10)} searchableColumns={[{id:"designation",title:"Employee / Role"}]} filterableColumns={[]} isShowExportButtons={{isShow:false,fileName:""}} />
                   <div className="flex justify-between items-center">
                     <div className="flex gap-3 text-xs flex-wrap">
                       {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as const).map((k) => {
@@ -811,7 +811,8 @@ export function HrHub({ section }: { section: HrSection }) {
               ) : summaryRows.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground border rounded-xl"><BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load Summary to view monthly attendance</p></div>
               ) : (
-                <ClientSideTable data={summaryRows} columns={attnSummaryColumns} pageCount={Math.ceil(summaryRows.length/10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{isShow:true,fileName:`attendance-${summaryMonth}`}} />
+                <ClientSideTable
+          fillHeight={false} data={summaryRows} columns={attnSummaryColumns} pageCount={Math.ceil(summaryRows.length/10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{isShow:true,fileName:`attendance-${summaryMonth}`}} />
               )}
             </>
           )}
@@ -844,7 +845,7 @@ export function HrHub({ section }: { section: HrSection }) {
             <Button size="sm" variant="outline" onClick={fetchPayrolls} className="gap-1.5" disabled={payLoading}>
               <RefreshCw className={`h-3.5 w-3.5 ${payLoading ? "animate-spin" : ""}`} /> Load
             </Button>
-            <Button size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 ml-auto" onClick={() => setGenAllOpen(true)}>
+            <Button size="sm" variant="success" className="gap-1.5 ml-auto" onClick={() => setGenAllOpen(true)}>
               <DollarSign className="h-3.5 w-3.5" /> Generate All
             </Button>
             <Button size="sm" variant="outline" asChild className="gap-1.5">
@@ -898,6 +899,7 @@ export function HrHub({ section }: { section: HrSection }) {
           ) : (
             <>
               <ClientSideTable
+          fillHeight={false}
                 data={payrolls}
                 columns={payrollColumns}
                 pageCount={Math.ceil(payrolls.length / 10)}
@@ -952,6 +954,7 @@ export function HrHub({ section }: { section: HrSection }) {
           ) : (
             <>
               <ClientSideTable
+          fillHeight={false}
                 data={leaves} columns={leaveColumns}
                 pageCount={Math.ceil(leaves.length / 10)}
                 searchableColumns={[]}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Banknote, FileMinus2, FileText, Loader2, Printer, RefreshCw, Scale,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -185,6 +187,45 @@ function DashboardPanel() {
     void load();
   }, [load]);
 
+  const overdueColumns = useMemo<ColumnDef<ApDashboard["overdueLines"][number]>[]>(
+    () => [
+      {
+        id: "supplierName",
+        accessorKey: "supplierName",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Supplier" />,
+        cell: ({ row }) => <span className="text-sm">{row.original.supplierName}</span>,
+      },
+      {
+        id: "docNumber",
+        accessorFn: (l) => `${l.source} ${l.docNumber}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Doc" />,
+        cell: ({ row }) => (
+          <span className="text-sm">
+            <Badge variant="outline" className="text-[10px] mr-1">{row.original.source}</Badge>
+            {row.original.docNumber}
+          </span>
+        ),
+      },
+      {
+        id: "amount",
+        accessorKey: "amount",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.amount)}</span>
+        ),
+      },
+      {
+        id: "daysPastDue",
+        accessorKey: "daysPastDue",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="DPD" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-amber-600">{row.original.daysPastDue}</span>
+        ),
+      },
+    ],
+    [],
+  );
+
   if (loading && !data) {
     return (
       <div className="flex justify-center py-16">
@@ -195,6 +236,7 @@ function DashboardPanel() {
 
   const k = data?.kpis;
   const aging = data?.aging;
+  const overdueLines = data?.overdueLines ?? [];
 
   return (
     <div className="space-y-4">
@@ -274,43 +316,22 @@ function DashboardPanel() {
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="px-4 py-3 border-b">
-            <h3 className="text-sm font-semibold">Overdue open lines</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-2">Supplier</th>
-                  <th className="text-left px-4 py-2">Doc</th>
-                  <th className="text-right px-4 py-2">Amount</th>
-                  <th className="text-right px-4 py-2">DPD</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.overdueLines ?? []).map((l) => (
-                  <tr key={`${l.source}-${l.id}`} className="border-b border-border/40">
-                    <td className="px-4 py-2">{l.supplierName}</td>
-                    <td className="px-4 py-2">
-                      <Badge variant="outline" className="text-[10px] mr-1">{l.source}</Badge>
-                      {l.docNumber}
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">{formatNumber(l.amount)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-amber-600">{l.daysPastDue}</td>
-                  </tr>
-                ))}
-                {!data?.overdueLines?.length && (
-                  <tr>
-                    <td colSpan={4} className="text-center text-muted-foreground py-10">No overdue lines</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold px-1">Overdue open lines</h3>
+        <ClientSideTable
+          fillHeight={false}
+          data={overdueLines}
+          columns={overdueColumns}
+          pageCount={Math.max(1, Math.ceil(overdueLines.length / 10))}
+          searchableColumns={[
+            { id: "supplierName", title: "Supplier" },
+            { id: "docNumber", title: "Doc" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "ap-overdue-lines" }}
+        />
+      </div>
+      {/* TODO: remaining tables → ClientSideTable — supplier statement print layout skipped */}
     </div>
   );
 }

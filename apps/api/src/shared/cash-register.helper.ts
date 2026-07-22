@@ -64,6 +64,7 @@ export async function findOpenRegister(
       movements: { orderBy: { createdAt: 'asc' } },
       cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
       branch: { select: { id: true, name: true, code: true } },
+      counter: { select: { id: true, name: true, code: true } },
     },
   });
 }
@@ -73,18 +74,21 @@ export async function findAnyOpenRegisterOnBranch(
   db: Db,
   tenantId: string,
   branchId: string,
+  counterId?: string | null,
 ) {
   return db.cashRegister.findFirst({
     where: {
       tenantId,
       branchId,
       status: CashRegisterStatus.OPEN,
+      ...(counterId ? { counterId } : {}),
     },
     orderBy: { openingTime: 'desc' },
     include: {
       movements: { orderBy: { createdAt: 'asc' } },
       cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
       branch: { select: { id: true, name: true, code: true } },
+      counter: { select: { id: true, name: true, code: true } },
     },
   });
 }
@@ -136,13 +140,14 @@ export async function recordSaleCashMovement(
   invoiceNumber: string,
   payments: { method: PaymentMethod; amount: number }[],
   changeDue: number,
+  counterId?: string | null,
 ) {
   const netCash = netCashFromSalePayments(payments, changeDue);
   if (netCash <= 0) return;
 
   let register = await findOpenRegister(prisma, tenantId, branchId, cashierId);
   if (!register || register.status !== CashRegisterStatus.OPEN) {
-    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId);
+    register = await findAnyOpenRegisterOnBranch(prisma, tenantId, branchId, counterId);
   }
   if (!register || register.status !== CashRegisterStatus.OPEN) return;
 

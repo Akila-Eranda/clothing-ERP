@@ -8,7 +8,7 @@ import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNe
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus, BankTxnType, BankTxnStatus } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -75,6 +75,8 @@ export class SalePaymentDto {
   @ApiProperty({ enum: PaymentMethod }) @IsEnum(PaymentMethod) method: PaymentMethod;
   @ApiProperty() @IsNumber() @Min(0) amount: number;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
+  /** Required for BANK_TRANSFER and QR — Accounting bank account that receives the funds. */
+  @ApiPropertyOptional() @IsOptional() @IsString() bankAccountId?: string;
 }
 
 export class CreateSaleDto {
@@ -130,17 +132,25 @@ export class PosService {
     return branch.id;
   }
 
-  async createSale(tenantId: string, branchId: string, cashierId: string, dto: CreateSaleDto) {
+  async createSale(
+    tenantId: string,
+    branchId: string,
+    cashierId: string,
+    dto: CreateSaleDto,
+    counterId?: string | null,
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     branchId = resolvedBranchId;
 
-    let openRegister = await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
-    if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
+    let openRegister = counterId
+      ? await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId, counterId)
+      : await findOpenRegister(this.prisma, tenantId, branchId, cashierId);
+    if ((!openRegister || openRegister.status !== CashRegisterStatus.OPEN) && !counterId) {
       openRegister = await findAnyOpenRegisterOnBranch(this.prisma, tenantId, branchId);
     }
     if (!openRegister || openRegister.status !== CashRegisterStatus.OPEN) {
       throw new BadRequestException(
-        'Open your cash shift before selling (POS → enter opening cash)',
+        'Open your cash shift before selling (POS → select counter & opening cash)',
       );
     }
 
@@ -299,6 +309,39 @@ export class PosService {
       }
     }
 
+    const cardPays = dto.payments.filter((p) => p.method === PaymentMethod.CARD && p.amount > 0);
+    for (const cp of cardPays) {
+      const digits = (cp.reference ?? '').replace(/\D/g, '');
+      if (digits.length !== 3) {
+        throw new BadRequestException('Last 3 card digits required in payment reference for CARD payments');
+      }
+      cp.reference = digits;
+    }
+
+    const bankTenderPays = dto.payments.filter(
+      (p) =>
+        (p.method === PaymentMethod.BANK_TRANSFER || p.method === PaymentMethod.QR) &&
+        p.amount > 0,
+    );
+    for (const bp of bankTenderPays) {
+      if (!(bp.bankAccountId ?? '').trim()) {
+        throw new BadRequestException(
+          `${bp.method === PaymentMethod.QR ? 'QR' : 'Bank transfer'} requires selecting a bank account`,
+        );
+      }
+    }
+    const bankAccountIds = [...new Set(bankTenderPays.map((p) => p.bankAccountId!.trim()))];
+    const bankAccounts =
+      bankAccountIds.length > 0
+        ? await this.prisma.bankAccount.findMany({
+            where: { tenantId, id: { in: bankAccountIds }, isActive: true },
+            select: { id: true, name: true, code: true },
+          })
+        : [];
+    if (bankAccounts.length !== bankAccountIds.length) {
+      throw new BadRequestException('One or more bank accounts are invalid or inactive');
+    }
+
     const sale = await this.prisma.$transaction(async (tx) => {
       await this.inventoryService.assertSaleStockAvailable(
         tenantId,
@@ -376,6 +419,10 @@ export class PosService {
               method: p.method,
               amount: p.amount,
               reference: p.reference,
+              bankAccountId:
+                p.method === PaymentMethod.BANK_TRANSFER || p.method === PaymentMethod.QR
+                  ? p.bankAccountId?.trim() || null
+                  : null,
               status: paymentStatus,
             })),
           },
@@ -510,6 +557,27 @@ export class PosService {
         });
       }
 
+      for (const bp of bankTenderPays) {
+        const label = bp.method === PaymentMethod.QR ? 'QR pay' : 'Bank transfer';
+        await tx.bankTransaction.create({
+          data: {
+            tenantId,
+            bankAccountId: bp.bankAccountId!.trim(),
+            type: BankTxnType.DEPOSIT,
+            status: BankTxnStatus.CLEARED,
+            amount: bp.amount,
+            txnDate: new Date(),
+            reference: created.invoiceNumber,
+            description: `POS ${label} · ${created.invoiceNumber}${bp.reference ? ` · ${bp.reference}` : ''}`,
+            createdBy: cashierId,
+          },
+        });
+        await tx.bankAccount.update({
+          where: { id: bp.bankAccountId!.trim() },
+          data: { currentBalance: { increment: bp.amount } },
+        });
+      }
+
       return created;
     });
 
@@ -523,6 +591,7 @@ export class PosService {
       sale.invoiceNumber,
       dto.payments,
       changeDue,
+      counterId,
     );
     return sale;
   }
@@ -1487,6 +1556,7 @@ export class PosService {
           movements: { orderBy: { createdAt: 'asc' } },
           cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
           branch: { select: { id: true, name: true, code: true } },
+          counter: { select: { id: true, name: true, code: true } },
         },
       });
     }
@@ -1802,7 +1872,7 @@ export class PosService {
     return { ok: true, hasPin: false };
   }
 
-  async unlockWithPosPin(tenantId: string, branchId: string, pin: string) {
+  async unlockWithPosPin(tenantId: string, branchId: string, pin: string, counterId?: string | null) {
     assertValidPosPin(pin);
     const candidates = await this.prisma.user.findMany({
       where: {
@@ -1836,10 +1906,17 @@ export class PosService {
 
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
     const ownRegister = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, matched.id);
+    const ownMatchesCounter =
+      !counterId || !ownRegister?.counterId || ownRegister.counterId === counterId;
     const sharedRegister =
-      ownRegister?.status === CashRegisterStatus.OPEN
+      ownRegister?.status === CashRegisterStatus.OPEN && ownMatchesCounter
         ? ownRegister
-        : await findAnyOpenRegisterOnBranch(this.prisma, tenantId, resolvedBranchId);
+        : await findAnyOpenRegisterOnBranch(
+            this.prisma,
+            tenantId,
+            resolvedBranchId,
+            counterId || undefined,
+          );
 
     const unlockToken = signPosUnlockToken(tenantId, matched.id);
     const name = `${matched.firstName} ${matched.lastName}`.trim();
@@ -1888,12 +1965,14 @@ export class PosController {
     @CurrentUser() user: IAuthUser,
     @Body() dto: CreateSaleDto,
     @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-pos-counter-id') counterId?: string,
   ) {
     return this.posService.createSale(
       user.tenantId,
       user.branchId ?? '',
       this.actingCashier(user, unlockToken),
       dto,
+      counterId || undefined,
     );
   }
 
@@ -2102,8 +2181,17 @@ export class PosController {
   @Post('pin/unlock')
   @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Unlock POS / switch cashier with 4-digit PIN (no re-login)' })
-  unlockPosPin(@CurrentUser() user: IAuthUser, @Body() dto: UnlockPosPinDto) {
-    return this.posService.unlockWithPosPin(user.tenantId, user.branchId ?? '', dto.pin);
+  unlockPosPin(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: UnlockPosPinDto,
+    @Headers('x-pos-counter-id') counterId?: string,
+  ) {
+    return this.posService.unlockWithPosPin(
+      user.tenantId,
+      user.branchId ?? '',
+      dto.pin,
+      counterId || undefined,
+    );
   }
 
   @Post('gift-vouchers')

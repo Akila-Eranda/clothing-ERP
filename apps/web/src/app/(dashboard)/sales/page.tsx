@@ -12,14 +12,10 @@ import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { formatNumber } from "@/lib/utils";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
   id: string; invoiceNumber: string; invoiceDate: string;
@@ -549,31 +545,29 @@ export default function SalesPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
-          data={sales}
-          columns={columns}
-          pageCount={Math.ceil(sales.length / 10)}
-          searchableColumns={[{ id: "invoiceNumber", title: "Invoice" }]}
-          filterableColumns={[{
-            id: "status", title: "Status",
-            options: [
-              { label: "Completed", value: "COMPLETED" },
-              { label: "Refunded",  value: "REFUNDED" },
-              { label: "Pending",   value: "PENDING" },
-            ],
-          }, {
-            id: "paymentMethod", title: "Payment",
-            options: [
-              { label: "Cash",   value: "CASH" },
-              { label: "Card",   value: "CARD" },
-              { label: "UPI",    value: "UPI" },
-              { label: "Wallet", value: "WALLET" },
-            ],
-          }]}
-          isShowExportButtons={{ isShow: true, fileName: "sales-export" }}
-        />
-      </div>
+      <ClientSideTable
+        fillHeight
+        data={sales}
+        columns={columns}
+        searchableColumns={[{ id: "invoiceNumber", title: "Invoice" }]}
+        filterableColumns={[{
+          id: "status", title: "Status",
+          options: [
+            { label: "Completed", value: "COMPLETED" },
+            { label: "Refunded",  value: "REFUNDED" },
+            { label: "Pending",   value: "PENDING" },
+          ],
+        }, {
+          id: "paymentMethod", title: "Payment",
+          options: [
+            { label: "Cash",   value: "CASH" },
+            { label: "Card",   value: "CARD" },
+            { label: "UPI",    value: "UPI" },
+            { label: "Wallet", value: "WALLET" },
+          ],
+        }]}
+        isShowExportButtons={{ isShow: true, fileName: "sales-export" }}
+      />
 
       {/* Sale detail modal */}
       {viewId && (

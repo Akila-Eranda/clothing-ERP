@@ -1140,7 +1140,7 @@ export default function SettingsPage() {
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base">{branchModal.editing ? "Edit Branch" : "New Branch"}</CardTitle>
-                    <button onClick={() => setBranchModal({ open: false, editing: null })} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                    <Button type="button" variant="ghost" size="icon-sm" onClick={() => setBranchModal({ open: false, editing: null })} className="text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">

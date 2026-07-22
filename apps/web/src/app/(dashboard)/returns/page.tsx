@@ -14,17 +14,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber, cn } from "@/lib/utils";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
 import { ModuleGate } from "@/components/shop/module-gate";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
 type ReasonOption = { value: string; label: string };
 
 function buildReasons(type: string | null | undefined): ReasonOption[] {
@@ -57,7 +53,6 @@ interface VariantLookup {
   product: { name: string };
   size?: string | null; color?: string | null;
 }
-
 
 const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.ElementType }> = {
   INITIATED:        { label: "Initiated",        variant: "warning", icon: Clock },
@@ -930,8 +925,8 @@ export default function ReturnsPage() {
       </div>
 
       {/* Table */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
       <ClientSideTable
+          fillHeight
         data={returns}
         columns={columns}
         pageCount={Math.ceil(returns.length / 10)}
@@ -957,7 +952,6 @@ export default function ReturnsPage() {
         ]}
         isShowExportButtons={{ isShow: true, fileName: "returns-exchanges-export" }}
       />
-      </div>
 
       {/* Modals */}
       {addOpen && (

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Calculator, FileText, Loader2, Plus, RefreshCw, Wallet,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -271,6 +273,67 @@ function BookPanel() {
     }
   };
 
+  const bookColumns = useMemo<ColumnDef<BookLine>[]>(
+    () => [
+      {
+        id: "txnDate",
+        accessorFn: (l) => fmt(l.txnDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => <span>{fmt(row.original.txnDate)}</span>,
+      },
+      {
+        id: "type",
+        accessorKey: "type",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-[10px]">{row.original.type}</Badge>
+        ),
+      },
+      {
+        id: "description",
+        accessorKey: "description",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => (
+          <span>
+            {row.original.description}
+            {row.original.category && (
+              <span className="text-muted-foreground text-xs ml-1">({row.original.category})</span>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: "in",
+        accessorFn: (l) => (l.signedAmount > 0 ? l.signedAmount : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="In" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-emerald-700">
+            {row.original.signedAmount > 0 ? formatNumber(row.original.signedAmount) : "—"}
+          </span>
+        ),
+      },
+      {
+        id: "out",
+        accessorFn: (l) => (l.signedAmount < 0 ? Math.abs(l.signedAmount) : 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Out" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-rose-700">
+            {row.original.signedAmount < 0 ? formatNumber(Math.abs(row.original.signedAmount)) : "—"}
+          </span>
+        ),
+      },
+      {
+        id: "balanceAfter",
+        accessorKey: "balanceAfter",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.balanceAfter)}</span>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 justify-end">
@@ -387,52 +450,24 @@ function BookPanel() {
         </div>
       )}
 
-      <Card>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                    <th className="text-left px-4 py-3">Date</th>
-                    <th className="text-left px-4 py-3">Type</th>
-                    <th className="text-left px-4 py-3">Description</th>
-                    <th className="text-right px-4 py-3">In</th>
-                    <th className="text-right px-4 py-3">Out</th>
-                    <th className="text-right px-4 py-3">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l) => (
-                    <tr key={l.id} className="border-b border-border/40">
-                      <td className="px-4 py-2.5">{fmt(l.txnDate)}</td>
-                      <td className="px-4 py-2.5"><Badge variant="outline" className="text-[10px]">{l.type}</Badge></td>
-                      <td className="px-4 py-2.5">
-                        {l.description}
-                        {l.category && <span className="text-muted-foreground text-xs ml-1">({l.category})</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-emerald-700">
-                        {l.signedAmount > 0 ? formatNumber(l.signedAmount) : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums text-rose-700">
-                        {l.signedAmount < 0 ? formatNumber(Math.abs(l.signedAmount)) : "—"}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(l.balanceAfter)}</td>
-                    </tr>
-                  ))}
-                  {!lines.length && (
-                    <tr>
-                      <td colSpan={6} className="text-center text-muted-foreground py-10">
-                        {fundId ? "No transactions in period" : "Create a fund to start"}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={lines}
+          columns={bookColumns}
+          pageCount={Math.max(1, Math.ceil(lines.length / 10))}
+          searchableColumns={[
+            { id: "description", title: "Description" },
+            { id: "type", title: "Type" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "petty-cash-ledger" }}
+        />
+      )}
     </div>
   );
 }
@@ -531,6 +566,83 @@ function ClaimsPanel() {
     }
   };
 
+  const claimColumns = useMemo<ColumnDef<Claim>[]>(
+    () => [
+      {
+        id: "claimDate",
+        accessorFn: (c) => fmt(c.claimDate),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => <span>{fmt(row.original.claimDate)}</span>,
+      },
+      {
+        id: "claimantName",
+        accessorKey: "claimantName",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Claimant" />,
+      },
+      {
+        id: "description",
+        accessorKey: "description",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => (
+          <span>
+            {row.original.description}
+            {row.original.category && (
+              <span className="text-xs text-muted-foreground ml-1">({row.original.category})</span>
+            )}
+          </span>
+        ),
+      },
+      {
+        id: "amount",
+        accessorKey: "amount",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.amount)}</span>
+        ),
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <Badge className="text-[10px]">{row.original.status}</Badge>,
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <div className="flex justify-end gap-1 flex-wrap">
+              {c.status === "DRAFT" && (
+                <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "submit")}>
+                  Submit
+                </Button>
+              )}
+              {(c.status === "DRAFT" || c.status === "SUBMITTED") && (
+                <>
+                  <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "approve")}>
+                    Approve
+                  </Button>
+                  <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "reject")}>
+                    Reject
+                  </Button>
+                </>
+              )}
+              {c.status === "APPROVED" && (
+                <Button size="sm" className="h-8" disabled={busy} onClick={() => void reimburse(c)}>
+                  Reimburse
+                </Button>
+              )}
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [busy, fundId],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -584,61 +696,36 @@ function ClaimsPanel() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">Date</th>
-                  <th className="text-left px-4 py-3">Claimant</th>
-                  <th className="text-left px-4 py-3">Description</th>
-                  <th className="text-right px-4 py-3">Amount</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {claims.map((c) => (
-                  <tr key={c.id} className="border-b border-border/40">
-                    <td className="px-4 py-2.5">{fmt(c.claimDate)}</td>
-                    <td className="px-4 py-2.5">{c.claimantName}</td>
-                    <td className="px-4 py-2.5">
-                      {c.description}
-                      {c.category && <span className="text-xs text-muted-foreground ml-1">({c.category})</span>}
-                    </td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(c.amount)}</td>
-                    <td className="px-4 py-2.5"><Badge className="text-[10px]">{c.status}</Badge></td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex justify-end gap-1 flex-wrap">
-                        {c.status === "DRAFT" && (
-                          <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "submit")}>Submit</Button>
-                        )}
-                        {(c.status === "DRAFT" || c.status === "SUBMITTED") && (
-                          <>
-                            <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "approve")}>Approve</Button>
-                            <Button variant="outline" size="sm" className="h-8" disabled={busy} onClick={() => void act(c.id, "reject")}>Reject</Button>
-                          </>
-                        )}
-                        {c.status === "APPROVED" && (
-                          <Button size="sm" className="h-8" disabled={busy} onClick={() => void reimburse(c)}>Reimburse</Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {!claims.length && (
-                  <tr>
-                    <td colSpan={6} className="text-center text-muted-foreground py-10">No expense claims yet</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={claims}
+          columns={claimColumns}
+          pageCount={Math.max(1, Math.ceil(claims.length / 10))}
+          searchableColumns={[
+            { id: "claimantName", title: "Claimant" },
+            { id: "description", title: "Description" },
+          ]}
+          filterableColumns={[
+            {
+              id: "status",
+              title: "Status",
+              options: [
+                { value: "DRAFT", label: "Draft" },
+                { value: "SUBMITTED", label: "Submitted" },
+                { value: "APPROVED", label: "Approved" },
+                { value: "REJECTED", label: "Rejected" },
+                { value: "REIMBURSED", label: "Reimbursed" },
+              ],
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "expense-claims" }}
+        />
+      )}
     </div>
   );
 }
@@ -705,6 +792,7 @@ function ReportsPanel() {
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
+            {/* TODO: remaining tables → ClientSideTable — fund status & spend-by-category are small report summaries */}
             <Card>
               <CardContent className="p-0">
                 <div className="px-4 py-3 border-b"><h3 className="text-sm font-semibold">Fund status</h3></div>

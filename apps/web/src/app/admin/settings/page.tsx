@@ -5,6 +5,7 @@ import { Settings, Shield, Database, Bell, Globe, Save, CheckCircle, Loader2, Cr
 import { toast } from 'sonner'
 import { fetchPlatformConfig, updatePlatformConfig, fetchHealth, fetchBillingSettings, updateBillingSettings, type PlatformConfig, type PlatformBillingSettings } from '@/lib/admin-api'
 import MaintenanceModeCard from '@/components/admin/MaintenanceModeCard'
+import { Button } from '@/components/ui/button'
 
 interface Section { id: string; label: string; icon: React.ElementType }
 
@@ -103,14 +104,14 @@ export default function SettingsPage() {
           <h1 className="text-base font-bold text-gray-900">Settings</h1>
           <p className="text-xs text-gray-500 mt-0.5">Platform-wide configuration — persisted to database</p>
         </div>
-        <button
+        <Button
+          variant="default"
           onClick={handleSave}
           disabled={saving}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
         >
           {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
           {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Changes'}
-        </button>
+        </Button>
       </div>
 
       <MaintenanceModeCard config={config} onUpdate={setConfig} />
@@ -120,16 +121,16 @@ export default function SettingsPage() {
           {SECTIONS.map(s => {
             const Icon = s.icon
             return (
-              <button
+              <Button
                 key={s.id}
+                size="sm"
+                variant={active === s.id ? 'default' : 'ghost'}
                 onClick={() => setActive(s.id)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
-                  active === s.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+                className="w-full justify-start"
               >
                 <Icon size={14} className="flex-shrink-0" />
                 {s.label}
-              </button>
+              </Button>
             )
           })}
         </div>

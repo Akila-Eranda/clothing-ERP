@@ -17,6 +17,7 @@ import {
 } from '@/lib/admin-api'
 import { getShopProfile } from '@/lib/shop-profiles'
 import { tenantLoginUrl, SHOP_DOMAIN_SUFFIX } from '@/lib/auth-host'
+import { Button } from '@/components/ui/button'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: Building2 },
@@ -170,9 +171,9 @@ export default function TenantDetailPage() {
     <div className="space-y-5">
       {/* Breadcrumb + header */}
       <div className="flex flex-col gap-4">
-        <button onClick={() => router.push('/admin/tenants')} className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 w-fit">
+        <Button variant="ghost" onClick={() => router.push('/admin/tenants')} className="h-auto px-0 text-xs text-gray-500 hover:text-gray-800 hover:bg-transparent w-fit">
           <ArrowLeft size={14} /> Back to Tenants
-        </button>
+        </Button>
         <div className="flex flex-col sm:flex-row sm:items-start gap-4">
           <div className="flex items-start gap-3 flex-1">
             <div className="w-12 h-12 rounded-xl bg-gray-900 text-white text-lg font-bold flex items-center justify-center shrink-0">
@@ -196,15 +197,15 @@ export default function TenantDetailPage() {
               className="flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg hover:bg-gray-50">
               <ExternalLink size={13} /> Open Workspace
             </a>
-            <button onClick={handleToggleStatus}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm border rounded-lg ${
-                tenant.status === 'ACTIVE' ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-green-200 text-green-700 hover:bg-green-50'
-              }`}>
+            <Button
+              variant={tenant.status === 'ACTIVE' ? 'danger' : 'success'}
+              onClick={handleToggleStatus}
+            >
               {tenant.status === 'ACTIVE' ? <><Ban size={13} /> Suspend</> : <><CheckCircle size={13} /> Reactivate</>}
-            </button>
-            <button onClick={load} className="p-2 border border-gray-200 rounded-lg hover:bg-gray-50">
+            </Button>
+            <Button variant="outline" size="icon-sm" onClick={load}>
               <RefreshCw size={14} className="text-gray-500" />
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -214,12 +215,17 @@ export default function TenantDetailPage() {
         {TABS.map(t => {
           const Icon = t.icon
           return (
-            <button key={t.id} onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                tab === t.id ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}>
+            <Button
+              key={t.id}
+              size="sm"
+              variant={tab === t.id ? 'default' : 'ghost'}
+              onClick={() => setTab(t.id)}
+              className={`rounded-none border-b-2 border-x-0 border-t-0 ${
+                tab === t.id ? 'border-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
               <Icon size={14} /> {t.label}
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -231,15 +237,15 @@ export default function TenantDetailPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-gray-900">Tenant Details</h2>
               {!editing ? (
-                <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-800">
+                <Button variant="ghost" size="sm" onClick={() => setEditing(true)} className="h-auto px-0 text-xs text-gray-500 hover:text-gray-800 hover:bg-transparent">
                   <Edit2 size={12} /> Edit
-                </button>
+                </Button>
               ) : (
                 <div className="flex gap-2">
-                  <button onClick={() => setEditing(false)} className="p-1.5 text-gray-400 hover:text-gray-700"><X size={14} /></button>
-                  <button onClick={handleSave} disabled={saving} className="flex items-center gap-1 px-3 py-1.5 text-xs bg-gray-900 text-white rounded-lg">
+                  <Button variant="ghost" size="icon-sm" onClick={() => setEditing(false)} className="text-gray-400 hover:text-gray-700"><X size={14} /></Button>
+                  <Button variant="default" size="sm" onClick={handleSave} disabled={saving}>
                     {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Save
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>
@@ -361,16 +367,17 @@ export default function TenantDetailPage() {
                 </div>
               ))}
             </div>
-            <button onClick={handleSave} disabled={saving} className="w-full py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+            <Button variant="default" className="w-full" onClick={handleSave} disabled={saving}>
               {saving ? 'Saving…' : 'Update Limits & Plan'}
-            </button>
+            </Button>
             {currentPlan && currentPlan.price > 0 && (
-              <button
+              <Button
+                variant="outline"
+                className="w-full"
                 onClick={() => setShowInvoice(true)}
-                className="w-full flex items-center justify-center gap-2 py-2.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 font-medium text-gray-700"
               >
                 <FileText size={14} /> Generate & Send Invoice
-              </button>
+              </Button>
             )}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -402,11 +409,10 @@ export default function TenantDetailPage() {
             <p className="text-xs text-gray-500">
               SSL certificates are issued automatically on registration. Re-provision if a tenant sees a certificate error (usually ready in 1–3 minutes).
             </p>
-            <button onClick={handleProvisionSsl} disabled={sslLoading}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50">
+            <Button variant="default" onClick={handleProvisionSsl} disabled={sslLoading}>
               {sslLoading ? <Loader2 size={14} className="animate-spin" /> : <Shield size={14} />}
               {sslLoading ? 'Queuing SSL renewal…' : 'Re-provision DNS + SSL'}
-            </button>
+            </Button>
           </div>
         </div>
       )}

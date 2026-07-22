@@ -9,9 +9,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -583,6 +581,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           </div>
         ) : (
           <ClientSideTable
+          fillHeight={false}
             data={dash?.urgent ?? []}
             columns={lotColumns}
             pageCount={Math.ceil((dash?.urgent?.length ?? 0) / 10) || 1}
@@ -604,6 +603,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             </div>
           ) : (
             <ClientSideTable
+          fillHeight={false}
               data={nearLots}
               columns={lotColumns}
               pageCount={Math.ceil(nearLots.length / 10) || 1}
@@ -626,6 +626,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             </div>
           ) : (
             <ClientSideTable
+          fillHeight={false}
               data={expiredLots}
               columns={lotColumns}
               pageCount={Math.ceil(expiredLots.length / 10) || 1}
@@ -644,6 +645,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           </div>
         ) : (
           <ClientSideTable
+          fillHeight={false}
             data={lots}
             columns={lotColumns}
             pageCount={Math.ceil(lots.length / 10) || 1}
@@ -661,6 +663,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           </div>
         ) : (
           <ClientSideTable
+          fillHeight={false}
             data={txns}
             columns={txnColumns}
             pageCount={Math.ceil(txns.length / 10) || 1}
@@ -714,6 +717,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             </div>
           ) : (
             <ClientSideTable
+          fillHeight={false}
               data={reconcile?.mismatches ?? []}
               columns={reconcileColumns}
               pageCount={Math.ceil((reconcile?.mismatches?.length ?? 0) / 10) || 1}

@@ -393,7 +393,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
         <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-          <Button onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
+          <Button variant="success" onClick={submit} disabled={loading} className="gap-1.5 min-w-[150px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
             {payNow ? "Receive & Pay" : "Confirm Receipt"}
           </Button>

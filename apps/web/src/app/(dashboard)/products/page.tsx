@@ -7,9 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { parseApiList } from "@/lib/parse-api-list";
@@ -18,7 +16,6 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
-import { OpenRecordButton } from "@/components/table/open-record-button";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 
 const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
@@ -407,8 +404,8 @@ export default function ProductsPage() {
         ))}
       </div>
 
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={listRows}
           columns={columns}
           pageCount={Math.ceil(listRows.length / 10) || 1}
@@ -431,7 +428,6 @@ export default function ProductsPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: "products-variants" }}
         />
-      </div>
     </div>
   );
 }

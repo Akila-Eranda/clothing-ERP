@@ -10,9 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { ShopType } from "@/lib/shop-profiles";
@@ -20,8 +18,6 @@ import { api } from "@/lib/api";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { AddCustomerModal, type Customer } from "@/components/customers/add-customer-modal";
 import { ViewCustomerModal } from "@/components/customers/view-customer-modal";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   BRONZE:   { label: "Bronze",   color: "text-amber-800",  bg: "bg-amber-50 border border-amber-200",  icon: Star },
@@ -335,8 +331,8 @@ export default function CustomersPage() {
       )}
 
       {/* Table */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={customers}
           columns={columns}
           pageCount={Math.ceil(customers.length / 10)}
@@ -353,7 +349,6 @@ export default function CustomersPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: "customers-export" }}
         />
-      </div>
 
       <AddCustomerModal
         open={addOpen}

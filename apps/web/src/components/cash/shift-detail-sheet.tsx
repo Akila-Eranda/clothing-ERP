@@ -114,7 +114,7 @@ export function ShiftDetailSheet({ shiftId, onClose }: { shiftId: string; onClos
           )}
         </div>
         <div className="px-5 py-3 border-t shrink-0">
-          <Button variant="outline" className="w-full" onClick={onClose}>Close</Button>
+          <Button variant="outline" className="w-full h-10 rounded-xl" onClick={onClose}>Close</Button>
         </div>
       </div>
     </div>

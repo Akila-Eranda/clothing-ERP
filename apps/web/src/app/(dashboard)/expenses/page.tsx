@@ -12,10 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
-import { OpenRecordButton } from "@/components/table/open-record-button";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -107,7 +104,7 @@ function ExpenseModal({ edit, onClose, onSaved }: { edit?: Expense | null; onClo
         </div>
         <div className={modalBarFooterClass}>
           <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="bg-red-500 hover:bg-red-600 min-w-[110px]">
+          <Button variant="danger" onClick={save} disabled={saving} className="min-w-[110px]">
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : edit ? "Save Changes" : "Record"}
           </Button>
         </div>
@@ -192,7 +189,7 @@ export default function ExpensesPage() {
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4 bg-red-500 hover:bg-red-600" onClick={() => setAddOpen(true)}>
+          <Button variant="danger" className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setAddOpen(true)}>
             <Plus className="h-[18px] w-[18px]" /> Record Expense
           </Button>
         </div>

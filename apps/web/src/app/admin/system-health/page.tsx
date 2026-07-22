@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Activity, Database, Wifi, Server } from 'lucide-react'
 import { fetchHealth } from '@/lib/admin-api'
 import { APP_NAME } from '@/lib/constants'
+import { Button } from '@/components/ui/button'
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
@@ -87,13 +88,15 @@ export default function SystemHealthPage() {
             <p className="text-sm text-gray-500">Last checked: {lastCheck.toLocaleTimeString()}</p>
           )}
         </div>
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+          className="ml-auto"
         >
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Overall status */}

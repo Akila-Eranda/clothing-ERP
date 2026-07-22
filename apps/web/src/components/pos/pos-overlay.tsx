@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -25,7 +25,7 @@ import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { getReturnReasons, variantDisplayLabel } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
-import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState } from "@/components/pos/pos-payment-panel";
+import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState, type PosBankAccountOption } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
 import { PosQuantityPopup } from "@/components/pos/pos-quantity-popup";
 import { bypassesWorkflowApproval, canViewAllPosSales, DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
@@ -161,7 +161,15 @@ interface SaleDetail { id: string; invoiceNumber: string; total: number; invoice
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
 
-const PAY_METHODS = [{ value:"CASH", label:"Cash", icon: Banknote }, { value:"CARD", label:"Card", icon: CreditCard }, { value:"CHEQUE", label:"Cheque", icon: FileCheck }, { value:"CUSTOMER_CREDIT", label:"Credit", icon: UserCheck }, { value:"GIFT_VOUCHER", label:"Voucher", icon: Gift }];
+const PAY_METHODS = [
+  { value: "CASH", label: "Cash", icon: Banknote },
+  { value: "CARD", label: "Card", icon: CreditCard },
+  { value: "BANK_TRANSFER", label: "Bank", icon: Landmark },
+  { value: "QR", label: "QR", icon: QrCode },
+  { value: "CHEQUE", label: "Cheque", icon: FileCheck },
+  { value: "CUSTOMER_CREDIT", label: "Credit", icon: UserCheck },
+  { value: "GIFT_VOUCHER", label: "Voucher", icon: Gift },
+];
 
 const BASE_NAV_ITEMS = [
   { id:"products", label:"Products", icon: ShoppingBag },
@@ -339,6 +347,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
   const [chequeNumber, setChequeNumber] = React.useState("");
+  const [cardLast3, setCardLast3] = React.useState("");
+  const [payBankAccountId, setPayBankAccountId] = React.useState("");
+  const [bankAccounts, setBankAccounts] = React.useState<PosBankAccountOption[]>([]);
   const [voucherIssueAmt, setVoucherIssueAmt] = React.useState("");
   const [voucherIssueName, setVoucherIssueName] = React.useState("");
   const [voucherBusy, setVoucherBusy] = React.useState(false);
@@ -440,6 +451,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const partialPayInputRef = React.useRef<HTMLInputElement>(null);
   const giftVoucherInputRef = React.useRef<HTMLInputElement>(null);
   const chequeInputRef = React.useRef<HTMLInputElement>(null);
+  const cardLast3Ref = React.useRef<HTMLInputElement>(null);
   const checkoutConfirmRef = React.useRef<HTMLButtonElement>(null);
   const barcodeBuffer = React.useRef(""); const lastKeyTime = React.useRef(0); const barcodeTimer = React.useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const { items, customer, discount, discountType, taxRate, couponCode, loyaltyPointsToRedeem, addItem, updateQuantity, removeItem, setCustomer, setDiscount, setCoupon, setTaxRate, setLoyaltyPoints, clearCart, loadFromHeldBill, getHoldPayload, activeHeldBillId, subtotal, discountAmount, taxAmount, total, itemCount, allowNegativeStock, setAllowNegativeStock } = useCartStore();
@@ -509,12 +521,26 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       chequeInputRef.current?.select();
       return;
     }
+    if (activePayment === "CARD") {
+      cardLast3Ref.current?.focus();
+      cardLast3Ref.current?.select();
+      return;
+    }
     setActivePayment("GIFT_VOUCHER");
     requestAnimationFrame(() => {
       giftVoucherInputRef.current?.focus();
       giftVoucherInputRef.current?.select();
     });
   }, [activePayment]);
+
+  React.useEffect(() => {
+    if (!checkoutOpen || activePayment !== "CARD") return;
+    const t = setTimeout(() => {
+      cardLast3Ref.current?.focus();
+      cardLast3Ref.current?.select();
+    }, 50);
+    return () => clearTimeout(t);
+  }, [checkoutOpen, activePayment]);
 
   const setExactCashTender = React.useCallback(() => {
     const s = String(Math.round(total() * 100) / 100);
@@ -695,6 +721,27 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     requestAnimationFrame(() => cashPanelRef.current?.focus());
   }, [checkoutOpen, customer?.creditLimit, patchPayState]);
+
+  React.useEffect(() => {
+    if (!checkoutOpen) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const r = await api.get<PosBankAccountOption[] | { data: PosBankAccountOption[] }>("/accounting/bank-accounts");
+        const rows = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        const active = rows.filter((b) => (b as { isActive?: boolean }).isActive !== false);
+        if (cancelled) return;
+        setBankAccounts(active);
+        setPayBankAccountId((prev) => {
+          if (prev && active.some((b) => b.id === prev)) return prev;
+          return active[0]?.id ?? "";
+        });
+      } catch {
+        if (!cancelled) setBankAccounts([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [checkoutOpen]);
 
   const loadProducts = React.useCallback(async () => {
     setLoading(true);
@@ -1489,7 +1536,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const payMethod = forceMethod ?? activePayment;
     if (forceMethod) setActivePayment(forceMethod);
     const tenderPad = forceMethod === "CASH" ? "" : numpad;
-    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount);
+    const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount, cardLast3, payBankAccountId);
     if (payMethod === "WALLET" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for wallet payment"); return; }
       payments.length = 0;
@@ -1513,6 +1560,32 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
       }
     }
+    if (payMethod === "CARD" && !payState.splitMode) {
+      const digits = cardLast3.replace(/\D/g, "");
+      if (digits.length !== 3) {
+        toast.error("Enter last 3 digits of the card");
+        cardLast3Ref.current?.focus();
+        return;
+      }
+      const paidNow = payments.reduce((s, p) => s + p.amount, 0);
+      const amt = paidNow > 0 ? paidNow : totalAmt;
+      payments.length = 0;
+      payments.push({ method: "CARD", amount: amt, reference: digits });
+    }
+    if ((payMethod === "BANK_TRANSFER" || payMethod === "QR") && !payState.splitMode) {
+      if (!payBankAccountId.trim()) {
+        toast.error("Select the bank account that received the payment");
+        return;
+      }
+      if (bankAccounts.length === 0) {
+        toast.error("No bank accounts found — add one in Accounting → Banking first");
+        return;
+      }
+      const paidNow = payments.reduce((s, p) => s + p.amount, 0);
+      const amt = paidNow > 0 ? paidNow : totalAmt;
+      payments.length = 0;
+      payments.push({ method: payMethod, amount: amt, bankAccountId: payBankAccountId.trim() });
+    }
     if (payMethod === "CHEQUE" && !payState.splitMode) {
       if (!chequeNumber.trim()) { toast.error("Enter cheque number"); return; }
       payments.length = 0;
@@ -1521,6 +1594,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (payState.splitMode) {
       const missingCheque = payments.some((p) => p.method === "CHEQUE" && !(p as { reference?: string }).reference);
       if (missingCheque) { toast.error("Enter cheque number on CHEQUE payment lines"); return; }
+      const missingCard = payments.some((p) => {
+        if (p.method !== "CARD") return false;
+        const d = ((p as { reference?: string }).reference ?? "").replace(/\D/g, "");
+        return d.length !== 3;
+      });
+      if (missingCard) { toast.error("Enter last 3 card digits on CARD payment lines"); return; }
+      const missingBank = payments.some((p) =>
+        (p.method === "BANK_TRANSFER" || p.method === "QR") &&
+        !(p as { bankAccountId?: string }).bankAccountId,
+      );
+      if (missingBank) { toast.error("Select bank account on Bank / QR payment lines"); return; }
     }
     if (payMethod === "GIFT_VOUCHER" && !payState.splitMode) {
       if (!giftVoucherCode.trim()) { toast.error("Enter gift voucher code"); return; }
@@ -1653,7 +1737,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       }
       setTimeout(() => setThankYouSale(null), 12_000);
       clearCart();setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
-      setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber("");
+      setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber(""); setCardLast3(""); setPayBankAccountId("");
       setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
       setPartialPayAmount("");
@@ -1691,7 +1775,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
     } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
-  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
+  },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,loadProducts,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
 
   const handleThermalPrint = React.useCallback(async () => {
     if (!items.length) { toast.error("Cart is empty"); return; }
@@ -3898,6 +3982,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   onCouponChange={onCouponChange}
                   couponInputRef={couponInputRef}
                   partialPayInputRef={partialPayInputRef}
+                  bankAccounts={bankAccounts}
                 />
                 {showLoyalty && customer && (
                   <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
@@ -3961,6 +4046,51 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     className="mx-3 mt-2 w-[calc(100%-1.5rem)] h-9 px-3 rounded-xl text-sm text-white outline-none font-mono"
                     style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                   />
+                )}
+                {activePayment==="CARD"&&(
+                  <div className="mx-3 mt-2 space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wide block" style={{color:"var(--pos-muted)"}}>
+                      Card last 3 digits
+                    </label>
+                    <input
+                      ref={cardLast3Ref}
+                      value={cardLast3}
+                      onChange={(e)=>setCardLast3(e.target.value.replace(/\D/g, "").slice(0, 3))}
+                      inputMode="numeric"
+                      maxLength={3}
+                      placeholder="•••"
+                      className="w-full h-11 px-3 rounded-xl text-center text-xl text-white outline-none font-mono tracking-[0.35em]"
+                      style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                      onKeyDown={(e)=>{
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          void handleCheckout();
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                {(activePayment==="BANK_TRANSFER"||activePayment==="QR")&&(
+                  <div className="mx-3 mt-2 space-y-1">
+                    <label className="text-[10px] font-semibold uppercase tracking-wide block" style={{color:"var(--pos-muted)"}}>
+                      {activePayment === "QR" ? "QR paid into bank account" : "Transfer received in bank account"}
+                    </label>
+                    <select
+                      value={payBankAccountId}
+                      onChange={(e)=>setPayBankAccountId(e.target.value)}
+                      className="w-full h-11 px-3 rounded-xl text-sm text-white outline-none"
+                      style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                    >
+                      <option value="">
+                        {bankAccounts.length ? "Select bank account…" : "No bank accounts — add in Accounting"}
+                      </option>
+                      {bankAccounts.map((b)=>(
+                        <option key={b.id} value={b.id}>
+                          {b.name}{b.bankName ? ` · ${b.bankName}` : ""}{b.code ? ` (${b.code})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
                 {helpers.length > 0 && (
                   <div className="flex items-center gap-2 px-3 pt-2">

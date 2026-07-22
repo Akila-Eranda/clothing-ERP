@@ -8,6 +8,7 @@ import {
 } from 'recharts'
 import { fetchTenants, type TenantRow } from '@/lib/admin-api'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
 
 function Skeleton({ h = 'h-8', w = 'w-full' }: { h?: string; w?: string }) {
   return <div className={`${h} ${w} bg-gray-100 rounded-lg animate-pulse`} />
@@ -89,9 +90,9 @@ export default function AnalyticsPage() {
     <div className="space-y-6">
       <div className="flex items-center gap-3">
         <h1 className="text-base font-bold text-gray-900">Analytics</h1>
-        <button onClick={load} disabled={loading} className="ml-auto flex items-center gap-1.5 px-3 py-2 text-sm border border-gray-200 bg-white text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-50">
+        <Button variant="outline" size="sm" onClick={load} disabled={loading} className="ml-auto">
           <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </button>
+        </Button>
       </div>
 
       {/* Summary */}

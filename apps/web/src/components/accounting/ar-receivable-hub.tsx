@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   FileText, Loader2, Printer, RefreshCw, Wallet, Banknote, FileMinus2,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -196,6 +198,54 @@ function DashboardPanel() {
     void load();
   }, [load]);
 
+  const overdueColumns = useMemo<ColumnDef<ArDashboard["overdueCharges"][number]>[]>(
+    () => [
+      {
+        id: "partyName",
+        accessorKey: "partyName",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+        cell: ({ row }) => <span className="text-sm">{row.original.partyName}</span>,
+      },
+      {
+        id: "description",
+        accessorFn: (c) => c.description ?? "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground truncate max-w-[220px] block">
+            {row.original.description || "—"}
+          </span>
+        ),
+      },
+      {
+        id: "amount",
+        accessorKey: "amount",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.amount)}</span>
+        ),
+      },
+      {
+        id: "daysPastDue",
+        accessorKey: "daysPastDue",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="DPD" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums text-amber-600">{row.original.daysPastDue}</span>
+        ),
+      },
+      {
+        id: "bucket",
+        accessorKey: "bucket",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Bucket" />,
+        cell: ({ row }) => (
+          <Badge variant="outline" className="text-[10px]">
+            {BUCKET_LABELS[row.original.bucket] ?? row.original.bucket}
+          </Badge>
+        ),
+      },
+    ],
+    [],
+  );
+
   if (loading && !data) {
     return (
       <div className="flex justify-center py-16">
@@ -206,6 +256,7 @@ function DashboardPanel() {
 
   const k = data?.kpis;
   const buckets = data?.aging?.buckets ?? {};
+  const overdueCharges = data?.overdueCharges ?? [];
 
   return (
     <div className="space-y-4">
@@ -286,44 +337,28 @@ function DashboardPanel() {
         </Card>
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="px-4 py-3 border-b">
-            <h3 className="text-sm font-semibold">Overdue open charges</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-2">Customer</th>
-                  <th className="text-left px-4 py-2">Description</th>
-                  <th className="text-right px-4 py-2">Amount</th>
-                  <th className="text-right px-4 py-2">DPD</th>
-                  <th className="text-left px-4 py-2">Bucket</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.overdueCharges ?? []).map((c) => (
-                  <tr key={c.id} className="border-b border-border/40">
-                    <td className="px-4 py-2">{c.partyName}</td>
-                    <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{c.description || "—"}</td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium">{formatNumber(c.amount)}</td>
-                    <td className="px-4 py-2 text-right tabular-nums text-amber-600">{c.daysPastDue}</td>
-                    <td className="px-4 py-2">
-                      <Badge variant="outline" className="text-[10px]">{BUCKET_LABELS[c.bucket] ?? c.bucket}</Badge>
-                    </td>
-                  </tr>
-                ))}
-                {!data?.overdueCharges?.length && (
-                  <tr>
-                    <td colSpan={5} className="text-center text-muted-foreground py-10">No overdue charges</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <h3 className="text-sm font-semibold px-1">Overdue open charges</h3>
+        <ClientSideTable
+          fillHeight={false}
+          data={overdueCharges}
+          columns={overdueColumns}
+          pageCount={Math.max(1, Math.ceil(overdueCharges.length / 10))}
+          searchableColumns={[
+            { id: "partyName", title: "Customer" },
+            { id: "description", title: "Description" },
+          ]}
+          filterableColumns={[
+            {
+              id: "bucket",
+              title: "Bucket",
+              options: Object.entries(BUCKET_LABELS).map(([value, label]) => ({ value, label })),
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "ar-overdue-charges" }}
+        />
+      </div>
+      {/* TODO: remaining tables → ClientSideTable — customer statement print layout skipped */}
     </div>
   );
 }
@@ -527,6 +562,44 @@ function PaymentPanel() {
   useEffect(() => {
     setSelected(customers.find((c) => c.id === customerId) ?? null);
   }, [customerId, customers]);
+
+  const paymentColumns = useMemo<ColumnDef<ArDashboard["recentPayments"][number]>[]>(
+    () => [
+      {
+        id: "createdAt",
+        accessorFn: (p) => fmt(p.createdAt),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{fmt(row.original.createdAt)}</span>
+        ),
+      },
+      {
+        id: "customer",
+        accessorFn: (p) => nameOf(p.customer),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Customer" />,
+        cell: ({ row }) => <span className="text-sm">{nameOf(row.original.customer)}</span>,
+      },
+      {
+        id: "description",
+        accessorFn: (p) => p.description ?? "",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />,
+        cell: ({ row }) => (
+          <span className="text-muted-foreground">{row.original.description || "—"}</span>
+        ),
+      },
+      {
+        id: "amount",
+        accessorKey: "amount",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Amount" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium text-emerald-600">
+            {formatNumber(row.original.amount)}
+          </span>
+        ),
+      },
+    ],
+    [],
+  );
 
   const pay = async () => {
     const amt = parseFloat(amount);
@@ -737,45 +810,26 @@ function PaymentPanel() {
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="px-4 py-3 border-b flex justify-between items-center">
-            <h3 className="text-sm font-semibold">Recent AR payments</h3>
-            <Button variant="ghost" size="sm" onClick={() => void loadCustomers()}>
-              <RefreshCw className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-2">Date</th>
-                  <th className="text-left px-4 py-2">Customer</th>
-                  <th className="text-left px-4 py-2">Description</th>
-                  <th className="text-right px-4 py-2">Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {payments.map((p) => (
-                  <tr key={p.id} className="border-b border-border/40">
-                    <td className="px-4 py-2 text-muted-foreground">{fmt(p.createdAt)}</td>
-                    <td className="px-4 py-2">{nameOf(p.customer)}</td>
-                    <td className="px-4 py-2 text-muted-foreground">{p.description || "—"}</td>
-                    <td className="px-4 py-2 text-right tabular-nums font-medium text-emerald-600">
-                      {formatNumber(p.amount)}
-                    </td>
-                  </tr>
-                ))}
-                {!payments.length && (
-                  <tr>
-                    <td colSpan={4} className="text-center text-muted-foreground py-10">No payments this period</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-sm font-semibold">Recent AR payments</h3>
+          <Button variant="ghost" size="sm" onClick={() => void loadCustomers()}>
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <ClientSideTable
+          fillHeight={false}
+          data={payments}
+          columns={paymentColumns}
+          pageCount={Math.max(1, Math.ceil(payments.length / 10))}
+          searchableColumns={[
+            { id: "customer", title: "Customer" },
+            { id: "description", title: "Description" },
+          ]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "ar-recent-payments" }}
+        />
+      </div>
     </div>
   );
 }

@@ -6,9 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
-import { ClientSideTable } from "@/components/table/client-side-table";
-import { DataTableColumnHeader } from "@/components/table/data-table-column-header";
-import { TableActionsRow } from "@/components/table/table-actions-row";
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/receive-items-modal";
@@ -16,8 +14,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
-import { OpenRecordButton } from "@/components/table/open-record-button";
-
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
@@ -219,8 +215,8 @@ export default function PurchasesPage() {
       </div>
 
       {/* Table — fills remaining viewport */}
-      <div className="overflow-y-auto" style={{ height: "calc(100vh - 240px)" }}>
-        <ClientSideTable
+      <ClientSideTable
+          fillHeight
           data={pos}
           columns={columns}
           pageCount={Math.ceil(pos.length / 10)}
@@ -234,7 +230,6 @@ export default function PurchasesPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: "purchase-orders-export" }}
         />
-      </div>
 
       <ReceiveItemsModal po={receivePO} onClose={() => setReceivePO(null)} onReceived={fetchPOs} />
     </div>

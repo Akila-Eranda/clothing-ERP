@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   Calculator, Eye, FileText, LayoutDashboard, Loader2, RefreshCw,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -95,6 +97,8 @@ type Payslip = {
   snapshot: Record<string, unknown>;
   employee: { firstName: string; lastName: string; code?: string | null; designation?: string | null };
 };
+
+type PayrollEntry = NonNullable<PayrollRun["entries"]>[number];
 
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
@@ -419,6 +423,127 @@ function ProcessPanel() {
     }
   };
 
+  const runColumns = useMemo<ColumnDef<PayrollRun>[]>(
+    () => [
+      {
+        id: "period",
+        accessorKey: "periodLabel",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
+        cell: ({ row }) => <span>{row.original.periodLabel}</span>,
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => <Badge className="text-[10px]">{row.original.status}</Badge>,
+      },
+      {
+        id: "employees",
+        accessorKey: "employeeCount",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Employees" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{row.original.employeeCount}</span>
+        ),
+      },
+      {
+        id: "net",
+        accessorKey: "totalNet",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Net" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.totalNet)}</span>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => (
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => void openRun(row.original.id)}>
+            Open
+          </Button>
+        ),
+      },
+    ],
+    [],
+  );
+
+  const entryColumns = useMemo<ColumnDef<PayrollEntry>[]>(
+    () => [
+      {
+        id: "employee",
+        accessorFn: (e) => `${e.employee.firstName} ${e.employee.lastName}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+        cell: ({ row }) => {
+          const e = row.original;
+          return (
+            <span>
+              {e.employee.firstName} {e.employee.lastName}
+              {e.employee.code && (
+                <span className="text-xs text-muted-foreground ml-1">({e.employee.code})</span>
+              )}
+            </span>
+          );
+        },
+      },
+      {
+        id: "basic",
+        accessorKey: "basicSalary",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Basic" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.basicSalary)}</span>
+        ),
+      },
+      {
+        id: "allowances",
+        accessorKey: "allowances",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Allow." />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.allowances)}</span>
+        ),
+      },
+      {
+        id: "gross",
+        accessorKey: "grossSalary",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Gross" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.grossSalary)}</span>
+        ),
+      },
+      {
+        id: "epf",
+        accessorKey: "epfEmployee",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="EPF" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.epfEmployee)}</span>
+        ),
+      },
+      {
+        id: "etf",
+        accessorKey: "etfEmployer",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="ETF" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums">{formatNumber(row.original.etfEmployer)}</span>
+        ),
+      },
+      {
+        id: "net",
+        accessorKey: "netSalary",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Net" />,
+        cell: ({ row }) => (
+          <span className="tabular-nums font-medium">{formatNumber(row.original.netSalary)}</span>
+        ),
+      },
+      {
+        id: "payStatus",
+        accessorFn: (e) => (e.isPaid ? "PAID" : "PENDING"),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => (
+          <Badge className="text-[10px]">{row.original.isPaid ? "PAID" : "PENDING"}</Badge>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex justify-end">
@@ -464,34 +589,18 @@ function ProcessPanel() {
       </Dialog>
 
       {runs.length > 0 && (
-        <Card>
-          <CardContent className="p-0">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-2">Period</th>
-                  <th className="text-left px-4 py-2">Status</th>
-                  <th className="text-right px-4 py-2">Employees</th>
-                  <th className="text-right px-4 py-2">Net</th>
-                  <th className="text-right px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {runs.map((r) => (
-                  <tr key={r.id} className="border-b border-border/40">
-                    <td className="px-4 py-2">{r.periodLabel}</td>
-                    <td className="px-4 py-2"><Badge className="text-[10px]">{r.status}</Badge></td>
-                    <td className="px-4 py-2 text-right tabular-nums">{r.employeeCount}</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{formatNumber(r.totalNet)}</td>
-                    <td className="px-4 py-2 text-right">
-                      <Button variant="ghost" size="sm" className="h-8" onClick={() => void openRun(r.id)}>Open</Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+        <ClientSideTable
+          fillHeight={false}
+          data={runs}
+          columns={runColumns}
+          pageCount={Math.max(1, Math.ceil(runs.length / 10))}
+          searchableColumns={[
+            { id: "period", title: "Period" },
+            { id: "status", title: "Status" },
+          ] as { id: keyof PayrollRun; title: string }[]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "payroll-runs" }}
+        />
       )}
 
       {run && (
@@ -516,43 +625,15 @@ function ProcessPanel() {
             </div>
           </div>
 
-          <Card>
-            <CardContent className="p-0">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                    <th className="text-left px-4 py-3">Employee</th>
-                    <th className="text-right px-4 py-3">Basic</th>
-                    <th className="text-right px-4 py-3">Allow.</th>
-                    <th className="text-right px-4 py-3">Gross</th>
-                    <th className="text-right px-4 py-3">EPF</th>
-                    <th className="text-right px-4 py-3">ETF</th>
-                    <th className="text-right px-4 py-3">Net</th>
-                    <th className="text-left px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(run.entries ?? []).map((e) => (
-                    <tr key={e.id} className="border-b border-border/40">
-                      <td className="px-4 py-2.5">
-                        {e.employee.firstName} {e.employee.lastName}
-                        {e.employee.code && <span className="text-xs text-muted-foreground ml-1">({e.employee.code})</span>}
-                      </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(e.basicSalary)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(e.allowances)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(e.grossSalary)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(e.epfEmployee)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{formatNumber(e.etfEmployer)}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums font-medium">{formatNumber(e.netSalary)}</td>
-                      <td className="px-4 py-2.5">
-                        <Badge className="text-[10px]">{e.isPaid ? "PAID" : "PENDING"}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </CardContent>
-          </Card>
+          <ClientSideTable
+          fillHeight={false}
+            data={run.entries ?? []}
+            columns={entryColumns}
+            pageCount={Math.max(1, Math.ceil((run.entries?.length ?? 0) / 10))}
+            searchableColumns={[{ id: "employee", title: "Employee" }]}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "payroll-run-entries" }}
+          />
         </>
       )}
     </div>
@@ -602,6 +683,45 @@ function PayslipsPanel({
     }
   }, [initialId, open, onCleared]);
 
+  const slipColumns = useMemo<ColumnDef<Payslip>[]>(
+    () => [
+      {
+        id: "payslip",
+        accessorKey: "payslipNumber",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Payslip" />,
+        cell: ({ row }) => (
+          <span className="font-mono text-xs">{row.original.payslipNumber}</span>
+        ),
+      },
+      {
+        id: "employee",
+        accessorFn: (s) => `${s.employee.firstName} ${s.employee.lastName}`,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Employee" />,
+        cell: ({ row }) => (
+          <span>
+            {row.original.employee.firstName} {row.original.employee.lastName}
+          </span>
+        ),
+      },
+      {
+        id: "period",
+        accessorKey: "periodLabel",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
+        cell: ({ row }) => <span>{row.original.periodLabel}</span>,
+      },
+      {
+        id: "actions",
+        header: () => <span className="sr-only">Actions</span>,
+        cell: ({ row }) => (
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => void open(row.original.id)}>
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+        ),
+      },
+    ],
+    [open],
+  );
+
   const snap = selected?.snapshot as {
     employee?: { name?: string; designation?: string | null; epfNumber?: string | null; etfNumber?: string | null };
     earnings?: { basicSalary?: number; allowances?: number; bonus?: number; commission?: number; grossSalary?: number };
@@ -615,45 +735,23 @@ function PayslipsPanel({
 
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      <Card>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/30 text-[10px] uppercase text-muted-foreground">
-                  <th className="text-left px-4 py-3">Payslip</th>
-                  <th className="text-left px-4 py-3">Employee</th>
-                  <th className="text-left px-4 py-3">Period</th>
-                  <th className="text-right px-4 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {slips.map((s) => (
-                  <tr key={s.id} className="border-b border-border/40">
-                    <td className="px-4 py-2.5 font-mono text-xs">{s.payslipNumber}</td>
-                    <td className="px-4 py-2.5">{s.employee.firstName} {s.employee.lastName}</td>
-                    <td className="px-4 py-2.5">{s.periodLabel}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <Button variant="ghost" size="sm" className="h-8" onClick={() => void open(s.id)}>
-                        <Eye className="h-3.5 w-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-                {!slips.length && (
-                  <tr>
-                    <td colSpan={4} className="text-center text-muted-foreground py-10">
-                      No payslips — pay a payroll run first
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {loading ? (
+        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={slips}
+          columns={slipColumns}
+          pageCount={Math.max(1, Math.ceil(slips.length / 10))}
+          searchableColumns={[
+            { id: "payslip", title: "Payslip" },
+            { id: "employee", title: "Employee" },
+            { id: "period", title: "Period" },
+          ] as { id: keyof Payslip; title: string }[]}
+          filterableColumns={[]}
+          isShowExportButtons={{ isShow: true, fileName: "payslips" }}
+        />
+      )}
 
       <Card>
         <CardContent className="p-6">
@@ -661,6 +759,7 @@ function PayslipsPanel({
             <p className="text-sm text-muted-foreground text-center py-12">Select a payslip to view</p>
           ) : (
             <div className="space-y-4 max-w-md mx-auto">
+              {/* TODO: remaining tables → ClientSideTable — payslip detail is a print-style layout */}
               <div className="text-center border-b pb-3">
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Payslip</p>
                 <h2 className="text-lg font-bold">{snap.payslipNumber ?? selected.payslipNumber}</h2>

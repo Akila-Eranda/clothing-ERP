@@ -1,16 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Building2, Users, Activity, RefreshCw,
-  AlertTriangle, CheckCircle, ArrowUpRight, DollarSign, Clock,
+  AlertTriangle, CheckCircle, ArrowUpRight, DollarSign, Clock, Loader2,
 } from 'lucide-react'
+import { ColumnDef } from '@tanstack/react-table'
 import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
+import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from '@/components/table'
 import { fetchPlatformOverview, fetchHealth, type PlatformOverview, type HealthData } from '@/lib/admin-api'
+import { Button } from '@/components/ui/button'
+
+type RecentTenant = PlatformOverview['recentTenants'][number]
 
 function Skeleton({ h = 'h-8', w = 'w-full' }: { h?: string; w?: string }) {
   return <div className={`${h} ${w} bg-gray-100 rounded-lg animate-pulse`} />
@@ -31,6 +37,7 @@ const PLAN_COLORS: Record<string, string> = {
 }
 
 export default function AdminDashboardPage() {
+  const router = useRouter()
   const [overview, setOverview] = useState<PlatformOverview | null>(null)
   const [health, setHealth]     = useState<HealthData | null>(null)
   const [loading, setLoading]   = useState(true)
@@ -55,7 +62,81 @@ export default function AdminDashboardPage() {
 
   useEffect(() => { load() }, [load])
 
+  const recentColumns = useMemo<ColumnDef<RecentTenant>[]>(
+    () => [
+      {
+        id: 'name',
+        accessorKey: 'name',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Name" />,
+        cell: ({ row }) => {
+          const t = row.original
+          return (
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+                {t.name.charAt(0)}
+              </div>
+              <div>
+                <OpenRecordButton
+                  onClick={() => router.push(`/admin/tenants/${t.id}`)}
+                  className="text-xs"
+                  title="View tenant"
+                >
+                  {t.name}
+                </OpenRecordButton>
+                <p className="text-[10px] text-gray-400">{t.email}</p>
+              </div>
+            </div>
+          )
+        },
+      },
+      {
+        id: 'subdomain',
+        accessorKey: 'subdomain',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Subdomain" />,
+        cell: ({ row }) => (
+          <span className="text-xs font-mono text-gray-500">{row.original.subdomain}</span>
+        ),
+      },
+      {
+        id: 'plan',
+        accessorKey: 'plan',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
+        cell: ({ row }) => (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
+            {row.original.plan}
+          </span>
+        ),
+      },
+      {
+        id: 'status',
+        accessorKey: 'status',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => (
+          <span className={STATUS_BADGE[row.original.status] ?? STATUS_BADGE.INACTIVE}>
+            {row.original.status}
+          </span>
+        ),
+      },
+      {
+        id: 'users',
+        accessorKey: 'userCount',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Users" />,
+        cell: ({ row }) => <span className="text-xs text-gray-600">{row.original.userCount}</span>,
+      },
+      {
+        id: 'joined',
+        accessorFn: (t) => fmtDate(t.createdAt),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
+        cell: ({ row }) => (
+          <span className="text-xs text-gray-500">{fmtDate(row.original.createdAt)}</span>
+        ),
+      },
+    ],
+    [router],
+  )
+
   const stats = overview?.stats
+  const recentTenants = overview?.recentTenants ?? []
   const statCards = stats ? [
     { label: 'Total Tenants',  value: stats.totalTenants,    icon: Building2,   color: 'text-blue-600',   bg: 'bg-blue-50',    href: '/admin/tenants' },
     { label: 'Active',         value: stats.activeTenants,   icon: CheckCircle, color: 'text-green-600',  bg: 'bg-green-50',   href: '/admin/tenants?status=ACTIVE' },
@@ -74,9 +155,9 @@ export default function AdminDashboardPage() {
       <AlertTriangle size={32} className="text-amber-400" />
       <p className="text-sm font-medium text-gray-700">Could not load dashboard</p>
       <p className="text-xs text-gray-400">{error}</p>
-      <button onClick={load} className="px-4 py-2 text-xs bg-gray-900 text-white rounded-lg hover:bg-gray-800">
-        <RefreshCw size={12} className="inline mr-1" />Retry
-      </button>
+      <Button variant="default" size="sm" onClick={load}>
+        <RefreshCw size={12} />Retry
+      </Button>
     </div>
   )
 
@@ -202,54 +283,30 @@ export default function AdminDashboardPage() {
             <h2 className="text-sm font-semibold text-gray-900">Recent Tenants</h2>
             <div className="flex items-center gap-2">
               <Link href="/admin/tenants" className="text-xs text-gray-500 hover:text-gray-800">View all →</Link>
-              <button onClick={load} disabled={loading} className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg">
+              <Button variant="ghost" size="icon-sm" onClick={load} disabled={loading} className="text-gray-400 hover:text-gray-700">
                 <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              </button>
+              </Button>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-100">
-                  {['Name', 'Subdomain', 'Plan', 'Status', 'Users', 'Joined'].map(h => (
-                    <th key={h} className="px-4 py-2.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center">
-                    <RefreshCw size={16} className="animate-spin mx-auto text-gray-300" />
-                  </td></tr>
-                ) : (overview?.recentTenants.length ?? 0) === 0 ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No tenants yet</td></tr>
-                ) : overview!.recentTenants.map(t => (
-                  <tr key={t.id} className="hover:bg-gray-50 transition-colors cursor-pointer"
-                    onClick={() => window.location.href = `/admin/tenants/${t.id}`}>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
-                          {t.name.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-xs font-semibold text-gray-900">{t.name}</p>
-                          <p className="text-[10px] text-gray-400">{t.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-xs font-mono text-gray-500">{t.subdomain}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">{t.plan}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={STATUS_BADGE[t.status] ?? STATUS_BADGE.INACTIVE}>{t.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{t.userCount}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(t.createdAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-3">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 size={16} className="animate-spin text-gray-300" />
+              </div>
+            ) : (
+              <ClientSideTable
+                data={recentTenants}
+                columns={recentColumns}
+                pageCount={Math.max(1, Math.ceil(recentTenants.length / 10))}
+                searchableColumns={[
+                  { id: 'name', title: 'Name' },
+                  { id: 'subdomain', title: 'Subdomain' },
+                  { id: 'plan', title: 'Plan' },
+                ]}
+                filterableColumns={[]}
+                isShowExportButtons={{ isShow: true, fileName: 'recent-tenants' }}
+              />
+            )}
           </div>
         </div>
       </div>

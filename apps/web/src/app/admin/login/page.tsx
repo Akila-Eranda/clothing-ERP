@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Eye, EyeOff } from 'lucide-react'
 import { adminLogin } from '@/lib/admin-api'
 import { AppLogo } from '@/components/brand/app-logo'
+import { Button } from '@/components/ui/button'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -61,13 +62,15 @@ export default function AdminLoginPage() {
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   required
                 />
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setShowPwd(p => !p)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 h-7 w-7 text-gray-400 hover:text-gray-600"
                 >
                   {showPwd ? <EyeOff size={15} /> : <Eye size={15} />}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -75,13 +78,14 @@ export default function AdminLoginPage() {
               <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
             )}
 
-            <button
+            <Button
               type="submit"
+              variant="default"
+              className="w-full"
               disabled={loading}
-              className="w-full py-2.5 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
             >
               {loading ? 'Signing in…' : 'Sign In'}
-            </button>
+            </Button>
           </form>
 
           <p className="text-center text-[11px] text-gray-400 mt-4 leading-relaxed">

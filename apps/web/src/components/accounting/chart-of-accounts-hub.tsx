@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ColumnDef } from "@tanstack/react-table";
 import {
   ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Download, FileUp,
-  Loader2, Pencil, Plus, RefreshCw, Search, Trash2, Upload, X,
+  Loader2, Pencil, Plus, RefreshCw, Trash2, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import {
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
+import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
@@ -59,18 +61,12 @@ function flatten(nodes: CoaNode[]): CoaNode[] {
   return out;
 }
 
-function filterTree(nodes: CoaNode[], q: string, type: string): CoaNode[] {
-  const needle = q.trim().toLowerCase();
+function filterTree(nodes: CoaNode[], type: string): CoaNode[] {
   return nodes.flatMap((node) => {
-    const children = filterTree(node.children ?? [], q, type);
+    const children = filterTree(node.children ?? [], type);
     const matchesType = type === "ALL" || node.type === type;
-    const matchesSearch =
-      !needle ||
-      node.code.toLowerCase().includes(needle) ||
-      node.name.toLowerCase().includes(needle) ||
-      node.description?.toLowerCase().includes(needle);
 
-    if ((matchesType && matchesSearch) || children.length > 0) {
+    if (matchesType || children.length > 0) {
       return [{ ...node, children }];
     }
     return [];
@@ -258,7 +254,6 @@ export function ChartOfAccountsHub() {
   const { profile } = useShopWorkspace();
   const [tree, setTree] = useState<CoaNode[]>([]);
   const [loading, setLoading] = useState(true);
-  const [q, setQ] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [modalOpen, setModalOpen] = useState(false);
@@ -285,7 +280,7 @@ export function ChartOfAccountsHub() {
   useEffect(() => { load(); }, [load]);
 
   const flat = useMemo(() => flatten(tree), [tree]);
-  const filteredTree = useMemo(() => filterTree(tree, q, typeFilter), [tree, q, typeFilter]);
+  const filteredTree = useMemo(() => filterTree(tree, typeFilter), [tree, typeFilter]);
 
   const toggle = (id: string) => {
     setExpanded((prev) => {
@@ -322,6 +317,130 @@ export function ChartOfAccountsHub() {
       toast.error((e as Error).message ?? "Delete failed");
     }
   };
+
+  const columns = useMemo<ColumnDef<CoaNode>[]>(
+    () => [
+      {
+        id: "code",
+        accessorKey: "code",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Code" />,
+        cell: ({ row }) => {
+          const account = row.original;
+          const hasChildren = (account.children?.length ?? 0) > 0;
+          const open = expanded.has(account.id);
+          return (
+            <div
+              className="flex items-center gap-1 font-mono text-xs"
+              style={{ paddingLeft: Math.min(account.depth, 5) * 14 }}
+            >
+              {hasChildren ? (
+                <button
+                  type="button"
+                  aria-label={open ? `Collapse ${account.name}` : `Expand ${account.name}`}
+                  onClick={() => toggle(account.id)}
+                  className="rounded p-0.5 hover:bg-muted"
+                >
+                  {open
+                    ? <ChevronDown className="h-3.5 w-3.5" />
+                    : <ChevronRight className="h-3.5 w-3.5" />}
+                </button>
+              ) : (
+                <span className="w-4" />
+              )}
+              {account.code}
+            </div>
+          );
+        },
+      },
+      {
+        id: "name",
+        accessorKey: "name",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Account" />,
+        cell: ({ row }) => (
+          <div className="max-w-[320px]">
+            <p className="truncate font-medium">{row.original.name}</p>
+            {row.original.description && (
+              <p className="truncate text-[10px] text-muted-foreground">{row.original.description}</p>
+            )}
+          </div>
+        ),
+      },
+      {
+        id: "type",
+        accessorKey: "type",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
+        cell: ({ row }) => {
+          const meta = TYPE_META[row.original.type];
+          return (
+            <div className="flex flex-wrap items-center gap-1">
+              <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${meta.bg} ${meta.color}`}>
+                {meta.label}
+              </span>
+              {row.original.isSystem && <Badge variant="outline" className="text-[9px]">System</Badge>}
+              {!row.original.isActive && <Badge variant="secondary" className="text-[9px]">Inactive</Badge>}
+            </div>
+          );
+        },
+      },
+      {
+        id: "openingBalance",
+        accessorKey: "openingBalance",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Opening" />,
+        cell: ({ row }) => (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {formatNumber(row.original.openingBalance)}
+          </span>
+        ),
+      },
+      {
+        id: "balance",
+        accessorKey: "balance",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Balance" />,
+        cell: ({ row }) => (
+          <span className={`text-xs font-semibold tabular-nums ${
+            row.original.balance < 0 ? "text-red-500" : ""
+          }`}>
+            {formatNumber(row.original.balance)}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        enableSorting: false,
+        cell: ({ row }) => {
+          const account = row.original;
+          return (
+            <div className="flex justify-end gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:text-blue-600"
+                aria-label={`Edit ${account.name}`}
+                onClick={() => { setEdit(account); setModalOpen(true); }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
+                aria-label={`Deactivate ${account.name}`}
+                disabled={account.isSystem || !account.isActive}
+                onClick={() => void remove(account)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [expanded],
+  );
 
   const exportCsv = async () => {
     try {
@@ -492,168 +611,67 @@ export function ChartOfAccountsHub() {
         })}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="flex flex-wrap items-center gap-2 border-b p-3">
-            <div className="relative min-w-[220px] flex-1 sm:max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Search code, name, or description…"
-                className="h-9 pl-8 pr-8"
-              />
-              {q && (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => setQ("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">All types</SelectItem>
-                {(Object.keys(TYPE_META) as AccountType[]).map((t) => (
-                  <SelectItem key={t} value={t}>{TYPE_META[t].label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5" onClick={expandAll}>
-              <ChevronsUpDown className="h-3.5 w-3.5" /> Expand
-            </Button>
-            <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5" onClick={collapseAll}>
-              <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse
-            </Button>
-            <Badge variant="secondary" className="ml-auto text-[10px]">
-              {visibleRows.length} of {flat.length}
-            </Badge>
-          </div>
-          {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : visibleRows.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground space-y-3">
-              <p>{flat.length ? "No accounts match your filters." : "No accounts yet."}</p>
-              {flat.length ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => { setQ(""); setTypeFilter("ALL"); }}
-                >
-                  Clear filters
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" onClick={() => void seedDefaults()}>Auto-setup accounting</Button>
-              )}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                    <th className="w-[180px] px-4 py-3 text-left font-semibold">Code</th>
-                    <th className="px-4 py-3 text-left font-semibold">Account</th>
-                    <th className="w-[180px] px-4 py-3 text-left font-semibold">Type</th>
-                    <th className="w-[130px] px-4 py-3 text-right font-semibold">Opening</th>
-                    <th className="w-[130px] px-4 py-3 text-right font-semibold">Balance</th>
-                    <th className="w-[90px] px-4 py-3 text-right font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleRows.map((row) => {
-                    const hasChildren = (row.children?.length ?? 0) > 0;
-                    const open = expanded.has(row.id);
-                    const meta = TYPE_META[row.type];
-                    return (
-                      <tr
-                        key={row.id}
-                        className={`border-b border-border/40 hover:bg-muted/20 ${
-                          !row.isActive ? "opacity-55" : ""
-                        }`}
-                      >
-                        <td className="px-4 py-3">
-                          <div
-                            className="flex items-center gap-1 font-mono text-xs"
-                            style={{ paddingLeft: Math.min(row.depth, 5) * 14 }}
-                          >
-                            {hasChildren ? (
-                              <button
-                                type="button"
-                                aria-label={open ? `Collapse ${row.name}` : `Expand ${row.name}`}
-                                onClick={() => toggle(row.id)}
-                                className="rounded p-0.5 hover:bg-muted"
-                              >
-                                {open
-                                  ? <ChevronDown className="h-3.5 w-3.5" />
-                                  : <ChevronRight className="h-3.5 w-3.5" />}
-                              </button>
-                            ) : (
-                              <span className="w-4" />
-                            )}
-                            {row.code}
-                          </div>
-                        </td>
-                        <td className="max-w-[320px] px-4 py-3">
-                          <p className="truncate font-medium">{row.name}</p>
-                          {row.description && (
-                            <p className="truncate text-[10px] text-muted-foreground">{row.description}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${meta.bg} ${meta.color}`}>
-                            {meta.label}
-                          </span>
-                          {row.isSystem && <Badge variant="outline" className="ml-1 text-[9px]">System</Badge>}
-                          {!row.isActive && <Badge variant="secondary" className="ml-1 text-[9px]">Inactive</Badge>}
-                        </td>
-                        <td className="px-4 py-3 text-right text-xs tabular-nums text-muted-foreground">
-                          {formatNumber(row.openingBalance)}
-                        </td>
-                        <td className={`px-4 py-3 text-right text-xs font-semibold tabular-nums ${
-                          row.balance < 0 ? "text-red-500" : ""
-                        }`}>
-                          {formatNumber(row.balance)}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex justify-end gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 hover:text-blue-600"
-                              aria-label={`Edit ${row.name}`}
-                              onClick={() => { setEdit(row); setModalOpen(true); }}
-                            >
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 hover:bg-red-500/10 hover:text-red-500"
-                              aria-label={`Deactivate ${row.name}`}
-                              disabled={row.isSystem || !row.isActive}
-                              onClick={() => void remove(row)}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex flex-wrap items-center gap-2">
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="h-9 w-40"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="ALL">All types</SelectItem>
+            {(Object.keys(TYPE_META) as AccountType[]).map((t) => (
+              <SelectItem key={t} value={t}>{TYPE_META[t].label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5" onClick={expandAll}>
+          <ChevronsUpDown className="h-3.5 w-3.5" /> Expand
+        </Button>
+        <Button type="button" variant="ghost" size="sm" className="h-9 gap-1.5" onClick={collapseAll}>
+          <ChevronsDownUp className="h-3.5 w-3.5" /> Collapse
+        </Button>
+        <Badge variant="secondary" className="ml-auto text-[10px]">
+          {visibleRows.length} of {flat.length}
+        </Badge>
+      </div>
+
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : visibleRows.length === 0 ? (
+        <Card>
+          <CardContent className="py-16 text-center text-sm text-muted-foreground space-y-3">
+            <p>{flat.length ? "No accounts match your filters." : "No accounts yet."}</p>
+            {flat.length ? (
+              <Button size="sm" variant="outline" onClick={() => setTypeFilter("ALL")}>
+                Clear filters
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => void seedDefaults()}>Auto-setup accounting</Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <ClientSideTable
+          fillHeight={false}
+          data={visibleRows}
+          columns={columns}
+          pageCount={Math.max(1, Math.ceil(visibleRows.length / 10))}
+          searchableColumns={[
+            { id: "code", title: "Code" },
+            { id: "name", title: "Account" },
+          ]}
+          filterableColumns={[
+            {
+              id: "type",
+              title: "Type",
+              options: (Object.keys(TYPE_META) as AccountType[]).map((t) => ({
+                value: t,
+                label: TYPE_META[t].label,
+              })),
+            },
+          ]}
+          isShowExportButtons={{ isShow: true, fileName: "chart-of-accounts" }}
+        />
+      )}
 
       {modalOpen && (
         <AccountFormModal

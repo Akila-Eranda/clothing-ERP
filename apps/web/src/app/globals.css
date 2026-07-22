@@ -418,100 +418,186 @@
     background: hsl(var(--card-hover)) !important;
   }
 
-  /* ── Data tables (react-table-craft via [data-table-craft] wrapper) ──
-     One solid card surface for toolbar + table + pagination so the block
-     never shows the page canvas through, in light or dark mode. */
+  /* ── Data tables (react-table-craft via [data-table-craft]) ─────────────
+     Single orderly card: toolbar → scroll body → pagination. Light + dark. */
   [data-table-craft] {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    width: 100%;
+    min-width: 0;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
     border-radius: var(--radius);
-    padding: 0.75rem;
     box-shadow: 0 4px 20px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
   }
   .dark [data-table-craft] {
-    border-color: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
     box-shadow: none;
   }
 
-  /* Inner table frame sits on the same card surface */
+  /* Inner craft root fills the card when fillHeight is on */
+  [data-table-craft] > div {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+  }
+  [data-table-craft] > div > div {
+    min-width: 0;
+  }
+
+  /* Toolbar row spacing */
+  [data-table-craft] > .flex,
+  [data-table-craft] > div > .flex.items-center {
+    padding: 0.75rem 0.875rem;
+    border-bottom: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+    column-gap: 0.5rem;
+  }
+  .dark [data-table-craft] > .flex,
+  .dark [data-table-craft] > div > .flex.items-center {
+    border-bottom-color: rgba(255, 255, 255, 0.06);
+  }
+
+  [data-table-craft] .overflow-auto,
+  [data-table-craft] .relative.w-full.overflow-auto {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
   [data-table-craft] table {
     background: hsl(var(--card));
-    table-layout: fixed;
     width: 100%;
-  }
-
-  /* Prevent long cell text from spilling into neighbouring columns */
-  [data-table-craft] th,
-  [data-table-craft] td {
-    overflow: hidden;
-    vertical-align: middle;
-  }
-
-  /* Search boxes + filter inputs: solid fill + clear outline in both themes */
-  [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
-    background: hsl(0 0% 100%);
-    border-color: hsl(var(--input));
-    border-radius: var(--radius-control);
-  }
-  .dark [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
-    background: hsl(var(--secondary));
-  }
-  [data-table-craft] button[role="combobox"] {
-    background: hsl(0 0% 100%);
-    border-color: hsl(var(--input));
-  }
-  .dark [data-table-craft] button[role="combobox"] {
-    background: hsl(var(--secondary));
-  }
-
-  /* Enterprise header + row treatment — no zebra */
-  :root:not(.dark) .enterprise-table,
-  :root:not(.dark) [data-table-craft] table {
+    min-width: 720px;
+    table-layout: auto;
     border-collapse: separate;
     border-spacing: 0;
   }
-  :root:not(.dark) .enterprise-table thead,
-  :root:not(.dark) [data-table-craft] thead {
+
+  [data-table-craft] thead {
     background: hsl(var(--secondary-background));
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 2;
   }
-  .dark [data-table-craft] thead {
-    background: hsl(var(--secondary-background));
-    position: sticky;
-    top: 0;
-    z-index: 1;
-  }
-  :root:not(.dark) .enterprise-table th,
-  :root:not(.dark) [data-table-craft] th {
+
+  [data-table-craft] th {
+    height: 44px;
+    padding: 0 0.875rem;
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
-    font-size: 11.5px;
+    font-size: 11px;
+    line-height: 1.2;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: hsl(var(--secondary-foreground));
-    height: 44px;
+    letter-spacing: 0.04em;
+    color: hsl(var(--muted-foreground));
+    white-space: nowrap;
+    text-align: left;
+    vertical-align: middle;
   }
-  :root:not(.dark) .enterprise-table td,
-  :root:not(.dark) [data-table-craft] td {
-    border-bottom: 1px solid hsl(var(--divider));
+
+  [data-table-craft] td {
     height: 52px;
+    padding: 0 0.875rem;
+    border-bottom: 1px solid hsl(var(--divider));
+    font-size: 0.8125rem;
+    color: hsl(var(--foreground));
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  :root:not(.dark) .enterprise-table tbody tr:nth-child(even),
-  :root:not(.dark) [data-table-craft] tbody tr:nth-child(even) {
+  .dark [data-table-craft] td {
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+  }
+
+  [data-table-craft] tbody tr {
+    transition: background-color 0.12s ease;
     background: transparent;
   }
-  :root:not(.dark) .enterprise-table tbody tr:hover,
-  :root:not(.dark) [data-table-craft] tbody tr:hover {
+  [data-table-craft] tbody tr:hover {
     background: hsl(var(--hover));
   }
   .dark [data-table-craft] tbody tr:hover {
     background: hsl(var(--card-hover));
   }
-  :root:not(.dark) .enterprise-table tbody tr,
-  :root:not(.dark) [data-table-craft] tbody tr {
-    transition: background-color 0.12s ease;
+  [data-table-craft] tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  [data-table-craft] td .whitespace-normal,
+  [data-table-craft] td [data-cell-wrap] {
+    white-space: normal;
+  }
+
+  [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
+    height: 2.25rem;
+    background: hsl(0 0% 100%);
+    border-color: hsl(var(--input));
+    border-radius: var(--radius-control);
+    font-size: 0.8125rem;
+  }
+  .dark [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
+    background: hsl(var(--secondary));
+  }
+  [data-table-craft] button[role="combobox"] {
+    height: 2.25rem;
+    background: hsl(0 0% 100%);
+    border-color: hsl(var(--input));
+    border-radius: var(--radius-control);
+    font-size: 0.8125rem;
+  }
+  .dark [data-table-craft] button[role="combobox"] {
+    background: hsl(var(--secondary));
+  }
+
+  [data-table-craft] > div:last-child {
+    border-top: 1px solid hsl(var(--border));
+    padding: 0.625rem 0.875rem;
+    background: hsl(var(--secondary-background) / 0.55);
+  }
+  .dark [data-table-craft] > div:last-child {
+    border-top-color: rgba(255, 255, 255, 0.06);
+    background: hsl(var(--secondary) / 0.45);
+  }
+
+  .enterprise-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .enterprise-table thead {
+    background: hsl(var(--secondary-background));
+  }
+  .enterprise-table th {
+    height: 44px;
+    padding: 0 0.875rem;
+    border-bottom: 1px solid hsl(var(--border));
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+  }
+  .enterprise-table td {
+    height: 52px;
+    padding: 0 0.875rem;
+    border-bottom: 1px solid hsl(var(--divider));
+    font-size: 0.8125rem;
+    vertical-align: middle;
+  }
+  .enterprise-table tbody tr:hover {
+    background: hsl(var(--hover));
+  }
+  .dark .enterprise-table tbody tr:hover {
+    background: hsl(var(--card-hover));
   }
 
   /* Animated border */

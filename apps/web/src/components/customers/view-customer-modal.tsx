@@ -397,7 +397,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 <Input type="number" min={1} step={0.01} placeholder="Top-up amount (LKR )…" value={walletInput}
                   onChange={(e) => setWalletInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && topupWallet()} />
-                <Button onClick={topupWallet} disabled={actionLoading || !walletInput} className="gap-1.5 shrink-0 bg-emerald-600 hover:bg-emerald-700">
+                <Button variant="success" onClick={topupWallet} disabled={actionLoading || !walletInput} className="gap-1.5 shrink-0">
                   {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Top Up
                 </Button>
               </div>
@@ -450,7 +450,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                   <Input type="number" min={0.01} step={0.01} placeholder="Payment / advance (LKR)…" value={creditPayInput}
                     onChange={(e) => setCreditPayInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && receiveCreditPayment()} />
-                  <Button onClick={receiveCreditPayment} disabled={actionLoading || !creditPayInput} className="gap-1.5 shrink-0 bg-amber-600 hover:bg-amber-700">
+                  <Button variant="warning" onClick={receiveCreditPayment} disabled={actionLoading || !creditPayInput} className="gap-1.5 shrink-0">
                     {actionLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Receive
                   </Button>
                 </div>

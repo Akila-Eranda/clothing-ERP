@@ -1598,7 +1598,8 @@ export default function CreatePOPage() {
                 size="sm"
                 onClick={() => submit(false)}
                 disabled={saving || !supplierId || items.length === 0 || grnPrefillLoading}
-                className="flex-1 gap-1.5 bg-emerald-600 hover:bg-emerald-700 sm:flex-none"
+                variant="success"
+                className="flex-1 gap-1.5 sm:flex-none"
               >
                 <FileText className="h-4 w-4" />
                 <span className="truncate">Create & link GRN</span>

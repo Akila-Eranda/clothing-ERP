@@ -339,7 +339,7 @@ function PaymentModal({
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
-            <Button onClick={submit} disabled={loading || loadingList} className="gap-1.5 min-w-[150px] bg-emerald-600 hover:bg-emerald-700">
+            <Button variant="success" onClick={submit} disabled={loading || loadingList} className="gap-1.5 min-w-[150px]">
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Banknote className="h-3.5 w-3.5" />}
               Record Payment
             </Button>
