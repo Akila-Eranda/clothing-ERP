@@ -239,7 +239,7 @@ export default function GrnPage() {
           </p>
         </div>
         {loading ? (
-          <div className="flex min-h-[420px] h-[min(72vh,calc(100dvh-200px))] items-center justify-center rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <div className="flex min-h-[200px] items-center justify-center rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : (

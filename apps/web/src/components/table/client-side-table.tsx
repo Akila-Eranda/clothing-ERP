@@ -16,16 +16,15 @@ export type AppClientSideTableProps<TData, TValue> = CraftProps<TData, TValue> &
   /** Extra classes on the outer craft card */
   className?: string;
   /**
-   * Main list pages: fill remaining viewport neatly.
-   * Hub embeds with several small tables should pass `fillHeight={false}`.
-   * Defaults to true.
+   * When true, the table body scrolls inside a max-height (no empty gap below short lists).
+   * Defaults to true for list pages. Pass false for compact hub embeds.
    */
   fillHeight?: boolean;
 };
 
 /**
  * App-wide data table — single module for every list page.
- * Styles: `[data-table-craft]` in globals.css (toolbar / rows / pagination).
+ * Card height follows content; long lists scroll inside the body (no bottom empty space).
  */
 export function ClientSideTable<TData, TValue>({
   className,
@@ -40,17 +39,10 @@ export function ClientSideTable<TData, TValue>({
   return (
     <div
       data-table-craft
-      className={cn(
-        "w-full min-w-0",
-        fillHeight
-          ? "flex flex-col min-h-[420px] h-[min(72vh,calc(100dvh-200px))]"
-          : "flex flex-col",
-        className,
-      )}
+      data-fill-height={fillHeight ? "true" : "false"}
+      className={cn("w-full min-w-0 flex flex-col", className)}
     >
-      <div className={cn("min-h-0 w-full", fillHeight ? "flex-1 overflow-hidden" : "w-full")}>
-        <BaseClientSideTable data={rows} pageCount={resolvedPageCount} {...props} />
-      </div>
+      <BaseClientSideTable data={rows} pageCount={resolvedPageCount} {...props} />
     </div>
   );
 }
