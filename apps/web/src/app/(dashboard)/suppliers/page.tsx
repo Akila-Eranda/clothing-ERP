@@ -23,7 +23,8 @@ function buildColumns(
 ): ColumnDef<Supplier>[] {
   return [
     {
-      accessorKey: "name",
+      id: "name",
+      accessorFn: (s) => `${s.name} ${s.contactPerson ?? ""} ${s.phone ?? ""} ${s.email ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title={copy.singular} />,
       cell: ({ row }) => {
         const s = row.original;
@@ -169,17 +170,14 @@ export default function SuppliersPage() {
   );
 
   return (
-    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
-      {/* Header — compact single row */}
+    <div className="page-shell">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">
-          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight flex items-center gap-2">
-            <span>{profile.emoji}</span> {copy.pageTitle}
-          </h1>
+          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">{copy.pageTitle}</h1>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">{copy.subtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchSuppliers} className="gap-1.5">
+          <Button variant="outline" onClick={() => void fetchSuppliers()} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
@@ -189,7 +187,6 @@ export default function SuppliersPage() {
         </div>
       </div>
 
-      {/* Stats — compact 68px cards */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         {STATS.map((s) => (
           <Card
@@ -209,11 +206,24 @@ export default function SuppliersPage() {
         ))}
       </div>
 
-      {/* Table — fills remaining viewport */}
+      {copy.tips.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {copy.tips.map((tip) => (
+            <div
+              key={tip}
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium text-muted-foreground max-w-full"
+            >
+              <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" strokeWidth={1.75} />
+              <span className="truncate">{tip}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <ClientSideTable
           data={suppliers}
           columns={columns}
-          searchableColumns={[{ id: "name", title: copy.nameLabel }]}
+          searchableColumns={[{ id: "name", title: `${copy.nameLabel} / phone / email` }]}
           filterableColumns={[
             {
               id: "isActive",
@@ -226,19 +236,6 @@ export default function SuppliersPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
         />
-
-      {/* Tips — compact chips */}
-      <div className="flex flex-wrap gap-2">
-        {copy.tips.map((tip) => (
-          <div
-            key={tip}
-            className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium text-muted-foreground max-w-full"
-          >
-            <Lightbulb className="h-3.5 w-3.5 text-amber-600 shrink-0" strokeWidth={1.75} />
-            <span className="truncate">{tip}</span>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }

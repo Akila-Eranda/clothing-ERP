@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Tag, Plus, Package, RefreshCw } from "lucide-react";
+import { Tag, Plus, Package, RefreshCw, FolderTree, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
@@ -126,16 +127,24 @@ export default function CategoriesPage() {
   };
 
   const columns = buildColumns(handleDelete, handleAddSub);
+  const subCount = categories.reduce((s, c) => s + c.children.length, 0);
+  const productCount = flatRows.reduce((s, c) => s + c._count.products, 0);
+  const STATS = [
+    { label: "Categories", value: categories.length, icon: Tag, color: "text-slate-600 dark:text-slate-300", bg: "bg-slate-500/15", tint: "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent" },
+    { label: "Subcategories", value: subCount, icon: FolderTree, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Products", value: productCount, icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Active roots", value: categories.filter((c) => c.isActive).length, icon: Layers, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+  ];
 
   return (
-    <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+    <div className="page-shell">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">
           <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Categories</h1>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">Organize products into categories and subcategories</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={fetchCategories} className="gap-1.5">
+          <Button variant="outline" onClick={() => void fetchCategories()} className="gap-1.5">
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
@@ -145,20 +154,23 @@ export default function CategoriesPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-[18px] border bg-card h-[68px] px-4 py-2 flex flex-col justify-center overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
-          <p className="text-[22px] font-bold leading-none tabular-nums">{categories.length}</p>
-          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Categories</p>
-        </div>
-        <div className="rounded-[18px] border bg-card h-[68px] px-4 py-2 flex flex-col justify-center overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent">
-          <p className="text-[22px] font-bold leading-none tabular-nums text-primary">{categories.reduce((s, c) => s + c.children.length, 0)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Subcategories</p>
-        </div>
-        <div className="rounded-[18px] border bg-card h-[68px] px-4 py-2 flex flex-col justify-center overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
-          <p className="text-[22px] font-bold leading-none tabular-nums text-emerald-600">{flatRows.reduce((s, c) => s + c._count.products, 0)}</p>
-          <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">Total Products</p>
-        </div>
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        {STATS.map((s) => (
+          <Card
+            key={s.label}
+            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
+          >
+            <CardContent className="h-[68px] p-4 flex items-center gap-3">
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[22px] font-bold leading-none tabular-nums truncate">{s.value}</p>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <ClientSideTable

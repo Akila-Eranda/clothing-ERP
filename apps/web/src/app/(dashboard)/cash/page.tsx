@@ -578,7 +578,7 @@ export default function CashManagementPage() {
           </div>
         </div>
 
-        <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+        <div className="page-shell">
 
           {/* Date filter — auto-applies to KPI, history & variance */}
           <div className="bg-card rounded-xl p-3 flex items-center gap-2 flex-wrap  border border-border">

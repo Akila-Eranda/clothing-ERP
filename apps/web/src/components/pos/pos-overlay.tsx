@@ -285,6 +285,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [categories, setCategories] = React.useState<string[]>(["All"]);
   const [activeCategory, setActiveCategory] = React.useState("All");
   const [search, setSearch] = React.useState("");
+  const [productPage, setProductPage] = React.useState(1);
+  const [productTotalPages, setProductTotalPages] = React.useState(1);
+  const [productTotal, setProductTotal] = React.useState(0);
+  const POS_PAGE_SIZE = 20;
   const [activeNav, setActiveNav] = React.useState("products");
   const [sidebarHidden, setSidebarHidden] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -749,19 +753,67 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     return () => { cancelled = true; };
   }, [checkoutOpen]);
 
-  const loadProducts = React.useCallback(async (opts?: { silent?: boolean }) => {
+  const loadProducts = React.useCallback(async (opts?: {
+    silent?: boolean;
+    page?: number;
+    search?: string;
+    category?: string;
+  }) => {
     if (!opts?.silent) setLoading(true);
+    const page = Math.max(1, opts?.page ?? productPage);
+    const q = (opts?.search ?? search).trim();
+    const cat = opts?.category ?? activeCategory;
     try {
-      const r = await api.get<ProductItem[]>("/pos/products?limit=12000");
-      const raw = Array.isArray(r.data) ? r.data : [];
-      setProducts(raw);
-      setCategories(["All", ...Array.from(new Set(raw.map((p) => p.category).filter(Boolean)))]);
+      const params = new URLSearchParams({
+        limit: String(POS_PAGE_SIZE),
+        page: String(page),
+      });
+      if (q) params.set("search", q);
+      if (cat && cat !== "All") params.set("category", cat);
+      type PagePayload = {
+        items: ProductItem[];
+        page: number;
+        limit: number;
+        total: number;
+        totalPages: number;
+        categories?: string[];
+      };
+      const r = await api.get<ProductItem[] | PagePayload>(`/pos/products?${params.toString()}`);
+      const raw = r.data;
+      if (Array.isArray(raw)) {
+        setProducts(raw);
+        setProductPage(1);
+        setProductTotalPages(1);
+        setProductTotal(raw.length);
+        setCategories(["All", ...Array.from(new Set(raw.map((p) => p.category).filter(Boolean)))]);
+      } else {
+        const items = Array.isArray(raw?.items) ? raw.items : [];
+        setProducts(items);
+        setProductPage(raw?.page ?? page);
+        setProductTotalPages(Math.max(1, raw?.totalPages ?? 1));
+        setProductTotal(raw?.total ?? items.length);
+        if (raw?.categories?.length) {
+          setCategories(["All", ...raw.categories.filter(Boolean)]);
+        }
+      }
     } catch {
       if (!opts?.silent) toast.error("Failed to load products");
     } finally {
       if (!opts?.silent) setLoading(false);
     }
-  }, []);
+  }, [productPage, search, activeCategory]);
+
+  // Server-paginated catalog: reload page 1 when search / category changes
+  React.useEffect(() => {
+    if (!posOpen || !shiftReady) return;
+    const q = search.trim();
+    // Don't hammer API while typing a barcode scan into the search box
+    if (q.length > 0 && q.length < 2 && !isLikelyBarcodeScan(q)) return;
+    const handle = window.setTimeout(() => {
+      void loadProducts({ page: 1, search: q, category: activeCategory });
+    }, q ? 280 : 0);
+    return () => window.clearTimeout(handle);
+  }, [search, activeCategory, posOpen, shiftReady]); // eslint-disable-line react-hooks/exhaustive-deps — loadProducts identity changes often
 
   const applySoldStockLocally = React.useCallback((sold: { variantId: string; quantity: number }[]) => {
     if (!sold.length) return;
@@ -933,7 +985,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   React.useEffect(() => { if (activeNav === "vouchers" && posOpen) loadVouchers(); }, [activeNav, posOpen, loadVouchers]);
 
-  React.useEffect(() => { if (posOpen && shiftReady) { loadProducts(); loadHeldBills(); loadTodayStats(); } }, [posOpen, shiftReady, loadProducts, loadHeldBills, loadTodayStats]);
+  React.useEffect(() => { if (posOpen && shiftReady) { loadHeldBills(); loadTodayStats(); } }, [posOpen, shiftReady, loadHeldBills, loadTodayStats]);
   React.useEffect(() => {
     if (!posOpen || !shiftReady) return;
     const t = setInterval(loadTodayStats, 30_000);
@@ -1039,8 +1091,41 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     return () => clearTimeout(t);
   }, [inlineCustomerSearch, activeNav, posOpen, fetchPosCustomers]);
 
-  const productGroups = React.useMemo(() => { const m = new Map<string,ProductItem[]>(); for (const p of products) m.set(p.productName,[...(m.get(p.productName)||[]),p]); return m; }, [products]);
+  const productGroups = React.useMemo(() => {
+    const m = new Map<string, ProductItem[]>();
+    for (const p of products) {
+      const arr = m.get(p.productName);
+      if (arr) arr.push(p);
+      else m.set(p.productName, [p]);
+    }
+    return m;
+  }, [products]);
   const getVariants = React.useCallback((n:string)=>productGroups.get(n)||[], [productGroups]);
+  /** O(1) barcode / SKU lookup for supermarket-scale catalogs */
+  const barcodeIndex = React.useMemo(() => {
+    const m = new Map<string, ProductItem[]>();
+    const add = (key: string | undefined, p: ProductItem) => {
+      const k = key?.trim().toLowerCase();
+      if (!k) return;
+      const arr = m.get(k);
+      if (arr) arr.push(p);
+      else m.set(k, [p]);
+    };
+    for (const p of products) {
+      add(p.barcode, p);
+      add(p.sku, p);
+    }
+    return m;
+  }, [products]);
+  const lookupLocalBarcode = React.useCallback((code: string): ProductItem[] => {
+    const matches = new Map<string, ProductItem>();
+    for (const key of barcodeLookupCandidates(code)) {
+      const rows = barcodeIndex.get(key.toLowerCase());
+      if (!rows) continue;
+      for (const p of rows) matches.set(p.variantId, p);
+    }
+    return [...matches.values()];
+  }, [barcodeIndex]);
   const totalAmt = React.useMemo(
     () => calcPosAmountDue(
       items.map((i) => ({
@@ -1141,45 +1226,28 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
     return top;
   }, [products, recentScans, liked]);
-  const filteredProducts = React.useMemo(() => products.filter((p) => {
-    const q = search.toLowerCase().trim();
-    const qBase = q.replace(/\d{3}$/, "");
-    const matchesQ = !q
-      || p.productName.toLowerCase().includes(q)
-      || p.sku.toLowerCase().includes(q)
-      || (p.barcode && p.barcode.toLowerCase().includes(q))
-      || (p.barcode && qBase && qBase !== q && p.barcode.toLowerCase().includes(qBase))
-      || (qBase && qBase !== q && p.sku.toLowerCase().includes(qBase))
-      || p.variantName.toLowerCase().includes(q)
-      || p.category?.toLowerCase().includes(q)
-      || p.color?.toLowerCase().includes(q)
-      || p.size?.toLowerCase().includes(q)
-      || p.material?.toLowerCase().includes(q)
-      || p.style?.toLowerCase().includes(q);
-    return matchesQ && (activeCategory === "All" || p.category === activeCategory);
-  }), [products, search, activeCategory]);
-
+  /** Current page only (~20) — server already filtered by search/category */
+  const filteredProducts = products;
   const productCards = React.useMemo(() => {
     const map = new Map<string, { rep: ProductItem; variants: ProductItem[]; totalStock: number; minPrice: number; maxPrice: number }>();
     for (const p of filteredProducts) {
       const key = p.productId || p.productName;
-      const existing = map.get(key);
-      if (!existing) {
-        const variants = getVariants(p.productName).filter((v) =>
-          activeCategory === "All" || v.category === activeCategory,
-        );
-        const list = variants.length ? variants : [p];
-        map.set(key, {
-          rep: p,
-          variants: list,
-          totalStock: list.reduce((s, v) => s + v.stock, 0),
-          minPrice: Math.min(...list.map((v) => v.unitPrice)),
-          maxPrice: Math.max(...list.map((v) => v.unitPrice)),
-        });
-      }
+      if (map.has(key)) continue;
+      const variants = productGroups.get(p.productName) || [p];
+      const list = variants.length ? variants : [p];
+      map.set(key, {
+        rep: p,
+        variants: list,
+        totalStock: list.reduce((s, v) => s + v.stock, 0),
+        minPrice: Math.min(...list.map((v) => v.unitPrice)),
+        maxPrice: Math.max(...list.map((v) => v.unitPrice)),
+      });
     }
     return Array.from(map.values());
-  }, [filteredProducts, getVariants, activeCategory]);
+  }, [filteredProducts, productGroups]);
+
+  const catalogTotalCount = productTotal;
+  const filteredTotalCount = productTotal;
 
   const openAddPopup = React.useCallback((p: ProductItem, matchList?: ProductItem[]) => {
     const variants = matchList && matchList.length > 0
@@ -1307,8 +1375,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       commitAddProduct(chosen, 1, { keepSearchFocus: true });
     };
 
-    // Fast path: resolve from local catalog cache before waiting on the API
-    const localMatches = findAllProductsByBarcodeCode(trimmed, products);
+    // Fast path: resolve from local barcode index (O(1)) before waiting on the API
+    const localMatches = lookupLocalBarcode(trimmed);
     if (localMatches.length > 1) {
       const pick = localMatches.find((p) => p.stock > 0) ?? localMatches[0];
       finishScan(pick, localMatches);
@@ -1372,7 +1440,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
 
     if (!found) {
-      found = findProductByBarcodeCode(trimmed, products);
+      found = lookupLocalBarcode(trimmed)[0] ?? findProductByBarcodeCode(trimmed, products);
       if (found) {
         const siblings = getVariants(found.productName);
         if (siblings.length > 1) {
@@ -1396,7 +1464,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       return;
     }
     finishScan(found);
-  }, [products, openAddPopup, commitAddProduct, soundAlerts, getVariants, confirmQtyPopup]);
+  }, [products, openAddPopup, commitAddProduct, soundAlerts, getVariants, confirmQtyPopup, lookupLocalBarcode]);
 
   const handleCardClick = React.useCallback((p: ProductItem) => {
     openAddPopup(p);
@@ -2237,7 +2305,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p></div>):(
+          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p><p className="text-xs mt-1 opacity-70">Scan barcode or search</p></div>):(
+            <>
             <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
               {productCards.map((card, pIdx)=>{
                 const p = card.rep;
@@ -2250,19 +2319,46 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   : `LKR ${formatNumber(card.minPrice)}`;
                 const thumbBg = getCardBg(p.color, lightUi);
                 return (
-                  <motion.div key={p.productId || p.productName} whileTap={{scale:0.96}} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-all hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
+                  <div key={p.productId || p.productName} role="button" tabIndex={0} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-colors hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
                     <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":thumbBg}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={thumbBg} iconClassName="h-10 w-10" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"var(--pos-warn-pill)":"#16a34a"}}>{varStock}</div>
                       {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:allowNegativeStock?"var(--pos-warn-pill)":"rgba(220,38,38,0.85)",color:"#fff"}}>{allowNegativeStock?"Stock 0 — sell OK":"Out of Stock"}</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"var(--pos-warn-pill)",color:"#fff"}}>Low Stock</div>}
-                      <button onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                      <button type="button" onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
                     <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"var(--pos-muted)"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
-                  </motion.div>
+                  </div>
                 );
               })}
             </div>
+            {productTotalPages > 1 && (
+              <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                <button
+                  type="button"
+                  disabled={loading || productPage <= 1}
+                  onClick={() => void loadProducts({ page: productPage - 1 })}
+                  className="h-9 px-3 rounded-lg text-xs font-bold disabled:opacity-40"
+                  style={{ background: "var(--pos-input)", color: "var(--pos-text)" }}
+                >
+                  ← Prev
+                </button>
+                <p className="text-[11px] tabular-nums" style={{ color: "var(--pos-muted)" }}>
+                  Page {productPage} / {productTotalPages}
+                  {productTotal > 0 ? ` · ${productTotal.toLocaleString()} items` : ""}
+                </p>
+                <button
+                  type="button"
+                  disabled={loading || productPage >= productTotalPages}
+                  onClick={() => void loadProducts({ page: productPage + 1 })}
+                  className="h-9 px-3 rounded-lg text-xs font-bold disabled:opacity-40"
+                  style={{ background: "var(--pos-input)", color: "var(--pos-text)" }}
+                >
+                  Next →
+                </button>
+              </div>
+            )}
+            </>
           )}
         </div>
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"var(--pos-border)"}}>
@@ -2279,7 +2375,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <button
                   key={s.id}
                   type="button"
-                  onClick={() => { if (product) handleAddProduct(product); else toast.info("Product not in catalog cache — scan again"); }}
+                  onClick={() => { if (product) handleAddProduct(product); else toast.info("Not on this page — scan barcode again"); }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b hover:bg-white/5 transition-colors text-left"
                   style={{borderColor:"var(--pos-border)"}}
                 >

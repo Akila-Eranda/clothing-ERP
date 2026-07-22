@@ -1416,115 +1416,155 @@ export class PosService {
     return insights;
   }
 
-  async getProducts(tenantId: string, branchId: string, opts?: { search?: string; limit?: number; supplierId?: string }) {
+  async getProducts(
+    tenantId: string,
+    branchId: string,
+    opts?: {
+      search?: string;
+      limit?: number;
+      page?: number;
+      category?: string;
+      supplierId?: string;
+    },
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    // Supermarket catalogs can be 5k–10k SKUs; keep local POS cache complete for instant scan.
-    const take = Math.min(Math.max(opts?.limit ?? 10000, 1), 15000);
+    const paginated = opts?.page != null && opts.page > 0;
+    const take = paginated
+      ? Math.min(Math.max(opts?.limit ?? 20, 1), 100)
+      : Math.min(Math.max(opts?.limit ?? 1500, 1), 15000);
+    const page = paginated ? Math.max(1, opts!.page!) : 1;
+    const skip = paginated ? (page - 1) * take : 0;
     const search = opts?.search?.trim();
-    const variants = await this.prisma.productVariant.findMany({
-      where: {
-        isActive: true,
-        product: { tenantId, status: 'ACTIVE' },
-        ...(opts?.supplierId
-          ? {
-              supplierAssignments: {
-                some: { tenantId, supplierId: opts.supplierId },
-              },
-            }
-          : {}),
-        ...(search
-          ? {
-              OR: [
-                { sku: { contains: search, mode: 'insensitive' } },
-                { barcode: { contains: search, mode: 'insensitive' } },
-                { name: { contains: search, mode: 'insensitive' } },
-                { product: { name: { contains: search, mode: 'insensitive' } } },
-                { product: { barcode: { contains: search, mode: 'insensitive' } } },
-                ...(opts?.supplierId
-                  ? [{
-                      supplierAssignments: {
-                        some: {
-                          tenantId,
-                          supplierId: opts.supplierId,
-                          supplierProductCode: { contains: search, mode: 'insensitive' as const },
-                        },
-                      },
-                    }]
-                  : [{
-                      supplierAssignments: {
-                        some: {
-                          tenantId,
-                          supplierProductCode: { contains: search, mode: 'insensitive' as const },
-                        },
-                      },
-                    }]),
-              ],
-            }
+    const category = opts?.category?.trim();
+    const where = {
+      isActive: true,
+      product: {
+        tenantId,
+        status: 'ACTIVE' as const,
+        ...(category && category !== 'All'
+          ? { category: { name: { equals: category, mode: 'insensitive' as const } } }
           : {}),
       },
-      select: {
-        id: true,
-        productId: true,
-        name: true,
-        sku: true,
-        barcode: true,
-        sellingPrice: true,
-        costPrice: true,
-        mrp: true,
-        color: true,
-        size: true,
-        material: true,
-        style: true,
-        images: true,
-        sortOrder: true,
-        product: {
-          select: {
-            name: true,
-            barcode: true,
-            taxRate: true,
-            images: true,
-            productKind: true,
-            unit: true,
-            allowDecimalSelling: true,
-            weightScaleReady: true,
-            warrantyMonths: true,
-            category: { select: { name: true } },
+      ...(opts?.supplierId
+        ? {
+            supplierAssignments: {
+              some: { tenantId, supplierId: opts.supplierId },
+            },
+          }
+        : {}),
+      ...(search
+        ? {
+            OR: [
+              { sku: { contains: search, mode: 'insensitive' as const } },
+              { barcode: { contains: search, mode: 'insensitive' as const } },
+              { name: { contains: search, mode: 'insensitive' as const } },
+              { product: { name: { contains: search, mode: 'insensitive' as const } } },
+              { product: { barcode: { contains: search, mode: 'insensitive' as const } } },
+              ...(opts?.supplierId
+                ? [{
+                    supplierAssignments: {
+                      some: {
+                        tenantId,
+                        supplierId: opts.supplierId,
+                        supplierProductCode: { contains: search, mode: 'insensitive' as const },
+                      },
+                    },
+                  }]
+                : [{
+                    supplierAssignments: {
+                      some: {
+                        tenantId,
+                        supplierProductCode: { contains: search, mode: 'insensitive' as const },
+                      },
+                    },
+                  }]),
+            ],
+          }
+        : {}),
+    };
+
+    const includeImages = take <= 100;
+    const [total, variants, categoryRows] = await Promise.all([
+      paginated
+        ? this.prisma.productVariant.count({ where })
+        : Promise.resolve(0),
+      this.prisma.productVariant.findMany({
+        where,
+        select: {
+          id: true,
+          productId: true,
+          name: true,
+          sku: true,
+          barcode: true,
+          sellingPrice: true,
+          costPrice: true,
+          mrp: true,
+          color: true,
+          size: true,
+          material: true,
+          style: true,
+          sortOrder: true,
+          ...(includeImages ? { images: true } : {}),
+          product: {
+            select: {
+              name: true,
+              barcode: true,
+              taxRate: true,
+              productKind: true,
+              unit: true,
+              allowDecimalSelling: true,
+              weightScaleReady: true,
+              warrantyMonths: true,
+              ...(includeImages ? { images: true } : {}),
+              category: { select: { name: true } },
+            },
+          },
+          supplierAssignments: opts?.supplierId
+            ? {
+                where: { tenantId, supplierId: opts.supplierId },
+                select: {
+                  supplierId: true,
+                  supplierProductCode: true,
+                  leadTimeDays: true,
+                  lastBuyingPrice: true,
+                  isPreferred: true,
+                  minOrderQty: true,
+                  isActive: true,
+                },
+                take: 1,
+              }
+            : false,
+          inventory: {
+            where: { branchId: resolvedBranchId },
+            select: { quantity: true, reservedQty: true },
+            take: 1,
           },
         },
-        supplierAssignments: opts?.supplierId
-          ? {
-              where: { tenantId, supplierId: opts.supplierId },
-              select: {
-                supplierId: true,
-                supplierProductCode: true,
-                leadTimeDays: true,
-                lastBuyingPrice: true,
-                isPreferred: true,
-                minOrderQty: true,
-                isActive: true,
-              },
-              take: 1,
-            }
-          : false,
-        inventory: {
-          where: { branchId: resolvedBranchId },
-          select: { quantity: true, reservedQty: true },
-          take: 1,
-        },
-      },
-      orderBy: [{ product: { name: 'asc' } }, { name: 'asc' }],
-      take,
-    });
+        orderBy: [{ product: { name: 'asc' } }, { name: 'asc' }],
+        ...(paginated ? { skip, take } : { take }),
+      }),
+      paginated && page === 1
+        ? this.prisma.category.findMany({
+            where: { tenantId, products: { some: { status: 'ACTIVE', variants: { some: { isActive: true } } } } },
+            select: { name: true },
+            orderBy: { name: 'asc' },
+            take: 200,
+          })
+        : Promise.resolve([] as { name: string }[]),
+    ]);
 
     const mapped = variants.map((v) => {
       const onHand = v.inventory[0]?.quantity ?? 0;
       const reserved = v.inventory[0]?.reservedQty ?? 0;
       const available = Math.max(0, onHand - reserved);
       const assignment = Array.isArray(v.supplierAssignments) ? v.supplierAssignments[0] : undefined;
-      // When filtering by supplier, never return inactive assignments
       if (opts?.supplierId && assignment && assignment.isActive === false) {
         return null;
       }
+      const vImages = includeImages && 'images' in v ? (v as { images?: string[] }).images : undefined;
+      const pImages = includeImages && v.product && 'images' in v.product
+        ? (v.product as { images?: string[] }).images
+        : undefined;
       return {
         assignment,
         variantId:   v.id,
@@ -1547,12 +1587,11 @@ export class PosService {
         unit:        v.product.unit ?? null,
         allowDecimalSelling: v.product.allowDecimalSelling ?? v.product.productKind === 'WEIGHTED',
         weightScaleReady: v.product.weightScaleReady ?? false,
-        /** Available to sell (on hand − reserved) — kept as `stock` for POS compatibility */
         stock: available,
         currentStock: onHand,
         reservedStock: reserved,
         availableStock: available,
-        imageUrl:    v.images?.[0] ?? v.product.images?.[0] ?? null,
+        imageUrl:    vImages?.[0] ?? pImages?.[0] ?? null,
         barcode:     v.barcode ?? v.product.barcode ?? undefined,
         warrantyMonths: v.product.warrantyMonths ?? null,
         supplierId: assignment?.supplierId ?? opts?.supplierId ?? null,
@@ -1564,28 +1603,37 @@ export class PosService {
       };
     }).filter((row): row is NonNullable<typeof row> => row != null);
 
-    if (!opts?.supplierId) {
-      return mapped.map(({ assignment: _a, ...rest }) => rest);
+    let items = mapped.map(({ assignment: _a, ...rest }) => rest);
+    if (opts?.supplierId) {
+      const insights = await this.attachSupplierPurchaseInsights(
+        tenantId,
+        resolvedBranchId,
+        opts.supplierId,
+        mapped.map((m) => ({ variantId: m.variantId, stock: m.stock })),
+      );
+      items = mapped.map(({ assignment: _a, ...m }) => {
+        const insight = insights.get(m.variantId);
+        return {
+          ...m,
+          lastPurchaseDate: insight?.lastPurchaseDate ?? null,
+          lastPurchaseQty: insight?.lastPurchaseQty ?? null,
+          stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
+          soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
+          stockDecreased: insight?.stockDecreased ?? false,
+        };
+      });
     }
 
-    const insights = await this.attachSupplierPurchaseInsights(
-      tenantId,
-      resolvedBranchId,
-      opts.supplierId,
-      mapped.map((m) => ({ variantId: m.variantId, stock: m.stock })),
-    );
+    if (!paginated) return items;
 
-    return mapped.map(({ assignment: _a, ...m }) => {
-      const insight = insights.get(m.variantId);
-      return {
-        ...m,
-        lastPurchaseDate: insight?.lastPurchaseDate ?? null,
-        lastPurchaseQty: insight?.lastPurchaseQty ?? null,
-        stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
-        soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
-        stockDecreased: insight?.stockDecreased ?? false,
-      };
-    });
+    return {
+      items,
+      page,
+      limit: take,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / take)),
+      categories: categoryRows.map((c) => c.name).filter(Boolean),
+    };
   }
 
   async closeDaySession(tenantId: string, branchId: string, cashierId: string, notes?: string) {
@@ -2117,16 +2165,20 @@ export class PosController {
   }
 
   @Get('products')
-  @ApiOperation({ summary: 'Get all active products/variants for POS with current stock' })
+  @ApiOperation({ summary: 'Get POS products/variants with stock (pass page= for 20/page pagination)' })
   getProducts(
     @CurrentUser() user: IAuthUser,
     @Query('search') search?: string,
     @Query('limit') limit?: string,
+    @Query('page') page?: string,
+    @Query('category') category?: string,
     @Query('supplierId') supplierId?: string,
   ) {
     return this.posService.getProducts(user.tenantId, user.branchId ?? '', {
       search,
       limit: limit ? parseInt(limit, 10) : undefined,
+      page: page ? parseInt(page, 10) : undefined,
+      category,
       supplierId,
     });
   }

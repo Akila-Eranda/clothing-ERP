@@ -385,7 +385,7 @@ export default function AppointmentsPage() {
 
   return (
     <ModuleGate module="appointments">
-      <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+      <div className="page-shell">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="min-w-0">
             <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight flex items-center gap-2">

@@ -550,7 +550,7 @@ export default function ServicesPage() {
 
   return (
     <ModuleGate module="workshop">
-      <div className="p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto">
+      <div className="page-shell">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="min-w-0">
