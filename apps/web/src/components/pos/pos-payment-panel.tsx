@@ -122,7 +122,7 @@ export function PosPaymentPanel({
   };
 
   return (
-    <div className="space-y-2 px-3 py-2 border-b" style={{ borderColor: "var(--pos-border)" }}>
+    <div className="space-y-2 px-3 py-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Advanced Payment</span>
         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--pos-input)", color: "var(--pos-muted)" }}>
@@ -176,7 +176,7 @@ export function PosPaymentPanel({
       </div>
 
       {state.allowPartial && hasCreditCustomer && !state.splitMode && (
-        <div className="rounded-xl border px-3 py-2 space-y-2" style={{ background: "rgba(79,110,247,0.08)", borderColor: "rgba(79,110,247,0.25)" }}>
+        <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "rgba(79,110,247,0.08)" }}>
           <p className="text-[10px] font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
             Pay part now — balance goes on customer credit account
           </p>
@@ -191,11 +191,11 @@ export function PosPaymentPanel({
               onChange={(e) => onPayNowAmountChange?.(e.target.value)}
               placeholder={`0 — full bill LKR ${formatNumber(totalAmt)}`}
               className="h-9 text-sm text-white"
-              style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
+              style={{ background: "var(--pos-input)", borderColor: "transparent" }}
             />
           </div>
           {paidTotal > 0 && paidTotal + 0.01 < totalAmt && (
-            <div className="flex justify-between text-xs pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+            <div className="flex justify-between text-xs pt-1">
               <span style={{ color: "var(--pos-muted)" }}>Pay now</span>
               <span className="font-bold tabular-nums" style={{ color: "var(--pos-success-soft)" }}>LKR {formatNumber(paidTotal)}</span>
             </div>
@@ -352,10 +352,13 @@ export function buildCheckoutPayments(
       .filter((p) => p.amount > 0);
   }
   if (state.allowPartial) {
-    const raw = (partialPayAmount?.trim() || (activePayment === "CASH" ? numpad : "")).trim();
+    const raw = (
+      partialPayAmount?.trim()
+      || ((activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") ? numpad : "")
+    ).trim();
     const payNow = parseFloat(raw);
     if (!Number.isNaN(payNow) && payNow > 0 && payNow + 0.01 < totalAmt) {
-      const method = activePayment === "CUSTOMER_CREDIT" ? "CASH" : activePayment;
+      const method = activePayment;
       if (method === "CHEQUE") {
         return [{ method: "CHEQUE", amount: payNow, reference: chequeNumber?.trim() || undefined }];
       }
@@ -368,7 +371,10 @@ export function buildCheckoutPayments(
       return [{ method, amount: payNow }];
     }
   }
-  const cashAmt = activePayment === "CASH" && numpad ? parseFloat(numpad) : totalAmt;
+  const cashAmt =
+    (activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") && numpad
+      ? parseFloat(numpad)
+      : totalAmt;
   const amount = cashAmt || totalAmt;
   if (activePayment === "CHEQUE") {
     return [{ method: "CHEQUE", amount, reference: chequeNumber?.trim() || undefined }];
@@ -378,6 +384,9 @@ export function buildCheckoutPayments(
   }
   if (activePayment === "BANK_TRANSFER" || activePayment === "QR") {
     return [{ method: activePayment, amount, bankAccountId: bankId }];
+  }
+  if (activePayment === "CUSTOMER_CREDIT") {
+    return [{ method: "CUSTOMER_CREDIT", amount }];
   }
   return [{ method: activePayment, amount }];
 }

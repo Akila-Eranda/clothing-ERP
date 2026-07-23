@@ -483,6 +483,29 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (inInput && e.key === "Enter" && !isSearch) {
         return;
       }
+
+      // Checkout: ← → / Tab always switch payment method — even inside card PIN / amount fields
+      if (ctx.checkoutOpen && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        if (e.key === "ArrowLeft" && !e.shiftKey) {
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          cyclePayment(ctx, -1);
+          return;
+        }
+        if (e.key === "ArrowRight" && !e.shiftKey) {
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          cyclePayment(ctx, 1);
+          return;
+        }
+        if (e.key === "Tab") {
+          e.preventDefault();
+          (document.activeElement as HTMLElement | null)?.blur?.();
+          cyclePayment(ctx, e.shiftKey ? -1 : 1);
+          return;
+        }
+      }
+
       if (inInput && !isSearch) return;
       // Barcode search focused → letters type/scan; tool letters need Alt+key
       if (isSearch && !e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
@@ -604,7 +627,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           cyclePayment(ctx, 1);
           return;
         }
-        if (!inInput && ctx.activePayment === "CASH") {
+        if (!inInput && (ctx.activePayment === "CASH" || ctx.activePayment === "CUSTOMER_CREDIT")) {
           if (/^\d$/.test(e.key)) {
             e.preventDefault();
             ctx.handleNumpad(e.key);
@@ -621,7 +644,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
             return;
           }
         }
-        if (!inInput && (e.altKey || ctx.activePayment !== "CASH") && /^[1-9]$/.test(e.key)) {
+        if (!inInput && (e.altKey || (ctx.activePayment !== "CASH" && ctx.activePayment !== "CUSTOMER_CREDIT")) && /^[1-9]$/.test(e.key)) {
           const idx = parseInt(e.key, 10) - 1;
           if (idx < POS_PAY_METHODS.length) {
             e.preventDefault();

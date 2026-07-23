@@ -720,7 +720,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   }, []);
 
   React.useEffect(() => {
-    if (activePayment === "CASH" && payState.allowPartial) {
+    if ((activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") && payState.allowPartial) {
       setPartialPayAmount(numpad);
     }
   }, [numpad, activePayment, payState.allowPartial]);
@@ -1784,9 +1784,18 @@ ${receiptSoftwareCreditHtml()}
         }
       } else {
         if (available <= 0) { toast.error("No credit available — set credit limit on customer profile"); return; }
-        if (totalAmt > available + 0.01) { toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`); return; }
+        const typed = numpad.trim() ? parseFloat(numpad) : totalAmt;
+        const creditAmt = Number.isFinite(typed) && typed > 0 ? Math.min(typed, totalAmt) : totalAmt;
+        if (creditAmt > available + 0.01) {
+          toast.error(`Credit limit exceeded. Available: LKR ${available.toLocaleString()}`);
+          return;
+        }
+        if (creditAmt + 0.01 < totalAmt && !payState.allowPartial) {
+          toast.error("Credit amount is less than total — enable Partial pay or enter the full amount");
+          return;
+        }
         payments.length = 0;
-        payments.push({ method: "CUSTOMER_CREDIT", amount: totalAmt });
+        payments.push({ method: "CUSTOMER_CREDIT", amount: creditAmt });
       }
     }
     if (payMethod === "CARD" && !payState.splitMode) {
@@ -4172,8 +4181,8 @@ ${rows}
                 </div>
             {checkoutOpen && (
               <div className="fixed inset-0 z-[115] flex items-center justify-center p-2 sm:p-4" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
-              <div className="w-full max-w-5xl max-h-[96vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}} onClick={e=>e.stopPropagation()}>
-                <div className="flex items-center justify-between px-4 py-2.5 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}>
+              <div className="w-full max-w-5xl max-h-[96vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col" style={{background:"var(--pos-panel)", boxShadow: "0 25px 50px rgba(0,0,0,0.35)"}} onClick={e=>e.stopPropagation()}>
+                <div className="flex items-center justify-between px-4 py-3 shrink-0">
                   <div className="min-w-0">
                     <h2 className="text-white font-bold text-base">Checkout</h2>
                     <p className="text-xs" style={{color:"var(--pos-muted)"}}>{itemCount()} items · Tax {taxEnabled ? `${taxRate}%` : "off"}</p>
@@ -4190,8 +4199,8 @@ ${rows}
                 </div>
               <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
                 {/* Left: bill + options */}
-                <div className="lg:w-[42%] lg:max-w-md lg:border-r lg:overflow-y-auto shrink-0 flex flex-col" style={{borderColor:"var(--pos-border)"}}>
-                <div className="px-4 py-2.5 border-b space-y-1" style={{borderColor:"var(--pos-border)"}}>
+                <div className="lg:w-[42%] lg:max-w-md lg:overflow-y-auto shrink-0 flex flex-col lg:pr-1" style={{ background: isPosLight ? "var(--pos-elevated)" : "transparent" }}>
+                <div className="px-4 py-2.5 space-y-1">
                   <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
                   {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
                   {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
@@ -4203,9 +4212,9 @@ ${rows}
                     <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
-                  <div className="flex justify-between text-xl font-bold text-white pt-1 border-t sm:hidden" style={{borderColor:"var(--pos-border)"}}><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
                   <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="rounded-xl border px-3 py-2 space-y-2" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
+                    <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "var(--pos-input)" }}>
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-white">Tax</p>
@@ -4235,7 +4244,6 @@ ${rows}
                               style={{
                                 background: taxRate === r ? "#4f6ef7" : "var(--pos-panel)",
                                 color: taxRate === r ? "#fff" : "var(--pos-muted)",
-                                border: `1px solid ${taxRate === r ? "#4f6ef7" : "var(--pos-border)"}`,
                               }}
                             >
                               {r}%
@@ -4244,7 +4252,7 @@ ${rows}
                         </div>
                       )}
                     </div>
-                    <div className="rounded-xl border px-3 py-2 flex items-center justify-between gap-2" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
+                    <div className="rounded-xl px-3 py-2 flex items-center justify-between gap-2" style={{ background: "var(--pos-input)" }}>
                       <div className="min-w-0 flex items-center gap-2">
                         <MessageCircle className="h-4 w-4 shrink-0" style={{ color: waBillEnabled ? "#10b981" : "var(--pos-muted)" }} />
                         <div>
@@ -4278,7 +4286,7 @@ ${rows}
                   payNowAmount={partialPayAmount || (activePayment === "CASH" ? numpad : "")}
                   onPayNowAmountChange={(v) => {
                     setPartialPayAmount(v);
-                    if (activePayment === "CASH") setNumpad(v);
+                    if (activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") setNumpad(v);
                   }}
                   state={payState}
                   onStateChange={patchPayState}
@@ -4288,7 +4296,7 @@ ${rows}
                   bankAccounts={bankAccounts}
                 />
                 {showLoyalty && customer && (
-                  <div className="px-3 py-2 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+                  <div className="px-3 py-2 shrink-0">
                     <label className="text-[10px] font-semibold uppercase tracking-wide block mb-1.5" style={{ color: "var(--pos-muted)" }}>
                       Redeem loyalty points ({customer.loyaltyPoints} available · LKR 0.10/pt)
                     </label>
@@ -4304,13 +4312,13 @@ ${rows}
                         }}
                         placeholder="0"
                         className="h-8 text-xs text-white flex-1"
-                        style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
+                        style={{ background: "var(--pos-input)", borderColor: "transparent" }}
                       />
                       <button
                         type="button"
                         onClick={() => setLoyaltyPoints(Math.min(customer.loyaltyPoints, Math.floor(amountBeforeLoyalty / 0.1)))}
                         className="px-2.5 h-8 rounded-lg text-[10px] font-bold text-white whitespace-nowrap"
-                        style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+                        style={{ background: "var(--pos-input)" }}
                       >
                         Max
                       </button>
@@ -4321,7 +4329,7 @@ ${rows}
 
                 {/* Right: methods + keypad + confirm */}
                 <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto">
-                <div className="flex gap-1.5 px-3 py-2 border-b shrink-0 flex-wrap" style={{borderColor:"var(--pos-border)"}}>
+                <div className="flex gap-1.5 px-3 py-2 shrink-0 flex-wrap">
                   {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>{
                     const active = activePayment === value;
                     return (
@@ -4332,17 +4340,14 @@ ${rows}
                       onClick={()=>setActivePayment(value)}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
-                        "flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all border",
+                        "flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all",
                         active && "pos-cta",
                         touchMode ? "py-2.5" : "py-1.5",
                       )}
                       style={{
                         background: active
                           ? "linear-gradient(135deg,#4f6ef7,#7c3aed)"
-                          : (isPosLight ? "#CBD5E1" : "var(--pos-input)"),
-                        borderColor: active
-                          ? "transparent"
-                          : (isPosLight ? "#475569" : "var(--pos-border)"),
+                          : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
                         color: active ? "#ffffff" : (isPosLight ? "#0F172A" : "var(--pos-text)"),
                       }}
                     >
@@ -4398,11 +4403,6 @@ ${rows}
                       className="w-full h-11 px-3 rounded-xl text-center text-xl text-white outline-none font-mono tracking-[0.35em]"
                       style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
                       onKeyDown={(e)=>{
-                        // Let ← → Home End move the caret — don't bubble to POS payment cycling
-                        if (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Home" || e.key === "End") {
-                          e.stopPropagation();
-                          return;
-                        }
                         if (e.key === "Enter") {
                           e.preventDefault();
                           void handleCheckout();
@@ -4449,28 +4449,70 @@ ${rows}
                     </select>
                   </div>
                 )}
-                {activePayment==="CASH"&&(
+                {(activePayment==="CASH"||activePayment==="CUSTOMER_CREDIT")&&(
                   <div ref={cashPanelRef} className="px-3 py-2 flex-1 flex flex-col min-h-0" style={{borderColor:"var(--pos-border)"}}>
                     <div className="flex items-center justify-between mb-1.5 gap-2">
                       <span className="text-base font-bold" style={{color:"var(--pos-text)"}}>
-                        {payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}
+                        {activePayment === "CUSTOMER_CREDIT"
+                          ? "Credit amount (LKR)"
+                          : payState.allowPartial && (customer?.creditLimit ?? 0) > 0
+                            ? "Paying now (LKR)"
+                            : "Cash Received (LKR)"}
                       </span>
                       <span className="text-[11px] font-mono font-semibold shrink-0" style={{color:"var(--pos-text-soft)"}}>F9 confirm</span>
                       <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                     </div>
-                    <div className="h-12 rounded-xl flex items-center px-3 mb-2 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",color:"var(--pos-success-soft)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
-                    {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
+                    {activePayment === "CUSTOMER_CREDIT" && customer && (
+                      <div className="flex justify-between text-xs mb-2 px-1">
+                        <span style={{color:"var(--pos-muted)"}}>
+                          {customer.name} · available
+                        </span>
+                        <span className="font-bold tabular-nums" style={{color:"var(--pos-success-soft)"}}>
+                          LKR {formatNumber(Math.max(0, (customer.creditLimit ?? 0) - (customer.outstandingBalance ?? 0)))}
+                        </span>
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={numpad}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/[^\d.]/g, "");
+                        const parts = v.split(".");
+                        const clean = parts.length > 2 ? `${parts[0]}.${parts.slice(1).join("")}` : v;
+                        setNumpad(clean);
+                        if (activePayment === "CASH" && payState.allowPartial) setPartialPayAmount(clean);
+                      }}
+                      placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "0.00"}
+                      className="h-12 rounded-xl px-3 mb-2 font-bold text-2xl font-mono outline-none w-full"
+                      style={{
+                        background: activePayment === "CUSTOMER_CREDIT" ? "rgba(79,110,247,0.1)" : "rgba(16,185,129,0.1)",
+                        color: activePayment === "CUSTOMER_CREDIT" ? "var(--pos-accent-soft)" : "var(--pos-success-soft)",
+                        border: "none",
+                      }}
+                    />
+                    {activePayment === "CUSTOMER_CREDIT" && !numpad && (
+                      <p className="text-[10px] mb-2 px-1" style={{ color: "var(--pos-muted)" }}>
+                        Empty = full bill LKR {formatNumber(totalAmt)} on credit
+                      </p>
+                    )}
+                    {activePayment === "CASH" && payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
+                        <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
+                      </div>
+                    )}
+                    {activePayment === "CUSTOMER_CREDIT" && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (
+                      <div className="flex justify-between text-xs mb-2 px-1">
+                        <span style={{color:"var(--pos-muted)"}}>Remaining due</span>
                         <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
                     <div className="grid gap-1.5 flex-1 content-start" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
-                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95 border" style={{
+                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95" style={{
                           background: isQuick ? (isPosLight ? "#94A3B8" : "var(--pos-border)") : isDel ? "rgba(239,68,68,0.15)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
-                          borderColor: isDel ? "rgba(239,68,68,0.45)" : (isPosLight ? "#475569" : "var(--pos-border)"),
                           color: isQuick ? (isPosLight ? "#0F172A" : "var(--pos-text)") : isDel ? "#DC2626" : "var(--pos-text)",
                         }}>
                           {isDel?<Delete className="h-4 w-4 mx-auto" strokeWidth={2.25}/>:k}
@@ -4479,7 +4521,7 @@ ${rows}
                     </div>
                   </div>
                 )}
-                {activePayment!=="CASH"&&(
+                {activePayment!=="CASH"&&activePayment!=="CUSTOMER_CREDIT"&&(
                   <div className="flex-1 px-4 py-6 flex items-center justify-center">
                     <p className="text-sm text-center" style={{color:"var(--pos-muted)"}}>
                       Pay <span className="font-bold text-white">LKR {formatNumber(totalAmt)}</span> via {activePayment.replace(/_/g, " ").toLowerCase()}
@@ -4487,16 +4529,15 @@ ${rows}
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2.5 border-t shrink-0" style={{borderColor:"var(--pos-border)"}}>
+                  <div className="flex justify-between items-center px-4 py-2 shrink-0 rounded-xl mx-3 mb-1" style={{ background: "rgba(16,185,129,0.1)" }}>
                     <span className="text-base font-bold" style={{color:"var(--pos-success-soft)"}}>Change</span>
                     <span className="font-bold font-mono text-xl" style={{color:"var(--pos-success-soft)"}}>LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
-                <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold border transition-all hover:bg-white/10 disabled:opacity-40" style={{
-                    borderColor: isPosLight ? "#64748B" : "var(--pos-border)",
+                <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0">
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold transition-all hover:bg-white/10 disabled:opacity-40" style={{
                     color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)",
-                    background: isPosLight ? "#E2E8F0" : "transparent",
+                    background: isPosLight ? "#E2E8F0" : "var(--pos-input)",
                   }}>
                     Split Bill
                   </button>
@@ -4513,12 +4554,11 @@ ${rows}
                     <span>Confirm Payment</span>
                     <span className="text-xs font-mono" style={{ opacity: 0.9 }}>(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{
-                    borderColor: isPosLight ? "#64748B" : "var(--pos-border)",
-                    background: isPosLight ? "#E2E8F0" : "transparent",
+                  <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center transition-all hover:bg-white/10" style={{
+                    background: isPosLight ? "#E2E8F0" : "var(--pos-input)",
                   }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)"}} strokeWidth={2.25}/></button>
                 </div>
-                <p className="px-3 py-1.5 text-[11px] text-center border-t shrink-0 font-medium" style={{ color: "var(--pos-text-soft)", borderColor: "var(--pos-border)" }}>
+                <p className="px-3 pb-2 text-[11px] text-center shrink-0 font-medium" style={{ color: "var(--pos-text-soft)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
                 </div>
