@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 export type AppTableSearchColumn<TData> = {
   id: string;
   title: string;
-  getValue?: (row: TData) => string | number | null | undefined;
+  getValue?: (row: TData) => string | number | boolean | null | undefined;
 };
 
 export type AppTableFilterColumn<TData> = {
   id: string;
   title: string;
   options: { label: string; value: string }[];
-  getValue?: (row: TData) => string | number | null | undefined;
+  getValue?: (row: TData) => string | number | boolean | null | undefined;
 };
 
 type TableFilterBarProps = {
@@ -95,8 +95,8 @@ export function TableFilterBar({
               )}
             >
               <option value="all">All</option>
-              {f.options.map((o) => (
-                <option key={o.value} value={o.value}>
+              { (f.options ?? []).map((o) => (
+                <option key={String(o.value)} value={String(o.value)}>
                   {o.label}
                 </option>
               ))}
@@ -140,17 +140,23 @@ function onChangeSafe(onChange: (value: string) => void, value: string) {
 
 export function resolveTableFieldValue<TData>(
   row: TData,
-  col: { id: string; getValue?: (row: TData) => string | number | null | undefined },
+  col: { id: string; getValue?: (row: TData) => string | number | boolean | null | undefined },
 ): string {
-  if (col.getValue) {
-    const v = col.getValue(row);
-    return v == null ? "" : String(v);
+  try {
+    if (col.getValue) {
+      const v = col.getValue(row);
+      if (v == null) return "";
+      return String(v);
+    }
+    if (row == null || typeof row !== "object") return "";
+    const record = row as Record<string, unknown>;
+    const v = record[col.id];
+    if (v == null) return "";
+    if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
+    return "";
+  } catch {
+    return "";
   }
-  const record = row as Record<string, unknown>;
-  const v = record[col.id];
-  if (v == null) return "";
-  if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") return String(v);
-  return "";
 }
 
 export function applyTableFilters<TData>(

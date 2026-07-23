@@ -43,12 +43,9 @@ const APP_TABLE_DEFAULTS: TableConfigInput = {
   },
 };
 
-const EMPTY_SEARCH: AppTableSearchColumn<unknown>[] = [];
-const EMPTY_FILTERS: AppTableFilterColumn<unknown>[] = [];
-
 /** Standard pageCount for client-side tables (min 1). */
 export function tablePageCount(rowCount: number, pageSize = DEFAULT_PAGE_SIZE): number {
-  return Math.max(1, Math.ceil(rowCount / pageSize));
+  return Math.max(1, Math.ceil(Math.max(0, rowCount) / pageSize));
 }
 
 type CraftProps<TData, TValue> = Parameters<typeof BaseClientSideTable<TData, TValue>>[0];
@@ -70,7 +67,7 @@ export type AppClientSideTableProps<TData, TValue> = Omit<
 export function ClientSideTable<TData, TValue>({
   className,
   fillHeight,
-  pageCount,
+  pageCount: _pageCount,
   data,
   config,
   filterableColumns,
@@ -78,9 +75,9 @@ export function ClientSideTable<TData, TValue>({
   isShowExportButtons,
   ...props
 }: AppClientSideTableProps<TData, TValue>) {
-  const rows = (data ?? []) as TData[];
-  const searchCols = (searchableColumns ?? EMPTY_SEARCH) as AppTableSearchColumn<TData>[];
-  const filterCols = (filterableColumns ?? EMPTY_FILTERS) as AppTableFilterColumn<TData>[];
+  const rows = React.useMemo(() => (Array.isArray(data) ? data : []) as TData[], [data]);
+  const searchCols = searchableColumns ?? [];
+  const filterCols = filterableColumns ?? [];
   const showFilterBar = searchCols.length > 0 || filterCols.length > 0;
 
   const [search, setSearch] = React.useState("");
@@ -88,45 +85,79 @@ export function ClientSideTable<TData, TValue>({
 
   const deferredSearch = React.useDeferredValue(search);
 
-  const filteredRows = React.useMemo(
+  const filterKey = React.useMemo(
     () =>
-      applyTableFilters(rows, {
+      `${deferredSearch.trim()}|${Object.entries(filterValues)
+        .filter(([, v]) => v)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}:${v}`)
+        .join("&")}`,
+    [deferredSearch, filterValues],
+  );
+
+  const filteredRows = React.useMemo(() => {
+    try {
+      return applyTableFilters(rows, {
         search: deferredSearch,
         searchableColumns: searchCols,
         filterValues,
         filterableColumns: filterCols,
-      }),
-    [rows, deferredSearch, filterValues, searchCols, filterCols],
-  );
+      });
+    } catch {
+      return rows;
+    }
+  }, [rows, deferredSearch, filterValues, searchCols, filterCols]);
 
-  const resolvedPageCount = pageCount ?? tablePageCount(filteredRows.length);
+  // Always derive from filtered rows — parent pageCount is based on unfiltered data
+  // and can crash the craft table when filters shrink the list.
+  const resolvedPageCount = tablePageCount(filteredRows.length);
   const shouldFill = fillHeight ?? filteredRows.length >= FILL_HEIGHT_MIN_ROWS;
 
-  const mergedConfig = createTableConfig({
-    ...APP_TABLE_DEFAULTS,
-    ...config,
-    features: {
-      ...APP_TABLE_DEFAULTS.features,
-      ...config?.features,
-      search: false,
-      filter: false,
-      columnVisibility: config?.features?.columnVisibility ?? false,
-      csvExport: config?.features?.csvExport ?? false,
-      rowSelection: config?.features?.rowSelection ?? false,
-    },
-    pagination: { ...APP_TABLE_DEFAULTS.pagination, ...config?.pagination },
-    search: { ...APP_TABLE_DEFAULTS.search, ...config?.search },
-  });
+  const mergedConfig = React.useMemo(
+    () =>
+      createTableConfig({
+        ...APP_TABLE_DEFAULTS,
+        ...config,
+        features: {
+          ...APP_TABLE_DEFAULTS.features,
+          ...config?.features,
+          search: false,
+          filter: false,
+          columnVisibility: config?.features?.columnVisibility ?? false,
+          csvExport: config?.features?.csvExport ?? false,
+          rowSelection: config?.features?.rowSelection ?? false,
+        },
+        pagination: { ...APP_TABLE_DEFAULTS.pagination, ...config?.pagination },
+        search: { ...APP_TABLE_DEFAULTS.search, ...config?.search },
+      }),
+    [config],
+  );
 
   const searchPlaceholder =
     searchCols.length > 0
-      ? `Search ${searchCols.map((c) => c.title).join(" / ")}…`
-      : "Search…";
+      ? `Search ${searchCols.map((c) => c.title).join(" / ")}...`
+      : "Search...";
 
   const clearAll = () => {
     setSearch("");
     setFilterValues({});
   };
+
+  const safeFilters = filterCols
+    .filter((col) => col && col.id && Array.isArray(col.options))
+    .map((col) => ({
+      id: col.id,
+      title: col.title || col.id,
+      options: col.options.filter((o) => o && o.value != null),
+      value: filterValues[col.id] ?? "",
+      onChange: (value: string) =>
+        setFilterValues((prev) => {
+          const next = { ...prev };
+          if (!value) delete next[col.id];
+          else next[col.id] = value;
+          return next;
+        }),
+    }));
 
   return (
     <div className={cn("flex w-full min-w-0 flex-col gap-3", className)}>
@@ -136,19 +167,7 @@ export function ClientSideTable<TData, TValue>({
           onSearchChange={setSearch}
           searchPlaceholder={searchPlaceholder}
           showSearch={searchCols.length > 0}
-          filters={filterCols.map((col) => ({
-            id: col.id,
-            title: col.title,
-            options: col.options,
-            value: filterValues[col.id] ?? "",
-            onChange: (value) =>
-              setFilterValues((prev) => {
-                const next = { ...prev };
-                if (!value) delete next[col.id];
-                else next[col.id] = value;
-                return next;
-              }),
-          }))}
+          filters={safeFilters}
           onClear={clearAll}
           resultCount={filteredRows.length}
           totalCount={rows.length}
@@ -164,6 +183,7 @@ export function ClientSideTable<TData, TValue>({
       >
         <TableProvider config={mergedConfig}>
           <BaseClientSideTable
+            key={filterKey}
             {...props}
             data={filteredRows}
             pageCount={resolvedPageCount}
