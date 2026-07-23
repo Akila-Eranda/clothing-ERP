@@ -130,7 +130,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
   if (checking) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "var(--pos-overlay)" }}>
-        <Loader2 className="h-10 w-10 animate-spin text-white" />
+        <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#ffffff" }} data-pos-on-accent="" />
       </div>
     );
   }
@@ -189,7 +189,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "var(--pos-border)" }}>
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(16,185,129,0.15)" }}>
-              <Banknote className="h-5 w-5 text-emerald-400" />
+              <Banknote className="h-5 w-5" style={{ color: "var(--pos-success-soft)" }} />
             </div>
             <div>
               <h2 className="text-white font-bold text-lg">Start cash shift</h2>
@@ -257,7 +257,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           </div>
 
           {suggested != null && (
-            <p className="text-[10px] text-emerald-400/80">Suggested from last close: LKR {formatNumber(suggested)}</p>
+            <p className="text-[10px]" style={{ color: "var(--pos-success-soft)" }}>Suggested from last close: LKR {formatNumber(suggested)}</p>
           )}
           <div className="space-y-2">
             <Label className="text-white/70">Opening amount (LKR)</Label>
@@ -308,8 +308,9 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
           <Button
             onClick={() => void handleStart()}
             disabled={submitting || !counterId}
-            className="w-full h-11 gap-2 font-bold"
-            style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+            data-pos-accent=""
+            className="w-full h-11 gap-2 font-bold text-white"
+            style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
             Start Shift

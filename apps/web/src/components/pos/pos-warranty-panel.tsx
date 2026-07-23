@@ -427,7 +427,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             className="h-16 w-16 rounded-2xl flex items-center justify-center"
             style={{ background: "rgba(16,185,129,0.15)" }}
           >
-            <Wrench className="h-8 w-8 text-emerald-400" />
+            <Wrench className="h-8 w-8" style={{ color: "var(--pos-success-soft)" }} />
           </div>
           <div>
             <h3 className="text-white font-bold text-lg">Claim submitted</h3>

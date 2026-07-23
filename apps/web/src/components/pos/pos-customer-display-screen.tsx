@@ -84,7 +84,7 @@ function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?
       {state.discount > 0.001 && (
         <div
           className="flex justify-between items-center rounded-xl px-3 py-2"
-          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "#34d399" }}
+          style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "var(--pos-success-soft, #047857)" }}
         >
           <span className="font-bold">{discLabel}</span>
           <span className="font-black tabular-nums">− {currency} {formatNumber(state.discount)}</span>
@@ -258,7 +258,7 @@ function ThankYouScreen({ state }: { state: CustomerDisplayState }) {
           <p className="text-sm font-semibold uppercase tracking-wide" style={{ color: "#6ee7b7" }}>
             {state.discountPercent ? `You saved ${state.discountPercent}%` : "You saved"}
           </p>
-          <p className="text-3xl font-black" style={{ color: "#34d399" }}>
+          <p className="text-3xl font-black" style={{ color: "var(--pos-success-soft, #34d399)" }}>
             {state.currency} {formatNumber(state.discount)}
           </p>
         </div>
@@ -397,7 +397,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
                     {item.variantName !== "Default" ? item.variantName : item.sku}
                   </p>
                   {(item.lineDiscount ?? 0) > 0.001 && (
-                    <p className="text-xs font-semibold mt-0.5" style={{ color: "#34d399" }}>
+                    <p className="text-xs font-semibold mt-0.5" style={{ color: "var(--pos-success-soft, #34d399)" }}>
                       Disc −{state.currency} {formatNumber(item.lineDiscount ?? 0)}
                     </p>
                   )}

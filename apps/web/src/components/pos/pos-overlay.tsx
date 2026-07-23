@@ -2322,10 +2322,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   <div key={p.productId || p.productName} role="button" tabIndex={0} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-colors hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
                     <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":thumbBg}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={thumbBg} iconClassName="h-10 w-10" />
-                      <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" style={{background:varStock===0?"#dc2626":varStock<=5?"var(--pos-warn-pill)":"#16a34a"}}>{varStock}</div>
+                      <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" data-pos-on-accent="" style={{background:varStock===0?"#dc2626":varStock<=5?"var(--pos-warn-pill)":"#16a34a",color:"#fff"}}>{varStock}</div>
                       {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:allowNegativeStock?"var(--pos-warn-pill)":"rgba(220,38,38,0.85)",color:"#fff"}}>{allowNegativeStock?"Stock 0 — sell OK":"Out of Stock"}</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"var(--pos-warn-pill)",color:"#fff"}}>Low Stock</div>}
-                      <button type="button" onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{background:"#4f6ef7"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                      <button type="button" data-pos-accent="" onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{background:"#4f6ef7",color:"#fff"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
                     <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"var(--pos-muted)"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
                   </div>
@@ -2461,7 +2461,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             <input value={inlineCustomerSearch} onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
             {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
           </div>
-          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold text-white shrink-0 transition-all hover:opacity-90" style={{background:showNewCust?"var(--pos-card)":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none"}}>
+          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90" {...(!showNewCust ? { "data-pos-accent": "" } : {})} style={{background:showNewCust?"var(--pos-card)":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none",color:showNewCust?"var(--pos-accent)":"#ffffff"}}>
             {showNewCust?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{showNewCust?"Cancel":"Register New"}
           </button>
         </div>
@@ -2781,7 +2781,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 {vouchers.map((v)=>(
                   <tr key={v.id} className="border-t" style={{borderColor:"var(--pos-border)"}}>
                     <td className="px-3 py-2 font-mono text-xs text-white">{v.code}</td>
-                    <td className="px-3 py-2 text-xs text-emerald-400">LKR {formatNumber(v.balance)}</td>
+                    <td className="px-3 py-2 text-xs" style={{ color: "var(--pos-success-soft)" }}>LKR {formatNumber(v.balance)}</td>
                     <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(v.initialAmount)}</td>
                     <td className="px-3 py-2 text-xs" style={{color:"var(--pos-text-secondary)"}}>{v.status}</td>
                   </tr>
@@ -3457,7 +3457,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         {pinLocked&&(
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"var(--pos-pin-bg)"}}>
             <div className="flex flex-col items-center gap-2">
-              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
+              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" data-pos-on-accent="" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
               <h2 className="font-bold text-2xl" style={{color:"var(--pos-text)"}}>Switch cashier</h2>
               <p className="text-sm text-center max-w-xs" style={{color:"var(--pos-muted)"}}>
                 Enter your 4-digit PIN — bills will be assigned to you (no re-login)
@@ -3937,7 +3937,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                               </p>
                             )}
                             {lineDisc > 0.001 && (
-                              <p className="text-[10px] font-semibold truncate" style={{color:"#34d399"}}>
+                              <p className="text-[10px] font-semibold truncate" style={{color:"var(--pos-success-soft)"}}>
                                 Disc −LKR {formatNumber(lineDisc)}
                                 {item.discountType === "percentage" && item.discountAmount > 0
                                   ? ` (${item.discountAmount}%)`
@@ -4016,7 +4016,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                     <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
                   </div>
                   {discount > 0 && cartDiscountAmt > 0 && !pendingDiscountApproval && (
-                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.35)",color:"#34d399"}}>
+                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.35)",color:"var(--pos-success-soft)"}}>
                       <span className="font-semibold flex items-center gap-1.5"><Tag className="h-3.5 w-3.5"/>{discount}% cart discount applied</span>
                       <span className="font-bold tabular-nums">−LKR {formatNumber(cartDiscountAmt)}</span>
                     </div>
@@ -4037,11 +4037,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       <span>Sub Total</span>
                       <span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span>
                     </div>
-                    {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
-                    {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"#34d399"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
-                    {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
-                    {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
-                    {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                    {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
+                    {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                    {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                    {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                    {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
                     {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold pt-1" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                     <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                       <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
@@ -4097,11 +4097,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 <div className="lg:w-[42%] lg:max-w-md lg:border-r lg:overflow-y-auto shrink-0 flex flex-col" style={{borderColor:"var(--pos-border)"}}>
                 <div className="px-4 py-2.5 border-b space-y-1" style={{borderColor:"var(--pos-border)"}}>
                   <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
-                  {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
-                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"#34d399"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
-                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
-                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
-                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"#34d399"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
+                  {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
+                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                  {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
+                  {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
+                  {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
                   {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                   <div className="flex justify-between text-sm" style={{color: taxEnabled ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                     <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
@@ -4123,7 +4123,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                           aria-checked={taxEnabled}
                           onClick={() => setCheckoutTaxEnabled(!taxEnabled)}
                           className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                          style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-panel)" }}
+                          style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-toggle-off)" }}
                         >
                           <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${taxEnabled ? "translate-x-5" : ""}`} />
                         </button>
@@ -4164,7 +4164,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                         aria-checked={waBillEnabled}
                         onClick={() => setCheckoutWaBillEnabled(!waBillEnabled)}
                         className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-panel)" }}
+                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-toggle-off)" }}
                       >
                         <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${waBillEnabled ? "translate-x-5" : ""}`} />
                       </button>
@@ -4234,6 +4234,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       type="button"
                       title={`${label} (${idx + 1})`}
                       onClick={()=>setActivePayment(value)}
+                      {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn("flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all border", touchMode ? "py-2.5" : "py-1.5")}
                       style={{
                         background: active ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
@@ -4344,7 +4345,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       <span className="text-[10px] font-mono shrink-0" style={{color:"var(--pos-muted-2)"}}>F9 confirm</span>
                       <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                     </div>
-                    <div className="h-12 rounded-xl flex items-center px-3 mb-2 text-green-400 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
+                    <div className="h-12 rounded-xl flex items-center px-3 mb-2 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",color:"var(--pos-success-soft)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
                     {payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
@@ -4374,8 +4375,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
                   <div className="flex justify-between items-center px-4 py-2.5 border-t shrink-0" style={{borderColor:"var(--pos-border)"}}>
-                    <span className="text-base font-bold text-green-500 dark:text-green-400">Change</span>
-                    <span className="text-green-500 dark:text-green-400 font-bold font-mono text-xl">LKR {formatNumber(changeAmt)}</span>
+                    <span className="text-base font-bold" style={{color:"var(--pos-success-soft)"}}>Change</span>
+                    <span className="font-bold font-mono text-xl" style={{color:"var(--pos-success-soft)"}}>LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
                 <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
@@ -4386,7 +4387,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   }}>
                     Split Bill
                   </button>
-                  <button ref={checkoutConfirmRef} type="button" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>
+                  <button ref={checkoutConfirmRef} type="button" data-pos-accent="" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#ffffff"}}>
                     {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
                     Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
                   </button>
@@ -4424,6 +4425,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             {drawerCash != null && (
               <div
                 className="flex items-center gap-1.5 shrink-0 px-2.5 py-1 rounded-full"
+                data-pos-on-accent=""
                 style={{
                   background: isPosLight ? "#047857" : "rgba(16,185,129,0.2)",
                   border: isPosLight ? "1px solid #065F46" : "1px solid rgba(16,185,129,0.35)",
@@ -4611,10 +4613,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.75)"}}>
             <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-md" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
-              <div className="p-5 text-white text-center" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)"}}>
+              <div className="p-5 text-white text-center" data-pos-on-accent="" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)",color:"#ffffff"}}>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{background:"rgba(255,255,255,0.2)"}}><TrendingUp className="h-6 w-6"/></div>
                 <h2 className="text-base font-bold">Day End Summary</h2>
-                <p className="text-white/70 text-xs">{dayEndSummary.date}</p>
+                <p className="text-xs" style={{color:"rgba(255,255,255,0.75)"}}>{dayEndSummary.date}</p>
               </div>
               <div className="p-4 space-y-2.5 max-h-[70vh] overflow-y-auto">
                 {dayEndSummary.cash && (

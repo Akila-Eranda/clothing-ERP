@@ -599,8 +599,9 @@ export function PosQuantityPopup({
               type="button"
               onClick={submit}
               disabled={unitPriceValue <= 0 || (!allowNegativeStock && (selectedVariant?.stock ?? maxQty) <= 0)}
+              data-pos-accent=""
               className={`flex-[1.35] ${btnH} rounded-xl font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2.5 transition-opacity`}
-              style={{ background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)" }}
+              style={{ background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)", color: "#ffffff" }}
             >
               <ShoppingCart className="h-4 w-4 shrink-0" />
               <span>Add to Cart</span>

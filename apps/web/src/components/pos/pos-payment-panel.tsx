@@ -131,7 +131,7 @@ export function PosPaymentPanel({
       </div>
 
       {tierPct > 0 && customerTier && (
-        <div className="flex justify-between text-xs text-emerald-400 px-1">
+        <div className="flex justify-between text-xs px-1" style={{ color: "var(--pos-success-soft)" }}>
           <span>{customerTier} tier discount ({tierPct}%)</span>
           <span>-LKR {formatNumber(tierAmt)}</span>
         </div>
@@ -147,14 +147,14 @@ export function PosPaymentPanel({
           className="h-8 text-xs text-white flex-1"
           style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
         />
-        <button type="button" onClick={applyCoupon}
+        <button type="button" onClick={applyCoupon} data-pos-accent=""
           className="px-2.5 h-8 rounded-lg text-xs font-bold text-white flex items-center gap-1"
-          style={{ background: "#4f6ef7" }}>
+          style={{ background: "#4f6ef7", color: "#ffffff" }}>
           <Tag className="h-3 w-3" /> Apply
         </button>
       </div>
       {state.couponDiscount > 0 && (
-        <p className="text-[10px] text-emerald-400 px-1">Coupon discount: LKR {formatNumber(state.couponDiscount)}</p>
+        <p className="text-[10px] px-1" style={{ color: "var(--pos-success-soft)" }}>Coupon discount: LKR {formatNumber(state.couponDiscount)}</p>
       )}
 
       <div className="flex items-center justify-between text-xs">
@@ -197,7 +197,7 @@ export function PosPaymentPanel({
           {paidTotal > 0 && paidTotal + 0.01 < totalAmt && (
             <div className="flex justify-between text-xs pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
               <span style={{ color: "var(--pos-muted)" }}>Pay now</span>
-              <span className="text-emerald-400 font-bold tabular-nums">LKR {formatNumber(paidTotal)}</span>
+              <span className="font-bold tabular-nums" style={{ color: "var(--pos-success-soft)" }}>LKR {formatNumber(paidTotal)}</span>
             </div>
           )}
           {onCreditAmt > 0.01 && (
@@ -283,7 +283,7 @@ export function PosPaymentPanel({
           </button>
           <div className="flex justify-between text-xs pt-1">
             <span style={{ color: "var(--pos-muted)" }}>Paid / Due</span>
-            <span className={balance > 0.01 && !state.allowPartial ? "text-amber-400" : "text-emerald-400"}>
+            <span style={{ color: balance > 0.01 && !state.allowPartial ? "var(--pos-warn)" : "var(--pos-success-soft)" }}>
               LKR {formatNumber(paidTotal)} / {formatNumber(totalAmt)}
             </span>
           </div>
@@ -299,7 +299,7 @@ export function PosPaymentPanel({
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--pos-muted)" }}>
                 <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Credit available</span>
-                <span className={creditAvailable < totalAmt ? "text-amber-400" : "text-emerald-400"}>
+                <span style={{ color: creditAvailable < totalAmt ? "var(--pos-warn)" : "var(--pos-success-soft)" }}>
                   LKR {formatNumber(creditAvailable)}
                 </span>
               </div>

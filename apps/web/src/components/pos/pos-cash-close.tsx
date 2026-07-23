@@ -107,7 +107,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
   if (loading) {
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center" style={{ background: "var(--pos-overlay)" }}>
-        <Loader2 className="h-10 w-10 animate-spin text-white" />
+        <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#ffffff" }} data-pos-on-accent="" />
       </div>
     );
   }
