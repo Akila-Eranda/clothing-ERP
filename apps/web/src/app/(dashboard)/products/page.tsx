@@ -25,6 +25,24 @@ const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning
   OUT_OF_STOCK: "danger",
 };
 
+function ProductListThumb({ src }: { src: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [src]);
+  if (!src || broken) {
+    return <Package className="h-4 w-4 text-muted-foreground/40" />;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className="h-full w-full object-cover"
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
+  );
+}
+
 type ProductListRow = {
   rowKey: string;
   productId: string;
@@ -164,12 +182,7 @@ function buildColumns(
         return (
           <div className="flex min-w-0 max-w-[280px] items-center gap-3">
             <div className="h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-muted flex items-center justify-center">
-              {src ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
-              ) : (
-                <Package className="h-4 w-4 text-muted-foreground/40" />
-              )}
+              <ProductListThumb src={src} />
             </div>
             <div className="min-w-0 flex-1 overflow-hidden">
               <OpenRecordButton

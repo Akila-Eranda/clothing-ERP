@@ -247,10 +247,17 @@ function PosProductThumb({
   light?: boolean;
 }) {
   const src = posImageSrc(url);
-  if (src) {
+  const [broken, setBroken] = React.useState(false);
+  React.useEffect(() => { setBroken(false); }, [src]);
+  if (src && !broken) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt={name} className={cn("object-cover", className)} />
+      <img
+        src={src}
+        alt={name}
+        className={cn("object-cover", className)}
+        onError={() => setBroken(true)}
+      />
     );
   }
   return (

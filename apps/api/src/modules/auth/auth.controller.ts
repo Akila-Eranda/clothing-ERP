@@ -37,6 +37,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { IsEmail, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+import { resolveLoginTenantSlug } from '@/shared/tenant-host.helper';
 
 class KcLoginDto {
   @ApiProperty({ example: 'admin@demo.fashionerp.com' })
@@ -75,8 +76,18 @@ export class AuthController {
     @Req() req: Request,
     @Headers('user-agent') userAgent: string,
     @Headers('x-tenant-id') tenantSlug?: string,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+    @Headers('x-forwarded-host') forwardedHost?: string,
   ) {
-    return this.authService.login(dto, req.ip, userAgent, tenantSlug);
+    const resolvedSlug = resolveLoginTenantSlug({
+      headerSlug: tenantSlug,
+      origin,
+      referer,
+      forwardedHost,
+      host: req.headers.host,
+    });
+    return this.authService.login(dto, req.ip, userAgent, resolvedSlug);
   }
 
   @Public()

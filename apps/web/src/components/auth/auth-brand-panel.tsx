@@ -11,20 +11,25 @@ import { formatTenantSlug } from "@/lib/auth-host";
 import { cn } from "@/lib/utils";
 
 interface AuthBrandPanelProps {
-  shopType?: ShopType;
+  shopType?: ShopType | null;
   tenantName?: string | null;
   tenantSubdomain?: string | null;
+  /** True while resolving tenant profile — avoid wrong vertical FOUC */
+  loading?: boolean;
 }
 
 export function AuthBrandPanel({
-  shopType = ShopType.CLOTHING,
+  shopType = null,
   tenantName,
   tenantSubdomain,
+  loading = false,
 }: AuthBrandPanelProps) {
-  const profile = getShopProfile(shopType);
-  const verticalFeatures = getVerticalFeatures(shopType).filter((f) => f.live).slice(0, 5);
+  const resolvedType = shopType ?? ShopType.CLOTHING;
+  const profile = getShopProfile(resolvedType);
+  const verticalFeatures = getVerticalFeatures(resolvedType).filter((f) => f.live).slice(0, 5);
   const workspaceLabel = tenantName ?? (tenantSubdomain ? formatTenantSlug(tenantSubdomain) : null);
-  const isTenant = Boolean(workspaceLabel);
+  const isTenant = Boolean(workspaceLabel || tenantSubdomain);
+  const showVertical = Boolean(shopType) && !loading;
 
   return (
     <div className="hidden lg:flex lg:w-1/2 relative flex-col min-h-screen overflow-hidden bg-[#070d1a] text-white">
@@ -64,31 +69,45 @@ export function AuthBrandPanel({
                 <h1 className="text-3xl xl:text-4xl font-black leading-tight mb-3">
                   Welcome to{" "}
                   <span className="bg-gradient-to-r from-indigo-400 to-violet-300 bg-clip-text text-transparent">
-                    {workspaceLabel}
+                    {workspaceLabel ?? "your shop"}
                   </span>
                 </h1>
                 <p className="text-sm text-slate-400 leading-relaxed">
-                  {profile.emoji}{" "}
-                  <span className="text-slate-300 font-medium">{profile.label}</span>
-                  {" — "}sign in to manage POS, inventory, and reports.
+                  {loading || !showVertical ? (
+                    <>Sign in to manage POS, inventory, and reports.</>
+                  ) : (
+                    <>
+                      {profile.emoji}{" "}
+                      <span className="text-slate-300 font-medium">{profile.label}</span>
+                      {" — "}sign in to manage POS, inventory, and reports.
+                    </>
+                  )}
                 </p>
               </div>
 
-              <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">
-                  Your workspace includes
-                </p>
-                <ul className="space-y-2.5">
-                  {verticalFeatures.map((f) => (
-                    <li key={f.label} className="flex items-center gap-2.5 text-sm text-slate-300">
-                      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/20">
-                        <Check className="h-3 w-3 text-indigo-300" />
-                      </span>
-                      {f.label}
-                    </li>
+              {loading || !showVertical ? (
+                <div className="space-y-2.5" aria-hidden>
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="h-5 rounded-md bg-white/5 animate-pulse" style={{ width: `${72 - i * 12}%` }} />
                   ))}
-                </ul>
-              </div>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">
+                    Your workspace includes
+                  </p>
+                  <ul className="space-y-2.5">
+                    {verticalFeatures.map((f) => (
+                      <li key={f.label} className="flex items-center gap-2.5 text-sm text-slate-300">
+                        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-indigo-500/20">
+                          <Check className="h-3 w-3 text-indigo-300" />
+                        </span>
+                        {f.label}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -118,7 +137,7 @@ export function AuthBrandPanel({
                       key={p.type}
                       className={cn(
                         "flex items-center gap-2 rounded-lg border px-3 py-2",
-                        shopType === p.type
+                        shopType != null && shopType === p.type
                           ? "border-indigo-400/40 bg-indigo-500/10"
                           : "border-white/8 bg-white/[0.03]",
                       )}

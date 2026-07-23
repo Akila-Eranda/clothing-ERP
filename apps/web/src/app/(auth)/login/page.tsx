@@ -51,6 +51,7 @@ function LoginContent() {
   const [isMainDomain, setIsMainDomain] = React.useState(false);
   const [hostnameSlug, setHostnameSlug] = React.useState<string | null>(null);
   const [tenantPreview, setTenantPreview] = React.useState<TenantPreview | null>(null);
+  const [tenantPreviewLoading, setTenantPreviewLoading] = React.useState(false);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(45_000);
 
   const urlTenant = searchParams.get("tenant");
@@ -68,9 +69,11 @@ function LoginContent() {
     const slug = hostnameSlug ?? (subdomain.trim() || null);
     if (!slug || isMainDomain) {
       setTenantPreview(null);
+      setTenantPreviewLoading(false);
       return;
     }
     let cancelled = false;
+    setTenantPreviewLoading(true);
     fetch(`${API_BASE}/tenants/resolve/${encodeURIComponent(slug)}`)
       .then(async (res) => {
         if (!res.ok) return null;
@@ -78,9 +81,16 @@ function LoginContent() {
         return (json.data ?? json) as TenantPreview;
       })
       .then((data) => {
-        if (!cancelled && data?.subdomain) setTenantPreview(data);
+        if (cancelled) return;
+        if (data?.subdomain) setTenantPreview(data);
+        else setTenantPreview(null);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!cancelled) setTenantPreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTenantPreviewLoading(false);
+      });
     return () => { cancelled = true; };
   }, [hostnameSlug, subdomain, isMainDomain]);
 
@@ -94,7 +104,8 @@ function LoginContent() {
   }, [urlEmail, setValue]);
 
   const effectiveSlug = hostnameSlug ?? (subdomain.trim() || undefined);
-  const shopType = tenantPreview?.shopType ?? ShopType.CLOTHING;
+  // Never default to CLOTHING on a tenant host — that caused login FOUC
+  const shopType = tenantPreview?.shopType ?? null;
   const showSubdomainField = isMainDomain;
 
   const onSubmit = async (data: LoginForm) => {
@@ -104,6 +115,10 @@ function LoginContent() {
     }
     if (isMainDomain && !subdomain.trim()) {
       toast.error("Enter your shop subdomain to continue");
+      return;
+    }
+    if (!isMainDomain && !effectiveSlug) {
+      toast.error("Open your shop login URL (your-shop.shop.hexalyte.com)");
       return;
     }
     setIsLoading(true);
@@ -140,6 +155,7 @@ function LoginContent() {
         shopType={shopType}
         tenantName={tenantPreview?.name}
         tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
+        loading={Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview)}
       />
 
       {/* Right — login form (always light; see (auth)/layout.tsx) */}
