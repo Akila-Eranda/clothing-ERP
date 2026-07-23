@@ -14,14 +14,13 @@ const FILL_HEIGHT_MIN_ROWS = 12;
 
 const APP_TABLE_DEFAULTS: TableConfigInput = {
   features: {
-    // Toolbar chrome removed product-wide (search / filters / columns / CSV)
-    search: false,
-    filter: false,
+    // Search + faceted filters on by default for every list page
+    search: true,
+    filter: true,
     pagination: true,
     columnVisibility: false,
     csvExport: false,
     rowSelection: false,
-    // Cards toggle adds toolbar noise — keep Table view only by default
     viewToggle: false,
     floatingBar: false,
     advancedFilter: false,
@@ -64,23 +63,25 @@ export function ClientSideTable<TData, TValue>({
   pageCount,
   data,
   config,
-  filterableColumns: _filterableColumns,
-  searchableColumns: _searchableColumns,
-  isShowExportButtons: _isShowExportButtons,
+  filterableColumns,
+  searchableColumns,
+  isShowExportButtons,
   ...props
 }: AppClientSideTableProps<TData, TValue>) {
   const rows = (data ?? []) as TData[];
   const resolvedPageCount = pageCount ?? tablePageCount(rows.length);
   const shouldFill = fillHeight ?? rows.length >= FILL_HEIGHT_MIN_ROWS;
+  const hasSearch = (searchableColumns?.length ?? 0) > 0;
+  const hasFilters = (filterableColumns?.length ?? 0) > 0;
   const mergedConfig = createTableConfig({
     ...APP_TABLE_DEFAULTS,
     ...config,
     features: {
       ...APP_TABLE_DEFAULTS.features,
       ...config?.features,
-      // Always hide toolbar chrome unless a page explicitly re-enables
-      search: config?.features?.search ?? false,
-      filter: config?.features?.filter ?? false,
+      // Auto-enable from props; pages can still force via config.features
+      search: config?.features?.search ?? hasSearch,
+      filter: config?.features?.filter ?? hasFilters,
       columnVisibility: config?.features?.columnVisibility ?? false,
       csvExport: config?.features?.csvExport ?? false,
       rowSelection: config?.features?.rowSelection ?? false,
@@ -94,6 +95,7 @@ export function ClientSideTable<TData, TValue>({
       data-table-craft
       data-table-modern
       data-fill-height={shouldFill ? "true" : "false"}
+      data-has-filters={hasFilters ? "true" : "false"}
       className={cn("w-full min-w-0", className)}
     >
       <TableProvider config={mergedConfig}>
@@ -102,9 +104,9 @@ export function ClientSideTable<TData, TValue>({
           data={rows}
           pageCount={resolvedPageCount}
           config={mergedConfig}
-          filterableColumns={[]}
-          searchableColumns={[]}
-          isShowExportButtons={{ isShow: false }}
+          filterableColumns={filterableColumns ?? []}
+          searchableColumns={searchableColumns ?? []}
+          isShowExportButtons={isShowExportButtons ?? { isShow: false }}
         />
       </TableProvider>
     </div>

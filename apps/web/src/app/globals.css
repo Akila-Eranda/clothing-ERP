@@ -485,27 +485,45 @@
       linear-gradient(180deg, hsl(var(--secondary) / 0.55), hsl(var(--card)));
   }
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col {
-    gap: 0.75rem;
+    gap: 0.5rem;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
   }
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3 {
     flex-wrap: wrap;
     row-gap: 0.5rem;
-    column-gap: 0.625rem;
+    column-gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:first-child {
+    flex: 1 1 14rem;
   }
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) {
-    margin-top: 0.125rem;
-    border-top: 1px dashed hsl(var(--border) / 0.7);
-    padding-top: 0.75rem;
+    margin-top: 0;
+    border-top: none;
+    padding-top: 0;
+    gap: 0.5rem;
+    flex: 0 1 auto;
   }
   .dark [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) {
-    border-top-color: rgba(255, 255, 255, 0.06);
+    border-top-color: transparent;
+  }
+
+  /* Hide noisy "Filter by" label — pills are self-explanatory */
+  [data-table-craft][data-has-filters="true"] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) > span:first-child,
+  [data-table-craft][data-has-filters="true"] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) > p:first-child,
+  [data-table-craft][data-has-filters="true"] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) > .text-muted-foreground:first-child {
+    display: none !important;
   }
 
   /* Search + controls */
   [data-table-craft] > .max-md\:hidden input:not([type="checkbox"]):not([type="radio"]) {
     height: var(--dt-control-h);
     min-width: 14rem;
-    max-width: 26rem;
+    max-width: 28rem;
+    flex: 1 1 16rem;
     border-radius: 0.75rem;
     font-size: 0.8125rem;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
@@ -526,17 +544,31 @@
     border-color: hsl(var(--primary) / 0.35);
   }
 
-  /* Faceted filter pills */
+  /* Faceted filter pills — compact, single-row with search */
   [data-table-craft] > .max-md\:hidden button[role="combobox"],
   [data-table-craft] button[role="combobox"] {
-    border-radius: 9999px !important;
-    padding-inline: 0.875rem;
-    background: hsl(var(--card));
+    border-radius: 0.75rem !important;
+    padding-inline: 0.75rem;
+    background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+    box-shadow: none;
+    font-size: 0.75rem;
+    font-weight: 600;
   }
   .dark [data-table-craft] button[role="combobox"] {
-    background: hsl(var(--secondary));
+    background: hsl(var(--secondary) / 0.8);
+  }
+  [data-table-craft] button[role="combobox"][data-state="open"],
+  [data-table-craft] button[role="combobox"]:has(+ *) {
+    border-color: hsl(var(--primary) / 0.45);
+  }
+  /* Active filter chips stand out */
+  [data-table-craft] button[role="combobox"]:has(span.bg-primary),
+  [data-table-craft] button[role="combobox"]:has(.bg-primary),
+  [data-table-craft] button[role="combobox"].border-primary {
+    background: hsl(var(--primary) / 0.1);
+    border-color: hsl(var(--primary) / 0.45);
+    color: hsl(var(--primary));
   }
 
   /* Flatten nested Card — never stretch into empty space */
