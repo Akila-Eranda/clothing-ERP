@@ -696,7 +696,12 @@ export default function SalesPage() {
       <ClientSideTable
         data={sales}
         columns={columns}
-        searchableColumns={[{ id: "invoice", title: "Invoice / customer" }]}
+        searchableColumns={[{
+          id: "invoice",
+          title: "Invoice / customer",
+          getValue: (s) =>
+            `${s.invoiceNumber} ${s.customer?.name ?? "Walk-in"} ${s.customer?.phone ?? ""}`.trim(),
+        }]}
         filterableColumns={[
           {
             id: "status",
@@ -724,6 +729,7 @@ export default function SalesPage() {
               { label: "Unpaid", value: "Unpaid" },
               { label: "Refunded", value: "Refunded" },
             ],
+            getValue: (s) => paymentLabel(s).label,
           },
         ]}
         isShowExportButtons={{ isShow: true, fileName: `sales-${dateFilter}` }}

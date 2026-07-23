@@ -5,13 +5,19 @@
  * so search, filters, pagination, export, and the modern `[data-table-craft]`
  * shell stay consistent across the product.
  *
- * Stack: toolbar → filters → sticky header body → pagination footer.
+ * Stack: external filter bar → table card → sticky header body → pagination footer.
  *
  * Use for: dashboard list pages, admin lists, hub data grids.
  * Do NOT use for: print/receipt HTML, POS cart line editors, financial
  * statement layouts that need custom row/column spanning.
  */
 export { ClientSideTable, tablePageCount, type AppClientSideTableProps } from "./client-side-table";
+export {
+  TableFilterBar,
+  applyTableFilters,
+  type AppTableFilterColumn,
+  type AppTableSearchColumn,
+} from "./table-filter-bar";
 export { DataTableColumnHeader } from "./data-table-column-header";
 export { TableActionsRow } from "./table-actions-row";
 export { OpenRecordButton } from "./open-record-button";
