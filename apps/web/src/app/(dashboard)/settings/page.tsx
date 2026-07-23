@@ -9,7 +9,7 @@ import {
   Printer, Image, Server, FileText, Upload, MessageCircle,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
-import { RECEIPT_SOFTWARE_CREDIT, receiptThemeColors } from "@/lib/receipt-theme";
+import { RECEIPT_SOFTWARE_CREDIT, receiptMoney, receiptThemeColors } from "@/lib/receipt-theme";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -319,46 +319,55 @@ function AuditLogTab() {
 }
 
 function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string }) {
-  const fs = s.fontSize === "small" ? "10px" : s.fontSize === "large" ? "14px" : "12px";
+  const fs = s.fontSize === "small" ? "10px" : s.fontSize === "large" ? "14px" : "12.5px";
   const logoSrc = resolvePublicAssetUrl(s.logoUrl);
   const c = receiptThemeColors(s.receiptTheme);
-  const rule = { borderTop: `1px dashed ${c.rule}`, margin: "6px 0" } as const;
-  const row = { display: "flex", justifyContent: "space-between", fontSize: "0.85em", color: c.fg } as const;
+  const dash = { borderTop: `1px dashed ${c.rule}`, margin: "7px 0" } as const;
+  const dbl = { borderTop: `2px solid ${c.rule}`, margin: "7px 0" } as const;
+  const row = { display: "flex", justifyContent: "space-between", gap: 8, fontSize: "0.88em", color: c.fg } as const;
+  const muted = { color: c.muted } as const;
   return (
-    <div style={{ fontFamily: "'Courier New', monospace", fontSize: fs, padding: "12px", background: c.bg, color: c.fg, maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: `1px dashed ${c.rule}` }}>
-      {logoSrc && <img src={logoSrc} alt="logo" style={{ maxWidth: "80px", display: "block", margin: "0 auto 4px" }} />}
-      <div style={{ textAlign: "center", fontWeight: 900, fontSize: "1.3em" }}>{s.shopName || "Shop Name"}</div>
-      {s.tagline && <div style={{ textAlign: "center", fontSize: "0.85em", marginBottom: 2, color: c.muted }}>{s.tagline}</div>}
-      {s.address1 && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.address1}</div>}
-      {s.address2 && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.address2}</div>}
-      {s.phone && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.phone}</div>}
-      {s.email && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.email}</div>}
-      {s.website && <div style={{ textAlign: "center", fontSize: "0.85em", color: c.muted }}>{s.website}</div>}
-      {s.headerText && <div style={{ textAlign: "center", fontSize: "0.85em", marginTop: 4, fontStyle: "italic", color: c.muted }}>{s.headerText}</div>}
-      <div style={rule} />
-      <div style={row}><span>Invoice:</span><span><b>INV-00001</b></span></div>
-      <div style={row}><span>Date:</span><span>{new Date().toLocaleDateString()}</span></div>
-      {s.showCashier && <div style={row}><span>Cashier:</span><span>{cashier || "Admin"}</span></div>}
-      {s.showCustomer && <div style={row}><span>Customer:</span><span>Walk-in</span></div>}
-      <div style={rule} />
-      <div style={{ fontSize: "0.8em", fontWeight: "bold", marginBottom: 2 }}>ITEMS</div>
-      <div style={{ fontSize: "0.85em", fontWeight: "bold" }}>Sample T-Shirt (Blue / L)</div>
-      <div style={row}><span>2 x LKR 1,500.00</span><span>LKR 3,000.00</span></div>
-      <div style={rule} />
-      <div style={row}><span>Subtotal</span><span>LKR 3,000.00</span></div>
-      {s.showDiscount && <div style={row}><span>Discount</span><span>-LKR 200.00</span></div>}
-      {s.showTax && <div style={row}><span>Tax (5%)</span><span>LKR 140.00</span></div>}
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.1em", fontWeight: 900, borderTop: `2px solid ${c.rule}`, paddingTop: 4, marginTop: 4, color: c.fg }}><span>TOTAL</span><span>LKR 2,940.00</span></div>
-      <div style={rule} />
-      <div style={row}><span>Payment</span><span><b>CASH</b></span></div>
+    <div style={{ fontFamily: "'Courier New', Courier, monospace", fontSize: fs, lineHeight: 1.35, padding: "12px 10px", background: c.bg, color: c.fg, maxWidth: s.paperWidth === "58mm" ? "220px" : "300px", margin: "0 auto", border: `1px solid ${c.rule}` }}>
+      <div style={{ textAlign: "center", marginBottom: 2 }}>
+        {logoSrc && <img src={logoSrc} alt="logo" style={{ maxWidth: 72, maxHeight: 48, display: "block", margin: "0 auto 6px", objectFit: "contain" }} />}
+        <div style={{ fontWeight: 900, fontSize: "1.35em", letterSpacing: "0.04em", textTransform: "uppercase", lineHeight: 1.2 }}>{s.shopName || "Shop Name"}</div>
+        {s.tagline && <div style={{ fontSize: "0.82em", marginTop: 2, fontWeight: 600, ...muted }}>{s.tagline}</div>}
+        {s.address1 && <div style={{ fontSize: "0.8em", ...muted }}>{s.address1}</div>}
+        {s.address2 && <div style={{ fontSize: "0.8em", ...muted }}>{s.address2}</div>}
+        {s.phone && <div style={{ fontSize: "0.8em", ...muted }}>{s.phone}</div>}
+        {s.email && <div style={{ fontSize: "0.8em", ...muted }}>{s.email}</div>}
+        {s.website && <div style={{ fontSize: "0.8em", ...muted }}>{s.website}</div>}
+        {s.headerText && <div style={{ fontSize: "0.8em", marginTop: 4, fontStyle: "italic", ...muted }}>{s.headerText}</div>}
+      </div>
+      <div style={{ textAlign: "center", fontSize: "0.78em", fontWeight: 900, letterSpacing: "0.18em", textTransform: "uppercase", margin: "8px 0 2px", padding: "3px 0", borderTop: `1px solid ${c.rule}`, borderBottom: `1px solid ${c.rule}` }}>Tax Invoice</div>
+      <div style={row}><span style={muted}>Invoice</span><span><b>INV-00001</b></span></div>
+      <div style={row}><span style={muted}>Date</span><span>{new Date().toLocaleDateString()}</span></div>
+      {s.showCashier && <div style={row}><span style={muted}>Cashier</span><span>{cashier || "Admin"}</span></div>}
+      {s.showCustomer && <div style={row}><span style={muted}>Customer</span><span>Walk-in</span></div>}
+      <div style={dbl} />
+      <div style={{ fontSize: "0.72em", fontWeight: 900, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 4 }}>Items</div>
+      <div style={{ fontSize: "0.9em", fontWeight: 800, marginBottom: 1 }}>Sample T-Shirt (Blue / L)</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.86em" }}>
+        <span style={muted}>2 × {receiptMoney(1500)}</span>
+        <span style={{ fontWeight: 700 }}>{receiptMoney(3000)}</span>
+      </div>
+      <div style={dash} />
+      <div style={row}><span style={muted}>Subtotal</span><span>{receiptMoney(3000)}</span></div>
+      {s.showDiscount && <div style={row}><span style={muted}>Discount</span><span>-{receiptMoney(200)}</span></div>}
+      {s.showTax && <div style={row}><span style={muted}>Tax (5%)</span><span>{receiptMoney(140)}</span></div>}
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "1.12em", fontWeight: 900, borderTop: `2px solid ${c.rule}`, borderBottom: `2px solid ${c.rule}`, padding: "6px 0", margin: "6px 0 4px" }}>
+        <span>TOTAL</span><span>{receiptMoney(2940)}</span>
+      </div>
+      <div style={dash} />
+      <div style={row}><span style={muted}>Payment</span><span><b>CASH</b></span></div>
       {s.showBarcode && (
         <div
-          style={{ textAlign: "center", margin: "8px 0 4px", padding: 6, background: c.barcodePad, borderRadius: 2 }}
+          style={{ textAlign: "center", margin: "10px 0 4px", padding: "8px 4px 4px", background: c.barcodePad, borderTop: `1px dashed ${c.rule}`, borderBottom: `1px dashed ${c.rule}` }}
           dangerouslySetInnerHTML={{ __html: receiptInvoiceBarcodeHtml("INV-00001", s.paperWidth) }}
         />
       )}
-      <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.8em", lineHeight: 1.6, color: c.muted }}>{s.footerText}</div>
-      <div style={{ textAlign: "center", marginTop: 6, fontSize: "0.65em", lineHeight: 1.35, color: c.muted, opacity: 0.9 }}>{RECEIPT_SOFTWARE_CREDIT}</div>
+      <div style={{ textAlign: "center", marginTop: 8, fontSize: "0.82em", lineHeight: 1.55, fontWeight: 600, ...muted }}>{s.footerText}</div>
+      <div style={{ textAlign: "center", marginTop: 8, paddingTop: 4, borderTop: `1px dotted ${c.rule}`, fontSize: "0.62em", lineHeight: 1.4, opacity: 0.95, ...muted }}>{RECEIPT_SOFTWARE_CREDIT}</div>
     </div>
   );
 }

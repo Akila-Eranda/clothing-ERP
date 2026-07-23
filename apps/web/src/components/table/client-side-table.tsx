@@ -14,13 +14,13 @@ const FILL_HEIGHT_MIN_ROWS = 12;
 
 const APP_TABLE_DEFAULTS: TableConfigInput = {
   features: {
-    search: true,
-    filter: true,
+    // Toolbar chrome removed product-wide (search / filters / columns / CSV)
+    search: false,
+    filter: false,
     pagination: true,
-    columnVisibility: true,
-    csvExport: true,
-    // Keep selection so Export CSV works; column is narrow via CSS
-    rowSelection: true,
+    columnVisibility: false,
+    csvExport: false,
+    rowSelection: false,
     // Cards toggle adds toolbar noise — keep Table view only by default
     viewToggle: false,
     floatingBar: false,
@@ -64,6 +64,9 @@ export function ClientSideTable<TData, TValue>({
   pageCount,
   data,
   config,
+  filterableColumns: _filterableColumns,
+  searchableColumns: _searchableColumns,
+  isShowExportButtons: _isShowExportButtons,
   ...props
 }: AppClientSideTableProps<TData, TValue>) {
   const rows = (data ?? []) as TData[];
@@ -72,7 +75,16 @@ export function ClientSideTable<TData, TValue>({
   const mergedConfig = createTableConfig({
     ...APP_TABLE_DEFAULTS,
     ...config,
-    features: { ...APP_TABLE_DEFAULTS.features, ...config?.features },
+    features: {
+      ...APP_TABLE_DEFAULTS.features,
+      ...config?.features,
+      // Always hide toolbar chrome unless a page explicitly re-enables
+      search: config?.features?.search ?? false,
+      filter: config?.features?.filter ?? false,
+      columnVisibility: config?.features?.columnVisibility ?? false,
+      csvExport: config?.features?.csvExport ?? false,
+      rowSelection: config?.features?.rowSelection ?? false,
+    },
     pagination: { ...APP_TABLE_DEFAULTS.pagination, ...config?.pagination },
     search: { ...APP_TABLE_DEFAULTS.search, ...config?.search },
   });
@@ -85,7 +97,15 @@ export function ClientSideTable<TData, TValue>({
       className={cn("w-full min-w-0", className)}
     >
       <TableProvider config={mergedConfig}>
-        <BaseClientSideTable data={rows} pageCount={resolvedPageCount} config={mergedConfig} {...props} />
+        <BaseClientSideTable
+          {...props}
+          data={rows}
+          pageCount={resolvedPageCount}
+          config={mergedConfig}
+          filterableColumns={[]}
+          searchableColumns={[]}
+          isShowExportButtons={{ isShow: false }}
+        />
       </TableProvider>
     </div>
   );

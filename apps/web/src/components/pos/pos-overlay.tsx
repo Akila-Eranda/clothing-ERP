@@ -13,7 +13,7 @@ import { api } from "@/lib/api";
 import { posCashierStorage, type PosActiveCashier } from "@/lib/pos-cashier";
 import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
-import { receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
+import { receiptMoney, receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
@@ -1617,33 +1617,77 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const buildReceiptHtml = React.useCallback((r: SaleReceipt): string => {
     const s: ReceiptSettings = receiptSettings;
-    const pw = s.paperWidth==="58mm"?"58mm":"80mm";
-    const rows=r.items.map(i=>{
-      const listUnit=i.listUnit??(i.qty>0?i.price/i.qty:0);
-      const disc=i.discount??0;
-      const discRow=disc>0?`<div class="row"><span>&nbsp;&nbsp;Discount</span><span>-LKR ${disc.toFixed(2)}</span></div>`:"";
-      return `<div class="iname">${i.name}</div><div class="row"><span>${i.qty} x LKR ${listUnit.toFixed(2)}</span><span>LKR ${i.price.toFixed(2)}</span></div>${discRow}`;
+    const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
+    const now = new Date();
+    const dateStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const rows = r.items.map((i) => {
+      const listUnit = i.listUnit ?? (i.qty > 0 ? i.price / i.qty : 0);
+      const disc = i.discount ?? 0;
+      const discRow = disc > 0
+        ? `<div class="disc"><span>Discount</span><span>-${receiptMoney(disc)}</span></div>`
+        : "";
+      return `<div class="item"><div class="iname">${i.name}</div><div class="irow"><span class="q">${i.qty} × ${receiptMoney(listUnit)}</span><span class="a">${receiptMoney(i.price)}</span></div>${discRow}</div>`;
     }).join("");
-    const logoHtml=s.logoUrl?`<img src="${resolvePublicAssetUrl(s.logoUrl)}" style="max-width:80px;display:block;margin:0 auto 4px"/>`:"";
-    const addr=[s.address1,s.address2].filter(Boolean).map(a=>`<sub>${a}</sub>`).join("");
-    const contactHtml=[s.phone&&`<sub>${s.phone}</sub>`,s.email&&`<sub>${s.email}</sub>`,s.website&&`<sub>${s.website}</sub>`].filter(Boolean).join("");
-    const headerMsg=s.headerText?`<sub style="font-style:italic">${s.headerText}</sub>`:"";
-    const cashierHtml=s.showCashier?`<div class="row"><span>Cashier:</span><span>${activeCashier?.name ?? user?.name??"Admin"}</span></div>`:"";
-    const customerHtml=(s.showCustomer&&r.customerName)?`<div class="row"><span>Customer:</span><span>${r.customerName}</span></div>`:"";
-    const discountHtml=r.discount>0?`<div class="row"><span>Discount</span><span>-LKR ${r.discount.toFixed(2)}</span></div>`:"";
-    const taxHtml=(s.showTax&&r.tax>0)?`<div class="row"><span>Tax</span><span>LKR ${r.tax.toFixed(2)}</span></div>`:"";
+    const logoHtml = s.logoUrl
+      ? `<img class="logo" src="${resolvePublicAssetUrl(s.logoUrl)}" alt=""/>`
+      : "";
+    const addr = [s.address1, s.address2].filter(Boolean).map((a) => `<div class="info">${a}</div>`).join("");
+    const contactHtml = [s.phone, s.email, s.website].filter(Boolean).map((t) => `<div class="info">${t}</div>`).join("");
+    const headerMsg = s.headerText ? `<div class="info" style="font-style:italic;margin-top:4px">${s.headerText}</div>` : "";
+    const cashierHtml = s.showCashier
+      ? `<div class="row"><span>Cashier</span><span>${activeCashier?.name ?? user?.name ?? "Admin"}</span></div>`
+      : "";
+    const customerHtml = s.showCustomer && r.customerName
+      ? `<div class="row"><span>Customer</span><span>${r.customerName}</span></div>`
+      : "";
+    const discountHtml = r.discount > 0
+      ? `<div class="row"><span>Discount</span><span>-${receiptMoney(r.discount)}</span></div>`
+      : "";
+    const taxHtml = s.showTax && r.tax > 0
+      ? `<div class="row"><span>Tax</span><span>${receiptMoney(r.tax)}</span></div>`
+      : "";
     const savingsAmt = r.savings ?? 0;
-    const savingsHtml=savingsAmt>0?`<div class="save"><span>You saved</span><span>LKR ${savingsAmt.toFixed(2)}</span></div>`:"";
-    // Always print scannable invoice barcode (Code128) on sale receipts
-    const barcodeHtml=receiptInvoiceBarcodeHtml(r.invoiceNumber, pw==="58mm"?"58mm":"80mm");
+    const savingsHtml = savingsAmt > 0
+      ? `<div class="save"><span>You saved</span><span>${receiptMoney(savingsAmt)}</span></div>`
+      : "";
+    const cashHtml = r.cashTendered
+      ? `<div class="row"><span>Cash tendered</span><span>${receiptMoney(r.cashTendered)}</span></div><div class="row"><span>Change</span><span><b>${receiptMoney(r.changeDue)}</b></span></div>`
+      : "";
+    const barcodeHtml = receiptInvoiceBarcodeHtml(r.invoiceNumber, pw === "58mm" ? "58mm" : "80mm");
     const css = receiptThemeStyleBlock({
       paperWidth: pw,
       fontSize: s.fontSize,
       // Thermal receipts must always stay printer-friendly (black on white).
       theme: "light",
     });
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt</title><style>${css}</style></head><body>${logoHtml}<h1>${s.shopName||APP_NAME}</h1>${s.tagline?`<sub>${s.tagline}</sub>`:""}${addr}${contactHtml}${headerMsg}<hr class="d"/><div class="row"><span>Invoice:</span><span><b>${r.invoiceNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div>${cashierHtml}${customerHtml}<hr class="d"/><div style="font-size:0.8em;font-weight:bold;margin-bottom:2px">ITEMS</div>${rows}<hr class="d"/><div class="row"><span>Subtotal</span><span>LKR ${r.subtotal.toFixed(2)}</span></div>${discountHtml}${taxHtml}<div class="tot"><span>TOTAL</span><span>LKR ${r.total.toFixed(2)}</span></div>${savingsHtml}<hr class="d"/><div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>${r.cashTendered?`<div class="row"><span>Cash Tendered</span><span>LKR ${r.cashTendered.toFixed(2)}</span></div><div class="row"><span>Change</span><span>LKR ${r.changeDue.toFixed(2)}</span></div>`:""}<hr class="d"/>${barcodeHtml}<div class="foot">${s.footerText||"Thank you for shopping!"}</div>${receiptSoftwareCreditHtml()}</body></html>`;
-  },[user, activeCashier, receiptSettings]);
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Receipt ${r.invoiceNumber}</title><style>${css}</style></head><body>
+<div class="hdr">${logoHtml}<div class="shop">${s.shopName || APP_NAME}</div>${s.tagline ? `<div class="tag">${s.tagline}</div>` : ""}${addr}${contactHtml}${headerMsg}</div>
+<div class="badge">Tax Invoice</div>
+<div class="meta">
+  <div class="row"><span>Invoice</span><span><b>${r.invoiceNumber}</b></span></div>
+  <div class="row"><span>Date</span><span>${dateStr}</span></div>
+  ${cashierHtml}${customerHtml}
+</div>
+<hr class="dbl"/>
+<div class="sec">Items</div>
+${rows}
+<hr class="d"/>
+<div class="sums">
+  <div class="row"><span>Subtotal</span><span>${receiptMoney(r.subtotal)}</span></div>
+  ${discountHtml}${taxHtml}
+  <div class="tot"><span>TOTAL</span><span>${receiptMoney(r.total)}</span></div>
+  ${savingsHtml}
+</div>
+<hr class="d"/>
+<div class="pay">
+  <div class="row"><span>Payment</span><span><b>${r.paymentMethod}</b></span></div>
+  ${cashHtml}
+</div>
+${barcodeHtml}
+<div class="foot">${s.footerText || "Thank you for your purchase"}</div>
+${receiptSoftwareCreditHtml()}
+</body></html>`;
+  }, [user, activeCashier, receiptSettings]);
 
   const reprintSale = React.useCallback(async (saleId: string) => {
     setReprintingId(saleId);
@@ -1970,14 +2014,35 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (!items.length) { toast.error("Cart is empty"); return; }
     const s = receiptSettings;
     const pw = s.paperWidth === "58mm" ? "58mm" : "80mm";
-    const rows = items.map(i => `<div class="iname">${receiptItemName(i.productName, i.variantName)}</div><div class="row"><span>${i.quantity} x LKR ${i.unitPrice.toFixed(2)}</span><span>LKR ${(i.quantity*i.unitPrice).toFixed(2)}</span></div>`).join("");
+    const now = new Date();
+    const dateStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    const rows = items.map((i) =>
+      `<div class="item"><div class="iname">${receiptItemName(i.productName, i.variantName)}</div><div class="irow"><span class="q">${i.quantity} × ${receiptMoney(i.unitPrice)}</span><span class="a">${receiptMoney(i.quantity * i.unitPrice)}</span></div></div>`,
+    ).join("");
+    const logoHtml = s.logoUrl
+      ? `<img class="logo" src="${resolvePublicAssetUrl(s.logoUrl)}" alt=""/>`
+      : "";
     const css = receiptThemeStyleBlock({
       paperWidth: pw,
       fontSize: s.fontSize,
       // Thermal receipts must always stay printer-friendly (black on white).
       theme: "light",
     });
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>${css}</style></head><body><h1>${s.shopName||APP_NAME}</h1><sub>PRE-BILL</sub><hr class="d"/><div class="row"><span>Date:</span><span>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</span></div><div class="row"><span>Cashier:</span><span>${activeCashier?.name ?? user?.name??"Admin"}</span></div><hr class="d"/>${rows}<hr class="d"/><div class="tot"><span>TOTAL</span><span>LKR ${totalAmt.toFixed(2)}</span></div><hr class="d"/><div class="foot">** NOT A RECEIPT — PENDING PAYMENT **</div></body></html>`;
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Pre-Bill</title><style>${css}</style></head><body>
+<div class="hdr">${logoHtml}<div class="shop">${s.shopName || APP_NAME}</div>${s.tagline ? `<div class="tag">${s.tagline}</div>` : ""}</div>
+<div class="badge warn">Pre-Bill</div>
+<div class="meta">
+  <div class="row"><span>Date</span><span>${dateStr}</span></div>
+  <div class="row"><span>Cashier</span><span>${activeCashier?.name ?? user?.name ?? "Admin"}</span></div>
+</div>
+<hr class="dbl"/>
+<div class="sec">Items</div>
+${rows}
+<hr class="d"/>
+<div class="tot"><span>TOTAL</span><span>${receiptMoney(totalAmt)}</span></div>
+<hr class="d"/>
+<div class="foot strong">Not a receipt — pending payment</div>
+</body></html>`;
     try {
       await executeReceiptPrint({ html, printType: "PRE_BILL", settings: s, title: "Pre-Bill" });
       void refreshPrinterStatus();
@@ -3449,7 +3514,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
             touchMode={touchMode}
             onCancel={() => setAddPopup(null)}
             onConfirm={({ qty, unitPrice, variant }) => {
-              const base = variant ?? addPopup.selected;
+              const base =
+                (variant
+                  ? addPopup.variants.find((v) => v.variantId === variant.variantId)
+                  : null) ?? addPopup.selected;
               setAddPopup(null);
               commitAddProduct(base, qty, {
                 unitPrice: unitPrice > 0 ? unitPrice : base.unitPrice,
