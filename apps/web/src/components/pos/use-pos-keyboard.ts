@@ -210,8 +210,11 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       const searchEmpty = isSearch && !searchValue.trim();
 
       if (ctx.pinLocked) {
-        if (/^\d$/.test(e.key)) { ctx.handlePinEntry(e.key); return; }
-        if (e.key === "Backspace") { ctx.handlePinEntry("DEL"); return; }
+        // Capture-phase: block barcode/search from receiving PIN keystrokes
+        e.preventDefault();
+        e.stopPropagation();
+        if (/^\d$/.test(e.key)) { void ctx.handlePinEntry(e.key); return; }
+        if (e.key === "Backspace") { void ctx.handlePinEntry("DEL"); return; }
         if (e.key === "Escape") { ctx.closePos(); return; }
         return;
       }

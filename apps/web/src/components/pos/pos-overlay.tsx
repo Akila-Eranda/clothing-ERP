@@ -1515,6 +1515,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const handlePinEntry = React.useCallback(async (digit: string) => {
     if (pinBusy) return;
+    // Never let PIN digits accumulate in the barcode/search box
+    setSearch("");
     if (digit === "DEL") { setPinEntry(p => p.slice(0, -1)); setPinError(false); return; }
     const next = pinEntry + digit;
     if (next.length > 4) return;
@@ -1531,6 +1533,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       const data = res.data;
       posCashierStorage.set(data.unlockToken, data.cashier);
       setActiveCashier(data.cashier);
+      setSearch("");
       setPinLocked(false);
       setPinEntry("");
       setPinError(false);
@@ -1540,6 +1543,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     } catch (e: unknown) {
       setPinError(true);
       setPinEntry("");
+      setSearch("");
       toast.error((e as Error).message || "Incorrect PIN");
     } finally {
       setPinBusy(false);
@@ -1550,9 +1554,11 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const lockCashier = React.useCallback(() => {
     posCashierStorage.clear();
     setActiveCashier(null);
+    setSearch("");
     setPinLocked(true);
     setPinEntry("");
     setPinError(false);
+    searchRef.current?.blur();
   }, []);
 
 
@@ -2271,7 +2277,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   usePosKeyboard(keyboardCtx as Parameters<typeof usePosKeyboard>[0]);
 
   React.useEffect(() => {
-    if (posOpen && !pinLocked && !waBillOffer) {
+    if (pinLocked) {
+      setSearch("");
+      searchRef.current?.blur();
+      return;
+    }
+    if (posOpen && !waBillOffer) {
       const t = setTimeout(() => searchRef.current?.focus(), 120);
       return () => clearTimeout(t);
     }
@@ -3499,7 +3510,17 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
           </div>
           <div className="flex-1 relative mx-4 max-w-xl">
             <Scan className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
-            <input ref={searchRef} value={search} onChange={e=>setSearch(e.target.value)} onFocus={()=>setActiveNav("products")} placeholder="Scan barcode · search name / SKU / category..." className="pos-input w-full pl-9 pr-16 h-9 text-sm rounded-xl outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",color:"var(--pos-text)"}}/>
+            <input
+              ref={searchRef}
+              value={search}
+              onChange={e=>setSearch(e.target.value)}
+              onFocus={()=>{ if (pinLocked) { searchRef.current?.blur(); return; } setActiveNav("products"); }}
+              readOnly={pinLocked}
+              tabIndex={pinLocked ? -1 : 0}
+              placeholder="Scan barcode · search name / SKU / category..."
+              className="pos-input w-full pl-9 pr-16 h-9 text-sm rounded-xl outline-none"
+              style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",color:"var(--pos-text)"}}
+            />
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"var(--pos-kbd)",color:"var(--pos-muted)"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
