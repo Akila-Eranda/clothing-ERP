@@ -4054,23 +4054,23 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       onClick={() => void handleCheckout("CASH")}
                       disabled={items.length === 0 || checkoutLoading || !!pendingDiscountApproval}
                       data-pos-accent=""
-                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                      className="pos-cta h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
                       style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
                     >
                       {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />}
                       Pay Cash
-                      <span className="text-[10px] opacity-70 font-mono">⌃↵</span>
+                      <span className="text-[10px] font-mono" style={{ opacity: 0.9 }}>⌃↵</span>
                     </button>
                     <button
                       onClick={() => { setActivePayment("CASH"); setCheckoutOpen(true); }}
                       disabled={items.length === 0}
                       data-pos-accent=""
-                      className="h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                      className="pos-cta h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
                       style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#ffffff" }}
                     >
                       <ChevronRight className="h-4 w-4"/>
                       Pay / Card
-                      <span className="text-[10px] opacity-70 font-mono">F9</span>
+                      <span className="text-[10px] font-mono" style={{ opacity: 0.9 }}>F9</span>
                     </button>
                   </div>
                 </div>
@@ -4235,16 +4235,33 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       title={`${label} (${idx + 1})`}
                       onClick={()=>setActivePayment(value)}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
-                      className={cn("flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all border", touchMode ? "py-2.5" : "py-1.5")}
+                      className={cn(
+                        "flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all border",
+                        active && "pos-cta",
+                        touchMode ? "py-2.5" : "py-1.5",
+                      )}
                       style={{
-                        background: active ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
-                        borderColor: active ? "transparent" : (isPosLight ? "#94A3B8" : "var(--pos-border)"),
-                        color: active ? "#fff" : (isPosLight ? "#0F172A" : "var(--pos-text-secondary)"),
+                        background: active
+                          ? "linear-gradient(135deg,#4f6ef7,#7c3aed)"
+                          : (isPosLight ? "#CBD5E1" : "var(--pos-input)"),
+                        borderColor: active
+                          ? "transparent"
+                          : (isPosLight ? "#475569" : "var(--pos-border)"),
+                        color: active ? "#ffffff" : (isPosLight ? "#0F172A" : "var(--pos-text)"),
                       }}
                     >
-                      <Icon className={touchMode ? "h-5 w-5" : "h-4 w-4"} strokeWidth={2.25} />
-                      <span>{label}</span>
-                      <span className="text-[9px] font-mono" style={{ opacity: active ? 0.7 : (isPosLight ? 0.55 : 0.7) }}>{idx + 1}</span>
+                      <Icon
+                        className={touchMode ? "h-5 w-5" : "h-4 w-4"}
+                        strokeWidth={2.4}
+                        style={{ color: "inherit", stroke: "currentColor" }}
+                      />
+                      <span style={{ color: "inherit" }}>{label}</span>
+                      <span
+                        className="text-[9px] font-mono"
+                        style={{ color: "inherit", opacity: active ? 0.85 : (isPosLight ? 0.75 : 0.7) }}
+                      >
+                        {idx + 1}
+                      </span>
                     </button>
                     );
                   })}
@@ -4342,7 +4359,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       <span className="text-base font-bold" style={{color:"var(--pos-text)"}}>
                         {payState.allowPartial && (customer?.creditLimit ?? 0) > 0 ? "Paying now (LKR)" : "Cash Received (LKR)"}
                       </span>
-                      <span className="text-[10px] font-mono shrink-0" style={{color:"var(--pos-muted-2)"}}>F9 confirm</span>
+                      <span className="text-[11px] font-mono font-semibold shrink-0" style={{color:"var(--pos-text-soft)"}}>F9 confirm</span>
                       <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                     </div>
                     <div className="h-12 rounded-xl flex items-center px-3 mb-2 font-bold text-2xl font-mono" style={{background:"rgba(16,185,129,0.1)",border:"1px solid rgba(16,185,129,0.3)",color:"var(--pos-success-soft)"}}>{numpad?formatNumber(parseFloat(numpad)):"0.00"}</div>
@@ -4356,8 +4373,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
                         return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95 border" style={{
-                          background: isQuick ? (isPosLight ? "#CBD5E1" : "var(--pos-border)") : isDel ? "rgba(239,68,68,0.15)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
-                          borderColor: isDel ? "rgba(239,68,68,0.35)" : (isPosLight ? "#94A3B8" : "var(--pos-border)"),
+                          background: isQuick ? (isPosLight ? "#94A3B8" : "var(--pos-border)") : isDel ? "rgba(239,68,68,0.15)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
+                          borderColor: isDel ? "rgba(239,68,68,0.45)" : (isPosLight ? "#475569" : "var(--pos-border)"),
                           color: isQuick ? (isPosLight ? "#0F172A" : "var(--pos-text)") : isDel ? "#DC2626" : "var(--pos-text)",
                         }}>
                           {isDel?<Delete className="h-4 w-4 mx-auto" strokeWidth={2.25}/>:k}
@@ -4387,16 +4404,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
                   }}>
                     Split Bill
                   </button>
-                  <button ref={checkoutConfirmRef} type="button" data-pos-accent="" onClick={() => void handleCheckout()} disabled={checkoutLoading||items.length===0} className="flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold text-white transition-all hover:opacity-90 disabled:opacity-40" style={{background:"linear-gradient(135deg,#10b981,#059669)",color:"#ffffff"}}>
-                    {checkoutLoading?<Loader2 className="h-5 w-5 animate-spin"/>:<Check className="h-5 w-5"/>}
-                    Confirm Payment<span className="text-xs opacity-70 font-mono">(F9)</span>
+                  <button
+                    ref={checkoutConfirmRef}
+                    type="button"
+                    data-pos-accent=""
+                    onClick={() => void handleCheckout()}
+                    disabled={checkoutLoading||items.length===0}
+                    className="pos-cta flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                    style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
+                  >
+                    {checkoutLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
+                    <span>Confirm Payment</span>
+                    <span className="text-xs font-mono" style={{ opacity: 0.9 }}>(F9)</span>
                   </button>
                   <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center border transition-all hover:bg-white/10" style={{
                     borderColor: isPosLight ? "#64748B" : "var(--pos-border)",
                     background: isPosLight ? "#E2E8F0" : "transparent",
                   }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)"}} strokeWidth={2.25}/></button>
                 </div>
-                <p className="px-3 py-1.5 text-[10px] text-center border-t shrink-0" style={{ color: "var(--pos-muted)", borderColor: "var(--pos-border)" }}>
+                <p className="px-3 py-1.5 text-[11px] text-center border-t shrink-0 font-medium" style={{ color: "var(--pos-text-soft)", borderColor: "var(--pos-border)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
                 </div>

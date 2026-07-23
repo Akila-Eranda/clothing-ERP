@@ -941,8 +941,18 @@
 
 /*
  * White labels on accent fills — MUST beat .text-white remap (higher specificity).
- * Mark CTAs with data-pos-accent / data-pos-on-accent.
+ * Prefer class `pos-cta` on filled action buttons (no text-white needed).
  */
+.pos-shell .pos-cta,
+.pos-shell .pos-cta *:not(option) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.pos-shell .pos-cta svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
 .pos-shell.pos-light [data-pos-accent],
 .pos-shell.pos-light [data-pos-accent].text-white,
 .pos-shell.pos-light [data-pos-accent] .text-white,
@@ -951,12 +961,20 @@
 .pos-shell.pos-light [data-pos-on-accent].text-white,
 .pos-shell.pos-light [data-pos-on-accent] .text-white,
 .pos-shell.pos-light [data-pos-on-accent] * {
-  color: var(--pos-on-accent, #ffffff) !important;
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 .pos-shell.pos-light [data-pos-accent] svg,
 .pos-shell.pos-light [data-pos-on-accent] svg {
-  color: var(--pos-on-accent, #ffffff) !important;
-  stroke: var(--pos-on-accent, #ffffff) !important;
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* Selected text in POS inputs — keep readable in light mode */
+.pos-shell.pos-light input::selection,
+.pos-shell.pos-light textarea::selection {
+  background: rgba(79, 110, 247, 0.28);
+  color: #0f172a;
 }
 
 /* Gradient / solid accent fills (buttons + badges) keep white text */

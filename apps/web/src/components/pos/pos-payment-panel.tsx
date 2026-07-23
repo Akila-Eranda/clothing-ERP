@@ -148,7 +148,7 @@ export function PosPaymentPanel({
           style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
         />
         <button type="button" onClick={applyCoupon} data-pos-accent=""
-          className="px-2.5 h-8 rounded-lg text-xs font-bold text-white flex items-center gap-1"
+          className="pos-cta px-2.5 h-8 rounded-lg text-xs font-bold flex items-center gap-1"
           style={{ background: "#4f6ef7", color: "#ffffff" }}>
           <Tag className="h-3 w-3" /> Apply
         </button>

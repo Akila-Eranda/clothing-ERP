@@ -309,7 +309,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
             onClick={() => void handleStart()}
             disabled={submitting || !counterId}
             data-pos-accent=""
-            className="w-full h-11 gap-2 font-bold text-white"
+            className="pos-cta w-full h-11 gap-2 font-bold"
             style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}

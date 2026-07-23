@@ -336,13 +336,13 @@ export function PosQuantityPopup({
           <div className="flex flex-wrap items-center gap-2">
             <span
               className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(79,110,247,0.18)", color: "#93b4ff" }}
+              style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-accent-soft)" }}
             >
               {isWeighted ? `Max ${gramsLimit} g` : `Max qty ${stockLimit}`}
             </span>
             <span
               className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(16,185,129,0.15)", color: "#4ade80" }}
+              style={{ background: "rgba(16,185,129,0.15)", color: "var(--pos-success-soft)" }}
             >
               {isWeighted
                 ? `${formatPosWeightQty(selectedVariant?.stock ?? maxQty, activeWeight)} in stock`
@@ -401,10 +401,10 @@ export function PosQuantityPopup({
                           />
                         </div>
                         <div className="flex items-end justify-between gap-2">
-                          <p className="text-sm font-bold tabular-nums" style={{ color: active ? "#60a5fa" : "#f3f4f6" }}>
+                          <p className="text-sm font-bold tabular-nums" style={{ color: active ? "var(--pos-accent-soft)" : "var(--pos-text)" }}>
                             {money(v.unitPrice)}
                           </p>
-                          <p className="text-[11px] font-medium tabular-nums" style={{ color: v.stock > 0 ? "#4ade80" : "#f87171" }}>
+                          <p className="text-[11px] font-medium tabular-nums" style={{ color: v.stock > 0 ? "var(--pos-success-soft)" : "#dc2626" }}>
                             {v.stock} left
                           </p>
                         </div>
@@ -450,7 +450,7 @@ export function PosQuantityPopup({
                           <p className="text-sm font-bold tabular-nums" style={{ color: active ? "#60a5fa" : "#e5e7eb" }}>
                             {money(v.unitPrice)}
                           </p>
-                          <p className="text-[11px] mt-0.5 font-medium" style={{ color: v.stock > 0 ? "#4ade80" : "#f87171" }}>
+                          <p className="text-[11px] mt-0.5 font-medium" style={{ color: v.stock > 0 ? "var(--pos-success-soft)" : "#dc2626" }}>
                             {v.stock} left
                           </p>
                         </button>
@@ -487,7 +487,8 @@ export function PosQuantityPopup({
                   type="button"
                   onClick={() => bump(isWeighted ? -10 : -1)}
                   disabled={isWeighted ? grams <= 1 : qty <= 1}
-                  className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  className="h-full w-10 flex items-center justify-center disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  style={{ color: "var(--pos-text)" }}
                 >
                   <Minus className="h-4 w-4" />
                 </button>
@@ -498,13 +499,15 @@ export function PosQuantityPopup({
                   value={qtyRaw}
                   onChange={(e) => onQtyInput(e.target.value)}
                   onBlur={() => setQtyRaw(isWeighted ? String(Math.max(1, grams || 1)) : String(qty))}
-                  className="flex-1 min-w-0 h-full bg-transparent text-center text-lg font-bold text-white tabular-nums outline-none"
+                  className="flex-1 min-w-0 h-full bg-transparent text-center text-lg font-bold tabular-nums outline-none"
+                  style={{ color: "var(--pos-text)", WebkitTextFillColor: "var(--pos-text)" }}
                 />
                 <button
                   type="button"
                   onClick={() => bump(isWeighted ? 10 : 1)}
                   disabled={isWeighted ? grams >= gramsLimit : qty >= stockLimit}
-                  className="h-full w-10 flex items-center justify-center text-white disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  className="h-full w-10 flex items-center justify-center disabled:opacity-30 hover:bg-white/5 shrink-0"
+                  style={{ color: "var(--pos-text)" }}
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -539,8 +542,8 @@ export function PosQuantityPopup({
                     setPriceRaw(String(selectedVariant?.unitPrice ?? unitPrice));
                   }
                 }}
-                className="w-full h-12 rounded-xl px-3 text-lg font-bold text-white tabular-nums outline-none border focus:border-[#3b82f6]"
-                style={fieldStyle}
+                className="w-full h-12 rounded-xl px-3 text-lg font-bold tabular-nums outline-none border focus:border-[#3b82f6]"
+                style={{ ...fieldStyle, color: "var(--pos-text)", WebkitTextFillColor: "var(--pos-text)" }}
               />
             </div>
           </div>
@@ -572,7 +575,7 @@ export function PosQuantityPopup({
               ) : null}
             </div>
             <div className="text-right shrink-0">
-              <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: "#22c55e" }}>
+              <p className="text-2xl font-bold tabular-nums leading-none" style={{ color: "var(--pos-success-soft)" }}>
                 {money(lineTotal)}
               </p>
             </div>
@@ -581,7 +584,7 @@ export function PosQuantityPopup({
 
         {/* Footer */}
         <div className="px-4 pb-4 pt-2 shrink-0 space-y-2.5 border-t" style={{ borderColor: "var(--pos-border)" }}>
-          <p className="text-[10px] text-center pt-2" style={{ color: "#6b7280" }}>
+          <p className="text-[11px] text-center pt-2 font-medium" style={{ color: "var(--pos-text-soft)" }}>
             {hasVariants ? "← → pick item · " : ""}
             {isWeighted ? "Weight in grams · " : "↑/↓ qty · "}
             Q qty · P price · Enter add · Esc close
@@ -590,8 +593,8 @@ export function PosQuantityPopup({
             <button
               type="button"
               onClick={onCancel}
-              className={`flex-1 ${btnH} rounded-xl font-semibold text-white/90 hover:bg-white/5 transition-colors`}
-              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+              className={`flex-1 ${btnH} rounded-xl font-semibold hover:bg-white/5 transition-colors`}
+              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" }}
             >
               Cancel
             </button>
@@ -600,14 +603,14 @@ export function PosQuantityPopup({
               onClick={submit}
               disabled={unitPriceValue <= 0 || (!allowNegativeStock && (selectedVariant?.stock ?? maxQty) <= 0)}
               data-pos-accent=""
-              className={`flex-[1.35] ${btnH} rounded-xl font-bold text-white disabled:opacity-40 flex items-center justify-center gap-2.5 transition-opacity`}
+              className={`pos-cta flex-[1.35] ${btnH} rounded-xl font-bold disabled:opacity-40 flex items-center justify-center gap-2.5 transition-opacity`}
               style={{ background: "linear-gradient(180deg, #22c55e 0%, #16a34a 100%)", color: "#ffffff" }}
             >
               <ShoppingCart className="h-4 w-4 shrink-0" />
               <span>Add to Cart</span>
               <span
                 className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-md"
-                style={{ background: "rgba(0,0,0,0.22)" }}
+                style={{ background: "rgba(0,0,0,0.28)", color: "#ffffff" }}
               >
                 {money(lineTotal)}
               </span>

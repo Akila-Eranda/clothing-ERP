@@ -293,7 +293,7 @@ export function PosQuickProductPanel({
           onClick={() => void submit()}
           disabled={busy}
           data-pos-accent=""
-          className="w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+          className="pos-cta w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
           style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#ffffff" }}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
