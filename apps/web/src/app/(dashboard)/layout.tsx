@@ -113,8 +113,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           <Header />
           <MaintenanceBanner />
-          <main className="flex-1 overflow-y-auto">
-            <div className="h-full" key={`${activeBranchId ?? "none"}-${branchRevision}`}>
+            <main className="flex-1 overflow-y-auto">
+            <div className="min-h-full" key={`${activeBranchId ?? "none"}-${branchRevision}`}>
               {children}
             </div>
           </main>

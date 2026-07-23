@@ -9,6 +9,8 @@ import {
 import { cn } from "@/lib/utils";
 
 const DEFAULT_PAGE_SIZE = 10;
+/** Only lock a scroll viewport when the list is long enough to need it. */
+const FILL_HEIGHT_MIN_ROWS = 12;
 
 const APP_TABLE_DEFAULTS: TableConfigInput = {
   features: {
@@ -17,8 +19,10 @@ const APP_TABLE_DEFAULTS: TableConfigInput = {
     pagination: true,
     columnVisibility: true,
     csvExport: true,
+    // Keep selection so Export CSV works; column is narrow via CSS
     rowSelection: true,
-    viewToggle: true,
+    // Cards toggle adds toolbar noise — keep Table view only by default
+    viewToggle: false,
     floatingBar: false,
     advancedFilter: false,
     sorting: true,
@@ -44,24 +48,19 @@ export type AppClientSideTableProps<TData, TValue> = CraftProps<TData, TValue> &
   /** Extra classes on the outer craft card */
   className?: string;
   /**
-   * When true, the table body scrolls inside a max-height (no empty gap below short lists).
-   * Defaults to true for list pages. Pass false for compact hub embeds.
+   * When true, long lists scroll inside a max-height.
+   * Default: auto — only when there are enough rows (avoids empty stretched gap).
    */
   fillHeight?: boolean;
 };
 
 /**
- * App-wide data table — single module for every list page.
- *
- * Layout (top → bottom):
- * 1. Toolbar — view toggle · search · columns · export
- * 2. Filters — faceted chips (when configured)
- * 3. Body — sticky header · rows · empty state
- * 4. Pagination — count · page size · pages
+ * App-wide modern data table — shared shell for every list page.
+ * Styles live on `[data-table-craft]` in globals.css.
  */
 export function ClientSideTable<TData, TValue>({
   className,
-  fillHeight = true,
+  fillHeight,
   pageCount,
   data,
   config,
@@ -69,6 +68,7 @@ export function ClientSideTable<TData, TValue>({
 }: AppClientSideTableProps<TData, TValue>) {
   const rows = (data ?? []) as TData[];
   const resolvedPageCount = pageCount ?? tablePageCount(rows.length);
+  const shouldFill = fillHeight ?? rows.length >= FILL_HEIGHT_MIN_ROWS;
   const mergedConfig = createTableConfig({
     ...APP_TABLE_DEFAULTS,
     ...config,
@@ -80,8 +80,9 @@ export function ClientSideTable<TData, TValue>({
   return (
     <div
       data-table-craft
-      data-fill-height={fillHeight ? "true" : "false"}
-      className={cn("w-full min-w-0 flex flex-col", className)}
+      data-table-modern
+      data-fill-height={shouldFill ? "true" : "false"}
+      className={cn("w-full min-w-0", className)}
     >
       <TableProvider config={mergedConfig}>
         <BaseClientSideTable data={rows} pageCount={resolvedPageCount} config={mergedConfig} {...props} />

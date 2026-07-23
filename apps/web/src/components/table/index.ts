@@ -2,10 +2,10 @@
  * App-wide data table module.
  *
  * All list / data grids should import from `@/components/table` (this barrel)
- * so search, filters, pagination, export, and `[data-table-craft]` styles stay
- * consistent across the product.
+ * so search, filters, pagination, export, and the modern `[data-table-craft]`
+ * shell stay consistent across the product.
  *
- * Stack order: toolbar → filters → sticky header body → pagination footer.
+ * Stack: toolbar → filters → sticky header body → pagination footer.
  *
  * Use for: dashboard list pages, admin lists, hub data grids.
  * Do NOT use for: print/receipt HTML, POS cart line editors, financial

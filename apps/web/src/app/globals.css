@@ -418,23 +418,31 @@
     background: hsl(var(--card-hover)) !important;
   }
 
-  /* ── Data tables (react-table-craft via [data-table-craft]) ─────────────
-     Orderly stack: toolbar → filters → body → pagination. Light + dark. */
+  /* ── Modern data tables (all pages via [data-table-craft]) ──────────────
+     One shell: toolbar → filters → rows → pagination. Hugs content. */
   [data-table-craft] {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+    --dt-row-h: 52px;
+    --dt-head-h: 42px;
+    --dt-pad-x: 1rem;
+    --dt-radius: 1rem;
+    --dt-control-h: 2.375rem;
+    display: block;
     width: 100%;
     min-width: 0;
+    height: auto;
     background: hsl(var(--card));
-    border: 1px solid hsl(var(--border));
-    border-radius: calc(var(--radius) + 2px);
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.04);
+    border: 1px solid hsl(var(--border) / 0.9);
+    border-radius: var(--dt-radius);
+    box-shadow:
+      0 0 0 1px rgba(15, 23, 42, 0.02),
+      0 1px 2px rgba(15, 23, 42, 0.03),
+      0 12px 32px -12px rgba(15, 23, 42, 0.08);
     overflow: hidden;
+    isolation: isolate;
   }
   .dark [data-table-craft] {
-    border-color: rgba(255, 255, 255, 0.08);
-    box-shadow: none;
+    border-color: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.03);
   }
 
   [data-table-craft] > * {
@@ -457,108 +465,175 @@
     [data-table-craft] > .flex.items-center.justify-between {
       display: flex !important;
       gap: 0.5rem;
-      padding: 0.75rem 0.875rem;
-      border-bottom: 1px solid hsl(var(--border));
-      background: hsl(var(--card));
+      padding: 0.875rem 1rem;
+      border-bottom: 1px solid hsl(var(--border) / 0.85);
+      background:
+        linear-gradient(180deg, hsl(var(--secondary-background) / 0.7), hsl(var(--card)));
     }
   }
 
-  /* ── 1. Desktop toolbar ──────────────────────────────────────────────── */
+  /* ── Toolbar ─────────────────────────────────────────────────────────── */
   [data-table-craft] > .max-md\:hidden {
-    padding: 0.75rem 1rem;
-    border-bottom: 1px solid hsl(var(--border));
-    background: hsl(var(--card));
+    padding: 0.875rem 1.125rem;
+    border-bottom: 1px solid hsl(var(--border) / 0.85);
+    background:
+      linear-gradient(180deg, hsl(var(--secondary-background) / 0.85), hsl(var(--card)));
   }
   .dark [data-table-craft] > .max-md\:hidden {
     border-bottom-color: rgba(255, 255, 255, 0.06);
+    background:
+      linear-gradient(180deg, hsl(var(--secondary) / 0.55), hsl(var(--card)));
   }
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col {
-    gap: 0.625rem;
+    gap: 0.75rem;
   }
-  /* Primary toolbar row: toggle · search · actions */
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3 {
     flex-wrap: wrap;
     row-gap: 0.5rem;
     column-gap: 0.625rem;
   }
-  /* Faceted filter row */
   [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) {
-    padding-top: 0.125rem;
+    margin-top: 0.125rem;
+    border-top: 1px dashed hsl(var(--border) / 0.7);
+    padding-top: 0.75rem;
   }
-  /* Search inputs */
+  .dark [data-table-craft] > .max-md\:hidden > .flex.w-full.flex-col > .flex.items-center.gap-3:nth-child(2) {
+    border-top-color: rgba(255, 255, 255, 0.06);
+  }
+
+  /* Search + controls */
   [data-table-craft] > .max-md\:hidden input:not([type="checkbox"]):not([type="radio"]) {
-    height: 2.25rem;
-    min-width: 12rem;
-    max-width: 22rem;
+    height: var(--dt-control-h);
+    min-width: 14rem;
+    max-width: 26rem;
     border-radius: 0.75rem;
     font-size: 0.8125rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   }
-  /* View toggle + outline toolbar buttons */
   [data-table-craft] > .max-md\:hidden .rounded-lg.border.bg-muted\/30 {
     border-radius: 0.75rem;
-    background: hsl(var(--muted) / 0.45);
+    background: hsl(var(--muted) / 0.5);
+    border-color: hsl(var(--border));
   }
   [data-table-craft] > .max-md\:hidden button {
     border-radius: 0.75rem;
+    height: var(--dt-control-h);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  }
+  [data-table-craft] > .max-md\:hidden button:hover {
+    border-color: hsl(var(--primary) / 0.35);
   }
 
-  /* Flatten nested Card — outer shell is the only chrome */
+  /* Faceted filter pills */
+  [data-table-craft] > .max-md\:hidden button[role="combobox"],
+  [data-table-craft] button[role="combobox"] {
+    border-radius: 9999px !important;
+    padding-inline: 0.875rem;
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  }
+  .dark [data-table-craft] button[role="combobox"] {
+    background: hsl(var(--secondary));
+  }
+
+  /* Flatten nested Card — never stretch into empty space */
   [data-table-craft] > .mt-3 {
     margin-top: 0 !important;
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
     background: transparent !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
+    display: block !important;
   }
-  [data-table-craft] > .mt-3 > [class*="p-"] {
+  [data-table-craft] > .mt-3 > [class*="p-"],
+  [data-table-craft] > .mt-3 > .overflow-x-auto {
     padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: none !important;
   }
 
-  /* ── 2. Scroll body ──────────────────────────────────────────────────── */
+  /* Hug rows; scroll viewport only for long lists */
+  [data-table-craft] .relative.w-full.overflow-auto:has(table) {
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    flex: none !important;
+  }
   [data-table-craft][data-fill-height="true"] .relative.w-full.overflow-auto:has(table) {
-    max-height: min(56vh, calc(100dvh - 320px));
+    max-height: min(58vh, calc(100dvh - 300px)) !important;
   }
 
   [data-table-craft] table {
-    background: hsl(var(--card));
+    background: transparent;
     width: 100%;
     min-width: 720px;
+    height: auto !important;
     table-layout: auto;
     border-collapse: separate;
     border-spacing: 0;
   }
 
+  /* Sticky header band */
   [data-table-craft] thead {
-    background: hsl(var(--secondary-background));
+    background: hsl(var(--secondary-background) / 0.92);
     position: sticky;
     top: 0;
     z-index: 2;
   }
   .dark [data-table-craft] thead {
-    background: hsl(var(--secondary) / 0.85);
-    backdrop-filter: blur(8px);
+    background: hsl(217 36% 9% / 0.92);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
   }
 
   [data-table-craft] th {
-    height: 44px;
-    padding: 0 1rem;
+    height: var(--dt-head-h);
+    padding: 0 var(--dt-pad-x);
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
-    font-size: 11px;
+    font-size: 0.6875rem;
     line-height: 1.2;
     text-transform: uppercase;
-    letter-spacing: 0.045em;
+    letter-spacing: 0.06em;
     color: hsl(var(--muted-foreground));
     white-space: nowrap;
     text-align: left;
     vertical-align: middle;
   }
+  .dark [data-table-craft] th {
+    border-bottom-color: rgba(255, 255, 255, 0.07);
+    color: hsl(215 20% 72%);
+  }
+  /* Quiet sort affordance */
+  [data-table-craft] th button {
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    gap: 0.35rem;
+  }
+  [data-table-craft] th svg {
+    width: 0.875rem;
+    height: 0.875rem;
+    opacity: 0.45;
+  }
+  [data-table-craft] th:hover svg {
+    opacity: 0.85;
+  }
 
   [data-table-craft] td {
-    height: 52px;
-    padding: 0 1rem;
+    height: var(--dt-row-h);
+    padding: 0 var(--dt-pad-x);
     border-bottom: 1px solid hsl(var(--divider));
     font-size: 0.8125rem;
+    line-height: 1.35;
     color: hsl(var(--foreground));
     vertical-align: middle;
     overflow: hidden;
@@ -566,27 +641,38 @@
     white-space: nowrap;
   }
   .dark [data-table-craft] td {
-    border-bottom-color: rgba(255, 255, 255, 0.05);
+    border-bottom-color: rgba(255, 255, 255, 0.045);
   }
 
   [data-table-craft] tbody tr {
-    transition: background-color 0.12s ease;
+    transition: background-color 0.14s ease, box-shadow 0.14s ease;
     background: transparent;
   }
-  [data-table-craft] tbody tr:nth-child(even) {
-    background: hsl(var(--muted) / 0.22);
-  }
-  .dark [data-table-craft] tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, 0.015);
-  }
   [data-table-craft] tbody tr:hover {
-    background: hsl(var(--hover));
+    background: hsl(var(--primary) / 0.04);
   }
   .dark [data-table-craft] tbody tr:hover {
-    background: hsl(var(--card-hover));
+    background: hsl(var(--primary) / 0.08);
+  }
+  [data-table-craft] tbody tr[data-state="selected"] {
+    background: hsl(var(--primary) / 0.08);
+  }
+  .dark [data-table-craft] tbody tr[data-state="selected"] {
+    background: hsl(var(--primary) / 0.14);
   }
   [data-table-craft] tbody tr:last-child td {
     border-bottom: none;
+  }
+
+  /* Primary / link cells */
+  [data-table-craft] td a,
+  [data-table-craft] td button.text-primary {
+    font-weight: 600;
+  }
+
+  /* Soft status chips inside cells */
+  [data-table-craft] td [class*="rounded-full"] {
+    letter-spacing: 0.01em;
   }
 
   [data-table-craft] td .whitespace-normal,
@@ -594,37 +680,49 @@
     white-space: normal;
   }
 
-  /* Checkbox column */
+  /* Checkbox column — compact */
   [data-table-craft] th:has(button[role="checkbox"]),
   [data-table-craft] td:has(button[role="checkbox"]),
   [data-table-craft] th:has(input[type="checkbox"]),
   [data-table-craft] td:has(input[type="checkbox"]) {
-    width: 2.75rem;
+    width: 2.5rem;
     padding-left: 0.875rem;
-    padding-right: 0.5rem;
+    padding-right: 0.25rem;
+  }
+  [data-table-craft] button[role="checkbox"],
+  [data-table-craft] input[type="checkbox"] {
+    border-radius: 0.375rem;
   }
 
   /* Empty state */
   [data-table-craft] td.py-16 {
     height: auto;
-    padding-top: 3.5rem !important;
-    padding-bottom: 3.5rem !important;
+    padding-top: 3.25rem !important;
+    padding-bottom: 3.25rem !important;
     white-space: normal;
+    color: hsl(var(--muted-foreground));
   }
 
-  /* ── 3. Controls inside table ────────────────────────────────────────── */
+  /* ── Controls ────────────────────────────────────────────────────────── */
   [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
-    height: 2.25rem;
+    height: var(--dt-control-h);
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
     border-radius: 0.75rem;
     font-size: 0.8125rem;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  [data-table-craft] input:not([type="checkbox"]):not([type="radio"]):focus,
+  [data-table-craft] input:not([type="checkbox"]):not([type="radio"]):focus-visible {
+    border-color: hsl(var(--primary) / 0.55);
+    box-shadow: 0 0 0 3px hsl(var(--primary) / 0.14);
+    outline: none;
   }
   .dark [data-table-craft] input:not([type="checkbox"]):not([type="radio"]) {
     background: hsl(var(--secondary));
   }
   [data-table-craft] button[role="combobox"] {
-    height: 2.25rem;
+    height: var(--dt-control-h);
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
     border-radius: 0.75rem;
@@ -634,53 +732,78 @@
     background: hsl(var(--secondary));
   }
 
-  /* ── 4. Pagination footer ────────────────────────────────────────────── */
+  /* ── Pagination footer ───────────────────────────────────────────────── */
   [data-table-craft] nav[aria-label] {
-    border-top: 1px solid hsl(var(--border));
-    background: hsl(var(--secondary-background) / 0.65);
-    padding: 0.75rem 1rem !important;
+    border-top: 1px solid hsl(var(--border) / 0.9);
+    background:
+      linear-gradient(180deg, hsl(var(--secondary-background) / 0.55), hsl(var(--secondary-background) / 0.85));
+    padding: 0.75rem 1.125rem !important;
     gap: 0.75rem !important;
   }
   .dark [data-table-craft] nav[aria-label] {
     border-top-color: rgba(255, 255, 255, 0.06);
-    background: hsl(var(--secondary) / 0.4);
+    background: hsl(var(--secondary) / 0.45);
   }
   [data-table-craft] nav[aria-label] button {
     border-radius: 0.625rem;
     height: 2rem;
+    min-width: 2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  [data-table-craft] nav[aria-label] button[aria-current="page"],
+  [data-table-craft] nav[aria-label] button.bg-primary {
+    box-shadow: 0 1px 2px hsl(var(--primary) / 0.35);
+  }
+  [data-table-craft] nav[aria-label] select,
+  [data-table-craft] nav[aria-label] button[role="combobox"] {
+    height: 2rem;
+    border-radius: 0.625rem;
+    font-size: 0.75rem;
   }
 
+  /* Shared plain tables (hubs / custom grids) — match craft look */
   .enterprise-table {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
   }
   .enterprise-table thead {
-    background: hsl(var(--secondary-background));
+    background: hsl(var(--secondary-background) / 0.92);
+  }
+  .dark .enterprise-table thead {
+    background: hsl(217 36% 9% / 0.92);
   }
   .enterprise-table th {
-    height: 44px;
-    padding: 0 0.875rem;
+    height: 42px;
+    padding: 0 1rem;
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
-    font-size: 11px;
+    font-size: 0.6875rem;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
     color: hsl(var(--muted-foreground));
     text-align: left;
   }
   .enterprise-table td {
     height: 52px;
-    padding: 0 0.875rem;
+    padding: 0 1rem;
     border-bottom: 1px solid hsl(var(--divider));
     font-size: 0.8125rem;
     vertical-align: middle;
   }
+  .dark .enterprise-table td {
+    border-bottom-color: rgba(255, 255, 255, 0.045);
+  }
+  .enterprise-table tbody tr {
+    transition: background-color 0.14s ease;
+  }
   .enterprise-table tbody tr:hover {
-    background: hsl(var(--hover));
+    background: hsl(var(--primary) / 0.04);
   }
   .dark .enterprise-table tbody tr:hover {
-    background: hsl(var(--card-hover));
+    background: hsl(var(--primary) / 0.08);
   }
 
   /* Animated border */

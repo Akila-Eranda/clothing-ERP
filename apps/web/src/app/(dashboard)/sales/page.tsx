@@ -493,18 +493,23 @@ export default function SalesPage() {
         `${s.invoiceNumber} ${s.customer?.name ?? "Walk-in"} ${s.customer?.phone ?? ""}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Invoice" />,
       cell: ({ row }) => (
-        <div className="min-w-0" data-cell-wrap>
-          <OpenRecordButton
-            onClick={() => setViewId(row.original.id)}
-            className="font-mono text-xs"
-            title="View sale"
-          >
-            {row.original.invoiceNumber}
-          </OpenRecordButton>
-          <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-            {fmtTime(row.original.invoiceDate)}
-          </p>
-        </div>
+        <OpenRecordButton
+          onClick={() => setViewId(row.original.id)}
+          className="font-mono text-xs"
+          title="View sale"
+        >
+          {row.original.invoiceNumber}
+        </OpenRecordButton>
+      ),
+    },
+    {
+      id: "time",
+      accessorFn: (s) => s.invoiceDate,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {fmtTime(row.original.invoiceDate)}
+        </span>
       ),
     },
     {
@@ -516,9 +521,7 @@ export default function SalesPage() {
           <p className="text-sm font-medium truncate">{row.original.customer?.name ?? "Walk-in"}</p>
           {row.original.customer?.phone ? (
             <p className="text-[10px] text-muted-foreground font-mono">{row.original.customer.phone}</p>
-          ) : (
-            <p className="text-[10px] text-muted-foreground">No phone</p>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -527,8 +530,7 @@ export default function SalesPage() {
       accessorFn: (s) => s._count?.items ?? 0,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Items" />,
       cell: ({ row }) => (
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
-          <Package className="h-3.5 w-3.5 text-muted-foreground" />
+        <span className="text-sm font-medium tabular-nums">
           {row.original._count?.items ?? "—"}
         </span>
       ),
@@ -559,7 +561,7 @@ export default function SalesPage() {
       cell: ({ row }) => {
         const pay = paymentLabel(row.original);
         return (
-          <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold", pay.className)}>
+          <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", pay.className)}>
             {pay.label}
           </span>
         );
