@@ -882,10 +882,12 @@ export function PosQuickGrnPanel({
                       />
                     </div>
                     <div>
-                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Due date</label>
+                      <label className="text-[9px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Cheque Date</label>
                       <input
                         type="date"
                         value={chequeDueDate}
+                        min="2000-01-01"
+                        max="2099-12-31"
                         onChange={(e) => setChequeDueDate(e.target.value)}
                         disabled={busy}
                         className={INPUT_CLS}

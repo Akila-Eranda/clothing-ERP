@@ -594,8 +594,15 @@ export function ChequesHub() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Due date</Label>
-                  <Input type="date" className="h-9" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                  <Label className="text-xs font-semibold">Cheque Date</Label>
+                  <Input
+                    type="date"
+                    className="h-9"
+                    value={dueDate}
+                    min="2000-01-01"
+                    max="2099-12-31"
+                    onChange={(e) => setDueDate(e.target.value)}
+                  />
                 </div>
               </div>
               <div className="space-y-1">

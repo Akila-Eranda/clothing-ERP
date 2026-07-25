@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -173,7 +172,7 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
   return (
     <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-5xl border overflow-hidden max-h-[92vh] flex flex-col">
+      <div className="bg-background rounded-2xl shadow-2xl w-full max-w-5xl border overflow-hidden h-[min(92vh,900px)] flex flex-col">
 
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
@@ -189,32 +188,40 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
           </button>
         </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {/* Top bar: Supplier + Date */}
-          <div className="px-6 py-4 border-b shrink-0">
-            <div className="grid grid-cols-2 gap-4">
+        <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          {/* Top bar: Supplier + Date + Notes — stays fixed */}
+          <div className="px-6 py-4 border-b shrink-0 space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Supplier <span className="text-destructive">*</span></Label>
+              <Select value={supplierId} onValueChange={setSupplierId}>
+                <SelectTrigger><SelectValue placeholder="Select supplier…" /></SelectTrigger>
+                <SelectContent>
+                  {suppliers.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="font-medium">{s.name}</span>
+                      {s.contactPerson && <span className="text-muted-foreground ml-2 text-xs">— {s.contactPerson}</span>}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Supplier <span className="text-destructive">*</span></Label>
-                <Select value={supplierId} onValueChange={setSupplierId}>
-                  <SelectTrigger><SelectValue placeholder="Select supplier…" /></SelectTrigger>
-                  <SelectContent>
-                    {suppliers.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        <span className="font-medium">{s.name}</span>
-                        {s.contactPerson && <span className="text-muted-foreground ml-2 text-xs">— {s.contactPerson}</span>}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs font-semibold">Expected Delivery</Label>
+                <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">Expected Delivery Date</Label>
-                <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
+                <Label className="text-xs font-semibold">Notes</Label>
+                <Input
+                  placeholder="Optional notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
               </div>
             </div>
           </div>
 
-          {/* Three-column product picker */}
+          {/* Three-column product picker — only this middle band scrolls internally */}
           <div className="flex-1 overflow-hidden flex min-h-0">
 
             {/* Col 1: Product search list */}
@@ -364,11 +371,8 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
             </div>
           </div>
 
-          {/* Notes + optional pay */}
+          {/* Optional pay — stays fixed below the scrollable picker */}
           <div className="px-6 py-3 border-t shrink-0 space-y-3">
-            <Textarea rows={1} placeholder="Internal notes for this PO… (optional)"
-              value={notes} onChange={(e) => setNotes(e.target.value)}
-              className="text-xs resize-none" />
             <div className="rounded-xl border p-3 space-y-2 bg-muted/10">
               <label className="flex items-center gap-2 text-xs font-semibold cursor-pointer">
                 <input
@@ -416,7 +420,15 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
                   {payMethod === "CHEQUE" && (
                     <>
                       <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} placeholder="Cheque #" className="h-8 text-xs font-mono" />
-                      <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-8 text-xs" />
+                      <Input
+                        type="date"
+                        value={chequeDueDate}
+                        min="2000-01-01"
+                        max="2099-12-31"
+                        title="Cheque Date — future dates allowed"
+                        onChange={(e) => setChequeDueDate(e.target.value)}
+                        className="h-8 text-xs"
+                      />
                       <Input value={chequeBankName} onChange={(e) => setChequeBankName(e.target.value)} placeholder="Bank" className="h-8 text-xs" />
                     </>
                   )}

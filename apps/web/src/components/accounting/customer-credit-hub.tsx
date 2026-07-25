@@ -724,15 +724,21 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold">Due date</label>
+                      <label className="text-xs font-semibold">Cheque Date</label>
+                      {/* Post-dated cheques: allow future dates (unlike payment/report date pickers) */}
                       <Input
                         type="date"
                         className="h-9"
                         value={payChequeDue}
+                        min="2000-01-01"
+                        max="2099-12-31"
                         onChange={(e) => setPayChequeDue(e.target.value)}
                       />
                     </div>
                   </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Cheque Date can be a future (post-dated) date.
+                  </p>
                 </div>
               )}
             </div>

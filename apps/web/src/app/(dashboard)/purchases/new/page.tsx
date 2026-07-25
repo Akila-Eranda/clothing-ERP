@@ -893,12 +893,11 @@ export default function CreatePOPage() {
                 </div>
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
                   <label className="text-xs font-medium text-muted-foreground">Notes</label>
-                  <textarea
+                  <Input
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Internal notes for this PO…"
-                    className="w-full resize-none rounded-lg border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    placeholder="Optional notes"
+                    className="h-10"
                   />
                 </div>
               </div>
@@ -935,7 +934,8 @@ export default function CreatePOPage() {
                 </Button>
               }
             >
-              <div className="relative">
+              {/* Search stays fixed; only the added lines scroll below */}
+              <div className="relative shrink-0">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <ScanLine className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
                 <input
@@ -949,9 +949,12 @@ export default function CreatePOPage() {
                   }}
                   onFocus={() => setProductSearchOpen(true)}
                   onKeyDown={handleBigSearchKeyDown}
-                  placeholder={supplierId ? "Search name, SKU, barcode, supplier code… Enter to add" : "Select supplier first"}
+                  placeholder={supplierId ? "Search & add product…" : "Select supplier first"}
                   className="h-12 w-full rounded-xl border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
                 />
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  ↑↓ select product · Enter add · Enter on qty → buying price → next item
+                </p>
                 {productSearchOpen && supplierId && (
                   <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl">
                     <div className="max-h-80 overflow-y-auto">
@@ -1004,6 +1007,7 @@ export default function CreatePOPage() {
                 )}
               </div>
 
+              <div className="max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain rounded-xl border bg-muted/5">
               {/* Mobile / tablet cards */}
               <div className="divide-y lg:hidden">
                 {items.length === 0 ? (
@@ -1170,9 +1174,9 @@ export default function CreatePOPage() {
               </div>
 
               {/* Desktop table */}
-              <div className="hidden overflow-x-auto lg:block -mx-4 sm:-mx-5 border-t">
+              <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full min-w-[1100px] text-sm">
-                  <thead className="border-b bg-muted/40">
+                  <thead className="sticky top-0 z-10 border-b bg-muted/40 backdrop-blur-sm">
                     <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
                       <th className="px-4 py-3 text-left font-semibold">Product</th>
                       <th className="px-3 py-3 text-right font-semibold">Stock</th>
@@ -1384,9 +1388,10 @@ export default function CreatePOPage() {
                   </tbody>
                 </table>
               </div>
+              </div>
 
               {items.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/10 px-4 py-3 text-sm sm:px-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/10 px-4 py-3 text-sm sm:px-5 shrink-0">
                   <span className="text-xs text-muted-foreground sm:text-sm">
                     {items.length} line{items.length === 1 ? "" : "s"} · {totalQty} units
                   </span>
@@ -1473,8 +1478,15 @@ export default function CreatePOPage() {
                           <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="h-9 font-mono" />
                         </div>
                         <div>
-                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due date *</label>
-                          <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-9" />
+                          <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Cheque Date *</label>
+                          <Input
+                            type="date"
+                            value={chequeDueDate}
+                            min="2000-01-01"
+                            max="2099-12-31"
+                            onChange={(e) => setChequeDueDate(e.target.value)}
+                            className="h-9"
+                          />
                         </div>
                         <div>
                           <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Bank</label>

@@ -677,8 +677,15 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
                         <Input value={chequeNumber} onChange={(e) => setChequeNumber(e.target.value)} className="h-9 font-mono" />
                       </div>
                       <div>
-                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Due date</label>
-                        <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} className="h-9" />
+                        <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Cheque Date</label>
+                        <Input
+                          type="date"
+                          value={chequeDueDate}
+                          min="2000-01-01"
+                          max="2099-12-31"
+                          onChange={(e) => setChequeDueDate(e.target.value)}
+                          className="h-9"
+                        />
                       </div>
                       <div>
                         <label className="text-[10px] font-semibold text-muted-foreground block mb-1">Bank</label>

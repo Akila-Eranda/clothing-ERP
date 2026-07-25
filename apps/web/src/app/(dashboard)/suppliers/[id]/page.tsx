@@ -126,6 +126,7 @@ function PaymentModal({
   const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [reference, setReference] = useState("");
+  const [chequeDueDate, setChequeDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -182,6 +183,10 @@ function PaymentModal({
       toast.error("Cheque number is required");
       return;
     }
+    if (method === "CHEQUE" && !chequeDueDate.trim()) {
+      toast.error("Cheque Date is required");
+      return;
+    }
     setLoading(true);
     try {
       const res = await api.post<{ supplierBalance: number; poSummary?: string }>(
@@ -193,6 +198,12 @@ function PaymentModal({
           purchaseIds: [...selected],
           reference: reference || undefined,
           notes: notes || undefined,
+          ...(method === "CHEQUE"
+            ? {
+                chequeNumber: reference.trim(),
+                chequeDueDate: chequeDueDate.trim(),
+              }
+            : {}),
         },
       );
       toast.success(
@@ -326,6 +337,24 @@ function PaymentModal({
               onChange={(e) => setReference(e.target.value)}
             />
           </div>
+
+          {method === "CHEQUE" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">
+                Cheque Date <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                type="date"
+                value={chequeDueDate}
+                min="2000-01-01"
+                max="2099-12-31"
+                onChange={(e) => setChequeDueDate(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Future (post-dated) cheque dates are allowed.
+              </p>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">Notes</Label>

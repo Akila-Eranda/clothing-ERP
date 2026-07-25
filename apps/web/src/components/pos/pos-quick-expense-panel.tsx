@@ -517,10 +517,12 @@ export function PosQuickExpensePanel({
 
           {method === "CHEQUE" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Due date *</label>
+              <label className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Cheque Date *</label>
               <input
                 type="date"
                 value={chequeDue}
+                min="2000-01-01"
+                max="2099-12-31"
                 onChange={(e) => setChequeDue(e.target.value)}
                 className={INPUT_CLS}
                 style={INPUT_STYLE}

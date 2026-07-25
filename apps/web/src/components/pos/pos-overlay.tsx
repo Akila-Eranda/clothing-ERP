@@ -377,6 +377,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [partialPayAmount, setPartialPayAmount] = React.useState("");
   const [creditPayAmount, setCreditPayAmount] = React.useState("");
   const [creditPayMethod, setCreditPayMethod] = React.useState("CASH");
+  const [creditPayChequeNumber, setCreditPayChequeNumber] = React.useState("");
+  const [creditPayChequeDue, setCreditPayChequeDue] = React.useState("");
   const [creditPayBusy, setCreditPayBusy] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
@@ -2137,15 +2139,27 @@ ${rows}
       toast.error(`Amount exceeds outstanding (LKR ${formatNumber(owed)})`);
       return;
     }
+    if (creditPayMethod === "CHEQUE" && !creditPayChequeNumber.trim()) {
+      toast.error("Enter cheque number");
+      return;
+    }
     setCreditPayBusy(true);
     try {
       await api.post(`/customers/${customerId}/credit/payment`, {
         amount: amt,
         paymentMethod: creditPayMethod,
         description: `POS credit settlement — ${customerName}`,
+        ...(creditPayMethod === "CHEQUE"
+          ? {
+              chequeNumber: creditPayChequeNumber.trim(),
+              chequeDueDate: creditPayChequeDue || undefined,
+            }
+          : {}),
       });
       toast.success(`Received LKR ${formatNumber(amt)} from ${customerName}`);
       setCreditPayAmount("");
+      setCreditPayChequeNumber("");
+      setCreditPayChequeDue("");
       void loadCustomerInsight(customerId);
       if (customer?.id === customerId) {
         setCustomer({
@@ -2161,7 +2175,7 @@ ${rows}
     } finally {
       setCreditPayBusy(false);
     }
-  }, [creditPayAmount, creditPayMethod, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
+  }, [creditPayAmount, creditPayMethod, creditPayChequeNumber, creditPayChequeDue, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
 
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
@@ -2664,8 +2678,31 @@ ${rows}
                         <option value="CARD">Card</option>
                         <option value="UPI">UPI</option>
                         <option value="BANK_TRANSFER">Bank</option>
+                        <option value="CHEQUE">Cheque</option>
                       </select>
                     </div>
+                    {creditPayMethod === "CHEQUE" && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="text"
+                          value={creditPayChequeNumber}
+                          onChange={(e) => setCreditPayChequeNumber(e.target.value)}
+                          placeholder="Cheque #"
+                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
+                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+                        />
+                        <input
+                          type="date"
+                          value={creditPayChequeDue}
+                          min="2000-01-01"
+                          max="2099-12-31"
+                          onChange={(e) => setCreditPayChequeDue(e.target.value)}
+                          title="Cheque Date — future dates allowed"
+                          className="h-9 rounded-xl px-3 text-sm text-white outline-none"
+                          style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)",colorScheme:"dark"}}
+                        />
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <button
                         type="button"

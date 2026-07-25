@@ -181,8 +181,14 @@ export function InvoicePaymentModal({ open, onClose, onPaid, invoices, banks, in
             <div className="rounded-xl border bg-muted/30 p-4 space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold">Cheque due date</Label>
-                  <Input type="date" value={chequeDueDate} onChange={(e) => setChequeDueDate(e.target.value)} />
+                  <Label className="text-xs font-semibold">Cheque Date</Label>
+                  <Input
+                    type="date"
+                    value={chequeDueDate}
+                    min="2000-01-01"
+                    max="2099-12-31"
+                    onChange={(e) => setChequeDueDate(e.target.value)}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold">Cheque bank</Label>

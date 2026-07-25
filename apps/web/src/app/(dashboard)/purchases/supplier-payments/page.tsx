@@ -451,12 +451,15 @@ export default function SupplierPaymentsPage() {
 
               {form.method === "CHEQUE" && (
                 <div className="space-y-1.5">
-                  <Label>Cheque due date *</Label>
+                  <Label>Cheque Date *</Label>
                   <Input
                     type="date"
                     value={form.chequeDueDate}
+                    min="2000-01-01"
+                    max="2099-12-31"
                     onChange={(e) => setForm((f) => ({ ...f, chequeDueDate: e.target.value }))}
                   />
+                  <p className="text-[10px] text-muted-foreground">Future (post-dated) cheque dates are allowed.</p>
                 </div>
               )}
 
