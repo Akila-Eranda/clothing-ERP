@@ -393,8 +393,11 @@ async function main() {
   });
 
   // POS counters
-  for (const [i, name] of [['C1', 'Counter 1'], ['C2', 'Counter 2'], ['C3', 'Counter 3']].entries()) {
-    const code = ['C1', 'C2', 'C3'][i];
+  for (const [i, [code, name]] of [
+    ['C1', 'Counter 1'],
+    ['C2', 'Counter 2'],
+    ['C3', 'Counter 3'],
+  ].entries()) {
     const existing = await prisma.posCounter.findFirst({ where: { tenantId: tenant.id, branchId: branch.id, code } });
     if (!existing) {
       await prisma.posCounter.create({
