@@ -1620,6 +1620,80 @@ async function main() {
   });
   console.log('✅ General Shop demo: general.shop.hexalyte.com — admin@general.demo.fashionerp.com / Admin@123456');
 
+  // ── Cake House / Bakery demo tenant (rich catalog seeded via scripts/_seed_cakehouse.js) ──
+  const bakeryProfile = getShopProfile(ShopType.BAKERY);
+  const bakeryTenant = await prisma.tenant.upsert({
+    where: { subdomain: 'cake' },
+    update: { shopType: ShopType.BAKERY, name: 'SweetNest Cake House' },
+    create: {
+      name: 'SweetNest Cake House',
+      subdomain: 'cake',
+      email: 'admin@cake.demo.fashionerp.com',
+      shopType: ShopType.BAKERY,
+      plan: SubscriptionPlan.PROFESSIONAL,
+      status: TenantStatus.ACTIVE,
+      currency: 'LKR',
+      country: 'LK',
+      timezone: 'Asia/Colombo',
+      maxProducts: 5000,
+    },
+  });
+  const bakeryBranch = await prisma.branch.upsert({
+    where: { tenantId_code: { tenantId: bakeryTenant.id, code: 'HO-001' } },
+    update: {},
+    create: {
+      tenantId: bakeryTenant.id,
+      name: 'Bambalapitiya Outlet',
+      code: 'HO-001',
+      isDefault: true,
+      city: 'Colombo',
+    },
+  });
+  const bakeryAdminRole = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId: bakeryTenant.id, name: 'Tenant Admin' } },
+    update: {},
+    create: { tenantId: bakeryTenant.id, name: 'Tenant Admin', type: RoleType.TENANT_ADMIN, isSystem: true },
+  });
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: bakeryTenant.id, email: 'admin@cake.demo.fashionerp.com' } },
+    update: { status: UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: bakeryTenant.id,
+      branchId: bakeryBranch.id,
+      email: 'admin@cake.demo.fashionerp.com',
+      firstName: 'SweetNest',
+      lastName: 'Admin',
+      passwordHash,
+      emailVerified: true,
+      status: UserStatus.ACTIVE,
+      roles: { create: [{ roleId: bakeryAdminRole.id }] },
+    },
+  });
+  for (const name of bakeryProfile.defaultCategories) {
+    await prisma.category.upsert({
+      where: { tenantId_slug: { tenantId: bakeryTenant.id, slug: slugifyCategory(name) } },
+      update: {},
+      create: { tenantId: bakeryTenant.id, name, slug: slugifyCategory(name) },
+    });
+  }
+  await prisma.tenant.update({
+    where: { id: bakeryTenant.id },
+    data: {
+      settings: {
+        shopProfile: {
+          type: bakeryProfile.type,
+          defaultUnit: bakeryProfile.defaultUnit,
+          units: bakeryProfile.units,
+          modules: bakeryProfile.modules,
+          labelTemplates: bakeryProfile.labelTemplates,
+          variantAttributes: bakeryProfile.variantAttributes,
+        },
+      },
+    },
+  });
+  console.log('✅ Cake House demo: cake.shop.hexalyte.com — admin@cake.demo.fashionerp.com / Admin@123456');
+  console.log('   (Run node scripts/_seed_cakehouse.js for full products+images+demo data)');
+
   await prisma.user.updateMany({
     where: { emailVerified: true, status: UserStatus.PENDING_VERIFICATION },
     data: { status: UserStatus.ACTIVE },
@@ -1636,6 +1710,7 @@ async function main() {
   console.log('  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)');
   console.log('  Tyre Shop:     admin@tyres.demo.fashionerp.com / Admin@123456 (subdomain: tyres)');
   console.log('  General Shop:  admin@general.demo.fashionerp.com / Admin@123456 (subdomain: general)');
+  console.log('  Cake House:    admin@cake.demo.fashionerp.com / Admin@123456 (subdomain: cake)');
   console.log('  Cashier:       cashier@demo.fashionerp.com / Cashier@123456');
   console.log('  Branch Mgr:    manager@demo.fashionerp.com / Manager@123456');
   console.log('  Inv. Manager:  inventory@demo.fashionerp.com / Manager@123456');

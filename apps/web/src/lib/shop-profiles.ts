@@ -8,6 +8,7 @@ export enum ShopType {
   SPARE_PARTS = 'SPARE_PARTS',
   TIRE_SHOP = 'TIRE_SHOP',
   GENERAL = 'GENERAL',
+  BAKERY = 'BAKERY',
 }
 
 export interface VariantAttributeDef {
@@ -158,6 +159,22 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'kg', 'pack'],
     modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    labelTemplates: ['sticker', 'shelf'],
+  },
+  [ShopType.BAKERY]: {
+    type: ShopType.BAKERY,
+    label: 'Cake House / Bakery',
+    labelSi: 'කේක් හවුස් / බේකරි',
+    emoji: '🎂',
+    description: 'Cakes, pastries & bakery — sizes, flavours, expiry & batch tracking',
+    defaultCategories: ['Cakes', 'Cupcakes', 'Pastries', 'Bread', 'Beverages', 'Ingredients', 'Custom Orders'],
+    variantAttributes: [
+      { name: 'Size', presets: ['500g', '1kg', '1.5kg', '2kg', 'Box of 6', 'Box of 12'], mapsTo: 'size' },
+      { name: 'Flavour', presets: ['Chocolate', 'Vanilla', 'Strawberry', 'Red Velvet', 'Butter', 'Black Forest'], mapsTo: 'style' },
+    ],
+    defaultUnit: 'pcs',
+    units: ['pcs', 'kg', 'g', 'box', 'pack', 'L', 'ml'],
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: true, batch: true, ...OFF, quotations: true },
     labelTemplates: ['sticker', 'shelf'],
   },
 };

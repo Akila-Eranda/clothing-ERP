@@ -286,6 +286,7 @@ enum ShopType {
   SPARE_PARTS
   TIRE_SHOP
   GENERAL
+  BAKERY
 }
 
 enum WarrantyClaimStatus {

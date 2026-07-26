@@ -30,7 +30,7 @@ var SHOP_PROFILES = {
   ["CLOTHING" /* CLOTHING */]: {
     type: "CLOTHING" /* CLOTHING */,
     label: "Clothing Shop",
-    labelSi: "\u0D87\u0DB3\u0DD4\u0DB8\u0DCA \u0D9A\u0DA9\u0DBA",
+    labelSi: "Apparel, fashion, boutiques",
     emoji: "\u{1F455}",
     description: "Apparel, fashion, boutiques \u2014 sizes, colors, hang tags",
     defaultCategories: ["Men's Wear", "Women's Wear", "Kids' Wear", "Accessories", "Footwear"],
@@ -138,6 +138,22 @@ var SHOP_PROFILES = {
     units: ["pcs", "set", "pair", "box", "kg", "pack"],
     modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
     labelTemplates: ["sticker", "shelf"]
+  },
+  ["BAKERY" /* BAKERY */]: {
+    type: "BAKERY" /* BAKERY */,
+    label: "Cake House / Bakery",
+    labelSi: "\u0D9A\u0DDA\u0D9A\u0DCA \u0DC4\u0DC0\u0DD4\u0DC3\u0DCA / \u0DB6\u0DDA\u0D9A\u0DBB\u0DD2",
+    emoji: "\u{1F382}",
+    description: "Cakes, pastries & bakery \u2014 sizes, flavours, expiry & batch tracking",
+    defaultCategories: ["Cakes", "Cupcakes", "Pastries", "Bread", "Beverages", "Ingredients", "Custom Orders"],
+    variantAttributes: [
+      { name: "Size", presets: ["500g", "1kg", "1.5kg", "2kg", "Box of 6", "Box of 12"], mapsTo: "size" },
+      { name: "Flavour", presets: ["Chocolate", "Vanilla", "Strawberry", "Red Velvet", "Butter", "Black Forest"], mapsTo: "style" }
+    ],
+    defaultUnit: "pcs",
+    units: ["pcs", "kg", "g", "box", "pack", "L", "ml"],
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: true, batch: true, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    labelTemplates: ["sticker", "shelf"]
   }
 };
 var SHOP_TYPE_LIST = Object.values(SHOP_PROFILES);
@@ -211,10 +227,10 @@ async function main() {
     }
   });
   console.log("\u2705 Platform admin: admin@hexalyte.com (password: Admin@123456) \u2014 admin3.hexalyte.com only");
-    const tenant = await prisma.tenant.upsert({
+  const tenant = await prisma.tenant.upsert({
     where: { subdomain: "demo" },
-        update: {},
-        create: {
+    update: {},
+    create: {
       name: "Demo Fashion Store",
       subdomain: "demo",
       email: "admin@demo.fashionerp.com",
@@ -227,20 +243,20 @@ async function main() {
     }
   });
   console.log(`\u2705 Tenant: ${tenant.name} (${tenant.id})`);
-    const branch = await prisma.branch.upsert({
+  const branch = await prisma.branch.upsert({
     where: { tenantId_code: { tenantId: tenant.id, code: "HO-001" } },
-        update: {},
-        create: {
-            tenantId: tenant.id,
+    update: {},
+    create: {
+      tenantId: tenant.id,
       name: "Main Store - Head Office",
       code: "HO-001",
-            isDefault: true,
+      isDefault: true,
       city: "Mumbai",
       state: "Maharashtra"
     }
   });
   console.log(`\u2705 Branch: ${branch.name} (${branch.id})`);
-    const permissionDefs = [
+  const permissionDefs = [
     // Products
     { resource: "products", action: "create" },
     { resource: "products", action: "read" },
@@ -309,32 +325,32 @@ async function main() {
       });
     }
   };
-    const superAdminRole = await prisma.role.upsert({
+  const superAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Super Admin" } },
-        update: {},
+    update: {},
     create: { tenantId: tenant.id, name: "Super Admin", type: import_client.RoleType.SUPER_ADMIN, isSystem: true }
-    });
-    const tenantAdminRole = await prisma.role.upsert({
+  });
+  const tenantAdminRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Tenant Admin" } },
-        update: {},
-        create: {
+    update: {},
+    create: {
       tenantId: tenant.id,
       name: "Tenant Admin",
       type: import_client.RoleType.TENANT_ADMIN,
       isSystem: true,
       permissions: { create: permissions.map((p) => ({ permissionId: p.id })) }
     }
-    });
-    const cashierRole = await prisma.role.upsert({
+  });
+  const cashierRole = await prisma.role.upsert({
     where: { tenantId_name: { tenantId: tenant.id, name: "Cashier" } },
-        update: {},
-        create: {
+    update: {},
+    create: {
       tenantId: tenant.id,
       name: "Cashier",
       type: import_client.RoleType.CASHIER,
       isSystem: true,
-            permissions: {
-        create: permissions.filter((p) => ["sales", "customers", "inventory", "products"].includes(p.resource) && p.action !== "delete").map((p) => ({ permissionId: p.id }))
+      permissions: {
+        create: permissions.filter((p) => ["sales", "customers", "inventory", "products", "cash"].includes(p.resource) && p.action !== "delete").map((p) => ({ permissionId: p.id }))
       }
     }
   });
@@ -356,7 +372,12 @@ async function main() {
           "purchases:update",
           "sales:read",
           "reports:read",
-          "products:read"
+          "products:read",
+          "customers:read",
+          "customers:create",
+          "customers:update",
+          "cash:read",
+          "cash:update"
         )
       }
     }
@@ -420,6 +441,10 @@ async function main() {
       }
     }
   });
+  await syncRolePermissions(
+    cashierRole.id,
+    permissions.filter((p) => ["sales", "customers", "inventory", "products", "cash"].includes(p.resource) && p.action !== "delete").map((p) => `${p.resource}:${p.action}`)
+  );
   await syncRolePermissions(branchManagerRole.id, [
     "inventory:read",
     "inventory:update",
@@ -428,7 +453,12 @@ async function main() {
     "purchases:update",
     "sales:read",
     "reports:read",
-    "products:read"
+    "products:read",
+    "customers:read",
+    "customers:create",
+    "customers:update",
+    "cash:read",
+    "cash:update"
   ]);
   await syncRolePermissions(inventoryManagerRole.id, [
     "inventory:read",
@@ -454,17 +484,17 @@ async function main() {
     "inventory:read"
   ]);
   console.log("\u2705 Seeded roles: Super Admin, Tenant Admin, Cashier, Branch Manager, Inventory Manager, Accountant, Purchasing Staff");
-    const adminUser = await prisma.user.upsert({
+  const adminUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "admin@demo.fashionerp.com" } },
     update: { status: import_client.UserStatus.ACTIVE, emailVerified: true },
-        create: {
-            tenantId: tenant.id,
-            branchId: branch.id,
+    create: {
+      tenantId: tenant.id,
+      branchId: branch.id,
       email: "admin@demo.fashionerp.com",
       firstName: "Admin",
       lastName: "User",
-            passwordHash,
-            emailVerified: true,
+      passwordHash,
+      emailVerified: true,
       status: import_client.UserStatus.ACTIVE,
       roles: { create: [{ roleId: tenantAdminRole.id }] }
     }
@@ -478,22 +508,44 @@ async function main() {
     create: { userId: adminUser.id, roleId: tenantAdminRole.id }
   });
   console.log(`\u2705 Shop admin: ${adminUser.email} (password: Admin@123456) \u2014 shop.hexalyte.com only`);
-    const cashierUser = await prisma.user.upsert({
+  const cashierPassword = await bcrypt.hash("Cashier@123456", 12);
+  const cashierUser = await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "cashier@demo.fashionerp.com" } },
-        update: {},
-        create: {
-            tenantId: tenant.id,
-            branchId: branch.id,
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      branchId: branch.id,
       email: "cashier@demo.fashionerp.com",
       firstName: "Demo",
       lastName: "Cashier",
-      passwordHash: await bcrypt.hash("Cashier@123456", 12),
-            emailVerified: true,
+      passwordHash: cashierPassword,
+      emailVerified: true,
       status: import_client.UserStatus.ACTIVE,
       roles: { create: [{ roleId: cashierRole.id }] }
     }
   });
-  console.log(`\u2705 Cashier user: ${cashierUser.email} (password: Cashier@123456)`);
+  console.log(`\u2705 Cashier 1: ${cashierUser.email} (password: Cashier@123456)`);
+  const cashier2User = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: "cashier2@demo.fashionerp.com" } },
+    update: { status: import_client.UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: tenant.id,
+      branchId: branch.id,
+      email: "cashier2@demo.fashionerp.com",
+      firstName: "Demo",
+      lastName: "Cashier 2",
+      passwordHash: cashierPassword,
+      emailVerified: true,
+      status: import_client.UserStatus.ACTIVE,
+      roles: { create: [{ roleId: cashierRole.id }] }
+    }
+  });
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: cashier2User.id, roleId: cashierRole.id } },
+    update: {},
+    create: { userId: cashier2User.id, roleId: cashierRole.id }
+  });
+  console.log(`\u2705 Cashier 2: ${cashier2User.email} (password: Cashier@123456) \u2014 separate cash drawer`);
   const managerPassword = await bcrypt.hash("Manager@123456", 12);
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId: tenant.id, email: "manager@demo.fashionerp.com" } },
@@ -945,7 +997,7 @@ async function main() {
     }
   });
   for (const name of tyreProfile.defaultCategories) {
-        await prisma.category.upsert({
+    await prisma.category.upsert({
       where: { tenantId_slug: { tenantId: tyreTenant.id, slug: slugifyCategory(name) } },
       update: {},
       create: { tenantId: tyreTenant.id, name, slug: slugifyCategory(name) }
@@ -1181,8 +1233,8 @@ async function main() {
     });
     const kamal = await prisma.customer.upsert({
       where: { tenantId_phone: { tenantId: tyreTenant.id, phone: "0771234567" } },
-            update: {},
-            create: {
+      update: {},
+      create: {
         tenantId: tyreTenant.id,
         firstName: "Kamal",
         lastName: "Perera",
@@ -1669,6 +1721,78 @@ async function main() {
     }
   });
   console.log("\u2705 General Shop demo: general.shop.hexalyte.com \u2014 admin@general.demo.fashionerp.com / Admin@123456");
+  const bakeryProfile = getShopProfile(import_client.ShopType.BAKERY);
+  const bakeryTenant = await prisma.tenant.upsert({
+    where: { subdomain: "cake" },
+    update: { shopType: import_client.ShopType.BAKERY, name: "SweetNest Cake House" },
+    create: {
+      name: "SweetNest Cake House",
+      subdomain: "cake",
+      email: "admin@cake.demo.fashionerp.com",
+      shopType: import_client.ShopType.BAKERY,
+      plan: import_client.SubscriptionPlan.PROFESSIONAL,
+      status: import_client.TenantStatus.ACTIVE,
+      currency: "LKR",
+      country: "LK",
+      timezone: "Asia/Colombo",
+      maxProducts: 5e3
+    }
+  });
+  const bakeryBranch = await prisma.branch.upsert({
+    where: { tenantId_code: { tenantId: bakeryTenant.id, code: "HO-001" } },
+    update: {},
+    create: {
+      tenantId: bakeryTenant.id,
+      name: "Bambalapitiya Outlet",
+      code: "HO-001",
+      isDefault: true,
+      city: "Colombo"
+    }
+  });
+  const bakeryAdminRole = await prisma.role.upsert({
+    where: { tenantId_name: { tenantId: bakeryTenant.id, name: "Tenant Admin" } },
+    update: {},
+    create: { tenantId: bakeryTenant.id, name: "Tenant Admin", type: import_client.RoleType.TENANT_ADMIN, isSystem: true }
+  });
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: bakeryTenant.id, email: "admin@cake.demo.fashionerp.com" } },
+    update: { status: import_client.UserStatus.ACTIVE, emailVerified: true },
+    create: {
+      tenantId: bakeryTenant.id,
+      branchId: bakeryBranch.id,
+      email: "admin@cake.demo.fashionerp.com",
+      firstName: "SweetNest",
+      lastName: "Admin",
+      passwordHash,
+      emailVerified: true,
+      status: import_client.UserStatus.ACTIVE,
+      roles: { create: [{ roleId: bakeryAdminRole.id }] }
+    }
+  });
+  for (const name of bakeryProfile.defaultCategories) {
+    await prisma.category.upsert({
+      where: { tenantId_slug: { tenantId: bakeryTenant.id, slug: slugifyCategory(name) } },
+      update: {},
+      create: { tenantId: bakeryTenant.id, name, slug: slugifyCategory(name) }
+    });
+  }
+  await prisma.tenant.update({
+    where: { id: bakeryTenant.id },
+    data: {
+      settings: {
+        shopProfile: {
+          type: bakeryProfile.type,
+          defaultUnit: bakeryProfile.defaultUnit,
+          units: bakeryProfile.units,
+          modules: bakeryProfile.modules,
+          labelTemplates: bakeryProfile.labelTemplates,
+          variantAttributes: bakeryProfile.variantAttributes
+        }
+      }
+    }
+  });
+  console.log("\u2705 Cake House demo: cake.shop.hexalyte.com \u2014 admin@cake.demo.fashionerp.com / Admin@123456");
+  console.log("   (Run node scripts/_seed_cakehouse.js for full products+images+demo data)");
   await prisma.user.updateMany({
     where: { emailVerified: true, status: import_client.UserStatus.PENDING_VERIFICATION },
     data: { status: import_client.UserStatus.ACTIVE }
@@ -1684,6 +1808,7 @@ async function main() {
   console.log("  Spare Parts:   admin@spareparts.demo.fashionerp.com / Admin@123456 (subdomain: spareparts)");
   console.log("  Tyre Shop:     admin@tyres.demo.fashionerp.com / Admin@123456 (subdomain: tyres)");
   console.log("  General Shop:  admin@general.demo.fashionerp.com / Admin@123456 (subdomain: general)");
+  console.log("  Cake House:    admin@cake.demo.fashionerp.com / Admin@123456 (subdomain: cake)");
   console.log("  Cashier:       cashier@demo.fashionerp.com / Cashier@123456");
   console.log("  Branch Mgr:    manager@demo.fashionerp.com / Manager@123456");
   console.log("  Inv. Manager:  inventory@demo.fashionerp.com / Manager@123456");
