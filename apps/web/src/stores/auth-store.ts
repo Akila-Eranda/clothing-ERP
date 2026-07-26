@@ -7,6 +7,8 @@ import { authApi, api, tokenStorage } from "@/lib/api";
 import { setStoredShopType, ShopType } from "@/lib/shop-profiles";
 import { normalizeRole } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
+import { clearPosCounterId } from "@/lib/pos-counter";
+import { posCashierStorage } from "@/lib/pos-cashier";
 
 interface AuthStore {
   user: User | null;
@@ -41,6 +43,8 @@ export const useAuthStore = create<AuthStore>()(
 
       logout: () => {
         tokenStorage.clear();
+        clearPosCounterId();
+        posCashierStorage.clear();
         useBranchStore.getState().clearBranch();
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },
@@ -100,6 +104,8 @@ export const useAuthStore = create<AuthStore>()(
       logoutApi: async () => {
         try { await authApi.logout(); } catch {}
         tokenStorage.clear();
+        clearPosCounterId();
+        posCashierStorage.clear();
         useBranchStore.getState().clearBranch();
         set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
       },

@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -34,6 +34,7 @@ import { POS_SHORTCUT_SECTIONS } from "@/components/pos/pos-shortcuts";
 import { usePosKeyboard } from "@/components/pos/use-pos-keyboard";
 import { PosShiftGate } from "@/components/pos/pos-shift-gate";
 import { PosCashClose } from "@/components/pos/pos-cash-close";
+import { PosTransferFundsModal } from "@/components/pos/pos-transfer-funds-modal";
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
 import { PosDemoProductPanel } from "@/components/pos/pos-demo-product-panel";
@@ -410,6 +411,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [warrantySaleId, setWarrantySaleId] = React.useState<string | null>(null);
   const [shiftReady, setShiftReady] = React.useState(false);
   const [showCashClose, setShowCashClose] = React.useState(false);
+  const [showTransferFunds, setShowTransferFunds] = React.useState(false);
   const [pinLocked, setPinLocked] = React.useState(false);
   const [pinEntry, setPinEntry] = React.useState("");
   const [pinError, setPinError] = React.useState(false);
@@ -569,6 +571,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const openCashClose = React.useCallback(() => setShowCashClose(true), []);
   const closeCashClose = React.useCallback(() => setShowCashClose(false), []);
+  const closeTransferFunds = React.useCallback(() => setShowTransferFunds(false), []);
   const waPhoneRef = React.useRef<HTMLInputElement>(null);
   const closeWaBillOffer = React.useCallback(() => {
     setWaBillOffer(null);
@@ -2342,6 +2345,8 @@ ${rows}
     openCashClose,
     showCashClose,
     closeCashClose,
+    showTransferFunds,
+    closeTransferFunds,
     waBillOfferOpen: !!waBillOffer,
     closeWaBillOffer,
     sendWaBill,
@@ -2352,7 +2357,7 @@ ${rows}
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
-    posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose,
+    posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose, showTransferFunds,
     waBillOffer, addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
@@ -2361,7 +2366,7 @@ ${rows}
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
-    openCartCustomerDropdown, openCashClose, closeCashClose, closeWaBillOffer, sendWaBill, setExactCashTender, focusCheckoutGiftOrCheque,
+    openCartCustomerDropdown, openCashClose, closeCashClose, closeTransferFunds, closeWaBillOffer, sendWaBill, setExactCashTender, focusCheckoutGiftOrCheque,
     payState.allowPartial, payState.splitMode,
   ]);
 
@@ -3585,6 +3590,12 @@ ${rows}
           />
         )}
 
+        {showTransferFunds && (
+          <PosTransferFundsModal
+            onClose={() => setShowTransferFunds(false)}
+          />
+        )}
+
         {/* PIN LOCK SCREEN */}
         {pinLocked&&(
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"var(--pos-pin-bg)"}}>
@@ -4703,6 +4714,19 @@ ${rows}
               >
                 {dayEndLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TrendingUp className="h-3.5 w-3.5" />}
                 <span className="hidden sm:inline">Day End</span>
+              </button>
+              <button
+                onClick={() => setShowTransferFunds(true)}
+                title="Transfer funds to cashiers"
+                className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
+                style={{
+                  background: isPosLight ? "#4F46E5" : "rgba(79,110,247,0.15)",
+                  color: isPosLight ? "#ffffff" : "#a5b4fc",
+                  border: `1px solid ${isPosLight ? "#4338CA" : "rgba(79,110,247,0.35)"}`,
+                }}
+              >
+                <ArrowLeftRight className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Transfer</span>
               </button>
               <button
                 onClick={() => setShowCashClose(true)}

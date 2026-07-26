@@ -15,6 +15,7 @@ export interface BranchOption {
 
 interface BranchContextValue {
   branches: BranchOption[];
+  /** True after /branches loaded and an active branch is written (or list empty). */
   ready: boolean;
 }
 
@@ -49,19 +50,19 @@ function pickDefaultBranch(
 
 export function BranchProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
-  const { setBranch, activeBranchId } = useBranchStore();
+  const { setBranch } = useBranchStore();
   const [branches, setBranches] = React.useState<BranchOption[]>([]);
   const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
+    setReady(false);
 
-    // Use cached branch immediately so pages can fetch data without waiting on /branches.
-    const cachedId = getStoredBranchId() ?? activeBranchId ?? user?.branchId ?? null;
-    if (cachedId && !activeBranchId) {
+    // Seed from cache so API headers have a branch while we validate.
+    const cachedId = getStoredBranchId() ?? useBranchStore.getState().activeBranchId ?? user?.branchId ?? null;
+    if (cachedId && !useBranchStore.getState().activeBranchId) {
       setBranch(cachedId, useBranchStore.getState().activeBranchName);
     }
-    setReady(true);
 
     api
       .get<{ data: BranchOption[] }>("/branches?limit=50")
@@ -82,21 +83,35 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
 
         if (currentValid) {
           const current = list.find((b) => b.id === currentId)!;
-          if (useBranchStore.getState().activeBranchName !== current.name) {
-            setBranch(current.id, current.name);
+          if (
+            useBranchStore.getState().activeBranchId !== current.id ||
+            useBranchStore.getState().activeBranchName !== current.name
+          ) {
+            // Same branch id — update name only without clearing counter.
+            if (useBranchStore.getState().activeBranchId === current.id) {
+              useBranchStore.setState({ activeBranchName: current.name });
+              if (typeof window !== "undefined") {
+                localStorage.setItem("fe_active_branch", current.id);
+              }
+            } else {
+              setBranch(current.id, current.name);
+            }
           }
-          return;
+        } else {
+          const chosen = pickDefaultBranch(list, user?.branchId);
+          if (chosen) setBranch(chosen.id, chosen.name);
         }
-
-        const chosen = pickDefaultBranch(list, user?.branchId);
-        if (chosen) setBranch(chosen.id, chosen.name);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setReady(true);
+      });
 
     return () => {
       cancelled = true;
     };
-  }, [user?.branchId, setBranch, activeBranchId]);
+    // Only re-resolve when user assignment changes — not on every branch switch.
+  }, [user?.branchId, setBranch]);
 
   return (
     <BranchContext.Provider value={{ branches, ready }}>

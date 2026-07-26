@@ -132,6 +132,8 @@ export interface PosKeyboardContext {
   openCashClose: () => void;
   showCashClose: boolean;
   closeCashClose: () => void;
+  showTransferFunds: boolean;
+  closeTransferFunds: () => void;
   /** WhatsApp send-bill modal after sale */
   waBillOfferOpen: boolean;
   closeWaBillOffer: () => void;
@@ -163,6 +165,7 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.showShortcuts
     || ctx.showDayEnd
     || ctx.showCashClose
+    || ctx.showTransferFunds
     || ctx.waBillOfferOpen
     || ctx.qtyPopupOpen
     || !!ctx.selectedProductName
@@ -224,6 +227,14 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (e.key === "Escape") {
           e.preventDefault();
           ctx.closeCashClose();
+        }
+        return;
+      }
+
+      if (ctx.showTransferFunds) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.closeTransferFunds();
         }
         return;
       }
@@ -292,6 +303,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         e.preventDefault();
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
         if (ctx.showCashClose) { ctx.closeCashClose(); return; }
+        if (ctx.showTransferFunds) { ctx.closeTransferFunds(); return; }
         if (ctx.waBillOfferOpen) { ctx.closeWaBillOffer(); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }

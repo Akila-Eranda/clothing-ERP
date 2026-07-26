@@ -39,6 +39,42 @@ export class CashMovementDto {
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
 }
 
+export enum CashTransferSource {
+  SAFE = 'SAFE',
+  REGISTER = 'REGISTER',
+}
+
+export class TransferFundsDto {
+  @ApiProperty({ description: 'Destination open cash shift' })
+  @IsString()
+  toRegisterId: string;
+
+  @ApiProperty()
+  @IsNumber()
+  @Min(0.01)
+  amount: number;
+
+  @ApiPropertyOptional({
+    enum: CashTransferSource,
+    description: 'SAFE = top-up from office float; REGISTER = move from another open till',
+    default: CashTransferSource.SAFE,
+  })
+  @IsOptional()
+  @IsEnum(CashTransferSource)
+  from?: CashTransferSource;
+
+  @ApiPropertyOptional({ description: 'Required when from=REGISTER (source open shift)' })
+  @IsOptional()
+  @IsString()
+  fromRegisterId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
 export class CloseCashRegisterDto {
   @ApiProperty() @IsNumber() @Min(0) actualCash: number;
   @ApiPropertyOptional() @IsOptional() @IsObject() denominations?: Record<string, number>;
@@ -675,6 +711,188 @@ export class CashManagementService {
     return this.getPeriodSummary(tenantId, branchId, today, today);
   }
 
+  async listOpenShifts(tenantId: string, branchId: string | undefined) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const registers = await this.prisma.cashRegister.findMany({
+      where: {
+        tenantId,
+        branchId: resolvedBranchId,
+        status: CashRegisterStatus.OPEN,
+      },
+      orderBy: { openingTime: 'asc' },
+      include: {
+        movements: { orderBy: { createdAt: 'asc' } },
+        cashier: { select: { id: true, firstName: true, lastName: true, email: true } },
+        branch: { select: { id: true, name: true, code: true } },
+        counter: { select: { id: true, name: true, code: true } },
+      },
+    });
+    return registers.map((r) => {
+      const view = this.buildRegisterView(r);
+      return {
+        id: view.id,
+        openingCash: view.openingCash,
+        openingTime: view.openingTime,
+        status: view.status,
+        cashierId: view.cashierId,
+        cashierName: view.cashierName,
+        counterId: r.counterId,
+        counterName: r.counter?.name ?? null,
+        counterCode: r.counter?.code ?? null,
+        expectedCash: view.summary.expectedCash,
+        summary: view.summary,
+      };
+    });
+  }
+
+  private canManageCashTransfers(roles: string[] = []) {
+    return (
+      bypassesWorkflowApproval(roles)
+      || roles.includes(RoleType.BRANCH_MANAGER)
+      || roles.includes(RoleType.ACCOUNTANT)
+      || roles.includes(RoleType.INVENTORY_MANAGER)
+    );
+  }
+
+  async transferFunds(
+    tenantId: string,
+    branchId: string | undefined,
+    userId: string,
+    userRoles: string[],
+    dto: TransferFundsDto,
+    actingCashierId?: string,
+  ) {
+    const amount = Math.round(dto.amount * 100) / 100;
+    if (!(amount > 0)) throw new BadRequestException('Amount must be greater than zero');
+
+    const from = dto.from ?? CashTransferSource.SAFE;
+    const reason = (dto.reason || '').trim() || 'Funds transfer';
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+
+    const toRegister = await this.getRegisterEntity(dto.toRegisterId, tenantId);
+    if (toRegister.branchId !== resolvedBranchId) {
+      throw new BadRequestException('Destination shift is on another branch');
+    }
+    if (toRegister.status !== CashRegisterStatus.OPEN) {
+      throw new BadRequestException('Destination shift is not open');
+    }
+
+    const destLabel =
+      toRegister.counter?.name
+      ?? (toRegister.cashier
+        ? `${toRegister.cashier.firstName} ${toRegister.cashier.lastName}`.trim()
+        : 'cashier');
+
+    if (from === CashTransferSource.SAFE) {
+      await this.prisma.$transaction(async (tx) => {
+        await recordCashMovement(tx, {
+          tenantId,
+          registerId: toRegister.id,
+          type: CashMovementType.DEPOSIT,
+          amount,
+          reference: `XFER-SAFE-${Date.now()}`,
+          description: `Transfer from safe · ${reason}`,
+          createdById: userId,
+        });
+      });
+
+      this.eventEmitter.emit('cash.funds.transferred', {
+        tenantId,
+        branchId: resolvedBranchId,
+        from: 'SAFE',
+        toRegisterId: toRegister.id,
+        amount,
+        userId,
+      });
+
+      return {
+        amount,
+        from: 'SAFE',
+        to: await this.getRegisterById(toRegister.id, tenantId),
+        message: `Transferred LKR ${amount.toFixed(2)} to ${destLabel}`,
+      };
+    }
+
+    // REGISTER → REGISTER
+    if (!dto.fromRegisterId) {
+      throw new BadRequestException('fromRegisterId is required when transferring from a till');
+    }
+    if (dto.fromRegisterId === dto.toRegisterId) {
+      throw new BadRequestException('Cannot transfer to the same shift');
+    }
+
+    const fromRegister = await this.getRegisterEntity(dto.fromRegisterId, tenantId);
+    if (fromRegister.branchId !== resolvedBranchId) {
+      throw new BadRequestException('Source shift is on another branch');
+    }
+    if (fromRegister.status !== CashRegisterStatus.OPEN) {
+      throw new BadRequestException('Source shift is not open');
+    }
+
+    // PIN-switched cashiers act under their own id while the terminal stays logged in as someone else.
+    const isSourceCashier =
+      fromRegister.cashierId === userId || fromRegister.cashierId === actingCashierId;
+    if (!isSourceCashier && !this.canManageCashTransfers(userRoles)) {
+      throw new ForbiddenException('Only the till cashier or a manager can transfer from this shift');
+    }
+
+    const expected = computeExpectedCashFromMovements(
+      fromRegister.openingCash,
+      fromRegister.movements,
+    );
+    if (amount > expected + 0.001) {
+      throw new BadRequestException(
+        `Insufficient cash in source till (expected LKR ${expected.toFixed(2)})`,
+      );
+    }
+
+    const fromLabel =
+      fromRegister.counter?.name
+      ?? (fromRegister.cashier
+        ? `${fromRegister.cashier.firstName} ${fromRegister.cashier.lastName}`.trim()
+        : 'till');
+
+    const ref = `XFER-${Date.now()}`;
+    await this.prisma.$transaction(async (tx) => {
+      await recordCashMovement(tx, {
+        tenantId,
+        registerId: fromRegister.id,
+        type: CashMovementType.WITHDRAWAL,
+        amount,
+        reference: ref,
+        description: `Transfer to ${destLabel} · ${reason}`,
+        createdById: userId,
+      });
+      await recordCashMovement(tx, {
+        tenantId,
+        registerId: toRegister.id,
+        type: CashMovementType.DEPOSIT,
+        amount,
+        reference: ref,
+        description: `Transfer from ${fromLabel} · ${reason}`,
+        createdById: userId,
+      });
+    });
+
+    this.eventEmitter.emit('cash.funds.transferred', {
+      tenantId,
+      branchId: resolvedBranchId,
+      from: 'REGISTER',
+      fromRegisterId: fromRegister.id,
+      toRegisterId: toRegister.id,
+      amount,
+      userId,
+    });
+
+    return {
+      amount,
+      from: 'REGISTER',
+      fromRegister: await this.getRegisterById(fromRegister.id, tenantId),
+      to: await this.getRegisterById(toRegister.id, tenantId),
+      message: `Transferred LKR ${amount.toFixed(2)} from ${fromLabel} to ${destLabel}`,
+    };
+  }
+
   async getRegisterById(id: string, tenantId: string) {
     const register = await this.getRegisterEntity(id, tenantId);
     return this.buildRegisterView(register);
@@ -798,6 +1016,32 @@ export class CashManagementController {
       user.branchId,
       cashierId,
       counterId || counterHeader || undefined,
+    );
+  }
+
+  @Get('open-shifts')
+  @RequireAnyPermissions('cash:read', 'sales:read', 'sales:create')
+  @ApiOperation({ summary: 'List all open cash shifts on the branch (for funds transfer)' })
+  listOpenShifts(@CurrentUser() user: IAuthUser) {
+    return this.cashService.listOpenShifts(user.tenantId, user.branchId);
+  }
+
+  @Post('transfer')
+  @RequireAnyPermissions('cash:create', 'sales:create', 'cash:update')
+  @ApiOperation({ summary: 'Transfer funds to a cashier till (from safe or another till)' })
+  transferFunds(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: TransferFundsDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+  ) {
+    const actingCashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
+    return this.cashService.transferFunds(
+      user.tenantId,
+      user.branchId,
+      user.id,
+      user.roles ?? [],
+      dto,
+      actingCashierId,
     );
   }
 
