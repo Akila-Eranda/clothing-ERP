@@ -1,7 +1,7 @@
 import { api } from '@/lib/api';
 import type { ReceiptSettings } from '@/lib/use-receipt-settings';
 
-export type ReceiptPrintType = 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN';
+export type ReceiptPrintType = 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN' | 'REPAIR';
 
 export interface ReceiptPrintResult {
   logId?: string;

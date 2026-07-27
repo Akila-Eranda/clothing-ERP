@@ -518,6 +518,7 @@ enum ReceiptPrintType {
   PAYSLIP
   LABEL
   GRN
+  REPAIR
 }
 
 enum ReceiptPrintStatus {

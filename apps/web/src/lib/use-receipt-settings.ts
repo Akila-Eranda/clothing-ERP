@@ -20,6 +20,8 @@ export interface ReceiptSettings {
   showCashier: boolean;
   showCustomer: boolean;
   showBarcode: boolean;
+  /** When false, repair/job-card printed invoices hide PART lines (stock records unchanged). */
+  showAddedPartsOnInvoice: boolean;
   fontSize: "small" | "medium" | "large";
   printServerEnabled: boolean;
   printServerUrl: string;
@@ -47,6 +49,7 @@ export const RECEIPT_DEFAULTS: ReceiptSettings = {
   showCashier: true,
   showCustomer: true,
   showBarcode: true,
+  showAddedPartsOnInvoice: true,
   fontSize: "medium",
   printServerEnabled: false,
   printServerUrl: "",

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
   ClipboardList, Plus, Loader2, RefreshCw, CheckCircle2, Users, Clock,
-  Banknote, Wrench, Package, Play, FileCheck,
+  Banknote, Wrench, Package, Play, FileCheck, Printer,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalInlineFooterClass } from "@/components/ui/modal-footer";
@@ -22,6 +22,8 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { printRepairInvoice } from "@/lib/job-card-invoice-print";
 
 interface JobLine {
   id: string; lineType: string; description?: string | null; quantity: number; unitPrice: number; total: number;
@@ -187,11 +189,15 @@ function JobDetailDialog({
   onClose,
   onSave,
   onStatus,
+  onPrint,
+  printing,
 }: {
   job: JobCard | null;
   onClose: () => void;
   onSave: (id: string, afterNotes: string, signature: string) => void;
   onStatus: (id: string, status: string) => void;
+  onPrint: (job: JobCard) => void;
+  printing?: boolean;
 }) {
   const [afterNotes, setAfterNotes] = useState("");
   const [signature, setSignature] = useState("");
@@ -291,6 +297,16 @@ function JobDetailDialog({
                   <FileCheck className="h-3.5 w-3.5" /> Mark Invoiced
                 </Button>
               )}
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1"
+                disabled={printing}
+                onClick={() => onPrint(job)}
+              >
+                {printing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                Print Invoice
+              </Button>
             </div>
             <div className="flex gap-2">
               <Button size="sm" variant="outline" onClick={onClose}>Close</Button>
@@ -305,6 +321,7 @@ function JobDetailDialog({
 
 export default function JobCardsPage() {
   const { profile } = useShopWorkspace();
+  const { settings: receiptSettings } = useReceiptSettings();
   const [jobs, setJobs] = useState<JobCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -315,6 +332,7 @@ export default function JobCardsPage() {
   const [viewJob, setViewJob] = useState<JobCard | null>(null);
   const [form, setForm] = useState({ customerId: "", complaintNotes: "", serviceId: "", technicianId: "" });
   const [saving, setSaving] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -376,6 +394,42 @@ export default function JobCardsPage() {
       setViewJob(null);
     } catch (e: unknown) { toast.error((e as Error).message); }
   }, [fetchJobs]);
+
+  const printInvoice = useCallback(async (job: JobCard) => {
+    setPrinting(true);
+    try {
+      await printRepairInvoice(
+        {
+          jobNumber: job.jobNumber,
+          customerName: customerName(job),
+          customerPhone: job.customer.phone,
+          vehicleLabel: vehicleLabel(job),
+          repairDescription: job.complaintNotes,
+          afterNotes: job.afterNotes,
+          status: job.status,
+          createdAt: job.createdAt,
+          total: job.total,
+          lines: job.lines.map((l) => ({
+            lineType: l.lineType,
+            description: lineLabel(l),
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            total: l.total,
+          })),
+        },
+        receiptSettings,
+      );
+      toast.success(
+        receiptSettings.showAddedPartsOnInvoice !== false
+          ? "Repair invoice printed (parts listed)"
+          : "Repair invoice printed (parts hidden)",
+      );
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Print failed");
+    } finally {
+      setPrinting(false);
+    }
+  }, [receiptSettings]);
 
   const displayed = useMemo(
     () => statusFilter === "ALL" ? jobs : jobs.filter((j) => j.status === statusFilter),
@@ -598,6 +652,8 @@ export default function JobCardsPage() {
           onClose={() => setViewJob(null)}
           onSave={saveDetails}
           onStatus={updateStatus}
+          onPrint={printInvoice}
+          printing={printing}
         />
       </div>
     </ModuleGate>
