@@ -7,7 +7,7 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 HOST = "95.217.14.198"
 USER = "root"
-PASSWORD = r"pwrU\r*UGS£?8H2V$8]<qT"
+PASSWORD = r"FrCnCXMdTgiu"
 DEPLOY_DIR = "/opt/fashionerp"
 
 DEPLOY = f"""#!/bin/bash

@@ -31,6 +31,7 @@ import {
   ResetPasswordDto,
   ChangePasswordDto,
   Verify2FADto,
+  ImpersonateExchangeDto,
 } from './dto/login.dto';
 import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
@@ -103,6 +104,15 @@ export class AuthController {
     @Headers('user-agent') userAgent: string,
   ) {
     return this.authService.platformLogin(dto, req.ip, userAgent);
+  }
+
+  @Public()
+  @Post('impersonate-exchange')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Exchange support impersonation code for session tokens' })
+  impersonateExchange(@Body() dto: ImpersonateExchangeDto) {
+    return this.authService.impersonateExchange(dto.code);
   }
 
   @Public()

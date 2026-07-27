@@ -504,6 +504,8 @@ model Tenant {
   accountingBudgets AccountingBudget[]
   recurringJournals RecurringJournal[]
   exchangeRates     ExchangeRate[]
+  featureSuggestions FeatureSuggestion[]
+  releaseReads     TenantReleaseRead[]
 
   @@map("tenants")
 }
@@ -629,6 +631,8 @@ model User {
   cashRegisters       CashRegister[] @relation("CashierRegisters")
   cashRegistersApproved CashRegister[] @relation("CashRegisterApprover")
   cashMovements       CashMovement[]
+  featureSuggestions  FeatureSuggestion[]
+  announcementDismissals AnnouncementDismissal[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -3909,4 +3913,193 @@ model CalendarMeeting {
 
   @@index([tenantId, startsAt])
   @@map("calendar_meetings")
+}
+
+// ============================================================
+// PLATFORM OPS (admin parity with Hexalyte Enterprise)
+// ============================================================
+
+enum FeatureSuggestionStatus {
+  NEW
+  UNDER_REVIEW
+  PLANNED
+  IN_PROGRESS
+  DONE
+  DECLINED
+}
+
+enum FeatureSuggestionPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum FeatureSuggestionHistoryAction {
+  CREATED
+  STATUS_CHANGED
+  PRIORITY_CHANGED
+  RESPONSE_UPDATED
+  NOTE_UPDATED
+}
+
+model PlatformAnnouncement {
+  id            String    @id @default(cuid())
+  title         String
+  body          String
+  type          String    @default("INFO")
+  status        String    @default("DRAFT")
+  target        String    @default("ALL")
+  targetTenants String[]  @default([])
+  dismissible   Boolean   @default(true)
+  scheduledAt   DateTime?
+  sentAt        DateTime?
+  seenCount     Int       @default(0)
+  createdBy     String    @default("Admin")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  dismissals AnnouncementDismissal[]
+
+  @@index([status, createdAt])
+  @@map("platform_announcements")
+}
+
+model AnnouncementDismissal {
+  id             String   @id @default(cuid())
+  userId         String
+  announcementId String
+  dismissedAt    DateTime @default(now())
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  announcement PlatformAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, announcementId])
+  @@index([userId])
+  @@index([announcementId])
+  @@map("announcement_dismissals")
+}
+
+model PlatformRelease {
+  id             String   @id @default(cuid())
+  version        String
+  title          String
+  summary        String
+  releaseDate    DateTime
+  status         String   @default("DRAFT")
+  popupEnabled   Boolean  @default(true)
+  active         Boolean  @default(true)
+  targetType     String   @default("ALL")
+  targetPlans    String[] @default([])
+  targetTenants  String[] @default([])
+  targetBranches String[] @default([])
+  imageUrl       String?
+  videoUrl       String?
+  docUrl         String?
+  createdBy      String   @default("Admin")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items PlatformReleaseItem[]
+  reads TenantReleaseRead[]
+
+  @@index([status, releaseDate])
+  @@index([version])
+  @@map("platform_releases")
+}
+
+model PlatformReleaseItem {
+  id           String  @id @default(cuid())
+  releaseId    String
+  category     String
+  module       String?
+  featureName  String
+  description  String
+  badge        String?
+  displayOrder Int     @default(0)
+  imageUrl     String?
+  videoUrl     String?
+  docUrl       String?
+
+  release PlatformRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@index([releaseId, displayOrder])
+  @@map("platform_release_items")
+}
+
+model TenantReleaseRead {
+  id        String    @id @default(cuid())
+  tenantId  String
+  releaseId String
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+
+  tenant  Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  release PlatformRelease @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, releaseId])
+  @@index([tenantId])
+  @@index([releaseId])
+  @@map("tenant_release_reads")
+}
+
+model FeatureSuggestion {
+  id               String                    @id @default(cuid())
+  tenantId         String
+  submittedById    String
+  category         String
+  title            String
+  description      String
+  status           FeatureSuggestionStatus   @default(NEW)
+  priority         FeatureSuggestionPriority @default(MEDIUM)
+  publicResponse   String?
+  internalNote     String?
+  respondedByEmail String?
+  respondedAt      DateTime?
+  createdAt        DateTime                  @default(now())
+  updatedAt        DateTime                  @updatedAt
+
+  tenant      Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  submittedBy User                       @relation(fields: [submittedById], references: [id], onDelete: Cascade)
+  history     FeatureSuggestionHistory[]
+
+  @@index([tenantId])
+  @@index([submittedById])
+  @@index([status])
+  @@index([priority])
+  @@index([category])
+  @@index([createdAt])
+  @@map("feature_suggestions")
+}
+
+model FeatureSuggestionHistory {
+  id               String                         @id @default(cuid())
+  suggestionId     String
+  action           FeatureSuggestionHistoryAction
+  oldStatus        FeatureSuggestionStatus?
+  newStatus        FeatureSuggestionStatus?
+  oldPriority      FeatureSuggestionPriority?
+  newPriority      FeatureSuggestionPriority?
+  publicResponse   String?
+  performedByEmail String
+  createdAt        DateTime                       @default(now())
+
+  suggestion FeatureSuggestion @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
+
+  @@index([suggestionId, createdAt])
+  @@map("feature_suggestion_history")
+}
+
+model SupportNote {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  title     String
+  body      String
+  createdBy String   @default("Admin")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("support_notes")
 }

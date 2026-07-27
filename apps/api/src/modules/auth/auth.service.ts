@@ -554,4 +554,65 @@ export class AuthService {
   async hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, BCRYPT_ROUNDS);
   }
+
+  /** Exchange one-time support impersonation code for a short-lived session. */
+  async impersonateExchange(code: string) {
+    const { consumeImpersonationCode } = await import(
+      '@/modules/platform-ops/impersonation-codes'
+    );
+    const token = consumeImpersonationCode(code);
+    if (!token) throw new UnauthorizedException('Invalid or expired impersonation code');
+
+    let payload: IJwtPayload;
+    try {
+      payload = await this.jwtService.verifyAsync<IJwtPayload>(token, {
+        secret: this.configService.get('jwt.accessSecret'),
+        issuer: this.configService.get('jwt.issuer'),
+        audience: this.configService.get('jwt.audience'),
+      });
+    } catch {
+      throw new UnauthorizedException('Invalid or expired impersonation code');
+    }
+
+    if (!payload.impersonation) {
+      throw new UnauthorizedException('Invalid or expired impersonation code');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      include: {
+        roles: {
+          include: {
+            role: {
+              include: { permissions: { include: { permission: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('Invalid or expired impersonation code');
+    }
+
+    const roles = user.roles.map((r) => r.role.type);
+    const permissions = user.roles.flatMap((ur) =>
+      ur.role.permissions.map((rp) => `${rp.permission.resource}:${rp.permission.action}`),
+    );
+
+    return {
+      accessToken: token,
+      refreshToken: token,
+      user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        tenantId: user.tenantId,
+        branchId: user.branchId,
+        roles,
+        permissions,
+        impersonation: true,
+      },
+    };
+  }
 }

@@ -67,3 +67,9 @@ export class Verify2FADto {
   @IsString()
   code: string;
 }
+
+export class ImpersonateExchangeDto {
+  @ApiProperty({ description: 'One-time impersonation code from platform support tools' })
+  @IsString()
+  code: string;
+}

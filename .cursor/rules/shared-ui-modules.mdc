@@ -1,0 +1,40 @@
+---
+description: Use shared Button and Table modules for consistent UI across the app
+globs: apps/web/src/**/*.{tsx,ts}
+alwaysApply: false
+---
+
+# Shared UI modules
+
+## Buttons
+
+All dashboard / admin / hub action buttons MUST use:
+
+```ts
+import { Button } from "@/components/ui/button";
+```
+
+Variants (do not invent `bg-emerald-600` / `bg-red-600` overrides):
+
+| Use | Variant |
+|-----|---------|
+| Primary action | `default` |
+| Secondary / cancel / refresh | `outline` |
+| Positive confirm (start, create, save green) | `success` |
+| Warning | `warning` |
+| Hard destructive CTA | `danger` |
+| Soft destructive | `destructive` |
+| Icon only | `ghost` + `size="icon-sm"` |
+| Filter chips | `chip` idle, `success` selected |
+
+**Exceptions:** POS shell (`pos-overlay`, POS panels with `--pos-*` tokens) and print/receipt HTML may keep local controls.
+
+## Tables
+
+List / data grids MUST use:
+
+```ts
+import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
+```
+
+**Exceptions:** print statements, receipt HTML, POS cart line editors, financial statement layouts.

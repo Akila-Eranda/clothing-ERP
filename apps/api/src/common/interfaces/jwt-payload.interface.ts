@@ -5,6 +5,7 @@ export interface IJwtPayload {
   branchId?: string;
   roles: string[];
   permissions: string[];
+  impersonation?: boolean;
   iat?: number;
   exp?: number;
   iss?: string;

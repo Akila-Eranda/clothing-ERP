@@ -55,6 +55,7 @@ import { BranchContextInterceptor } from './common/interceptors/branch-context.i
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
+import { PlatformOpsModule } from './modules/platform-ops/platform-ops.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { WarehouseModule } from './modules/warehouse/warehouse.module';
     WorkshopModule,
     CalendarModule,
     WarehouseModule,
+    PlatformOpsModule,
 
     // ── Infrastructure ────────────────────────────────────────
     MailModule,
@@ -143,6 +145,7 @@ export class AppModule implements NestModule {
         { path: 'api/v1/tenants/shop-types', method: RequestMethod.GET },
         { path: 'api/v1/auth/login', method: RequestMethod.POST },
         { path: 'api/v1/auth/platform-login', method: RequestMethod.POST },
+        { path: 'api/v1/auth/impersonate-exchange', method: RequestMethod.POST },
         { path: 'api/v1/auth/refresh', method: RequestMethod.POST },
         { path: 'api/v1/health', method: RequestMethod.GET },
       )
