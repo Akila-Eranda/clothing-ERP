@@ -901,31 +901,6 @@ export default function SettingsPage() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Repair Invoice</CardTitle>
-                  <CardDescription>
-                    Controls what appears on printed / PDF repair (job card) invoices. Parts stay recorded in stock either way.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between py-2.5">
-                    <div>
-                      <p className="text-sm font-medium">Show Added Parts on Invoice</p>
-                      <p className="text-xs text-muted-foreground">
-                        {receiptForm.showAddedPartsOnInvoice
-                          ? "Replacement parts (Display, Battery, etc.) are listed on the printed invoice"
-                          : "Invoice shows repair description and total only — parts are hidden from the customer copy"}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={receiptForm.showAddedPartsOnInvoice !== false}
-                      onCheckedChange={(v) => setReceiptForm((f) => ({ ...f, showAddedPartsOnInvoice: v }))}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
                   <CardTitle className="text-base flex items-center gap-2">
                     <Server className="h-4 w-4 text-primary" />Store Print Server
                   </CardTitle>

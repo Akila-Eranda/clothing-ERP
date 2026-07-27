@@ -54,8 +54,6 @@ export class ReceiptSettingsDto {
   @ApiPropertyOptional() @IsOptional() showCashier?: boolean;
   @ApiPropertyOptional() @IsOptional() showCustomer?: boolean;
   @ApiPropertyOptional() @IsOptional() showBarcode?: boolean;
-  /** Repair / job-card invoice: show PART lines on printed invoice (default true). */
-  @ApiPropertyOptional() @IsOptional() showAddedPartsOnInvoice?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() fontSize?: string;
   @ApiPropertyOptional() @IsOptional() printServerEnabled?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsString() printServerUrl?: string;
@@ -130,7 +128,6 @@ interface StoredReceiptSettings {
   showCashier: boolean;
   showCustomer: boolean;
   showBarcode: boolean;
-  showAddedPartsOnInvoice: boolean;
   fontSize: string;
   printServerEnabled: boolean;
   printServerUrl: string;
@@ -968,7 +965,6 @@ export class TenantsService {
       showCashier:  bool(receipt['showCashier'], true),
       showCustomer: bool(receipt['showCustomer'], true),
       showBarcode:  bool(receipt['showBarcode'], false),
-      showAddedPartsOnInvoice: bool(receipt['showAddedPartsOnInvoice'], true),
       fontSize:     str(receipt['fontSize'], 'medium'),
       printServerEnabled: bool(receipt['printServerEnabled']),
       printServerUrl:     str(receipt['printServerUrl']),
@@ -1162,9 +1158,9 @@ export class TenantsService {
     dto: ReceiptPrintDispatchDto,
   ) {
     const settings = await this.getReceiptSettings(tenantId);
-    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP', 'LABEL', 'GRN', 'REPAIR'].includes(dto.printType)
+    const printType = (['SALE', 'PRE_BILL', 'RETURN', 'TEST', 'PAYSLIP', 'LABEL', 'GRN'].includes(dto.printType)
       ? dto.printType
-      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN' | 'REPAIR';
+      : 'SALE') as 'SALE' | 'PRE_BILL' | 'RETURN' | 'TEST' | 'PAYSLIP' | 'LABEL' | 'GRN';
     const mode = settings.printMode ?? 'auto';
     const useServer = settings.printServerEnabled && settings.printServerUrl;
 
