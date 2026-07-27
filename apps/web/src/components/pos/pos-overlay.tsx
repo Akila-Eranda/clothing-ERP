@@ -327,16 +327,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [lastScanAt, setLastScanAt] = React.useState<Date | null>(null);
   const [lastAddedVariantId, setLastAddedVariantId] = React.useState<string | undefined>();
   const [thankYouSale, setThankYouSale] = React.useState<ThankYouSale | null>(null);
-  const [waBillOffer, setWaBillOffer] = React.useState<{
-    invoiceNumber: string;
-    total: string;
-    paymentMethod: string;
-    customerName?: string;
-    phone: string;
-    itemsSummary: string;
-  } | null>(null);
-  const [waPhoneEdit, setWaPhoneEdit] = React.useState("");
-  const [waSending, setWaSending] = React.useState(false);
   const [waBillEnabled, setWaBillEnabled] = React.useState(() => readPosWaBillOffer());
   const [recentScans, setRecentScans] = React.useState<RecentScan[]>([]);
   const [selectedProductName, setSelectedProductName] = React.useState<string | null>(null);
@@ -572,42 +562,6 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const openCashClose = React.useCallback(() => setShowCashClose(true), []);
   const closeCashClose = React.useCallback(() => setShowCashClose(false), []);
   const closeTransferFunds = React.useCallback(() => setShowTransferFunds(false), []);
-  const waPhoneRef = React.useRef<HTMLInputElement>(null);
-  const closeWaBillOffer = React.useCallback(() => {
-    setWaBillOffer(null);
-    setWaSending(false);
-    setTimeout(() => searchRef.current?.focus(), 80);
-  }, []);
-  const sendWaBill = React.useCallback(() => {
-    if (!waBillOffer || waSending) return;
-    const phone = waPhoneEdit.trim();
-    if (!phone) {
-      toast.error("Enter customer WhatsApp number");
-      waPhoneRef.current?.focus();
-      return;
-    }
-    void (async () => {
-      setWaSending(true);
-      try {
-        await api.post("/whatsapp/send-bill", {
-          phone,
-          invoiceNumber: waBillOffer.invoiceNumber,
-          customerName: waBillOffer.customerName,
-          total: waBillOffer.total,
-          paymentMethod: waBillOffer.paymentMethod,
-          itemsSummary: waBillOffer.itemsSummary,
-          shopName: receiptSettings.shopName || APP_NAME,
-        });
-        toast.success("Bill sent on WhatsApp");
-        setWaBillOffer(null);
-        setTimeout(() => searchRef.current?.focus(), 80);
-      } catch (e) {
-        toast.error((e as Error).message ?? "WhatsApp send failed");
-      } finally {
-        setWaSending(false);
-      }
-    })();
-  }, [waBillOffer, waSending, waPhoneEdit, receiptSettings.shopName]);
 
   const applyCartDiscount = React.useCallback(async () => {
     const v = parseFloat(discountInput) || 0;
@@ -1962,33 +1916,35 @@ ${receiptSoftwareCreditHtml()}
       });
       if (waBillEnabled) {
         const phone = (customer?.phone ?? "").trim();
-        const itemsSummary = saleSnapshot.items
-          .slice(0, 12)
-          .map((i) => `• ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} ×${i.quantity}`)
-          .join("\n");
-        // Only open send modal when WhatsApp is actually connected — otherwise cashier gets stuck
-        void (async () => {
-          try {
-            const wa = await api.get<{ status?: string }>("/whatsapp/status");
-            if (wa.data?.status !== "connected") {
-              toast.message("WhatsApp not connected — bill not sent. Connect QR in Settings → WhatsApp.");
-              return;
+        if (!phone) {
+          toast.message("WhatsApp bill skipped — select a customer with a phone number.");
+        } else {
+          const itemsSummary = saleSnapshot.items
+            .slice(0, 12)
+            .map((i) => `• ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} ×${i.quantity}`)
+            .join("\n");
+          void (async () => {
+            try {
+              const wa = await api.get<{ status?: string }>("/whatsapp/status");
+              if (wa.data?.status !== "connected") {
+                toast.message("WhatsApp not connected — bill not sent. Connect QR in Settings → WhatsApp.");
+                return;
+              }
+              await api.post("/whatsapp/send-bill", {
+                phone,
+                invoiceNumber: s.invoiceNumber,
+                customerName: saleSnapshot.customerName,
+                total: formatNumber(s.total),
+                paymentMethod: saleSnapshot.paymentMethod,
+                itemsSummary,
+                shopName: receiptSettings.shopName || APP_NAME,
+              });
+              toast.success(`Bill sent on WhatsApp · ${phone}`);
+            } catch (e) {
+              toast.error((e as Error).message ?? "WhatsApp send failed");
             }
-            setWaBillOffer({
-              invoiceNumber: s.invoiceNumber,
-              total: formatNumber(s.total),
-              paymentMethod: saleSnapshot.paymentMethod,
-              customerName: saleSnapshot.customerName,
-              phone,
-              itemsSummary,
-            });
-            setWaPhoneEdit(phone);
-          } catch {
-            toast.message("WhatsApp unavailable — skipped bill send.");
-          }
-        })();
-      } else {
-        setWaBillOffer(null);
+          })();
+        }
       }
       setTimeout(() => setThankYouSale(null), 12_000);
       // Checkout tax is per-bill: remember rate for next toggle, then turn OFF for the next sale
@@ -2366,9 +2322,6 @@ ${rows}
     closeCashClose,
     showTransferFunds,
     closeTransferFunds,
-    waBillOfferOpen: !!waBillOffer,
-    closeWaBillOffer,
-    sendWaBill,
     setExactCashTender,
     focusCheckoutGiftOrCheque,
     getFilteredProduct: (idx: number) => productCards[idx]?.rep,
@@ -2377,7 +2330,7 @@ ${rows}
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
     posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose, showTransferFunds,
-    waBillOffer, addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
+    addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
     closePos, handlePinEntry, lockCashier, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
@@ -2385,7 +2338,7 @@ ${rows}
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
-    openCartCustomerDropdown, openCashClose, closeCashClose, closeTransferFunds, closeWaBillOffer, sendWaBill, setExactCashTender, focusCheckoutGiftOrCheque,
+    openCartCustomerDropdown, openCashClose, closeCashClose, closeTransferFunds, setExactCashTender, focusCheckoutGiftOrCheque,
     payState.allowPartial, payState.splitMode,
   ]);
 
@@ -2401,20 +2354,11 @@ ${rows}
       searchRef.current?.blur();
       return;
     }
-    if (posOpen && !waBillOffer) {
+    if (posOpen) {
       const t = setTimeout(() => searchRef.current?.focus(), 120);
       return () => clearTimeout(t);
     }
-  }, [posOpen, pinLocked, waBillOffer]);
-
-  React.useEffect(() => {
-    if (!waBillOffer) return;
-    const t = setTimeout(() => {
-      waPhoneRef.current?.focus();
-      waPhoneRef.current?.select();
-    }, 80);
-    return () => clearTimeout(t);
-  }, [waBillOffer]);
+  }, [posOpen, pinLocked]);
 
   React.useEffect(() => {
     if (activeNav !== "customers") return;
@@ -4325,7 +4269,7 @@ ${rows}
                         <div>
                           <p className="text-sm font-semibold text-white">WhatsApp</p>
                           <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
-                            {waBillEnabled ? "Ask after sale" : "Skip"}
+                            {waBillEnabled ? "Auto send after sale" : "Off"}
                           </p>
                         </div>
                       </div>
@@ -4773,83 +4717,6 @@ ${rows}
           </div>
         </div>
 
-
-        {/* WHATSAPP SEND BILL (after sale) */}
-        <AnimatePresence>
-          {waBillOffer && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[120] flex items-end sm:items-center justify-center p-4"
-              style={{ background: "var(--pos-overlay)" }}
-              onClick={closeWaBillOffer}
-            >
-              <motion.div
-                initial={{ y: 24, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: 16, opacity: 0 }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden"
-                style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
-              >
-                <div className="px-4 py-3 flex items-center gap-2 border-b" style={{ borderColor: "var(--pos-border)", background: "rgba(16,185,129,0.12)" }}>
-                  <MessageCircle className="h-4 w-4" style={{ color: "#10b981" }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold" style={{ color: "var(--pos-text)" }}>Send bill on WhatsApp</p>
-                    <p className="text-[11px]" style={{ color: "var(--pos-muted)" }}>{waBillOffer.invoiceNumber} · LKR {waBillOffer.total}</p>
-                  </div>
-                  <button type="button" onClick={closeWaBillOffer} className="p-1.5 rounded-lg hover:bg-white/10">
-                    <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
-                  </button>
-                </div>
-                <form
-                  className="p-4 space-y-3"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    sendWaBill();
-                  }}
-                >
-                  <div>
-                    <label className="text-[11px] font-semibold block mb-1" style={{ color: "var(--pos-muted)" }}>Customer WhatsApp number</label>
-                    <input
-                      ref={waPhoneRef}
-                      value={waPhoneEdit}
-                      onChange={(e) => setWaPhoneEdit(e.target.value)}
-                      placeholder="077 123 4567"
-                      inputMode="tel"
-                      autoComplete="tel"
-                      className="w-full h-10 px-3 rounded-xl text-sm outline-none"
-                      style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" }}
-                    />
-                  </div>
-                  <p className="text-[11px]" style={{ color: "var(--pos-muted-2)" }}>
-                    Connect shop WhatsApp in Settings → WhatsApp (scan QR) before sending. Press Enter to send, Esc to skip.
-                  </p>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={closeWaBillOffer}
-                      className="flex-1 h-10 rounded-xl text-sm font-semibold"
-                      style={{ background: "var(--pos-input)", color: "var(--pos-muted)" }}
-                    >
-                      Skip
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={waSending || !waPhoneEdit.trim()}
-                      className="flex-[1.4] h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-                      style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
-                    >
-                      {waSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                      Send bill
-                    </button>
-                  </div>
-                </form>
-              </motion.div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* DAY END MODAL */}
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(

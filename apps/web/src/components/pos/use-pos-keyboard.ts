@@ -134,10 +134,6 @@ export interface PosKeyboardContext {
   closeCashClose: () => void;
   showTransferFunds: boolean;
   closeTransferFunds: () => void;
-  /** WhatsApp send-bill modal after sale */
-  waBillOfferOpen: boolean;
-  closeWaBillOffer: () => void;
-  sendWaBill: () => void;
   /** Fill cash tender = bill total */
   setExactCashTender: () => void;
   focusCheckoutGiftOrCheque: () => void;
@@ -166,7 +162,6 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.showDayEnd
     || ctx.showCashClose
     || ctx.showTransferFunds
-    || ctx.waBillOfferOpen
     || ctx.qtyPopupOpen
     || !!ctx.selectedProductName
   );
@@ -239,36 +234,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
-      // WhatsApp bill modal — Esc skip, Enter send.
-      // Barcode wedge (rapid keys) closes modal so POS is not stuck for the next sale.
-      if (ctx.waBillOfferOpen) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          ctx.closeWaBillOffer();
-          return;
-        }
-        if (e.key === "Enter" && !e.shiftKey) {
-          e.preventDefault();
-          ctx.sendWaBill();
-          return;
-        }
-        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-          const now = Date.now();
-          const delta = now - ctx.lastKeyTime.current;
-          ctx.lastKeyTime.current = now;
-          if (delta < 60) {
-            e.preventDefault();
-            ctx.closeWaBillOffer();
-            // Let the wedge continue into the search path on subsequent keys
-            ctx.barcodeBuffer.current = e.key;
-            clearTimeout(ctx.barcodeTimer.current);
-            ctx.barcodeTimer.current = setTimeout(() => { ctx.barcodeBuffer.current = ""; }, 120);
-            return;
-          }
-        }
-        return;
-      }
-
       // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
@@ -319,7 +284,6 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (ctx.showShortcuts) { ctx.setShowShortcuts(false); return; }
         if (ctx.showCashClose) { ctx.closeCashClose(); return; }
         if (ctx.showTransferFunds) { ctx.closeTransferFunds(); return; }
-        if (ctx.waBillOfferOpen) { ctx.closeWaBillOffer(); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }
