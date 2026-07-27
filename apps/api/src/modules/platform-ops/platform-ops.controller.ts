@@ -19,6 +19,7 @@ import { Roles } from '@/common/decorators/roles.decorator'
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator'
 import { PlatformOpsService } from './platform-ops.service'
 import { PlatformOpsW3Service } from './platform-ops-w3.service'
+import { SecurityScanService } from './security-scan.service'
 
 @ApiTags('Platform Ops')
 @ApiBearerAuth('access-token')
@@ -28,6 +29,7 @@ export class PlatformOpsController {
   constructor(
     private readonly ops: PlatformOpsService,
     private readonly w3: PlatformOpsW3Service,
+    private readonly securityScan: SecurityScanService,
   ) {}
 
   // ── Announcements ──────────────────────────────────────────
@@ -283,5 +285,18 @@ export class PlatformOpsController {
   @ApiOperation({ summary: 'Pin which tenant hosts the billing WhatsApp session' })
   setBillingWaTenant(@Body() body: { tenantId?: string }) {
     return this.w3.setBillingWhatsAppTenantId(String(body.tenantId || ''))
+  }
+
+  // ── Security scan ──────────────────────────────────────────
+  @Post('security-scan')
+  @ApiOperation({ summary: 'Run platform security scan (auth, sessions, public endpoints)' })
+  runSecurityScan() {
+    return this.securityScan.runScan()
+  }
+
+  @Get('security-scan')
+  @ApiOperation({ summary: 'Run platform security scan (GET alias)' })
+  getSecurityScan() {
+    return this.securityScan.runScan()
   }
 }

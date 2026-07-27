@@ -7,6 +7,7 @@ import { PlatformOpsController } from './platform-ops.controller'
 import { PlatformOpsService } from './platform-ops.service'
 import { PlatformOpsW3Service } from './platform-ops-w3.service'
 import { FeatureSuggestionsTenantController } from './feature-suggestions-tenant.controller'
+import { SecurityScanService } from './security-scan.service'
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { FeatureSuggestionsTenantController } from './feature-suggestions-tenant
     }),
   ],
   controllers: [PlatformOpsController, FeatureSuggestionsTenantController],
-  providers: [PlatformOpsService, PlatformOpsW3Service],
-  exports: [PlatformOpsService, PlatformOpsW3Service],
+  providers: [PlatformOpsService, PlatformOpsW3Service, SecurityScanService],
+  exports: [PlatformOpsService, PlatformOpsW3Service, SecurityScanService],
 })
 export class PlatformOpsModule {}

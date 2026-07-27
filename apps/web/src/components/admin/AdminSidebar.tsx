@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, Building2, Users, CreditCard, Activity,
-  BarChart3, ScrollText, Settings, Shield, X, Tag,
+  BarChart3, ScrollText, Settings, Shield, X, Tag, ScanSearch,
 } from 'lucide-react'
 import { AppLogo } from "@/components/brand/app-logo";
 
@@ -15,6 +15,7 @@ const NAV = [
   { href: '/admin/subscriptions',  label: 'Subscriptions',    icon: CreditCard      },
   { href: '/admin/plans',          label: 'Plans',            icon: Tag             },
   { href: '/admin/system-health',  label: 'System Health',    icon: Activity        },
+  { href: '/admin/security-scan',  label: 'Security Scan',    icon: ScanSearch      },
   { href: '/admin/analytics',      label: 'Analytics',        icon: BarChart3       },
   { href: '/admin/activity-logs',  label: 'Activity Logs',    icon: ScrollText      },
   { href: '/admin/settings',       label: 'Settings',         icon: Settings        },

@@ -12,6 +12,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/users':         'Users',
   '/admin/subscriptions': 'Subscriptions',
   '/admin/system-health': 'System Health',
+  '/admin/security-scan': 'Security Scan',
   '/admin/analytics':     'Analytics',
   '/admin/activity-logs': 'Activity Logs',
   '/admin/plans':         'Plans',

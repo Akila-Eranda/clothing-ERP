@@ -621,6 +621,28 @@ export async function fetchHealth(): Promise<HealthData> {
   }
 }
 
+// ── Security scan (platform admin) ────────────────────────────────────────────
+export type SecurityScanSeverity = 'pass' | 'warn' | 'fail' | 'info'
+
+export interface SecurityScanCheck {
+  id: string
+  category: string
+  title: string
+  status: SecurityScanSeverity
+  detail: string
+  recommendation?: string
+}
+
+export interface SecurityScanResult {
+  scannedAt: string
+  summary: { pass: number; warn: number; fail: number; info: number; score: number }
+  checks: SecurityScanCheck[]
+}
+
+export async function runSecurityScan(): Promise<SecurityScanResult> {
+  return req<SecurityScanResult>('/platform/security-scan', { method: 'POST' })
+}
+
 // ── Dashboard Stats (derived) ─────────────────────────────────────────────────
 export async function fetchPlatformStats(): Promise<PlatformStats> {
   const res = await fetchTenants()
