@@ -239,7 +239,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
-      // WhatsApp bill modal — Esc skip, Enter send; block POS shortcuts so it doesn't stack
+      // WhatsApp bill modal — Esc skip, Enter send.
+      // Barcode wedge (rapid keys) closes modal so POS is not stuck for the next sale.
       if (ctx.waBillOfferOpen) {
         if (e.key === "Escape") {
           e.preventDefault();
@@ -250,6 +251,20 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
           e.preventDefault();
           ctx.sendWaBill();
           return;
+        }
+        if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          const now = Date.now();
+          const delta = now - ctx.lastKeyTime.current;
+          ctx.lastKeyTime.current = now;
+          if (delta < 60) {
+            e.preventDefault();
+            ctx.closeWaBillOffer();
+            // Let the wedge continue into the search path on subsequent keys
+            ctx.barcodeBuffer.current = e.key;
+            clearTimeout(ctx.barcodeTimer.current);
+            ctx.barcodeTimer.current = setTimeout(() => { ctx.barcodeBuffer.current = ""; }, 120);
+            return;
+          }
         }
         return;
       }

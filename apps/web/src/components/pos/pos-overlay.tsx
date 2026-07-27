@@ -1966,15 +1966,27 @@ ${receiptSoftwareCreditHtml()}
           .slice(0, 12)
           .map((i) => `• ${i.productName}${i.variantName ? ` (${i.variantName})` : ""} ×${i.quantity}`)
           .join("\n");
-        setWaBillOffer({
-          invoiceNumber: s.invoiceNumber,
-          total: formatNumber(s.total),
-          paymentMethod: saleSnapshot.paymentMethod,
-          customerName: saleSnapshot.customerName,
-          phone,
-          itemsSummary,
-        });
-        setWaPhoneEdit(phone);
+        // Only open send modal when WhatsApp is actually connected — otherwise cashier gets stuck
+        void (async () => {
+          try {
+            const wa = await api.get<{ status?: string }>("/whatsapp/status");
+            if (wa.data?.status !== "connected") {
+              toast.message("WhatsApp not connected — bill not sent. Connect QR in Settings → WhatsApp.");
+              return;
+            }
+            setWaBillOffer({
+              invoiceNumber: s.invoiceNumber,
+              total: formatNumber(s.total),
+              paymentMethod: saleSnapshot.paymentMethod,
+              customerName: saleSnapshot.customerName,
+              phone,
+              itemsSummary,
+            });
+            setWaPhoneEdit(phone);
+          } catch {
+            toast.message("WhatsApp unavailable — skipped bill send.");
+          }
+        })();
       } else {
         setWaBillOffer(null);
       }

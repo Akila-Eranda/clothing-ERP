@@ -189,11 +189,9 @@ export class WhatsappService implements OnModuleDestroy {
     }
 
     this.clearReconnect(session);
-    const resetAuth =
-      !session.qrDataUrl ||
-      session.status === 'error' ||
-      session.status === 'logged_out' ||
-      session.status === 'disconnected';
+    // After API restart status is "disconnected" but creds on disk are still valid.
+    // Never wipe auth here — only Disconnect / logged_out should clear the session folder.
+    const resetAuth = session.status === 'logged_out';
 
     session.starting = true;
     session.status = 'connecting';
