@@ -170,6 +170,37 @@ export class PosService {
       }
     }
 
+    // Stale cart / wiped catalog: fail early with a clear message instead of opaque FK 400
+    const catalogVariantIds = [
+      ...new Set(
+        dto.items
+          .filter((i) => !(i.isCustom || !i.variantId?.trim() || i.variantId.startsWith('custom-')))
+          .map((i) => i.variantId!.trim()),
+      ),
+    ];
+    if (catalogVariantIds.length > 0) {
+      const found = await this.prisma.productVariant.findMany({
+        where: { id: { in: catalogVariantIds }, product: { tenantId } },
+        select: { id: true },
+      });
+      const foundIds = new Set(found.map((v) => v.id));
+      const missing = dto.items.filter(
+        (i) =>
+          !(i.isCustom || !i.variantId?.trim() || i.variantId.startsWith('custom-')) &&
+          !foundIds.has(i.variantId!.trim()),
+      );
+      if (missing.length > 0) {
+        const labels = missing
+          .slice(0, 3)
+          .map((i) => i.productName?.trim() || i.sku || i.variantId)
+          .join(', ');
+        const more = missing.length > 3 ? ` (+${missing.length - 3} more)` : '';
+        throw new BadRequestException(
+          `Cart has products no longer in catalog (${labels}${more}). Clear the cart and re-add items.`,
+        );
+      }
+    }
+
     let customerRecord: { id: string; firstName: string; lastName: string | null; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; creditDays: number; tier: import('@prisma/client').CustomerTier } | null = null;
     if (dto.customerId) {
       customerRecord = await this.prisma.customer.findFirst({

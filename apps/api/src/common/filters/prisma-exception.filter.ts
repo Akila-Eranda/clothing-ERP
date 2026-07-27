@@ -34,7 +34,13 @@ export class PrismaExceptionFilter implements ExceptionFilter {
         }
         case 'P2003': {
           status = HttpStatus.BAD_REQUEST;
-          message = 'Foreign key constraint failed';
+          const field =
+            (exception.meta?.field_name as string | undefined) ||
+            (exception.meta?.constraint as string | undefined) ||
+            '';
+          message = field.toLowerCase().includes('variant')
+            ? 'Cart references a product variant that no longer exists. Clear the cart and re-add items.'
+            : 'Foreign key constraint failed';
           error = 'Bad Request';
           break;
         }

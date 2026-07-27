@@ -2021,7 +2021,14 @@ ${receiptSoftwareCreditHtml()}
       void refreshPrinterStatus();
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
       toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
-    } catch(e:unknown){toast.error((e as Error).message??"Checkout failed");} finally{setCheckoutLoading(false);}
+    } catch(e:unknown){
+      const msg=(e as Error).message??"Checkout failed";
+      toast.error(msg);
+      if (/no longer in catalog|variant that no longer exists/i.test(msg)) {
+        clearCart();
+        setSelectedCartIdx(-1);
+      }
+    } finally{setCheckoutLoading(false);}
   },[items,checkoutLoading,activePayment,numpad,totalAmt,products,customer,discountAmount,couponCode,loyaltyPointsToRedeem,payState,clearCart,cartNotes,activeHeldBillId,helperEmployeeId,giftVoucherCode,chequeNumber,cardLast3,payBankAccountId,bankAccounts,soundAlerts,loadHeldBills,applySoldStockLocally,loadTodayStats,refreshPrinterStatus,pendingDiscountApproval,receiptSettings,buildReceiptHtml,waBillEnabled]);
 
   const handleThermalPrint = React.useCallback(async () => {
