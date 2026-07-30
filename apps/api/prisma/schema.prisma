@@ -491,6 +491,10 @@ model Tenant {
   posCounters      PosCounter[]
   cashMovements    CashMovement[]
   giftVouchers     GiftVoucher[]
+  reloadOperators  ReloadOperator[]
+  reloadDenominations ReloadDenomination[]
+  reloadCardStocks ReloadCardStock[]
+  reloadSales      ReloadSale[]
   creditSchedules  CustomerCreditSchedule[]
   creditReminders  CustomerCreditReminder[]
   calendarNotes    CalendarNote[]
@@ -1828,6 +1832,113 @@ model GiftVoucher {
   @@index([tenantId])
   @@index([tenantId, status])
   @@map("gift_vouchers")
+}
+
+enum ReloadSaleType {
+  DIGITAL
+  PHYSICAL
+}
+
+enum ReloadCardStatus {
+  AVAILABLE
+  SOLD
+  VOID
+}
+
+model ReloadOperator {
+  id                     String               @id @default(cuid())
+  tenantId               String
+  code                   String
+  name                   String
+  digitalCommissionPct   Float                @default(2)
+  physicalCommissionPct  Float                @default(3)
+  isActive               Boolean              @default(true)
+  sortOrder              Int                  @default(0)
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  tenant                 Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  denominations          ReloadDenomination[]
+  cardStocks             ReloadCardStock[]
+  sales                  ReloadSale[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, isActive])
+  @@map("reload_operators")
+}
+
+model ReloadDenomination {
+  id          String            @id @default(cuid())
+  tenantId    String
+  operatorId  String
+  faceValue   Float
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator    ReloadOperator    @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  cardStocks  ReloadCardStock[]
+  sales       ReloadSale[]
+
+  @@unique([operatorId, faceValue])
+  @@index([tenantId])
+  @@index([operatorId, isActive])
+  @@map("reload_denominations")
+}
+
+model ReloadCardStock {
+  id              String           @id @default(cuid())
+  tenantId        String
+  branchId        String?
+  operatorId      String
+  denominationId  String
+  pinCode         String
+  pinMasked       String
+  purchaseCost    Float?
+  status          ReloadCardStatus @default(AVAILABLE)
+  soldSaleId      String?
+  soldAt          DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator        ReloadOperator   @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  denomination    ReloadDenomination @relation(fields: [denominationId], references: [id], onDelete: Cascade)
+  sales           ReloadSale[]
+
+  @@unique([tenantId, pinCode])
+  @@index([tenantId, status])
+  @@index([operatorId, denominationId, status])
+  @@map("reload_card_stocks")
+}
+
+model ReloadSale {
+  id                String         @id @default(cuid())
+  tenantId          String
+  branchId          String
+  saleId            String
+  type              ReloadSaleType
+  operatorId        String
+  denominationId    String?
+  cardStockId       String?
+  msisdn            String?
+  faceValue         Float
+  unitPrice         Float
+  costPrice         Float          @default(0)
+  commissionPct     Float          @default(0)
+  commissionEarned  Float          @default(0)
+  createdAt         DateTime       @default(now())
+
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  operator          ReloadOperator @relation(fields: [operatorId], references: [id])
+  denomination      ReloadDenomination? @relation(fields: [denominationId], references: [id])
+  cardStock         ReloadCardStock? @relation(fields: [cardStockId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([saleId])
+  @@index([operatorId])
+  @@map("reload_sales")
 }
 
 model SalePayment {

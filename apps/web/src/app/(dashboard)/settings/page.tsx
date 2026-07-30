@@ -6,7 +6,7 @@ import {
   Store, Bell, Shield, Palette, CreditCard, GitBranch,
   User, Loader2, Plus, Pencil, Trash2, Check, X, Building2,
   Key, Globe, Phone, Mail, MapPin, Hash, Eye, EyeOff, ClipboardList, RefreshCw, ChevronLeft, ChevronRight,
-  Printer, Image, Server, FileText, Upload, MessageCircle,
+  Printer, Image, Server, FileText, Upload, MessageCircle, Smartphone,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
 import { RECEIPT_SOFTWARE_CREDIT, receiptMoney, receiptThemeColors } from "@/lib/receipt-theme";
@@ -27,6 +27,7 @@ import { api } from "@/lib/api";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
+import { ReloadSettingsTab } from "@/components/settings/reload-settings-tab";
 import {
   ACCENT_PRESETS,
   type AccentId,
@@ -50,7 +51,7 @@ const CURRENCIES = ["LKR","INR","USD","EUR","GBP","AED","SGD"];
 const COUNTRIES = ["LK","IN","US","GB","AE","SG","AU"];
 
 const SETTINGS_TAB_VALUES = [
-  "general", "receipt", "whatsapp", "payslip", "profile", "security", "branches",
+  "general", "receipt", "whatsapp", "payslip", "reload", "profile", "security", "branches",
   "notifications", "appearance", "billing", "audit-log",
 ] as const;
 
@@ -595,6 +596,7 @@ export default function SettingsPage() {
           <TabsTrigger value="receipt" className="gap-1.5"><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
           <TabsTrigger value="whatsapp" className="gap-1.5"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</TabsTrigger>
           <TabsTrigger value="payslip" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
+          <TabsTrigger value="reload" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" />Reload</TabsTrigger>
           <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
           <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
           <TabsTrigger value="branches" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
@@ -1020,6 +1022,10 @@ export default function SettingsPage() {
 
         <TabsContent value="payslip">
           <PayslipSettingsTab receiptSettings={receiptForm} />
+        </TabsContent>
+
+        <TabsContent value="reload" className="mt-6">
+          <ReloadSettingsTab />
         </TabsContent>
 
         <TabsContent value="profile" className="mt-6 space-y-6">

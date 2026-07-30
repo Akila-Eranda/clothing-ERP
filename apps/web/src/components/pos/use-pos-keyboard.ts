@@ -45,6 +45,7 @@ export type PosHeldBill = {
 export interface PosKeyboardContext {
   posOpen: boolean;
   pinLocked: boolean;
+  saleCompleteOpen: boolean;
   checkoutOpen: boolean;
   showShortcuts: boolean;
   showCustomerSearch: boolean;
@@ -96,6 +97,7 @@ export interface PosKeyboardContext {
   setPinError: React.Dispatch<React.SetStateAction<boolean>>;
   lockCashier: () => void;
   closePos: () => void;
+  dismissSaleComplete: () => void;
   handlePinEntry: (key: string) => void;
   scanAndAddProduct: (code: string) => Promise<void>;
   handleSearchEnter: () => void;
@@ -155,7 +157,8 @@ function isInputFocused(target?: EventTarget | null) {
 
 function anyModalOpen(ctx: PosKeyboardContext) {
   return (
-    ctx.checkoutOpen
+    ctx.saleCompleteOpen
+    || ctx.checkoutOpen
     || ctx.showCustomerSearch
     || ctx.showHeldBills
     || ctx.showShortcuts
@@ -201,6 +204,16 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
 
     const onKey = (e: KeyboardEvent) => {
       const ctx = ctxRef.current;
+
+      // The cashier must acknowledge the customer's change before starting
+      // another sale. Swallow every other shortcut while this screen is open.
+      if (ctx.saleCompleteOpen) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.key === "F9") ctx.dismissSaleComplete();
+        return;
+      }
+
       const inInput = isInputFocused(e.target) || isInputFocused(document.activeElement);
       const isSearch = document.activeElement === ctx.searchRef.current
         || e.target === ctx.searchRef.current;
@@ -532,6 +545,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (letterToolsOk && key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
       if (letterToolsOk && key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
       if (letterToolsOk && key === "y") { e.preventDefault(); ctx.setActiveNav("demo-product"); return; }
+      if (letterToolsOk && key === "l" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("reload"); return; }
       if (letterToolsOk && key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
       if (letterToolsOk && key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
       if (letterToolsOk && key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }

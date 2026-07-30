@@ -10,6 +10,36 @@ export function computeHelperCommission(saleAmount: number, commissionRatePct: n
   return round2((saleAmount * commissionRatePct) / 100);
 }
 
+export type ReloadSaleKind = 'DIGITAL' | 'PHYSICAL';
+
+export type ReloadCommissionInput = {
+  digitalCommissionPct: number;
+  physicalCommissionPct: number;
+};
+
+/** Pick digital vs physical % and compute earned commission + cost. */
+export function computeReloadCommission(
+  operator: ReloadCommissionInput,
+  type: ReloadSaleKind,
+  faceValue: number,
+): { commissionPct: number; commissionEarned: number; costPrice: number } {
+  const commissionPct = type === 'DIGITAL'
+    ? Math.max(0, operator.digitalCommissionPct || 0)
+    : Math.max(0, operator.physicalCommissionPct || 0);
+  const commissionEarned = faceValue > 0 && commissionPct > 0
+    ? round2((faceValue * commissionPct) / 100)
+    : 0;
+  const costPrice = round2(Math.max(0, faceValue - commissionEarned));
+  return { commissionPct, commissionEarned, costPrice };
+}
+
+/** Mask PIN for receipts / UI (keep last 4). */
+export function maskReloadPin(pin: string): string {
+  const cleaned = String(pin || '').replace(/\s+/g, '');
+  if (cleaned.length <= 4) return '****';
+  return `${'*'.repeat(Math.max(4, cleaned.length - 4))}${cleaned.slice(-4)}`;
+}
+
 export type GiftVoucherRedeemResult =
   | { ok: true; applied: number; remainingBalance: number; status: 'ACTIVE' | 'PARTIALLY_USED' | 'REDEEMED' }
   | { ok: false; reason: string };

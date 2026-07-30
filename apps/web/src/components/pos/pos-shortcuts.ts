@@ -88,6 +88,7 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
     items: [
       ["Q / Alt+Q", "New Product (save to catalog)"],
       ["Y / Alt+Y", "Demo Product (bill only)"],
+      ["L / Alt+L", "Reload / Recharge cards"],
       ["O / Alt+O", "Orders (today’s sales)"],
       ["V / Alt+V", "Gift vouchers"],
       ["B / Alt+B", "Quick GRN"],

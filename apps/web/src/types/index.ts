@@ -272,6 +272,12 @@ export interface CartItem {
   isCustom?: boolean;
   /** Cost for margin on custom lines (optional). */
   costPrice?: number;
+  /** Reload / recharge metadata for ledger write on sale. */
+  reloadType?: "DIGITAL" | "PHYSICAL";
+  reloadOperatorId?: string;
+  reloadDenominationId?: string;
+  reloadMsisdn?: string;
+  reloadFaceValue?: number;
   productKind?: string;
   unit?: string | null;
   allowDecimalSelling?: boolean;

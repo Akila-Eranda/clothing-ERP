@@ -132,4 +132,5 @@ export type PosTenantSettings = {
   autoPrint: boolean;
   roundOff: boolean;
   loyalty: boolean;
+  reloadEnabled?: boolean;
 };

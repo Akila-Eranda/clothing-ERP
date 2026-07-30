@@ -1,7 +1,9 @@
 import {
   applyGiftVoucherRedeem,
   computeHelperCommission,
+  computeReloadCommission,
   generateGiftVoucherCode,
+  maskReloadPin,
   scanCycleBudgetMs,
   stackCartQuantity,
 } from './pos-phase6.helper';
@@ -16,6 +18,24 @@ describe('Phase 6 POS — high-speed & accuracy', () => {
       expect(computeHelperCommission(10000, 5)).toBe(500);
       expect(computeHelperCommission(0, 5)).toBe(0);
       expect(computeHelperCommission(1000, 0)).toBe(0);
+    });
+  });
+
+  describe('Reload commission', () => {
+    it('uses separate digital vs physical rates', () => {
+      const op = { digitalCommissionPct: 2.5, physicalCommissionPct: 3 };
+      const digital = computeReloadCommission(op, 'DIGITAL', 1000);
+      expect(digital.commissionPct).toBe(2.5);
+      expect(digital.commissionEarned).toBe(25);
+      expect(digital.costPrice).toBe(975);
+      const physical = computeReloadCommission(op, 'PHYSICAL', 500);
+      expect(physical.commissionPct).toBe(3);
+      expect(physical.commissionEarned).toBe(15);
+      expect(physical.costPrice).toBe(485);
+    });
+
+    it('masks PIN keeping last 4', () => {
+      expect(maskReloadPin('123456789012')).toBe('********9012');
     });
   });
 

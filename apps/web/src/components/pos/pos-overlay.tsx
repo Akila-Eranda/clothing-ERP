@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight } from "lucide-react";
+import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,6 +38,7 @@ import { PosTransferFundsModal } from "@/components/pos/pos-transfer-funds-modal
 import { PosQuickGrnPanel } from "@/components/pos/pos-quick-grn-panel";
 import { PosQuickProductPanel } from "@/components/pos/pos-quick-product-panel";
 import { PosDemoProductPanel } from "@/components/pos/pos-demo-product-panel";
+import { PosReloadPanel } from "@/components/pos/pos-reload-panel";
 import { PosQuickExpensePanel } from "@/components/pos/pos-quick-expense-panel";
 import { PosPromotionsPanel } from "@/components/pos/pos-promotions-panel";
 import { PosSalesReportPanel } from "@/components/pos/pos-sales-report-panel";
@@ -178,6 +179,7 @@ const BASE_NAV_ITEMS = [
   { id:"products", label:"Products", icon: ShoppingBag },
   { id:"quick-product", label:"New Product", icon: PackagePlus },
   { id:"demo-product", label:"Demo Product", icon: Sparkles },
+  { id:"reload", label:"Reload", icon: Smartphone },
   { id:"customers", label:"Customers", icon: Users },
   { id:"hold-bills", label:"Hold Bills", icon: PauseCircle },
   { id:"orders", label:"Orders", icon: FileText },
@@ -279,14 +281,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { user } = useAuthStore();
   const { profile, workspace } = useShopWorkspace();
   const showLoyalty = hasShopModule(profile, 'loyalty');
+  const [reloadEnabled, setReloadEnabled] = React.useState(true);
   const navItems = React.useMemo(() => BASE_NAV_ITEMS.filter((item) => {
     // Cashier POS: hide ERP reports; keep Settings so cashiers can set PIN / touch / sound / tax
     if (posOnly && item.id === "reports") return false;
+    if (item.id === "reload" && !reloadEnabled) return false;
     if (!item.module) return true;
     return hasShopModule(profile, item.module);
   }).map((item) => item.id === 'customers'
     ? { ...item, label: workspace.customerLabel }
-    : item), [profile, workspace.customerLabel, posOnly]);
+    : item), [profile, workspace.customerLabel, posOnly, reloadEnabled]);
   const returnReasons = React.useMemo(() => getReturnReasons(profile.type), [profile.type]);
   const [products, setProducts] = React.useState<ProductItem[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -928,6 +932,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         const allow = Boolean(r.data?.allowNegativeStock);
         writePosAllowNegativeStock(allow);
         setAllowNegativeStock(allow);
+        setReloadEnabled(r.data?.reloadEnabled !== false);
       })
       .catch(() => {
         /* keep cached local setting */
@@ -1873,6 +1878,13 @@ ${receiptSoftwareCreditHtml()}
           discount:i.discountAmount??0,
           discountType:i.discountType==="percentage"?"PERCENTAGE":"FIXED",
           taxRate:taxRate,
+          ...(i.reloadType ? {
+            reloadType: i.reloadType,
+            reloadOperatorId: i.reloadOperatorId,
+            reloadDenominationId: i.reloadDenominationId,
+            reloadMsisdn: i.reloadMsisdn,
+            reloadFaceValue: i.reloadFaceValue ?? i.unitPrice,
+          } : {}),
         })),
         payments,
         discountAmount:discountAmount(),
@@ -1946,7 +1958,6 @@ ${receiptSoftwareCreditHtml()}
           })();
         }
       }
-      setTimeout(() => setThankYouSale(null), 12_000);
       // Checkout tax is per-bill: remember rate for next toggle, then turn OFF for the next sale
       if (taxRate > 0) writePosSavedTaxRate(taxRate);
       clearCart();
@@ -2225,10 +2236,18 @@ ${rows}
   }, [selectedCartIdx, items]);
 
   const closeQtyPopup = React.useCallback(() => setAddPopup(null), []);
+  const dismissSaleComplete = React.useCallback(() => {
+    setThankYouSale(null);
+    setTimeout(() => {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    }, 50);
+  }, []);
 
   const keyboardCtx = React.useMemo(() => ({
     posOpen,
     pinLocked,
+    saleCompleteOpen: !!thankYouSale,
     checkoutOpen,
     showShortcuts,
     showCustomerSearch: cartCustomerOpen,
@@ -2286,6 +2305,7 @@ ${rows}
     setPinError,
     lockCashier,
     closePos,
+    dismissSaleComplete,
     handlePinEntry,
     scanAndAddProduct,
     handleSearchEnter,
@@ -2329,11 +2349,11 @@ ${rows}
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
   }), [
-    posOpen, pinLocked, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose, showTransferFunds,
+    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose, showTransferFunds,
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
-    closePos, handlePinEntry, lockCashier, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
+    closePos, dismissSaleComplete, handlePinEntry, lockCashier, scanAndAddProduct, handleSearchEnter, handleAddProduct, handleCardClick,
     handleNumpad, handleCheckout, handleHoldBill, handleRestoreHeldBill, handleDeleteHeldBill,
     handleSplitBill, handleThermalPrint, handleDayEnd, loadProducts, clearCart, setCustomer,
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
@@ -2487,6 +2507,20 @@ ${rows}
     if (activeNav === "demo-product") {
       return (
         <PosDemoProductPanel
+          onBack={() => setActiveNav("products")}
+          taxRate={taxRate}
+          onAddToCart={(item) => {
+            addItem(item);
+            setActiveNav("products");
+          }}
+        />
+      );
+    }
+
+    // RELOAD / RECHARGE
+    if (activeNav === "reload") {
+      return (
+        <PosReloadPanel
           onBack={() => setActiveNav("products")}
           taxRate={taxRate}
           onAddToCart={(item) => {
@@ -4579,6 +4613,77 @@ ${rows}
             )}
           </div>
         </div>
+
+        {thankYouSale && (
+          <div
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+            style={{ background: "rgba(2, 6, 23, 0.82)", backdropFilter: "blur(8px)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sale-complete-title"
+          >
+            <div
+              className="w-full max-w-xl overflow-hidden rounded-3xl border shadow-2xl"
+              style={{ background: "var(--pos-panel)", borderColor: "rgba(16,185,129,0.45)" }}
+            >
+              <div className="flex flex-col items-center px-6 pb-5 pt-8 text-center">
+                <div
+                  className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
+                  style={{ background: "rgba(16,185,129,0.16)" }}
+                >
+                  <CheckCircle2 className="h-9 w-9" style={{ color: "#10b981" }} strokeWidth={2.5} />
+                </div>
+                <h2 id="sale-complete-title" className="text-2xl font-bold" style={{ color: "var(--pos-text)" }}>
+                  Payment Complete
+                </h2>
+                <p className="mt-1 font-mono text-xs" style={{ color: "var(--pos-muted)" }}>
+                  {thankYouSale.invoiceNumber}
+                </p>
+              </div>
+
+              <div className="mx-5 rounded-2xl border px-5 py-6 text-center" style={{
+                background: thankYouSale.changeDue > 0 ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.1)",
+                borderColor: thankYouSale.changeDue > 0 ? "rgba(245,158,11,0.4)" : "rgba(16,185,129,0.35)",
+              }}>
+                <p className="text-sm font-bold uppercase tracking-[0.16em]" style={{
+                  color: thankYouSale.changeDue > 0 ? "#fbbf24" : "#34d399",
+                }}>
+                  {thankYouSale.changeDue > 0 ? "Change to Customer" : "No Change Due"}
+                </p>
+                <p className="mt-2 font-mono text-5xl font-black tabular-nums sm:text-6xl" style={{
+                  color: thankYouSale.changeDue > 0 ? "#fbbf24" : "#34d399",
+                }}>
+                  LKR {formatNumber(thankYouSale.changeDue)}
+                </p>
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm" style={{ color: "var(--pos-text-soft)" }}>
+                  <span>Sale total</span>
+                  <span className="font-bold tabular-nums" style={{ color: "var(--pos-text)" }}>
+                    LKR {formatNumber(thankYouSale.total)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="px-5 pb-6 pt-5 text-center">
+                <p className="text-sm font-semibold" style={{ color: "var(--pos-text-soft)" }}>
+                  Give the change to the customer, then press
+                </p>
+                <div className="mt-3 inline-flex items-center gap-3 rounded-xl border px-5 py-3" style={{
+                  background: "var(--pos-input)",
+                  borderColor: "var(--pos-border)",
+                  color: "var(--pos-text)",
+                }}>
+                  <kbd className="rounded-lg bg-emerald-600 px-4 py-2 font-mono text-lg font-black text-white shadow">
+                    F9
+                  </kbd>
+                  <span className="font-bold">Next Sale</span>
+                </div>
+                <p className="mt-3 text-xs" style={{ color: "var(--pos-muted)" }}>
+                  This screen closes only with F9
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* BOTTOM BAR */}
         <div

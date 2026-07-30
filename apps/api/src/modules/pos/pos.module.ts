@@ -8,7 +8,7 @@ import { IsString, IsOptional, IsNumber, IsEnum, IsArray, IsInt, Min, ValidateNe
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus, BankTxnType, BankTxnStatus } from '@prisma/client';
+import { PaymentMethod, SaleStatus, StockMovementType, PaymentStatus, CashRegisterStatus, GiftVoucherStatus, ChequeDirection, ChequeStatus, BankTxnType, BankTxnStatus, ReloadCardStatus, ReloadSaleType, Prisma } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
@@ -24,7 +24,7 @@ import {
 } from '@/modules/pricing/pricing.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
 import { buildPaymentsSummary } from './pos-sale.helpers';
-import { applyGiftVoucherRedeem, computeHelperCommission, generateGiftVoucherCode } from './pos-phase6.helper';
+import { applyGiftVoucherRedeem, computeHelperCommission, computeReloadCommission, generateGiftVoucherCode, maskReloadPin, round2 } from './pos-phase6.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
 import { computeChargeDueDate } from '@/modules/customers/customer-credit.helper';
 import { chequeSourceNotes } from '@/modules/accounting/finance.helper';
@@ -69,6 +69,37 @@ export class SaleItemDto {
   @ApiProperty() @IsString() variantName: string;
   @ApiProperty() @IsString() sku: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() taxRate?: number;
+  /** DIGITAL | PHYSICAL — when set, creates ReloadSale ledger rows. */
+  @ApiPropertyOptional() @IsOptional() @IsEnum(ReloadSaleType) reloadType?: ReloadSaleType;
+  @ApiPropertyOptional() @IsOptional() @IsString() reloadOperatorId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reloadDenominationId?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() reloadMsisdn?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) reloadFaceValue?: number;
+}
+
+export class UpsertReloadOperatorDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() code?: string;
+  @ApiProperty() @IsString() name: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) digitalCommissionPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) physicalCommissionPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
+}
+
+export class UpdateReloadOperatorDto {
+  @ApiPropertyOptional() @IsOptional() @IsString() name?: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) digitalCommissionPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) physicalCommissionPct?: number;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isActive?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsInt() sortOrder?: number;
+}
+
+export class ImportReloadCardsDto {
+  @ApiProperty() @IsString() operatorId: string;
+  @ApiProperty() @IsString() denominationId: string;
+  /** One PIN per line, or comma/space separated. */
+  @ApiProperty() @IsString() pins: string;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) purchaseCost?: number;
 }
 
 export class SalePaymentDto {
@@ -494,6 +525,8 @@ export class PosService {
           referenceType: 'Sale',
         }, tx);
       }
+
+      await this.recordReloadSalesFromItems(tx, tenantId, branchId, created.id, dto.items);
 
       if (dto.customerId && customerRecord) {
         const creditIncrement = creditPayTotal + partialCredit;
@@ -1916,6 +1949,247 @@ export class PosService {
     return { data, meta: { total, page, limit, totalPages: Math.ceil(total / limit) } };
   }
 
+  private static readonly DEFAULT_RELOAD_PROVIDERS = [
+    { code: 'DIALOG', name: 'Dialog', digitalCommissionPct: 2, physicalCommissionPct: 3, sortOrder: 1 },
+    { code: 'MOBITEL', name: 'Mobitel', digitalCommissionPct: 2, physicalCommissionPct: 3, sortOrder: 2 },
+    { code: 'HUTCH', name: 'Hutch', digitalCommissionPct: 2, physicalCommissionPct: 3, sortOrder: 3 },
+    { code: 'AIRTEL', name: 'Airtel', digitalCommissionPct: 2, physicalCommissionPct: 3, sortOrder: 4 },
+  ];
+  private static readonly DEFAULT_RELOAD_DENOMS = [50, 100, 200, 500, 1000];
+
+  async ensureReloadProviders(tenantId: string) {
+    const count = await this.prisma.reloadOperator.count({ where: { tenantId } });
+    if (count > 0) return;
+    for (const p of PosService.DEFAULT_RELOAD_PROVIDERS) {
+      const op = await this.prisma.reloadOperator.create({
+        data: {
+          tenantId,
+          code: p.code,
+          name: p.name,
+          digitalCommissionPct: p.digitalCommissionPct,
+          physicalCommissionPct: p.physicalCommissionPct,
+          sortOrder: p.sortOrder,
+        },
+      });
+      await this.prisma.reloadDenomination.createMany({
+        data: PosService.DEFAULT_RELOAD_DENOMS.map((faceValue) => ({
+          tenantId,
+          operatorId: op.id,
+          faceValue,
+        })),
+      });
+    }
+  }
+
+  async listReloadOperators(tenantId: string) {
+    await this.ensureReloadProviders(tenantId);
+    const operators = await this.prisma.reloadOperator.findMany({
+      where: { tenantId },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      include: {
+        denominations: { orderBy: { faceValue: 'asc' } },
+      },
+    });
+    const availableCounts = await this.prisma.reloadCardStock.groupBy({
+      by: ['operatorId', 'denominationId'],
+      where: { tenantId, status: ReloadCardStatus.AVAILABLE },
+      _count: { _all: true },
+    });
+    const countMap = new Map(
+      availableCounts.map((r) => [`${r.operatorId}:${r.denominationId}`, r._count._all]),
+    );
+    return operators.map((op) => ({
+      ...op,
+      denominations: op.denominations.map((d) => ({
+        ...d,
+        availableCards: countMap.get(`${op.id}:${d.id}`) ?? 0,
+      })),
+    }));
+  }
+
+  async createReloadOperator(tenantId: string, dto: UpsertReloadOperatorDto) {
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException('Provider name required');
+    const code = (dto.code?.trim() || name).toUpperCase().replace(/[^A-Z0-9]+/g, '_').slice(0, 24) || 'PROVIDER';
+    const existing = await this.prisma.reloadOperator.findFirst({ where: { tenantId, code } });
+    if (existing) throw new BadRequestException('Provider code already exists');
+    const op = await this.prisma.reloadOperator.create({
+      data: {
+        tenantId,
+        code,
+        name,
+        digitalCommissionPct: dto.digitalCommissionPct ?? 2,
+        physicalCommissionPct: dto.physicalCommissionPct ?? 3,
+        isActive: dto.isActive ?? true,
+        sortOrder: dto.sortOrder ?? 100,
+      },
+    });
+    await this.prisma.reloadDenomination.createMany({
+      data: PosService.DEFAULT_RELOAD_DENOMS.map((faceValue) => ({
+        tenantId,
+        operatorId: op.id,
+        faceValue,
+      })),
+    });
+    return this.prisma.reloadOperator.findUnique({
+      where: { id: op.id },
+      include: { denominations: { orderBy: { faceValue: 'asc' } } },
+    });
+  }
+
+  async updateReloadOperator(tenantId: string, id: string, dto: UpdateReloadOperatorDto) {
+    const op = await this.prisma.reloadOperator.findFirst({ where: { id, tenantId } });
+    if (!op) throw new NotFoundException('Provider not found');
+    return this.prisma.reloadOperator.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+        ...(dto.digitalCommissionPct !== undefined ? { digitalCommissionPct: dto.digitalCommissionPct } : {}),
+        ...(dto.physicalCommissionPct !== undefined ? { physicalCommissionPct: dto.physicalCommissionPct } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+        ...(dto.sortOrder !== undefined ? { sortOrder: dto.sortOrder } : {}),
+      },
+      include: { denominations: { orderBy: { faceValue: 'asc' } } },
+    });
+  }
+
+  async importReloadCards(tenantId: string, branchId: string, dto: ImportReloadCardsDto) {
+    const operator = await this.prisma.reloadOperator.findFirst({ where: { id: dto.operatorId, tenantId } });
+    if (!operator) throw new NotFoundException('Provider not found');
+    const denom = await this.prisma.reloadDenomination.findFirst({
+      where: { id: dto.denominationId, tenantId, operatorId: dto.operatorId },
+    });
+    if (!denom) throw new NotFoundException('Denomination not found');
+    const pins = dto.pins
+      .split(/[\s,;]+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (!pins.length) throw new BadRequestException('No PIN codes provided');
+    let imported = 0;
+    let skipped = 0;
+    for (const pin of pins) {
+      const pinCode = pin.replace(/\s+/g, '');
+      try {
+        await this.prisma.reloadCardStock.create({
+          data: {
+            tenantId,
+            branchId: branchId || undefined,
+            operatorId: dto.operatorId,
+            denominationId: dto.denominationId,
+            pinCode,
+            pinMasked: maskReloadPin(pinCode),
+            purchaseCost: dto.purchaseCost,
+            status: ReloadCardStatus.AVAILABLE,
+          },
+        });
+        imported += 1;
+      } catch {
+        skipped += 1;
+      }
+    }
+    return { imported, skipped, total: pins.length };
+  }
+
+  private async recordReloadSalesFromItems(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    branchId: string,
+    saleId: string,
+    items: SaleItemDto[],
+  ) {
+    for (const item of items) {
+      if (!item.reloadType || !item.reloadOperatorId) continue;
+      const qty = Math.max(1, Math.floor(item.quantity || 1));
+      const operator = await tx.reloadOperator.findFirst({
+        where: { id: item.reloadOperatorId, tenantId, isActive: true },
+      });
+      if (!operator) throw new BadRequestException(`Reload provider not found: ${item.reloadOperatorId}`);
+      const faceValue = item.reloadFaceValue ?? item.unitPrice;
+      const commission = computeReloadCommission(
+        {
+          digitalCommissionPct: operator.digitalCommissionPct,
+          physicalCommissionPct: operator.physicalCommissionPct,
+        },
+        item.reloadType,
+        faceValue,
+      );
+
+      if (item.reloadType === ReloadSaleType.DIGITAL) {
+        const msisdn = (item.reloadMsisdn || '').replace(/\D/g, '');
+        if (msisdn.length < 9) throw new BadRequestException('Reload requires a valid phone number');
+        for (let i = 0; i < qty; i += 1) {
+          await tx.reloadSale.create({
+            data: {
+              tenantId,
+              branchId,
+              saleId,
+              type: ReloadSaleType.DIGITAL,
+              operatorId: operator.id,
+              denominationId: item.reloadDenominationId || null,
+              msisdn,
+              faceValue,
+              unitPrice: item.unitPrice,
+              costPrice: commission.costPrice,
+              commissionPct: commission.commissionPct,
+              commissionEarned: commission.commissionEarned,
+            },
+          });
+        }
+        continue;
+      }
+
+      // PHYSICAL — allocate available PIN cards
+      if (!item.reloadDenominationId) {
+        throw new BadRequestException('Recharge card sale requires a denomination');
+      }
+      const cards = await tx.reloadCardStock.findMany({
+        where: {
+          tenantId,
+          operatorId: operator.id,
+          denominationId: item.reloadDenominationId,
+          status: ReloadCardStatus.AVAILABLE,
+        },
+        orderBy: { createdAt: 'asc' },
+        take: qty,
+      });
+      if (cards.length < qty) {
+        throw new BadRequestException(
+          `Not enough ${operator.name} LKR ${faceValue} recharge cards in stock (need ${qty}, have ${cards.length})`,
+        );
+      }
+      for (const card of cards) {
+        const costPrice = card.purchaseCost != null && card.purchaseCost >= 0
+          ? card.purchaseCost
+          : commission.costPrice;
+        const commissionEarned = round2(Math.max(0, faceValue - costPrice));
+        await tx.reloadCardStock.update({
+          where: { id: card.id },
+          data: {
+            status: ReloadCardStatus.SOLD,
+            soldSaleId: saleId,
+            soldAt: new Date(),
+          },
+        });
+        await tx.reloadSale.create({
+          data: {
+            tenantId,
+            branchId,
+            saleId,
+            type: ReloadSaleType.PHYSICAL,
+            operatorId: operator.id,
+            denominationId: item.reloadDenominationId,
+            cardStockId: card.id,
+            faceValue,
+            unitPrice: item.unitPrice,
+            costPrice,
+            commissionPct: commission.commissionPct,
+            commissionEarned,
+          },
+        });
+      }
+    }
+  }
+
   async cashierShiftSummary(tenantId: string, branchId: string, cashierId: string, date?: string) {
     const day = date ? dayjs(date) : dayjs();
     const range = { gte: day.startOf('day').toDate(), lte: day.endOf('day').toDate() };
@@ -2354,6 +2628,38 @@ export class PosController {
     @Query('amount') amount?: string,
   ) {
     return this.posService.validateGiftVoucher(user.tenantId, code, parseFloat(amount ?? '0') || 0);
+  }
+
+  @Get('reload/operators')
+  @RequirePermissions('sales:read')
+  @ApiOperation({ summary: 'List reload / recharge providers with commissions and card stock' })
+  listReloadOperators(@CurrentUser() user: IAuthUser) {
+    return this.posService.listReloadOperators(user.tenantId);
+  }
+
+  @Post('reload/operators')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Create reload provider' })
+  createReloadOperator(@CurrentUser() user: IAuthUser, @Body() dto: UpsertReloadOperatorDto) {
+    return this.posService.createReloadOperator(user.tenantId, dto);
+  }
+
+  @Put('reload/operators/:id')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Update reload provider commissions' })
+  updateReloadOperator(
+    @CurrentUser() user: IAuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateReloadOperatorDto,
+  ) {
+    return this.posService.updateReloadOperator(user.tenantId, id, dto);
+  }
+
+  @Post('reload/cards/import')
+  @RequirePermissions('sales:create')
+  @ApiOperation({ summary: 'Bulk import physical recharge card PINs' })
+  importReloadCards(@CurrentUser() user: IAuthUser, @Body() dto: ImportReloadCardsDto) {
+    return this.posService.importReloadCards(user.tenantId, user.branchId ?? '', dto);
   }
 }
 

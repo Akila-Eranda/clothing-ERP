@@ -68,6 +68,7 @@ export class PosSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() autoPrint?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() roundOff?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() loyalty?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() reloadEnabled?: boolean;
 }
 
 export class PayslipSettingsDto {
@@ -1236,6 +1237,7 @@ export class TenantsService {
       autoPrint: bool(pos['autoPrint'] ?? s['autoPrint'], false),
       roundOff: bool(pos['roundOff'] ?? s['roundOff'], true),
       loyalty: bool(pos['loyalty'] ?? s['loyalty'], true),
+      reloadEnabled: bool(pos['reloadEnabled'], true),
     };
   }
 
@@ -1255,6 +1257,7 @@ export class TenantsService {
             ...(dto.autoPrint !== undefined ? { autoPrint: dto.autoPrint } : {}),
             ...(dto.roundOff !== undefined ? { roundOff: dto.roundOff } : {}),
             ...(dto.loyalty !== undefined ? { loyalty: dto.loyalty } : {}),
+            ...(dto.reloadEnabled !== undefined ? { reloadEnabled: dto.reloadEnabled } : {}),
           },
         },
       },
