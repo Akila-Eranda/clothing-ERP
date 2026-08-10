@@ -213,7 +213,7 @@ export const ERP_MODULES: { title: string; icon: string; items: Capability[] }[]
       { id: 'sec-device', label: 'Device Tracking', status: 'planned', module: 'security' },
       { id: 'sec-login-history', label: 'Login History', status: 'live', module: 'security' },
       { id: 'sec-ip', label: 'IP Restrictions', status: 'planned', module: 'security' },
-      { id: 'sec-2fa', label: '2FA', status: 'planned', module: 'security' },
+      { id: 'sec-2fa', label: '2FA', status: 'live', module: 'security' },
       { id: 'sec-permissions', label: 'Permission Matrix', status: 'live', module: 'security' },
     ],
   },

@@ -3,12 +3,16 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { User } from "@/types";
-import { authApi, api, tokenStorage } from "@/lib/api";
+import { authApi, api, tokenStorage, isLoginRequires2FA } from "@/lib/api";
 import { setStoredShopType, ShopType } from "@/lib/shop-profiles";
 import { normalizeRole } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
 import { clearPosCounterId } from "@/lib/pos-counter";
 import { posCashierStorage } from "@/lib/pos-cashier";
+
+export type LoginResult =
+  | { status: "ok" }
+  | { status: "requires_2fa"; userId: string };
 
 interface AuthStore {
   user: User | null;
@@ -19,11 +23,56 @@ interface AuthStore {
 
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
-  loginWithApi: (email: string, password: string, tenantSlug?: string) => Promise<void>;
+  loginWithApi: (
+    email: string,
+    password: string,
+    tenantSlug?: string,
+    twoFactorCode?: string,
+  ) => Promise<LoginResult>;
   logoutApi: () => Promise<void>;
   updateUser: (user: Partial<User>) => void;
   setLoading: (loading: boolean) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+}
+
+async function warmSessionAfterLogin(
+  apiUser: {
+    id: string;
+    branchId: string | null;
+  },
+) {
+  try {
+    const tenantRes = await api.get<{ shopType?: ShopType }>("/tenants/me");
+    if (tenantRes.data?.shopType) {
+      setStoredShopType(tenantRes.data.shopType);
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(
+          "fe_tenant_profile",
+          JSON.stringify({ shopType: tenantRes.data.shopType, fetchedAt: Date.now() }),
+        );
+      }
+    }
+  } catch {
+    /* tenant profile optional on first paint */
+  }
+
+  api
+    .get<{ data: { id: string; name: string; code: string; isDefault?: boolean }[] }>(
+      "/branches?limit=50",
+    )
+    .then((br) => {
+      const raw = br.data?.data ?? (Array.isArray(br.data) ? br.data : []);
+      const list = Array.isArray(raw) ? raw : [];
+      const stored =
+        typeof window !== "undefined" ? localStorage.getItem("fe_active_branch") : null;
+      const pick =
+        (stored && list.find((b) => b.id === stored)) ??
+        (apiUser.branchId ? list.find((b) => b.id === apiUser.branchId) : undefined) ??
+        list.find((b) => b.isDefault) ??
+        list[0];
+      if (pick) useBranchStore.getState().setBranch(pick.id, pick.name);
+    })
+    .catch(() => {});
 }
 
 export const useAuthStore = create<AuthStore>()(
@@ -46,13 +95,23 @@ export const useAuthStore = create<AuthStore>()(
         clearPosCounterId();
         posCashierStorage.clear();
         useBranchStore.getState().clearBranch();
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
       },
 
-      loginWithApi: async (email, password, tenantSlug) => {
+      loginWithApi: async (email, password, tenantSlug, twoFactorCode) => {
         set({ isLoading: true });
         try {
-          const res = await authApi.login(email, password, tenantSlug);
+          const res = await authApi.login(email, password, tenantSlug, twoFactorCode);
+          if (isLoginRequires2FA(res.data)) {
+            set({ isLoading: false });
+            return { status: "requires_2fa", userId: res.data.userId };
+          }
+
           const { accessToken, refreshToken, user: apiUser } = res.data;
           tokenStorage.setAccess(accessToken);
           tokenStorage.setRefresh(refreshToken);
@@ -64,37 +123,19 @@ export const useAuthStore = create<AuthStore>()(
             role: normalizeRole(apiUser.roles?.[0]) as User["role"],
             permissions: [],
             isActive: true,
-            twoFactorEnabled: false,
+            twoFactorEnabled: Boolean(twoFactorCode),
             branchId: apiUser.branchId ?? undefined,
             createdAt: new Date(),
           };
-          set({ user, accessToken, refreshToken, isAuthenticated: true, isLoading: false });
-          try {
-            const tenantRes = await api.get<{ shopType?: ShopType }>('/tenants/me');
-            if (tenantRes.data?.shopType) {
-              setStoredShopType(tenantRes.data.shopType);
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem(
-                  'fe_tenant_profile',
-                  JSON.stringify({ shopType: tenantRes.data.shopType, fetchedAt: Date.now() }),
-                );
-              }
-            }
-          } catch { /* tenant profile optional on first paint */ }
-          // Warm branch list in background so branch switcher is ready without blocking pages.
-          api.get<{ data: { id: string; name: string; code: string; isDefault?: boolean }[] }>('/branches?limit=50')
-            .then((br) => {
-              const raw = br.data?.data ?? (Array.isArray(br.data) ? br.data : []);
-              const list = Array.isArray(raw) ? raw : [];
-              const stored = typeof window !== 'undefined' ? localStorage.getItem('fe_active_branch') : null;
-              const pick =
-                (stored && list.find((b) => b.id === stored)) ??
-                (apiUser.branchId ? list.find((b) => b.id === apiUser.branchId) : undefined) ??
-                list.find((b) => b.isDefault) ??
-                list[0];
-              if (pick) useBranchStore.getState().setBranch(pick.id, pick.name);
-            })
-            .catch(() => {});
+          set({
+            user,
+            accessToken,
+            refreshToken,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+          void warmSessionAfterLogin(apiUser);
+          return { status: "ok" };
         } catch (e) {
           set({ isLoading: false });
           throw e;
@@ -102,12 +143,19 @@ export const useAuthStore = create<AuthStore>()(
       },
 
       logoutApi: async () => {
-        try { await authApi.logout(); } catch {}
+        try {
+          await authApi.logout();
+        } catch {}
         tokenStorage.clear();
         clearPosCounterId();
         posCashierStorage.clear();
         useBranchStore.getState().clearBranch();
-        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+        set({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
       },
 
       updateUser: (updates) =>
@@ -128,8 +176,8 @@ export const useAuthStore = create<AuthStore>()(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // Mock user for demo purposes

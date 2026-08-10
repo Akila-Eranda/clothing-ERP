@@ -16,13 +16,22 @@ const TOKEN_KEY   = 'fe_access_token';
 const REFRESH_KEY = 'fe_refresh_token';
 const TENANT_KEY  = 'fe_tenant_id';
 
+/** Middleware gate cookie. HttpOnly requires Set-Cookie from the API; client can still set Secure. */
+function accessTokenCookie(value: string, maxAge: number): string {
+  const secure =
+    typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? '; Secure'
+      : '';
+  return `${TOKEN_KEY}=${value}; path=/; SameSite=Lax; max-age=${maxAge}${secure}`;
+}
+
 export const tokenStorage = {
   getAccess:   () => (typeof window !== 'undefined' ? localStorage.getItem(TOKEN_KEY)   : null),
   getRefresh:  () => (typeof window !== 'undefined' ? localStorage.getItem(REFRESH_KEY) : null),
   getTenant:   () => (typeof window !== 'undefined' ? localStorage.getItem(TENANT_KEY)  : null),
   setAccess:   (t: string) => {
     localStorage.setItem(TOKEN_KEY, t);
-    document.cookie = `${TOKEN_KEY}=${t}; path=/; SameSite=Lax; max-age=86400`;
+    document.cookie = accessTokenCookie(t, 86400);
   },
   setRefresh:  (t: string) => localStorage.setItem(REFRESH_KEY, t),
   setTenant:   (id: string) => localStorage.setItem(TENANT_KEY, id),
@@ -30,7 +39,7 @@ export const tokenStorage = {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(REFRESH_KEY);
     localStorage.removeItem(TENANT_KEY);
-    document.cookie = `${TOKEN_KEY}=; path=/; max-age=0`;
+    document.cookie = accessTokenCookie('', 0);
   },
 };
 
@@ -220,25 +229,46 @@ export async function logClientAuditEvent(payload: {
 }
 
 // ── Auth API ─────────────────────────────────────────────────────────────
-export interface LoginResponse {
+export interface LoginUserPayload {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  tenantId: string;
+  branchId: string | null;
+  roles: string[];
+}
+
+export interface LoginSuccessResponse {
   accessToken: string;
   refreshToken: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-    tenantId: string;
-    branchId: string | null;
-    roles: string[];
-  };
+  user: LoginUserPayload;
+  requiresTwoFactor?: false;
+}
+
+export interface LoginRequires2FAResponse {
+  requiresTwoFactor: true;
+  userId: string;
+}
+
+export type LoginResponse = LoginSuccessResponse | LoginRequires2FAResponse;
+
+export function isLoginRequires2FA(
+  data: LoginResponse | null | undefined,
+): data is LoginRequires2FAResponse {
+  return Boolean(data && 'requiresTwoFactor' in data && data.requiresTwoFactor);
 }
 
 export const authApi = {
-  login: (email: string, password: string, tenantSlug?: string) =>
+  login: (
+    email: string,
+    password: string,
+    tenantSlug?: string,
+    twoFactorCode?: string,
+  ) =>
     api.post<LoginResponse>(
       '/auth/login',
-      { email, password },
+      { email, password, ...(twoFactorCode ? { twoFactorCode } : {}) },
       tenantSlug ? { headers: { 'x-tenant-id': tenantSlug } } : undefined,
     ),
 
@@ -246,7 +276,7 @@ export const authApi = {
     api.delete<null>('/auth/logout'),
 
   me: () =>
-    api.get<LoginResponse['user']>('/auth/me'),
+    api.get<LoginUserPayload>('/auth/me'),
 
   refresh: (refreshToken: string) =>
     api.post<{ accessToken: string; refreshToken: string }>('/auth/refresh', { refreshToken }),

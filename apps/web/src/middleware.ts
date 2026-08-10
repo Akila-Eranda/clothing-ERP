@@ -54,7 +54,14 @@ export function middleware(request: NextRequest) {
   if (!isPublic && !token && !pathname.startsWith('/_next') && !pathname.startsWith('/api')) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
-    loginUrl.searchParams.set('from', pathname);
+    // Only pass same-origin relative paths (never protocol-relative //…)
+    if (
+      pathname.startsWith('/') &&
+      !pathname.startsWith('//') &&
+      !pathname.includes('\\')
+    ) {
+      loginUrl.searchParams.set('from', pathname);
+    }
     return NextResponse.redirect(loginUrl);
   }
 

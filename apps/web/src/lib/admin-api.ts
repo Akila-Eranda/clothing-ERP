@@ -41,7 +41,11 @@ export const adminAuth = {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(TENANT_KEY, tenantSlug)
     localStorage.setItem(ROLES_KEY, JSON.stringify(roles))
-    document.cookie = `admin_token=${token}; path=/; max-age=${60 * 60 * 8}; SameSite=Strict`
+    const secure =
+      typeof window !== 'undefined' && window.location.protocol === 'https:'
+        ? '; Secure'
+        : ''
+    document.cookie = `admin_token=${token}; path=/; max-age=${60 * 60 * 8}; SameSite=Strict${secure}`
   },
   clear: () => {
     localStorage.removeItem(TOKEN_KEY)
