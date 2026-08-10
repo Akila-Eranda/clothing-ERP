@@ -40,6 +40,7 @@ services:
       dockerfile: Dockerfile
     container_name: fashionerp_api
     restart: unless-stopped
+    user: "1001:1001"
     depends_on:
       postgres:
         condition: service_healthy

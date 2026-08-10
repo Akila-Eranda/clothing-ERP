@@ -1,8 +1,6 @@
 #!/bin/sh
 set -e
-
-mkdir -p /app/uploads
-chown -R nestjs:nodejs /app/uploads 2>/dev/null || true
-
+# Container runs as uid 1001 (nestjs). Uploads volume is mounted at /app/uploads.
+mkdir -p /app/uploads 2>/dev/null || true
 cd /app
-exec su -s /bin/sh nestjs -c 'exec node dist/main'
+exec node dist/main
