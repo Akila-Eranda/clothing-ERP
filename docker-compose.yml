@@ -112,7 +112,13 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    pids_limit: 200
+    pids_limit: 100
+    mem_limit: 768m
+    cpus: 1.5
+    # No extra mounts — keeps attack surface minimal
+    labels:
+      - "fashionerp.role=web"
+      - "fashionerp.harden=anti-miner"
 
   nginx:
     image: nginx:alpine
