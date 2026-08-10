@@ -23,22 +23,22 @@ ENV NEXT_PUBLIC_PLATFORM_TENANT=$NEXT_PUBLIC_PLATFORM_TENANT
 
 RUN pnpm build
 
-# ── Stage 2: Runner ───────────────────────────────────────────
-FROM node:20-alpine AS runner
+# ── Stage 2: Runner (Debian slim — NO busybox wget applet) ───
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001 \
-  && (command -v wget >/dev/null && ln -sf /bin/false "$(command -v wget)" || true) \
-  && (command -v curl >/dev/null && ln -sf /bin/false "$(command -v curl)" || true) \
-  && rm -f /usr/bin/wget /bin/wget /usr/bin/curl /bin/curl 2>/dev/null || true \
+RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs -m nextjs \
+  && apt-get update -y \
+  && apt-get purge -y wget curl 2>/dev/null || true \
+  && rm -f /usr/bin/wget /bin/wget /usr/bin/curl /bin/curl \
   && printf '%s\n' '#!/bin/false' > /usr/local/bin/wget \
   && printf '%s\n' '#!/bin/false' > /usr/local/bin/curl \
   && chmod 755 /usr/local/bin/wget /usr/local/bin/curl \
-  && rm -rf /var/cache/apk /tmp/* 2>/dev/null || true
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

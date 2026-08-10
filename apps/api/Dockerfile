@@ -22,7 +22,13 @@ FROM node:20-slim AS runner
 
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+  && apt-get purge -y wget curl 2>/dev/null || true \
+  && rm -f /usr/bin/wget /bin/wget /usr/bin/curl /bin/curl 2>/dev/null || true \
+  && printf '%s\n' '#!/bin/false' > /usr/local/bin/wget \
+  && printf '%s\n' '#!/bin/false' > /usr/local/bin/curl \
+  && chmod 755 /usr/local/bin/wget /usr/local/bin/curl \
+  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN npm install -g pnpm
 
@@ -41,6 +47,8 @@ RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
+
+# Keep root for entrypoint (drops to nestjs). Do not USER nestjs here.
 
 EXPOSE 3001
 
