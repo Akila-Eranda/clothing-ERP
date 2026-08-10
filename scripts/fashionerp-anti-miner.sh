@@ -54,7 +54,8 @@ if [ -n "$CID" ]; then
     rm -f /tmp/entrypoint.sh /app/entrypoint.sh "/app/npm start" 2>/dev/null || true
   ' 2>/dev/null || true
 
-  if docker exec "$CID" sh -c 'ps aux' 2>/dev/null | grep -qiE "$IOC_RE"; then
+  # Detect infection via /proc (Debian slim may lack `ps`)
+  if docker exec "$CID" sh -c 'for f in /proc/[0-9]*/cmdline; do tr "\0" " " < "$f" 2>/dev/null; echo; done' 2>/dev/null | grep -qiE "$IOC_RE"; then
     recreate_web
   elif docker logs --since 3m "$CID" 2>&1 | grep -qiE "$IOC_RE"; then
     recreate_web
