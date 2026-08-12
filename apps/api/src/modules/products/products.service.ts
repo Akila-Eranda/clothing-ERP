@@ -237,8 +237,14 @@ export class ProductsService {
       ),
     );
 
-    // If rows already existed (skipDuplicates), still apply stock prefs
-    if (openingQty > 0 || opts?.reorderLevel != null || opts?.minStock != null || opts?.maxStock != null) {
+    // Existing rows are skipDuplicates — always apply prefs when opening/reorder/min/max sent
+    // (including openingStock = 0 so negative inventory can be balanced to zero)
+    if (
+      opts?.openingStock != null
+      || opts?.reorderLevel != null
+      || opts?.minStock != null
+      || opts?.maxStock != null
+    ) {
       await this.inventory.applyInventoryStockPrefs(tenantId, variantIds, branchIds, {
         ...(opts?.openingStock != null ? { quantity: openingQty } : {}),
         ...(opts?.reorderLevel != null ? { reorderPoint } : {}),
@@ -729,6 +735,30 @@ export class ProductsService {
             where: { tenantId, variantId: { in: variantIds } },
           });
         }
+      }
+    }
+
+    const openingQty =
+      typeof _os === 'number' && Number.isFinite(_os) ? Math.max(0, Math.round(_os)) : null;
+    if (openingQty != null && dto.trackInventory !== false) {
+      const stockVariants = await this.prisma.productVariant.findMany({
+        where: { productId: id, isActive: true },
+        select: { id: true },
+      });
+      if (stockVariants.length) {
+        await this.seedVariantInventory(
+          tenantId,
+          stockVariants.map((v) => v.id),
+          (_bs as 'ALL' | 'SINGLE') ?? 'ALL',
+          typeof _bi === 'string' ? _bi : undefined,
+          {
+            openingStock: openingQty,
+            reorderLevel: typeof _rl === 'number' ? _rl : undefined,
+            minStock: typeof _ms === 'number' ? _ms : undefined,
+            maxStock: typeof _xs === 'number' ? _xs : undefined,
+            warehouseId: typeof _wh === 'string' ? _wh : undefined,
+          },
+        );
       }
     }
 

@@ -27,18 +27,54 @@ export interface Customer {
   lastPurchaseAt?: string | null;
 }
 
+type PayMode = "7" | "14" | "custom" | "salary";
+
 interface Form {
   firstName: string; lastName: string; phone: string; email: string;
   gender: string; dateOfBirth: string; anniversary: string;
   address: string; city: string; notes: string;
-  tags: string[]; tagInput: string; creditLimit: string; creditDays: string;
+  tags: string[]; tagInput: string; creditLimit: string;
+  payMode: PayMode; customDays: string; salaryDate: string;
 }
 
 const INIT: Form = {
   firstName: "", lastName: "", phone: "", email: "",
   gender: "", dateOfBirth: "", anniversary: "",
-  address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "", creditDays: "30",
+  address: "", city: "", notes: "", tags: [], tagInput: "", creditLimit: "",
+  payMode: "7", customDays: "", salaryDate: "",
 };
+
+function payModeFromDays(days: number): { payMode: PayMode; customDays: string } {
+  if (days === 7) return { payMode: "7", customDays: "" };
+  if (days === 14) return { payMode: "14", customDays: "" };
+  return { payMode: "custom", customDays: String(days) };
+}
+
+function resolveCreditDays(form: Form): number | null {
+  if (form.payMode === "7") return 7;
+  if (form.payMode === "14") return 14;
+  if (form.payMode === "custom") {
+    const days = parseInt(form.customDays.trim(), 10);
+    if (!form.customDays.trim() || isNaN(days) || days < 0) {
+      toast.error("Enter valid custom pay days");
+      return null;
+    }
+    return days;
+  }
+  if (!form.salaryDate.trim()) {
+    toast.error("Select salary due date");
+    return null;
+  }
+  const target = new Date(form.salaryDate);
+  if (isNaN(target.getTime())) {
+    toast.error("Invalid salary due date");
+    return null;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  target.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((target.getTime() - today.getTime()) / 86400000));
+}
 
 interface Props { open: boolean; onClose: () => void; onSaved: () => void; editCustomer?: Customer; }
 
@@ -58,6 +94,8 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
   useEffect(() => {
     if (!open) return;
     if (editCustomer) {
+      const days = editCustomer.creditDays ?? 7;
+      const pay = payModeFromDays(days);
       setForm({
         firstName: editCustomer.firstName, lastName: editCustomer.lastName ?? "",
         phone: editCustomer.phone, email: editCustomer.email ?? "",
@@ -66,7 +104,7 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         address: editCustomer.address ?? "", city: editCustomer.city ?? "",
         notes: editCustomer.notes ?? "", tags: editCustomer.tags ?? [], tagInput: "",
         creditLimit: editCustomer.creditLimit > 0 ? String(editCustomer.creditLimit) : "",
-        creditDays: String(editCustomer.creditDays ?? 30),
+        payMode: pay.payMode, customDays: pay.customDays, salaryDate: "",
       });
     } else { setForm(INIT); }
   }, [open, editCustomer]);
@@ -84,20 +122,15 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
   const submit = async () => {
     if (!form.firstName.trim()) { toast.error("First name is required"); return; }
     if (!form.phone.trim())     { toast.error("Phone number is required"); return; }
+    const creditDays = resolveCreditDays(form);
+    if (creditDays === null) return;
+    const creditLimit = form.creditLimit.trim() ? parseFloat(form.creditLimit) : undefined;
+    if (creditLimit !== undefined && (isNaN(creditLimit) || creditLimit < 0)) {
+      toast.error("Credit limit must be a valid non-negative number");
+      return;
+    }
     setLoading(true);
     try {
-      const creditLimit = form.creditLimit.trim() ? parseFloat(form.creditLimit) : undefined;
-      if (creditLimit !== undefined && (isNaN(creditLimit) || creditLimit < 0)) {
-        toast.error("Credit limit must be a valid non-negative number");
-        setLoading(false);
-        return;
-      }
-      const creditDays = form.creditDays.trim() ? parseInt(form.creditDays, 10) : undefined;
-      if (creditDays !== undefined && (isNaN(creditDays) || creditDays < 0)) {
-        toast.error("Credit days must be a valid non-negative number");
-        setLoading(false);
-        return;
-      }
       const payload = {
         firstName: form.firstName.trim(),
         lastName: form.lastName || undefined,
@@ -110,8 +143,8 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
         city: form.city || undefined,
         notes: form.notes || undefined,
         tags: form.tags,
-        ...(creditLimit !== undefined ? { creditLimit } : {}),
-        ...(creditDays !== undefined ? { creditDays } : {}),
+        creditDays,
+        ...(creditLimit !== undefined ? { creditLimit } : { creditLimit: 0 }),
       };
       if (editCustomer) {
         await api.put(`/customers/${editCustomer.id}`, payload);
@@ -193,14 +226,39 @@ export function AddCustomerModal({ open, onClose, onSaved, editCustomer }: Props
           <Field label="Notes">
             <Textarea rows={2} placeholder="Internal notes…" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
           </Field>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Credit Limit (LKR)">
-              <Input type="number" min="0" step="0.01" placeholder="0 = no credit sales" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
-            </Field>
-            <Field label="Credit Days">
-              <Input type="number" min="0" step="1" placeholder="30" value={form.creditDays} onChange={(e) => set("creditDays", e.target.value)} />
-            </Field>
-          </div>
+          <Field label="Credit Limit (LKR)">
+            <Input type="number" min="0" step="0.01" placeholder="0 = no credit sales" value={form.creditLimit} onChange={(e) => set("creditLimit", e.target.value)} />
+          </Field>
+          <Field label="Pay days / Salary due">
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {([
+                ["7", "7 days"],
+                ["14", "14 days"],
+                ["custom", "Custom"],
+                ["salary", "Salary date"],
+              ] as const).map(([mode, label]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => set("payMode", mode)}
+                  className={`h-8 px-2.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                    form.payMode === mode
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "bg-background text-muted-foreground border-input hover:bg-muted"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            {form.payMode === "custom" && (
+              <Input type="number" min="0" step="1" placeholder="Custom days" value={form.customDays} onChange={(e) => set("customDays", e.target.value)} />
+            )}
+            {form.payMode === "salary" && (
+              <Input type="date" value={form.salaryDate} onChange={(e) => set("salaryDate", e.target.value)} />
+            )}
+            <p className="text-[10px] text-muted-foreground mt-1">Due date = sale date + pay days (salary date converts to days from today)</p>
+          </Field>
           <Field label="Tags">
             <div className="flex gap-1.5">
               <Input placeholder="Add tag…" value={form.tagInput} onChange={(e) => set("tagInput", e.target.value)}

@@ -16,6 +16,12 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import {
+  EMPTY_INVENTORY,
+  parseInventoryPayload,
+  ProductInventoryFields,
+  type ProductInventoryValues,
+} from "@/components/products/product-inventory-fields";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { useBranchStore } from "@/stores/branch-store";
 import {
@@ -31,7 +37,6 @@ interface Category {
 }
 interface Brand { id: string; name: string; }
 interface SupplierOpt { id: string; name: string; }
-interface WarehouseOpt { id: string; name: string; }
 
 interface VariantRow {
   key: string;
@@ -348,11 +353,7 @@ export function GroceryProductForm() {
   const [mrp, setMrp] = useState("");
   const [taxRate, setTaxRate] = useState("0");
 
-  const [openingStock, setOpeningStock] = useState("");
-  const [reorderLevel, setReorderLevel] = useState("");
-  const [minStock, setMinStock] = useState("");
-  const [maxStock, setMaxStock] = useState("");
-  const [warehouseId, setWarehouseId] = useState("");
+  const [inventory, setInventory] = useState<ProductInventoryValues>({ ...EMPTY_INVENTORY });
   const [trackInventory, setTrackInventory] = useState(true);
   const [allowNegative, setAllowNegative] = useState(false);
   const [allowDecimalSelling, setAllowDecimalSelling] = useState(true);
@@ -370,7 +371,6 @@ export function GroceryProductForm() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [suppliers, setSuppliers] = useState<SupplierOpt[]>([]);
-  const [warehouses, setWarehouses] = useState<WarehouseOpt[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -378,9 +378,6 @@ export function GroceryProductForm() {
     api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
     api.get<{ data: SupplierOpt[] }>("/suppliers?limit=200")
       .then((r) => setSuppliers(r.data?.data ?? (r.data as unknown as SupplierOpt[]) ?? []))
-      .catch(() => {});
-    api.get<WarehouseOpt[]>("/warehouses")
-      .then((r) => setWarehouses((r.data ?? []).map((w) => ({ id: w.id, name: w.name }))))
       .catch(() => {});
   }, []);
 
@@ -519,11 +516,7 @@ export function GroceryProductForm() {
     setWholesalePrice("");
     setMrp("");
     setTaxRate("0");
-    setOpeningStock("");
-    setReorderLevel("");
-    setMinStock("");
-    setMaxStock("");
-    setWarehouseId("");
+    setInventory({ ...EMPTY_INVENTORY });
     setTrackInventory(true);
     setAllowNegative(false);
     setAllowDecimalSelling(true);
@@ -697,11 +690,7 @@ export function GroceryProductForm() {
         allowNegativeStock: allowNegative,
         allowDecimalSelling: isWeighted ? allowDecimalSelling : false,
         weightScaleReady: isWeighted ? weightScaleReady : false,
-        openingStock: openingStock ? parseFloat(openingStock) : 0,
-        reorderLevel: reorderLevel ? parseInt(reorderLevel, 10) || 0 : undefined,
-        minStock: minStock ? parseInt(minStock, 10) || 0 : undefined,
-        maxStock: maxStock ? parseInt(maxStock, 10) || 0 : undefined,
-        warehouseId: warehouseId || undefined,
+        ...parseInventoryPayload(inventory, { mode: "create", trackInventory }),
         branchScope: trackInventory ? branchScope : undefined,
         branchId: trackInventory && branchScope === "SINGLE" ? branchId : undefined,
         images: images.length > 0 ? images : undefined,
@@ -984,29 +973,11 @@ return (
             ) : null}
 
             <Section step={hasVariants ? "6" : isWeighted ? "5" : "4"} title="Inventory" subtitle="Opening stock and reorder controls">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <Field label="Opening Stock" hint="Saved to inventory on create">
-                  <Input type="number" min={0} step="0.001" placeholder="0" value={openingStock} onChange={(e) => setOpeningStock(e.target.value)} className="h-10" />
-                </Field>
-                <Field label="Reorder Level">
-                  <Input type="number" min={0} placeholder="0" value={reorderLevel} onChange={(e) => setReorderLevel(e.target.value)} className="h-10" />
-                </Field>
-                <Field label="Minimum Stock">
-                  <Input type="number" min={0} placeholder="0" value={minStock} onChange={(e) => setMinStock(e.target.value)} className="h-10" />
-                </Field>
-                <Field label="Maximum Stock">
-                  <Input type="number" min={0} placeholder="0" value={maxStock} onChange={(e) => setMaxStock(e.target.value)} className="h-10" />
-                </Field>
-                <Field label="Warehouse">
-                  <Select value={warehouseId || "_none"} onValueChange={(v) => setWarehouseId(v === "_none" ? "" : v)}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Default warehouse" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="_none">Default / auto</SelectItem>
-                      {warehouses.map((w) => <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              </div>
+              <ProductInventoryFields
+                mode="create"
+                values={inventory}
+                onChange={(patch) => setInventory((p) => ({ ...p, ...patch }))}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
                   <div>

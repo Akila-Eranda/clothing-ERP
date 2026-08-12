@@ -349,6 +349,7 @@ function buildTransferColumns(opts: {
 }
 
 function getStockStatus(qty: number) {
+  if (qty < 0) return "negative";
   if (qty === 0) return "out_of_stock";
   if (qty <= 5) return "low_stock";
   return "in_stock";
@@ -387,7 +388,11 @@ function buildStockColumns(
     {
       accessorKey: "quantity",
       header: ({ column }) => <DataTableColumnHeader column={column} title="On Hand" />,
-      cell: ({ row }) => <span className="font-bold">{row.original.quantity}</span>,
+      cell: ({ row }) => (
+        <span className={`font-bold tabular-nums ${row.original.quantity < 0 ? "text-red-600" : ""}`}>
+          {row.original.quantity}
+        </span>
+      ),
     },
     {
       id: "reserved",
@@ -420,8 +425,8 @@ function buildStockColumns(
       cell: ({ row }) => {
         const s = getStockStatus(row.original.quantity);
         return (
-          <Badge variant={s === "out_of_stock" ? "danger" : s === "low_stock" ? "warning" : "success"} className="text-[10px]">
-            {s === "out_of_stock" ? "Out of Stock" : s === "low_stock" ? "Low Stock" : "In Stock"}
+          <Badge variant={s === "negative" || s === "out_of_stock" ? "danger" : s === "low_stock" ? "warning" : "success"} className="text-[10px]">
+            {s === "negative" ? "Negative" : s === "out_of_stock" ? "Out of Stock" : s === "low_stock" ? "Low Stock" : "In Stock"}
           </Badge>
         );
       },
@@ -489,6 +494,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
   const [transfers, setTransfers] = useState<StockTransferRow[]>([]);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferActionId, setTransferActionId] = useState<string | null>(null);
+  const [zeroNegBusy, setZeroNegBusy] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -545,6 +551,26 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     }
   };
 
+  const zeroNegativeStock = async () => {
+    const count = stock.filter((i) => i.quantity < 0).length;
+    if (count === 0) {
+      toast.info("No negative stock to fix");
+      return;
+    }
+    if (!window.confirm(`Set ${count} negative stock row(s) to 0? Positive stock will not change.`)) return;
+    setZeroNegBusy(true);
+    try {
+      const res = await api.post<{ fixed: number }>("/inventory/zero-negatives");
+      const fixed = res.data?.fixed ?? 0;
+      toast.success(fixed > 0 ? `Balanced ${fixed} negative item(s) to 0` : "No negative stock found");
+      await fetchData();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to zero negatives");
+    } finally {
+      setZeroNegBusy(false);
+    }
+  };
+
   const actOnTransferWorkflow = async (taskId: string, action: "approve" | "reject") => {
     setTransferActionId(taskId);
     try {
@@ -583,6 +609,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     return i.quantity > 0 && i.quantity <= threshold;
   }).length;
   const outCount = stock.filter((i) => i.quantity === 0).length;
+  const negativeCount = stock.filter((i) => i.quantity < 0).length;
   const transferPending = transfers.filter((t) => t.status === "PENDING").length;
   const transferInTransit = transfers.filter((t) => t.status === "IN_TRANSIT").length;
   const transferReceived = transfers.filter((t) => t.status === "RECEIVED").length;
@@ -627,6 +654,15 @@ export function InventoryHub({ section }: { section: InventorySection }) {
             </Button>
             {section === "stock" && (
               <>
+                <Button
+                  variant="outline"
+                  disabled={zeroNegBusy || negativeCount === 0}
+                  onClick={() => void zeroNegativeStock()}
+                  className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5 border-red-500/30 text-red-600 hover:bg-red-500/10"
+                >
+                  {zeroNegBusy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Ban className="h-[18px] w-[18px]" />}
+                  Zero negatives{negativeCount > 0 ? ` (${negativeCount})` : ""}
+                </Button>
                 <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
                   <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
                 </Button>
@@ -680,11 +716,12 @@ export function InventoryHub({ section }: { section: InventorySection }) {
 
       {section === "stock" && (
         <>
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
             {[
               { label: "Total SKUs", value: stock.length, icon: Package, color: "text-blue-500", bg: "bg-blue-500/10" },
               { label: "Low Stock", value: lowCount, icon: TrendingDown, color: "text-amber-500", bg: "bg-amber-500/10" },
               { label: "Out of Stock", value: outCount, icon: AlertTriangle, color: "text-red-500", bg: "bg-red-500/10" },
+              { label: "Negative", value: negativeCount, icon: Ban, color: "text-rose-600", bg: "bg-rose-500/10" },
               { label: "SKUs Tracked", value: summary?.skuCount ?? stock.length, icon: BarChart3, color: "text-emerald-500", bg: "bg-emerald-500/10" },
             ].map((s) => (
               <Card key={s.label}>

@@ -21,6 +21,12 @@ import {
 } from "@/lib/shop-vertical";
 import { getWorkspace } from "@/lib/shop-workspace";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import {
+  EMPTY_INVENTORY,
+  parseInventoryPayload,
+  ProductInventoryFields,
+  type ProductInventoryValues,
+} from "@/components/products/product-inventory-fields";
 import { useBranchStore } from "@/stores/branch-store";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
@@ -57,6 +63,7 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   unit: string; batchNumber: string;
   trackInventory: boolean;
+  inventory: ProductInventoryValues;
   seoTitle: string; seoDescription: string;
   images: string[];
   branchScope: ProductBranchScope;
@@ -76,7 +83,7 @@ const buildInitialForm = (): Form => {
     attributes: variantAttrsFromProfile(profile.type),
     unit: profile.defaultUnit,
     batchNumber: "",
-    trackInventory: true, seoTitle: "", seoDescription: "",
+    trackInventory: true, inventory: { ...EMPTY_INVENTORY }, seoTitle: "", seoDescription: "",
     images: [],
     branchScope: "ALL",
     branchId: "",
@@ -154,6 +161,7 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
         unit: (editProduct.tags ?? []).find((t) => t.startsWith("unit:"))?.slice(5) ?? shopProfile.defaultUnit,
         batchNumber: (editProduct.tags ?? []).find((t) => t.startsWith("batch:"))?.slice(6) ?? "",
         trackInventory: editProduct.trackInventory,
+        inventory: { ...EMPTY_INVENTORY },
         seoTitle: editProduct.seoTitle ?? "", seoDescription: editProduct.seoDescription ?? "",
         images: editProduct.images ?? [],
         branchScope: "ALL",
@@ -281,6 +289,10 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
       tags: extraTags,
       hasVariants: form.hasVariants,
       trackInventory: form.trackInventory,
+      ...parseInventoryPayload(form.inventory, {
+        mode: editProduct ? "edit" : "create",
+        trackInventory: form.trackInventory,
+      }),
       branchScope: !editProduct && form.trackInventory ? form.branchScope : undefined,
       branchId: !editProduct && form.trackInventory && form.branchScope === "SINGLE" ? form.branchId : undefined,
       seoTitle: form.seoTitle || undefined,
@@ -765,6 +777,13 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
           </div>
           <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
         </div>
+        {form.trackInventory && (
+          <ProductInventoryFields
+            mode={editProduct ? "edit" : "create"}
+            values={form.inventory}
+            onChange={(patch) => setForm((p) => ({ ...p, inventory: { ...p.inventory, ...patch } }))}
+          />
+        )}
         {!editProduct && form.trackInventory && (
           <ProductBranchScopeSelect
             branchScope={form.branchScope}

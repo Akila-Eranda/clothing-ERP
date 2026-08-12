@@ -20,6 +20,12 @@ import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns
 import { variantAttrsFromProfile } from "@/lib/shop-profiles";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
+import {
+  EMPTY_INVENTORY,
+  parseInventoryPayload,
+  ProductInventoryFields,
+  type ProductInventoryValues,
+} from "@/components/products/product-inventory-fields";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -42,6 +48,7 @@ interface Form {
   sellingPrice: string; costPrice: string; mrp: string; taxRate: string;
   hasVariants: boolean; attributes: VariantAttr[];
   trackInventory: boolean;
+  inventory: ProductInventoryValues;
   warrantyMonths: string;
   loadIndex: string;
   speedRating: string;
@@ -55,6 +62,7 @@ interface ExistingVariant {
   size?: string | null; color?: string | null; material?: string | null; style?: string | null;
   costPrice: number; sellingPrice: number; mrp: number;
   isActive: boolean;
+  inventory?: { quantity: number }[];
   supplierAssignments?: {
     supplierId: string;
     isActive?: boolean;
@@ -111,6 +119,7 @@ export default function EditProductPage() {
     sellingPrice: "", costPrice: "", mrp: "", taxRate: "0",
     hasVariants: false, attributes: variantAttrsFromProfile(shopProfile.type),
     trackInventory: true,
+    inventory: { ...EMPTY_INVENTORY },
     warrantyMonths: "",
     loadIndex: "",
     speedRating: "",
@@ -129,6 +138,7 @@ export default function EditProductPage() {
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [productName, setProductName] = useState("");
   const [systemTags, setSystemTags] = useState<string[]>([]);
+  const [currentStock, setCurrentStock] = useState<number | null>(null);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
@@ -146,6 +156,12 @@ export default function EditProductPage() {
       const { userTags, systemTags: sysTags } = splitProductTags(p.tags ?? []);
       setProductName(p.name);
       setSystemTags(sysTags);
+      setCurrentStock(
+        (p.variants ?? []).reduce(
+          (sum, v) => sum + (v.inventory ?? []).reduce((a, i) => a + (i.quantity ?? 0), 0),
+          0,
+        ),
+      );
       setCategories(catRes.data ?? []);
       setBrands(brandRes.data ?? []);
       setSuppliers(supplierRes.data?.data ?? (supplierRes.data as unknown as SupplierOpt[]) ?? []);
@@ -174,6 +190,7 @@ export default function EditProductPage() {
         hasVariants:   p.hasVariants,
         attributes:    variantAttrsFromProfile(shopProfile.type),
         trackInventory: p.trackInventory,
+        inventory: { ...EMPTY_INVENTORY },
         warrantyMonths: p.warrantyMonths != null && p.warrantyMonths > 0 ? String(p.warrantyMonths) : "",
         loadIndex: p.loadIndex ?? "",
         speedRating: p.speedRating ?? "",
@@ -330,6 +347,10 @@ export default function EditProductPage() {
         tags:           savedTags,
         hasVariants:    form.hasVariants,
         trackInventory: form.trackInventory,
+        ...parseInventoryPayload(form.inventory, {
+          mode: "edit",
+          trackInventory: form.trackInventory,
+        }),
         ...(showWarranty
           ? { warrantyMonths: form.warrantyMonths.trim() ? parseInt(form.warrantyMonths, 10) || 0 : 0 }
           : {}),
@@ -897,6 +918,14 @@ export default function EditProductPage() {
               </div>
               <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
             </div>
+            {form.trackInventory && (
+              <ProductInventoryFields
+                mode="edit"
+                values={form.inventory}
+                currentStock={currentStock}
+                onChange={(patch) => setForm((p) => ({ ...p, inventory: { ...p.inventory, ...patch } }))}
+              />
+            )}
           </div>
 
           {/* Summary */}

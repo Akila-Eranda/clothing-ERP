@@ -69,7 +69,8 @@ export function PosQuickProductPanel({
 
     setBusy(true);
     try {
-      const res = await api.post<{ id: string; sku?: string }>("/products", {
+      const qty = Math.max(0, parseInt(stockQty, 10) || 0);
+      const res = await api.post<{ id: string; sku?: string; variants?: { id: string }[] }>("/products", {
         name: name.trim(),
         barcode: barcode.trim() || undefined,
         categoryId: categoryId || undefined,
@@ -80,27 +81,18 @@ export function PosQuickProductPanel({
         status: "ACTIVE",
         hasVariants: false,
         trackInventory: true,
+        openingStock: qty,
         branchScope: "ALL",
       });
 
-      const qty = Math.max(0, parseInt(stockQty, 10) || 0);
-      let variantId: string | undefined;
-      try {
-        const detail = await api.get<{
-          variants?: { id: string }[];
-        }>(`/products/${res.data.id}`);
-        variantId = detail.data?.variants?.[0]?.id;
-        if (variantId && qty > 0) {
-          await api.post("/inventory/adjust", {
-            variantId,
-            quantity: qty,
-            movementType: "PURCHASE",
-            unitCost: cost,
-            notes: "POS quick product opening stock",
-          });
+      let variantId = res.data?.variants?.[0]?.id;
+      if (!variantId) {
+        try {
+          const detail = await api.get<{ variants?: { id: string }[] }>(`/products/${res.data.id}`);
+          variantId = detail.data?.variants?.[0]?.id;
+        } catch {
+          /* supplier assign optional */
         }
-      } catch {
-        /* product created; stock optional / may need inventory permission */
       }
 
       if (supplierId && variantId) {

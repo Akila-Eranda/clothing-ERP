@@ -1691,4 +1691,69 @@ export class InventoryService {
       data,
     });
   }
+
+  /**
+   * Set every negative on-hand qty to 0 (does not touch positive stock).
+   * Writes ADJUSTMENT ledger rows; skips lot layer to avoid phantom inbound lots.
+   */
+  async zeroNegativeStock(tenantId: string, branchId: string, userId: string) {
+    const rows = await this.prisma.inventory.findMany({
+      where: {
+        tenantId,
+        quantity: { lt: 0 },
+        ...(branchId ? { branchId } : {}),
+      },
+      select: {
+        id: true,
+        variantId: true,
+        warehouseId: true,
+        branchId: true,
+        quantity: true,
+        reservedQty: true,
+        damagedQty: true,
+        variant: { select: { sku: true, name: true, product: { select: { name: true } } } },
+      },
+    });
+
+    if (!rows.length) {
+      return { fixed: 0, items: [] as { variantId: string; sku: string; name: string; was: number; now: number }[] };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const row of rows) {
+        await tx.inventory.update({
+          where: { id: row.id },
+          data: { quantity: 0 },
+        });
+        await tx.inventoryLog.create({
+          data: {
+            tenantId,
+            branchId: row.branchId,
+            variantId: row.variantId,
+            movementType: StockMovementType.ADJUSTMENT,
+            quantityChange: 0 - row.quantity,
+            quantityBefore: row.quantity,
+            quantityAfter: 0,
+            reservedBefore: row.reservedQty,
+            reservedAfter: row.reservedQty,
+            damagedBefore: row.damagedQty,
+            damagedAfter: row.damagedQty,
+            notes: 'Zero negative stock balance',
+            performedBy: userId,
+          },
+        });
+      }
+    });
+
+    return {
+      fixed: rows.length,
+      items: rows.map((r) => ({
+        variantId: r.variantId,
+        sku: r.variant.sku,
+        name: r.variant.product?.name ?? r.variant.name,
+        was: r.quantity,
+        now: 0,
+      })),
+    };
+  }
 }

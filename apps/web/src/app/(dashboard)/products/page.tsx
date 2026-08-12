@@ -154,6 +154,11 @@ async function parseCsvAndImport(
         description: obj.description || undefined,
         tags: obj.tags ? obj.tags.split("|").filter(Boolean) : [],
         status: (obj.status?.toUpperCase() as "ACTIVE" | "DRAFT") || "DRAFT",
+        trackInventory: true,
+        openingStock: parseFloat(obj.openingstock || obj["opening stock"] || "0") || 0,
+        reorderLevel: obj.reorderlevel || obj["reorder level"]
+          ? parseInt(obj.reorderlevel || obj["reorder level"], 10) || 0
+          : undefined,
       });
       success++;
     } catch { failed++; }

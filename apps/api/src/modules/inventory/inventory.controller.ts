@@ -41,6 +41,13 @@ export class InventoryController {
     return this.inventoryService.adjustStock(user.tenantId, user.branchId ?? '', user.id, dto);
   }
 
+  @Post('zero-negatives')
+  @RequirePermissions('inventory:update')
+  @ApiOperation({ summary: 'Set all negative on-hand quantities to 0 (positives untouched)' })
+  zeroNegatives(@CurrentUser() user: IAuthUser) {
+    return this.inventoryService.zeroNegativeStock(user.tenantId, user.branchId ?? '', user.id);
+  }
+
   @Post('adjust/request')
   @RequirePermissions('inventory:update')
   @ApiOperation({ summary: 'Submit stock adjustment for approval workflow' })

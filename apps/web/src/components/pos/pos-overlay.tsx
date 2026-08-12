@@ -101,6 +101,100 @@ function mapApiCustomer(c: ApiCustomerRow): CustomerItem {
   };
 }
 
+type NewCustPayMode = "7" | "14" | "custom" | "salary";
+
+const posInputStyle: React.CSSProperties = { background: "var(--pos-input)", border: "1px solid var(--pos-border)" };
+const posMutedLabelStyle: React.CSSProperties = { color: "var(--pos-muted)" };
+
+function PosNewCustomerCreditFields({
+  creditLimit,
+  onCreditLimitChange,
+  payMode,
+  onPayModeChange,
+  customDays,
+  onCustomDaysChange,
+  salaryDate,
+  onSalaryDateChange,
+  compact,
+}: {
+  creditLimit: string;
+  onCreditLimitChange: (v: string) => void;
+  payMode: NewCustPayMode;
+  onPayModeChange: (v: NewCustPayMode) => void;
+  customDays: string;
+  onCustomDaysChange: (v: string) => void;
+  salaryDate: string;
+  onSalaryDateChange: (v: string) => void;
+  compact?: boolean;
+}) {
+  const chip = (mode: NewCustPayMode, label: string) => (
+    <button
+      key={mode}
+      type="button"
+      onClick={() => onPayModeChange(mode)}
+      className={`rounded-lg font-bold transition-all ${compact ? "h-7 px-2 text-[10px]" : "h-8 px-2.5 text-[11px]"}`}
+      style={{
+        background: payMode === mode ? "#4f6ef7" : "var(--pos-input)",
+        color: payMode === mode ? "#fff" : "var(--pos-muted)",
+        border: payMode === mode ? "none" : "1px solid var(--pos-border)",
+      }}
+    >
+      {label}
+    </button>
+  );
+  return (
+    <>
+      <div>
+        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={posMutedLabelStyle}>
+          Credit Limit (LKR)
+        </label>
+        <input
+          type="number"
+          min={0}
+          step="0.01"
+          value={creditLimit}
+          onChange={(e) => onCreditLimitChange(e.target.value)}
+          placeholder="0 = no credit"
+          className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+          style={posInputStyle}
+        />
+      </div>
+      <div>
+        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={posMutedLabelStyle}>
+          Pay days / Salary due
+        </label>
+        <div className="flex flex-wrap gap-1.5 mb-1.5">
+          {chip("7", "7 days")}
+          {chip("14", "14 days")}
+          {chip("custom", "Custom")}
+          {chip("salary", "Salary date")}
+        </div>
+        {payMode === "custom" && (
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={customDays}
+            onChange={(e) => onCustomDaysChange(e.target.value)}
+            placeholder="Custom days"
+            className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            style={posInputStyle}
+          />
+        )}
+        {payMode === "salary" && (
+          <input
+            type="date"
+            value={salaryDate}
+            onChange={(e) => onSalaryDateChange(e.target.value)}
+            className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            style={posInputStyle}
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
 type SaleCustomer = { name?: string; firstName?: string; lastName?: string | null; phone?: string };
 
 function formatSaleCustomerName(customer?: SaleCustomer | null): string {
@@ -320,6 +414,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [showShortcuts, setShowShortcuts] = React.useState(false);
   const [cartCustomerOpen, setCartCustomerOpen] = React.useState(false);
   const [showHeldBills, setShowHeldBills] = React.useState(false);
+  const [showReload, setShowReload] = React.useState(false);
   const [customerSearch, setCustomerSearch] = React.useState("");
   const [customers, setCustomers] = React.useState<CustomerItem[]>([]);
   const [customerLoading, setCustomerLoading] = React.useState(false);
@@ -352,6 +447,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const cashPanelRef = React.useRef<HTMLDivElement>(null);
   const cartCustomerSearchRef = React.useRef<HTMLInputElement>(null);
   const cartCustomerDropdownRef = React.useRef<HTMLDivElement>(null);
+  const inlineCustomerSearchRef = React.useRef<HTMLInputElement>(null);
   const [helpers, setHelpers] = React.useState<{ id: string; firstName: string; lastName: string; commissionRate: number }[]>([]);
   const [helperEmployeeId, setHelperEmployeeId] = React.useState("");
   const [giftVoucherCode, setGiftVoucherCode] = React.useState("");
@@ -386,6 +482,10 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [newCustLast, setNewCustLast] = React.useState("");
   const [newCustPhone, setNewCustPhone] = React.useState("");
   const [newCustEmail, setNewCustEmail] = React.useState("");
+  const [newCustCreditLimit, setNewCustCreditLimit] = React.useState("");
+  const [newCustPayMode, setNewCustPayMode] = React.useState<"7" | "14" | "custom" | "salary">("7");
+  const [newCustCustomDays, setNewCustCustomDays] = React.useState("");
+  const [newCustSalaryDate, setNewCustSalaryDate] = React.useState("");
   const [newCustSaving, setNewCustSaving] = React.useState(false);
   const [returnStep, setReturnStep] = React.useState<"search"|"items"|"confirm"|"done">("search");
   const [returnQuery, setReturnQuery] = React.useState("");
@@ -1697,16 +1797,19 @@ ${receiptSoftwareCreditHtml()}
 
   const openCustomerPopup = React.useCallback(() => {
     setShowHeldBills(false);
+    setShowReload(false);
     setCartCustomerOpen(false);
     setCustomerSearch("");
     setCustomers([]);
     setShowNewCust(false);
     setFocusedCustomerIdx(0);
     setActiveNav("customers");
+    setTimeout(() => inlineCustomerSearchRef.current?.focus(), 50);
   }, []);
 
   const openCartCustomerDropdown = React.useCallback(() => {
     setShowHeldBills(false);
+    setShowReload(false);
     setCartShowNewCust(false);
     setFocusedCustomerIdx(0);
     setCartCustomerOpen(true);
@@ -1716,9 +1819,17 @@ ${receiptSoftwareCreditHtml()}
   const openHeldBillsPopup = React.useCallback(() => {
     setActiveNav("products");
     setCartCustomerOpen(false);
+    setShowReload(false);
     setShowHeldBills(true);
     void loadHeldBills();
   }, [loadHeldBills]);
+
+  const openReloadPopup = React.useCallback(() => {
+    setActiveNav("products");
+    setCartCustomerOpen(false);
+    setShowHeldBills(false);
+    setShowReload(true);
+  }, []);
 
   const handleCheckout = React.useCallback(async (forceMethod?: string) => {
     if(!items.length||checkoutLoading)return;
@@ -2166,19 +2277,85 @@ ${rows}
     }
   }, [creditPayAmount, creditPayMethod, creditPayChequeNumber, creditPayChequeDue, customerInsight?.creditBalance, customer, loadCustomerInsight, setCustomer]);
 
+  const resetNewCustomerForm = React.useCallback(() => {
+    setNewCustFirst("");
+    setNewCustLast("");
+    setNewCustPhone("");
+    setNewCustEmail("");
+    setNewCustCreditLimit("");
+    setNewCustPayMode("7");
+    setNewCustCustomDays("");
+    setNewCustSalaryDate("");
+  }, []);
+
+  const resolveNewCustomerCreditDays = React.useCallback((): number | null => {
+    if (newCustPayMode === "7") return 7;
+    if (newCustPayMode === "14") return 14;
+    if (newCustPayMode === "custom") {
+      const days = parseInt(newCustCustomDays.trim(), 10);
+      if (!newCustCustomDays.trim() || isNaN(days) || days < 0) {
+        toast.error("Enter valid custom pay days");
+        return null;
+      }
+      return days;
+    }
+    if (!newCustSalaryDate.trim()) {
+      toast.error("Select salary due date");
+      return null;
+    }
+    const target = new Date(newCustSalaryDate);
+    if (isNaN(target.getTime())) {
+      toast.error("Invalid salary due date");
+      return null;
+    }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    target.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.round((target.getTime() - today.getTime()) / 86400000));
+  }, [newCustPayMode, newCustCustomDays, newCustSalaryDate]);
+
   const saveNewCustomer = React.useCallback(async () => {
     if (!newCustFirst.trim() || !newCustPhone.trim()) { toast.error("First name and phone are required"); return; }
+    const creditDays = resolveNewCustomerCreditDays();
+    if (creditDays === null) return;
+    let creditLimit: number | undefined;
+    if (newCustCreditLimit.trim()) {
+      creditLimit = parseFloat(newCustCreditLimit);
+      if (isNaN(creditLimit) || creditLimit < 0) {
+        toast.error("Credit limit must be a valid non-negative number");
+        return;
+      }
+    }
     setNewCustSaving(true);
     try {
-      const res = await api.post<any>("/customers", { firstName: newCustFirst.trim(), lastName: newCustLast.trim()||undefined, phone: newCustPhone.trim(), email: newCustEmail.trim()||undefined });
+      const res = await api.post<any>("/customers", {
+        firstName: newCustFirst.trim(),
+        lastName: newCustLast.trim() || undefined,
+        phone: newCustPhone.trim(),
+        email: newCustEmail.trim() || undefined,
+        creditDays,
+        ...(creditLimit !== undefined ? { creditLimit } : {}),
+      });
       const c = res.data;
       const item: CustomerItem = mapApiCustomer(c);
       applyCustomer(item);
-      setNewCustFirst(""); setNewCustLast(""); setNewCustPhone(""); setNewCustEmail("");
-      setInlineCustomerSearch(""); setInlineCustomers([]);
-    } catch(e:unknown){ toast.error((e as Error).message??"Failed to register customer"); }
-    finally { setNewCustSaving(false); }
-  }, [newCustFirst, newCustLast, newCustPhone, newCustEmail, applyCustomer]);
+      resetNewCustomerForm();
+      setShowNewCust(false);
+      setCartShowNewCust(false);
+      setInlineCustomerSearch("");
+      setInlineCustomers([]);
+      setCustomerSearch("");
+      setCustomers([]);
+      toast.success(`${item.name} registered`);
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to register customer");
+    } finally {
+      setNewCustSaving(false);
+    }
+  }, [
+    newCustFirst, newCustLast, newCustPhone, newCustEmail, newCustCreditLimit,
+    resolveNewCustomerCreditDays, resetNewCustomerForm, applyCustomer,
+  ]);
 
   const handleSplitBill = React.useCallback(async () => {
     if (selectedCartIdx < 0 || !items[selectedCartIdx]) {
@@ -2252,6 +2429,7 @@ ${rows}
     showShortcuts,
     showCustomerSearch: cartCustomerOpen,
     showHeldBills,
+    showReload,
     showDayEnd,
     qtyPopupOpen: !!addPopup,
     selectedProductName: selectedProductName ?? addPopup?.productName ?? null,
@@ -2286,6 +2464,7 @@ ${rows}
     },
     setShowCustomerSearch: setCartCustomerOpen,
     setShowHeldBills,
+    setShowReload,
     setCustomerSearch,
     setCustomers,
     setActiveNav,
@@ -2348,8 +2527,9 @@ ${rows}
     getHeldBill: (idx: number) => serverHeldBills[idx],
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
+    openReloadPopup,
   }), [
-    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showDayEnd, showCashClose, showTransferFunds,
+    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showReload, showDayEnd, showCashClose, showTransferFunds,
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
@@ -2359,12 +2539,22 @@ ${rows}
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
     openCartCustomerDropdown, openCashClose, closeCashClose, closeTransferFunds, setExactCashTender, focusCheckoutGiftOrCheque,
-    payState.allowPartial, payState.splitMode,
+    openReloadPopup, payState.allowPartial, payState.splitMode,
   ]);
 
   React.useEffect(() => {
     if (activeNav === "hold-bills") openHeldBillsPopup();
   }, [activeNav, openHeldBillsPopup]);
+
+  React.useEffect(() => {
+    if (activeNav === "reload") openReloadPopup();
+  }, [activeNav, openReloadPopup]);
+
+  React.useEffect(() => {
+    if (activeNav !== "customers" || !posOpen) return;
+    const t = setTimeout(() => inlineCustomerSearchRef.current?.focus(), 50);
+    return () => clearTimeout(t);
+  }, [activeNav, posOpen]);
 
   usePosKeyboard(keyboardCtx as Parameters<typeof usePosKeyboard>[0]);
 
@@ -2517,20 +2707,6 @@ ${rows}
       );
     }
 
-    // RELOAD / RECHARGE
-    if (activeNav === "reload") {
-      return (
-        <PosReloadPanel
-          onBack={() => setActiveNav("products")}
-          taxRate={taxRate}
-          onAddToCart={(item) => {
-            addItem(item);
-            setActiveNav("products");
-          }}
-        />
-      );
-    }
-
     // QUICK EXPENSE
     if (activeNav === "expenses") {
       return (
@@ -2566,7 +2742,16 @@ ${rows}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
-            <input value={inlineCustomerSearch} onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}} placeholder="Search customer by name or phone..." className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
+            <input
+              ref={inlineCustomerSearchRef}
+              data-pos-customer-search
+              value={inlineCustomerSearch}
+              onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}}
+              placeholder="Type phone number or name…"
+              autoComplete="off"
+              className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none"
+              style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+            />
             {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
           </div>
           <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90" {...(!showNewCust ? { "data-pos-accent": "" } : {})} style={{background:showNewCust?"var(--pos-card)":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none",color:showNewCust?"var(--pos-accent)":"#ffffff"}}>
@@ -2580,8 +2765,20 @@ ${rows}
             <div className="grid grid-cols-2 gap-2">
               <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>First Name *</label><input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
               <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Last Name</label><input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" inputMode="tel" autoComplete="tel" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
               <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Email</label><input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <PosNewCustomerCreditFields
+                creditLimit={newCustCreditLimit}
+                onCreditLimitChange={setNewCustCreditLimit}
+                payMode={newCustPayMode}
+                onPayModeChange={setNewCustPayMode}
+                customDays={newCustCustomDays}
+                onCustomDaysChange={setNewCustCustomDays}
+                salaryDate={newCustSalaryDate}
+                onSalaryDateChange={setNewCustSalaryDate}
+              />
             </div>
             <button onClick={saveNewCustomer} disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()} className="w-full h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40" style={{background:"#4f6ef7"}}>
               {newCustSaving?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}{newCustSaving?"Saving...":"Save & Add to Bill"}
@@ -3653,25 +3850,25 @@ ${rows}
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"var(--pos-kbd)",color:"var(--pos-muted)"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCustomerPopup()}].map((btn,i)=>(
+            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label:"Reload",key:"L",icon:Smartphone,onClick:()=>openReloadPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCartCustomerDropdown()}].map((btn,i)=>(
               <button
                 key={i}
                 onClick={btn.onClick}
-                className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", i===2&&"max-w-[180px]")}
+                className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", i===3&&"max-w-[180px]")}
                 style={{
-                  background: i === 2 && customer
+                  background: (i === 3 && customer) || (i === 2 && showReload)
                     ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
                     : (isPosLight ? "#334155" : "var(--pos-input)"),
-                  color: i === 2 && customer
+                  color: (i === 3 && customer) || (i === 2 && showReload)
                     ? "#ffffff"
                     : (isPosLight ? "#ffffff" : "var(--pos-text-secondary)"),
-                  border: i === 2 && customer
+                  border: (i === 3 && customer) || (i === 2 && showReload)
                     ? (isPosLight ? "1px solid #4338ca" : "1px solid rgba(79,110,247,0.35)")
                     : (isPosLight ? "1px solid #1E293B" : "none"),
                 }}
-                title={i===2?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : undefined}
+                title={i===3?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : i===2 ? "Reload / Recharge (L)" : undefined}
               >
-                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===2 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-70 ml-0.5 shrink-0">{btn.key}</span>}
+                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===3 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-70 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
             ))}
           </div>
@@ -3818,11 +4015,12 @@ ${rows}
                     </div>
                   );
                 }
-                const active=activeNav===item.id;
+                const active=activeNav===item.id || (item.id === "reload" && showReload);
                 const shortcutIdx = navItems.filter((n) => n.id !== "demo-product").findIndex((n) => n.id === item.id);
                 return (
                   <button key={item.id} onClick={()=>{
                     if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
+                    if (item.id === "reload") { openReloadPopup(); return; }
                     setActiveNav(item.id);
                   }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#4f6ef7":"var(--pos-muted)",background:active?"rgba(79,110,247,0.15)":"transparent"}}>
                     {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
@@ -3830,7 +4028,8 @@ ${rows}
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
                     {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-warn)",color:"#fff"}}>{serverHeldBills.length}</span>}
-                    {shortcutIdx>=0&&shortcutIdx<9&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
+                    {item.id==="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">L</span>}
+                    {shortcutIdx>=0&&shortcutIdx<9&&item.id!=="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
                   </button>
                 );
               })}
@@ -3957,8 +4156,12 @@ ${rows}
                       ref={cartCustomerSearchRef}
                       value={customerSearch}
                       onChange={(e) => { setCustomerSearch(e.target.value); setCartShowNewCust(false); setFocusedCustomerIdx(0); }}
-                      placeholder="Search name or phone..."
-                      className="flex-1 h-8 px-1.5 text-xs text-white outline-none bg-transparent"
+                      placeholder="Type phone or name…"
+                      inputMode="search"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className="flex-1 h-8 px-1.5 text-xs text-white outline-none bg-transparent font-mono"
                     />
                     <button
                       type="button"
@@ -3978,9 +4181,20 @@ ${rows}
                       <div className="grid grid-cols-2 gap-1.5">
                         <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
                         <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
-                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
+                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" inputMode="tel" autoComplete="tel" className="h-8 px-2 rounded-lg text-xs text-white outline-none font-mono" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
                         <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
                       </div>
+                      <PosNewCustomerCreditFields
+                        compact
+                        creditLimit={newCustCreditLimit}
+                        onCreditLimitChange={setNewCustCreditLimit}
+                        payMode={newCustPayMode}
+                        onPayModeChange={setNewCustPayMode}
+                        customDays={newCustCustomDays}
+                        onCustomDaysChange={setNewCustCustomDays}
+                        salaryDate={newCustSalaryDate}
+                        onSalaryDateChange={setNewCustSalaryDate}
+                      />
                       <button type="button" onClick={() => void saveNewCustomer()} disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()} className="w-full h-8 rounded-lg text-xs font-bold text-white disabled:opacity-40" style={{ background: "#4f6ef7" }}>
                         {newCustSaving ? "Saving…" : "Save & add to bill"}
                       </button>
@@ -4258,6 +4472,66 @@ ${rows}
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+
+                  {/* Checkout discount */}
+                  <div className="pt-2 rounded-xl border px-3 py-2.5 space-y-2" style={{ background: "var(--pos-input)", borderColor: discount > 0 ? "rgba(16,185,129,0.4)" : "var(--pos-border)" }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Tag className="h-3.5 w-3.5 shrink-0" style={{ color: discount > 0 ? "#10b981" : "#4f6ef7" }} />
+                        <p className="text-sm font-semibold text-white">Discount %</p>
+                      </div>
+                      {cartDiscountAmt > 0 && !pendingDiscountApproval && (
+                        <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: "var(--pos-success-soft)" }}>
+                          −LKR {formatNumber(cartDiscountAmt)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        ref={discountInputRef}
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={discountInput}
+                        onChange={(e) => setDiscountInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            void applyCartDiscount();
+                          }
+                        }}
+                        placeholder={pendingDiscountApproval ? `${pendingDiscountApproval.percent}% pending` : discount > 0 ? `${discount}%` : "0"}
+                        disabled={!!pendingDiscountApproval}
+                        className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60 tabular-nums"
+                        style={{
+                          background: "var(--pos-panel)",
+                          border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "#10b981" : "var(--pos-border)"}`,
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void applyCartDiscount()}
+                        disabled={!!pendingDiscountApproval}
+                        className="px-3 h-9 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
+                        style={{ background: "#4f6ef7" }}
+                      >
+                        {pendingDiscountApproval ? "Pending" : "Apply"}
+                      </button>
+                    </div>
+                    {pendingDiscountApproval && (
+                      <p className="text-[10px] flex items-center gap-1" style={{ color: "var(--pos-warn-soft)" }}>
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {pendingDiscountApproval.percent}% awaiting manager approval
+                      </p>
+                    )}
+                    {!adminBypass && !pendingDiscountApproval && (
+                      <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                        Over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% needs manager approval
+                      </p>
+                    )}
+                  </div>
+
                   <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "var(--pos-input)" }}>
                       <div className="flex items-center justify-between gap-2">
@@ -4987,6 +5261,50 @@ ${rows}
                     })}
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
+        {/* RELOAD / RECHARGE MODAL */}
+        <AnimatePresence>{showReload && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={() => setShowReload(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-2xl border shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+            >
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  <h2 className="text-white font-bold text-sm">Reload / Recharge</h2>
+                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>L</kbd>
+                </div>
+                <button type="button" onClick={() => setShowReload(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                  <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <PosReloadPanel
+                  asModal
+                  initialPhone={customer?.phone ?? ""}
+                  onBack={() => setShowReload(false)}
+                  taxRate={taxRate}
+                  onAddToCart={(item) => {
+                    addItem(item);
+                    setShowReload(false);
+                  }}
+                />
               </div>
             </motion.div>
           </motion.div>

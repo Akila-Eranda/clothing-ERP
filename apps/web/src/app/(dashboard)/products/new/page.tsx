@@ -23,6 +23,12 @@ import {
   applyVariantCombo, getProductFormCopy,
 } from "@/lib/shop-vertical";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
+import {
+  EMPTY_INVENTORY,
+  parseInventoryPayload,
+  ProductInventoryFields,
+  type ProductInventoryValues,
+} from "@/components/products/product-inventory-fields";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { GroceryProductForm } from "@/components/products/grocery-product-form";
 import { useBranchStore } from "@/stores/branch-store";
@@ -49,6 +55,7 @@ interface Form {
   hasVariants: boolean; attributes: VariantAttr[];
   unit: string; batchNumber: string;
   trackInventory: boolean;
+  inventory: ProductInventoryValues;
   warrantyMonths: string;
   loadIndex: string;
   speedRating: string;
@@ -71,6 +78,7 @@ function buildInitial(type?: string): Form {
     hasVariants: d.hasVariants, attributes: d.attributes,
     unit: d.unit, batchNumber: "",
     trackInventory: true,
+    inventory: { ...EMPTY_INVENTORY },
     warrantyMonths: "",
     loadIndex: "",
     speedRating: "",
@@ -293,6 +301,10 @@ function StandardAddProductPage() {
         status, tags: extraTags,
         hasVariants: form.hasVariants,
         trackInventory: form.trackInventory,
+        ...parseInventoryPayload(form.inventory, {
+          mode: "create",
+          trackInventory: form.trackInventory,
+        }),
         ...(showWarranty && form.warrantyMonths.trim()
           ? { warrantyMonths: parseInt(form.warrantyMonths, 10) || 0 }
           : showWarranty ? { warrantyMonths: 0 } : {}),
@@ -837,6 +849,13 @@ function StandardAddProductPage() {
               </div>
               <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
             </div>
+            {form.trackInventory && (
+              <ProductInventoryFields
+                mode="create"
+                values={form.inventory}
+                onChange={(patch) => setForm((p) => ({ ...p, inventory: { ...p.inventory, ...patch } }))}
+              />
+            )}
             {form.trackInventory && (
               <ProductBranchScopeSelect
                 branchScope={form.branchScope}

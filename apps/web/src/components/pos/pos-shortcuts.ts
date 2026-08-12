@@ -49,11 +49,12 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
   {
     title: "Customers & holds",
     items: [
-      ["F4", "Open cart customer dropdown"],
+      ["F4", "Customer — type phone / name (cart dropdown)"],
       ["U", "Customers sidebar (Alt+U while search focused)"],
       ["N", "Register new customer (in customer UI)"],
       ["X", "Remove customer from bill"],
       ["↑↓ Enter", "Pick customer"],
+      ["L / Alt+L", "Reload / Recharge popup (type phone)"],
       ["F3", "Hold current bill"],
       ["F8 / H", "Held bills / recent bills"],
       ["↑↓ Enter (holds)", "Navigate · restore held bill"],
@@ -88,7 +89,6 @@ export const POS_SHORTCUT_SECTIONS: { title: string; items: [string, string][] }
     items: [
       ["Q / Alt+Q", "New Product (save to catalog)"],
       ["Y / Alt+Y", "Demo Product (bill only)"],
-      ["L / Alt+L", "Reload / Recharge cards"],
       ["O / Alt+O", "Orders (today’s sales)"],
       ["V / Alt+V", "Gift vouchers"],
       ["B / Alt+B", "Quick GRN"],

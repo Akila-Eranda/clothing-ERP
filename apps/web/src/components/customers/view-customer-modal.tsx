@@ -57,8 +57,17 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   const [walletInput, setWalletInput] = useState("");
   const [creditPayInput, setCreditPayInput] = useState("");
   const [creditLimitInput, setCreditLimitInput] = useState("");
-  const [creditDaysInput, setCreditDaysInput] = useState("30");
+  const [creditDaysInput, setCreditDaysInput] = useState("7");
+  const [creditPayMode, setCreditPayMode] = useState<"7" | "14" | "custom" | "salary">("7");
+  const [creditSalaryDate, setCreditSalaryDate] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
+
+  const applyCreditDaysToForm = (days: number) => {
+    if (days === 7) { setCreditPayMode("7"); setCreditDaysInput("7"); }
+    else if (days === 14) { setCreditPayMode("14"); setCreditDaysInput("14"); }
+    else { setCreditPayMode("custom"); setCreditDaysInput(String(days)); }
+    setCreditSalaryDate("");
+  };
 
   useEffect(() => {
     if (!customerId) { setCustomer(null); return; }
@@ -67,7 +76,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
       .then((r) => {
         setCustomer(r.data);
         setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
-        setCreditDaysInput(String(r.data.creditDays ?? 30));
+        applyCreditDaysToForm(r.data.creditDays ?? 7);
       })
       .catch(() => toast.error("Failed to load customer"))
       .finally(() => setLoading(false));
@@ -131,7 +140,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
     const r = await api.get<FullCustomer>(`/customers/${customerId}`);
     setCustomer(r.data);
     setCreditLimitInput(r.data.creditLimit > 0 ? String(r.data.creditLimit) : "");
-    setCreditDaysInput(String(r.data.creditDays ?? 30));
+    applyCreditDaysToForm(r.data.creditDays ?? 7);
   };
 
   const receiveCreditPayment = async () => {
@@ -189,8 +198,22 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
   };
 
   const saveCreditDays = async () => {
-    const days = parseInt(creditDaysInput, 10);
-    if (!customer || isNaN(days) || days < 0) { toast.error("Enter valid credit days"); return; }
+    if (!customer) return;
+    let days: number;
+    if (creditPayMode === "7") days = 7;
+    else if (creditPayMode === "14") days = 14;
+    else if (creditPayMode === "custom") {
+      days = parseInt(creditDaysInput, 10);
+      if (isNaN(days) || days < 0) { toast.error("Enter valid custom pay days"); return; }
+    } else {
+      if (!creditSalaryDate.trim()) { toast.error("Select salary due date"); return; }
+      const target = new Date(creditSalaryDate);
+      if (isNaN(target.getTime())) { toast.error("Invalid salary due date"); return; }
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      target.setHours(0, 0, 0, 0);
+      days = Math.max(0, Math.round((target.getTime() - today.getTime()) / 86400000));
+    }
     setActionLoading(true);
     try {
       await api.put(`/customers/${customer.id}/credit/days`, { creditDays: days });
@@ -438,13 +461,41 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
                 </div>
               </div>
               <div className="rounded-xl border p-3 space-y-2">
-                <p className="text-xs font-semibold">Payment Terms (days)</p>
-                <div className="flex gap-2">
-                  <Input type="number" min={0} step={1} placeholder="e.g. 30" value={creditDaysInput}
-                    onChange={(e) => setCreditDaysInput(e.target.value)} />
-                  <Button onClick={saveCreditDays} disabled={actionLoading} variant="outline" className="shrink-0">Save</Button>
+                <p className="text-xs font-semibold">Pay days / Salary due</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {([
+                    ["7", "7 days"],
+                    ["14", "14 days"],
+                    ["custom", "Custom"],
+                    ["salary", "Salary date"],
+                  ] as const).map(([mode, label]) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => {
+                        setCreditPayMode(mode);
+                        if (mode === "7") setCreditDaysInput("7");
+                        if (mode === "14") setCreditDaysInput("14");
+                      }}
+                      className={`h-8 px-2.5 rounded-lg text-[11px] font-bold border transition-colors ${
+                        creditPayMode === mode
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background text-muted-foreground border-input hover:bg-muted"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
-                <p className="text-[10px] text-muted-foreground">Due date = sale date + credit days</p>
+                {creditPayMode === "custom" && (
+                  <Input type="number" min={0} step={1} placeholder="Custom days" value={creditDaysInput}
+                    onChange={(e) => setCreditDaysInput(e.target.value)} />
+                )}
+                {creditPayMode === "salary" && (
+                  <Input type="date" value={creditSalaryDate} onChange={(e) => setCreditSalaryDate(e.target.value)} />
+                )}
+                <Button onClick={saveCreditDays} disabled={actionLoading} variant="outline" className="w-full">Save payment terms</Button>
+                <p className="text-[10px] text-muted-foreground">Due date = sale date + pay days</p>
               </div>
               <div className="flex gap-2">
                   <Input type="number" min={0.01} step={0.01} placeholder="Payment / advance (LKR)…" value={creditPayInput}

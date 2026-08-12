@@ -50,6 +50,7 @@ export interface PosKeyboardContext {
   showShortcuts: boolean;
   showCustomerSearch: boolean;
   showHeldBills: boolean;
+  showReload: boolean;
   showDayEnd: boolean;
   qtyPopupOpen: boolean;
   selectedProductName: string | null;
@@ -81,6 +82,7 @@ export interface PosKeyboardContext {
   setSelectedProductName: React.Dispatch<React.SetStateAction<string | null>>;
   setShowCustomerSearch: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHeldBills: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowReload: React.Dispatch<React.SetStateAction<boolean>>;
   setCustomerSearch: React.Dispatch<React.SetStateAction<string>>;
   setCustomers: React.Dispatch<React.SetStateAction<PosCustomerRow[]>>;
   setActiveNav: React.Dispatch<React.SetStateAction<string>>;
@@ -130,6 +132,8 @@ export interface PosKeyboardContext {
   payStateSplitMode: boolean;
   /** Cart customer dropdown (F4) */
   openCartCustomer: () => void;
+  /** Reload / recharge popup */
+  openReloadPopup: () => void;
   /** Close shift cash drawer */
   openCashClose: () => void;
   showCashClose: boolean;
@@ -161,6 +165,7 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.checkoutOpen
     || ctx.showCustomerSearch
     || ctx.showHeldBills
+    || ctx.showReload
     || ctx.showShortcuts
     || ctx.showDayEnd
     || ctx.showCashClose
@@ -173,11 +178,17 @@ function anyModalOpen(ctx: PosKeyboardContext) {
 function navigateToNavItem(ctx: PosKeyboardContext, id: string) {
   if (id === "hold-bills") {
     ctx.setShowHeldBills(true);
+    ctx.setShowReload(false);
     ctx.setActiveNav("products");
+    return;
+  }
+  if (id === "reload") {
+    ctx.openReloadPopup();
     return;
   }
   if (id === "customers") {
     ctx.setShowCustomerSearch(false);
+    ctx.setShowReload(false);
   }
   ctx.setActiveNav(id);
 }
@@ -247,6 +258,14 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      if (ctx.showReload) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.setShowReload(false);
+        }
+        return;
+      }
+
       // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
@@ -255,7 +274,13 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       const ms = Date.now();
       const delta = ms - ctx.lastKeyTime.current;
       ctx.lastKeyTime.current = ms;
-      if (e.key.length === 1 && delta < 60 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      // Don't treat cashier phone/customer typing as a barcode wedge
+      const blockBarcode =
+        ctx.showCustomerSearch
+        || ctx.showReload
+        || ctx.activeNav === "customers"
+        || ctx.showNewCust;
+      if (!blockBarcode && e.key.length === 1 && delta < 60 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         ctx.barcodeBuffer.current += e.key;
         clearTimeout(ctx.barcodeTimer.current);
         ctx.barcodeTimer.current = setTimeout(() => { ctx.barcodeBuffer.current = ""; }, 120);
@@ -273,7 +298,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
-      if (e.key === "Enter" && ctx.barcodeBuffer.current.length >= 3) {
+      if (!blockBarcode && e.key === "Enter" && ctx.barcodeBuffer.current.length >= 3) {
         const code = ctx.barcodeBuffer.current.trim();
         ctx.barcodeBuffer.current = "";
         clearTimeout(ctx.barcodeTimer.current);
@@ -299,6 +324,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (ctx.showTransferFunds) { ctx.closeTransferFunds(); return; }
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
+        if (ctx.showReload) { ctx.setShowReload(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }
         if (ctx.showCustomerSearch) {
           ctx.setShowCustomerSearch(false);
@@ -545,7 +571,7 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       if (letterToolsOk && key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
       if (letterToolsOk && key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
       if (letterToolsOk && key === "y") { e.preventDefault(); ctx.setActiveNav("demo-product"); return; }
-      if (letterToolsOk && key === "l" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("reload"); return; }
+      if (letterToolsOk && key === "l" && !ctx.checkoutOpen) { e.preventDefault(); ctx.openReloadPopup(); return; }
       if (letterToolsOk && key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
       if (letterToolsOk && key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }
       if (letterToolsOk && key === "u") { e.preventDefault(); ctx.setShowCustomerSearch(false); ctx.setFocusedCustomerIdx(0); ctx.setActiveNav("customers"); return; }

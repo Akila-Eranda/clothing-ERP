@@ -158,6 +158,15 @@ export function StockAdjustModal({ open, onClose, onAdjusted, item }: Props) {
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold">
               {movementType === "ADJUSTMENT" ? "New Total Quantity" : "Quantity"}
+              {item && item.quantity < 0 && movementType === "ADJUSTMENT" && (
+                <button
+                  type="button"
+                  className="ml-2 text-[11px] font-semibold text-red-600 underline"
+                  onClick={() => setQuantity("0")}
+                >
+                  Set to 0 (clear minus {item.quantity})
+                </button>
+              )}
             </Label>
             <Input
               type="number" min={0} placeholder="0" value={quantity}
