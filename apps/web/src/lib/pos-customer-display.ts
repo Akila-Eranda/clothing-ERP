@@ -8,7 +8,7 @@ import {
 } from "@/lib/pos-totals";
 import { calculateDiscount } from "@/lib/utils";
 
-export type CustomerDisplayPhase = "idle" | "shopping" | "checkout" | "thankyou" | "waiting";
+export type CustomerDisplayPhase = "idle" | "shopping" | "checkout" | "thankyou" | "waiting" | "reload";
 
 export interface CustomerDisplayItem {
   variantId: string;
@@ -52,10 +52,21 @@ export interface CustomerDisplayState {
   changeDue?: number;
   cashTendered?: number;
   paymentMethod?: string;
+  /** Digital reload — phone shown / typed on customer display. */
+  reloadPhone?: string;
 }
+
+/** Customer display → cashier (e.g. typed reload phone). */
+export type CustomerDisplayInputEvent = {
+  updatedAt: number;
+  type: "reloadPhone";
+  phone: string;
+};
 
 const CHANNEL = "hexaone-pos-customer-display";
 const LS_KEY = "hexaone-pos-customer-display-state";
+const INPUT_CHANNEL = "hexaone-pos-customer-display-input";
+const INPUT_LS_KEY = "hexaone-pos-customer-display-input";
 
 function lineDiscountAmt(item: CartItem) {
   const gross = item.unitPrice * item.quantity;
@@ -90,6 +101,7 @@ export function buildCustomerDisplayState(input: {
   cashTendered?: number;
   paymentMethod?: string;
   saleTotal?: number;
+  reloadPhone?: string;
 }): CustomerDisplayState {
   const posLines = input.items as PosLineInput[];
   const netSub = calcPosSubtotal(posLines);
@@ -160,6 +172,7 @@ export function buildCustomerDisplayState(input: {
     changeDue: input.changeDue,
     cashTendered: input.cashTendered,
     paymentMethod: input.paymentMethod,
+    reloadPhone: input.reloadPhone,
   };
 }
 
@@ -206,6 +219,52 @@ export function subscribeCustomerDisplayState(
     if (event.key !== LS_KEY || !event.newValue) return;
     try {
       onState(JSON.parse(event.newValue) as CustomerDisplayState);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  ch?.addEventListener("message", onMessage);
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    ch?.removeEventListener("message", onMessage);
+    ch?.close();
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+/** Customer display posts typed phone (etc.) back to the cashier POS window. */
+export function publishCustomerDisplayInput(event: CustomerDisplayInputEvent) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(INPUT_LS_KEY, JSON.stringify(event));
+  } catch {
+    /* quota */
+  }
+  if (typeof BroadcastChannel !== "undefined") {
+    const ch = new BroadcastChannel(INPUT_CHANNEL);
+    ch.postMessage(event);
+    ch.close();
+  }
+}
+
+export function subscribeCustomerDisplayInput(
+  onEvent: (event: CustomerDisplayInputEvent) => void,
+): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  const ch =
+    typeof BroadcastChannel !== "undefined" ? new BroadcastChannel(INPUT_CHANNEL) : null;
+
+  const onMessage = (event: MessageEvent<CustomerDisplayInputEvent>) => {
+    if (event.data?.type && event.data.updatedAt) onEvent(event.data);
+  };
+
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== INPUT_LS_KEY || !event.newValue) return;
+    try {
+      onEvent(JSON.parse(event.newValue) as CustomerDisplayInputEvent);
     } catch {
       /* ignore */
     }

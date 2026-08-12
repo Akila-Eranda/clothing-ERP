@@ -906,7 +906,7 @@
   opacity: 0.75;
 }
 
-/* Dark-first markup uses text-white — remap for light panels */
+/* Dark-first markup uses text-white — remap for light panels (body copy) */
 .pos-shell.pos-light .text-white {
   color: var(--pos-text) !important;
 }
@@ -929,15 +929,51 @@
 .pos-shell.pos-light .hover\:bg-white\/5:hover {
   background-color: var(--pos-hover) !important;
 }
+/*
+ * Light mode: keep white labels on action buttons.
+ * (Panel .text-white remap above would otherwise turn CTA text dark.)
+ */
+.pos-shell.pos-light button.text-white,
+.pos-shell.pos-light button.text-white *:not(option),
+.pos-shell.pos-light button .text-white,
+.pos-shell.pos-light button.pos-cta,
+.pos-shell.pos-light button.pos-cta *:not(option),
+.pos-shell.pos-light button[data-pos-on-accent],
+.pos-shell.pos-light button[data-pos-on-accent] *:not(option),
+.pos-shell.pos-light button[data-pos-accent],
+.pos-shell.pos-light button[data-pos-accent] *:not(option) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+.pos-shell.pos-light button.text-white svg,
+.pos-shell.pos-light button.pos-cta svg,
+.pos-shell.pos-light button[data-pos-on-accent] svg,
+.pos-shell.pos-light button[data-pos-accent] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
 .pos-shell.pos-light input:not([type=checkbox]):not([type=radio]),
 .pos-shell.pos-light textarea,
 .pos-shell.pos-light select {
   color: var(--pos-text);
+  color-scheme: light;
 }
 .pos-shell.pos-light input::placeholder,
 .pos-shell.pos-light textarea::placeholder {
   color: var(--pos-muted);
   opacity: 0.75;
+}
+/* Chrome autofill paints dark slate + white text — keep light-mode inputs readable */
+.pos-shell.pos-light input:-webkit-autofill,
+.pos-shell.pos-light input:-webkit-autofill:hover,
+.pos-shell.pos-light input:-webkit-autofill:focus,
+.pos-shell.pos-light textarea:-webkit-autofill,
+.pos-shell.pos-light select:-webkit-autofill {
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color: #0f172a;
+  box-shadow: 0 0 0 1000px #f8fafc inset;
+  border-color: #334155;
+  transition: background-color 99999s ease-out 0s;
 }
 
 /* Dark-theme mint greens → readable success on light */
@@ -1040,10 +1076,19 @@
 .pos-shell.pos-light button[style*="background: #10b981"],
 .pos-shell.pos-light button[style*="background:#059669"],
 .pos-shell.pos-light button[style*="background:#DC2626"],
+.pos-shell.pos-light button[style*="background:#dc2626"],
 .pos-shell.pos-light button[style*="background:#334155"],
+.pos-shell.pos-light button[style*="background: #334155"],
 .pos-shell.pos-light button[style*="background:#475569"],
-.pos-shell.pos-light button[style*="background:#047857"] {
-  color: var(--pos-on-accent, #ffffff) !important;
+.pos-shell.pos-light button[style*="background: #475569"],
+.pos-shell.pos-light button[style*="background:#1e40af"],
+.pos-shell.pos-light button[style*="background: #1e40af"],
+.pos-shell.pos-light button[style*="background:#047857"],
+.pos-shell.pos-light button[style*="background:rgba(79,110,247"],
+.pos-shell.pos-light button[style*="background: rgba(79,110,247"],
+.pos-shell.pos-light button[style*="background:rgba(16,185,129"] {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 .pos-shell.pos-light button[style*="background:#4f6ef7"] *,
 .pos-shell.pos-light button[style*="background: #4f6ef7"] *,
@@ -1051,10 +1096,19 @@
 .pos-shell.pos-light button[style*="background: #10b981"] *,
 .pos-shell.pos-light button[style*="background:#059669"] *,
 .pos-shell.pos-light button[style*="background:#DC2626"] *,
+.pos-shell.pos-light button[style*="background:#dc2626"] *,
 .pos-shell.pos-light button[style*="background:#334155"] *,
+.pos-shell.pos-light button[style*="background: #334155"] *,
 .pos-shell.pos-light button[style*="background:#475569"] *,
-.pos-shell.pos-light button[style*="background:#047857"] * {
-  color: var(--pos-on-accent, #ffffff) !important;
+.pos-shell.pos-light button[style*="background: #475569"] *,
+.pos-shell.pos-light button[style*="background:#1e40af"] *,
+.pos-shell.pos-light button[style*="background: #1e40af"] *,
+.pos-shell.pos-light button[style*="background:#047857"] *,
+.pos-shell.pos-light button[style*="background:rgba(79,110,247"] *,
+.pos-shell.pos-light button[style*="background: rgba(79,110,247"] *,
+.pos-shell.pos-light button[style*="background:rgba(16,185,129"] * {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 .pos-shell.pos-light button[style*="background:#4f6ef7"] svg,
 .pos-shell.pos-light button[style*="background: #4f6ef7"] svg,
@@ -1062,11 +1116,19 @@
 .pos-shell.pos-light button[style*="background: #10b981"] svg,
 .pos-shell.pos-light button[style*="background:#059669"] svg,
 .pos-shell.pos-light button[style*="background:#DC2626"] svg,
+.pos-shell.pos-light button[style*="background:#dc2626"] svg,
 .pos-shell.pos-light button[style*="background:#334155"] svg,
+.pos-shell.pos-light button[style*="background: #334155"] svg,
 .pos-shell.pos-light button[style*="background:#475569"] svg,
-.pos-shell.pos-light button[style*="background:#047857"] svg {
-  color: var(--pos-on-accent, #ffffff) !important;
-  stroke: var(--pos-on-accent, #ffffff) !important;
+.pos-shell.pos-light button[style*="background: #475569"] svg,
+.pos-shell.pos-light button[style*="background:#1e40af"] svg,
+.pos-shell.pos-light button[style*="background: #1e40af"] svg,
+.pos-shell.pos-light button[style*="background:#047857"] svg,
+.pos-shell.pos-light button[style*="background:rgba(79,110,247"] svg,
+.pos-shell.pos-light button[style*="background: rgba(79,110,247"] svg,
+.pos-shell.pos-light button[style*="background:rgba(16,185,129"] svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 /* Stock / status pills with solid colored backgrounds */

@@ -2116,7 +2116,9 @@ export class PosService {
 
       if (item.reloadType === ReloadSaleType.DIGITAL) {
         const msisdn = (item.reloadMsisdn || '').replace(/\D/g, '');
-        if (msisdn.length < 9) throw new BadRequestException('Reload requires a valid phone number');
+        if (msisdn.length > 0 && msisdn.length < 9) {
+          throw new BadRequestException('Reload phone number looks incomplete');
+        }
         for (let i = 0; i < qty; i += 1) {
           await tx.reloadSale.create({
             data: {
@@ -2126,7 +2128,7 @@ export class PosService {
               type: ReloadSaleType.DIGITAL,
               operatorId: operator.id,
               denominationId: item.reloadDenominationId || null,
-              msisdn,
+              msisdn: msisdn || null,
               faceValue,
               unitPrice: item.unitPrice,
               costPrice: commission.costPrice,

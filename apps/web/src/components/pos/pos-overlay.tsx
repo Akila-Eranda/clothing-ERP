@@ -16,7 +16,7 @@ import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, typ
 import { receiptMoney, receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
-import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME } from "@/lib/pos-customer-display";
+import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME, subscribeCustomerDisplayInput } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
 import { barcodeLookupCandidates, findAllProductsByBarcodeCode, findProductByBarcodeCode, isLikelyBarcodeScan, matchesCachedBarcode } from "@/lib/pos-barcode";
 import { executeReceiptPrint } from "@/lib/receipt-print";
@@ -103,8 +103,30 @@ function mapApiCustomer(c: ApiCustomerRow): CustomerItem {
 
 type NewCustPayMode = "7" | "14" | "custom" | "salary";
 
-const posInputStyle: React.CSSProperties = { background: "var(--pos-input)", border: "1px solid var(--pos-border)" };
+const posInputStyle: React.CSSProperties = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" };
 const posMutedLabelStyle: React.CSSProperties = { color: "var(--pos-muted)" };
+
+function posCustomerFormStyles(light: boolean) {
+  return {
+    label: { color: light ? "#334155" : "var(--pos-muted)" } as React.CSSProperties,
+    title: { color: light ? "#0f172a" : "var(--pos-text)" } as React.CSSProperties,
+    input: {
+      background: light ? "#f8fafc" : "var(--pos-input)",
+      border: `1px solid ${light ? "#334155" : "var(--pos-border)"}`,
+      color: light ? "#0f172a" : "var(--pos-text)",
+      colorScheme: light ? "light" : "dark",
+    } as React.CSSProperties,
+    card: {
+      background: light ? "#ffffff" : "var(--pos-card)",
+      borderColor: light ? "#1e40af" : "#4f6ef7",
+    } as React.CSSProperties,
+    chipIdle: {
+      background: light ? "#334155" : "var(--pos-input)",
+      color: "#ffffff",
+      border: `1px solid ${light ? "#1e293b" : "var(--pos-border)"}`,
+    } as React.CSSProperties,
+  };
+}
 
 function PosNewCustomerCreditFields({
   creditLimit,
@@ -116,6 +138,7 @@ function PosNewCustomerCreditFields({
   salaryDate,
   onSalaryDateChange,
   compact,
+  lightMode = false,
 }: {
   creditLimit: string;
   onCreditLimitChange: (v: string) => void;
@@ -126,18 +149,21 @@ function PosNewCustomerCreditFields({
   salaryDate: string;
   onSalaryDateChange: (v: string) => void;
   compact?: boolean;
+  lightMode?: boolean;
 }) {
+  const s = posCustomerFormStyles(lightMode);
   const chip = (mode: NewCustPayMode, label: string) => (
     <button
       key={mode}
       type="button"
       onClick={() => onPayModeChange(mode)}
+      data-pos-on-accent=""
       className={`rounded-lg font-bold transition-all ${compact ? "h-7 px-2 text-[10px]" : "h-8 px-2.5 text-[11px]"}`}
-      style={{
-        background: payMode === mode ? "#4f6ef7" : "var(--pos-input)",
-        color: payMode === mode ? "#fff" : "var(--pos-muted)",
-        border: payMode === mode ? "none" : "1px solid var(--pos-border)",
-      }}
+      style={
+        payMode === mode
+          ? { background: "#4f6ef7", color: "#ffffff", border: "1px solid #4f6ef7" }
+          : s.chipIdle
+      }
     >
       {label}
     </button>
@@ -145,7 +171,7 @@ function PosNewCustomerCreditFields({
   return (
     <>
       <div>
-        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={posMutedLabelStyle}>
+        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
           Credit Limit (LKR)
         </label>
         <input
@@ -155,12 +181,12 @@ function PosNewCustomerCreditFields({
           value={creditLimit}
           onChange={(e) => onCreditLimitChange(e.target.value)}
           placeholder="0 = no credit"
-          className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
-          style={posInputStyle}
+          className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+          style={s.input}
         />
       </div>
       <div>
-        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={posMutedLabelStyle}>
+        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
           Pay days / Salary due
         </label>
         <div className="flex flex-wrap gap-1.5 mb-1.5">
@@ -177,8 +203,8 @@ function PosNewCustomerCreditFields({
             value={customDays}
             onChange={(e) => onCustomDaysChange(e.target.value)}
             placeholder="Custom days"
-            className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
-            style={posInputStyle}
+            className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            style={s.input}
           />
         )}
         {payMode === "salary" && (
@@ -186,8 +212,8 @@ function PosNewCustomerCreditFields({
             type="date"
             value={salaryDate}
             onChange={(e) => onSalaryDateChange(e.target.value)}
-            className={`w-full px-3 rounded-xl text-white outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
-            style={posInputStyle}
+            className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            style={s.input}
           />
         )}
       </div>
@@ -415,6 +441,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [cartCustomerOpen, setCartCustomerOpen] = React.useState(false);
   const [showHeldBills, setShowHeldBills] = React.useState(false);
   const [showReload, setShowReload] = React.useState(false);
+  const [reloadPhone, setReloadPhone] = React.useState("");
   const [customerSearch, setCustomerSearch] = React.useState("");
   const [customers, setCustomers] = React.useState<CustomerItem[]>([]);
   const [customerLoading, setCustomerLoading] = React.useState(false);
@@ -473,7 +500,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [creditPayBusy, setCreditPayBusy] = React.useState(false);
   const [cartNotes, setCartNotes] = React.useState("");
   const [discountInput, setDiscountInput] = React.useState("");
-  const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{ entityId: string; percent: number } | null>(null);
+  const [discountEditType, setDiscountEditType] = React.useState<"percentage" | "fixed">("percentage");
+  const [pendingDiscountApproval, setPendingDiscountApproval] = React.useState<{
+    entityId: string;
+    value: number;
+    type: "percentage" | "fixed";
+    /** Equivalent % of subtotal (for display / threshold). */
+    percent: number;
+  } | null>(null);
   const adminBypass = bypassesWorkflowApproval(user?.role);
   const viewAllSales = canViewAllPosSales(user?.role);
   const [showNewCust, setShowNewCust] = React.useState(false);
@@ -669,6 +703,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const applyCartDiscount = React.useCallback(async () => {
     const v = parseFloat(discountInput) || 0;
+    const type = discountEditType;
     if (v <= 0) {
       setDiscount(0, "percentage");
       setDiscountInput("");
@@ -676,30 +711,45 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       toast.info("Discount cleared");
       return;
     }
-    if (v > 100) {
-      toast.error("Discount cannot exceed 100%");
+
+    const sub = subtotal();
+    if (type === "percentage") {
+      if (v > 100) {
+        toast.error("Discount cannot exceed 100%");
+        return;
+      }
+    } else if (v > sub + 0.001) {
+      toast.error("Fixed discount cannot exceed subtotal");
       return;
     }
 
-    const needsApproval = !adminBypass && v > DISCOUNT_APPROVAL_THRESHOLD_PCT;
+    const discAmt = type === "percentage" ? sub * (v / 100) : v;
+    const equivalentPct = sub > 0 ? (discAmt / sub) * 100 : (type === "percentage" ? v : 100);
+    const needsApproval = !adminBypass && equivalentPct > DISCOUNT_APPROVAL_THRESHOLD_PCT;
+
     if (needsApproval) {
+      const label = type === "percentage" ? `${v}%` : `LKR ${formatNumber(v)}`;
       const reason = window.prompt(
-        `Discount ${v}% requires manager approval (over ${DISCOUNT_APPROVAL_THRESHOLD_PCT}%). Enter reason:`,
+        `Discount ${label} requires manager approval (over ${DISCOUNT_APPROVAL_THRESHOLD_PCT}%). Enter reason:`,
       );
       if (!reason?.trim()) {
         toast.error("Reason is required for manager approval");
         return;
       }
-      const discAmt = subtotal() * (v / 100);
       try {
         const res = await api.post<{ entityId: string; status: string }>("/workflows/discount-request", {
           amount: discAmt,
-          discountPercent: v,
+          discountPercent: Math.round(equivalentPct * 100) / 100,
           reason: reason.trim(),
-          cartTotal: subtotal(),
+          cartTotal: sub,
         });
         const inst = res.data;
-        setPendingDiscountApproval({ entityId: inst.entityId, percent: v });
+        setPendingDiscountApproval({
+          entityId: inst.entityId,
+          value: v,
+          type,
+          percent: Math.round(equivalentPct * 100) / 100,
+        });
         setDiscount(0, "percentage");
         toast.info("Discount sent for manager approval — waiting…");
       } catch (e: unknown) {
@@ -709,10 +759,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
 
     setPendingDiscountApproval(null);
-    setDiscount(v, "percentage");
+    setDiscount(v, type);
     setDiscountInput(String(v));
-    toast.success(`${v}% discount applied — LKR ${formatNumber(subtotal() * (v / 100))} off`);
-  }, [discountInput, adminBypass, subtotal, setDiscount]);
+    if (type === "percentage") {
+      toast.success(`${v}% discount applied — LKR ${formatNumber(discAmt)} off`);
+    } else {
+      toast.success(`LKR ${formatNumber(v)} discount applied`);
+    }
+  }, [discountInput, discountEditType, adminBypass, subtotal, setDiscount]);
 
   React.useEffect(() => {
     if (!pendingDiscountApproval?.entityId) return;
@@ -725,10 +779,15 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
         if (cancelled) return;
         const status = res.data?.status;
         if (status === "APPROVED") {
-          setDiscount(pendingDiscountApproval.percent, "percentage");
+          setDiscount(pendingDiscountApproval.value, pendingDiscountApproval.type);
+          setDiscountEditType(pendingDiscountApproval.type);
           setPendingDiscountApproval(null);
-          setDiscountInput(String(pendingDiscountApproval.percent));
-          toast.success(`${pendingDiscountApproval.percent}% discount approved and applied`);
+          setDiscountInput(String(pendingDiscountApproval.value));
+          const label =
+            pendingDiscountApproval.type === "percentage"
+              ? `${pendingDiscountApproval.value}%`
+              : `LKR ${formatNumber(pendingDiscountApproval.value)}`;
+          toast.success(`${label} discount approved and applied`);
         } else if (status === "REJECTED" || status === "CANCELLED") {
           setPendingDiscountApproval(null);
           toast.error("Discount request was rejected");
@@ -915,6 +974,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       clearCart();
       setCartNotes("");
       setDiscountInput("");
+      setDiscountEditType("percentage");
       await loadHeldBills();
       await loadProducts();
       toast.success("Bill held — stock reserved");
@@ -931,6 +991,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     loadFromHeldBill(bill.data, bill.id);
     setCartNotes(bill.data.notes ?? "");
     setDiscountInput(bill.data.discount > 0 ? String(bill.data.discount) : "");
+    setDiscountEditType(bill.data.discountType === "fixed" ? "fixed" : "percentage");
     setActiveNav("products");
     if (bill.data.couponCode) {
       try {
@@ -1240,6 +1301,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     activePayment,
     cashTenderedInput: numpad,
     totalAmount: totalAmt,
+    reloadOpen: showReload,
+    reloadPhone,
   });
 
   const handleOpenCustomerDisplay = React.useCallback((event: React.MouseEvent) => {
@@ -1828,8 +1891,17 @@ ${receiptSoftwareCreditHtml()}
     setActiveNav("products");
     setCartCustomerOpen(false);
     setShowHeldBills(false);
+    setReloadPhone((customer?.phone ?? "").replace(/\D/g, ""));
     setShowReload(true);
-  }, []);
+  }, [customer?.phone]);
+
+  // Customer display → POS: phone typed on second screen
+  React.useEffect(() => {
+    if (!showReload) return;
+    return subscribeCustomerDisplayInput((ev) => {
+      if (ev.type === "reloadPhone") setReloadPhone(ev.phone.replace(/\D/g, ""));
+    });
+  }, [showReload]);
 
   const handleCheckout = React.useCallback(async (forceMethod?: string) => {
     if(!items.length||checkoutLoading)return;
@@ -2073,7 +2145,7 @@ ${receiptSoftwareCreditHtml()}
       if (taxRate > 0) writePosSavedTaxRate(taxRate);
       clearCart();
       setTaxRate(0);
-      setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setPendingDiscountApproval(null);setCheckoutOpen(false);
+      setNumpad("");setSelectedCartIdx(-1);setCartNotes("");setDiscountInput("");setDiscountEditType("percentage");setPendingDiscountApproval(null);setCheckoutOpen(false);
       setHelperEmployeeId(""); setGiftVoucherCode(""); setChequeNumber(""); setCardLast3(""); setPayBankAccountId("");
       setEditingCartQtyIdx(null);
       setPayState({ splitMode:false, paymentLines:[{method:"CASH",amount:""}], allowPartial:false, couponCode:"", couponDiscount:0, tierDiscountPct:0, currency:payState.currency });
@@ -2583,7 +2655,7 @@ ${rows}
       <div className="flex flex-col h-full overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-none" style={{borderColor:"var(--pos-border)"}}>
           {categories.map(cat=>(
-            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":"var(--pos-input)",color:activeCategory===cat?"#fff":"var(--pos-muted)"}}>
+            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":(lightUi?"#334155":"var(--pos-input)"),color:"#ffffff"}}>
               {cat}
             </button>
           ))}
@@ -2736,12 +2808,13 @@ ${rows}
     // CUSTOMERS
     if (activeNav === "customers") {
       const insightCustomer = customer ?? inlineCustomers.find((c) => c.id === previewCustomerId) ?? null;
+      const cf = posCustomerFormStyles(isPosLight);
       return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         {/* Search bar + Register button */}
         <div className="flex items-center gap-2 shrink-0">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color:"var(--pos-muted)"}}/>
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{color: isPosLight ? "#334155" : "var(--pos-muted)"}}/>
             <input
               ref={inlineCustomerSearchRef}
               data-pos-customer-search
@@ -2749,27 +2822,42 @@ ${rows}
               onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}}
               placeholder="Type phone number or name…"
               autoComplete="off"
-              className="w-full pl-9 pr-9 h-10 rounded-xl text-sm text-white outline-none"
-              style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}
+              className="w-full pl-9 pr-9 h-10 rounded-xl text-sm outline-none"
+              style={cf.input}
             />
             {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
           </div>
-          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90" {...(!showNewCust ? { "data-pos-accent": "" } : {})} style={{background:showNewCust?"var(--pos-card)":"#4f6ef7",border:showNewCust?"1px solid #4f6ef7":"none",color:showNewCust?"var(--pos-accent)":"#ffffff"}}>
+          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90" {...(!showNewCust ? { "data-pos-accent": "" } : {})} style={{background:showNewCust?(isPosLight?"#334155":"var(--pos-card)"):"#4f6ef7",border:showNewCust?`1px solid ${isPosLight?"#1e293b":"#4f6ef7"}`:"none",color:"#ffffff"}}>
             {showNewCust?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{showNewCust?"Cancel":"Register New"}
           </button>
         </div>
         {/* Register form */}
         {showNewCust&&(
-          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={{background:"var(--pos-card)",borderColor:"#4f6ef7"}}>
-            <p className="text-white font-bold text-sm flex items-center gap-2"><User className="h-4 w-4" style={{color:"#4f6ef7"}}/>Register New Customer</p>
+          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={cf.card}>
+            <p className="font-bold text-sm flex items-center gap-2" style={cf.title}>
+              <User className="h-4 w-4" style={{color:"#4f6ef7"}}/>Register New Customer
+            </p>
             <div className="grid grid-cols-2 gap-2">
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>First Name *</label><input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Last Name</label><input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Phone *</label><input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" inputMode="tel" autoComplete="tel" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
-              <div><label className="text-[11px] font-semibold block mb-1" style={{color:"var(--pos-muted)"}}>Email</label><input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/></div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>First Name *</label>
+                <input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Last Name</label>
+                <input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Phone *</label>
+                <input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" inputMode="tel" autoComplete="tel" className="w-full h-9 px-3 rounded-xl text-sm outline-none font-mono" style={cf.input}/>
+              </div>
+              <div>
+                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Email</label>
+                <input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <PosNewCustomerCreditFields
+                lightMode={isPosLight}
                 creditLimit={newCustCreditLimit}
                 onCreditLimitChange={setNewCustCreditLimit}
                 payMode={newCustPayMode}
@@ -2780,7 +2868,13 @@ ${rows}
                 onSalaryDateChange={setNewCustSalaryDate}
               />
             </div>
-            <button onClick={saveNewCustomer} disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()} className="w-full h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40" style={{background:"#4f6ef7"}}>
+            <button
+              onClick={saveNewCustomer}
+              disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()}
+              data-pos-on-accent=""
+              className="pos-cta w-full h-10 rounded-xl text-sm font-bold transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40"
+              style={{background:"#4f6ef7", color:"#ffffff"}}
+            >
               {newCustSaving?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}{newCustSaving?"Saving...":"Save & Add to Bill"}
             </button>
           </div>
@@ -4176,16 +4270,19 @@ ${rows}
                       {cartShowNewCust ? "Cancel" : "Register"}
                     </button>
                   </div>
-                  {cartShowNewCust && (
-                    <div className="p-2 border-b space-y-1.5" style={{ borderColor: "var(--pos-border)", background: "var(--pos-card)" }}>
+                  {cartShowNewCust && (() => {
+                    const cartCf = posCustomerFormStyles(isPosLight);
+                    return (
+                    <div className="p-2 border-b space-y-1.5" style={{ borderColor: isPosLight ? "#1e40af" : "var(--pos-border)", background: isPosLight ? "#ffffff" : "var(--pos-card)" }}>
                       <div className="grid grid-cols-2 gap-1.5">
-                        <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
-                        <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
-                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" inputMode="tel" autoComplete="tel" className="h-8 px-2 rounded-lg text-xs text-white outline-none font-mono" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
-                        <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs text-white outline-none" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }} />
+                        <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
+                        <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
+                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" inputMode="tel" autoComplete="tel" className="h-8 px-2 rounded-lg text-xs outline-none font-mono" style={cartCf.input} />
+                        <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
                       </div>
                       <PosNewCustomerCreditFields
                         compact
+                        lightMode={isPosLight}
                         creditLimit={newCustCreditLimit}
                         onCreditLimitChange={setNewCustCreditLimit}
                         payMode={newCustPayMode}
@@ -4195,11 +4292,12 @@ ${rows}
                         salaryDate={newCustSalaryDate}
                         onSalaryDateChange={setNewCustSalaryDate}
                       />
-                      <button type="button" onClick={() => void saveNewCustomer()} disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()} className="w-full h-8 rounded-lg text-xs font-bold text-white disabled:opacity-40" style={{ background: "#4f6ef7" }}>
+                      <button type="button" onClick={() => void saveNewCustomer()} disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()} data-pos-on-accent="" className="pos-cta w-full h-8 rounded-lg text-xs font-bold disabled:opacity-40" style={{ background: "#4f6ef7", color: "#ffffff" }}>
                         {newCustSaving ? "Saving…" : "Save & add to bill"}
                       </button>
                     </div>
-                  )}
+                    );
+                  })()}
                   <div className="max-h-52 overflow-y-auto p-1">
                     <button
                       type="button"
@@ -4375,25 +4473,77 @@ ${rows}
                 </div>
                 <div className="shrink-0 border-t" style={{borderColor:"var(--pos-border)"}}>
                   <div className="flex items-center gap-2 px-4 py-3 border-b" style={{borderColor:"var(--pos-border)"}}>
-                    <span className="text-sm font-medium shrink-0" style={{color:"var(--pos-muted)"}}>Discount %</span>
-                    <input ref={discountInputRef} type="number" min="0" max="100" value={discountInput} onChange={e=>setDiscountInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();applyCartDiscount();}}} placeholder={pendingDiscountApproval?`${pendingDiscountApproval.percent}% pending`:discount>0?`${discount}% active`:"0"} disabled={!!pendingDiscountApproval} className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60" style={{background:"var(--pos-input)",border:`1px solid ${pendingDiscountApproval?"var(--pos-warn)":discount>0?"#10b981":"var(--pos-border)"}`}}/>
-                    <button onClick={applyCartDiscount} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"#4f6ef7"}}>{pendingDiscountApproval?"Pending":"Apply"}</button>
+                    <div className="flex shrink-0 rounded-lg p-0.5 gap-0.5" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}>
+                      <button
+                        type="button"
+                        disabled={!!pendingDiscountApproval}
+                        onClick={() => setDiscountEditType("percentage")}
+                        className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
+                        style={{
+                          background: discountEditType === "percentage" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                          color: "#ffffff",
+                        }}
+                      >
+                        %
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!!pendingDiscountApproval}
+                        onClick={() => setDiscountEditType("fixed")}
+                        className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
+                        style={{
+                          background: discountEditType === "fixed" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                          color: "#ffffff",
+                        }}
+                      >
+                        LKR
+                      </button>
+                    </div>
+                    <input
+                      ref={discountInputRef}
+                      type="number"
+                      min="0"
+                      max={discountEditType === "percentage" ? 100 : undefined}
+                      step="0.01"
+                      value={discountInput}
+                      onChange={(e) => setDiscountInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void applyCartDiscount(); } }}
+                      placeholder={
+                        pendingDiscountApproval
+                          ? (pendingDiscountApproval.type === "percentage"
+                            ? `${pendingDiscountApproval.value}% pending`
+                            : `LKR ${pendingDiscountApproval.value} pending`)
+                          : discount > 0
+                            ? (discountType === "percentage" ? `${discount}% active` : `LKR ${discount} active`)
+                            : (discountEditType === "percentage" ? "0 %" : "0.00")
+                      }
+                      disabled={!!pendingDiscountApproval}
+                      className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60 tabular-nums"
+                      style={{ background: "var(--pos-input)", border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "#10b981" : "var(--pos-border)"}` }}
+                    />
+                    <button onClick={() => void applyCartDiscount()} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ background: "#4f6ef7" }}>{pendingDiscountApproval ? "Pending" : "Apply"}</button>
                   </div>
                   {discount > 0 && cartDiscountAmt > 0 && !pendingDiscountApproval && (
-                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{background:"rgba(16,185,129,0.12)",border:"1px solid rgba(16,185,129,0.35)",color:"var(--pos-success-soft)"}}>
-                      <span className="font-semibold flex items-center gap-1.5"><Tag className="h-3.5 w-3.5"/>{discount}% cart discount applied</span>
+                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "var(--pos-success-soft)" }}>
+                      <span className="font-semibold flex items-center gap-1.5">
+                        <Tag className="h-3.5 w-3.5" />
+                        {discountType === "percentage" ? `${discount}%` : `LKR ${formatNumber(discount)}`} cart discount applied
+                      </span>
                       <span className="font-bold tabular-nums">−LKR {formatNumber(cartDiscountAmt)}</span>
                     </div>
                   )}
                   {pendingDiscountApproval && (
-                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{background:"var(--pos-warn-bg)",border:"1px solid var(--pos-warn-border)",color:"var(--pos-warn-soft)"}}>
+                    <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center gap-2" style={{ background: "var(--pos-warn-bg)", border: "1px solid var(--pos-warn-border)", color: "var(--pos-warn-soft)" }}>
                       <Clock className="h-3.5 w-3.5 shrink-0"/>
-                      {pendingDiscountApproval.percent}% discount awaiting manager approval (auto-applies when approved)
+                      {pendingDiscountApproval.type === "percentage"
+                        ? `${pendingDiscountApproval.value}%`
+                        : `LKR ${formatNumber(pendingDiscountApproval.value)}`}{" "}
+                      discount awaiting manager approval (auto-applies when approved)
                     </div>
                   )}
                   {!adminBypass && !pendingDiscountApproval && (
-                    <p className="px-4 pb-2 text-[10px]" style={{color:"var(--pos-muted)"}}>
-                      Discounts over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% require manager approval via Workflows
+                    <p className="px-4 pb-2 text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                      Discounts over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% of subtotal require manager approval via Workflows
                     </p>
                   )}
                   <div className="px-4 py-3 space-y-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
@@ -4402,7 +4552,7 @@ ${rows}
                       <span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span>
                     </div>
                     {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
-                    {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                    {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
                     {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
                     {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
                     {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
@@ -4462,7 +4612,7 @@ ${rows}
                 <div className="px-4 py-2.5 space-y-1">
                   <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
                   {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
-                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
+                  {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
                   {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
                   {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
@@ -4473,12 +4623,12 @@ ${rows}
                   </div>
                   <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
 
-                  {/* Checkout discount */}
+                  {/* Checkout discount — % or fixed LKR */}
                   <div className="pt-2 rounded-xl border px-3 py-2.5 space-y-2" style={{ background: "var(--pos-input)", borderColor: discount > 0 ? "rgba(16,185,129,0.4)" : "var(--pos-border)" }}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <Tag className="h-3.5 w-3.5 shrink-0" style={{ color: discount > 0 ? "#10b981" : "#4f6ef7" }} />
-                        <p className="text-sm font-semibold text-white">Discount %</p>
+                        <p className="text-sm font-semibold text-white">Discount</p>
                       </div>
                       {cartDiscountAmt > 0 && !pendingDiscountApproval && (
                         <span className="text-[11px] font-bold tabular-nums shrink-0" style={{ color: "var(--pos-success-soft)" }}>
@@ -4487,11 +4637,37 @@ ${rows}
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
+                      <div className="flex shrink-0 rounded-lg p-0.5 gap-0.5" style={{ background: "var(--pos-panel)", border: "1px solid var(--pos-border)" }}>
+                        <button
+                          type="button"
+                          disabled={!!pendingDiscountApproval}
+                          onClick={() => setDiscountEditType("percentage")}
+                          className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
+                          style={{
+                            background: discountEditType === "percentage" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                            color: "#ffffff",
+                          }}
+                        >
+                          %
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!!pendingDiscountApproval}
+                          onClick={() => setDiscountEditType("fixed")}
+                          className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
+                          style={{
+                            background: discountEditType === "fixed" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                            color: "#ffffff",
+                          }}
+                        >
+                          LKR
+                        </button>
+                      </div>
                       <input
                         ref={discountInputRef}
                         type="number"
                         min="0"
-                        max="100"
+                        max={discountEditType === "percentage" ? 100 : undefined}
                         step="0.01"
                         value={discountInput}
                         onChange={(e) => setDiscountInput(e.target.value)}
@@ -4501,7 +4677,15 @@ ${rows}
                             void applyCartDiscount();
                           }
                         }}
-                        placeholder={pendingDiscountApproval ? `${pendingDiscountApproval.percent}% pending` : discount > 0 ? `${discount}%` : "0"}
+                        placeholder={
+                          pendingDiscountApproval
+                            ? (pendingDiscountApproval.type === "percentage"
+                              ? `${pendingDiscountApproval.value}% pending`
+                              : `LKR ${pendingDiscountApproval.value} pending`)
+                            : discount > 0
+                              ? (discountType === "percentage" ? `${discount}%` : `LKR ${discount}`)
+                              : (discountEditType === "percentage" ? "0 %" : "0.00")
+                        }
                         disabled={!!pendingDiscountApproval}
                         className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60 tabular-nums"
                         style={{
@@ -4522,12 +4706,15 @@ ${rows}
                     {pendingDiscountApproval && (
                       <p className="text-[10px] flex items-center gap-1" style={{ color: "var(--pos-warn-soft)" }}>
                         <Clock className="h-3 w-3 shrink-0" />
-                        {pendingDiscountApproval.percent}% awaiting manager approval
+                        {pendingDiscountApproval.type === "percentage"
+                          ? `${pendingDiscountApproval.value}%`
+                          : `LKR ${formatNumber(pendingDiscountApproval.value)}`}{" "}
+                        awaiting manager approval
                       </p>
                     )}
                     {!adminBypass && !pendingDiscountApproval && (
                       <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
-                        Over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% needs manager approval
+                        Over {DISCOUNT_APPROVAL_THRESHOLD_PCT}% of subtotal needs manager approval
                       </p>
                     )}
                   </div>
@@ -4660,14 +4847,14 @@ ${rows}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
                         "flex-1 min-w-[64px] flex flex-col items-center gap-0.5 rounded-xl text-xs font-bold transition-all",
-                        active && "pos-cta",
+                        "pos-cta",
                         touchMode ? "py-2.5" : "py-1.5",
                       )}
                       style={{
                         background: active
                           ? "linear-gradient(135deg,#4f6ef7,#7c3aed)"
-                          : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
-                        color: active ? "#ffffff" : (isPosLight ? "#0F172A" : "var(--pos-text)"),
+                          : (isPosLight ? "#334155" : "var(--pos-input)"),
+                        color: "#ffffff",
                       }}
                     >
                       <Icon
@@ -4831,8 +5018,8 @@ ${rows}
                       {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
                         const isQuick=ki===3;const isDel=k==="DEL";
                         return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className="h-11 rounded-lg text-sm font-bold transition-all active:scale-95" style={{
-                          background: isQuick ? (isPosLight ? "#94A3B8" : "var(--pos-border)") : isDel ? "rgba(239,68,68,0.15)" : (isPosLight ? "#E2E8F0" : "var(--pos-input)"),
-                          color: isQuick ? (isPosLight ? "#0F172A" : "var(--pos-text)") : isDel ? "#DC2626" : "var(--pos-text)",
+                          background: isQuick ? (isPosLight ? "#475569" : "var(--pos-border)") : isDel ? (isPosLight ? "#DC2626" : "rgba(239,68,68,0.15)") : (isPosLight ? "#334155" : "var(--pos-input)"),
+                          color: isDel && !isPosLight ? "#DC2626" : "#ffffff",
                         }}>
                           {isDel?<Delete className="h-4 w-4 mx-auto" strokeWidth={2.25}/>:k}
                         </button>);
@@ -4855,8 +5042,8 @@ ${rows}
                 )}
                 <div className="p-3 flex gap-2 flex-wrap mt-auto shrink-0">
                   <button onClick={handleSplitBill} disabled={items.length < 2} className="h-10 px-3 rounded-xl text-xs font-bold transition-all hover:bg-white/10 disabled:opacity-40" style={{
-                    color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)",
-                    background: isPosLight ? "#E2E8F0" : "var(--pos-input)",
+                    color: "#ffffff",
+                    background: isPosLight ? "#334155" : "var(--pos-input)",
                   }}>
                     Split Bill
                   </button>
@@ -4874,8 +5061,9 @@ ${rows}
                     <span className="text-xs font-mono" style={{ opacity: 0.9 }}>(F9)</span>
                   </button>
                   <button type="button" onClick={handleThermalPrint} className="h-[48px] w-[48px] rounded-xl flex items-center justify-center transition-all hover:bg-white/10" style={{
-                    background: isPosLight ? "#E2E8F0" : "var(--pos-input)",
-                  }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: isPosLight ? "#0F172A" : "var(--pos-text-secondary)"}} strokeWidth={2.25}/></button>
+                    background: isPosLight ? "#334155" : "var(--pos-input)",
+                    color: "#ffffff",
+                  }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: "#ffffff"}} strokeWidth={2.25}/></button>
                 </div>
                 <p className="px-3 pb-2 text-[11px] text-center shrink-0 font-medium" style={{ color: "var(--pos-text-soft)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
@@ -5274,7 +5462,7 @@ ${rows}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[110] flex items-center justify-center p-4"
             style={{ background: "rgba(0,0,0,0.7)" }}
-            onClick={() => setShowReload(false)}
+            onClick={() => { setShowReload(false); setReloadPhone(""); }}
           >
             <motion.div
               initial={{ scale: 0.95, y: 12 }}
@@ -5282,27 +5470,34 @@ ${rows}
               exit={{ scale: 0.95, y: 12 }}
               onClick={(e) => e.stopPropagation()}
               className="rounded-2xl border shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
-              style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+              style={{
+                background: "var(--pos-panel)",
+                borderColor: isPosLight ? "#1e293b" : "var(--pos-border)",
+                boxShadow: isPosLight ? "0 25px 50px rgba(15,23,42,0.25)" : undefined,
+              }}
             >
-              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: isPosLight ? "#334155" : "var(--pos-border)" }}>
                 <div className="flex items-center gap-2">
                   <Smartphone className="h-4 w-4" style={{ color: "#4f6ef7" }} />
-                  <h2 className="text-white font-bold text-sm">Reload / Recharge</h2>
-                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>L</kbd>
+                  <h2 className="font-bold text-sm" style={{ color: "var(--pos-text)" }}>Reload / Recharge</h2>
+                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: isPosLight ? "#0f172a" : "var(--pos-muted)", border: `1px solid ${isPosLight ? "#334155" : "var(--pos-border)"}` }}>L</kbd>
                 </div>
-                <button type="button" onClick={() => setShowReload(false)} className="p-1.5 rounded-lg hover:bg-white/10">
-                  <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
+                <button type="button" onClick={() => { setShowReload(false); setReloadPhone(""); }} className="p-1.5 rounded-lg hover:bg-black/5">
+                  <X className="h-4 w-4" style={{ color: isPosLight ? "#334155" : "var(--pos-muted)" }} />
                 </button>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <PosReloadPanel
                   asModal
-                  initialPhone={customer?.phone ?? ""}
-                  onBack={() => setShowReload(false)}
+                  lightMode={isPosLight}
+                  phone={reloadPhone}
+                  onPhoneChange={setReloadPhone}
+                  onBack={() => { setShowReload(false); setReloadPhone(""); }}
                   taxRate={taxRate}
                   onAddToCart={(item) => {
                     addItem(item);
                     setShowReload(false);
+                    setReloadPhone("");
                   }}
                 />
               </div>

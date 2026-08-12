@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Package, ShoppingBag, Wifi, WifiOff } from "lucide-react";
+import { CheckCircle2, Package, ShoppingBag, Wifi, WifiOff, Smartphone, Delete } from "lucide-react";
 import { formatNumber } from "@/lib/utils";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import {
   readCustomerDisplayState,
   subscribeCustomerDisplayState,
+  publishCustomerDisplayInput,
   type CustomerDisplayState,
 } from "@/lib/pos-customer-display";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
@@ -223,6 +224,113 @@ function WaitingScreen({ branding }: { branding: DisplayBranding }) {
       <WifiOff className="h-12 w-12 mb-4" style={{ color: "#4a6a8a" }} />
       <h2 className="text-3xl font-bold text-white mb-2">{branding.shopName}</h2>
       <p className="text-lg" style={{ color: "#6a8ab8" }}>Waiting for cashier — open POS to start</p>
+    </div>
+  );
+}
+
+function formatReloadPhoneDisplay(phone: string) {
+  const d = phone.replace(/\D/g, "");
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)} ${d.slice(3)}`;
+  return `${d.slice(0, 3)} ${d.slice(3, 6)} ${d.slice(6, 10)}`;
+}
+
+function ReloadPhoneScreen({
+  branding,
+  phone,
+}: {
+  branding: DisplayBranding;
+  phone: string;
+}) {
+  const [localPhone, setLocalPhone] = React.useState(phone.replace(/\D/g, ""));
+  const syncingFromPos = React.useRef(false);
+
+  React.useEffect(() => {
+    const next = phone.replace(/\D/g, "");
+    syncingFromPos.current = true;
+    setLocalPhone(next);
+    const t = setTimeout(() => { syncingFromPos.current = false; }, 50);
+    return () => clearTimeout(t);
+  }, [phone]);
+
+  const pushPhone = React.useCallback((next: string) => {
+    const digits = next.replace(/\D/g, "").slice(0, 12);
+    setLocalPhone(digits);
+    if (syncingFromPos.current) return;
+    publishCustomerDisplayInput({
+      updatedAt: Date.now(),
+      type: "reloadPhone",
+      phone: digits,
+    });
+  }, []);
+
+  const press = (key: string) => {
+    if (key === "del") {
+      pushPhone(localPhone.slice(0, -1));
+      return;
+    }
+    if (key === "clr") {
+      pushPhone("");
+      return;
+    }
+    if (/^\d$/.test(key) && localPhone.length < 12) {
+      pushPhone(localPhone + key);
+    }
+  };
+
+  const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "clr", "0", "del"] as const;
+
+  return (
+    <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-6 px-6 py-4">
+      <div className="text-center">
+        <ShopBrandLogo logoUrl={branding.logoUrl} shopName={branding.shopName} size="md" className="mx-auto mb-3" />
+        <div className="flex items-center justify-center gap-2 mb-2">
+          <Smartphone className="h-6 w-6" style={{ color: "#4f6ef7" }} />
+          <h2 className="text-3xl font-black text-white">Reload</h2>
+        </div>
+        <p className="text-lg" style={{ color: "#6a8ab8" }}>
+          Enter your mobile number
+        </p>
+        <p className="text-sm mt-1" style={{ color: "#4a6a8a" }}>
+          Optional — you can skip
+        </p>
+      </div>
+
+      <div
+        className="w-full max-w-md rounded-3xl px-6 py-5 text-center"
+        style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.35)" }}
+      >
+        <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#93c5fd" }}>
+          Phone number
+        </p>
+        <p className="text-4xl sm:text-5xl font-black text-white font-mono tracking-wider tabular-nums min-h-[3.5rem]">
+          {localPhone ? formatReloadPhoneDisplay(localPhone) : (
+            <span style={{ color: "#4a6a8a" }}>0XX XXX XXXX</span>
+          )}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 w-full max-w-md">
+        {keys.map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => press(k)}
+            className="h-16 sm:h-20 rounded-2xl text-2xl font-black text-white transition-transform active:scale-95"
+            style={{
+              background: k === "del" || k === "clr" ? "rgba(255,255,255,0.06)" : "#162338",
+              border: "1px solid #1e3356",
+              color: k === "clr" ? "#f87171" : k === "del" ? "#94a3b8" : "#fff",
+            }}
+          >
+            {k === "del" ? <Delete className="h-7 w-7 mx-auto" /> : k === "clr" ? "C" : k}
+          </button>
+        ))}
+      </div>
+
+      <p className="text-sm" style={{ color: "#4a6a8a" }}>
+        Tap the keypad · cashier can also type
+      </p>
     </div>
   );
 }
@@ -498,6 +606,8 @@ export function PosCustomerDisplayScreen() {
           <IdleScreen branding={branding} />
         ) : displayState.phase === "thankyou" ? (
           <ThankYouScreen state={displayState} />
+        ) : displayState.phase === "reload" ? (
+          <ReloadPhoneScreen branding={branding} phone={displayState.reloadPhone ?? ""} />
         ) : (
           <ShoppingScreen state={displayState} />
         )}

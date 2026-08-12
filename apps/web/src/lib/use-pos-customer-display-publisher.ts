@@ -42,6 +42,9 @@ interface PublisherInput {
   activePayment: string;
   cashTenderedInput: string;
   totalAmount: number;
+  /** Reload popup open — customer display shows phone keypad. */
+  reloadOpen?: boolean;
+  reloadPhone?: string;
 }
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -71,6 +74,8 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     activePayment,
     cashTenderedInput,
     totalAmount,
+    reloadOpen = false,
+    reloadPhone = "",
   } = input;
 
   const itemsKey = React.useMemo(
@@ -101,6 +106,7 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
 
     let phase: CustomerDisplayPhase = "idle";
     if (thankYouSale) phase = "thankyou";
+    else if (reloadOpen) phase = "reload";
     else if (checkoutOpen) phase = "checkout";
     else if (items.length > 0) phase = "shopping";
 
@@ -108,7 +114,7 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     let checkoutChangeDue: number | undefined;
     let checkoutPaymentMethod: string | undefined;
 
-    if (checkoutOpen && !thankYouSale) {
+    if (checkoutOpen && !thankYouSale && !reloadOpen) {
       checkoutPaymentMethod = PAYMENT_LABELS[activePayment] ?? activePayment;
       if (activePayment === "CASH" && cashTenderedInput.trim()) {
         const tendered = parseFloat(cashTenderedInput);
@@ -147,6 +153,7 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
         : checkoutCashTendered,
       paymentMethod: thankYouSale?.paymentMethod ?? checkoutPaymentMethod,
       saleTotal: thankYouSale?.total,
+      reloadPhone: reloadOpen ? reloadPhone : undefined,
     });
 
     if (thankYouSale) {
@@ -177,6 +184,8 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
     activePayment,
     cashTenderedInput,
     totalAmount,
+    reloadOpen,
+    reloadPhone,
   ]);
 }
 
