@@ -2855,7 +2855,7 @@ ${rows}
                 <input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-3">
               <PosNewCustomerCreditFields
                 lightMode={isPosLight}
                 creditLimit={newCustCreditLimit}

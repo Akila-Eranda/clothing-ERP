@@ -509,17 +509,15 @@ export function PosReloadPanel({
                 <button
                   key={op.id}
                   type="button"
+                  title={`${op.name} · Digital ${op.digitalCommissionPct}% · Card ${op.physicalCommissionPct}%`}
                   onClick={() => {
                     setOperatorId(op.id);
                     setFocusZone("provider");
                   }}
-                  className="rounded-xl border px-2.5 py-2.5 text-left transition-all hover:opacity-90"
+                  className="h-9 rounded-lg px-2.5 text-xs font-bold truncate transition-all hover:opacity-90"
                   style={chipStyle({ selected: active, focused: kb, light: lightMode })}
                 >
-                  <p className="text-xs font-bold truncate" style={{ color: "#fff" }}>{op.name}</p>
-                  <p className="mt-0.5 text-[10px]" style={{ color: active ? "rgba(255,255,255,0.85)" : (lightMode ? "rgba(255,255,255,0.7)" : "var(--pos-muted)") }}>
-                    D {op.digitalCommissionPct}% · C {op.physicalCommissionPct}%
-                  </p>
+                  {op.name}
                 </button>
               );
             })}
@@ -659,27 +657,17 @@ export function PosReloadPanel({
                     key={d.id}
                     type="button"
                     disabled={empty}
+                    title={empty ? "Out of stock" : `${d.availableCards} in stock`}
                     onClick={() => {
                       setCardIdx(idx);
                       setDenominationId(d.id);
                       setFocusZone("cards");
                     }}
-                    className="rounded-xl border px-3 py-3 text-left disabled:opacity-40 transition-all"
+                    className="h-10 rounded-lg border px-3 text-sm font-bold tabular-nums text-left disabled:opacity-40 transition-all"
                     style={chipStyle({ selected: active, focused: kb, empty, light: lightMode })}
                   >
-                    <p className="text-sm font-bold tabular-nums" style={{ color: "#fff" }}>
-                      LKR {formatMoney(d.faceValue)}
-                    </p>
-                    <p
-                      className="mt-1 text-[10px]"
-                      style={{
-                        color: empty
-                          ? (lightMode ? "#fecaca" : "#b91c1c")
-                          : "rgba(255,255,255,0.75)",
-                      }}
-                    >
-                      {d.availableCards} in stock
-                    </p>
+                    LKR {formatMoney(d.faceValue)}
+                    {empty ? " · out" : ""}
                   </button>
                 );
               })}
