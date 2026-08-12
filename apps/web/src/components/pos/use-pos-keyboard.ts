@@ -51,6 +51,8 @@ export interface PosKeyboardContext {
   showCustomerSearch: boolean;
   showHeldBills: boolean;
   showReload: boolean;
+  showQuickProduct: boolean;
+  showDemoProduct: boolean;
   showDayEnd: boolean;
   qtyPopupOpen: boolean;
   selectedProductName: string | null;
@@ -83,6 +85,8 @@ export interface PosKeyboardContext {
   setShowCustomerSearch: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHeldBills: React.Dispatch<React.SetStateAction<boolean>>;
   setShowReload: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowQuickProduct: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowDemoProduct: React.Dispatch<React.SetStateAction<boolean>>;
   setCustomerSearch: React.Dispatch<React.SetStateAction<string>>;
   setCustomers: React.Dispatch<React.SetStateAction<PosCustomerRow[]>>;
   setActiveNav: React.Dispatch<React.SetStateAction<string>>;
@@ -134,6 +138,10 @@ export interface PosKeyboardContext {
   openCartCustomer: () => void;
   /** Reload / recharge popup */
   openReloadPopup: () => void;
+  /** New product (catalog) popup */
+  openQuickProductPopup: () => void;
+  /** Demo product (bill-only) popup */
+  openDemoProductPopup: () => void;
   /** Close shift cash drawer */
   openCashClose: () => void;
   showCashClose: boolean;
@@ -166,6 +174,8 @@ function anyModalOpen(ctx: PosKeyboardContext) {
     || ctx.showCustomerSearch
     || ctx.showHeldBills
     || ctx.showReload
+    || ctx.showQuickProduct
+    || ctx.showDemoProduct
     || ctx.showShortcuts
     || ctx.showDayEnd
     || ctx.showCashClose
@@ -184,6 +194,14 @@ function navigateToNavItem(ctx: PosKeyboardContext, id: string) {
   }
   if (id === "reload") {
     ctx.openReloadPopup();
+    return;
+  }
+  if (id === "quick-product") {
+    ctx.openQuickProductPopup();
+    return;
+  }
+  if (id === "demo-product") {
+    ctx.openDemoProductPopup();
     return;
   }
   if (id === "customers") {
@@ -266,6 +284,30 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         return;
       }
 
+      if (ctx.showNewCust) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.setShowNewCust(false);
+        }
+        return;
+      }
+
+      if (ctx.showQuickProduct) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.setShowQuickProduct(false);
+        }
+        return;
+      }
+
+      if (ctx.showDemoProduct) {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          ctx.setShowDemoProduct(false);
+        }
+        return;
+      }
+
       // Quantity popup owns its own capture-phase handlers
       if (ctx.qtyPopupOpen) {
         return;
@@ -278,6 +320,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       const blockBarcode =
         ctx.showCustomerSearch
         || ctx.showReload
+        || ctx.showQuickProduct
+        || ctx.showDemoProduct
         || ctx.activeNav === "customers"
         || ctx.showNewCust;
       if (!blockBarcode && e.key.length === 1 && delta < 60 && !e.ctrlKey && !e.altKey && !e.metaKey) {
@@ -325,6 +369,9 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
         if (ctx.checkoutOpen) { ctx.setCheckoutOpen(false); return; }
         if (ctx.showHeldBills) { ctx.setShowHeldBills(false); return; }
         if (ctx.showReload) { ctx.setShowReload(false); return; }
+        if (ctx.showNewCust) { ctx.setShowNewCust(false); return; }
+        if (ctx.showQuickProduct) { ctx.setShowQuickProduct(false); return; }
+        if (ctx.showDemoProduct) { ctx.setShowDemoProduct(false); return; }
         if (ctx.selectedProductName) { ctx.setSelectedProductName(null); return; }
         if (ctx.showCustomerSearch) {
           ctx.setShowCustomerSearch(false);
@@ -569,8 +616,8 @@ export function usePosKeyboard(ctx: PosKeyboardContext) {
       // Letter shortcuts for full POS tools (checkout remaps some keys)
       if (letterToolsOk && key === "p" && !ctx.checkoutOpen) { e.preventDefault(); ctx.setActiveNav("products"); setTimeout(() => ctx.searchRef.current?.focus(), 50); return; }
       if (letterToolsOk && key === "c" && !ctx.checkoutOpen) { e.preventDefault(); if (ctx.itemsLength > 0) { ctx.setActivePayment("CASH"); ctx.setCheckoutOpen(true); } else toast.info("Cart is empty"); return; }
-      if (letterToolsOk && key === "q") { e.preventDefault(); ctx.setActiveNav("quick-product"); return; }
-      if (letterToolsOk && key === "y") { e.preventDefault(); ctx.setActiveNav("demo-product"); return; }
+      if (letterToolsOk && key === "q") { e.preventDefault(); ctx.openQuickProductPopup(); return; }
+      if (letterToolsOk && key === "y") { e.preventDefault(); ctx.openDemoProductPopup(); return; }
       if (letterToolsOk && key === "l" && !ctx.checkoutOpen) { e.preventDefault(); ctx.openReloadPopup(); return; }
       if (letterToolsOk && key === "r" && !e.ctrlKey) { e.preventDefault(); ctx.setActiveNav("returns"); return; }
       if (letterToolsOk && key === "h") { e.preventDefault(); ctx.setShowHeldBills(true); ctx.setActiveNav("products"); return; }

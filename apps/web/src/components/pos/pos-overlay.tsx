@@ -108,22 +108,22 @@ const posMutedLabelStyle: React.CSSProperties = { color: "var(--pos-muted)" };
 
 function posCustomerFormStyles(light: boolean) {
   return {
-    label: { color: light ? "#334155" : "var(--pos-muted)" } as React.CSSProperties,
+    label: { color: light ? "#64748b" : "var(--pos-muted)" } as React.CSSProperties,
     title: { color: light ? "#0f172a" : "var(--pos-text)" } as React.CSSProperties,
     input: {
-      background: light ? "#f8fafc" : "var(--pos-input)",
-      border: `1px solid ${light ? "#334155" : "var(--pos-border)"}`,
+      background: "var(--pos-input)",
+      border: "1px solid var(--pos-border)",
       color: light ? "#0f172a" : "var(--pos-text)",
       colorScheme: light ? "light" : "dark",
     } as React.CSSProperties,
     card: {
-      background: light ? "#ffffff" : "var(--pos-card)",
-      borderColor: light ? "#1e40af" : "#4f6ef7",
+      background: "var(--pos-panel)",
+      borderColor: "var(--pos-border)",
     } as React.CSSProperties,
     chipIdle: {
-      background: light ? "#334155" : "var(--pos-input)",
+      background: light ? "#475569" : "var(--pos-elevated)",
       color: "#ffffff",
-      border: `1px solid ${light ? "#1e293b" : "var(--pos-border)"}`,
+      border: "none",
     } as React.CSSProperties,
   };
 }
@@ -158,10 +158,10 @@ function PosNewCustomerCreditFields({
       type="button"
       onClick={() => onPayModeChange(mode)}
       data-pos-on-accent=""
-      className={`rounded-lg font-bold transition-all ${compact ? "h-7 px-2 text-[10px]" : "h-8 px-2.5 text-[11px]"}`}
+      className={`rounded-xl font-bold transition-all ${compact ? "h-8 px-2.5 text-[10px]" : "h-10 px-3 text-xs"}`}
       style={
         payMode === mode
-          ? { background: "#4f6ef7", color: "#ffffff", border: "1px solid #4f6ef7" }
+          ? { background: "#4f6ef7", color: "#ffffff" }
           : s.chipIdle
       }
     >
@@ -169,9 +169,9 @@ function PosNewCustomerCreditFields({
     </button>
   );
   return (
-    <>
-      <div>
-        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
+    <div className="space-y-4">
+      <div className="space-y-1.5">
+        <label className={`font-semibold uppercase tracking-wider block ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
           Credit Limit (LKR)
         </label>
         <input
@@ -181,15 +181,15 @@ function PosNewCustomerCreditFields({
           value={creditLimit}
           onChange={(e) => onCreditLimitChange(e.target.value)}
           placeholder="0 = no credit"
-          className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+          className={`w-full px-4 rounded-xl outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)] ${compact ? "h-10 text-sm" : "h-11 text-sm"}`}
           style={s.input}
         />
       </div>
-      <div>
-        <label className={`font-semibold block mb-1 ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
+      <div className="space-y-1.5">
+        <label className={`font-semibold uppercase tracking-wider block ${compact ? "text-[10px]" : "text-[11px]"}`} style={s.label}>
           Pay days / Salary due
         </label>
-        <div className="flex flex-wrap gap-1.5 mb-1.5">
+        <div className="flex flex-wrap gap-2">
           {chip("7", "7 days")}
           {chip("14", "14 days")}
           {chip("custom", "Custom")}
@@ -203,7 +203,7 @@ function PosNewCustomerCreditFields({
             value={customDays}
             onChange={(e) => onCustomDaysChange(e.target.value)}
             placeholder="Custom days"
-            className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            className={`w-full px-4 rounded-xl outline-none mt-1 ${compact ? "h-10 text-sm" : "h-11 text-sm"}`}
             style={s.input}
           />
         )}
@@ -212,12 +212,12 @@ function PosNewCustomerCreditFields({
             type="date"
             value={salaryDate}
             onChange={(e) => onSalaryDateChange(e.target.value)}
-            className={`w-full px-3 rounded-xl outline-none ${compact ? "h-8 text-xs" : "h-9 text-sm"}`}
+            className={`w-full px-4 rounded-xl outline-none mt-1 ${compact ? "h-10 text-sm" : "h-11 text-sm"}`}
             style={s.input}
           />
         )}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -441,6 +441,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [cartCustomerOpen, setCartCustomerOpen] = React.useState(false);
   const [showHeldBills, setShowHeldBills] = React.useState(false);
   const [showReload, setShowReload] = React.useState(false);
+  const [showQuickProduct, setShowQuickProduct] = React.useState(false);
+  const [showDemoProduct, setShowDemoProduct] = React.useState(false);
   const [reloadPhone, setReloadPhone] = React.useState("");
   const [customerSearch, setCustomerSearch] = React.useState("");
   const [customers, setCustomers] = React.useState<CustomerItem[]>([]);
@@ -1883,6 +1885,8 @@ ${receiptSoftwareCreditHtml()}
     setActiveNav("products");
     setCartCustomerOpen(false);
     setShowReload(false);
+    setShowQuickProduct(false);
+    setShowDemoProduct(false);
     setShowHeldBills(true);
     void loadHeldBills();
   }, [loadHeldBills]);
@@ -1891,9 +1895,29 @@ ${receiptSoftwareCreditHtml()}
     setActiveNav("products");
     setCartCustomerOpen(false);
     setShowHeldBills(false);
+    setShowQuickProduct(false);
+    setShowDemoProduct(false);
     setReloadPhone((customer?.phone ?? "").replace(/\D/g, ""));
     setShowReload(true);
   }, [customer?.phone]);
+
+  const openQuickProductPopup = React.useCallback(() => {
+    setActiveNav("products");
+    setCartCustomerOpen(false);
+    setShowHeldBills(false);
+    setShowReload(false);
+    setShowDemoProduct(false);
+    setShowQuickProduct(true);
+  }, []);
+
+  const openDemoProductPopup = React.useCallback(() => {
+    setActiveNav("products");
+    setCartCustomerOpen(false);
+    setShowHeldBills(false);
+    setShowReload(false);
+    setShowQuickProduct(false);
+    setShowDemoProduct(true);
+  }, []);
 
   // Customer display → POS: phone typed on second screen
   React.useEffect(() => {
@@ -2360,6 +2384,19 @@ ${rows}
     setNewCustSalaryDate("");
   }, []);
 
+  const closeRegisterCustomer = React.useCallback(() => {
+    setShowNewCust(false);
+    setCartShowNewCust(false);
+  }, []);
+
+  const openRegisterCustomer = React.useCallback((prefillPhone?: string) => {
+    resetNewCustomerForm();
+    const phone = (prefillPhone ?? "").trim();
+    if (phone && /^\d[\d\s+()-]*$/.test(phone)) setNewCustPhone(phone.replace(/\s+/g, ""));
+    if (cartCustomerOpen) setCartShowNewCust(true);
+    else setShowNewCust(true);
+  }, [resetNewCustomerForm, cartCustomerOpen]);
+
   const resolveNewCustomerCreditDays = React.useCallback((): number | null => {
     if (newCustPayMode === "7") return 7;
     if (newCustPayMode === "14") return 14;
@@ -2412,12 +2449,12 @@ ${rows}
       const item: CustomerItem = mapApiCustomer(c);
       applyCustomer(item);
       resetNewCustomerForm();
-      setShowNewCust(false);
-      setCartShowNewCust(false);
+      closeRegisterCustomer();
       setInlineCustomerSearch("");
       setInlineCustomers([]);
       setCustomerSearch("");
       setCustomers([]);
+      setCartCustomerOpen(false);
       toast.success(`${item.name} registered`);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to register customer");
@@ -2426,7 +2463,7 @@ ${rows}
     }
   }, [
     newCustFirst, newCustLast, newCustPhone, newCustEmail, newCustCreditLimit,
-    resolveNewCustomerCreditDays, resetNewCustomerForm, applyCustomer,
+    resolveNewCustomerCreditDays, resetNewCustomerForm, closeRegisterCustomer, applyCustomer,
   ]);
 
   const handleSplitBill = React.useCallback(async () => {
@@ -2502,6 +2539,8 @@ ${rows}
     showCustomerSearch: cartCustomerOpen,
     showHeldBills,
     showReload,
+    showQuickProduct,
+    showDemoProduct,
     showDayEnd,
     qtyPopupOpen: !!addPopup,
     selectedProductName: selectedProductName ?? addPopup?.productName ?? null,
@@ -2520,7 +2559,7 @@ ${rows}
     customersLength: customers.length,
     inlineCustomersLength: inlineCustomers.length,
     customerModalListLength: customers.length,
-    showNewCust: cartCustomerOpen ? cartShowNewCust : showNewCust,
+    showNewCust: showNewCust || cartShowNewCust,
     inCheckout: checkoutOpen,
     searchRef,
     cartCustomerSearchRef,
@@ -2537,6 +2576,8 @@ ${rows}
     setShowCustomerSearch: setCartCustomerOpen,
     setShowHeldBills,
     setShowReload,
+    setShowQuickProduct,
+    setShowDemoProduct,
     setCustomerSearch,
     setCustomers,
     setActiveNav,
@@ -2547,8 +2588,9 @@ ${rows}
     setFocusedCustomerIdx,
     setActiveCategory,
     setShowNewCust: ((v: React.SetStateAction<boolean>) => {
-      if (cartCustomerOpen) setCartShowNewCust(v);
-      else setShowNewCust(v);
+      const next = typeof v === "function" ? v(showNewCust || cartShowNewCust) : v;
+      if (next) openRegisterCustomer();
+      else closeRegisterCustomer();
     }) as React.Dispatch<React.SetStateAction<boolean>>,
     setShowDayEnd,
     setPinLocked,
@@ -2600,8 +2642,10 @@ ${rows}
     getCustomerModalItem: (idx: number) => customers[idx],
     getInlineCustomer: (idx: number) => inlineCustomers[idx],
     openReloadPopup,
+    openQuickProductPopup,
+    openDemoProductPopup,
   }), [
-    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showReload, showDayEnd, showCashClose, showTransferFunds,
+    posOpen, pinLocked, thankYouSale, checkoutOpen, showShortcuts, cartCustomerOpen, showHeldBills, showReload, showQuickProduct, showDemoProduct, showDayEnd, showCashClose, showTransferFunds,
     addPopup, selectedProductName, activeNav, activePayment, items.length, selectedCartIdx,
     focusedProductIdx, focusedHeldIdx, focusedCustomerIdx, productCards, serverHeldBills,
     navItems, categories, activeCategory, customers, inlineCustomers, showNewCust, cartShowNewCust, cartCustomerOpen,
@@ -2611,7 +2655,7 @@ ${rows}
     updateQuantity, removeItem, adjustSelectedQty, removeSelectedCartItem, openQtyEditForSelected, closeQtyPopup, applyCustomer,
     toggleCheckoutPartial, toggleCheckoutSplit, focusCheckoutCoupon, focusCheckoutPartialPay, setQuickCash,
     openCartCustomerDropdown, openCashClose, closeCashClose, closeTransferFunds, setExactCashTender, focusCheckoutGiftOrCheque,
-    openReloadPopup, payState.allowPartial, payState.splitMode,
+    openReloadPopup, openQuickProductPopup, openDemoProductPopup, openRegisterCustomer, closeRegisterCustomer, payState.allowPartial, payState.splitMode,
   ]);
 
   React.useEffect(() => {
@@ -2621,6 +2665,14 @@ ${rows}
   React.useEffect(() => {
     if (activeNav === "reload") openReloadPopup();
   }, [activeNav, openReloadPopup]);
+
+  React.useEffect(() => {
+    if (activeNav === "quick-product") openQuickProductPopup();
+  }, [activeNav, openQuickProductPopup]);
+
+  React.useEffect(() => {
+    if (activeNav === "demo-product") openDemoProductPopup();
+  }, [activeNav, openDemoProductPopup]);
 
   React.useEffect(() => {
     if (activeNav !== "customers" || !posOpen) return;
@@ -2752,32 +2804,7 @@ ${rows}
       </div>
     );
 
-    // QUICK PRODUCT (catalog)
-    if (activeNav === "quick-product") {
-      return (
-        <PosQuickProductPanel
-          onBack={() => setActiveNav("products")}
-          onCreated={() => {
-            void loadProducts();
-            setActiveNav("products");
-          }}
-        />
-      );
-    }
-
-    // DEMO PRODUCT (bill-only, not in products table)
-    if (activeNav === "demo-product") {
-      return (
-        <PosDemoProductPanel
-          onBack={() => setActiveNav("products")}
-          taxRate={taxRate}
-          onAddToCart={(item) => {
-            addItem(item);
-            setActiveNav("products");
-          }}
-        />
-      );
-    }
+    // QUICK PRODUCT + DEMO PRODUCT open as popups (see modals below)
 
     // QUICK EXPENSE
     if (activeNav === "expenses") {
@@ -2819,7 +2846,7 @@ ${rows}
               ref={inlineCustomerSearchRef}
               data-pos-customer-search
               value={inlineCustomerSearch}
-              onChange={e=>{setInlineCustomerSearch(e.target.value);setShowNewCust(false);}}
+              onChange={e=>{setInlineCustomerSearch(e.target.value);}}
               placeholder="Type phone number or name…"
               autoComplete="off"
               className="w-full pl-9 pr-9 h-10 rounded-xl text-sm outline-none"
@@ -2827,58 +2854,16 @@ ${rows}
             />
             {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
           </div>
-          <button onClick={()=>{setShowNewCust(s=>!s);setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90" {...(!showNewCust ? { "data-pos-accent": "" } : {})} style={{background:showNewCust?(isPosLight?"#334155":"var(--pos-card)"):"#4f6ef7",border:showNewCust?`1px solid ${isPosLight?"#1e293b":"#4f6ef7"}`:"none",color:"#ffffff"}}>
-            {showNewCust?<X className="h-4 w-4"/>:<Plus className="h-4 w-4"/>}{showNewCust?"Cancel":"Register New"}
+          <button
+            type="button"
+            onClick={() => openRegisterCustomer(/^\d+$/.test(inlineCustomerSearch.trim()) ? inlineCustomerSearch.trim() : undefined)}
+            data-pos-accent=""
+            className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90"
+            style={{ background: "#4f6ef7", color: "#ffffff" }}
+          >
+            <Plus className="h-4 w-4"/>Register New
           </button>
         </div>
-        {/* Register form */}
-        {showNewCust&&(
-          <div className="shrink-0 rounded-2xl border p-4 space-y-3" style={cf.card}>
-            <p className="font-bold text-sm flex items-center gap-2" style={cf.title}>
-              <User className="h-4 w-4" style={{color:"#4f6ef7"}}/>Register New Customer
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>First Name *</label>
-                <input value={newCustFirst} onChange={e=>setNewCustFirst(e.target.value)} placeholder="John" autoFocus className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Last Name</label>
-                <input value={newCustLast} onChange={e=>setNewCustLast(e.target.value)} placeholder="Doe" className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Phone *</label>
-                <input value={newCustPhone} onChange={e=>setNewCustPhone(e.target.value)} placeholder="077 123 4567" inputMode="tel" autoComplete="tel" className="w-full h-9 px-3 rounded-xl text-sm outline-none font-mono" style={cf.input}/>
-              </div>
-              <div>
-                <label className="text-[11px] font-semibold block mb-1" style={cf.label}>Email</label>
-                <input type="email" value={newCustEmail} onChange={e=>setNewCustEmail(e.target.value)} placeholder="john@email.com" className="w-full h-9 px-3 rounded-xl text-sm outline-none" style={cf.input}/>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <PosNewCustomerCreditFields
-                lightMode={isPosLight}
-                creditLimit={newCustCreditLimit}
-                onCreditLimitChange={setNewCustCreditLimit}
-                payMode={newCustPayMode}
-                onPayModeChange={setNewCustPayMode}
-                customDays={newCustCustomDays}
-                onCustomDaysChange={setNewCustCustomDays}
-                salaryDate={newCustSalaryDate}
-                onSalaryDateChange={setNewCustSalaryDate}
-              />
-            </div>
-            <button
-              onClick={saveNewCustomer}
-              disabled={newCustSaving||!newCustFirst.trim()||!newCustPhone.trim()}
-              data-pos-on-accent=""
-              className="pos-cta w-full h-10 rounded-xl text-sm font-bold transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40"
-              style={{background:"#4f6ef7", color:"#ffffff"}}
-            >
-              {newCustSaving?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}{newCustSaving?"Saving...":"Save & Add to Bill"}
-            </button>
-          </div>
-        )}
         {/* Active bill customer */}
         {customer ? (
           <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}>
@@ -2896,12 +2881,12 @@ ${rows}
         {/* List + insight */}
         <div className="flex-1 min-h-0 grid gap-3" style={{gridTemplateColumns:"minmax(260px,1fr) minmax(280px,1.1fr)"}}>
           <div className="min-h-0 overflow-y-auto rounded-xl border p-2" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
-            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&!showNewCust&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
+            {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet — register a new customer</p></div>}
             {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
               <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"var(--pos-muted-2)"}}>
                 <AlertCircle className="h-8 w-8 opacity-30"/>
                 <p className="text-sm">No customers found</p>
-                <button onClick={()=>{setShowNewCust(true);if(/^\d+$/.test(inlineCustomerSearch.trim()))setNewCustPhone(inlineCustomerSearch.trim());setInlineCustomerSearch("");setInlineCustomers([]);}} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
+                <button type="button" onClick={()=>openRegisterCustomer(/^\d+$/.test(inlineCustomerSearch.trim())?inlineCustomerSearch.trim():undefined)} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
               </div>
             )}
             <div className="space-y-2">
@@ -3903,13 +3888,51 @@ ${rows}
             {pinBusy&&<Loader2 className="h-5 w-5 animate-spin -mt-2" style={{color:"#4f6ef7"}}/>}
             <div className="grid gap-3" style={{gridTemplateColumns:"repeat(3,80px)"}}>
               {[1,2,3,4,5,6,7,8,9].map(n=>(
-                <button key={n} disabled={pinBusy} onClick={()=>void handlePinEntry(String(n))} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>{n}</button>
+                <button
+                  key={n}
+                  disabled={pinBusy}
+                  onClick={()=>void handlePinEntry(String(n))}
+                  className="h-20 rounded-2xl text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
+                  style={{
+                    background: "var(--pos-card)",
+                    border: "1px solid var(--pos-border)",
+                    color: "var(--pos-text)",
+                    boxShadow: isPosLight ? "0 1px 2px rgba(15,23,42,0.06)" : undefined,
+                  }}
+                >
+                  {n}
+                </button>
               ))}
-              <button disabled={pinBusy} onClick={()=>void handlePinEntry("DEL")} className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 hover:bg-white/10 flex items-center justify-center disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)",color:"#ef4444"}}><Delete className="h-6 w-6"/></button>
-              <button disabled={pinBusy} onClick={()=>void handlePinEntry("0")} className="h-20 rounded-2xl text-white text-2xl font-bold transition-all active:scale-95 hover:bg-white/10 disabled:opacity-50" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>0</button>
-              <button onClick={closePos} className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95 hover:bg-red-500/10" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)",color:"var(--pos-muted)"}}>Exit</button>
+              <button
+                disabled={pinBusy}
+                onClick={()=>void handlePinEntry("DEL")}
+                className="h-20 rounded-2xl text-sm font-bold transition-all active:scale-95 flex items-center justify-center disabled:opacity-50"
+                style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)", color: "#ef4444", boxShadow: isPosLight ? "0 1px 2px rgba(15,23,42,0.06)" : undefined }}
+              >
+                <Delete className="h-6 w-6"/>
+              </button>
+              <button
+                disabled={pinBusy}
+                onClick={()=>void handlePinEntry("0")}
+                className="h-20 rounded-2xl text-2xl font-bold transition-all active:scale-95 disabled:opacity-50"
+                style={{
+                  background: "var(--pos-card)",
+                  border: "1px solid var(--pos-border)",
+                  color: "var(--pos-text)",
+                  boxShadow: isPosLight ? "0 1px 2px rgba(15,23,42,0.06)" : undefined,
+                }}
+              >
+                0
+              </button>
+              <button
+                onClick={closePos}
+                className="h-20 rounded-2xl text-xs font-semibold transition-all active:scale-95"
+                style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)", color: "var(--pos-muted)", boxShadow: isPosLight ? "0 1px 2px rgba(15,23,42,0.06)" : undefined }}
+              >
+                Exit
+              </button>
             </div>
-            <p className="text-xs" style={{color:"var(--pos-border-strong)"}}>Terminal login: {user?.name??"Admin"}</p>
+            <p className="text-xs" style={{color:"var(--pos-muted-2)"}}>Terminal login: {user?.name??"Admin"}</p>
           </div>
         )}
 
@@ -4072,41 +4095,41 @@ ${rows}
                 if (item.id === "demo-product") return null;
                 if (item.id === "quick-product") {
                   const demoItem = navItems.find((n) => n.id === "demo-product");
-                  const newActive = activeNav === "quick-product";
-                  const demoActive = activeNav === "demo-product";
                   return (
-                    <div key="product-create-row" className="flex items-stretch gap-1 px-1.5 py-1">
+                    <React.Fragment key="product-create-nav">
                       <button
                         type="button"
-                        onClick={() => setActiveNav("quick-product")}
+                        onClick={() => openQuickProductPopup()}
                         title="New Product (Q)"
-                        className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
+                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative"
                         style={{
-                          color: newActive ? "#4f6ef7" : "var(--pos-muted)",
-                          background: newActive ? "rgba(79,110,247,0.15)" : "var(--pos-elevated)",
-                          border: `1px solid ${newActive ? "#4f6ef7" : "var(--pos-border)"}`,
+                          color: showQuickProduct ? "#4f6ef7" : "var(--pos-muted)",
+                          background: showQuickProduct ? "rgba(79,110,247,0.15)" : "transparent",
                         }}
                       >
-                        <PackagePlus className="h-3.5 w-3.5 shrink-0" style={{ color: newActive ? "#4f6ef7" : "var(--pos-muted)" }} />
-                        <span className="truncate w-full text-center">New</span>
+                        {showQuickProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "#4f6ef7" }} />}
+                        <PackagePlus className="h-4 w-4 shrink-0" style={{ color: showQuickProduct ? "#4f6ef7" : "var(--pos-muted)" }} />
+                        New Product
+                        <span className="ml-auto text-[9px] opacity-40 font-mono">Q</span>
                       </button>
                       {demoItem && (
                         <button
                           type="button"
-                          onClick={() => setActiveNav("demo-product")}
+                          onClick={() => openDemoProductPopup()}
                           title="Demo Product (Y)"
-                          className="flex-1 min-w-0 flex flex-col items-center justify-center gap-0.5 px-1 py-2 rounded-lg text-[10px] font-semibold leading-tight transition-all"
+                          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative"
                           style={{
-                            color: demoActive ? "#059669" : "var(--pos-muted)",
-                            background: demoActive ? "rgba(16,185,129,0.15)" : "var(--pos-elevated)",
-                            border: `1px solid ${demoActive ? "#10b981" : "var(--pos-border)"}`,
+                            color: showDemoProduct ? "#059669" : "var(--pos-muted)",
+                            background: showDemoProduct ? "rgba(16,185,129,0.15)" : "transparent",
                           }}
                         >
-                          <Sparkles className="h-3.5 w-3.5 shrink-0" style={{ color: demoActive ? "#10b981" : "var(--pos-muted)" }} />
-                          <span className="truncate w-full text-center">Demo</span>
+                          {showDemoProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "#10b981" }} />}
+                          <Sparkles className="h-4 w-4 shrink-0" style={{ color: showDemoProduct ? "#10b981" : "var(--pos-muted)" }} />
+                          Demo Product
+                          <span className="ml-auto text-[9px] opacity-40 font-mono">Y</span>
                         </button>
                       )}
-                    </div>
+                    </React.Fragment>
                   );
                 }
                 const active=activeNav===item.id || (item.id === "reload" && showReload);
@@ -4249,7 +4272,7 @@ ${rows}
                     <input
                       ref={cartCustomerSearchRef}
                       value={customerSearch}
-                      onChange={(e) => { setCustomerSearch(e.target.value); setCartShowNewCust(false); setFocusedCustomerIdx(0); }}
+                      onChange={(e) => { setCustomerSearch(e.target.value); setFocusedCustomerIdx(0); }}
                       placeholder="Type phone or name…"
                       inputMode="search"
                       autoComplete="off"
@@ -4259,45 +4282,14 @@ ${rows}
                     />
                     <button
                       type="button"
-                      onClick={() => {
-                        setCartShowNewCust((s) => !s);
-                        if (!cartShowNewCust && /^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
-                      }}
+                      onClick={() => openRegisterCustomer(/^\d+$/.test(customerSearch.trim()) ? customerSearch.trim() : undefined)}
                       className="h-7 px-2 rounded-lg text-[10px] font-bold text-white shrink-0 flex items-center gap-1"
-                      style={{ background: cartShowNewCust ? "var(--pos-card)" : "#4f6ef7", border: cartShowNewCust ? "1px solid #4f6ef7" : "none" }}
+                      style={{ background: "#4f6ef7" }}
                     >
-                      {cartShowNewCust ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      {cartShowNewCust ? "Cancel" : "Register"}
+                      <Plus className="h-3 w-3" />
+                      Register
                     </button>
                   </div>
-                  {cartShowNewCust && (() => {
-                    const cartCf = posCustomerFormStyles(isPosLight);
-                    return (
-                    <div className="p-2 border-b space-y-1.5" style={{ borderColor: isPosLight ? "#1e40af" : "var(--pos-border)", background: isPosLight ? "#ffffff" : "var(--pos-card)" }}>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <input value={newCustFirst} onChange={(e) => setNewCustFirst(e.target.value)} placeholder="First name *" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
-                        <input value={newCustLast} onChange={(e) => setNewCustLast(e.target.value)} placeholder="Last name" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
-                        <input value={newCustPhone} onChange={(e) => setNewCustPhone(e.target.value)} placeholder="Phone *" inputMode="tel" autoComplete="tel" className="h-8 px-2 rounded-lg text-xs outline-none font-mono" style={cartCf.input} />
-                        <input value={newCustEmail} onChange={(e) => setNewCustEmail(e.target.value)} placeholder="Email" className="h-8 px-2 rounded-lg text-xs outline-none" style={cartCf.input} />
-                      </div>
-                      <PosNewCustomerCreditFields
-                        compact
-                        lightMode={isPosLight}
-                        creditLimit={newCustCreditLimit}
-                        onCreditLimitChange={setNewCustCreditLimit}
-                        payMode={newCustPayMode}
-                        onPayModeChange={setNewCustPayMode}
-                        customDays={newCustCustomDays}
-                        onCustomDaysChange={setNewCustCustomDays}
-                        salaryDate={newCustSalaryDate}
-                        onSalaryDateChange={setNewCustSalaryDate}
-                      />
-                      <button type="button" onClick={() => void saveNewCustomer()} disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()} data-pos-on-accent="" className="pos-cta w-full h-8 rounded-lg text-xs font-bold disabled:opacity-40" style={{ background: "#4f6ef7", color: "#ffffff" }}>
-                        {newCustSaving ? "Saving…" : "Save & add to bill"}
-                      </button>
-                    </div>
-                    );
-                  })()}
                   <div className="max-h-52 overflow-y-auto p-1">
                     <button
                       type="button"
@@ -4306,7 +4298,7 @@ ${rows}
                         setCustomerInsight(null);
                         setPreviewCustomerId(null);
                         setCartCustomerOpen(false);
-                        setCartShowNewCust(false);
+                        closeRegisterCustomer();
                         setCustomerSearch("");
                         setCustomers([]);
                         toast.info("Walk-in customer");
@@ -5469,24 +5461,29 @@ ${rows}
               animate={{ scale: 1, y: 0 }}
               exit={{ scale: 0.95, y: 12 }}
               onClick={(e) => e.stopPropagation()}
-              className="rounded-2xl border shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="rounded-2xl border shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
               style={{
                 background: "var(--pos-panel)",
-                borderColor: isPosLight ? "#1e293b" : "var(--pos-border)",
-                boxShadow: isPosLight ? "0 25px 50px rgba(15,23,42,0.25)" : undefined,
+                borderColor: "var(--pos-border)",
+                boxShadow: isPosLight ? "0 25px 50px rgba(15,23,42,0.18)" : "0 25px 50px rgba(0,0,0,0.45)",
               }}
             >
-              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: isPosLight ? "#334155" : "var(--pos-border)" }}>
-                <div className="flex items-center gap-2">
-                  <Smartphone className="h-4 w-4" style={{ color: "#4f6ef7" }} />
-                  <h2 className="font-bold text-sm" style={{ color: "var(--pos-text)" }}>Reload / Recharge</h2>
-                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: isPosLight ? "#0f172a" : "var(--pos-muted)", border: `1px solid ${isPosLight ? "#334155" : "var(--pos-border)"}` }}>L</kbd>
+              <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--pos-border)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
+                    <Smartphone className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm leading-tight" style={{ color: "var(--pos-text)" }}>Reload / Recharge</h2>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--pos-muted)" }}>Digital top-up or physical card</p>
+                  </div>
+                  <kbd className="text-[10px] font-mono rounded-md px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)" }}>L</kbd>
                 </div>
-                <button type="button" onClick={() => { setShowReload(false); setReloadPhone(""); }} className="p-1.5 rounded-lg hover:bg-black/5">
-                  <X className="h-4 w-4" style={{ color: isPosLight ? "#334155" : "var(--pos-muted)" }} />
+                <button type="button" onClick={() => { setShowReload(false); setReloadPhone(""); }} className="p-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--pos-muted)" }}>
+                  <X className="h-4 w-4" />
                 </button>
               </div>
-              <div className="flex-1 min-h-0 overflow-y-auto">
+              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                 <PosReloadPanel
                   asModal
                   lightMode={isPosLight}
@@ -5498,6 +5495,206 @@ ${rows}
                     addItem(item);
                     setShowReload(false);
                     setReloadPhone("");
+                  }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
+        {/* REGISTER NEW CUSTOMER MODAL */}
+        <AnimatePresence>{(showNewCust || cartShowNewCust) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={closeRegisterCustomer}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-2xl border shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
+              style={{
+                background: "var(--pos-panel)",
+                borderColor: "var(--pos-border)",
+                boxShadow: isPosLight ? "0 25px 50px rgba(15,23,42,0.18)" : "0 25px 50px rgba(0,0,0,0.45)",
+              }}
+            >
+              <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--pos-border)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
+                    <User className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-sm leading-tight" style={{ color: "var(--pos-text)" }}>Register New Customer</h2>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--pos-muted)" }}>Save and add to the current bill</p>
+                  </div>
+                  <kbd className="text-[10px] font-mono rounded-md px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)" }}>N</kbd>
+                </div>
+                <button type="button" onClick={closeRegisterCustomer} className="p-2 rounded-xl transition-colors hover:bg-black/5" style={{ color: "var(--pos-muted)" }}>
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: isPosLight ? "#64748b" : "var(--pos-muted)" }}>First Name *</label>
+                    <input
+                      value={newCustFirst}
+                      onChange={(e) => setNewCustFirst(e.target.value)}
+                      placeholder="John"
+                      autoFocus
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      style={posCustomerFormStyles(isPosLight).input}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: isPosLight ? "#64748b" : "var(--pos-muted)" }}>Last Name</label>
+                    <input
+                      value={newCustLast}
+                      onChange={(e) => setNewCustLast(e.target.value)}
+                      placeholder="Doe"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      style={posCustomerFormStyles(isPosLight).input}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: isPosLight ? "#64748b" : "var(--pos-muted)" }}>Phone *</label>
+                    <input
+                      value={newCustPhone}
+                      onChange={(e) => setNewCustPhone(e.target.value)}
+                      placeholder="077 123 4567"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none font-mono transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      style={posCustomerFormStyles(isPosLight).input}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold uppercase tracking-wider block" style={{ color: isPosLight ? "#64748b" : "var(--pos-muted)" }}>Email</label>
+                    <input
+                      type="email"
+                      value={newCustEmail}
+                      onChange={(e) => setNewCustEmail(e.target.value)}
+                      placeholder="john@email.com"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      style={posCustomerFormStyles(isPosLight).input}
+                    />
+                  </div>
+                </div>
+
+                <PosNewCustomerCreditFields
+                  lightMode={isPosLight}
+                  creditLimit={newCustCreditLimit}
+                  onCreditLimitChange={setNewCustCreditLimit}
+                  payMode={newCustPayMode}
+                  onPayModeChange={setNewCustPayMode}
+                  customDays={newCustCustomDays}
+                  onCustomDaysChange={setNewCustCustomDays}
+                  salaryDate={newCustSalaryDate}
+                  onSalaryDateChange={setNewCustSalaryDate}
+                />
+              </div>
+
+              <div className="shrink-0 px-5 pb-5 pt-2" style={{ borderTop: "1px solid var(--pos-border)" }}>
+                <button
+                  type="button"
+                  onClick={() => void saveNewCustomer()}
+                  disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()}
+                  data-pos-on-accent=""
+                  className="pos-cta w-full h-12 rounded-xl text-sm font-bold transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40"
+                  style={{ background: "linear-gradient(135deg,#4f6ef7,#4338ca)", color: "#ffffff", boxShadow: "0 8px 20px rgba(79,110,247,0.25)" }}
+                >
+                  {newCustSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                  {newCustSaving ? "Saving..." : "Save & Add to Bill"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
+        {/* NEW PRODUCT MODAL */}
+        <AnimatePresence>{showQuickProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={() => setShowQuickProduct(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-2xl border shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
+              style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+            >
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+                <div className="flex items-center gap-2">
+                  <PackagePlus className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  <h2 className="text-white font-bold text-sm">New Product</h2>
+                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>Q</kbd>
+                </div>
+                <button type="button" onClick={() => setShowQuickProduct(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                  <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <PosQuickProductPanel
+                  onBack={() => setShowQuickProduct(false)}
+                  onCreated={() => {
+                    void loadProducts();
+                    setShowQuickProduct(false);
+                  }}
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}</AnimatePresence>
+
+        {/* DEMO PRODUCT MODAL */}
+        <AnimatePresence>{showDemoProduct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-4"
+            style={{ background: "rgba(0,0,0,0.7)" }}
+            onClick={() => setShowDemoProduct(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 12 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 12 }}
+              onClick={(e) => e.stopPropagation()}
+              className="rounded-2xl border shadow-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col"
+              style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+            >
+              <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4" style={{ color: "#10b981" }} />
+                  <h2 className="text-white font-bold text-sm">Demo Product</h2>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(16,185,129,0.15)", color: "#6ee7b7" }}>Bill only</span>
+                  <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>Y</kbd>
+                </div>
+                <button type="button" onClick={() => setShowDemoProduct(false)} className="p-1.5 rounded-lg hover:bg-white/10">
+                  <X className="h-4 w-4" style={{ color: "var(--pos-muted)" }} />
+                </button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-y-auto">
+                <PosDemoProductPanel
+                  onBack={() => setShowDemoProduct(false)}
+                  taxRate={taxRate}
+                  onAddToCart={(item) => {
+                    addItem(item);
+                    setShowDemoProduct(false);
                   }}
                 />
               </div>

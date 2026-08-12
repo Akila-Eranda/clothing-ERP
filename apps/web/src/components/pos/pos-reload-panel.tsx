@@ -1,18 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Loader2, Smartphone, CreditCard, Phone } from "lucide-react";
+import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { CartItem } from "@/types";
-
-const INPUT_CLS =
-  "w-full h-11 rounded-xl px-3 text-sm outline-none transition-colors placeholder:opacity-40 focus:outline-none";
-const INPUT_STYLE = {
-  background: "var(--pos-input)",
-  border: "1px solid var(--pos-border)",
-  color: "var(--pos-text)",
-} as const;
 
 type ReloadDenom = {
   id: string;
@@ -49,24 +41,7 @@ function digitsOnly(v: string) {
 }
 
 const ACCENT = "#4f6ef7";
-const ACCENT_SOFT_DARK = "rgba(79,110,247,0.18)";
-const ACCENT_SOFT_LIGHT = "rgba(79,110,247,0.12)";
-const ACCENT_BORDER = "rgba(79,110,247,0.65)";
-const FOCUS_DARK = "#38bdf8";
-const FOCUS_LIGHT = "#1d4ed8";
 const CARD_AMBER = "#d97706";
-const SUCCESS_DARK = "#10b981";
-const SUCCESS_LIGHT = "#047857";
-
-function focusRing(active: boolean, light: boolean): React.CSSProperties {
-  if (!active) return { outline: "none" };
-  return {
-    outline: "none",
-    boxShadow: light
-      ? "0 0 0 2px #1d4ed8, 0 0 0 4px rgba(29,78,216,0.2)"
-      : "0 0 0 2px rgba(56,189,248,0.85), 0 0 12px rgba(56,189,248,0.25)",
-  };
-}
 
 function chipStyle(opts: {
   selected: boolean;
@@ -75,35 +50,35 @@ function chipStyle(opts: {
   light: boolean;
 }): React.CSSProperties {
   const { selected, focused, empty, light } = opts;
-  const idleBorder = light ? "#1e293b" : "var(--pos-border)";
-  const idleBg = light ? "#334155" : "var(--pos-card)";
-  const idleText = "#ffffff";
-  const mute = light ? "rgba(255,255,255,0.55)" : "var(--pos-muted)";
+  const idleBg = light ? "#475569" : "var(--pos-elevated)";
+  const focusGlow = focused
+    ? (light
+        ? "0 0 0 2px rgba(79,110,247,0.45)"
+        : "0 0 0 2px rgba(56,189,248,0.55)")
+    : "none";
 
   if (empty) {
     return {
-      borderColor: idleBorder,
       background: idleBg,
-      color: mute,
-      opacity: 0.45,
-      ...focusRing(focused, light),
+      color: "rgba(255,255,255,0.45)",
+      opacity: 0.5,
+      border: "none",
+      boxShadow: focusGlow,
     };
   }
   if (selected) {
     return {
-      borderColor: ACCENT,
       background: ACCENT,
       color: "#ffffff",
-      ...focusRing(focused, light),
+      border: "none",
+      boxShadow: focusGlow,
     };
   }
   return {
-    borderColor: focused ? (light ? FOCUS_LIGHT : FOCUS_DARK) : idleBorder,
-    background: focused
-      ? (light ? "#1e40af" : "rgba(56,189,248,0.12)")
-      : idleBg,
-    color: idleText,
-    ...focusRing(focused, light),
+    background: idleBg,
+    color: "#ffffff",
+    border: "none",
+    boxShadow: focusGlow,
   };
 }
 
@@ -228,7 +203,6 @@ export function PosReloadPanel({
     return () => clearTimeout(t);
   }, [focusZone, loading, mode]);
 
-  // Start on provider row when panel opens
   React.useEffect(() => {
     if (loading) return;
     setFocusZone("provider");
@@ -329,7 +303,6 @@ export function PosReloadPanel({
     const inPhone = focusZone === "phone" && document.activeElement === phoneRef.current;
     const inAmount = focusZone === "amount" && document.activeElement === amountRef.current;
 
-    // Inside text fields: ←→ move caret; ↑↓ leave field
     if (inPhone || inAmount) {
       const el = (inPhone ? phoneRef.current : amountRef.current)!;
       const start = el.selectionStart ?? 0;
@@ -366,7 +339,7 @@ export function PosReloadPanel({
         else submit();
         return;
       }
-      return; // let normal typing / caret move
+      return;
     }
 
     if (key === "ArrowUp") {
@@ -403,7 +376,6 @@ export function PosReloadPanel({
         return;
       }
       if (focusZone === "cards" && denoms.length) {
-        // skip empty stock when possible
         let next = cardIdx + dir;
         while (next >= 0 && next < denoms.length && denoms[next]!.availableCards < 1) {
           next += dir;
@@ -414,7 +386,6 @@ export function PosReloadPanel({
         }
         return;
       }
-      // phone / amount / submit: left/right = zone hop
       moveZone(dir);
       return;
     }
@@ -432,12 +403,7 @@ export function PosReloadPanel({
         setFocusZone("submit");
         return;
       }
-      if (focusZone === "mode") {
-        // already selected via arrows
-        moveZone(1);
-        return;
-      }
-      if (focusZone === "provider") {
+      if (focusZone === "mode" || focusZone === "provider") {
         moveZone(1);
         return;
       }
@@ -449,19 +415,22 @@ export function PosReloadPanel({
     focusZone, moveZone, operators, operatorIdx, denoms, chipIdx, cardIdx, submit,
   ]);
 
-  const labelColor = lightMode ? "#334155" : "var(--pos-muted)";
-  const hintColor = lightMode ? "#475569" : "var(--pos-muted-2)";
+  const labelColor = lightMode ? "#64748b" : "var(--pos-muted)";
+  const hintColor = lightMode ? "#94a3b8" : "var(--pos-muted-2)";
   const textColor = lightMode ? "#0f172a" : "var(--pos-text)";
-  const borderIdle = lightMode ? "#334155" : "var(--pos-border)";
-  const focusColor = lightMode ? FOCUS_LIGHT : FOCUS_DARK;
-  const accentSoft = lightMode ? ACCENT_SOFT_LIGHT : ACCENT_SOFT_DARK;
-  const successColor = lightMode ? SUCCESS_LIGHT : SUCCESS_DARK;
-  const inputBg = lightMode ? "#f8fafc" : "var(--pos-input)";
-  const panelBg = lightMode ? "#ffffff" : "var(--pos-panel)";
+  const successColor = lightMode ? "#047857" : "#10b981";
+  const inputBg = "var(--pos-input)";
+
+  const fieldStyle = (zone: FocusZone): React.CSSProperties => ({
+    background: inputBg,
+    border: `1px solid ${focusZone === zone ? ACCENT : "var(--pos-border)"}`,
+    color: textColor,
+    boxShadow: focusZone === zone ? "0 0 0 3px rgba(79,110,247,0.18)" : "none",
+  });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center gap-2 p-10" style={{ color: labelColor }}>
+      <div className="flex items-center justify-center gap-2 p-12" style={{ color: labelColor }}>
         <Loader2 className="h-5 w-5 animate-spin" /> Loading providers…
       </div>
     );
@@ -472,12 +441,14 @@ export function PosReloadPanel({
       ref={rootRef}
       tabIndex={-1}
       onKeyDown={onPanelKeyDown}
-      className={asModal ? "flex flex-col outline-none" : "flex h-full flex-col gap-3 overflow-hidden p-4 outline-none"}
+      className={asModal ? "flex flex-col outline-none min-h-0" : "flex h-full flex-col overflow-hidden outline-none"}
     >
       {!asModal && (
-        <div className="flex shrink-0 items-center justify-between">
+        <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
-            <Smartphone className="h-4 w-4" style={{ color: ACCENT }} />
+            <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
+              <Smartphone className="h-4 w-4" style={{ color: ACCENT }} />
+            </div>
             <h2 className="text-base font-bold" style={{ color: textColor }}>Reload / Recharge</h2>
           </div>
           <button
@@ -491,17 +462,13 @@ export function PosReloadPanel({
         </div>
       )}
 
-      <div className="space-y-3 overflow-y-auto p-4">
-        <p className="text-[10px] font-semibold" style={{ color: focusColor }}>
-          ← → move · ↑ ↓ sections · Enter select / add
-        </p>
-
-        {/* Provider chips */}
-        <div>
-          <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: labelColor }}>
+      <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
+        {/* Provider */}
+        <section className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
             Provider
           </p>
-          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          <div className="flex flex-wrap gap-2">
             {operators.map((op, idx) => {
               const active = op.id === operatorId;
               const kb = focusZone === "provider" && idx === operatorIdx;
@@ -514,7 +481,7 @@ export function PosReloadPanel({
                     setOperatorId(op.id);
                     setFocusZone("provider");
                   }}
-                  className="h-9 rounded-lg px-2.5 text-xs font-bold truncate transition-all hover:opacity-90"
+                  className="h-10 min-w-[4.5rem] flex-1 rounded-xl px-3 text-sm font-bold truncate transition-all hover:opacity-90"
                   style={chipStyle({ selected: active, focused: kb, light: lightMode })}
                 >
                   {op.name}
@@ -523,87 +490,76 @@ export function PosReloadPanel({
             })}
           </div>
           {!operators.length && (
-            <p className="mt-2 text-xs font-medium" style={{ color: CARD_AMBER }}>
+            <p className="text-xs font-medium" style={{ color: CARD_AMBER }}>
               No providers — add them in Settings → Reload.
             </p>
           )}
-        </div>
+        </section>
 
-        {/* Mode toggle */}
-        <div
-          className="grid grid-cols-2 gap-1.5 p-1 rounded-xl"
-          style={{
-            background: inputBg,
-            border: `1px solid ${focusZone === "mode" ? focusColor : borderIdle}`,
-            ...focusRing(focusZone === "mode", lightMode),
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => { setMode("DIGITAL"); setFocusZone("mode"); }}
-            className="flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all"
-            style={{
-              background: mode === "DIGITAL" ? ACCENT : (lightMode ? "#334155" : "transparent"),
-              color: "#fff",
-            }}
-          >
-            <Smartphone className="h-3.5 w-3.5" /> Digital
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode("PHYSICAL"); setFocusZone("mode"); }}
-            className="flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all"
-            style={{
-              background: mode === "PHYSICAL" ? CARD_AMBER : (lightMode ? "#334155" : "transparent"),
-              color: "#fff",
-            }}
-          >
-            <CreditCard className="h-3.5 w-3.5" /> Card
-          </button>
-        </div>
-
-        {mode === "DIGITAL" ? (
-          <div className="space-y-3">
-            <div
-              className="rounded-xl border p-3 space-y-2"
+        {/* Mode */}
+        <section className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
+            Type
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { setMode("DIGITAL"); setFocusZone("mode"); }}
+              className="flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold transition-all"
               style={{
-                background: accentSoft,
-                borderColor: focusZone === "phone" ? focusColor : (lightMode ? "#1e3a8a" : ACCENT_BORDER),
-                ...focusRing(focusZone === "phone", lightMode),
+                background: mode === "DIGITAL" ? ACCENT : (lightMode ? "#475569" : "var(--pos-elevated)"),
+                color: "#ffffff",
+                boxShadow: focusZone === "mode" && mode === "DIGITAL" ? "0 0 0 2px rgba(79,110,247,0.45)" : "none",
               }}
             >
-              <label className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide" style={{ color: labelColor }}>
-                <Phone className="h-3 w-3" style={{ color: ACCENT }} />
-                Customer phone <span className="font-normal normal-case tracking-normal opacity-70">(optional)</span>
+              <Smartphone className="h-4 w-4" /> Digital
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode("PHYSICAL"); setFocusZone("mode"); }}
+              className="flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold transition-all"
+              style={{
+                background: mode === "PHYSICAL" ? CARD_AMBER : (lightMode ? "#475569" : "var(--pos-elevated)"),
+                color: "#ffffff",
+                boxShadow: focusZone === "mode" && mode === "PHYSICAL" ? "0 0 0 2px rgba(217,119,6,0.45)" : "none",
+              }}
+            >
+              <CreditCard className="h-4 w-4" /> Card
+            </button>
+          </div>
+        </section>
+
+        {mode === "DIGITAL" ? (
+          <>
+            {/* Phone — no boxed frame */}
+            <section className="space-y-2">
+              <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
+                <Phone className="h-3.5 w-3.5" style={{ color: ACCENT }} />
+                Customer phone
+                <span className="font-normal normal-case tracking-normal opacity-70">(optional)</span>
               </label>
               <input
                 ref={phoneRef}
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 onFocus={() => setFocusZone("phone")}
-                placeholder="0771234567"
+                placeholder="077 123 4567"
                 inputMode="numeric"
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                className={`${INPUT_CLS} font-mono text-lg tracking-wider tabular-nums`}
-                style={{
-                  background: panelBg,
-                  border: `1px solid ${focusZone === "phone" ? focusColor : (lightMode ? "#1e40af" : ACCENT_BORDER)}`,
-                  color: textColor,
-                }}
+                className="w-full h-12 rounded-xl px-4 text-base font-mono tracking-wider tabular-nums outline-none transition-shadow placeholder:opacity-40"
+                style={fieldStyle("phone")}
               />
-              <p className="text-[10px]" style={{ color: hintColor }}>
-                Cashier or customer display · ↑↓ to move
-              </p>
-            </div>
+            </section>
 
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: labelColor }}>
+            {/* Amount */}
+            <section className="space-y-2">
+              <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
                 Amount (LKR)
               </label>
               {denoms.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                <div className="flex flex-wrap gap-2">
                   {denoms.map((d, idx) => {
                     const active = amount === String(d.faceValue);
                     const kb = focusZone === "chips" && idx === chipIdx;
@@ -616,7 +572,7 @@ export function PosReloadPanel({
                           setAmount(String(d.faceValue));
                           setFocusZone("chips");
                         }}
-                        className="h-9 min-w-[3.25rem] rounded-lg px-2.5 text-xs font-bold tabular-nums transition-all"
+                        className="h-10 min-w-[3.5rem] rounded-xl px-3 text-sm font-bold tabular-nums transition-all hover:opacity-90"
                         style={chipStyle({ selected: active, focused: kb, light: lightMode })}
                       >
                         {d.faceValue}
@@ -632,22 +588,17 @@ export function PosReloadPanel({
                 onFocus={() => setFocusZone("amount")}
                 placeholder="0.00"
                 inputMode="decimal"
-                className={`${INPUT_CLS} font-mono text-base tabular-nums`}
-                style={{
-                  background: inputBg,
-                  border: `1px solid ${focusZone === "amount" ? focusColor : borderIdle}`,
-                  color: textColor,
-                  ...focusRing(focusZone === "amount", lightMode),
-                }}
+                className="w-full h-12 rounded-xl px-4 text-lg font-semibold font-mono tabular-nums outline-none transition-shadow placeholder:opacity-40"
+                style={fieldStyle("amount")}
               />
-            </div>
-          </div>
+            </section>
+          </>
         ) : (
-          <div className="space-y-2">
-            <label className="text-[10px] font-bold uppercase tracking-wide" style={{ color: labelColor }}>
+          <section className="space-y-2">
+            <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
               Card denomination
             </label>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {denoms.map((d, idx) => {
                 const active = d.id === denominationId;
                 const empty = d.availableCards < 1;
@@ -663,7 +614,7 @@ export function PosReloadPanel({
                       setDenominationId(d.id);
                       setFocusZone("cards");
                     }}
-                    className="h-10 rounded-lg border px-3 text-sm font-bold tabular-nums text-left disabled:opacity-40 transition-all"
+                    className="h-11 rounded-xl px-3 text-sm font-bold tabular-nums transition-all disabled:opacity-40 hover:opacity-90"
                     style={chipStyle({ selected: active, focused: kb, empty, light: lightMode })}
                   >
                     LKR {formatMoney(d.faceValue)}
@@ -677,32 +628,34 @@ export function PosReloadPanel({
                 No physical cards — import PINs in Settings → Reload.
               </p>
             )}
-          </div>
+          </section>
         )}
 
         {commission && (
           <div
-            className="rounded-xl border px-3 py-2 text-xs"
-            style={{
-              borderColor: lightMode ? "#059669" : "rgba(16,185,129,0.45)",
-              background: lightMode ? "rgba(16,185,129,0.1)" : "rgba(16,185,129,0.12)",
-            }}
+            className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+            style={{ background: lightMode ? "rgba(16,185,129,0.08)" : "rgba(16,185,129,0.12)" }}
           >
-            <div className="flex justify-between gap-2">
-              <span style={{ color: labelColor }}>Customer pays</span>
-              <span className="font-bold tabular-nums" style={{ color: textColor }}>
+            <div>
+              <p className="text-[11px] font-medium" style={{ color: labelColor }}>Customer pays</p>
+              <p className="text-base font-bold tabular-nums" style={{ color: textColor }}>
                 LKR {formatMoney(face)}
-              </span>
+              </p>
             </div>
-            <div className="mt-1 flex justify-between gap-2">
-              <span style={{ color: labelColor }}>Commission ({commission.pct}%)</span>
-              <span className="font-bold tabular-nums" style={{ color: successColor }}>
-                LKR {formatMoney(commission.earned)}
-              </span>
+            <div className="text-right">
+              <p className="text-[11px] font-medium" style={{ color: labelColor }}>Commission {commission.pct}%</p>
+              <p className="text-base font-bold tabular-nums" style={{ color: successColor }}>
+                +LKR {formatMoney(commission.earned)}
+              </p>
             </div>
           </div>
         )}
+      </div>
 
+      <div
+        className="shrink-0 px-5 pb-5 pt-2 space-y-2"
+        style={{ borderTop: "1px solid var(--pos-border)", background: "var(--pos-panel)" }}
+      >
         <button
           ref={submitRef}
           type="button"
@@ -710,17 +663,22 @@ export function PosReloadPanel({
           onFocus={() => setFocusZone("submit")}
           disabled={!operator || !(face > 0)}
           data-pos-on-accent=""
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white disabled:opacity-40 transition-opacity hover:opacity-90"
+          className="pos-cta flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-all hover:opacity-90"
           style={{
-            background: focusZone === "submit"
-              ? (lightMode ? "linear-gradient(135deg,#1d4ed8,#4f6ef7)" : "linear-gradient(135deg,#38bdf8,#4f6ef7)")
-              : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+            background: "linear-gradient(135deg,#4f6ef7,#4338ca)",
             color: "#ffffff",
-            ...focusRing(focusZone === "submit", lightMode),
+            boxShadow: focusZone === "submit" ? "0 0 0 3px rgba(79,110,247,0.28)" : "0 8px 20px rgba(79,110,247,0.25)",
           }}
         >
+          <ShoppingCart className="h-4 w-4" />
           Add to Cart
+          {face > 0 && (
+            <span className="opacity-90 font-mono tabular-nums">· LKR {formatMoney(face)}</span>
+          )}
         </button>
+        <p className="text-center text-[10px]" style={{ color: hintColor }}>
+          ← → move · ↑ ↓ sections · Enter add
+        </p>
       </div>
     </div>
   );
