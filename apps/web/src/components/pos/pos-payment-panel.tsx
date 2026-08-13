@@ -206,6 +206,14 @@ export function PosPaymentPanel({
               <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(onCreditAmt)}</span>
             </div>
           )}
+          {paidTotal > totalAmt + 0.01 && (
+            <div className="flex justify-between text-xs pt-1">
+              <span style={{ color: "var(--pos-muted)" }}>Change to give</span>
+              <span className="font-bold tabular-nums" style={{ color: "var(--pos-success-soft)" }}>
+                LKR {formatNumber(paidTotal - totalAmt)}
+              </span>
+            </div>
+          )}
           {onCreditAmt > 0.01 && creditAvailable !== undefined && onCreditAmt > creditAvailable + 0.01 && (
             <p className="text-[10px] text-red-400">Exceeds credit available (LKR {formatNumber(creditAvailable)})</p>
           )}
@@ -351,12 +359,14 @@ export function buildCheckoutPayments(
       })
       .filter((p) => p.amount > 0);
   }
+  // Prefer whichever cash/credit tender field has a value (numpad + partial can briefly desync).
+  const cashTenderRaw = (
+    (activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT")
+      ? (numpad?.trim() || partialPayAmount?.trim() || "")
+      : (partialPayAmount?.trim() || "")
+  );
   if (state.allowPartial) {
-    const raw = (
-      partialPayAmount?.trim()
-      || ((activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") ? numpad : "")
-    ).trim();
-    const payNow = parseFloat(raw);
+    const payNow = parseFloat(cashTenderRaw);
     if (!Number.isNaN(payNow) && payNow > 0 && payNow + 0.01 < totalAmt) {
       const method = activePayment;
       if (method === "CHEQUE") {
@@ -371,9 +381,13 @@ export function buildCheckoutPayments(
       return [{ method, amount: payNow }];
     }
   }
+  // Full / overpay: for cash, amount must be tendered (so API can compute changeDue).
+  const parsedTender = cashTenderRaw ? parseFloat(cashTenderRaw) : NaN;
   const cashAmt =
-    (activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT") && numpad
-      ? parseFloat(numpad)
+    (activePayment === "CASH" || activePayment === "CUSTOMER_CREDIT")
+      && Number.isFinite(parsedTender)
+      && parsedTender > 0
+      ? parsedTender
       : totalAmt;
   const amount = cashAmt || totalAmt;
   if (activePayment === "CHEQUE") {

@@ -1176,10 +1176,12 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     if (!cartCustomerOpen) return;
     const onDoc = (e: MouseEvent) => {
       const el = cartCustomerDropdownRef.current;
-      if (el && !el.contains(e.target as Node)) {
+      const target = e.target as Node;
+      // Register modal is portaled outside the dropdown — ignore clicks there
+      if ((target as Element)?.closest?.("[data-pos-register-customer-modal]")) return;
+      if (el && !el.contains(target)) {
         setCartCustomerOpen(false);
         setCustomerSearch("");
-        setCartShowNewCust(false);
         setCustomers([]);
       }
     };
@@ -1647,7 +1649,16 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     requestAnimationFrame(() => searchRef.current?.focus());
   }, [search, products, productCards, focusedProductIdx, scanAndAddProduct, handleCardClick, confirmQtyPopup, commitAddProduct]);
 
-  const handleNumpad = React.useCallback((k:string)=>{ if(k==="DEL"){setNumpad(p=>p.slice(0,-1));return;} if(k==="."&&numpad.includes("."))return; setNumpad(p=>p+k); },[numpad]);
+  const handleNumpad = React.useCallback((k: string) => {
+    setNumpad((prev) => {
+      let next = prev;
+      if (k === "DEL") next = prev.slice(0, -1);
+      else if (k === "." && prev.includes(".")) next = prev;
+      else next = prev + k;
+      setPartialPayAmount(next);
+      return next;
+    });
+  }, []);
 
   const handlePinEntry = React.useCallback(async (digit: string) => {
     if (pinBusy) return;
@@ -1935,7 +1946,18 @@ ${receiptSoftwareCreditHtml()}
     }
     const payMethod = forceMethod ?? activePayment;
     if (forceMethod) setActivePayment(forceMethod);
-    const tenderPad = forceMethod === "CASH" ? "" : numpad;
+    const tenderPad = numpad;
+    // Cash: Cash Received must be typed — never auto-assume exact total
+    if (payMethod === "CASH" && !payState.splitMode) {
+      const raw = numpad.trim();
+      const tendered = parseFloat(raw);
+      if (!raw || !Number.isFinite(tendered) || tendered <= 0) {
+        toast.error("Enter cash received amount");
+        setActivePayment("CASH");
+        setCheckoutOpen(true);
+        return;
+      }
+    }
     const payments = buildCheckoutPayments(payState, payMethod, tenderPad, totalAmt, chequeNumber, partialPayAmount, cardLast3, payBankAccountId);
     if (payMethod === "WALLET" && !payState.splitMode) {
       if (!customer) { toast.error("Select a customer for wallet payment"); return; }
@@ -2103,8 +2125,25 @@ ${receiptSoftwareCreditHtml()}
         ...(helperEmployeeId ? { helperEmployeeId } : {}),
         ...(activeHeldBillId?{heldBillId:activeHeldBillId}:{}),
       };
-      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;paymentStatus?:string}>("/pos/sale",payload);
+      const res=await api.post<{invoiceNumber:string;total:number;changeDue:number;amountPaid?:number;paymentStatus?:string}>("/pos/sale",payload);
       const s=res.data;
+      const saleTotal = Number(s.total) || totalAmt;
+      const cashTendered =
+        payMethod === "CASH" && tenderPad.trim()
+          ? parseFloat(tenderPad)
+          : payMethod === "CASH"
+            ? (payments.find((p) => p.method === "CASH")?.amount ?? 0)
+            : undefined;
+      const apiChange = Number(s.changeDue);
+      const localChange =
+        payMethod === "CASH" && cashTendered != null && Number.isFinite(cashTendered)
+          ? Math.max(0, cashTendered - saleTotal)
+          : 0;
+      // Prefer the larger of API vs local — Partial-pay overpay can otherwise report changeDue=0.
+      const resolvedChangeDue = Math.max(
+        Number.isFinite(apiChange) ? apiChange : 0,
+        localChange,
+      );
       const saleSnapshot = {
         items: [...items],
         subtotal: subtotal(),
@@ -2112,21 +2151,22 @@ ${receiptSoftwareCreditHtml()}
         tax: taxAmount(),
         customerName: customer?.name,
         paymentMethod: payments.map((p) => p.method).join(" + "),
-        cashTendered: payMethod === "CASH" && tenderPad ? parseFloat(tenderPad) : undefined,
+        cashTendered: cashTendered != null && Number.isFinite(cashTendered) ? cashTendered : undefined,
         savings: items.reduce((sum, i) => {
           const lineDisc = calcPosLineDiscount(i);
           const mrpExtra = i.mrp && i.mrp > i.unitPrice ? (i.mrp - i.unitPrice) * i.quantity : 0;
           return sum + lineDisc + mrpExtra;
         }, 0) + discountAmount() + payState.couponDiscount + tierDiscountAmt + loyaltyDiscountAmt,
       };
-      setTodayStats(prev=>({sales:prev.sales+s.total,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
+      setTodayStats(prev=>({sales:prev.sales+saleTotal,orders:prev.orders+1,items:prev.items+items.reduce((a,i)=>a+i.quantity,0)}));
       setThankYouSale({
         invoiceNumber: s.invoiceNumber,
-        total: s.total,
-        changeDue: s.changeDue ?? 0,
+        total: saleTotal,
+        changeDue: resolvedChangeDue,
         paymentMethod: saleSnapshot.paymentMethod,
         items: saleSnapshot.items,
         customerName: saleSnapshot.customerName,
+        cashTendered: saleSnapshot.cashTendered,
         manualDiscount: discount,
         manualDiscountType: discountType,
         couponDiscount: payState.couponDiscount,
@@ -2180,8 +2220,8 @@ ${receiptSoftwareCreditHtml()}
       {
         const receipt: SaleReceipt = {
           invoiceNumber: s.invoiceNumber,
-          total: s.total,
-          changeDue: s.changeDue ?? 0,
+          total: saleTotal,
+          changeDue: resolvedChangeDue,
           paymentMethod: saleSnapshot.paymentMethod,
           customerName: saleSnapshot.customerName,
           items: saleSnapshot.items.map((i) => cartLineToReceiptItem(i)),
@@ -2206,7 +2246,8 @@ ${receiptSoftwareCreditHtml()}
       void loadTodayStats();
       void refreshPrinterStatus();
       const partialNote = s.paymentStatus === "PENDING" ? " (partial — balance on account)" : "";
-      toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${s.total.toLocaleString()}${partialNote}`,{duration:3500});
+      const changeNote = resolvedChangeDue > 0.009 ? ` · Change LKR ${formatNumber(resolvedChangeDue)}` : "";
+      toast.success(`Sale complete · ${s.invoiceNumber} — ${payState.currency} ${saleTotal.toLocaleString()}${partialNote}${changeNote}`,{duration:3500});
     } catch(e:unknown){
       const msg=(e as Error).message??"Checkout failed";
       toast.error(msg);
@@ -2393,9 +2434,11 @@ ${rows}
     resetNewCustomerForm();
     const phone = (prefillPhone ?? "").trim();
     if (phone && /^\d[\d\s+()-]*$/.test(phone)) setNewCustPhone(phone.replace(/\s+/g, ""));
-    if (cartCustomerOpen) setCartShowNewCust(true);
-    else setShowNewCust(true);
-  }, [resetNewCustomerForm, cartCustomerOpen]);
+    // Always use the global modal flag — cart dropdown outside-click must not kill it
+    setCartShowNewCust(false);
+    setCartCustomerOpen(false);
+    setShowNewCust(true);
+  }, [resetNewCustomerForm]);
 
   const resolveNewCustomerCreditDays = React.useCallback((): number | null => {
     if (newCustPayMode === "7") return 7;
@@ -4981,14 +5024,19 @@ ${rows}
                         setNumpad(clean);
                         if (activePayment === "CASH" && payState.allowPartial) setPartialPayAmount(clean);
                       }}
-                      placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "0.00"}
+                      placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "Type amount…"}
                       className="h-12 rounded-xl px-3 mb-2 font-bold text-2xl font-mono outline-none w-full"
                       style={{
                         background: activePayment === "CUSTOMER_CREDIT" ? "rgba(79,110,247,0.1)" : "rgba(16,185,129,0.1)",
                         color: activePayment === "CUSTOMER_CREDIT" ? "var(--pos-accent-soft)" : "var(--pos-success-soft)",
-                        border: "none",
+                        border: activePayment === "CASH" && !(parseFloat(numpad) > 0) ? "1px solid rgba(239,68,68,0.55)" : "none",
                       }}
                     />
+                    {activePayment === "CASH" && !(parseFloat(numpad) > 0) && (
+                      <p className="text-[10px] mb-2 px-1 font-semibold" style={{ color: "#f87171" }}>
+                        Enter cash received before confirming
+                      </p>
+                    )}
                     {activePayment === "CUSTOMER_CREDIT" && !numpad && (
                       <p className="text-[10px] mb-2 px-1" style={{ color: "var(--pos-muted)" }}>
                         Empty = full bill LKR {formatNumber(totalAmt)} on credit
@@ -5044,7 +5092,7 @@ ${rows}
                     type="button"
                     data-pos-accent=""
                     onClick={() => void handleCheckout()}
-                    disabled={checkoutLoading||items.length===0}
+                    disabled={checkoutLoading||items.length===0||(activePayment==="CASH"&&!payState.splitMode&&!(parseFloat(numpad)>0))}
                     className="pos-cta flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold transition-all hover:opacity-90 disabled:opacity-40"
                     style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
                   >
@@ -5109,11 +5157,21 @@ ${rows}
                 }}>
                   LKR {formatNumber(thankYouSale.changeDue)}
                 </p>
-                <div className="mt-5 flex items-center justify-center gap-2 text-sm" style={{ color: "var(--pos-text-soft)" }}>
-                  <span>Sale total</span>
-                  <span className="font-bold tabular-nums" style={{ color: "var(--pos-text)" }}>
-                    LKR {formatNumber(thankYouSale.total)}
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm" style={{ color: "var(--pos-text-soft)" }}>
+                  <span>
+                    Sale{" "}
+                    <span className="font-bold tabular-nums" style={{ color: "var(--pos-text)" }}>
+                      LKR {formatNumber(thankYouSale.total)}
+                    </span>
                   </span>
+                  {thankYouSale.cashTendered != null && thankYouSale.cashTendered > 0 && (
+                    <span>
+                      Cash{" "}
+                      <span className="font-bold tabular-nums" style={{ color: "var(--pos-text)" }}>
+                        LKR {formatNumber(thankYouSale.cashTendered)}
+                      </span>
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -5510,6 +5568,7 @@ ${rows}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[120] flex items-center justify-center p-4"
             style={{ background: "rgba(0,0,0,0.7)" }}
+            data-pos-register-customer-modal=""
             onClick={closeRegisterCustomer}
           >
             <motion.div

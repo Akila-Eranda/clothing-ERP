@@ -16,6 +16,7 @@ interface ThankYouSale {
   paymentMethod: string;
   items: CartItem[];
   customerName?: string;
+  cashTendered?: number;
   /** Snapshot so discount still shows after cart is cleared. */
   manualDiscount?: number;
   manualDiscountType?: "percentage" | "fixed";
@@ -148,9 +149,7 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
       lastAddedVariantId,
       invoiceNumber: thankYouSale?.invoiceNumber,
       changeDue: thankYouSale?.changeDue ?? checkoutChangeDue,
-      cashTendered: thankYouSale
-        ? undefined
-        : checkoutCashTendered,
+      cashTendered: thankYouSale?.cashTendered ?? checkoutCashTendered,
       paymentMethod: thankYouSale?.paymentMethod ?? checkoutPaymentMethod,
       saleTotal: thankYouSale?.total,
       reloadPhone: reloadOpen ? reloadPhone : undefined,
@@ -158,9 +157,8 @@ export function usePosCustomerDisplayPublisher(input: PublisherInput) {
 
     if (thankYouSale) {
       state.customerName = thankYouSale.customerName ?? state.customerName;
-      if (thankYouSale.changeDue > 0) {
-        state.changeDue = thankYouSale.changeDue;
-      }
+      state.changeDue = thankYouSale.changeDue ?? 0;
+      if (thankYouSale.cashTendered != null) state.cashTendered = thankYouSale.cashTendered;
     }
 
     publishCustomerDisplayState(state);
