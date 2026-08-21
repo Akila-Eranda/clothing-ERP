@@ -4625,15 +4625,15 @@ ${rows}
                 </div>
             {checkoutOpen && (
               <div className="fixed inset-0 z-[115] flex items-center justify-center p-2 sm:p-4" style={{background:"rgba(0,0,0,0.72)"}} onClick={() => !checkoutLoading && setCheckoutOpen(false)}>
-              <div className="w-full max-w-5xl max-h-[96vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col" style={{background:"var(--pos-panel)", boxShadow: "0 25px 50px rgba(0,0,0,0.35)"}} onClick={e=>e.stopPropagation()}>
+              <div className="pos-checkout w-full max-w-5xl max-h-[96vh] overflow-hidden rounded-2xl shadow-2xl flex flex-col" style={{background:"var(--pos-panel)", boxShadow: "0 25px 50px rgba(0,0,0,0.35)"}} onClick={e=>e.stopPropagation()}>
                 <div className="flex items-center justify-between px-4 py-3 shrink-0">
                   <div className="min-w-0">
-                    <h2 className="text-white font-bold text-base">Checkout</h2>
-                    <p className="text-xs" style={{color:"var(--pos-muted)"}}>{itemCount()} items · Tax {taxEnabled ? `${taxRate}%` : "off"}</p>
+                    <h2 className="pos-checkout-title font-bold text-base" style={{ color: "var(--pos-text)" }}>Checkout</h2>
+                    <p className="text-xs font-semibold" style={{color:"var(--pos-text-soft)"}}>{itemCount()} items · Tax {taxEnabled ? `${taxRate}%` : "off"}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">
-                      <p className="text-[10px] uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Pay</p>
+                      <p className="text-[10px] uppercase tracking-wide font-bold" style={{color:"var(--pos-text-soft)"}}>Pay</p>
                       <p className="text-lg font-bold tabular-nums leading-none" style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</p>
                     </div>
                     <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
@@ -4645,7 +4645,7 @@ ${rows}
                 {/* Left: bill + options */}
                 <div className="lg:w-[42%] lg:max-w-md lg:overflow-y-auto shrink-0 flex flex-col lg:pr-1" style={{ background: isPosLight ? "var(--pos-elevated)" : "transparent" }}>
                 <div className="px-4 py-2.5 space-y-1">
-                  <div className="flex justify-between text-sm" style={{color:"var(--pos-muted)"}}><span>Items</span><span>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
+                  <div className="flex justify-between text-sm" style={{color:"var(--pos-text-soft)"}}><span>Items</span><span style={{ color: "var(--pos-text)" }}>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
                   {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>−LKR {formatNumber(itemDiscountTotal)}</span></div>}
                   {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>−LKR {formatNumber(cartDiscountAmt)}</span></div>}
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}

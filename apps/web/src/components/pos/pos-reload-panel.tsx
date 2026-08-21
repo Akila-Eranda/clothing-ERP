@@ -23,7 +23,7 @@ export type ReloadOperator = {
   denominations: ReloadDenom[];
 };
 
-type FocusZone = "provider" | "mode" | "phone" | "chips" | "amount" | "cards" | "submit";
+type FocusZone = "provider" | "mode" | "phone" | "amount" | "cards" | "submit";
 
 function formatMoney(n: number) {
   return n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -110,7 +110,6 @@ export function PosReloadPanel({
   const [amount, setAmount] = React.useState("");
   const [denominationId, setDenominationId] = React.useState("");
   const [focusZone, setFocusZone] = React.useState<FocusZone>("provider");
-  const [chipIdx, setChipIdx] = React.useState(0);
   const [cardIdx, setCardIdx] = React.useState(0);
 
   const rootRef = React.useRef<HTMLDivElement>(null);
@@ -161,9 +160,7 @@ export function PosReloadPanel({
 
   const zones = React.useMemo((): FocusZone[] => {
     if (mode === "DIGITAL") {
-      return denoms.length > 0
-        ? ["provider", "mode", "phone", "chips", "amount", "submit"]
-        : ["provider", "mode", "phone", "amount", "submit"];
+      return ["provider", "mode", "phone", "amount", "submit"];
     }
     return denoms.length > 0
       ? ["provider", "mode", "cards", "submit"]
@@ -335,7 +332,7 @@ export function PosReloadPanel({
       if (key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        if (inPhone) setFocusZone(denoms.length ? "chips" : "amount");
+        if (inPhone) setFocusZone("amount");
         else submit();
         return;
       }
@@ -369,12 +366,6 @@ export function PosReloadPanel({
         setMode(dir > 0 ? "PHYSICAL" : "DIGITAL");
         return;
       }
-      if (focusZone === "chips" && denoms.length) {
-        const next = Math.max(0, Math.min(denoms.length - 1, chipIdx + dir));
-        setChipIdx(next);
-        setAmount(String(denoms[next]!.faceValue));
-        return;
-      }
       if (focusZone === "cards" && denoms.length) {
         let next = cardIdx + dir;
         while (next >= 0 && next < denoms.length && denoms[next]!.availableCards < 1) {
@@ -393,11 +384,6 @@ export function PosReloadPanel({
     if (key === "Enter" || key === " ") {
       e.preventDefault();
       e.stopPropagation();
-      if (focusZone === "chips" && denoms[chipIdx]) {
-        setAmount(String(denoms[chipIdx]!.faceValue));
-        setFocusZone("amount");
-        return;
-      }
       if (focusZone === "cards" && denoms[cardIdx] && denoms[cardIdx]!.availableCards > 0) {
         setDenominationId(denoms[cardIdx]!.id);
         setFocusZone("submit");
@@ -412,7 +398,7 @@ export function PosReloadPanel({
       }
     }
   }, [
-    focusZone, moveZone, operators, operatorIdx, denoms, chipIdx, cardIdx, submit,
+    focusZone, moveZone, operators, operatorIdx, denoms, cardIdx, submit,
   ]);
 
   const labelColor = lightMode ? "#64748b" : "var(--pos-muted)";
@@ -553,34 +539,11 @@ export function PosReloadPanel({
               />
             </section>
 
-            {/* Amount */}
+            {/* Amount — type freely; no preset denomination chips */}
             <section className="space-y-2">
               <label className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: labelColor }}>
                 Amount (LKR)
               </label>
-              {denoms.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {denoms.map((d, idx) => {
-                    const active = amount === String(d.faceValue);
-                    const kb = focusZone === "chips" && idx === chipIdx;
-                    return (
-                      <button
-                        key={d.id}
-                        type="button"
-                        onClick={() => {
-                          setChipIdx(idx);
-                          setAmount(String(d.faceValue));
-                          setFocusZone("chips");
-                        }}
-                        className="h-10 min-w-[3.5rem] rounded-xl px-3 text-sm font-bold tabular-nums transition-all hover:opacity-90"
-                        style={chipStyle({ selected: active, focused: kb, light: lightMode })}
-                      >
-                        {d.faceValue}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
               <input
                 ref={amountRef}
                 value={amount}

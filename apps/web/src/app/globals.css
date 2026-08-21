@@ -900,10 +900,51 @@
 /* ── POS terminal Light / Dark shell ── */
 .pos-shell {
   color: var(--pos-text);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 .pos-shell .pos-input::placeholder {
   color: var(--pos-muted);
   opacity: 0.75;
+}
+
+/* Checkout modal — larger, higher-contrast type for cashiers */
+.pos-shell .pos-checkout {
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: var(--pos-text);
+}
+.pos-shell .pos-checkout h2,
+.pos-shell .pos-checkout .pos-checkout-title {
+  font-size: 1.2rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--pos-text) !important;
+}
+.pos-shell .pos-checkout label,
+.pos-shell .pos-checkout .text-\[10px\],
+.pos-shell .pos-checkout .text-\[11px\],
+.pos-shell .pos-checkout .text-xs {
+  font-size: 0.8125rem !important;
+  font-weight: 600;
+  color: var(--pos-text-soft);
+}
+.pos-shell .pos-checkout .text-sm {
+  font-size: 0.9375rem !important;
+  font-weight: 600;
+}
+.pos-shell .pos-checkout input,
+.pos-shell .pos-checkout select,
+.pos-shell .pos-checkout textarea {
+  font-size: 1rem !important;
+  font-weight: 600;
+  color: var(--pos-text) !important;
+}
+.pos-shell .pos-checkout .font-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
 }
 
 /* Dark-first markup uses text-white — remap for light panels (body copy) */
