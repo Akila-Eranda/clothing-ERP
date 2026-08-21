@@ -350,7 +350,7 @@ function StandardAddProductPage() {
 
       {/* â”€â”€ 2-column layout â”€â”€ */}
       <div className="flex-1 overflow-y-auto">
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">
+      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
 
         {/* â•â• LEFT COLUMN â•â• */}
         <div className="space-y-5">
@@ -826,45 +826,56 @@ function StandardAddProductPage() {
             )}
           </div>
 
+          {/* Status & Inventory — main column (roomy) */}
+          <div className="panel-edge p-6 space-y-5">
+            <div className="border-b pb-3 space-y-1">
+              <h2 className="font-semibold text-base">Status & Settings</h2>
+              <p className="text-sm text-muted-foreground">
+                Visibility, inventory tracking, and stock levels
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/20 px-4 py-3.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Status</p>
+                  <p className="text-xs text-muted-foreground">
+                    {form.status === "ACTIVE" ? "Visible in POS & inventory" : "Hidden — save as draft"}
+                  </p>
+                </div>
+                <Switch checked={form.status === "ACTIVE"} onCheckedChange={(v) => set("status", v ? "ACTIVE" : "DRAFT")} />
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-2xl border bg-muted/20 px-4 py-3.5">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Track Inventory</p>
+                  <p className="text-xs text-muted-foreground">Monitor stock levels</p>
+                </div>
+                <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
+              </div>
+            </div>
+            {form.trackInventory && (
+              <div className="pt-2 space-y-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Stock levels</p>
+                <ProductInventoryFields
+                  mode="create"
+                  layout="wide"
+                  values={form.inventory}
+                  onChange={(patch) => setForm((p) => ({ ...p, inventory: { ...p.inventory, ...patch } }))}
+                />
+                <ProductBranchScopeSelect
+                  branchScope={form.branchScope}
+                  branchId={form.branchId}
+                  onScopeChange={setBranchScope}
+                  onBranchChange={(id) => set("branchId", id)}
+                />
+              </div>
+            )}
+          </div>
+
         </div>
         {/* â•â• END LEFT COLUMN â•â• */}
 
         {/* â•â• RIGHT SIDEBAR â•â• */}
         <div className="space-y-4 lg:sticky lg:top-6">
-
-          {/* Status */}
-          <div className="panel-edge p-5  space-y-3">
-            <h3 className="font-semibold text-sm border-b pb-2">Status & Settings</h3>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Status</p>
-                <p className="text-xs text-muted-foreground">{form.status === "ACTIVE" ? "Visible in POS & inventory" : "Hidden â€” save as draft"}</p>
-              </div>
-              <Switch checked={form.status === "ACTIVE"} onCheckedChange={(v) => set("status", v ? "ACTIVE" : "DRAFT")} />
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium">Track Inventory</p>
-                <p className="text-xs text-muted-foreground">Monitor stock levels</p>
-              </div>
-              <Switch checked={form.trackInventory} onCheckedChange={(v) => set("trackInventory", v)} />
-            </div>
-            {form.trackInventory && (
-              <ProductInventoryFields
-                mode="create"
-                values={form.inventory}
-                onChange={(patch) => setForm((p) => ({ ...p, inventory: { ...p.inventory, ...patch } }))}
-              />
-            )}
-            {form.trackInventory && (
-              <ProductBranchScopeSelect
-                branchScope={form.branchScope}
-                branchId={form.branchId}
-                onScopeChange={setBranchScope}
-                onBranchChange={(id) => set("branchId", id)}
-              />
-            )}
-          </div>
 
           {/* Summary */}
           <div className="panel-edge p-5  space-y-2 text-sm">

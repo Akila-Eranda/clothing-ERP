@@ -54,14 +54,14 @@ function Field({
   children,
 }: {
   label: string;
-  hint?: string;
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-1.5">
-      <Label className="text-sm font-medium">{label}</Label>
+    <div className="space-y-2 min-w-0 w-full">
+      <Label className="text-sm font-semibold">{label}</Label>
       {children}
-      {hint ? <p className="text-[11px] text-muted-foreground leading-snug">{hint}</p> : null}
+      {hint ? <div className="text-xs text-muted-foreground leading-snug">{hint}</div> : null}
     </div>
   );
 }
@@ -71,12 +71,15 @@ export function ProductInventoryFields({
   onChange,
   mode = "create",
   currentStock,
+  layout = "sidebar",
 }: {
   values: ProductInventoryValues;
   onChange: (patch: Partial<ProductInventoryValues>) => void;
   mode?: "create" | "edit";
   /** Total on-hand across variants (edit). Shown when negative so user can balance. */
   currentStock?: number | null;
+  /** `wide` = main column (roomy grid); `sidebar` = narrow stack */
+  layout?: "wide" | "sidebar";
 }) {
   const [warehouses, setWarehouses] = useState<WarehouseOpt[]>([]);
 
@@ -90,91 +93,132 @@ export function ProductInventoryFields({
     onChange({ [key]: value });
 
   const isNegative = typeof currentStock === "number" && currentStock < 0;
+  const showCurrent = mode === "edit" && typeof currentStock === "number";
+  const wide = layout === "wide";
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      <Field
-        label="Opening Stock"
-        hint={
-          mode === "edit"
-            ? "Enter a number to set stock to that qty (use 0 to clear minus). Leave blank to keep current."
-            : "Saved to inventory on create"
-        }
-      >
-        <div className="flex gap-2">
-          <Input
-            type="number"
-            min={0}
-            step="0.001"
-            placeholder={mode === "edit" ? "Keep current" : "0"}
-            value={values.openingStock}
-            onChange={(e) => set("openingStock", e.target.value)}
-            className="h-10"
-          />
-          {mode === "edit" && (
+    <div className="space-y-4 w-full min-w-0">
+      {showCurrent && (
+        <div
+          className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 ${
+            isNegative
+              ? "border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400"
+              : "border-border bg-muted/40 text-muted-foreground"
+          }`}
+        >
+          <span className={wide ? "text-sm" : "text-xs"}>
+            Current stock:{" "}
+            <span className={`font-bold tabular-nums text-foreground ${wide ? "text-base" : ""}`}>
+              {currentStock}
+            </span>
+            {isNegative ? " — minus (enter 0 or qty below to balance)" : ""}
+          </span>
+          {isNegative && (
             <Button
               type="button"
               variant="outline"
-              className="h-10 shrink-0 px-3 text-xs"
+              size="sm"
+              className={`shrink-0 ${wide ? "h-9 px-3 text-sm" : "h-7 px-2.5 text-[11px]"}`}
               onClick={() => set("openingStock", "0")}
             >
               Set 0
             </Button>
           )}
         </div>
-        {mode === "edit" && typeof currentStock === "number" && (
-          <p className={`text-[11px] mt-1 ${isNegative ? "text-red-600 font-semibold" : "text-muted-foreground"}`}>
-            Current stock: {currentStock}
-            {isNegative ? " (minus — enter 0 or qty to balance)" : ""}
-          </p>
-        )}
-      </Field>
-      <Field label="Reorder Level">
-        <Input
-          type="number"
-          min={0}
-          placeholder="0"
-          value={values.reorderLevel}
-          onChange={(e) => set("reorderLevel", e.target.value)}
-          className="h-10"
-        />
-      </Field>
-      <Field label="Minimum Stock">
-        <Input
-          type="number"
-          min={0}
-          placeholder="0"
-          value={values.minStock}
-          onChange={(e) => set("minStock", e.target.value)}
-          className="h-10"
-        />
-      </Field>
-      <Field label="Maximum Stock">
-        <Input
-          type="number"
-          min={0}
-          placeholder="0"
-          value={values.maxStock}
-          onChange={(e) => set("maxStock", e.target.value)}
-          className="h-10"
-        />
-      </Field>
-      <Field label="Warehouse">
-        <Select
-          value={values.warehouseId || "_none"}
-          onValueChange={(v) => set("warehouseId", v === "_none" ? "" : v)}
+      )}
+
+      <div
+        className={
+          wide
+            ? "grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 w-full min-w-0"
+            : "grid grid-cols-1 gap-3 w-full min-w-0"
+        }
+      >
+        <Field
+          label="Opening Stock"
+          hint={
+            mode === "edit"
+              ? "Enter a number to set stock to that qty. Leave blank to keep current."
+              : "Saved to inventory on create"
+          }
         >
-          <SelectTrigger className="h-10">
-            <SelectValue placeholder="Default warehouse" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_none">Default / auto</SelectItem>
-            {warehouses.map((w) => (
-              <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Field>
+          <div className="flex items-center gap-2 w-full min-w-0">
+            <Input
+              type="number"
+              min={0}
+              step="0.001"
+              inputMode="decimal"
+              placeholder={mode === "edit" ? "Keep current" : "0"}
+              value={values.openingStock}
+              onChange={(e) => set("openingStock", e.target.value)}
+              className={`${wide ? "h-11 text-base" : "h-10"} flex-1 min-w-0 w-full`}
+            />
+            {mode === "edit" && !isNegative && (
+              <Button
+                type="button"
+                variant="outline"
+                className={`${wide ? "h-11 px-4 text-sm" : "h-10 px-3 text-xs"} shrink-0`}
+                onClick={() => set("openingStock", "0")}
+              >
+                Set 0
+              </Button>
+            )}
+          </div>
+        </Field>
+
+        <Field label="Reorder Level">
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="0"
+            value={values.reorderLevel}
+            onChange={(e) => set("reorderLevel", e.target.value)}
+            className={`${wide ? "h-11 text-base" : "h-10"} w-full`}
+          />
+        </Field>
+
+        <Field label="Minimum Stock">
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="0"
+            value={values.minStock}
+            onChange={(e) => set("minStock", e.target.value)}
+            className={`${wide ? "h-11 text-base" : "h-10"} w-full`}
+          />
+        </Field>
+
+        <Field label="Maximum Stock">
+          <Input
+            type="number"
+            min={0}
+            inputMode="numeric"
+            placeholder="0"
+            value={values.maxStock}
+            onChange={(e) => set("maxStock", e.target.value)}
+            className={`${wide ? "h-11 text-base" : "h-10"} w-full`}
+          />
+        </Field>
+
+        <Field label="Warehouse">
+          <Select
+            value={values.warehouseId || "_none"}
+            onValueChange={(v) => set("warehouseId", v === "_none" ? "" : v)}
+          >
+            <SelectTrigger className={`${wide ? "h-11 text-base" : "h-10"} w-full`}>
+              <SelectValue placeholder="Default warehouse" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_none">Default / auto</SelectItem>
+              {warehouses.map((w) => (
+                <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+      </div>
     </div>
   );
 }
