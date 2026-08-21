@@ -10,7 +10,7 @@ import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
-  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[#4f6ef7] transition-colors";
+  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[var(--pos-accent)] transition-colors";
 const INPUT_STYLE = {
   background: "var(--pos-input, var(--pos-input))",
   border: "1px solid var(--pos-border, var(--pos-border))",
@@ -312,12 +312,12 @@ export function PosQuickExpensePanel({
               onClick={() => setMode(tab.id)}
               className="flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-xs font-bold transition-all"
               style={{
-                background: active ? "rgba(79,110,247,0.15)" : "transparent",
-                color: active ? "#4f6ef7" : "var(--pos-muted)",
-                border: active ? "1px solid rgba(79,110,247,0.4)" : "1px solid transparent",
+                background: active ? "rgba(var(--pos-accent-rgb),0.15)" : "transparent",
+                color: active ? "var(--pos-accent)" : "var(--pos-muted)",
+                border: active ? "1px solid rgba(var(--pos-accent-rgb),0.4)" : "1px solid transparent",
               }}
             >
-              <tab.icon className="h-3.5 w-3.5" style={{ color: active ? "#4f6ef7" : "var(--pos-muted)" }} />
+              <tab.icon className="h-3.5 w-3.5" style={{ color: active ? "var(--pos-accent)" : "var(--pos-muted)" }} />
               {tab.label}
             </button>
           );
@@ -383,7 +383,7 @@ export function PosQuickExpensePanel({
               {selectedSupplier && (
                 <div
                   className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
-                  style={{ background: "rgba(79,110,247,0.1)", border: "1px solid rgba(79,110,247,0.3)" }}
+                  style={{ background: "rgba(var(--pos-accent-rgb),0.1)", border: "1px solid rgba(var(--pos-accent-rgb),0.3)" }}
                 >
                   <div className="min-w-0">
                     <p className="text-xs font-bold text-white truncate">{selectedSupplier.name}</p>
@@ -394,7 +394,7 @@ export function PosQuickExpensePanel({
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[10px] font-semibold uppercase" style={{ color: "var(--pos-muted)" }}>Outstanding</p>
-                    <p className="text-sm font-bold tabular-nums" style={{ color: (selectedSupplier.balance ?? 0) > 0 ? "var(--pos-warn-soft)" : "#10b981" }}>
+                    <p className="text-sm font-bold tabular-nums" style={{ color: (selectedSupplier.balance ?? 0) > 0 ? "var(--pos-warn-soft)" : "var(--pos-success)" }}>
                       LKR {formatNumber(selectedSupplier.balance ?? 0)}
                     </p>
                   </div>
@@ -569,7 +569,7 @@ export function PosQuickExpensePanel({
             style={{
               background: mode === "expense"
                 ? "linear-gradient(135deg,var(--pos-warn),var(--pos-warn-soft))"
-                : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+                : "var(--pos-accent-grad)",
               color: "#fff",
             }}
           >

@@ -190,9 +190,9 @@ export function PosPromotionsPanel({
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+          <Tag className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
           <h2 className="text-white font-bold text-base">Discounts & Promotions</h2>
-          <Badge className="ml-1 text-[10px]" style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}>
+          <Badge className="ml-1 text-[10px]" style={{ background: "rgba(var(--pos-accent-rgb),0.15)", color: "var(--pos-violet-soft)" }}>
             {profile.label}
           </Badge>
           <Badge className="text-[10px]" style={{ background: "rgba(16,185,129,0.15)", color: "var(--pos-success-soft)" }}>
@@ -315,7 +315,7 @@ export function PosPromotionsPanel({
             onClick={() => void createPromo()}
             disabled={busy || !canManage}
             className="w-full h-9 gap-1.5"
-            style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#fff" }}
+            style={{ background: "var(--pos-accent-grad)", color: "#fff" }}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Tag className="h-4 w-4" />}
             Create Promotion
@@ -344,7 +344,7 @@ export function PosPromotionsPanel({
           <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
             {loading ? (
               <div className="flex justify-center py-10">
-                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "#4f6ef7" }} />
+                <Loader2 className="h-5 w-5 animate-spin" style={{ color: "var(--pos-accent)" }} />
               </div>
             ) : filtered.length === 0 ? (
               <p className="text-xs text-center py-10" style={{ color: "var(--pos-muted-2)" }}>
@@ -359,7 +359,7 @@ export function PosPromotionsPanel({
                     className="rounded-lg border p-3"
                     style={{
                       background: "var(--pos-panel)",
-                      borderColor: live ? "rgba(79,110,247,0.45)" : "var(--pos-border)",
+                      borderColor: live ? "rgba(var(--pos-accent-rgb),0.45)" : "var(--pos-border)",
                     }}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -405,7 +405,7 @@ export function PosPromotionsPanel({
                           onClick={() => void applyPromo(p)}
                           className="h-8 text-[10px] gap-1"
                           style={{
-                            background: live && p.couponCode ? "#4f6ef7" : "var(--pos-input)",
+                            background: live && p.couponCode ? "var(--pos-accent)" : "var(--pos-input)",
                             color: live && p.couponCode ? "#fff" : "var(--pos-muted)",
                             opacity: live && p.couponCode ? 1 : 0.5,
                           }}

@@ -40,7 +40,7 @@ function digitsOnly(v: string) {
   return v.replace(/\D/g, "");
 }
 
-const ACCENT = "#4f6ef7";
+const ACCENT = "var(--pos-accent)";
 const CARD_AMBER = "#d97706";
 
 function chipStyle(opts: {
@@ -53,7 +53,7 @@ function chipStyle(opts: {
   const idleBg = light ? "#475569" : "var(--pos-elevated)";
   const focusGlow = focused
     ? (light
-        ? "0 0 0 2px rgba(79,110,247,0.45)"
+        ? "0 0 0 2px rgba(var(--pos-accent-rgb),0.45)"
         : "0 0 0 2px rgba(56,189,248,0.55)")
     : "none";
 
@@ -404,14 +404,14 @@ export function PosReloadPanel({
   const labelColor = lightMode ? "#64748b" : "var(--pos-muted)";
   const hintColor = lightMode ? "#94a3b8" : "var(--pos-muted-2)";
   const textColor = lightMode ? "#0f172a" : "var(--pos-text)";
-  const successColor = lightMode ? "#047857" : "#10b981";
+  const successColor = lightMode ? "#047857" : "var(--pos-success)";
   const inputBg = "var(--pos-input)";
 
   const fieldStyle = (zone: FocusZone): React.CSSProperties => ({
     background: inputBg,
     border: `1px solid ${focusZone === zone ? ACCENT : "var(--pos-border)"}`,
     color: textColor,
-    boxShadow: focusZone === zone ? "0 0 0 3px rgba(79,110,247,0.18)" : "none",
+    boxShadow: focusZone === zone ? "0 0 0 3px rgba(var(--pos-accent-rgb),0.18)" : "none",
   });
 
   if (loading) {
@@ -432,7 +432,7 @@ export function PosReloadPanel({
       {!asModal && (
         <div className="flex shrink-0 items-center justify-between px-5 pt-4 pb-2">
           <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
+            <div className="h-8 w-8 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--pos-accent-rgb),0.12)" }}>
               <Smartphone className="h-4 w-4" style={{ color: ACCENT }} />
             </div>
             <h2 className="text-base font-bold" style={{ color: textColor }}>Reload / Recharge</h2>
@@ -495,7 +495,7 @@ export function PosReloadPanel({
               style={{
                 background: mode === "DIGITAL" ? ACCENT : (lightMode ? "#475569" : "var(--pos-elevated)"),
                 color: "#ffffff",
-                boxShadow: focusZone === "mode" && mode === "DIGITAL" ? "0 0 0 2px rgba(79,110,247,0.45)" : "none",
+                boxShadow: focusZone === "mode" && mode === "DIGITAL" ? "0 0 0 2px rgba(var(--pos-accent-rgb),0.45)" : "none",
               }}
             >
               <Smartphone className="h-4 w-4" /> Digital
@@ -628,9 +628,9 @@ export function PosReloadPanel({
           data-pos-on-accent=""
           className="pos-cta flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold disabled:opacity-40 transition-all hover:opacity-90"
           style={{
-            background: "linear-gradient(135deg,#4f6ef7,#4338ca)",
+            background: "var(--pos-accent-grad)",
             color: "#ffffff",
-            boxShadow: focusZone === "submit" ? "0 0 0 3px rgba(79,110,247,0.28)" : "0 8px 20px rgba(79,110,247,0.25)",
+            boxShadow: focusZone === "submit" ? "0 0 0 3px rgba(var(--pos-accent-rgb),0.28)" : "0 8px 20px rgba(var(--pos-accent-rgb),0.25)",
           }}
         >
           <ShoppingCart className="h-4 w-4" />

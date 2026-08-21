@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import type { CartItem } from "@/types";
 
 const INPUT_CLS =
-  "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[#10b981] transition-colors placeholder:text-white/30";
+  "w-full h-10 rounded-xl px-3 text-sm text-white outline-none focus:border-[var(--pos-success)] transition-colors placeholder:text-white/30";
 const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 export function PosDemoProductPanel({
@@ -155,7 +155,7 @@ export function PosDemoProductPanel({
           type="button"
           onClick={submit}
           className="w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold text-white transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+          style={{ background: "var(--pos-success-grad)" }}
         >
           <ShoppingCart className="h-4 w-4" />
           Add to bill

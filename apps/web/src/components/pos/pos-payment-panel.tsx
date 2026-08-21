@@ -149,7 +149,7 @@ export function PosPaymentPanel({
         />
         <button type="button" onClick={applyCoupon} data-pos-accent=""
           className="pos-cta px-2.5 h-8 rounded-lg text-xs font-bold flex items-center gap-1"
-          style={{ background: "#4f6ef7", color: "#ffffff" }}>
+          style={{ background: "var(--pos-accent)", color: "#ffffff" }}>
           <Tag className="h-3 w-3" /> Apply
         </button>
       </div>
@@ -176,7 +176,7 @@ export function PosPaymentPanel({
       </div>
 
       {state.allowPartial && hasCreditCustomer && !state.splitMode && (
-        <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "rgba(79,110,247,0.08)" }}>
+        <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "rgba(var(--pos-accent-rgb),0.08)" }}>
           <p className="text-[10px] font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
             Pay part now — balance goes on customer credit account
           </p>
@@ -286,7 +286,7 @@ export function PosPaymentPanel({
           ))}
           <button type="button" onClick={addLine}
             className="text-[10px] flex items-center gap-1 font-semibold"
-            style={{ color: "#4f6ef7" }}>
+            style={{ color: "var(--pos-accent)" }}>
             <Plus className="h-3 w-3" /> Add payment line
           </button>
           <div className="flex justify-between text-xs pt-1">

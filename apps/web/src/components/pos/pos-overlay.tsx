@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, type ReceiptSettings } from "@/lib/use-receipt-settings";
 import { receiptMoney, receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
+import { POS_COLOR_DEFAULTS, usePosUiColors } from "@/lib/pos-ui-colors";
 import { formatScannerDetail, isScannerActive, usePosPrinterStatus } from "@/lib/use-pos-device-status";
 import { openCustomerDisplayFromClick, getCustomerDisplayUrl, CUSTOMER_DISPLAY_WINDOW_NAME, subscribeCustomerDisplayInput } from "@/lib/pos-customer-display";
 import { usePosCustomerDisplayPublisher, type ThankYouSale } from "@/lib/use-pos-customer-display-publisher";
@@ -50,7 +51,10 @@ import {
   readPosSavedTaxRate, writePosSavedTaxRate,
   readPosCartWidth, writePosCartWidth,
   readPosQtyPopup, writePosQtyPopup,
+  readPosProductCardSize, writePosProductCardSize, posProductCardSizeVars,
   POS_CART_WIDTH_PRESETS, POS_CART_WIDTH_MIN, POS_CART_WIDTH_MAX,
+  POS_PRODUCT_CARD_SIZE_PRESETS,
+  type PosProductCardSizeId,
   type PosTenantSettings,
 } from "@/lib/pos-settings";
 import { playPosSound } from "@/lib/pos-sound";
@@ -161,7 +165,7 @@ function PosNewCustomerCreditFields({
       className={`rounded-xl font-bold transition-all ${compact ? "h-8 px-2.5 text-[10px]" : "h-10 px-3 text-xs"}`}
       style={
         payMode === mode
-          ? { background: "#4f6ef7", color: "#ffffff" }
+          ? { background: "var(--pos-accent)", color: "#ffffff" }
           : s.chipIdle
       }
     >
@@ -181,7 +185,7 @@ function PosNewCustomerCreditFields({
           value={creditLimit}
           onChange={(e) => onCreditLimitChange(e.target.value)}
           placeholder="0 = no credit"
-          className={`w-full px-4 rounded-xl outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)] ${compact ? "h-10 text-sm" : "h-11 text-sm"}`}
+          className={`w-full px-4 rounded-xl outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(var(--pos-accent-rgb),0.18)] ${compact ? "h-10 text-sm" : "h-11 text-sm"}`}
           style={s.input}
         />
       </div>
@@ -347,7 +351,7 @@ function getCardBg(c = "", light = false) {
   };
   return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)";
 }
-const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"#10b981"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn)"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
+const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn)"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
 const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"var(--pos-warn)", platinum:"#8b5cf6", diamond:"#a78bfa" };
 
 function posImageSrc(url?: string | null) {
@@ -467,6 +471,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const [reprintingId, setReprintingId] = React.useState<string | null>(null);
   const [touchMode, setTouchMode] = React.useState(false);
   const [cartWidth, setCartWidth] = React.useState(() => readPosCartWidth());
+  const [productCardSize, setProductCardSize] = React.useState<PosProductCardSizeId>(() => readPosProductCardSize());
   const cartResizeRef = React.useRef<{ startX: number; startW: number } | null>(null);
   const [confirmQtyPopup, setConfirmQtyPopup] = React.useState(() => readPosQtyPopup());
   const [soundAlerts, setSoundAlerts] = React.useState(true);
@@ -592,6 +597,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     currency: "LKR",
   });
   const { settings: receiptSettings } = useReceiptSettings();
+  const [posColors, setPosColors] = usePosUiColors();
   const { display: printerStatus, refresh: refreshPrinterStatus } = usePosPrinterStatus(posOpen, receiptSettings);
   const searchRef = React.useRef<HTMLInputElement>(null);
   const discountInputRef = React.useRef<HTMLInputElement>(null);
@@ -2750,15 +2756,21 @@ ${rows}
       <div className="flex flex-col h-full overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2 border-b overflow-x-auto shrink-0 scrollbar-none" style={{borderColor:"var(--pos-border)"}}>
           {categories.map(cat=>(
-            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"linear-gradient(135deg,#4f6ef7,#7c3aed)":(lightUi?"#334155":"var(--pos-input)"),color:"#ffffff"}}>
+            <button key={cat} onClick={()=>setActiveCategory(cat)} className="px-3 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap shrink-0 transition-all" style={{background:activeCategory===cat?"var(--pos-accent-grad)":(lightUi?"#334155":"var(--pos-input)"),color:"#ffffff"}}>
               {cat}
             </button>
           ))}
         </div>
         <div className="flex-1 overflow-y-auto p-3">
-          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p><p className="text-xs mt-1 opacity-70">Scan barcode or search</p></div>):(
+          {loading?(<div className="flex items-center justify-center h-48"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):productCards.length===0?(<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Package className="h-12 w-12 mb-2 opacity-30"/><p className="text-sm">No products found</p><p className="text-xs mt-1 opacity-70">Scan barcode or search</p></div>):(
             <>
-            <div className="grid gap-2" style={{gridTemplateColumns:"repeat(auto-fill,minmax(165px,1fr))"}}>
+            <div
+              className="grid"
+              style={{
+                gridTemplateColumns: "repeat(auto-fill,minmax(var(--pos-product-min,165px),1fr))",
+                gap: "var(--pos-product-gap,8px)",
+              }}
+            >
               {productCards.map((card, pIdx)=>{
                 const p = card.rep;
                 const varStock = card.totalStock;
@@ -2770,15 +2782,19 @@ ${rows}
                   : `LKR ${formatNumber(card.minPrice)}`;
                 const thumbBg = getCardBg(p.color, lightUi);
                 return (
-                  <div key={p.productId || p.productName} role="button" tabIndex={0} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="rounded-xl overflow-hidden cursor-pointer group relative border transition-colors hover:border-blue-500/50" style={{background:"var(--pos-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.45)":"none"}}>
-                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-card)":thumbBg}}>
+                  <div key={p.productId || p.productName} role="button" tabIndex={0} onClick={()=>{setFocusedProductIdx(pIdx);handleCardClick(p);}} className="pos-product-card rounded-xl overflow-hidden cursor-pointer group relative border transition-colors" style={{background:"var(--pos-product-card)",borderColor:kbFocus||selectedProductName===p.productName||addPopup?.productName===p.productName?"var(--pos-accent)":"var(--pos-product-border)",boxShadow:kbFocus?"0 0 0 2px rgba(var(--pos-accent-rgb),0.45)":"none"}}>
+                    <div className="relative" style={{aspectRatio:"4/3",background:posImageSrc(p.imageUrl)?"var(--pos-product-card)":thumbBg}}>
                       <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="absolute inset-0 w-full h-full opacity-90" fallbackBg={thumbBg} iconClassName="h-10 w-10" />
                       <div className="absolute top-1.5 left-1.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold text-white" data-pos-on-accent="" style={{background:varStock===0?"#dc2626":varStock<=5?"var(--pos-warn-pill)":"#16a34a",color:"#fff"}}>{varStock}</div>
-                      {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(79,110,247,0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
+                      {multi && <div className="absolute top-1.5 right-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"rgba(var(--pos-accent-rgb),0.9)",color:"#fff"}}>{card.variants.length} variants</div>}
                       {varStock===0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:allowNegativeStock?"var(--pos-warn-pill)":"rgba(220,38,38,0.85)",color:"#fff"}}>{allowNegativeStock?"Stock 0 — sell OK":"Out of Stock"}</div>}{lowStock&&varStock>0&&<div className="absolute bottom-1.5 left-1.5 rounded px-1.5 py-0.5 text-[9px] font-bold" style={{background:"var(--pos-warn-pill)",color:"#fff"}}>Low Stock</div>}
-                      <button type="button" data-pos-accent="" onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{background:"#4f6ef7",color:"#fff"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
+                      <button type="button" data-pos-accent="" onClick={e=>{e.stopPropagation();handleCardClick(p);}} className="absolute bottom-1.5 right-1.5 h-6 w-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity" style={{background:"var(--pos-accent)",color:"#fff"}}><Plus className="h-3.5 w-3.5 text-white"/></button>
                     </div>
-                    <div className="p-2"><p className="text-white text-sm font-semibold leading-tight line-clamp-1">{p.productName}</p><p className="text-xs mt-0.5 line-clamp-1" style={{color:"var(--pos-muted)"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p><p className="text-base font-bold mt-0.5" style={{color:"#4f6ef7"}}>{priceLabel}</p></div>
+                    <div style={{ padding: "var(--pos-product-pad,8px)" }}>
+                      <p className="font-semibold leading-tight line-clamp-1" style={{color:"var(--pos-product-title)",fontSize:"var(--pos-product-title-size,14px)"}}>{p.productName}</p>
+                      <p className="mt-0.5 line-clamp-1" style={{color:"var(--pos-product-sub)",fontSize:"var(--pos-product-sub-size,12px)"}}>{multi ? "Tap to choose variant" : (variantDisplayLabel(p, profile) || p.variantName)}</p>
+                      <p className="font-bold mt-0.5" style={{color:"var(--pos-product-price)",fontSize:"var(--pos-product-price-size,16px)"}}>{priceLabel}</p>
+                    </div>
                   </div>
                 );
               })}
@@ -2814,8 +2830,8 @@ ${rows}
         </div>
         <div className="flex border-t shrink-0" style={{height:"180px",borderColor:"var(--pos-border)"}}>
           <div className="flex-1 flex flex-col min-w-0">
-            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"#4f6ef7"}}>View All</button></div>
-            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material, lightUi)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-white text-sm font-bold truncate">{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
+            <div className="flex items-center justify-between px-4 py-2 border-b shrink-0" style={{borderColor:"var(--pos-border)"}}><span className="text-base font-bold text-white">Popular Items</span><button type="button" onClick={() => { setActiveCategory("All"); setSearch(""); searchRef.current?.focus(); }} className="text-sm font-semibold" style={{color:"var(--pos-accent)"}}>View All</button></div>
+            <div className="overflow-y-auto flex-1">{popularItems.length===0?<div className="flex flex-col items-center justify-center h-full" style={{color:"var(--pos-muted-2)"}}><Package className="h-8 w-8 mb-2 opacity-30"/><p className="text-sm font-semibold">No popular items yet</p></div>:popularItems.map(p=>(<button key={p.variantId} onClick={()=>commitAddProduct(p, 1, { keepSearchFocus: true })} className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left"><PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-10 w-10 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color??p.material, lightUi)} iconClassName="h-5 w-5" /><div className="flex-1 min-w-0"><p className="text-sm font-bold truncate" style={{color:"var(--pos-product-title)"}}>{p.productName}</p><p className="text-xs truncate" style={{color:"var(--pos-product-sub)"}}>{variantDisplayLabel(p, profile)}</p></div><span className="text-sm font-bold shrink-0" style={{color:"var(--pos-product-price)"}}>LKR {formatNumber(p.unitPrice)}</span></button>))}</div>
           </div>
           <div className="w-px shrink-0 self-stretch" style={{ background: "var(--pos-border)" }} aria-hidden />
           <div className="flex-1 flex flex-col min-w-0">
@@ -2830,13 +2846,13 @@ ${rows}
                   className="w-full flex items-center gap-3 px-3 py-2.5 border-b hover:bg-white/5 transition-colors text-left"
                   style={{borderColor:"var(--pos-border)"}}
                 >
-                  <Scan className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>
+                  <Scan className="h-4 w-4 shrink-0" style={{color:"var(--pos-accent)"}}/>
                   <div className="flex-1 min-w-0">
                     <p className="text-white text-sm font-bold truncate">{s.name}</p>
                     <p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{s.variant} · ×{s.qty}</p>
                   </div>
                   <div className="text-right shrink-0">
-                    <span className="text-sm font-bold block" style={{color:"#4f6ef7"}}>LKR {formatNumber(s.price)}</span>
+                    <span className="text-sm font-bold block" style={{color:"var(--pos-price)"}}>LKR {formatNumber(s.price)}</span>
                     <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{s.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span>
                   </div>
                 </button>
@@ -2895,24 +2911,24 @@ ${rows}
               className="w-full pl-9 pr-9 h-10 rounded-xl text-sm outline-none"
               style={cf.input}
             />
-            {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"#4f6ef7"}}/>}
+            {inlineCustLoading&&<Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin" style={{color:"var(--pos-accent)"}}/>}
           </div>
           <button
             type="button"
             onClick={() => openRegisterCustomer(/^\d+$/.test(inlineCustomerSearch.trim()) ? inlineCustomerSearch.trim() : undefined)}
             data-pos-accent=""
             className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-bold shrink-0 transition-all hover:opacity-90"
-            style={{ background: "#4f6ef7", color: "#ffffff" }}
+            style={{ background: "var(--pos-accent)", color: "#ffffff" }}
           >
             <Plus className="h-4 w-4"/>Register New
           </button>
         </div>
         {/* Active bill customer */}
         {customer ? (
-          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(79,110,247,0.1)",border:"1px solid rgba(79,110,247,0.3)"}}>
-            <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{customer.name?.[0]}</div>
+          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(var(--pos-accent-rgb),0.1)",border:"1px solid rgba(var(--pos-accent-rgb),0.3)"}}>
+            <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"var(--pos-accent-grad)"}}>{customer.name?.[0]}</div>
             <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>On bill</span>
+            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>On bill</span>
             <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
           </div>
         ) : (
@@ -2929,7 +2945,7 @@ ${rows}
               <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"var(--pos-muted-2)"}}>
                 <AlertCircle className="h-8 w-8 opacity-30"/>
                 <p className="text-sm">No customers found</p>
-                <button type="button" onClick={()=>openRegisterCustomer(/^\d+$/.test(inlineCustomerSearch.trim())?inlineCustomerSearch.trim():undefined)} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"#4f6ef7"}}><Plus className="h-4 w-4"/>Register New Customer</button>
+                <button type="button" onClick={()=>openRegisterCustomer(/^\d+$/.test(inlineCustomerSearch.trim())?inlineCustomerSearch.trim():undefined)} className="flex items-center gap-1.5 px-4 h-9 rounded-xl text-sm font-bold text-white" style={{background:"var(--pos-accent)"}}><Plus className="h-4 w-4"/>Register New Customer</button>
               </div>
             )}
             <div className="space-y-2">
@@ -2938,10 +2954,10 @@ ${rows}
                   onClick={() => { setFocusedCustomerIdx(cIdx); void loadCustomerInsight(c.id); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
                   className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
-                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(79,110,247,0.12)":"var(--pos-card)",borderColor:customer?.id===c.id?"#10b981":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"#4f6ef7":"var(--pos-border)",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
-                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{c.name?.[0]}</div>
+                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(var(--pos-accent-rgb),0.12)":"var(--pos-card)",borderColor:customer?.id===c.id?"var(--pos-success)":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"var(--pos-accent)":"var(--pos-border)",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(var(--pos-accent-rgb),0.35)":"none"}}>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"var(--pos-accent-grad)"}}>{c.name?.[0]}</div>
                   <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"#10b981":"#4f6ef7"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"var(--pos-success)":"var(--pos-accent)"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
                 </div>
               ))}
             </div>
@@ -2954,7 +2970,7 @@ ${rows}
                 <p className="text-xs mt-1 text-center opacity-70">Tap a customer to preview bills & top products, then Select to add to bill</p>
               </div>
             ) : customerInsightLoading ? (
-              <div className="flex items-center justify-center flex-1"><Loader2 className="h-7 w-7 animate-spin" style={{color:"#4f6ef7"}}/></div>
+              <div className="flex items-center justify-center flex-1"><Loader2 className="h-7 w-7 animate-spin" style={{color:"var(--pos-accent)"}}/></div>
             ) : (
               <>
                 <div className="shrink-0">
@@ -3038,7 +3054,7 @@ ${rows}
                         disabled={creditPayBusy}
                         onClick={() => void payCustomerOutstanding(previewCustomerId, insightCustomer?.name ?? "Customer")}
                         className="flex-1 h-8 rounded-lg text-[10px] font-bold text-white disabled:opacity-40"
-                        style={{background:"linear-gradient(135deg,#10b981,#059669)"}}
+                        style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}
                       >
                         {creditPayBusy ? "Paying…" : "Receive payment"}
                       </button>
@@ -3069,7 +3085,7 @@ ${rows}
                 )}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Receipt className="h-3.5 w-3.5" style={{color:"#4f6ef7"}}/>
+                    <Receipt className="h-3.5 w-3.5" style={{color:"var(--pos-accent)"}}/>
                     <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Previous bills</p>
                   </div>
                   {(customerInsight?.sales.length ?? 0) === 0 ? (
@@ -3082,7 +3098,7 @@ ${rows}
                         return (
                         <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:isPending?"var(--pos-warn-bg)":"var(--pos-card)",border:`1px solid ${isPending?"var(--pos-warn-border)":"var(--pos-border)"}`}}>
                           <div className="min-w-0">
-                            <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"var(--pos-warn-soft)":"#4f6ef7"}}>{sale.invoiceNumber}</p>
+                            <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"var(--pos-warn-soft)":"var(--pos-accent)"}}>{sale.invoiceNumber}</p>
                             <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
                           </div>
                           <p className="text-xs font-bold font-mono text-white shrink-0">LKR {formatNumber(sale.total)}</p>
@@ -3094,7 +3110,7 @@ ${rows}
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="h-3.5 w-3.5" style={{color:"#10b981"}}/>
+                    <TrendingUp className="h-3.5 w-3.5" style={{color:"var(--pos-success)"}}/>
                     <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Top products</p>
                   </div>
                   {(customerInsight?.topProducts.length ?? 0) === 0 ? (
@@ -3103,7 +3119,7 @@ ${rows}
                     <div className="space-y-1.5">
                       {customerInsight!.topProducts.map((p, idx) => (
                         <div key={`${p.variantId}-${idx}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>
-                          <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>{idx + 1}</span>
+                          <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-white font-semibold truncate">{p.productName}</p>
                             <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{p.qty} sold · LKR {formatNumber(p.spent)}</p>
@@ -3124,19 +3140,19 @@ ${rows}
     // HOLD BILLS
     if (activeNav === "hold-bills") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
-        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"var(--pos-muted)"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"#4f6ef7"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
-        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
+        <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"var(--pos-muted)"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"var(--pos-accent)"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
+        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 — stock is reserved on the server</p></div>):(
           <div className="flex-1 overflow-y-auto grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",alignContent:"start"}}>
             {serverHeldBills.map((bill,idx)=>{
               const billItems = bill.data?.items ?? [];
               const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
               const kbFocus = focusedHeldIdx === idx;
               return (
-                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"var(--pos-card)",borderColor:kbFocus?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2 transition-all" style={{background:"var(--pos-card)",borderColor:kbFocus?"var(--pos-accent)":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(var(--pos-accent-rgb),0.35)":"none"}}>
                   <div className="flex items-start justify-between"><div><p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(bill.createdAt).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}  {billItems.length} item(s)</p></div><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn)"}}>Reserved</span></div>
-                  {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
+                  {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(var(--pos-accent-rgb),0.1)"}}><User className="h-3 w-3" style={{color:"var(--pos-accent)"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
                   <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} {i.variantName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more items</p>}</div>
-                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"#10b981"}}>Restore</button></div></div>
+                  <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}><span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span><div className="flex gap-2"><button onClick={()=>handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold transition-all hover:opacity-80" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button><button onClick={()=>handleRestoreHeldBill(bill)} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-success)"}}>Restore</button></div></div>
                 </div>
               );
             })}
@@ -3156,12 +3172,12 @@ ${rows}
             <RefreshCw className={cn("h-3.5 w-3.5",ordersLoading&&"animate-spin")}/>Refresh
           </button>
         </div>
-        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
+        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
           <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
             <table className="w-full text-sm">
               <thead style={{position:"sticky",top:0,background:"var(--pos-panel)"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"var(--pos-muted)",borderBottom:"1px solid var(--pos-border)"}}>{h}</th>)}</tr></thead>
               <tbody>{orders.map((o,i)=>{const st=STATUS_STYLE[o.status]??{bg:"rgba(100,100,100,0.15)",color:"#9ca3af"};return(<tr key={o.id} style={{borderBottom:"1px solid var(--pos-border)",background:i%2===0?"transparent":"var(--pos-hover)"}}>
-                <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"#4f6ef7"}}>{o.invoiceNumber}</td>
+                <td className="px-3 py-2 font-mono text-xs font-bold" style={{color:"var(--pos-accent)"}}>{o.invoiceNumber}</td>
                 <td className="px-3 py-2 text-xs text-white">{formatSaleCustomerName(o.customer)}</td>
                 <td className="px-3 py-2 text-xs" style={{color:"var(--pos-muted)"}}>{o._count?.items??0}</td>
                 <td className="px-3 py-2 text-xs font-bold font-mono text-white">LKR {formatNumber(o.total)}</td>
@@ -3170,7 +3186,7 @@ ${rows}
                 <td className="px-3 py-2"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:st.bg,color:st.color}}>{o.status}</span></td>
                 <td className="px-3 py-2">
                   <div className="flex gap-1">
-                    <button type="button" onClick={() => reprintSale(o.id)} disabled={reprintingId===o.id} className="text-[10px] font-bold px-2 py-1 rounded-lg text-white whitespace-nowrap disabled:opacity-50" style={{background:"rgba(79,110,247,0.85)"}}>
+                    <button type="button" onClick={() => reprintSale(o.id)} disabled={reprintingId===o.id} className="text-[10px] font-bold px-2 py-1 rounded-lg text-white whitespace-nowrap disabled:opacity-50" style={{background:"rgba(var(--pos-accent-rgb),0.85)"}}>
                       {reprintingId===o.id ? <Loader2 className="inline h-3 w-3 animate-spin"/> : <Printer className="inline h-3 w-3 mr-0.5 -mt-0.5"/>}
                       Reprint
                     </button>
@@ -3217,7 +3233,7 @@ ${rows}
               <Input type="number" placeholder="Amount (LKR)" value={voucherIssueAmt} onChange={(e)=>setVoucherIssueAmt(e.target.value)} className="bg-[var(--pos-input)] border-[var(--pos-border)] text-white" />
               <Input placeholder="Recipient name (optional)" value={voucherIssueName} onChange={(e)=>setVoucherIssueName(e.target.value)} className="bg-[var(--pos-input)] border-[var(--pos-border)] text-white" />
             </div>
-            <button type="button" onClick={issueVoucher} disabled={voucherBusy} className="px-4 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{background:"#4f6ef7"}}>
+            <button type="button" onClick={issueVoucher} disabled={voucherBusy} className="px-4 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-50" style={{background:"var(--pos-accent)"}}>
               {voucherBusy ? <Loader2 className="h-4 w-4 animate-spin inline mr-2"/> : <Gift className="h-4 w-4 inline mr-2"/>}
               Issue Voucher
             </button>
@@ -3305,7 +3321,7 @@ ${rows}
                 {["search","items","confirm","done"].map((s,i)=>(
                   <React.Fragment key={s}>
                     <div className="flex items-center gap-1">
-                      <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{background:["search","items","confirm","done"].indexOf(returnStep)>=i?"#4f6ef7":"var(--pos-input)",color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#fff":"var(--pos-muted-2)"}}>{i+1}</div>
+                      <div className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold" style={{background:["search","items","confirm","done"].indexOf(returnStep)>=i?"var(--pos-accent)":"var(--pos-input)",color:["search","items","confirm","done"].indexOf(returnStep)>=i?"#fff":"var(--pos-muted-2)"}}>{i+1}</div>
                       <span className="text-[10px] capitalize" style={{color:["search","items","confirm","done"].indexOf(returnStep)>=i?"var(--pos-text-secondary)":"var(--pos-muted-2)"}}>{s=="search"?"Find Sale":s=="items"?"Select Items":s=="confirm"?"Confirm":"Done"}</span>
                     </div>
                     {i<3&&<div className="w-6 h-px mx-1" style={{background:"var(--pos-border)"}}/>}
@@ -3323,14 +3339,14 @@ ${rows}
             <div className="flex-1 flex flex-col gap-3">
               <div className="flex gap-2">
                 <input value={returnQuery} onChange={e=>setReturnQuery(e.target.value)} onKeyDown={e=>e.key==="Enter"&&searchSale()} placeholder="Enter invoice number or customer phone..." className="flex-1 h-10 px-4 rounded-xl text-sm text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
-                <button onClick={searchSale} disabled={returnSearchLoading||!returnQuery.trim()} className="px-5 h-10 rounded-xl text-sm font-bold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>{returnSearchLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Search className="h-4 w-4"/>}Search</button>
+                <button onClick={searchSale} disabled={returnSearchLoading||!returnQuery.trim()} className="px-5 h-10 rounded-xl text-sm font-bold text-white flex items-center gap-2 disabled:opacity-50 transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}>{returnSearchLoading?<Loader2 className="h-4 w-4 animate-spin"/>:<Search className="h-4 w-4"/>}Search</button>
               </div>
               {returnSearchRes.length > 0 && (
                 <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
                   <div className="px-3 py-2 border-b" style={{borderColor:"var(--pos-border)"}}><p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>{returnSearchRes.length} sale(s) found — click to select</p></div>
                   {returnSearchRes.map(row=>(
                     <button key={row.id} onClick={()=>selectSale(row)} disabled={returnSaleLoading} className="w-full flex items-center gap-4 px-4 py-3 hover:bg-white/5 transition-colors text-left border-b" style={{borderColor:"var(--pos-border)"}}>
-                      {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"#4f6ef7"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"#4f6ef7"}}/>}
+                      {returnSaleLoading?<Loader2 className="h-4 w-4 animate-spin shrink-0" style={{color:"var(--pos-accent)"}}/>:<RotateCcw className="h-4 w-4 shrink-0" style={{color:"var(--pos-accent)"}}/>}
                       <div className="flex-1 min-w-0">
                         <p className="text-white font-bold text-sm font-mono">{row.invoiceNumber}</p>
                         <p className="text-xs" style={{color:"var(--pos-muted)"}}>{formatSaleCustomerName(row.customer)} · {new Date(row.invoiceDate).toLocaleDateString()}</p>
@@ -3364,8 +3380,8 @@ ${rows}
                     const sel=returnItems.get(it.variantId);
                     const isSelected=(sel?.qty??0)>0;
                     return(
-                      <div key={it.variantId} className="flex items-center gap-3 p-2.5 rounded-xl border transition-all" style={{background:isSelected?"rgba(79,110,247,0.1)":"var(--pos-card)",borderColor:isSelected?"#4f6ef7":"var(--pos-border)"}}>
-                        <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"#4f6ef7":"transparent",borderColor:isSelected?"#4f6ef7":"var(--pos-border-strong)"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
+                      <div key={it.variantId} className="flex items-center gap-3 p-2.5 rounded-xl border transition-all" style={{background:isSelected?"rgba(var(--pos-accent-rgb),0.1)":"var(--pos-card)",borderColor:isSelected?"var(--pos-accent)":"var(--pos-border)"}}>
+                        <button onClick={()=>setReturnItems(m=>{const n=new Map(m);const cur=n.get(it.variantId);if(cur){n.set(it.variantId,{...cur,qty:cur.qty>0?0:cur.maxQty});}return n;})} className="h-5 w-5 rounded border-2 flex items-center justify-center shrink-0 transition-all" style={{background:isSelected?"var(--pos-accent)":"transparent",borderColor:isSelected?"var(--pos-accent)":"var(--pos-border-strong)"}}>{isSelected&&<Check className="h-3 w-3 text-white"/>}</button>
                         <div className="flex-1 min-w-0">
                           <p className="text-white text-xs font-semibold truncate">{it.productName}</p>
                           <p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{it.variantName} · SKU: {it.sku}</p>
@@ -3393,7 +3409,7 @@ ${rows}
                       {exchangeProducts.map(p=>{
                         const ex=exchangeItems.get(p.variantId);
                         return(
-                          <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(79,110,247,0.12)":"var(--pos-card)",borderColor:(ex?.qty??0)>0?"#4f6ef7":"var(--pos-border)"}}>
+                          <div key={p.variantId} className="flex items-center gap-2 p-2 rounded-lg border" style={{background:(ex?.qty??0)>0?"rgba(var(--pos-accent-rgb),0.12)":"var(--pos-card)",borderColor:(ex?.qty??0)>0?"var(--pos-accent)":"var(--pos-border)"}}>
                             <PosProductThumb url={p.imageUrl} name={p.productName} light={lightUi} className="h-8 w-8 rounded-lg shrink-0 overflow-hidden" fallbackBg={getCardBg(p.color, lightUi)} iconClassName="h-4 w-4" />
                             <div className="flex-1 min-w-0"><p className="text-white text-[11px] font-semibold truncate">{p.productName}</p><p className="text-[10px] truncate" style={{color:"var(--pos-muted)"}}>{p.variantName} · {p.sku}</p></div>
                             <div className="flex items-center gap-1 shrink-0">
@@ -3401,7 +3417,7 @@ ${rows}
                               <span className="text-white text-xs font-bold w-4 text-center">{ex?.qty??0}</span>
                               <button onClick={()=>setExchangeItems(m=>{const n=new Map(m);const cur=n.get(p.variantId);n.set(p.variantId,{qty:(cur?.qty??0)+1,unitPrice:p.unitPrice,name:`${p.productName} ${p.variantName}`.trim(),maxQty:p.stock});return n;})} className="h-5 w-5 rounded flex items-center justify-center" style={{background:"var(--pos-input)"}}><Plus className="h-2.5 w-2.5 text-white"/></button>
                             </div>
-                            <p className="text-[10px] font-bold shrink-0" style={{color:"#4f6ef7"}}>LKR {formatNumber(p.unitPrice)}</p>
+                            <p className="text-[10px] font-bold shrink-0" style={{color:"var(--pos-price)"}}>LKR {formatNumber(p.unitPrice)}</p>
                           </div>
                         );
                       })}
@@ -3413,14 +3429,14 @@ ${rows}
                 <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>RETURN TYPE</p>
                 <div className="grid grid-cols-2 gap-1">
                   {[{v:"RETURN",l:"Refund"},{v:"EXCHANGE",l:"Exchange"}].map(t=>(
-                    <button key={t.v} onClick={()=>setReturnType(t.v as "RETURN"|"EXCHANGE")} className="h-8 rounded-xl text-xs font-bold transition-all border" style={{background:returnType===t.v?"#4f6ef7":"var(--pos-card)",borderColor:returnType===t.v?"#4f6ef7":"var(--pos-border)",color:returnType===t.v?"#fff":"var(--pos-muted)"}}>{t.l}</button>
+                    <button key={t.v} onClick={()=>setReturnType(t.v as "RETURN"|"EXCHANGE")} className="h-8 rounded-xl text-xs font-bold transition-all border" style={{background:returnType===t.v?"var(--pos-accent)":"var(--pos-card)",borderColor:returnType===t.v?"var(--pos-accent)":"var(--pos-border)",color:returnType===t.v?"#fff":"var(--pos-muted)"}}>{t.l}</button>
                   ))}
                 </div>
                 <p className="text-xs font-semibold" style={{color:"var(--pos-muted)"}}>RETURN REASON <span className="text-red-400">*</span></p>
                 <div className="space-y-1">
                   {REASONS.map(r=>(
-                    <button key={r.v} onClick={()=>setReturnReason(r.v)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border" style={{background:returnReason===r.v?"rgba(79,110,247,0.2)":"var(--pos-card)",borderColor:returnReason===r.v?"#4f6ef7":"var(--pos-border)",color:returnReason===r.v?"#4f6ef7":"var(--pos-muted)"}}>
-                      {returnReason===r.v&&<Check className="h-3.5 w-3.5 shrink-0" style={{color:"#4f6ef7"}}/>}
+                    <button key={r.v} onClick={()=>setReturnReason(r.v)} className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all border" style={{background:returnReason===r.v?"rgba(var(--pos-accent-rgb),0.2)":"var(--pos-card)",borderColor:returnReason===r.v?"var(--pos-accent)":"var(--pos-border)",color:returnReason===r.v?"var(--pos-accent)":"var(--pos-muted)"}}>
+                      {returnReason===r.v&&<Check className="h-3.5 w-3.5 shrink-0" style={{color:"var(--pos-accent)"}}/>}
                       {r.l}
                     </button>
                   ))}
@@ -3429,7 +3445,7 @@ ${rows}
                 <textarea value={returnNotes} onChange={e=>setReturnNotes(e.target.value)} rows={3} placeholder="Additional notes..." className="rounded-xl px-3 py-2 text-xs text-white outline-none resize-none" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}/>
                 <label className="flex items-center gap-2 px-3 py-2 rounded-xl cursor-pointer border" style={{background:returnRestock?"rgba(16,185,129,0.1)":"var(--pos-card)",borderColor:returnRestock?"rgba(16,185,129,0.4)":"var(--pos-border)"}}>
                   <input type="checkbox" checked={returnRestock} onChange={e=>setReturnRestock(e.target.checked)} className="w-4 h-4 rounded accent-green-500"/>
-                  <span className="text-xs font-semibold" style={{color:returnRestock?"#10b981":"var(--pos-muted)"}}>Restock returned items</span>
+                  <span className="text-xs font-semibold" style={{color:returnRestock?"var(--pos-success)":"var(--pos-muted)"}}>Restock returned items</span>
                 </label>
                 <div className="mt-auto p-3 rounded-xl border" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
                   <p className="text-xs" style={{color:"var(--pos-muted)"}}>Items selected: {selectedItems.length}</p>
@@ -3438,11 +3454,11 @@ ${rows}
                   {returnType==="EXCHANGE"&&(
                     <div className="mt-2 pt-2 border-t space-y-1" style={{borderColor:"var(--pos-border)"}}>
                       <div className="flex justify-between text-[10px]" style={{color:"var(--pos-muted)"}}><span>Exchange</span><span>LKR {formatNumber(exchangeTotal)}</span></div>
-                      <div className="flex justify-between text-[10px]" style={{color:exchangeDue>0?"var(--pos-warn)":"#10b981"}}><span>{exchangeDue>0?"Customer Pays":"Refund"}</span><span>LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</span></div>
+                      <div className="flex justify-between text-[10px]" style={{color:exchangeDue>0?"var(--pos-warn)":"var(--pos-success)"}}><span>{exchangeDue>0?"Customer Pays":"Refund"}</span><span>LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</span></div>
                     </div>
                   )}
                 </div>
-                <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}>Review Return ?</button>
+                <button onClick={()=>{if(!returnReason){toast.error("Select a reason");return;}if(!selectedItems.length){toast.error("Select at least one item");return;}setReturnStep("confirm");}} className="w-full h-9 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}>Review Return ?</button>
               </div>
             </div>
           )}
@@ -3454,7 +3470,7 @@ ${rows}
                 <p className="text-xs font-semibold mb-3" style={{color:"var(--pos-muted)"}}>RETURN SUMMARY</p>
                 <div className="grid grid-cols-2 gap-2 mb-3">
                   {[{l:"Original Invoice",v:returnSale.invoiceNumber},{l:"Customer",v:formatSaleCustomerName(returnSale.customer)},{l:"Type",v:returnType==="EXCHANGE"?"Exchange":"Refund"},{l:"Reason",v:REASONS.find(r=>r.v===returnReason)?.l??returnReason},{l:"Restock Items",v:returnRestock?"Yes":"No"},...(returnType==="EXCHANGE"?[{l:exchangeDue>0?"Customer Pays":"Refund",v:`LKR ${formatNumber(exchangeDue>0?exchangeDue:netRefund)}`}]:[])].map(f=>(
-                    <div key={f.l}><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"var(--pos-warn)"}:f.l==="Refund"?{color:"#10b981"}:{}}>{f.v}</p></div>
+                    <div key={f.l}><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{f.l}</p><p className="text-white text-xs font-semibold mt-0.5" style={f.l==="Customer Pays"?{color:"var(--pos-warn)"}:f.l==="Refund"?{color:"var(--pos-success)"}:{}}>{f.v}</p></div>
                   ))}
                 </div>
                 {returnNotes&&<div className="mt-2"><p className="text-[10px]" style={{color:"var(--pos-muted)"}}>Notes</p><p className="text-white text-xs mt-0.5">{returnNotes}</p></div>}
@@ -3483,11 +3499,11 @@ ${rows}
               )}
               <div className="flex justify-between items-center p-4 rounded-xl border mt-1" style={{background:exchangeDue>0?"var(--pos-warn-bg)":"rgba(16,185,129,0.08)",borderColor:exchangeDue>0?"var(--pos-warn-border)":"rgba(16,185,129,0.3)"}}>
                 <div>
-                  <p className="text-xs" style={{color:exchangeDue>0?"var(--pos-warn)":"#10b981"}}>{exchangeDue>0?"Customer Pays Balance":"Total Refund Amount"}</p>
+                  <p className="text-xs" style={{color:exchangeDue>0?"var(--pos-warn)":"var(--pos-success)"}}>{exchangeDue>0?"Customer Pays Balance":"Total Refund Amount"}</p>
                   <p className="text-2xl font-bold text-white mt-0.5">LKR {formatNumber(exchangeDue>0?exchangeDue:netRefund)}</p>
                   {returnType==="EXCHANGE"&&<p className="text-[10px] mt-1" style={{color:"var(--pos-muted)"}}>Returned LKR {formatNumber(refundTotal)} - Exchange LKR {formatNumber(exchangeTotal)}</p>}
                 </div>
-                <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,#10b981,#059669)"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm {returnType==="EXCHANGE"?"Exchange":"Return"}</button>
+                <button onClick={submitReturn} disabled={returnSubmitting} className="flex items-center gap-2 px-5 h-11 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{background:"linear-gradient(135deg,var(--pos-success),var(--pos-success-2))"}}>{returnSubmitting?<Loader2 className="h-4 w-4 animate-spin"/>:<Check className="h-4 w-4"/>}Confirm {returnType==="EXCHANGE"?"Exchange":"Return"}</button>
               </div>
             </div>
           )}
@@ -3496,7 +3512,7 @@ ${rows}
           {returnStep==="done"&&returnResult&&(
             <div className="flex-1 flex flex-col items-center justify-center gap-4">
               <div className="h-20 w-20 rounded-full flex items-center justify-center" style={{background:exchangeDue>0?"var(--pos-warn-bg)":"rgba(16,185,129,0.15)"}}>
-                <CheckCircle2 className="h-10 w-10" style={{color:exchangeDue>0?"var(--pos-warn)":"#10b981"}}/>
+                <CheckCircle2 className="h-10 w-10" style={{color:exchangeDue>0?"var(--pos-warn)":"var(--pos-success)"}}/>
               </div>
               <div className="text-center">
                 <h3 className="text-white font-bold text-xl">{returnType==="EXCHANGE"?"Exchange":"Return"} Processed!</h3>
@@ -3516,20 +3532,20 @@ ${rows}
                     <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Collect from customer before completing exchange</p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund>0&&(<>
-                    <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund to Customer</p>
-                    <p className="text-4xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(netRefund)}</p>
+                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-success)"}}>Refund to Customer</p>
+                    <p className="text-4xl font-bold" style={{color:"var(--pos-success)"}}>LKR {formatNumber(netRefund)}</p>
                     <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Return the difference to customer</p>
                   </>)}
                   {returnType==="EXCHANGE"&&exchangeDue===0&&netRefund===0&&(<>
-                    <p className="text-sm font-semibold mb-1" style={{color:"#4f6ef7"}}>Even Exchange</p>
-                    <p className="text-4xl font-bold" style={{color:"#4f6ef7"}}>LKR 0.00</p>
+                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-accent)"}}>Even Exchange</p>
+                    <p className="text-4xl font-bold" style={{color:"var(--pos-price)"}}>LKR 0.00</p>
                     <p className="text-xs mt-2" style={{color:"var(--pos-muted)"}}>Equal value — no money changes hands</p>
                   </>)}
                   {returnType!=="EXCHANGE"&&(<>
-                    <p className="text-sm font-semibold mb-1" style={{color:"#10b981"}}>Refund Amount</p>
-                    <p className="text-4xl font-bold" style={{color:"#10b981"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
+                    <p className="text-sm font-semibold mb-1" style={{color:"var(--pos-success)"}}>Refund Amount</p>
+                    <p className="text-4xl font-bold" style={{color:"var(--pos-success)"}}>LKR {formatNumber(returnResult.refundAmount)}</p>
                   </>)}
-                  <p className="text-xs mt-3 font-semibold px-3 py-1 rounded-full inline-block" style={{background:"rgba(79,110,247,0.15)",color:"#4f6ef7"}}>INITIATED · Awaiting Approval</p>
+                  <p className="text-xs mt-3 font-semibold px-3 py-1 rounded-full inline-block" style={{background:"rgba(var(--pos-accent-rgb),0.15)",color:"var(--pos-accent)"}}>INITIATED · Awaiting Approval</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -3544,10 +3560,10 @@ ${rows}
                         :`<div class="row tot blu"><span>EVEN EXCHANGE</span><span>LKR 0.00</span></div>`))
                     :`<div class="row tot grn"><span>REFUND</span><span>LKR ${returnResult.refundAmount.toFixed(2)}</span></div>`;
                   const exchRows=isExc&&selectedExchangeItems.length>0?`<hr class="d"/><div class="label">EXCHANGE ITEMS</div>${selectedExchangeItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Exchange Total</span><span>LKR ${exchangeTotal.toFixed(2)}</span></div>`:"";
-                  w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:#059669}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed · Awaiting Approval ***</div></body></html>`);
+                  w.document.write(`<!DOCTYPE html><html><head><title>${isExc?"Exchange":"Return"} Receipt</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;padding:6mm;max-width:80mm;margin:0 auto}h1{font-size:16px;font-weight:900;text-align:center}.sub{color:#666}.label{font-size:10px;font-weight:bold;margin:4px 0 2px}.d{border-top:1px dashed #000;margin:5px 0}.row{display:flex;justify-content:space-between;margin:2px 0}.tot{font-size:14px;font-weight:900;border-top:2px solid #000;padding-top:4px;margin-top:4px}.grn span:last-child{color:var(--pos-success-2)}.amb span:last-child{color:#b45309}.blu span:last-child{color:#2563eb}.foot{text-align:center;margin-top:8px;font-size:10px}@media print{@page{size:80mm auto}}</style></head><body><h1>${isExc?"EXCHANGE":"RETURN"} RECEIPT</h1><hr class="d"/><div class="row"><span>Ref:</span><span><b>${returnResult.returnNumber}</b></span></div><div class="row"><span>Date:</span><span>${new Date().toLocaleString()}</span></div><div class="row"><span>Invoice:</span><span>${returnSale?.invoiceNumber??""}</span></div><div class="row"><span>Customer:</span><span>${returnSale?.customer?.name??"Walk-in"}</span></div><div class="row"><span>Reason:</span><span>${REASONS.find(r=>r.v===returnReason)?.l??""}</span></div><hr class="d"/><div class="label">RETURNED ITEMS</div>${selectedItems.map(([,s])=>`<div class="row"><span>${s.name} ×${s.qty}</span><span>LKR ${(s.unitPrice*s.qty).toFixed(2)}</span></div>`).join("")}<div class="row sub"><span>Return Total</span><span>LKR ${refundTotal.toFixed(2)}</span></div>${exchRows}<hr class="d"/>${balanceLine}<div class="foot">*** ${isExc?"Exchange":"Return"} Processed · Awaiting Approval ***</div></body></html>`);
                   w.document.close();setTimeout(()=>{w.focus();w.print();setTimeout(()=>w.close(),500);},200);
                 }} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-text-secondary)"}}><Printer className="h-4 w-4"/>Print Receipt</button>
-                <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"#4f6ef7"}}><RotateCcw className="h-4 w-4"/>New Return</button>
+                <button onClick={()=>{setReturnStep("search");setReturnQuery("");setReturnSearchRes([]);setReturnSale(null);setReturnItems(new Map());setReturnReason("");setReturnNotes("");setReturnRestock(true);setReturnResult(null);setReturnType("RETURN");setExchangeItems(new Map());setExchangeSearch("");}} className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90" style={{background:"var(--pos-accent)"}}><RotateCcw className="h-4 w-4"/>New Return</button>
               </div>
             </div>
           )}
@@ -3576,12 +3592,12 @@ ${rows}
               { key: "qty", label: "Add popup", desc: "After scan, confirm qty & selling price (OFF = instant cart)", icon: Package, on: confirmQtyPopup, set: (v: boolean) => { setConfirmQtyPopup(writePosQtyPopup(v)); } },
             ] as const).map((row) => (
               <div key={row.key} className="flex items-center gap-3 py-2 border-b last:border-0" style={{borderColor:"var(--pos-border)"}}>
-                <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><row.icon className="h-4 w-4" style={{color:"#4f6ef7"}}/></div>
+                <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background:"rgba(var(--pos-accent-rgb),0.15)"}}><row.icon className="h-4 w-4" style={{color:"var(--pos-accent)"}}/></div>
                 <div className="flex-1">
                   <p className="text-white text-sm font-semibold">{row.label}</p>
                   <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>{row.desc}</p>
                 </div>
-                <button type="button" onClick={() => row.set(!row.on)} className="px-3 h-8 rounded-lg text-xs font-bold" style={{background: row.on ? "#10b981" : "var(--pos-input)", color: row.on ? "#fff" : "var(--pos-muted)"}}>
+                <button type="button" onClick={() => row.set(!row.on)} className="px-3 h-8 rounded-lg text-xs font-bold" style={{background: row.on ? "var(--pos-success)" : "var(--pos-input)", color: row.on ? "#fff" : "var(--pos-muted)"}}>
                   {row.on ? "ON" : "OFF"}
                 </button>
               </div>
@@ -3602,9 +3618,9 @@ ${rows}
                     onClick={() => applyCartWidth(p.px)}
                     className="h-10 min-w-[64px] px-3 rounded-xl text-sm font-bold transition-all"
                     style={{
-                      background: active ? "#4f6ef7" : "var(--pos-input)",
+                      background: active ? "var(--pos-accent)" : "var(--pos-input)",
                       color: active ? "#fff" : "var(--pos-muted)",
-                      border: `1px solid ${active ? "#4f6ef7" : "var(--pos-border)"}`,
+                      border: `1px solid ${active ? "var(--pos-accent)" : "var(--pos-border)"}`,
                     }}
                   >
                     {p.label}
@@ -3627,6 +3643,57 @@ ${rows}
             </div>
           </div>
           <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+            <h3 className="text-white font-bold text-base mb-1">Product card size</h3>
+            <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
+              Smaller = more products per row. Larger = bigger image &amp; text.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {POS_PRODUCT_CARD_SIZE_PRESETS.map((p) => {
+                const active = productCardSize === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      setProductCardSize(writePosProductCardSize(p.id));
+                      toast.success(`Product cards: ${p.label}`);
+                    }}
+                    className="h-10 min-w-[52px] px-3 rounded-xl text-sm font-bold transition-all"
+                    style={{
+                      background: active ? "var(--pos-accent)" : "var(--pos-input)",
+                      color: active ? "#fff" : "var(--pos-muted)",
+                      border: `1px solid ${active ? "var(--pos-accent)" : "var(--pos-border)"}`,
+                    }}
+                  >
+                    {p.label}
+                    <span className="block text-[10px] font-mono opacity-70">{p.min}px</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div
+              className="rounded-xl border overflow-hidden"
+              style={{
+                width: "min(100%, var(--pos-product-min))",
+                background: "var(--pos-product-card)",
+                borderColor: "var(--pos-product-border)",
+              }}
+            >
+              <div className="flex items-center justify-center" style={{ aspectRatio: "4/3", background: "var(--pos-thumb)" }}>
+                <Package style={{ width: "var(--pos-product-icon)", height: "var(--pos-product-icon)", color: "var(--pos-thumb-icon)" }} />
+              </div>
+              <div style={{ padding: "var(--pos-product-pad)" }}>
+                <p className="font-semibold leading-tight truncate" style={{ color: "var(--pos-product-title)", fontSize: "var(--pos-product-title-size)" }}>
+                  SAMPLE PRODUCT
+                </p>
+                <p className="mt-0.5" style={{ color: "var(--pos-product-sub)", fontSize: "var(--pos-product-sub-size)" }}>Default</p>
+                <p className="font-bold mt-0.5" style={{ color: "var(--pos-product-price)", fontSize: "var(--pos-product-price-size)" }}>
+                  LKR 645
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Thermal receipt theme</h3>
             <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
               Light = black on white (real thermal printers). Dark = white on navy (digital / browser print).
@@ -3646,7 +3713,7 @@ ${rows}
                     style={{
                       background: active ? (opt.value === "dark" ? "#0f172a" : "#fff") : "var(--pos-input)",
                       color: active ? (opt.value === "dark" ? "#f8fafc" : "#0f172a") : "var(--pos-muted)",
-                      border: active ? "2px solid #4f6ef7" : "1px solid var(--pos-border)",
+                      border: active ? "2px solid var(--pos-accent)" : "1px solid var(--pos-border)",
                     }}
                   >
                     {opt.label}
@@ -3655,12 +3722,137 @@ ${rows}
               })}
             </div>
           </div>
+          <div className="rounded-2xl border p-5 space-y-4" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-white font-bold text-base mb-1">POS colors</h3>
+                <p className="text-[11px]" style={{color:"var(--pos-muted)"}}>
+                  Customize buttons, product cards, and prices on this terminal.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setPosColors({ ...POS_COLOR_DEFAULTS });
+                  toast.success("POS colors reset");
+                }}
+                className="px-3 h-8 rounded-lg text-xs font-bold shrink-0"
+                style={{ background: "var(--pos-input)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}
+              >
+                Reset
+              </button>
+            </div>
+            <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>Buttons</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                { key: "accent" as const, label: "Primary / buttons", hint: "Main action buttons" },
+                { key: "accent2" as const, label: "Primary gradient end", hint: "Second color in gradients" },
+                { key: "success" as const, label: "Success / cash", hint: "Confirm & cash buttons" },
+                { key: "success2" as const, label: "Success gradient end", hint: "Cash button gradient" },
+              ]).map((row) => (
+                <label key={row.key} className="flex items-center gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
+                  <input
+                    type="color"
+                    value={posColors[row.key]}
+                    onChange={(e) => setPosColors({ [row.key]: e.target.value })}
+                    className="h-10 w-10 rounded-lg cursor-pointer border-0 bg-transparent shrink-0"
+                    aria-label={row.label}
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-white">{row.label}</span>
+                    <span className="block text-[11px]" style={{ color: "var(--pos-muted)" }}>{row.hint}</span>
+                    <span className="block text-[10px] font-mono mt-0.5" style={{ color: "var(--pos-text-soft)" }}>{posColors[row.key]}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <p className="text-[11px] font-bold uppercase tracking-wide pt-1" style={{ color: "var(--pos-muted)" }}>Product cards</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {([
+                {
+                  key: "cardBg" as const,
+                  label: "Card background",
+                  hint: "Product tile surface",
+                  auto: resolvePosUiMode(receiptSettings.receiptTheme) === "dark" ? "#162338" : "#ffffff",
+                },
+                {
+                  key: "cardTitle" as const,
+                  label: "Product name",
+                  hint: "Title text on card",
+                  auto: resolvePosUiMode(receiptSettings.receiptTheme) === "dark" ? "#ffffff" : "#0f172a",
+                },
+                {
+                  key: "cardSub" as const,
+                  label: "Variant / subtitle",
+                  hint: "Default / size line",
+                  auto: resolvePosUiMode(receiptSettings.receiptTheme) === "dark" ? "#8eabcf" : "#475569",
+                },
+                {
+                  key: "cardBorder" as const,
+                  label: "Card border",
+                  hint: "Idle border color",
+                  auto: resolvePosUiMode(receiptSettings.receiptTheme) === "dark" ? "#1e3356" : "#e2e8f0",
+                },
+                {
+                  key: "price" as const,
+                  label: "Price on card",
+                  hint: "Also checkout totals (dark auto = white)",
+                  auto: resolvePosUiMode(receiptSettings.receiptTheme) === "dark" ? "#ffffff" : posColors.accent,
+                },
+              ]).map((row) => (
+                <label key={row.key} className="flex items-center gap-3 rounded-xl border px-3 py-2.5" style={{ borderColor: "var(--pos-border)", background: "var(--pos-input)" }}>
+                  <input
+                    type="color"
+                    value={posColors[row.key] || row.auto}
+                    onChange={(e) => setPosColors({ [row.key]: e.target.value })}
+                    className="h-10 w-10 rounded-lg cursor-pointer border-0 bg-transparent shrink-0"
+                    aria-label={row.label}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-white">{row.label}</span>
+                    <span className="block text-[11px]" style={{ color: "var(--pos-muted)" }}>{row.hint}</span>
+                    <span className="block text-[10px] font-mono mt-0.5" style={{ color: "var(--pos-text-soft)" }}>
+                      {posColors[row.key] || "auto"}
+                    </span>
+                  </span>
+                  {posColors[row.key] ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPosColors({ [row.key]: "" });
+                      }}
+                      className="px-2.5 h-8 rounded-lg text-[11px] font-bold shrink-0"
+                      style={{ background: "var(--pos-panel)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}
+                    >
+                      Auto
+                    </button>
+                  ) : null}
+                </label>
+              ))}
+            </div>
+            <div className="rounded-xl border overflow-hidden w-44" style={{ background: "var(--pos-product-card)", borderColor: "var(--pos-product-border)" }}>
+              <div className="h-20 flex items-center justify-center" style={{ background: "var(--pos-thumb)" }}>
+                <Package className="h-8 w-8" style={{ color: "var(--pos-thumb-icon)" }} />
+              </div>
+              <div className="p-2">
+                <p className="text-sm font-semibold leading-tight truncate" style={{ color: "var(--pos-product-title)" }}>SAMPLE PRODUCT</p>
+                <p className="text-xs mt-0.5" style={{ color: "var(--pos-product-sub)" }}>Default</p>
+                <p className="text-base font-bold mt-0.5" style={{ color: "var(--pos-product-price)" }}>LKR 645</p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <span className="px-3 h-9 rounded-xl text-xs font-bold text-white inline-flex items-center" style={{ background: "var(--pos-accent)" }}>Primary</span>
+              <span className="px-3 h-9 rounded-xl text-xs font-bold text-white inline-flex items-center" style={{ background: "var(--pos-accent-grad)" }}>Gradient</span>
+              <span className="px-3 h-9 rounded-xl text-xs font-bold text-white inline-flex items-center" style={{ background: "var(--pos-success)" }}>Success</span>
+            </div>
+          </div>
           {/* Inventory admin */}
           <div className="rounded-2xl border p-5 space-y-3" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <h3 className="text-white font-bold text-base mb-1">Inventory (Admin)</h3>
             <div className="flex items-center gap-3 py-2">
-              <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background: allowNegativeStock ? "var(--pos-warn-bg)" : "rgba(79,110,247,0.15)"}}>
-                <AlertTriangle className="h-4 w-4" style={{color: allowNegativeStock ? "var(--pos-warn-soft)" : "#4f6ef7"}}/>
+              <div className="h-9 w-9 rounded-lg flex items-center justify-center" style={{background: allowNegativeStock ? "var(--pos-warn-bg)" : "rgba(var(--pos-accent-rgb),0.15)"}}>
+                <AlertTriangle className="h-4 w-4" style={{color: allowNegativeStock ? "var(--pos-warn-soft)" : "var(--pos-accent)"}}/>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm font-semibold">Allow negative stock</p>
@@ -3693,7 +3885,7 @@ ${rows}
           {/* Tax Rate */}
           <div className="rounded-2xl border p-5" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Receipt className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(var(--pos-accent-rgb),0.15)"}}><Receipt className="h-5 w-5" style={{color:"var(--pos-accent)"}}/></div>
               <div className="flex-1">
                 <h3 className="text-white font-bold text-base">Tax Rate</h3>
                 <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
@@ -3704,7 +3896,7 @@ ${rows}
               </div>
               <span className="text-xs font-bold px-3 py-1 rounded-full shrink-0" style={{
                 background: taxRate > 0 ? "rgba(16,185,129,0.15)" : "rgba(107,114,128,0.2)",
-                color: taxRate > 0 ? "#10b981" : "#9ca3af",
+                color: taxRate > 0 ? "var(--pos-success)" : "#9ca3af",
               }}>
                 {taxRate > 0 ? `${taxRate}% Active` : "Tax Off"}
               </span>
@@ -3715,13 +3907,13 @@ ${rows}
             <div className="flex items-center gap-3">
               <input key={`pos-tax-${taxRate}`} type="number" min="0" max="100" step="0.01" defaultValue={taxRate} onBlur={e=>applyPosTax(parseFloat(e.target.value)||0)} className="w-28 h-10 px-3 rounded-xl text-white text-center text-sm font-bold outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>
               <span className="text-white font-bold text-lg">%</span>
-              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"#4f6ef7":"var(--pos-input)",color:taxRate===v?"#fff":"var(--pos-muted)"}}>{v===0?"Off":`${v}%`}</button>))}</div>
+              <div className="flex gap-2 ml-2">{[0,5,10,15].map(v=>(<button key={v} onClick={()=>applyPosTax(v)} className="px-3 h-8 rounded-lg text-xs font-bold transition-all" style={{background:taxRate===v?"var(--pos-accent)":"var(--pos-input)",color:taxRate===v?"#fff":"var(--pos-muted)"}}>{v===0?"Off":`${v}%`}</button>))}</div>
             </div>
           </div>
           {/* PIN Security — per-user, switch cashiers without re-login */}
           <div className="rounded-2xl border p-5 space-y-4" style={{background:"var(--pos-card)",borderColor:"var(--pos-border)"}}>
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(79,110,247,0.15)"}}><Lock className="h-5 w-5" style={{color:"#4f6ef7"}}/></div>
+              <div className="h-10 w-10 rounded-xl flex items-center justify-center" style={{background:"rgba(var(--pos-accent-rgb),0.15)"}}><Lock className="h-5 w-5" style={{color:"var(--pos-accent)"}}/></div>
               <div>
                 <h3 className="text-white font-bold text-base">Your cashier PIN</h3>
                 <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
@@ -3730,7 +3922,7 @@ ${rows}
                     : "Set a 4-digit PIN so you can unlock POS and take over sales without logging in again."}
                 </p>
               </div>
-              {pinIsSet&&<span className="ml-auto text-xs font-bold px-3 py-1 rounded-full" style={{background:"rgba(16,185,129,0.15)",color:"#10b981"}}>Active</span>}
+              {pinIsSet&&<span className="ml-auto text-xs font-bold px-3 py-1 rounded-full" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>Active</span>}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -3759,7 +3951,7 @@ ${rows}
                   }
                 }}
                 className="px-5 h-10 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
-                style={{background:"#4f6ef7"}}
+                style={{background:"var(--pos-accent)"}}
               >
                 {pinIsSet ? "Update PIN" : "Save PIN"}
               </button>
@@ -3803,10 +3995,10 @@ ${rows}
               { icon: RefreshCw, title: "Reload Products", onClick: loadProducts, path: "" },
             ] as { icon: React.ElementType; title: string; path: string; displayLink?: boolean; onClick?: () => void }[]).map((item, i) => (
               item.displayLink
-                ? <a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
+                ? <a key={i} href={getCustomerDisplayUrl()} target={CUSTOMER_DISPLAY_WINDOW_NAME} rel="noopener noreferrer" onClick={handleOpenCustomerDisplay} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "var(--pos-accent)" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
                 : item.path
-                  ? <a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
-                  : <button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "#4f6ef7" }} /><span className="text-white text-sm font-semibold">{item.title}</span></button>
+                  ? <a key={i} href={item.path} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "var(--pos-accent)" }} /><span className="text-white text-sm font-semibold">{item.title}</span><ExternalLink className="h-3.5 w-3.5 ml-auto" style={{ color: "var(--pos-muted-2)" }} /></a>
+                  : <button key={i} onClick={item.onClick} className="flex items-center gap-3 p-4 rounded-xl border transition-all hover:bg-white/5 text-left" style={{ background: "var(--pos-card)", borderColor: "var(--pos-border)" }}><item.icon className="h-5 w-5 shrink-0" style={{ color: "var(--pos-accent)" }} /><span className="text-white text-sm font-semibold">{item.title}</span></button>
             ))}
           </div>
         </div>
@@ -3858,7 +4050,8 @@ ${rows}
           touchMode && "pos-touch-mode",
         )}
         style={{
-          ...posUiCssVars(posUiMode),
+          ...posUiCssVars(posUiMode, posColors),
+          ...posProductCardSizeVars(productCardSize),
           background: "var(--pos-bg)",
           color: "var(--pos-text)",
           fontSize: touchMode ? "15px" : undefined,
@@ -3916,7 +4109,7 @@ ${rows}
         {pinLocked&&(
           <div className="fixed inset-0 z-[150] flex flex-col items-center justify-center gap-8" style={{background:"var(--pos-pin-bg)"}}>
             <div className="flex flex-col items-center gap-2">
-              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" data-pos-on-accent="" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}><Lock className="h-8 w-8 text-white"/></div>
+              <div className="h-16 w-16 rounded-2xl flex items-center justify-center mb-1" data-pos-on-accent="" style={{background:"var(--pos-accent-grad)"}}><Lock className="h-8 w-8 text-white"/></div>
               <h2 className="font-bold text-2xl" style={{color:"var(--pos-text)"}}>Switch cashier</h2>
               <p className="text-sm text-center max-w-xs" style={{color:"var(--pos-muted)"}}>
                 Enter your 4-digit PIN — bills will be assigned to you (no re-login)
@@ -3924,11 +4117,11 @@ ${rows}
             </div>
             <div className="flex gap-4 mb-2">
               {[0,1,2,3].map(i=>(
-                <div key={i} className="h-4 w-4 rounded-full transition-all duration-150" style={{background:pinEntry.length>i?(pinError?"#ef4444":"#4f6ef7"):"var(--pos-border)",transform:pinError&&pinEntry.length===0?"translateX(0)":"none"}}/>
+                <div key={i} className="h-4 w-4 rounded-full transition-all duration-150" style={{background:pinEntry.length>i?(pinError?"#ef4444":"var(--pos-accent)"):"var(--pos-border)",transform:pinError&&pinEntry.length===0?"translateX(0)":"none"}}/>
               ))}
             </div>
             {pinError&&<p className="text-sm font-semibold -mt-4" style={{color:"#ef4444"}}>Incorrect PIN. Try again.</p>}
-            {pinBusy&&<Loader2 className="h-5 w-5 animate-spin -mt-2" style={{color:"#4f6ef7"}}/>}
+            {pinBusy&&<Loader2 className="h-5 w-5 animate-spin -mt-2" style={{color:"var(--pos-accent)"}}/>}
             <div className="grid gap-3" style={{gridTemplateColumns:"repeat(3,80px)"}}>
               {[1,2,3,4,5,6,7,8,9].map(n=>(
                 <button
@@ -4017,13 +4210,13 @@ ${rows}
                 className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", i===3&&"max-w-[180px]")}
                 style={{
                   background: (i === 3 && customer) || (i === 2 && showReload)
-                    ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                    ? (isPosLight ? "var(--pos-accent)" : "rgba(var(--pos-accent-rgb),0.15)")
                     : (isPosLight ? "#334155" : "var(--pos-input)"),
                   color: (i === 3 && customer) || (i === 2 && showReload)
                     ? "#ffffff"
                     : (isPosLight ? "#ffffff" : "var(--pos-text-secondary)"),
                   border: (i === 3 && customer) || (i === 2 && showReload)
-                    ? (isPosLight ? "1px solid #4338ca" : "1px solid rgba(79,110,247,0.35)")
+                    ? (isPosLight ? "1px solid var(--pos-accent-2)" : "1px solid rgba(var(--pos-accent-rgb),0.35)")
                     : (isPosLight ? "1px solid #1E293B" : "none"),
                 }}
                 title={i===3?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : i===2 ? "Reload / Recharge (L)" : undefined}
@@ -4056,8 +4249,8 @@ ${rows}
             <div
               className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold"
               style={{
-                background: isPosLight ? "#059669" : "rgba(16,185,129,0.15)",
-                color: isPosLight ? "#ffffff" : "#10b981",
+                background: isPosLight ? "var(--pos-success-2)" : "rgba(16,185,129,0.15)",
+                color: isPosLight ? "#ffffff" : "var(--pos-success)",
               }}
             >
               <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: isPosLight ? "#ffffff" : "#4ade80" }} />
@@ -4070,7 +4263,7 @@ ${rows}
               className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold hover:opacity-90"
               style={{
                 background: taxRate > 0
-                  ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                  ? (isPosLight ? "var(--pos-accent)" : "rgba(var(--pos-accent-rgb),0.15)")
                   : (isPosLight ? "#475569" : "rgba(107,114,128,0.15)"),
                 color: isPosLight ? "#ffffff" : (taxRate > 0 ? "var(--pos-accent-soft)" : "var(--pos-muted)"),
               }}
@@ -4105,7 +4298,7 @@ ${rows}
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
             </a>
             <div className="flex items-center gap-2 pl-2 border-l" style={{borderColor:"var(--pos-border)"}}>
-              <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>{(activeCashier?.name ?? user?.name)?.[0]??"A"}</div>
+              <div className="h-8 w-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:"var(--pos-accent-grad)"}}>{(activeCashier?.name ?? user?.name)?.[0]??"A"}</div>
               <div>
                 <p className="text-xs font-semibold leading-tight" style={{ color: "var(--pos-text)" }}>{activeCashier?.name ?? user?.name ?? "Admin"}</p>
                 <p className="text-[10px] leading-none" style={{color:"var(--pos-muted)"}}>
@@ -4146,12 +4339,12 @@ ${rows}
                         title="New Product (Q)"
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative"
                         style={{
-                          color: showQuickProduct ? "#4f6ef7" : "var(--pos-muted)",
-                          background: showQuickProduct ? "rgba(79,110,247,0.15)" : "transparent",
+                          color: showQuickProduct ? "var(--pos-accent)" : "var(--pos-muted)",
+                          background: showQuickProduct ? "rgba(var(--pos-accent-rgb),0.15)" : "transparent",
                         }}
                       >
-                        {showQuickProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "#4f6ef7" }} />}
-                        <PackagePlus className="h-4 w-4 shrink-0" style={{ color: showQuickProduct ? "#4f6ef7" : "var(--pos-muted)" }} />
+                        {showQuickProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "var(--pos-accent)" }} />}
+                        <PackagePlus className="h-4 w-4 shrink-0" style={{ color: showQuickProduct ? "var(--pos-accent)" : "var(--pos-muted)" }} />
                         New Product
                         <span className="ml-auto text-[9px] opacity-40 font-mono">Q</span>
                       </button>
@@ -4162,12 +4355,12 @@ ${rows}
                           title="Demo Product (Y)"
                           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative"
                           style={{
-                            color: showDemoProduct ? "#059669" : "var(--pos-muted)",
+                            color: showDemoProduct ? "var(--pos-success-2)" : "var(--pos-muted)",
                             background: showDemoProduct ? "rgba(16,185,129,0.15)" : "transparent",
                           }}
                         >
-                          {showDemoProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "#10b981" }} />}
-                          <Sparkles className="h-4 w-4 shrink-0" style={{ color: showDemoProduct ? "#10b981" : "var(--pos-muted)" }} />
+                          {showDemoProduct && <div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{ background: "var(--pos-success)" }} />}
+                          <Sparkles className="h-4 w-4 shrink-0" style={{ color: showDemoProduct ? "var(--pos-success)" : "var(--pos-muted)" }} />
                           Demo Product
                           <span className="ml-auto text-[9px] opacity-40 font-mono">Y</span>
                         </button>
@@ -4182,11 +4375,11 @@ ${rows}
                     if (item.id === "hold-bills") { openHeldBillsPopup(); return; }
                     if (item.id === "reload") { openReloadPopup(); return; }
                     setActiveNav(item.id);
-                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"#4f6ef7":"var(--pos-muted)",background:active?"rgba(79,110,247,0.15)":"transparent"}}>
-                    {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"#4f6ef7"}}/>}
-                    <item.icon className="h-4 w-4 shrink-0" style={{color:active?"#4f6ef7":"var(--pos-muted)"}}/>
+                  }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-base font-medium transition-all relative" style={{color:active?"var(--pos-accent)":"var(--pos-muted)",background:active?"rgba(var(--pos-accent-rgb),0.15)":"transparent"}}>
+                    {active&&<div className="absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full" style={{background:"var(--pos-accent)"}}/>}
+                    <item.icon className="h-4 w-4 shrink-0" style={{color:active?"var(--pos-accent)":"var(--pos-muted)"}}/>
                     {item.label}
-                    {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#4f6ef7",color:"#fff"}}>{itemCount()}</span>}
+                    {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-accent)",color:"#fff"}}>{itemCount()}</span>}
                     {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-warn)",color:"#fff"}}>{serverHeldBills.length}</span>}
                     {item.id==="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">L</span>}
                     {shortcutIdx>=0&&shortcutIdx<9&&item.id!=="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
@@ -4271,13 +4464,13 @@ ${rows}
                 }}
                 className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all hover:bg-white/5 text-left"
                 style={{
-                  background: customer ? "rgba(79,110,247,0.1)" : "var(--pos-card)",
-                  border: `1px solid ${cartCustomerOpen ? "#4f6ef7" : customer ? "rgba(79,110,247,0.35)" : "var(--pos-border)"}`,
+                  background: customer ? "rgba(var(--pos-accent-rgb),0.1)" : "var(--pos-card)",
+                  border: `1px solid ${cartCustomerOpen ? "var(--pos-accent)" : customer ? "rgba(var(--pos-accent-rgb),0.35)" : "var(--pos-border)"}`,
                 }}
               >
                 <div
                   className="h-8 w-8 rounded-full flex items-center justify-center shrink-0"
-                  style={{ background: customer ? "linear-gradient(135deg,#4f6ef7,#7c3aed)" : "var(--pos-input)" }}
+                  style={{ background: customer ? "var(--pos-accent-grad)" : "var(--pos-input)" }}
                 >
                   {customer
                     ? <span className="text-white text-xs font-bold">{customer.name?.[0] ?? "?"}</span>
@@ -4302,7 +4495,7 @@ ${rows}
                     <X className="h-3.5 w-3.5" style={{ color: "var(--pos-muted)" }} />
                   </button>
                 ) : (
-                  <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", cartCustomerOpen && "rotate-180")} style={{ color: "#4f6ef7" }} />
+                  <ChevronDown className={cn("h-4 w-4 shrink-0 transition-transform", cartCustomerOpen && "rotate-180")} style={{ color: "var(--pos-accent)" }} />
                 )}
               </button>
               {cartCustomerOpen && (
@@ -4311,7 +4504,7 @@ ${rows}
                   style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
                 >
                   <div className="flex items-center gap-2 p-2 border-b" style={{ borderColor: "var(--pos-border)" }}>
-                    <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "#4f6ef7" }} />
+                    <Search className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--pos-accent)" }} />
                     <input
                       ref={cartCustomerSearchRef}
                       value={customerSearch}
@@ -4327,7 +4520,7 @@ ${rows}
                       type="button"
                       onClick={() => openRegisterCustomer(/^\d+$/.test(customerSearch.trim()) ? customerSearch.trim() : undefined)}
                       className="h-7 px-2 rounded-lg text-[10px] font-bold text-white shrink-0 flex items-center gap-1"
-                      style={{ background: "#4f6ef7" }}
+                      style={{ background: "var(--pos-accent)" }}
                     >
                       <Plus className="h-3 w-3" />
                       Register
@@ -4347,7 +4540,7 @@ ${rows}
                         toast.info("Walk-in customer");
                       }}
                       className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-left"
-                      style={{ background: !customer ? "rgba(79,110,247,0.1)" : "transparent" }}
+                      style={{ background: !customer ? "rgba(var(--pos-accent-rgb),0.1)" : "transparent" }}
                     >
                       <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0" style={{ background: "var(--pos-input)" }}>
                         <User className="h-3.5 w-3.5" style={{ color: "var(--pos-muted)" }} />
@@ -4356,10 +4549,10 @@ ${rows}
                         <p className="text-xs font-semibold text-white">Walk-In Customer</p>
                         <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>No account on bill</p>
                       </div>
-                      {!customer && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />}
+                      {!customer && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--pos-success)" }} />}
                     </button>
                     {customerLoading && (
-                      <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" style={{ color: "#4f6ef7" }} /></div>
+                      <div className="flex justify-center py-4"><Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--pos-accent)" }} /></div>
                     )}
                     {!customerLoading && customers.length === 0 && customerSearch && !cartShowNewCust && (
                       <div className="text-center py-4 space-y-2">
@@ -4371,7 +4564,7 @@ ${rows}
                             if (/^\d+$/.test(customerSearch.trim())) setNewCustPhone(customerSearch.trim());
                           }}
                           className="text-[10px] font-bold px-3 h-7 rounded-lg text-white"
-                          style={{ background: "#4f6ef7" }}
+                          style={{ background: "var(--pos-accent)" }}
                         >
                           Register new
                         </button>
@@ -4384,11 +4577,11 @@ ${rows}
                         onClick={() => applyCustomer(c)}
                         className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg hover:bg-white/5 text-left"
                         style={{
-                          background: focusedCustomerIdx === cIdx || customer?.id === c.id ? "rgba(79,110,247,0.12)" : "transparent",
-                          outline: focusedCustomerIdx === cIdx ? "1px solid #4f6ef7" : "none",
+                          background: focusedCustomerIdx === cIdx || customer?.id === c.id ? "rgba(var(--pos-accent-rgb),0.12)" : "transparent",
+                          outline: focusedCustomerIdx === cIdx ? "1px solid var(--pos-accent)" : "none",
                         }}
                       >
-                        <div className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)" }}>
+                        <div className="h-7 w-7 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ background: "var(--pos-accent-grad)" }}>
                           {c.name?.[0]}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -4396,7 +4589,7 @@ ${rows}
                           <p className="text-[10px] truncate" style={{ color: "var(--pos-muted)" }}>{c.phone}</p>
                         </div>
                         {customer?.id === c.id ? (
-                          <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "#10b981" }} />
+                          <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--pos-success)" }} />
                         ) : (
                           <span className="text-[9px] capitalize shrink-0" style={{ color: "var(--pos-warn)" }}>{c.tier}</span>
                         )}
@@ -4423,7 +4616,7 @@ ${rows}
                         return (
                         <motion.div key={item.variantId} initial={{opacity:0,height:0}} animate={{opacity:1,height:"auto"}} exit={{opacity:0,height:0}}
                           onClick={()=>setSelectedCartIdx(idx)} className="flex items-center gap-2 px-2 py-2 rounded-lg cursor-pointer transition-all group"
-                          style={{background:selectedCartIdx===idx?"rgba(79,110,247,0.15)":"var(--pos-card)",border:`1px solid ${selectedCartIdx===idx?"#4f6ef7":"var(--pos-border)"}`}}>
+                          style={{background:selectedCartIdx===idx?"rgba(var(--pos-accent-rgb),0.15)":"var(--pos-card)",border:`1px solid ${selectedCartIdx===idx?"var(--pos-accent)":"var(--pos-border)"}`}}>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-semibold text-white truncate">
                               {item.productName}
@@ -4471,7 +4664,7 @@ ${rows}
                                   }
                                 }}
                                 className="w-10 h-6 rounded text-center text-xs font-bold text-white outline-none"
-                                style={{ background: "var(--pos-panel)", border: "1px solid #4f6ef7" }}
+                                style={{ background: "var(--pos-panel)", border: "1px solid var(--pos-accent)" }}
                                 title={weighted ? "Grams" : "Qty"}
                               />
                             ) : (
@@ -4515,7 +4708,7 @@ ${rows}
                         onClick={() => setDiscountEditType("percentage")}
                         className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
                         style={{
-                          background: discountEditType === "percentage" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                          background: discountEditType === "percentage" ? "var(--pos-accent)" : (isPosLight ? "#334155" : "transparent"),
                           color: "#ffffff",
                         }}
                       >
@@ -4527,7 +4720,7 @@ ${rows}
                         onClick={() => setDiscountEditType("fixed")}
                         className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
                         style={{
-                          background: discountEditType === "fixed" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                          background: discountEditType === "fixed" ? "var(--pos-accent)" : (isPosLight ? "#334155" : "transparent"),
                           color: "#ffffff",
                         }}
                       >
@@ -4554,9 +4747,9 @@ ${rows}
                       }
                       disabled={!!pendingDiscountApproval}
                       className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60 tabular-nums"
-                      style={{ background: "var(--pos-input)", border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "#10b981" : "var(--pos-border)"}` }}
+                      style={{ background: "var(--pos-input)", border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "var(--pos-success)" : "var(--pos-border)"}` }}
                     />
-                    <button onClick={() => void applyCartDiscount()} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ background: "#4f6ef7" }}>{pendingDiscountApproval ? "Pending" : "Apply"}</button>
+                    <button onClick={() => void applyCartDiscount()} disabled={!!pendingDiscountApproval} className="px-4 h-9 rounded-lg text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ background: "var(--pos-accent)" }}>{pendingDiscountApproval ? "Pending" : "Apply"}</button>
                   </div>
                   {discount > 0 && cartDiscountAmt > 0 && !pendingDiscountApproval && (
                     <div className="mx-4 mb-2 px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2" style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)", color: "var(--pos-success-soft)" }}>
@@ -4591,12 +4784,12 @@ ${rows}
                     {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
                     {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
                     {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
-                    {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold pt-1" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
+                    {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold pt-1" style={{color:"var(--pos-success)"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                     <div className="flex justify-between text-sm" style={{color: taxRate > 0 ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                       <span>{taxRate > 0 ? `Tax (${taxRate}% — POS setting)` : "Tax (off — POS setting)"}</span>
                       <span>LKR {formatNumber(taxAmount())}</span>
                     </div>
-                    <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"var(--pos-border)"}}><span>Grand Total</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                    <div className="flex justify-between text-xl font-bold text-white pt-2 border-t" style={{borderColor:"var(--pos-border)"}}><span>Grand Total</span><span style={{color:"var(--pos-price)"}}>LKR {formatNumber(totalAmt)}</span></div>
                   </div>
                   <div className="p-3 grid grid-cols-2 gap-2">
                     <button
@@ -4604,7 +4797,7 @@ ${rows}
                       disabled={items.length === 0 || checkoutLoading || !!pendingDiscountApproval}
                       data-pos-accent=""
                       className="pos-cta h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
+                      style={{ background: "linear-gradient(135deg,var(--pos-success),var(--pos-success-2))", color: "#ffffff" }}
                     >
                       {checkoutLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Banknote className="h-4 w-4" />}
                       Pay Cash
@@ -4615,7 +4808,7 @@ ${rows}
                       disabled={items.length === 0}
                       data-pos-accent=""
                       className="pos-cta h-[52px] rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
-                      style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#ffffff" }}
+                      style={{ background: "var(--pos-accent-grad)", color: "#ffffff" }}
                     >
                       <ChevronRight className="h-4 w-4"/>
                       Pay / Card
@@ -4634,7 +4827,7 @@ ${rows}
                   <div className="flex items-center gap-3">
                     <div className="text-right hidden sm:block">
                       <p className="text-[10px] uppercase tracking-wide font-bold" style={{color:"var(--pos-text-soft)"}}>Pay</p>
-                      <p className="text-lg font-bold tabular-nums leading-none" style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</p>
+                      <p className="pos-checkout-pay-total text-lg font-bold tabular-nums leading-none" data-pos-price="" style={{color:"var(--pos-price)"}}>LKR {formatNumber(totalAmt)}</p>
                     </div>
                     <button type="button" disabled={checkoutLoading} onClick={() => setCheckoutOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10">
                       <X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/>
@@ -4651,18 +4844,18 @@ ${rows}
                   {tierDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Tier discount</span><span>−LKR {formatNumber(tierDiscountAmt)}</span></div>}
                   {payState.couponDiscount>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Coupon{payState.couponCode?` (${payState.couponCode})`:""}</span><span>−LKR {formatNumber(payState.couponDiscount)}</span></div>}
                   {loyaltyDiscountAmt>0&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Loyalty</span><span>−LKR {formatNumber(loyaltyDiscountAmt)}</span></div>}
-                  {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"#10b981"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
+                  {totalSavings>0.001&&<div className="flex justify-between text-xs font-bold" style={{color:"var(--pos-success)"}}><span>Total saved</span><span>LKR {formatNumber(totalSavings)}</span></div>}
                   <div className="flex justify-between text-sm" style={{color: taxEnabled ? "var(--pos-muted)" : "var(--pos-muted-2)"}}>
                     <span>{taxEnabled ? `Tax (${taxRate}%)` : "Tax (off)"}</span>
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
-                  <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"#4f6ef7"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"var(--pos-price)"}}>LKR {formatNumber(totalAmt)}</span></div>
 
                   {/* Checkout discount — % or fixed LKR */}
                   <div className="pt-2 rounded-xl border px-3 py-2.5 space-y-2" style={{ background: "var(--pos-input)", borderColor: discount > 0 ? "rgba(16,185,129,0.4)" : "var(--pos-border)" }}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <Tag className="h-3.5 w-3.5 shrink-0" style={{ color: discount > 0 ? "#10b981" : "#4f6ef7" }} />
+                        <Tag className="h-3.5 w-3.5 shrink-0" style={{ color: discount > 0 ? "var(--pos-success)" : "var(--pos-accent)" }} />
                         <p className="text-sm font-semibold text-white">Discount</p>
                       </div>
                       {cartDiscountAmt > 0 && !pendingDiscountApproval && (
@@ -4679,7 +4872,7 @@ ${rows}
                           onClick={() => setDiscountEditType("percentage")}
                           className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
                           style={{
-                            background: discountEditType === "percentage" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                            background: discountEditType === "percentage" ? "var(--pos-accent)" : (isPosLight ? "#334155" : "transparent"),
                             color: "#ffffff",
                           }}
                         >
@@ -4691,7 +4884,7 @@ ${rows}
                           onClick={() => setDiscountEditType("fixed")}
                           className="h-8 px-2.5 rounded-md text-xs font-bold transition-all"
                           style={{
-                            background: discountEditType === "fixed" ? "#4f6ef7" : (isPosLight ? "#334155" : "transparent"),
+                            background: discountEditType === "fixed" ? "var(--pos-accent)" : (isPosLight ? "#334155" : "transparent"),
                             color: "#ffffff",
                           }}
                         >
@@ -4725,7 +4918,7 @@ ${rows}
                         className="flex-1 h-9 rounded-lg px-3 text-sm text-white outline-none disabled:opacity-60 tabular-nums"
                         style={{
                           background: "var(--pos-panel)",
-                          border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "#10b981" : "var(--pos-border)"}`,
+                          border: `1px solid ${pendingDiscountApproval ? "var(--pos-warn)" : discount > 0 ? "var(--pos-success)" : "var(--pos-border)"}`,
                         }}
                       />
                       <button
@@ -4733,7 +4926,7 @@ ${rows}
                         onClick={() => void applyCartDiscount()}
                         disabled={!!pendingDiscountApproval}
                         className="px-3 h-9 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
-                        style={{ background: "#4f6ef7" }}
+                        style={{ background: "var(--pos-accent)" }}
                       >
                         {pendingDiscountApproval ? "Pending" : "Apply"}
                       </button>
@@ -4769,7 +4962,7 @@ ${rows}
                           aria-checked={taxEnabled}
                           onClick={() => setCheckoutTaxEnabled(!taxEnabled)}
                           className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                          style={{ background: taxEnabled ? "#4f6ef7" : "var(--pos-toggle-off)" }}
+                          style={{ background: taxEnabled ? "var(--pos-accent)" : "var(--pos-toggle-off)" }}
                         >
                           <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${taxEnabled ? "translate-x-5" : ""}`} />
                         </button>
@@ -4783,7 +4976,7 @@ ${rows}
                               onClick={() => { writePosSavedTaxRate(r); setTaxRate(r); }}
                               className="rounded-md px-2 py-0.5 text-[10px] font-semibold transition-colors"
                               style={{
-                                background: taxRate === r ? "#4f6ef7" : "var(--pos-panel)",
+                                background: taxRate === r ? "var(--pos-accent)" : "var(--pos-panel)",
                                 color: taxRate === r ? "#fff" : "var(--pos-muted)",
                               }}
                             >
@@ -4795,7 +4988,7 @@ ${rows}
                     </div>
                     <div className="rounded-xl px-3 py-2 flex items-center justify-between gap-2" style={{ background: "var(--pos-input)" }}>
                       <div className="min-w-0 flex items-center gap-2">
-                        <MessageCircle className="h-4 w-4 shrink-0" style={{ color: waBillEnabled ? "#10b981" : "var(--pos-muted)" }} />
+                        <MessageCircle className="h-4 w-4 shrink-0" style={{ color: waBillEnabled ? "var(--pos-success)" : "var(--pos-muted)" }} />
                         <div>
                           <p className="text-sm font-semibold text-white">WhatsApp</p>
                           <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
@@ -4809,7 +5002,7 @@ ${rows}
                         aria-checked={waBillEnabled}
                         onClick={() => setCheckoutWaBillEnabled(!waBillEnabled)}
                         className="relative h-7 w-12 shrink-0 rounded-full transition-colors"
-                        style={{ background: waBillEnabled ? "#10b981" : "var(--pos-toggle-off)" }}
+                        style={{ background: waBillEnabled ? "var(--pos-success)" : "var(--pos-toggle-off)" }}
                       >
                         <span className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${waBillEnabled ? "translate-x-5" : ""}`} />
                       </button>
@@ -4887,7 +5080,7 @@ ${rows}
                       )}
                       style={{
                         background: active
-                          ? "linear-gradient(135deg,#4f6ef7,#7c3aed)"
+                          ? "var(--pos-accent-grad)"
                           : (isPosLight ? "#334155" : "var(--pos-input)"),
                         color: "#ffffff",
                       }}
@@ -5027,7 +5220,7 @@ ${rows}
                       placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "Type amount…"}
                       className="h-12 rounded-xl px-3 mb-2 font-bold text-2xl font-mono outline-none w-full"
                       style={{
-                        background: activePayment === "CUSTOMER_CREDIT" ? "rgba(79,110,247,0.1)" : "rgba(16,185,129,0.1)",
+                        background: activePayment === "CUSTOMER_CREDIT" ? "rgba(var(--pos-accent-rgb),0.1)" : "rgba(16,185,129,0.1)",
                         color: activePayment === "CUSTOMER_CREDIT" ? "var(--pos-accent-soft)" : "var(--pos-success-soft)",
                         border: activePayment === "CASH" && !(parseFloat(numpad) > 0) ? "1px solid rgba(239,68,68,0.55)" : "none",
                       }}
@@ -5094,7 +5287,7 @@ ${rows}
                     onClick={() => void handleCheckout()}
                     disabled={checkoutLoading||items.length===0||(activePayment==="CASH"&&!payState.splitMode&&!(parseFloat(numpad)>0))}
                     className="pos-cta flex-1 min-w-[140px] h-[48px] rounded-xl flex items-center justify-center gap-2 text-base font-bold transition-all hover:opacity-90 disabled:opacity-40"
-                    style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
+                    style={{ background: "linear-gradient(135deg,var(--pos-success),var(--pos-success-2))", color: "#ffffff" }}
                   >
                     {checkoutLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
                     <span>Confirm Payment</span>
@@ -5133,7 +5326,7 @@ ${rows}
                   className="mb-4 flex h-16 w-16 items-center justify-center rounded-full"
                   style={{ background: "rgba(16,185,129,0.16)" }}
                 >
-                  <CheckCircle2 className="h-9 w-9" style={{ color: "#10b981" }} strokeWidth={2.5} />
+                  <CheckCircle2 className="h-9 w-9" style={{ color: "var(--pos-success)" }} strokeWidth={2.5} />
                 </div>
                 <h2 id="sale-complete-title" className="text-2xl font-bold" style={{ color: "var(--pos-text)" }}>
                   Payment Complete
@@ -5203,7 +5396,7 @@ ${rows}
           style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
         >
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
-            {[{ label: "Shift Sales", value: `LKR ${formatNumber(todayStats.sales)}`, color: "#4f6ef7", short: "Sales" }, { label: "Orders", value: String(todayStats.orders), short: "Ord" }, { label: "Items Sold", value: String(todayStats.items), short: "Items" }, { label: "Avg. Bill", value: todayStats.orders > 0 ? `LKR ${formatNumber(todayStats.sales / todayStats.orders)}` : "LKR 0.00", short: "Avg" }].map((s) => (
+            {[{ label: "Shift Sales", value: `LKR ${formatNumber(todayStats.sales)}`, color: "var(--pos-accent)", short: "Sales" }, { label: "Orders", value: String(todayStats.orders), short: "Ord" }, { label: "Items Sold", value: String(todayStats.items), short: "Items" }, { label: "Avg. Bill", value: todayStats.orders > 0 ? `LKR ${formatNumber(todayStats.sales / todayStats.orders)}` : "LKR 0.00", short: "Avg" }].map((s) => (
               <div key={s.label} className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[10px] sm:text-xs font-medium whitespace-nowrap" style={{ color: "var(--pos-muted-2)" }}>
                   <span className="sm:hidden">{s.short}</span>
@@ -5238,7 +5431,7 @@ ${rows}
             {(() => {
               const scannerActive = isScannerActive(lastScanAt, scanFlash, now);
               const scannerDetail = formatScannerDetail(lastScanAt, now);
-              const scannerColor = scannerActive ? "#10b981" : "var(--pos-muted)";
+              const scannerColor = scannerActive ? "var(--pos-success)" : "var(--pos-muted)";
               return (
                 <div className="flex items-center gap-1.5 shrink-0 max-w-[200px] lg:max-w-none" style={{ color: scannerColor }} title={`Barcode Scanner · ${scannerDetail}`}>
                   <div className={cn("h-2 w-2 rounded-full shrink-0", scannerActive && "animate-pulse")} style={{ background: scannerActive ? "#4ade80" : "var(--pos-muted-2)" }} />
@@ -5270,11 +5463,11 @@ ${rows}
                 className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
                 style={{
                   background: isFullscreen
-                    ? (isPosLight ? "#4f6ef7" : "rgba(79,110,247,0.15)")
+                    ? (isPosLight ? "var(--pos-accent)" : "rgba(var(--pos-accent-rgb),0.15)")
                     : (isPosLight ? "#334155" : "var(--pos-input)"),
-                  color: isPosLight ? "#ffffff" : (isFullscreen ? "#4f6ef7" : "var(--pos-text-secondary)"),
+                  color: isPosLight ? "#ffffff" : (isFullscreen ? "var(--pos-accent)" : "var(--pos-text-secondary)"),
                   border: `1px solid ${isFullscreen
-                    ? (isPosLight ? "#4338ca" : "rgba(79,110,247,0.35)")
+                    ? (isPosLight ? "var(--pos-accent-2)" : "rgba(var(--pos-accent-rgb),0.35)")
                     : (isPosLight ? "#1E293B" : "var(--pos-border)")}`,
                 }}
               >
@@ -5300,9 +5493,9 @@ ${rows}
                 title="Transfer funds to cashiers"
                 className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
                 style={{
-                  background: isPosLight ? "#4F46E5" : "rgba(79,110,247,0.15)",
+                  background: isPosLight ? "#4F46E5" : "rgba(var(--pos-accent-rgb),0.15)",
                   color: isPosLight ? "#ffffff" : "#a5b4fc",
-                  border: `1px solid ${isPosLight ? "#4338CA" : "rgba(79,110,247,0.35)"}`,
+                  border: `1px solid ${isPosLight ? "#4338CA" : "rgba(var(--pos-accent-rgb),0.35)"}`,
                 }}
               >
                 <ArrowLeftRight className="h-3.5 w-3.5" />
@@ -5313,8 +5506,8 @@ ${rows}
                 title="Close Shift"
                 className="flex items-center gap-1.5 text-xs px-2 sm:px-3 py-1.5 rounded-lg font-semibold transition-all hover:opacity-90"
                 style={{
-                  background: isPosLight ? "#059669" : "rgba(16,185,129,0.12)",
-                  color: isPosLight ? "#ffffff" : "#10b981",
+                  background: isPosLight ? "var(--pos-success-2)" : "rgba(16,185,129,0.12)",
+                  color: isPosLight ? "#ffffff" : "var(--pos-success)",
                   border: `1px solid ${isPosLight ? "#047857" : "rgba(16,185,129,0.3)"}`,
                 }}
               >
@@ -5339,7 +5532,7 @@ ${rows}
         <AnimatePresence>{showDayEnd&&dayEndSummary&&(
           <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="fixed inset-0 z-[110] flex items-center justify-center p-4" style={{background:"rgba(0,0,0,0.75)"}}>
             <motion.div initial={{scale:0.9,y:16}} animate={{scale:1,y:0}} exit={{scale:0.9,y:16}} className="rounded-2xl overflow-hidden border shadow-2xl w-full max-w-md" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
-              <div className="p-5 text-white text-center" data-pos-on-accent="" style={{background:"linear-gradient(135deg,#7c3aed,#4f6ef7)",color:"#ffffff"}}>
+              <div className="p-5 text-white text-center" data-pos-on-accent="" style={{background:"var(--pos-accent-grad)",color:"#ffffff"}}>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-2" style={{background:"rgba(255,255,255,0.2)"}}><TrendingUp className="h-6 w-6"/></div>
                 <h2 className="text-base font-bold">Day End Summary</h2>
                 <p className="text-xs" style={{color:"rgba(255,255,255,0.75)"}}>{dayEndSummary.date}</p>
@@ -5348,8 +5541,8 @@ ${rows}
                 {dayEndSummary.cash && (
                   <div className="rounded-xl p-3 mb-1" style={{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.25)"}}>
                     <div className="flex items-center gap-2 mb-2">
-                      <Banknote className="h-4 w-4" style={{color:"#10b981"}}/>
-                      <p className="text-xs font-bold" style={{color:"#10b981"}}>Cash Drawer</p>
+                      <Banknote className="h-4 w-4" style={{color:"var(--pos-success)"}}/>
+                      <p className="text-xs font-bold" style={{color:"var(--pos-success)"}}>Cash Drawer</p>
                       {dayEndSummary.cash.shiftOpen && (
                         <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{background:"rgba(16,185,129,0.2)",color:"var(--pos-success-soft)"}}>Shift open</span>
                       )}
@@ -5375,8 +5568,8 @@ ${rows}
                     })}
                     {dayEndSummary.cash.expectedInDrawer != null && (
                       <div className="flex justify-between text-sm font-bold pt-2 mt-2 border-t" style={{borderColor:"rgba(16,185,129,0.2)"}}>
-                        <span style={{color:"#10b981"}}>Expected cash total</span>
-                        <span style={{color:"#10b981"}} className="tabular-nums">LKR {formatNumber(dayEndSummary.cash.expectedInDrawer)}</span>
+                        <span style={{color:"var(--pos-success)"}}>Expected cash total</span>
+                        <span style={{color:"var(--pos-success)"}} className="tabular-nums">LKR {formatNumber(dayEndSummary.cash.expectedInDrawer)}</span>
                       </div>
                     )}
                   </div>
@@ -5384,7 +5577,7 @@ ${rows}
 
                 <div className="grid grid-cols-3 gap-2">
                   {[
-                    { label: "Day income", val: dayEndSummary.income ?? dayEndSummary.totalRevenue, color: "#4f6ef7" },
+                    { label: "Day income", val: dayEndSummary.income ?? dayEndSummary.totalRevenue, color: "var(--pos-accent)" },
                     { label: "Day expenses", val: dayEndSummary.expenses ?? 0, color: "var(--pos-warn)" },
                     { label: "Supplier paid", val: dayEndSummary.supplierPayments ?? 0, color: "#ef4444" },
                   ].map((r) => (
@@ -5395,7 +5588,7 @@ ${rows}
                   ))}
                 </div>
 
-                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"var(--pos-text)"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"#4f6ef7"},{label:"Net (income − expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"#10b981"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"var(--pos-warn)"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"#10b981"}].map(r=>(
+                {[{label:"Total Sales",val:String(dayEndSummary.totalSales),color:"var(--pos-text)"},{label:"Gross Revenue",val:`LKR ${formatNumber(dayEndSummary.totalRevenue)}`,color:"var(--pos-accent)"},{label:"Net (income − expenses)",val:`LKR ${formatNumber(dayEndSummary.netIncome ?? (dayEndSummary.totalRevenue - (dayEndSummary.expenses ?? 0)))}`,color:"var(--pos-success)"},{label:"Tax Collected",val:`LKR ${formatNumber(dayEndSummary.totalTax)}`,color:"var(--pos-warn)"},{label:"Total Discount",val:`LKR ${formatNumber(dayEndSummary.totalDiscount)}`,color:"var(--pos-success)"}].map(r=>(
                   <div key={r.label} className="flex justify-between py-1.5 border-b" style={{borderColor:"var(--pos-border)"}}>
                     <span className="text-xs" style={{color:"var(--pos-muted)"}}>{r.label}</span>
                     <span className="text-sm font-bold" style={{color:r.color}}>{r.val}</span>
@@ -5407,7 +5600,7 @@ ${rows}
                     {Object.entries(dayEndSummary.byPaymentMethod).map(([method,amt])=>(
                       <div key={method} className="flex justify-between text-xs py-1">
                         <span className="text-white">{method.replace(/_/g, " ")}</span>
-                        <span className="font-bold tabular-nums" style={{color: method === "CASH" ? "#10b981" : "#4f6ef7"}}>LKR {formatNumber(amt)}</span>
+                        <span className="font-bold tabular-nums" style={{color: method === "CASH" ? "var(--pos-success)" : "var(--pos-accent)"}}>LKR {formatNumber(amt)}</span>
                       </div>
                     ))}
                   </div>
@@ -5419,12 +5612,12 @@ ${rows}
                     type="button"
                     onClick={() => { setShowDayEnd(false); setShowCashClose(true); }}
                     className="w-full h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2"
-                    style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+                    style={{ background: "linear-gradient(135deg,var(--pos-success),var(--pos-success-2))" }}
                   >
                     <Banknote className="h-4 w-4" /> Count & Close Shift
                   </button>
                 )}
-                <button onClick={()=>setShowDayEnd(false)} className="w-full h-10 rounded-xl text-sm font-bold text-white" style={{background:"linear-gradient(135deg,#4f6ef7,#7c3aed)"}}>Done</button>
+                <button onClick={()=>setShowDayEnd(false)} className="w-full h-10 rounded-xl text-sm font-bold text-white" style={{background:"var(--pos-accent-grad)"}}>Done</button>
                 <button
                   type="button"
                   onClick={() => {
@@ -5457,14 +5650,14 @@ ${rows}
                   <button onClick={()=>void loadHeldBills()} className="h-8 px-3 rounded-lg text-xs font-semibold border" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}>
                     <RefreshCw className={cn("h-3.5 w-3.5 inline mr-1",holdsLoading&&"animate-spin")}/>Refresh
                   </button>
-                  <button onClick={()=>{if(items.length>0){void handleHoldBill();setShowHeldBills(false);}else toast.info("Cart is empty");}} className="h-8 px-3 rounded-lg text-xs font-bold text-white" style={{background:"#4f6ef7"}}>
+                  <button onClick={()=>{if(items.length>0){void handleHoldBill();setShowHeldBills(false);}else toast.info("Cart is empty");}} className="h-8 px-3 rounded-lg text-xs font-bold text-white" style={{background:"var(--pos-accent)"}}>
                     Hold current
                   </button>
                   <button onClick={()=>setShowHeldBills(false)} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                {holdsLoading?(<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" style={{color:"#4f6ef7"}}/></div>):serverHeldBills.length===0?(
+                {holdsLoading?(<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):serverHeldBills.length===0?(
                   <div className="flex flex-col items-center justify-center py-12" style={{color:"var(--pos-muted-2)"}}>
                     <PauseCircle className="h-12 w-12 mb-2 opacity-20"/>
                     <p className="text-sm">No bills on hold</p>
@@ -5477,7 +5670,7 @@ ${rows}
                       const billTotal = billItems.reduce((a,i)=>a+i.unitPrice*i.quantity,0);
                       const kbFocus = focusedHeldIdx === idx;
                       return (
-                        <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"var(--pos-card)",borderColor:kbFocus?"#4f6ef7":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(79,110,247,0.35)":"none"}}>
+                        <div key={bill.id} className="rounded-xl border p-3 flex flex-col gap-2" style={{background:"var(--pos-card)",borderColor:kbFocus?"var(--pos-accent)":"var(--pos-border)",boxShadow:kbFocus?"0 0 0 2px rgba(var(--pos-accent-rgb),0.35)":"none"}}>
                           <div className="flex items-start justify-between">
                             <div>
                               <p className="text-white text-xs font-bold">{bill.label ?? `Bill #${serverHeldBills.length-idx}`}</p>
@@ -5485,13 +5678,13 @@ ${rows}
                             </div>
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn)"}}>Reserved</span>
                           </div>
-                          {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(79,110,247,0.1)"}}><User className="h-3 w-3" style={{color:"#4f6ef7"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
+                          {bill.data?.customer&&<div className="flex items-center gap-2 px-2 py-1 rounded-lg" style={{background:"rgba(var(--pos-accent-rgb),0.1)"}}><User className="h-3 w-3" style={{color:"var(--pos-accent)"}}/><span className="text-xs text-white">{bill.data.customer.name}</span></div>}
                           <div className="space-y-0.5">{billItems.slice(0,3).map(i=><div key={i.variantId} className="flex justify-between text-[10px]"><span className="truncate flex-1 mr-2" style={{color:"var(--pos-text-secondary)"}}>{i.productName} ×{i.quantity}</span><span className="font-mono" style={{color:"var(--pos-muted)"}}>LKR {formatNumber(i.unitPrice*i.quantity)}</span></div>)}{billItems.length>3&&<p className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>+{billItems.length-3} more</p>}</div>
                           <div className="flex items-center justify-between pt-1 border-t" style={{borderColor:"var(--pos-border)"}}>
                             <span className="text-white text-sm font-bold">LKR {formatNumber(billTotal)}</span>
                             <div className="flex gap-2">
                               <button onClick={()=>void handleDeleteHeldBill(bill.id)} className="px-2.5 h-7 rounded-lg text-[11px] font-semibold" style={{background:"rgba(239,68,68,0.15)",color:"#ef4444"}}>Delete</button>
-                              <button onClick={()=>{void handleRestoreHeldBill(bill);setShowHeldBills(false);}} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white" style={{background:"#10b981"}}>Restore</button>
+                              <button onClick={()=>{void handleRestoreHeldBill(bill);setShowHeldBills(false);}} className="px-2.5 h-7 rounded-lg text-[11px] font-bold text-white" style={{background:"var(--pos-success)"}}>Restore</button>
                             </div>
                           </div>
                         </div>
@@ -5528,8 +5721,8 @@ ${rows}
             >
               <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--pos-border)" }}>
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
-                    <Smartphone className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--pos-accent-rgb),0.12)" }}>
+                    <Smartphone className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
                   </div>
                   <div>
                     <h2 className="font-bold text-sm leading-tight" style={{ color: "var(--pos-text)" }}>Reload / Recharge</h2>
@@ -5585,8 +5778,8 @@ ${rows}
             >
               <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderBottom: "1px solid var(--pos-border)" }}>
                 <div className="flex items-center gap-3">
-                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(79,110,247,0.12)" }}>
-                    <User className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  <div className="h-9 w-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(var(--pos-accent-rgb),0.12)" }}>
+                    <User className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
                   </div>
                   <div>
                     <h2 className="font-bold text-sm leading-tight" style={{ color: "var(--pos-text)" }}>Register New Customer</h2>
@@ -5608,7 +5801,7 @@ ${rows}
                       onChange={(e) => setNewCustFirst(e.target.value)}
                       placeholder="John"
                       autoFocus
-                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(var(--pos-accent-rgb),0.18)]"
                       style={posCustomerFormStyles(isPosLight).input}
                     />
                   </div>
@@ -5618,7 +5811,7 @@ ${rows}
                       value={newCustLast}
                       onChange={(e) => setNewCustLast(e.target.value)}
                       placeholder="Doe"
-                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(var(--pos-accent-rgb),0.18)]"
                       style={posCustomerFormStyles(isPosLight).input}
                     />
                   </div>
@@ -5630,7 +5823,7 @@ ${rows}
                       placeholder="077 123 4567"
                       inputMode="tel"
                       autoComplete="tel"
-                      className="w-full h-11 px-4 rounded-xl text-sm outline-none font-mono transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none font-mono transition-shadow focus:shadow-[0_0_0_3px_rgba(var(--pos-accent-rgb),0.18)]"
                       style={posCustomerFormStyles(isPosLight).input}
                     />
                   </div>
@@ -5641,7 +5834,7 @@ ${rows}
                       value={newCustEmail}
                       onChange={(e) => setNewCustEmail(e.target.value)}
                       placeholder="john@email.com"
-                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(79,110,247,0.18)]"
+                      className="w-full h-11 px-4 rounded-xl text-sm outline-none transition-shadow focus:shadow-[0_0_0_3px_rgba(var(--pos-accent-rgb),0.18)]"
                       style={posCustomerFormStyles(isPosLight).input}
                     />
                   </div>
@@ -5667,7 +5860,7 @@ ${rows}
                   disabled={newCustSaving || !newCustFirst.trim() || !newCustPhone.trim()}
                   data-pos-on-accent=""
                   className="pos-cta w-full h-12 rounded-xl text-sm font-bold transition-all hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-40"
-                  style={{ background: "linear-gradient(135deg,#4f6ef7,#4338ca)", color: "#ffffff", boxShadow: "0 8px 20px rgba(79,110,247,0.25)" }}
+                  style={{ background: "var(--pos-accent-grad)", color: "#ffffff", boxShadow: "0 8px 20px rgba(var(--pos-accent-rgb),0.25)" }}
                 >
                   {newCustSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                   {newCustSaving ? "Saving..." : "Save & Add to Bill"}
@@ -5697,7 +5890,7 @@ ${rows}
             >
               <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
                 <div className="flex items-center gap-2">
-                  <PackagePlus className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+                  <PackagePlus className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
                   <h2 className="text-white font-bold text-sm">New Product</h2>
                   <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>Q</kbd>
                 </div>
@@ -5738,7 +5931,7 @@ ${rows}
             >
               <div className="flex items-center justify-between p-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
                 <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" style={{ color: "#10b981" }} />
+                  <Sparkles className="h-4 w-4" style={{ color: "var(--pos-success)" }} />
                   <h2 className="text-white font-bold text-sm">Demo Product</h2>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md" style={{ background: "rgba(16,185,129,0.15)", color: "#6ee7b7" }}>Bill only</span>
                   <kbd className="text-[10px] font-mono rounded px-1.5 py-0.5 ml-1" style={{ background: "var(--pos-kbd)", color: "var(--pos-muted)", border: "1px solid var(--pos-border)" }}>Y</kbd>
@@ -5767,7 +5960,7 @@ ${rows}
             <motion.div initial={{scale:0.95}} animate={{scale:1}} exit={{scale:0.95}} onClick={e=>e.stopPropagation()} className="rounded-2xl border shadow-2xl w-full max-w-3xl p-5 max-h-[88vh] overflow-y-auto" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)"}}>
               <div className="flex items-center justify-between mb-4 sticky top-0 z-10 pb-2" style={{background:"var(--pos-panel)"}}>
                 <div className="flex items-center gap-2">
-                  <Keyboard className="h-4 w-4" style={{color:"#4f6ef7"}}/>
+                  <Keyboard className="h-4 w-4" style={{color:"var(--pos-accent)"}}/>
                   <span className="text-white font-bold text-sm">Keyboard — full POS</span>
                 </div>
                 <button onClick={()=>setShowShortcuts(false)} className="p-1 rounded hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>

@@ -336,7 +336,7 @@ export function PosQuantityPopup({
           <div className="flex flex-wrap items-center gap-2">
             <span
               className="text-[10px] font-semibold px-2.5 py-1 rounded-full"
-              style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-accent-soft)" }}
+              style={{ background: "rgba(var(--pos-accent-rgb),0.15)", color: "var(--pos-accent-soft)" }}
             >
               {isWeighted ? `Max ${gramsLimit} g` : `Max qty ${stockLimit}`}
             </span>

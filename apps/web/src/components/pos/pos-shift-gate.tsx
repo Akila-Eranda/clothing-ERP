@@ -249,7 +249,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                 onClick={() => void handleApprovePending()}
                 disabled={approving}
                 className="w-full h-11 gap-2 font-bold"
-                style={{ background: "linear-gradient(135deg,#10b981,#059669)" }}
+                style={{ background: "var(--pos-success-grad)" }}
               >
                 {approving ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
                 Approve variance
@@ -423,8 +423,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                       onClick={() => setOpeningCash(String(p))}
                       className="px-2.5 py-1 text-[10px] rounded-lg border font-medium transition-all"
                       style={{
-                        background: openingCash === String(p) ? "#10b981" : "var(--pos-card)",
-                        borderColor: openingCash === String(p) ? "#10b981" : "var(--pos-border)",
+                        background: openingCash === String(p) ? "var(--pos-success)" : "var(--pos-card)",
+                        borderColor: openingCash === String(p) ? "var(--pos-success)" : "var(--pos-border)",
                         color: openingCash === String(p) ? "#fff" : "var(--pos-muted)",
                       }}
                     >
@@ -442,7 +442,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
             disabled={submitting || !activeBranchId || !counterId}
             data-pos-accent=""
             className="pos-cta w-full h-11 gap-2 font-bold"
-            style={{ background: "linear-gradient(135deg,#10b981,#059669)", color: "#ffffff" }}
+            style={{ background: "var(--pos-success-grad)", color: "#ffffff" }}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
             {existingOpen ? "Continue Shift" : "Start Shift"}

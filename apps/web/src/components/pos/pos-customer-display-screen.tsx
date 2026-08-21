@@ -12,6 +12,8 @@ import {
   type CustomerDisplayState,
 } from "@/lib/pos-customer-display";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
+import { readPosUiColors } from "@/lib/pos-ui-colors";
 import { cn } from "@/lib/utils";
 
 export interface DisplayBranding {
@@ -102,7 +104,7 @@ function TotalsPanel({ state, compact }: { state: CustomerDisplayState; compact?
         style={{ borderColor: "rgba(255,255,255,0.12)" }}
       >
         <span className={cn("font-bold text-white", compact ? "text-xl" : "text-2xl")}>Total</span>
-        <span className={cn("font-black", compact ? "text-3xl" : "text-4xl")} style={{ color: "#4f6ef7" }}>
+        <span className={cn("font-black", compact ? "text-3xl" : "text-4xl")} style={{ color: "var(--pos-price)" }}>
           {currency} {formatNumber(state.total)}
         </span>
       </div>
@@ -128,7 +130,7 @@ function CheckoutCashPanel({ state }: { state: CustomerDisplayState }) {
         <div className="grid grid-cols-2 gap-3">
           <div
             className="rounded-2xl p-4 text-center"
-            style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.3)" }}
+            style={{ background: "rgba(var(--pos-accent-rgb),0.12)", border: "1px solid rgba(var(--pos-accent-rgb),0.3)" }}
           >
             <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: "#93c5fd" }}>Amount Due</p>
             <p className="text-3xl font-black text-white">{state.currency} {formatNumber(state.total)}</p>
@@ -163,7 +165,7 @@ function CheckoutCashPanel({ state }: { state: CustomerDisplayState }) {
       {hasTendered && tendered >= state.total && change === 0 && (
         <div
           className="rounded-xl px-4 py-3 text-center"
-          style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.3)" }}
+          style={{ background: "rgba(var(--pos-accent-rgb),0.12)", border: "1px solid rgba(var(--pos-accent-rgb),0.3)" }}
         >
           <p className="text-base font-semibold text-white">Exact amount — no change</p>
         </div>
@@ -208,9 +210,9 @@ function IdleScreen({ branding }: { branding: DisplayBranding }) {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.2 }}
         className="flex items-center gap-3 px-6 py-4 rounded-2xl"
-        style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.25)" }}
+        style={{ background: "rgba(var(--pos-accent-rgb),0.12)", border: "1px solid rgba(var(--pos-accent-rgb),0.25)" }}
       >
-        <ShoppingBag className="h-8 w-8" style={{ color: "#4f6ef7" }} />
+        <ShoppingBag className="h-8 w-8" style={{ color: "var(--pos-price)" }} />
         <p className="text-xl text-white font-semibold">Welcome — your items will appear here</p>
       </motion.div>
     </div>
@@ -285,7 +287,7 @@ function ReloadPhoneScreen({
       <div className="text-center">
         <ShopBrandLogo logoUrl={branding.logoUrl} shopName={branding.shopName} size="md" className="mx-auto mb-3" />
         <div className="flex items-center justify-center gap-2 mb-2">
-          <Smartphone className="h-6 w-6" style={{ color: "#4f6ef7" }} />
+          <Smartphone className="h-6 w-6" style={{ color: "var(--pos-price)" }} />
           <h2 className="text-3xl font-black text-white">Reload</h2>
         </div>
         <p className="text-lg" style={{ color: "#6a8ab8" }}>
@@ -298,7 +300,7 @@ function ReloadPhoneScreen({
 
       <div
         className="w-full max-w-md rounded-3xl px-6 py-5 text-center"
-        style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.35)" }}
+        style={{ background: "rgba(var(--pos-accent-rgb),0.12)", border: "1px solid rgba(var(--pos-accent-rgb),0.35)" }}
       >
         <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#93c5fd" }}>
           Phone number
@@ -349,13 +351,13 @@ function ThankYouScreen({ state }: { state: CustomerDisplayState }) {
         className="h-24 w-24 rounded-full flex items-center justify-center mb-6"
         style={{ background: "rgba(16,185,129,0.15)", border: "2px solid rgba(16,185,129,0.4)" }}
       >
-        <CheckCircle2 className="h-12 w-12" style={{ color: "#10b981" }} />
+        <CheckCircle2 className="h-12 w-12" style={{ color: "var(--pos-success)" }} />
       </motion.div>
       <h2 className="text-4xl font-black text-white mb-2">Thank you!</h2>
       {state.customerName && (
         <p className="text-xl mb-4" style={{ color: "#6a8ab8" }}>{state.customerName}</p>
       )}
-      <p className="text-5xl font-black mb-2" style={{ color: "#4f6ef7" }}>
+      <p className="text-5xl font-black mb-2" style={{ color: "var(--pos-price)" }}>
         {state.currency} {formatNumber(state.total)}
       </p>
       {state.discount > 0.001 && (
@@ -419,7 +421,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
                   style={{ background: "linear-gradient(to top, rgba(13,27,46,0.95) 0%, transparent 55%)" }}
                 />
                 <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "#4f6ef7" }}>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: "var(--pos-price)" }}>
                     {state.phase === "checkout" ? "Your order" : "Just added"}
                   </p>
                   <h2 className="text-2xl font-black text-white leading-tight">{state.lastAdded.productName}</h2>
@@ -451,11 +453,11 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
         {state.customerName && (
           <div
             className="mt-4 px-5 py-3 rounded-2xl flex items-center gap-3 shrink-0"
-            style={{ background: "rgba(79,110,247,0.12)", border: "1px solid rgba(79,110,247,0.25)" }}
+            style={{ background: "rgba(var(--pos-accent-rgb),0.12)", border: "1px solid rgba(var(--pos-accent-rgb),0.25)" }}
           >
             <div
               className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0"
-              style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)" }}
+              style={{ background: "var(--pos-accent-grad)" }}
             >
               {state.customerName[0]}
             </div>
@@ -478,7 +480,7 @@ function ShoppingScreen({ state }: { state: CustomerDisplayState }) {
           </h3>
           <span
             className="text-sm font-bold px-3 py-1 rounded-full"
-            style={{ background: "rgba(79,110,247,0.2)", color: "#93c5fd" }}
+            style={{ background: "rgba(var(--pos-accent-rgb),0.2)", color: "#93c5fd" }}
           >
             {state.itemCount} {state.itemCount === 1 ? "item" : "items"}
           </span>
@@ -576,7 +578,10 @@ export function PosCustomerDisplayScreen() {
   return (
     <div
       className="fixed inset-0 flex flex-col overflow-hidden select-none"
-      style={{ background: "linear-gradient(160deg,#070d1a 0%,#0d1b2e 45%,#0f1f3a 100%)" }}
+      style={{
+        ...posUiCssVars(resolvePosUiMode(receiptSettings.receiptTheme), readPosUiColors()),
+        background: "linear-gradient(160deg,#070d1a 0%,#0d1b2e 45%,#0f1f3a 100%)",
+      }}
     >
       {/* Header */}
       <header
@@ -592,7 +597,7 @@ export function PosCustomerDisplayScreen() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: connected ? "#10b981" : "#6a8ab8" }}>
+        <div className="flex items-center gap-2 text-xs font-semibold" style={{ color: connected ? "var(--pos-success)" : "#6a8ab8" }}>
           {connected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
           {connected ? "Live" : "Reconnecting…"}
         </div>

@@ -946,6 +946,11 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.02em;
 }
+/* Checkout pay / grand totals — high contrast in dark mode */
+.pos-shell.pos-dark .pos-checkout .pos-checkout-pay-total,
+.pos-shell.pos-dark .pos-checkout [data-pos-price] {
+  color: var(--pos-price, #ffffff) !important;
+}
 
 /* Dark-first markup uses text-white — remap for light panels (body copy) */
 .pos-shell.pos-light .text-white {
@@ -1082,27 +1087,27 @@
 /* Selected text in POS inputs — keep readable in light mode */
 .pos-shell.pos-light input::selection,
 .pos-shell.pos-light textarea::selection {
-  background: rgba(79, 110, 247, 0.28);
+  background: rgba(var(--pos-accent-rgb), 0.28);
   color: #0f172a;
 }
 
 /* Gradient / solid accent fills (buttons + badges) keep white text */
-.pos-shell.pos-light [style*="linear-gradient(135deg,#4f6ef7"],
-.pos-shell.pos-light [style*="linear-gradient(135deg,#4f6ef7"].text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#4f6ef7"] .text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#4f6ef7"] *,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-accent)"],
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-accent)"].text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-accent)"] .text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-accent)"] *,
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"],
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"].text-white,
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"] .text-white,
 .pos-shell.pos-light [style*="linear-gradient(135deg,#7c3aed"] *,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"],
-.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"].text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"] .text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#10b981"] *,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"],
-.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"].text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"] .text-white,
-.pos-shell.pos-light [style*="linear-gradient(135deg,#059669"] *,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success)"],
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success)"].text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success)"] .text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success)"] *,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success-2)"],
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success-2)"].text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success-2)"] .text-white,
+.pos-shell.pos-light [style*="linear-gradient(135deg,var(--pos-success-2)"] *,
 .pos-shell.pos-light [style*="linear-gradient(180deg,#22c55e"],
 .pos-shell.pos-light [style*="linear-gradient(180deg,#22c55e"].text-white,
 .pos-shell.pos-light [style*="linear-gradient(180deg,#22c55e"] .text-white,
@@ -1111,11 +1116,11 @@
 .pos-shell.pos-light [style*="linear-gradient(180deg, #22c55e"].text-white,
 .pos-shell.pos-light [style*="linear-gradient(180deg, #22c55e"] .text-white,
 .pos-shell.pos-light [style*="linear-gradient(180deg, #22c55e"] *,
-.pos-shell.pos-light button[style*="background:#4f6ef7"],
-.pos-shell.pos-light button[style*="background: #4f6ef7"],
-.pos-shell.pos-light button[style*="background:#10b981"],
-.pos-shell.pos-light button[style*="background: #10b981"],
-.pos-shell.pos-light button[style*="background:#059669"],
+.pos-shell.pos-light button[style*="background:var(--pos-accent)"],
+.pos-shell.pos-light button[style*="background: var(--pos-accent)"],
+.pos-shell.pos-light button[style*="background:var(--pos-success)"],
+.pos-shell.pos-light button[style*="background: var(--pos-success)"],
+.pos-shell.pos-light button[style*="background:var(--pos-success-2)"],
 .pos-shell.pos-light button[style*="background:#DC2626"],
 .pos-shell.pos-light button[style*="background:#dc2626"],
 .pos-shell.pos-light button[style*="background:#334155"],
@@ -1131,11 +1136,11 @@
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
-.pos-shell.pos-light button[style*="background:#4f6ef7"] *,
-.pos-shell.pos-light button[style*="background: #4f6ef7"] *,
-.pos-shell.pos-light button[style*="background:#10b981"] *,
-.pos-shell.pos-light button[style*="background: #10b981"] *,
-.pos-shell.pos-light button[style*="background:#059669"] *,
+.pos-shell.pos-light button[style*="background:var(--pos-accent)"] *,
+.pos-shell.pos-light button[style*="background: var(--pos-accent)"] *,
+.pos-shell.pos-light button[style*="background:var(--pos-success)"] *,
+.pos-shell.pos-light button[style*="background: var(--pos-success)"] *,
+.pos-shell.pos-light button[style*="background:var(--pos-success-2)"] *,
 .pos-shell.pos-light button[style*="background:#DC2626"] *,
 .pos-shell.pos-light button[style*="background:#dc2626"] *,
 .pos-shell.pos-light button[style*="background:#334155"] *,
@@ -1151,11 +1156,11 @@
   color: #ffffff !important;
   -webkit-text-fill-color: #ffffff !important;
 }
-.pos-shell.pos-light button[style*="background:#4f6ef7"] svg,
-.pos-shell.pos-light button[style*="background: #4f6ef7"] svg,
-.pos-shell.pos-light button[style*="background:#10b981"] svg,
-.pos-shell.pos-light button[style*="background: #10b981"] svg,
-.pos-shell.pos-light button[style*="background:#059669"] svg,
+.pos-shell.pos-light button[style*="background:var(--pos-accent)"] svg,
+.pos-shell.pos-light button[style*="background: var(--pos-accent)"] svg,
+.pos-shell.pos-light button[style*="background:var(--pos-success)"] svg,
+.pos-shell.pos-light button[style*="background: var(--pos-success)"] svg,
+.pos-shell.pos-light button[style*="background:var(--pos-success-2)"] svg,
 .pos-shell.pos-light button[style*="background:#DC2626"] svg,
 .pos-shell.pos-light button[style*="background:#dc2626"] svg,
 .pos-shell.pos-light button[style*="background:#334155"] svg,

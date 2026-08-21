@@ -174,7 +174,7 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
       >
         <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--pos-border)" }}>
           <div className="flex items-center gap-2">
-            <ArrowLeftRight className="h-5 w-5" style={{ color: "#4f6ef7" }} />
+            <ArrowLeftRight className="h-5 w-5" style={{ color: "var(--pos-accent)" }} />
             <span className="text-white font-bold">Transfer Funds</span>
           </div>
           <div className="flex items-center gap-1">
@@ -195,7 +195,7 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
 
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#4f6ef7" }} />
+            <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
           </div>
         ) : shifts.length === 0 ? (
           <div className="p-6 text-center space-y-3">
@@ -217,8 +217,8 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
                     onClick={() => pickSource("SAFE")}
                     className="flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-semibold transition-all"
                     style={{
-                      background: from === "SAFE" ? "rgba(79,110,247,0.2)" : "var(--pos-card)",
-                      border: `1px solid ${from === "SAFE" ? "rgba(79,110,247,0.5)" : "var(--pos-border)"}`,
+                      background: from === "SAFE" ? "rgba(var(--pos-accent-rgb),0.2)" : "var(--pos-card)",
+                      border: `1px solid ${from === "SAFE" ? "rgba(var(--pos-accent-rgb),0.5)" : "var(--pos-border)"}`,
                       color: from === "SAFE" ? "#a5b4fc" : "var(--pos-muted)",
                     }}
                   >
@@ -230,8 +230,8 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
                     disabled={shifts.length < 2}
                     className="flex items-center justify-center gap-2 h-10 rounded-xl text-sm font-semibold transition-all disabled:opacity-40"
                     style={{
-                      background: from === "REGISTER" ? "rgba(79,110,247,0.2)" : "var(--pos-card)",
-                      border: `1px solid ${from === "REGISTER" ? "rgba(79,110,247,0.5)" : "var(--pos-border)"}`,
+                      background: from === "REGISTER" ? "rgba(var(--pos-accent-rgb),0.2)" : "var(--pos-card)",
+                      border: `1px solid ${from === "REGISTER" ? "rgba(var(--pos-accent-rgb),0.5)" : "var(--pos-border)"}`,
                       color: from === "REGISTER" ? "#a5b4fc" : "var(--pos-muted)",
                     }}
                   >
@@ -346,7 +346,7 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
                 onClick={() => void submit()}
                 disabled={busy || !toRegisterId || !(parseFloat(amount) > 0)}
                 className="w-full h-11 gap-2 font-bold"
-                style={{ background: "linear-gradient(135deg,#4f6ef7,#4338ca)" }}
+                style={{ background: "var(--pos-accent-grad)" }}
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowLeftRight className="h-4 w-4" />}
                 Transfer LKR {parseFloat(amount) > 0 ? formatNumber(parseFloat(amount)) : "—"}

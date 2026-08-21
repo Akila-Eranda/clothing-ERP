@@ -212,7 +212,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
   if (saleLoading && !sale) {
     return (
       <div className="flex items-center justify-center flex-1">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#4f6ef7" }} />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
       </div>
     );
   }
@@ -221,7 +221,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <Wrench className="h-5 w-5" style={{ color: "#4f6ef7" }} />
+          <Wrench className="h-5 w-5" style={{ color: "var(--pos-accent)" }} />
           <h2 className="text-white font-bold text-base">Warranty Claim</h2>
         </div>
         {step !== "search" && (
@@ -255,7 +255,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               onClick={searchSales}
               disabled={searchLoading}
               className="flex items-center gap-1.5 px-4 h-10 rounded-xl text-sm font-semibold text-white"
-              style={{ background: "#4f6ef7" }}
+              style={{ background: "var(--pos-accent)" }}
             >
               {searchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
               Search
@@ -285,7 +285,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                 <tbody>
                   {searchResults.map((row) => (
                     <tr key={row.id} style={{ borderBottom: "1px solid var(--pos-border)" }}>
-                      <td className="px-3 py-2 font-mono text-xs font-bold" style={{ color: "#4f6ef7" }}>
+                      <td className="px-3 py-2 font-mono text-xs font-bold" style={{ color: "var(--pos-accent)" }}>
                         {row.invoiceNumber}
                       </td>
                       <td className="px-3 py-2 text-xs text-white">{customerLabel(row.customer)}</td>
@@ -300,7 +300,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                           type="button"
                           onClick={() => loadSale(row)}
                           className="text-[10px] font-bold px-2 py-1 rounded-lg text-white"
-                          style={{ background: "#4f6ef7" }}
+                          style={{ background: "var(--pos-accent)" }}
                         >
                           Select
                         </button>
@@ -351,11 +351,11 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
                   onClick={() => setSelectedVariantId(it.variantId)}
                   className={cn(
                     "w-full text-left p-3 rounded-xl border transition-all",
-                    active && "ring-2 ring-[#4f6ef7]",
+                    active && "ring-2 ring-[var(--pos-accent)]",
                   )}
                   style={{
-                    borderColor: active ? "#4f6ef7" : "var(--pos-border)",
-                    background: active ? "rgba(79,110,247,0.12)" : "var(--pos-card)",
+                    borderColor: active ? "var(--pos-accent)" : "var(--pos-border)",
+                    background: active ? "rgba(var(--pos-accent-rgb),0.12)" : "var(--pos-card)",
                   }}
                 >
                   <p className="text-sm font-semibold text-white">
@@ -374,7 +374,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             disabled={!selectedVariantId || !customerId || eligibleItems.length === 0}
             onClick={() => setStep("confirm")}
             className="shrink-0 h-10 rounded-xl text-sm font-bold text-white disabled:opacity-40"
-            style={{ background: "#4f6ef7" }}
+            style={{ background: "var(--pos-accent)" }}
           >
             Continue
           </button>
@@ -412,7 +412,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               disabled={submitting || !issueDescription.trim()}
               onClick={submitClaim}
               className="flex-1 h-10 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-              style={{ background: "#4f6ef7" }}
+              style={{ background: "var(--pos-accent)" }}
             >
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wrench className="h-4 w-4" />}
               Submit claim
@@ -431,7 +431,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
           </div>
           <div>
             <h3 className="text-white font-bold text-lg">Claim submitted</h3>
-            <p className="text-sm mt-1 font-mono" style={{ color: "#4f6ef7" }}>
+            <p className="text-sm mt-1 font-mono" style={{ color: "var(--pos-accent)" }}>
               {claimNumber}
             </p>
             <p className="text-xs mt-2" style={{ color: "var(--pos-muted)" }}>
@@ -442,7 +442,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
             type="button"
             onClick={reset}
             className="flex items-center gap-2 px-4 h-10 rounded-xl text-sm font-semibold text-white"
-            style={{ background: "#4f6ef7" }}
+            style={{ background: "var(--pos-accent)" }}
           >
             <RefreshCw className="h-4 w-4" /> File another claim
           </button>

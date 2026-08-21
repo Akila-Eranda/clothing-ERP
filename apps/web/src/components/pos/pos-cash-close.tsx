@@ -155,8 +155,8 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
               </div>
             ))}
             <div className="flex justify-between pt-2 border-t font-bold" style={{ borderColor: "var(--pos-border)" }}>
-              <span style={{ color: "#10b981" }}>Expected in drawer</span>
-              <span style={{ color: "#10b981" }} className="tabular-nums">LKR {formatNumber(expected)}</span>
+              <span style={{ color: "var(--pos-success)" }}>Expected in drawer</span>
+              <span style={{ color: "var(--pos-success)" }} className="tabular-nums">LKR {formatNumber(expected)}</span>
             </div>
           </div>
 
@@ -187,7 +187,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
             </div>
             <div className="flex justify-between mt-3 pt-3 border-t" style={{ borderColor: "var(--pos-border)" }}>
               <span className="text-white font-semibold">Actual total</span>
-              <span className="text-lg font-bold tabular-nums" style={{ color: "#4f6ef7" }}>LKR {formatNumber(actualTotal)}</span>
+              <span className="text-lg font-bold tabular-nums" style={{ color: "var(--pos-accent)" }}>LKR {formatNumber(actualTotal)}</span>
             </div>
           </div>
 
@@ -195,7 +195,7 @@ export function PosCashClose({ onClosed, onCancel }: PosCashCloseProps) {
             <div className="rounded-xl p-3 text-sm" style={{ background: variance < 0 ? "rgba(239,68,68,0.1)" : "rgba(16,185,129,0.08)", border: `1px solid ${variance < 0 ? "rgba(239,68,68,0.3)" : "rgba(16,185,129,0.25)"}` }}>
               <div className="flex justify-between">
                 <span style={{ color: "var(--pos-muted)" }}>Variance</span>
-                <span className="font-bold tabular-nums" style={{ color: variance < 0 ? "#ef4444" : "#10b981" }}>
+                <span className="font-bold tabular-nums" style={{ color: variance < 0 ? "#ef4444" : "var(--pos-success)" }}>
                   {variance >= 0 ? "+" : ""}{formatNumber(variance)}
                 </span>
               </div>

@@ -8,6 +8,7 @@ export const POS_ALLOW_NEGATIVE_STOCK_KEY = "pos_allow_negative_stock";
 export const POS_WA_BILL_OFFER_KEY = "pos_wa_bill_offer";
 export const POS_TAX_SAVED_KEY = "pos_tax_rate_saved";
 export const POS_CART_WIDTH_KEY = "pos_cart_width";
+export const POS_PRODUCT_CARD_SIZE_KEY = "pos_product_card_size";
 
 export const POS_CART_WIDTH_PRESETS = [
   { id: "compact", label: "S", px: 360 },
@@ -19,6 +20,65 @@ export const POS_CART_WIDTH_PRESETS = [
 export const POS_CART_WIDTH_MIN = 320;
 export const POS_CART_WIDTH_MAX = 720;
 export const POS_CART_WIDTH_DEFAULT = 420;
+
+export type PosProductCardSizeId = "xs" | "s" | "m" | "l" | "xl";
+
+export type PosProductCardSizeConfig = {
+  id: PosProductCardSizeId;
+  label: string;
+  /** Grid minmax min width (px) */
+  min: number;
+  gap: number;
+  titlePx: number;
+  subPx: number;
+  pricePx: number;
+  padPx: number;
+  iconPx: number;
+};
+
+export const POS_PRODUCT_CARD_SIZE_PRESETS: readonly PosProductCardSizeConfig[] = [
+  { id: "xs", label: "XS", min: 118, gap: 6, titlePx: 11, subPx: 10, pricePx: 13, padPx: 6, iconPx: 28 },
+  { id: "s", label: "S", min: 140, gap: 8, titlePx: 12, subPx: 10, pricePx: 14, padPx: 8, iconPx: 32 },
+  { id: "m", label: "M", min: 165, gap: 8, titlePx: 14, subPx: 12, pricePx: 16, padPx: 8, iconPx: 40 },
+  { id: "l", label: "L", min: 200, gap: 10, titlePx: 15, subPx: 12, pricePx: 18, padPx: 10, iconPx: 44 },
+  { id: "xl", label: "XL", min: 240, gap: 12, titlePx: 16, subPx: 13, pricePx: 20, padPx: 12, iconPx: 48 },
+] as const;
+
+export const POS_PRODUCT_CARD_SIZE_DEFAULT: PosProductCardSizeId = "m";
+
+export function resolvePosProductCardSize(id?: string | null): PosProductCardSizeConfig {
+  const found = POS_PRODUCT_CARD_SIZE_PRESETS.find((p) => p.id === id);
+  return found ?? POS_PRODUCT_CARD_SIZE_PRESETS.find((p) => p.id === POS_PRODUCT_CARD_SIZE_DEFAULT)!;
+}
+
+export function readPosProductCardSize(): PosProductCardSizeId {
+  if (typeof window === "undefined") return POS_PRODUCT_CARD_SIZE_DEFAULT;
+  const raw = localStorage.getItem(POS_PRODUCT_CARD_SIZE_KEY);
+  if (raw === "xs" || raw === "s" || raw === "m" || raw === "l" || raw === "xl") return raw;
+  return POS_PRODUCT_CARD_SIZE_DEFAULT;
+}
+
+export function writePosProductCardSize(id: PosProductCardSizeId): PosProductCardSizeId {
+  const next = resolvePosProductCardSize(id).id;
+  if (typeof window !== "undefined") {
+    localStorage.setItem(POS_PRODUCT_CARD_SIZE_KEY, next);
+  }
+  return next;
+}
+
+/** CSS vars for product card sizing — apply on POS shell. */
+export function posProductCardSizeVars(id?: string | null): Record<string, string> {
+  const s = resolvePosProductCardSize(id);
+  return {
+    "--pos-product-min": `${s.min}px`,
+    "--pos-product-gap": `${s.gap}px`,
+    "--pos-product-title-size": `${s.titlePx}px`,
+    "--pos-product-sub-size": `${s.subPx}px`,
+    "--pos-product-price-size": `${s.pricePx}px`,
+    "--pos-product-pad": `${s.padPx}px`,
+    "--pos-product-icon": `${s.iconPx}px`,
+  };
+}
 
 export function readPosCartWidth(): number {
   if (typeof window === "undefined") return POS_CART_WIDTH_DEFAULT;

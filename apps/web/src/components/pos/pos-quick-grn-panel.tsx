@@ -13,7 +13,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
 
 const INPUT_CLS =
-  "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
+  "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[var(--pos-accent)] transition-colors";
 const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 type CartLine = {
@@ -476,14 +476,14 @@ export function PosQuickGrnPanel({
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(79,110,247,0.15)" }}>
-            <PackageCheck className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+          <div className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0" style={{ background: "rgba(var(--pos-accent-rgb),0.15)" }}>
+            <PackageCheck className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
           </div>
           <h2 className="text-white font-bold text-base">Quick GRN (Cashier)</h2>
           <span className="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "var(--pos-warn-bg)", color: "var(--pos-warn-soft)" }}>
             Exception
           </span>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: "rgba(var(--pos-accent-rgb),0.15)", color: "var(--pos-violet-soft)" }}>
             {profile.label}
           </span>
         </div>
@@ -573,7 +573,7 @@ export function PosQuickGrnPanel({
               <p className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 Assigned Products
               </p>
-              {productsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />}
+              {productsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "var(--pos-accent)" }} />}
             </div>
 
             {supplierId && (
@@ -600,7 +600,7 @@ export function PosQuickGrnPanel({
                 />
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                   {scanBusy ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "#4f6ef7" }} />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" style={{ color: "var(--pos-accent)" }} />
                   ) : (
                     <Scan className="h-3.5 w-3.5" style={{ color: "var(--pos-muted-2)" }} />
                   )}
@@ -641,7 +641,7 @@ export function PosQuickGrnPanel({
                     <div
                       key={p.variantId}
                       className="rounded-lg border p-3"
-                      style={{ background: "var(--pos-panel)", borderColor: inCart ? "#4f6ef7" : "var(--pos-border)" }}
+                      style={{ background: "var(--pos-panel)", borderColor: inCart ? "var(--pos-accent)" : "var(--pos-border)" }}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -656,8 +656,8 @@ export function PosQuickGrnPanel({
                           type="button"
                           className="h-7 px-2.5 rounded-lg text-[10px] font-bold flex items-center gap-1 shrink-0 transition-all hover:opacity-90"
                           style={inCart
-                            ? { border: "1px solid #4f6ef7", color: "var(--pos-accent-soft)", background: "transparent" }
-                            : { background: "#4f6ef7", color: "#fff" }}
+                            ? { border: "1px solid var(--pos-accent)", color: "var(--pos-accent-soft)", background: "transparent" }
+                            : { background: "var(--pos-accent)", color: "#fff" }}
                           onClick={() => addGrnItem(p, 1)}
                         >
                           <Plus className="h-3 w-3" />
@@ -917,10 +917,10 @@ export function PosQuickGrnPanel({
             className="h-12 gap-2 w-full shrink-0 rounded-xl flex items-center justify-center text-sm font-bold transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed"
             style={{
               background: payNow
-                ? "linear-gradient(135deg,#059669,#0d9488)"
-                : "linear-gradient(135deg,#4f6ef7,#7c3aed)",
+                ? "linear-gradient(135deg,var(--pos-success-2),#0d9488)"
+                : "var(--pos-accent-grad)",
               color: "#fff",
-              boxShadow: payNow ? "0 4px 16px rgba(16,185,129,0.35)" : "0 4px 16px rgba(79,110,247,0.35)",
+              boxShadow: payNow ? "0 4px 16px rgba(16,185,129,0.35)" : "0 4px 16px rgba(var(--pos-accent-rgb),0.35)",
             }}
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : payNow ? <Banknote className="h-4 w-4" /> : <PackageCheck className="h-4 w-4" />}

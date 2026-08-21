@@ -10,7 +10,7 @@ type Category = { id: string; name: string };
 type SupplierRow = { id: string; name: string };
 
 const INPUT_CLS =
-  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[#4f6ef7] transition-colors";
+  "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[var(--pos-accent)] transition-colors";
 const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 export function PosQuickProductPanel({
@@ -129,11 +129,11 @@ export function PosQuickProductPanel({
     <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
       <div className="flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
-          <PackagePlus className="h-4 w-4" style={{ color: "#4f6ef7" }} />
+          <PackagePlus className="h-4 w-4" style={{ color: "var(--pos-accent)" }} />
           <h2 className="text-white font-bold text-base">Quick Product</h2>
           <span
             className="text-[10px] font-bold px-2 py-0.5 rounded-md"
-            style={{ background: "rgba(79,110,247,0.15)", color: "var(--pos-violet-soft)" }}
+            style={{ background: "rgba(var(--pos-accent-rgb),0.15)", color: "var(--pos-violet-soft)" }}
           >
             {profile.label}
           </span>
@@ -286,7 +286,7 @@ export function PosQuickProductPanel({
           disabled={busy}
           data-pos-accent=""
           className="pos-cta w-full h-11 rounded-xl flex items-center justify-center gap-1.5 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg,#4f6ef7,#7c3aed)", color: "#ffffff" }}
+          style={{ background: "var(--pos-accent-grad)", color: "#ffffff" }}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
           Create Product

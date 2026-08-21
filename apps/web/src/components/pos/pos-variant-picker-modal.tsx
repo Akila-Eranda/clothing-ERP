@@ -123,20 +123,20 @@ export function PosVariantPickerModal({
                 onClick={() => onSelect(v)}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                 style={{
-                  background: focused ? "rgba(79,110,247,0.18)" : "var(--pos-card)",
-                  borderColor: focused ? "#4f6ef7" : "var(--pos-border)",
-                  boxShadow: focused ? "0 0 0 1px rgba(79,110,247,0.45)" : "none",
+                  background: focused ? "rgba(var(--pos-accent-rgb),0.18)" : "var(--pos-card)",
+                  borderColor: focused ? "var(--pos-accent)" : "var(--pos-border)",
+                  boxShadow: focused ? "0 0 0 1px rgba(var(--pos-accent-rgb),0.45)" : "none",
                 }}
               >
                 <div
                   className="h-12 w-12 rounded-lg flex items-center justify-center shrink-0 overflow-hidden"
-                  style={{ background: "rgba(79,110,247,0.12)" }}
+                  style={{ background: "rgba(var(--pos-accent-rgb),0.12)" }}
                 >
                   {v.imageUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={v.imageUrl} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <Package className="h-5 w-5" style={{ color: "#4f6ef7" }} />
+                    <Package className="h-5 w-5" style={{ color: "var(--pos-accent)" }} />
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
@@ -162,7 +162,7 @@ export function PosVariantPickerModal({
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-sm font-bold" style={{ color: "#4f6ef7" }}>
+                  <p className="text-sm font-bold" style={{ color: "var(--pos-accent)" }}>
                     LKR {formatNumber(v.unitPrice)}
                   </p>
                   {idx < 9 && (

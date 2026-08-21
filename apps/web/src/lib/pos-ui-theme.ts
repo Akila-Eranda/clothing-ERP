@@ -1,5 +1,11 @@
 /** POS terminal UI theme — synced with receipt Light/Dark header toggle. */
 
+import {
+  hexToRgbChannels,
+  POS_COLOR_DEFAULTS,
+  type PosUiColors,
+} from "@/lib/pos-ui-colors";
+
 export type PosUiMode = "light" | "dark";
 
 export type PosUiVars = Record<string, string>;
@@ -8,10 +14,53 @@ export function resolvePosUiMode(theme?: string | null): PosUiMode {
   return theme === "light" ? "light" : "dark";
 }
 
+function withCustomColors(base: PosUiVars, mode: PosUiMode, colors?: Partial<PosUiColors> | null): PosUiVars {
+  const accent = colors?.accent || POS_COLOR_DEFAULTS.accent;
+  const accent2 = colors?.accent2 || POS_COLOR_DEFAULTS.accent2;
+  const success = colors?.success || POS_COLOR_DEFAULTS.success;
+  const success2 = colors?.success2 || POS_COLOR_DEFAULTS.success2;
+  const price =
+    colors?.price
+    || (mode === "dark" ? "#ffffff" : accent);
+  const cardBg = colors?.cardBg || base["--pos-card"]!;
+  const cardTitle = colors?.cardTitle || base["--pos-text"]!;
+  const cardSub = colors?.cardSub || base["--pos-muted"]!;
+  const cardBorder = colors?.cardBorder || base["--pos-border"]!;
+
+  return {
+    ...base,
+    "--pos-accent": accent,
+    "--pos-accent-2": accent2,
+    "--pos-accent-soft": mode === "light" ? accent : accent,
+    "--pos-accent-rgb": hexToRgbChannels(accent),
+    "--pos-accent-grad": `linear-gradient(135deg,${accent},${accent2})`,
+    "--pos-success": success,
+    "--pos-success-2": success2,
+    "--pos-success-soft": success,
+    "--pos-success-rgb": hexToRgbChannels(success),
+    "--pos-success-grad": `linear-gradient(135deg,${success},${success2})`,
+    "--pos-on-accent": "#FFFFFF",
+    "--pos-price": price,
+    "--pos-product-card": cardBg,
+    "--pos-product-title": cardTitle,
+    "--pos-product-sub": cardSub,
+    "--pos-product-border": cardBorder,
+    "--pos-product-price": price,
+    "--pos-sales-bg": mode === "light"
+      ? base["--pos-sales-bg"]!
+      : `linear-gradient(135deg,${accent},${accent2})`,
+    "--pos-violet-soft": accent2,
+  };
+}
+
 /** CSS custom properties applied on the POS shell root. */
-export function posUiCssVars(mode?: string | null): PosUiVars {
-  if (resolvePosUiMode(mode) === "light") {
-    return {
+export function posUiCssVars(
+  mode?: string | null,
+  colors?: Partial<PosUiColors> | null,
+): PosUiVars {
+  const resolved = resolvePosUiMode(mode);
+  if (resolved === "light") {
+    return withCustomColors({
       "--pos-bg": "#F5F7FB",
       "--pos-panel": "#FFFFFF",
       "--pos-card": "#FFFFFF",
@@ -34,23 +83,16 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
       "--pos-sales-bg": "linear-gradient(135deg,#EFF6FF,#DBEAFE)",
       "--pos-sales-fg": "#1D4ED8",
       "--pos-sales-muted": "#64748B",
-      /* Warning / caution — rose instead of yellow in light mode */
       "--pos-warn": "#E11D48",
       "--pos-warn-soft": "#BE123C",
       "--pos-warn-bg": "rgba(225,29,72,0.12)",
       "--pos-warn-border": "rgba(225,29,72,0.35)",
       "--pos-warn-pill": "#E11D48",
-      "--pos-accent": "#4f6ef7",
-      "--pos-accent-soft": "#1D4ED8",
-      "--pos-success": "#047857",
-      "--pos-success-soft": "#047857",
-      "--pos-violet-soft": "#6D28D9",
       "--pos-btn-bg": "#475569",
-      "--pos-on-accent": "#FFFFFF",
       "--pos-toggle-off": "#CBD5E1",
-    };
+    }, resolved, colors);
   }
-  return {
+  return withCustomColors({
     "--pos-bg": "#0d1b2e",
     "--pos-panel": "#0f1f3a",
     "--pos-card": "#162338",
@@ -78,13 +120,7 @@ export function posUiCssVars(mode?: string | null): PosUiVars {
     "--pos-warn-bg": "rgba(245,158,11,0.15)",
     "--pos-warn-border": "rgba(245,158,11,0.35)",
     "--pos-warn-pill": "#d97706",
-    "--pos-accent": "#4f6ef7",
-    "--pos-accent-soft": "#93c5fd",
-    "--pos-success": "#34d399",
-    "--pos-success-soft": "#6ee7b7",
-    "--pos-violet-soft": "#c4b5fd",
     "--pos-btn-bg": "#1a2b4a",
-    "--pos-on-accent": "#FFFFFF",
     "--pos-toggle-off": "#1e3356",
-  };
+  }, resolved, colors);
 }

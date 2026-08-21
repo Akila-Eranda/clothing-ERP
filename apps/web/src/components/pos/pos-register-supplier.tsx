@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 
 const INPUT_CLS =
-  "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[#4f6ef7] transition-colors";
+  "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[var(--pos-accent)] transition-colors";
 const INPUT_STYLE = { background: "var(--pos-input)", border: "1px solid var(--pos-border)", color: "var(--pos-text)" } as const;
 
 export type RegisteredSupplier = {
@@ -89,7 +89,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
   return (
     <div
       className="rounded-xl border p-3 space-y-2.5"
-      style={{ background: "rgba(79,110,247,0.08)", borderColor: "rgba(79,110,247,0.35)" }}
+      style={{ background: "rgba(var(--pos-accent-rgb),0.08)", borderColor: "rgba(var(--pos-accent-rgb),0.35)" }}
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -153,7 +153,7 @@ export function PosRegisterSupplier({ disabled, onRegistered }: Props) {
         onClick={() => void submit()}
         disabled={busy || disabled}
         className="w-full h-9 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 disabled:opacity-50"
-        style={{ background: "#4f6ef7" }}
+        style={{ background: "var(--pos-accent)" }}
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
         {busy ? "Saving…" : "Save supplier"}
