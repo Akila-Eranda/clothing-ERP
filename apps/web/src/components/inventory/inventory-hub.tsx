@@ -88,6 +88,20 @@ function ageBucket(days: number) {
   return "90+";
 }
 
+/** Solid header actions — white label/icon in light and dark themes */
+const INV_HUB_BTN_BASE =
+  "h-10 rounded-[12px] gap-1.5 text-sm px-3.5 border-0 shadow-sm text-white hover:text-white hover:opacity-90 [&_svg]:text-white hover:[&_svg]:text-white dark:text-white dark:hover:text-white dark:[&_svg]:text-white dark:border-transparent dark:shadow-none disabled:opacity-40";
+
+const INV_HUB_BTN_COLOR = {
+  refresh: "bg-indigo-600 hover:bg-indigo-600 dark:bg-indigo-600",
+  danger: "bg-rose-600 hover:bg-rose-600 dark:bg-rose-600",
+  purchase: "bg-emerald-600 hover:bg-emerald-600 dark:bg-emerald-600",
+  transfer: "bg-violet-600 hover:bg-violet-600 dark:bg-violet-600",
+  expiry: "bg-orange-600 hover:bg-orange-600 dark:bg-orange-600",
+  warehouse: "bg-cyan-600 hover:bg-cyan-600 dark:bg-cyan-600",
+  primary: "bg-blue-600 hover:bg-blue-600 dark:bg-blue-600",
+} as const;
+
 const ABC_COLUMNS: ColumnDef<AbcRow>[] = [
   {
     accessorKey: "grade",
@@ -644,37 +658,37 @@ export function InventoryHub({ section }: { section: InventorySection }) {
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-bold">{meta.title}</h1>
+          <h1 className="text-2xl font-bold text-foreground">{meta.title}</h1>
           <p className="text-sm text-muted-foreground">{sectionSubtitle}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={fetchData} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+            <Button variant="ghost" onClick={fetchData} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.refresh}`}>
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
             {section === "stock" && (
               <>
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   disabled={zeroNegBusy || negativeCount === 0}
                   onClick={() => void zeroNegativeStock()}
-                  className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5 border-red-500/30 text-red-600 hover:bg-red-500/10"
+                  className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.danger}`}
                 >
                   {zeroNegBusy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Ban className="h-[18px] w-[18px]" />}
                   Zero negatives{negativeCount > 0 ? ` (${negativeCount})` : ""}
                 </Button>
-                <Button variant="outline" onClick={() => router.push("/purchases")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Button variant="ghost" onClick={() => router.push("/purchases")} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.purchase}`}>
                   <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
                 </Button>
-                <Button variant="outline" onClick={() => setTransferOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Button variant="ghost" onClick={() => setTransferOpen(true)} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.transfer}`}>
                   <ArrowLeftRight className="h-[18px] w-[18px]" /> Stock Transfer
                 </Button>
                 {(showBatch || showExpiry) && (
-                  <Button variant="outline" onClick={() => router.push("/inventory/expiry")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                  <Button variant="ghost" onClick={() => router.push("/inventory/expiry")} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.expiry}`}>
                     <Clock className="h-[18px] w-[18px]" /> Expiry Dashboard
                   </Button>
                 )}
-                <Button variant="outline" onClick={() => router.push("/warehouse")} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+                <Button variant="ghost" onClick={() => router.push("/warehouse")} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.warehouse}`}>
                   <Layers className="h-[18px] w-[18px]" /> Warehouses
                 </Button>
               </>
@@ -682,8 +696,8 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           </div>
           {section === "transfers" && (
             <>
-              <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-              <Button onClick={() => setTransferOpen(true)} className="h-10 rounded-[12px] gap-1.5 text-sm px-4">
+              <div className="hidden sm:block h-6 w-px bg-border mx-0.5" aria-hidden />
+              <Button variant="ghost" onClick={() => setTransferOpen(true)} className={`${INV_HUB_BTN_BASE} ${INV_HUB_BTN_COLOR.primary} px-4`}>
                 <Plus className="h-[18px] w-[18px]" /> New Transfer
               </Button>
             </>

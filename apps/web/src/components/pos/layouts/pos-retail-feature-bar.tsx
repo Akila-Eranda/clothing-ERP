@@ -37,11 +37,14 @@ export function PosRetailFeatureBar({
 
   return (
     <div
-      className="pos-retail-feature-bar shrink-0 border-b px-2 py-1.5 overflow-x-auto scrollbar-none"
-      style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
+      className="pos-retail-feature-bar shrink-0 border-b px-2.5 py-2 overflow-x-auto scrollbar-none"
+      style={{
+        background: lightUi ? "var(--pos-panel)" : "#0b1120",
+        borderColor: "var(--pos-border)",
+      }}
       aria-label="POS features"
     >
-      <div className="flex items-center gap-1 min-w-max">
+      <div className="flex items-center gap-1.5 min-w-max">
         {items.map((item) => {
           const active = activeNav === item.id;
           const badge =
@@ -57,19 +60,25 @@ export function PosRetailFeatureBar({
               type="button"
               onClick={() => onNavigate(item.id)}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all hover:opacity-90",
-                active && "ring-1 ring-inset shadow-sm",
+                "pos-retail-feature-btn flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold whitespace-nowrap transition-all",
+                "hover:brightness-110 active:scale-[0.98]",
+                active && "ring-2 ring-white/25 shadow-md",
               )}
-              style={btnStyle}
+              style={{ ...btnStyle, color: "#ffffff" }}
             >
-              <item.icon className="h-3.5 w-3.5 shrink-0" />
-              {item.label}
+              <item.icon
+                className="h-4 w-4 shrink-0"
+                strokeWidth={2.25}
+                style={{ color: "#ffffff", stroke: "currentColor" }}
+              />
+              <span style={{ color: "#ffffff" }}>{item.label}</span>
               {badge > 0 && (
                 <span
-                  className="text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[1.1rem] text-center"
+                  className="text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[1.25rem] text-center"
                   style={{
-                    background: "var(--pos-accent)",
-                    color: "#fff",
+                    background: "rgba(15, 23, 42, 0.45)",
+                    color: "#ffffff",
+                    border: "1px solid rgba(255,255,255,0.2)",
                   }}
                 >
                   {badge}

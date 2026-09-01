@@ -121,8 +121,25 @@
   background: linear-gradient(135deg, var(--pos-success), var(--pos-success-2));
 }
 
+/* ── Retail feature bar — solid colored pills, white labels (dark + light) ── */
+.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button.pos-retail-feature-btn {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button.pos-retail-feature-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button.pos-retail-feature-btn span {
+  color: #ffffff !important;
+}
+
 /* ── Category pills (feature bar + horizontal categories) ── */
-.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button {
+.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button:not(.pos-retail-feature-btn) {
   border-radius: 8px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
