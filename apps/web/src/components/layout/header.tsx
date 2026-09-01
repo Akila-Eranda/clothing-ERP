@@ -123,7 +123,7 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const { user, logoutApi } = useAuthStore();
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
@@ -181,6 +181,7 @@ export function Header() {
 
   const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
+  const isDarkHeader = resolvedTheme === "dark";
 
   const crumbLabel = (index: number) => {
     const fullPath = "/" + breadcrumbs.slice(0, index + 1).join("/");
@@ -194,7 +195,9 @@ export function Header() {
     <header
       className="hex-retail-header sticky top-0 z-40 flex h-14 items-center gap-3 border-b backdrop-blur-[12px] px-4 md:px-6 shrink-0"
       style={{
-        background: "var(--retail-topbar-bg, hsl(var(--background) / 0.9))",
+        background: isDarkHeader
+          ? "var(--retail-topbar-bg, #0d0d0d)"
+          : "var(--retail-topbar-bg, hsl(var(--background) / 0.95))",
         color: "var(--retail-topbar-fg, hsl(var(--foreground)))",
         borderColor: "var(--retail-topbar-border, hsl(var(--border)))",
       }}
@@ -254,7 +257,7 @@ export function Header() {
         <Button
           onClick={openPos}
           size="sm"
-          className="h-9 gap-1.5 text-xs font-semibold gradient-primary text-white border-0 hover:opacity-90 shadow-button"
+          className="h-9 gap-1.5 text-xs"
         >
           <ShoppingCart className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">POS Terminal</span>
@@ -271,7 +274,7 @@ export function Header() {
           variant="ghost"
           size="icon-sm"
           onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="h-9 w-9 rounded-[10px] hover:bg-muted dark:hover:bg-accent"
+          className="h-9 w-9"
         >
           <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
@@ -279,14 +282,14 @@ export function Header() {
         </Button>
 
         {/* Refresh */}
-        <Button variant="ghost" size="icon-sm" className="h-9 w-9 rounded-[10px] hover:bg-muted dark:hover:bg-accent" onClick={() => router.refresh()}>
+        <Button variant="ghost" size="icon-sm" className="h-9 w-9" onClick={() => router.refresh()}>
           <RefreshCw className="h-3.5 w-3.5" />
         </Button>
 
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative rounded-[10px] hover:bg-muted dark:hover:bg-accent">
+            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative">
               <Bell className="h-4 w-4" />
               {(isMaintenance || 4 > 0) && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">

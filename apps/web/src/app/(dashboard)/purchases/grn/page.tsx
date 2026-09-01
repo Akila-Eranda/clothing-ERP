@@ -144,9 +144,9 @@ export default function GrnPage() {
         cell: ({ row }) => (
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className="h-8 rounded-[10px] px-3 text-xs font-semibold text-primary hover:bg-[hsl(var(--primary-soft))]"
+            className="h-8 px-3 text-xs"
             onClick={() => setViewId(row.original.id)}
           >
             View

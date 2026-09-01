@@ -24,6 +24,12 @@ import {
   type SalesPurchasePoint,
 } from "./dreams-dashboard-charts";
 import "./dreams-dashboard.css";
+import {
+  DreamsDateRangePicker,
+  defaultDreamsDateRange,
+  isDateInRange,
+  type DreamsDateRange,
+} from "./dreams-date-range-picker";
 
 /* ── Types ── */
 interface DailySummary {
@@ -96,13 +102,6 @@ interface CategorySale {
   count: number;
 }
 
-function monthStart() {
-  const d = new Date();
-  return new Date(d.getFullYear(), d.getMonth(), 1);
-}
-function isThisMonth(iso: string) {
-  return new Date(iso) >= monthStart();
-}
 function pctChange(cur: number, prev: number) {
   if (prev <= 0) return { value: "0%", up: true };
   const p = ((cur - prev) / prev) * 100;
@@ -140,6 +139,8 @@ export function DreamsDashboard() {
   const [alertDismissed, setAlertDismissed] = React.useState(false);
   const [chartPeriod, setChartPeriod] = React.useState("1Y");
   const [txnTab, setTxnTab] = React.useState<"sale" | "purchase">("sale");
+  const [dateRange, setDateRange] = React.useState<DreamsDateRange>(defaultDreamsDateRange);
+  const [salesRows, setSalesRows] = React.useState<SaleRow[]>([]);
 
   const [overview, setOverview] = React.useState<Overview | null>(null);
   const [summary, setSummary] = React.useState<DailySummary | null>(null);
@@ -163,6 +164,7 @@ export function DreamsDashboard() {
         api.get<Overview>("/dashboard/overview"),
         api.get<DailySummary>("/pos/summary"),
         api.get<{ data: SaleRow[] }>("/sales?limit=8"),
+        api.get<{ data: SaleRow[] }>("/sales?limit=300"),
         api.get<TopProduct[]>("/dashboard/top-products"),
         api.get<LowStockItem[]>("/inventory/low-stock"),
         api.get<{ data: PurchaseOrder[] }>("/purchases?limit=300"),
@@ -176,11 +178,12 @@ export function DreamsDashboard() {
         api.get<{ total: number }>("/categories?limit=1"),
       ]);
 
-      const [ovRes, sumRes, salesRes, topRes, lowRes, poRes, retRes, noteRes, plRes, expRes, tcRes, catRes, supRes, catCntRes] = results;
+      const [ovRes, sumRes, salesRes, salesAllRes, topRes, lowRes, poRes, retRes, noteRes, plRes, expRes, tcRes, catRes, supRes, catCntRes] = results;
 
       if (ovRes.status === "fulfilled") setOverview(ovRes.value.data ?? null);
       if (sumRes.status === "fulfilled") setSummary(sumRes.value.data ?? null);
       if (salesRes.status === "fulfilled") setRecentSales(parseApiList<SaleRow>(salesRes.value.data));
+      if (salesAllRes.status === "fulfilled") setSalesRows(parseApiList<SaleRow>(salesAllRes.value.data));
       if (topRes.status === "fulfilled") setTopProducts(parseApiList<TopProduct>(topRes.value.data));
       if (lowRes.status === "fulfilled") setLowStock(parseApiList<LowStockItem>(lowRes.value.data));
       if (poRes.status === "fulfilled") setPurchases(parseApiList<PurchaseOrder>(poRes.value.data));
@@ -214,18 +217,62 @@ export function DreamsDashboard() {
 
   React.useEffect(() => { load(); }, [load]);
 
+  const inRange = React.useCallback(
+    (iso: string) => isDateInRange(iso, dateRange),
+    [dateRange],
+  );
+
+  const rangeSales = React.useMemo(
+    () => salesRows.filter((s) => inRange(s.invoiceDate)),
+    [salesRows, inRange],
+  );
+  const rangePurchases = React.useMemo(
+    () => purchases.filter((p) => p.status !== "CANCELLED" && inRange(p.orderDate)),
+    [purchases, inRange],
+  );
+  const rangeReturns = React.useMemo(
+    () => returns.filter((r) => inRange(r.createdAt)),
+    [returns, inRange],
+  );
+  const rangeDebitNotes = React.useMemo(
+    () => debitNotes.filter((n) => inRange(n.noteDate)),
+    [debitNotes, inRange],
+  );
+
+  const rangeSalesTotal = React.useMemo(
+    () => rangeSales.reduce((s, r) => s + r.total, 0),
+    [rangeSales],
+  );
+  const rangePurchaseTotal = React.useMemo(
+    () => rangePurchases.reduce((s, p) => s + p.total, 0),
+    [rangePurchases],
+  );
+  const rangeReturnsTotal = React.useMemo(
+    () => rangeReturns.reduce((s, r) => s + (r.refundAmount ?? 0), 0),
+    [rangeReturns],
+  );
+  const rangePurchaseReturnTotal = React.useMemo(
+    () => rangeDebitNotes.reduce((s, n) => s + (n.amount ?? 0), 0),
+    [rangeDebitNotes],
+  );
+
+  const filteredRecentSales = React.useMemo(
+    () => rangeSales.slice(0, 8),
+    [rangeSales],
+  );
+
   const curMonth = monthlyPl[monthlyPl.length - 1];
   const prevMonth = monthlyPl[monthlyPl.length - 2];
-  const monthSales = overview?.thisMonth?.revenue ?? curMonth?.revenue ?? 0;
+  const monthSales = rangeSalesTotal || overview?.thisMonth?.revenue || curMonth?.revenue || 0;
   const prevMonthSales = prevMonth?.revenue ?? 0;
-  const monthReturns = returns.filter((r) => isThisMonth(r.createdAt)).reduce((s, r) => s + (r.refundAmount ?? 0), 0);
+  const monthReturns = rangeReturnsTotal;
   const prevReturns = returns.filter((r) => {
     const d = new Date(r.createdAt);
     const prev = new Date();
     prev.setMonth(prev.getMonth() - 1);
     return d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear();
   }).reduce((s, r) => s + (r.refundAmount ?? 0), 0);
-  const monthPurchases = purchases.filter((p) => p.status !== "CANCELLED" && isThisMonth(p.orderDate)).reduce((s, p) => s + p.total, 0);
+  const monthPurchases = rangePurchaseTotal;
   const prevPurchases = purchases.filter((p) => {
     if (p.status === "CANCELLED") return false;
     const d = new Date(p.orderDate);
@@ -233,7 +280,7 @@ export function DreamsDashboard() {
     prev.setMonth(prev.getMonth() - 1);
     return d.getMonth() === prev.getMonth() && d.getFullYear() === prev.getFullYear();
   }).reduce((s, p) => s + p.total, 0);
-  const monthPurchaseReturn = debitNotes.filter((n) => isThisMonth(n.noteDate)).reduce((s, n) => s + (n.amount ?? 0), 0);
+  const monthPurchaseReturn = rangePurchaseReturnTotal;
   const prevPurchaseReturn = debitNotes.filter((n) => {
     const d = new Date(n.noteDate);
     const prev = new Date();
@@ -259,13 +306,13 @@ export function DreamsDashboard() {
 
   const salesByDay = React.useMemo(() => {
     const days = [0, 0, 0, 0, 0, 0, 0];
-    recentSales.forEach((s) => {
+    rangeSales.forEach((s) => {
       const dow = new Date(s.invoiceDate).getDay();
       const idx = dow === 0 ? 6 : dow - 1;
       days[idx] += s.total;
     });
     return days;
-  }, [recentSales]);
+  }, [rangeSales]);
 
   const returnCustomerPct = overview?.totalCustomers
     ? Math.min(100, Math.round(((overview.totalCustomers - (overview.today?.transactions ?? 0)) / overview.totalCustomers) * 100))
@@ -304,13 +351,7 @@ export function DreamsDashboard() {
             </p>
           </div>
           <div className="input-icon-start position-relative mb-3">
-            <span className="input-icon-addon"><CalendarDays size={16} /></span>
-            <input
-              className="dp-date-input"
-              type="text"
-              readOnly
-              value={new Date().toLocaleDateString("en-LK", { day: "numeric", month: "short", year: "numeric" })}
-            />
+            <DreamsDateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
         </div>
 
@@ -548,10 +589,10 @@ export function DreamsDashboard() {
               <div className="card-body">
                 {loading ? (
                   <div className="dp-skeleton" style={{ height: 200 }} />
-                ) : recentSales.length === 0 ? (
-                  <p className="text-center fs-13">No recent sales</p>
+                ) : filteredRecentSales.length === 0 ? (
+                  <p className="text-center fs-13">No sales in selected range</p>
                 ) : (
-                  recentSales.slice(0, 5).map((sale, i) => (
+                  filteredRecentSales.slice(0, 5).map((sale, i) => (
                     <div key={sale.id} className={`d-flex align-items-center justify-content-between dp-list-row ${i < 4 ? "mb-4" : "mb-0"}`}>
                       <div className="d-flex align-items-center">
                         <span className="avatar avatar-lg">{getInitials(custName(sale))}</span>
@@ -621,7 +662,7 @@ export function DreamsDashboard() {
                     </thead>
                     <tbody>
                       {txnTab === "sale"
-                        ? recentSales.slice(0, 6).map((s) => (
+                        ? filteredRecentSales.slice(0, 6).map((s) => (
                             <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => router.push("/sales")}>
                               <td>{new Date(s.invoiceDate).toLocaleDateString("en-LK", { day: "numeric", month: "short", year: "numeric" })}</td>
                               <td>
@@ -637,7 +678,7 @@ export function DreamsDashboard() {
                               <td className="fs-16 fw-bold text-gray-9">LKR {formatNumber(s.total)}</td>
                             </tr>
                           ))
-                        : purchases.slice(0, 6).map((p) => (
+                        : rangePurchases.slice(0, 6).map((p) => (
                             <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/purchases/${p.id}`)}>
                               <td>{new Date(p.orderDate).toLocaleDateString("en-LK", { day: "numeric", month: "short", year: "numeric" })}</td>
                               <td><span className="fw-semibold">{p.supplier?.name ?? "—"}</span></td>

@@ -118,8 +118,8 @@ body.mini-sidebar .hex-retail-sidebar {
 }
 
 /* DreamsPOS dark mode — sidebar matches dark shell (not light strip) */
-.dark [data-sidebar="light"] .hex-retail-sidebar,
-.dark [data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
+html.dark[data-sidebar="light"] .hex-retail-sidebar,
+html.dark[data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
   --retail-sidebar-bg: #0d0d0d;
   --retail-sidebar-fg: #d8dfee;
   --retail-sidebar-muted: #6b7280;
@@ -185,11 +185,34 @@ body.mini-sidebar .hex-retail-sidebar {
   --retail-topbar-border: rgba(15, 23, 42, 0.08);
 }
 
-.dark [data-topbar="white"] .hex-retail-header,
-.dark [data-topbar="topbarcolorone"] .hex-retail-header {
+html.dark[data-topbar="white"] .hex-retail-header,
+html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
   --retail-topbar-bg: #0d0d0d;
   --retail-topbar-fg: #d8dfee;
   --retail-topbar-border: #1f2228;
+  color: #d8dfee;
+}
+
+html.dark[data-topbar="white"] .hex-retail-header .text-foreground,
+html.dark[data-topbar="topbarcolorone"] .hex-retail-header .text-foreground {
+  color: #d8dfee;
+}
+
+html.dark[data-topbar="white"] .hex-retail-header .text-muted-foreground,
+html.dark[data-topbar="topbarcolorone"] .hex-retail-header .text-muted-foreground {
+  color: #9ca3af;
+}
+
+html.dark[data-topbar="white"] .hex-retail-header input,
+html.dark[data-topbar="topbarcolorone"] .hex-retail-header input {
+  background: #1a1a1a;
+  border-color: #2f343c;
+  color: #d8dfee;
+}
+
+html.dark[data-topbar="white"] .hex-retail-header button:hover,
+html.dark[data-topbar="topbarcolorone"] .hex-retail-header button:hover {
+  background: rgba(255, 255, 255, 0.06);
 }
 
 [data-topbar="topbarcolorone"] .hex-retail-header { --retail-topbar-bg: #fbfbfb; --retail-topbar-fg: #1f2937; --retail-topbar-border: rgba(0,0,0,0.06); }

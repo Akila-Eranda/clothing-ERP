@@ -617,14 +617,14 @@ export default function SalesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="inline-flex items-center gap-1 rounded-md border bg-card p-0.5">
+          <div className="inline-flex items-center gap-1 rounded-none border bg-card p-0.5">
             {datePresets.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setDateFilter(p.value)}
                 className={cn(
-                  "h-8 px-3 rounded-md text-xs font-bold transition-all text-white",
+                  "h-8 px-3 rounded-none text-xs font-bold transition-all text-white",
                   dateFilter === p.value
                     ? "bg-indigo-600 shadow-sm"
                     : "bg-slate-500 hover:bg-slate-600",
@@ -634,7 +634,7 @@ export default function SalesPage() {
               </button>
             ))}
           </div>
-          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-card text-sm cursor-pointer hover:bg-muted/50 transition-colors">
+          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-none border border-input bg-card text-sm cursor-pointer hover:bg-muted/50 transition-colors">
             <CalendarDays className="h-4 w-4 text-secondary-foreground shrink-0" />
             <input
               type="date"

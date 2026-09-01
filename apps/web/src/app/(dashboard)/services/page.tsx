@@ -167,7 +167,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
     {
       id: "actions",
       cell: ({ row }) => (
-        <Button variant="ghost" size="sm" className="h-8 rounded-[10px] px-3 text-xs font-semibold text-primary hover:bg-[hsl(var(--primary-soft))]" onClick={() => onView(row.original)}>
+        <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => onView(row.original)}>
           View
         </Button>
       ),

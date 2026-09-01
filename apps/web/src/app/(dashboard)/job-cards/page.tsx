@@ -157,7 +157,7 @@ function buildColumns(
         const j = row.original;
         return (
           <div className="flex gap-1 flex-wrap justify-end">
-            <Button variant="ghost" size="sm" className="h-8 rounded-[10px] px-3 text-xs font-semibold text-primary hover:bg-[hsl(var(--primary-soft))]" onClick={() => onView(j)}>
+            <Button variant="outline" size="sm" className="h-8 px-3 text-xs" onClick={() => onView(j)}>
               View
             </Button>
             {j.status === "OPEN" && (

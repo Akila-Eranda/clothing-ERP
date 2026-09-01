@@ -303,6 +303,15 @@
     @apply p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto;
   }
 
+  /*
+   * App-wide button shape — square corners on every dashboard/admin control.
+   * POS lives outside these shells and keeps its own styling.
+   */
+  .dashboard-shell button:not([role="checkbox"]),
+  .admin-app-shell button:not([role="checkbox"]) {
+    border-radius: 0 !important;
+  }
+
   /* Premium panel — near-white surface, hairline border, soft layered shadow */
   .panel-edge,
   .surface-panel {
@@ -769,7 +778,7 @@
     height: var(--dt-control-h);
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
-    border-radius: 0.75rem;
+    border-radius: 0;
     font-size: 0.8125rem;
   }
   .dark [data-table-craft] button[role="combobox"] {

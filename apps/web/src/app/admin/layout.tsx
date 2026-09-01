@@ -59,7 +59,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (segments[1] === 'tenants' && segments[2]) title = 'Tenant Details'
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#f8fafc]">
+    <div className="admin-app-shell flex h-screen overflow-hidden bg-[#f8fafc]">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-40 lg:hidden"
