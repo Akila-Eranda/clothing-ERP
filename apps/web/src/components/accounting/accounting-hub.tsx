@@ -18,7 +18,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import { toast } from "sonner";
-import { api } from "@/lib/api";
+import { api, type ApiResponse } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import Link from "next/link";
@@ -49,6 +49,12 @@ interface PLReport {
 interface ExpenseSummary { total: number; byCategory: { name: string; amount: number }[]; byPaymentMethod: { method: string; amount: number }[]; }
 interface TrialBalanceRow { code: string; name: string; type: string; balance: number; }
 interface CashFlowDay { date: string; inflow: number; outflow: number; }
+interface CashFlowPayload {
+  data: CashFlowDay[];
+  totalInflow: number;
+  totalOutflow: number;
+  outflowBreakdown?: { expenses: number; supplierPayments: number; cashSupplierPayments?: number; refunds: number };
+}
 interface JournalEntry { id: string; entryNumber: string; description: string; date: string; isPosted: boolean; lines: { id: string; type: string; amount: number; debitAccount?: { name: string; code: string } | null; creditAccount?: { name: string; code: string } | null; }[]; }
 interface BalanceSheet { assets: { accounts: Account[]; operatingCash: number; totalExpenses: number; total: number }; liabilities: { accounts: Account[]; total: number }; equity: { accounts: Account[]; retainedEarnings: number; total: number }; revenue: { accounts: Account[]; total: number }; expenseAcct: { accounts: Account[]; total: number }; }
 interface ARData { total: number; count: number; customers: { id: string; code: string; firstName: string; lastName: string; phone: string; creditBalance: number; creditLimit: number }[]; }
@@ -363,12 +369,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
   const [accounts, setAccounts]       = useState<Account[]>([]);
   const [monthlyPL, setMonthlyPL]     = useState<PLData[]>([]);
   const [plReport, setPlReport]       = useState<PLReport | null>(null);
-  const [cashFlow, setCashFlow]       = useState<{
-    data: CashFlowDay[];
-    totalInflow: number;
-    totalOutflow: number;
-    outflowBreakdown?: { expenses: number; supplierPayments: number; cashSupplierPayments?: number; refunds: number };
-  } | null>(null);
+  const [cashFlow, setCashFlow]       = useState<CashFlowPayload | null>(null);
   const [journalEntries, setJournal]  = useState<JournalEntry[]>([]);
   const [balanceSheet, setBS]         = useState<BalanceSheet | null>(null);
   const [thisMonthPL, setThisMonthPL] = useState<PLReport | null>(null);
@@ -394,7 +395,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
         api.get<{ data: Expense[] }>(`/accounting/expenses?limit=200&startDate=${tmStart}&endDate=${tmEnd}`),
         api.get<Account[]>("/accounting/accounts"),
         api.get<PLReport>(`/accounting/profit-loss?startDate=${plRange.start}&endDate=${plRange.end}`),
-        api.get<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number; outflowBreakdown?: { expenses: number; supplierPayments: number; cashSupplierPayments?: number; refunds: number } }>(`/accounting/cash-flow?startDate=${cfRange.start}&endDate=${cfRange.end}`),
+        api.get<CashFlowPayload>(`/accounting/cash-flow?startDate=${cfRange.start}&endDate=${cfRange.end}`),
         api.get<{ data: JournalEntry[] }>("/accounting/journal-entries?limit=50"),
         api.get<BalanceSheet>("/accounting/balance-sheet"),
         api.get<PLData[]>("/accounting/monthly-pl?months=6"),
@@ -410,20 +411,37 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
           ? ((results[i] as PromiseFulfilledResult<unknown>).value as T)
           : null;
 
-      const expRes = ok<{ data: Expense[] }>(0);
-      const accRes = ok<{ data?: Account[] } | Account[]>(1);
+      const expRes = ok<ApiResponse<{ data: Expense[] }> | Expense[]>(0);
+      const accRes = ok<ApiResponse<{ data?: Account[] } | Account[]> | Account[]>(1);
       if (expRes) setExpenses(parseApiList<Expense>(expRes));
       if (accRes) setAccounts(parseApiList<Account>(accRes));
-      const pl = ok<PLReport>(2); if (pl) setPlReport(pl);
-      const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number; outflowBreakdown?: { expenses: number; supplierPayments: number; refunds: number } }>(3); if (cf) setCashFlow(cf as any);
-      const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal(parseApiList<JournalEntry>(je?.data));
-      const bs = ok<BalanceSheet>(5); if (bs) setBS(bs);
-      const month = ok<PLData[]>(6); if (month) setMonthlyPL(Array.isArray(month) ? month : []);
-      const tm = ok<PLReport>(7); if (tm) setThisMonthPL(tm);
-      const ar = ok<ARData>(8); if (ar) setArData(ar);
-      const ap = ok<APData>(9); if (ap) setApData(ap);
-      const expSum = ok<ExpenseSummary>(10); if (expSum) setExpenseSummary(expSum);
-      const tb = ok<TrialBalanceRow[]>(11); if (tb) setTrialBalance(Array.isArray(tb) ? tb : []);
+      const plRes = ok<ApiResponse<PLReport>>(2);
+      if (plRes?.data) setPlReport(plRes.data);
+      const cfRes = ok<ApiResponse<CashFlowPayload>>(3);
+      if (cfRes?.data) {
+        setCashFlow({
+          data: Array.isArray(cfRes.data.data) ? cfRes.data.data : [],
+          totalInflow: cfRes.data.totalInflow ?? 0,
+          totalOutflow: cfRes.data.totalOutflow ?? 0,
+          outflowBreakdown: cfRes.data.outflowBreakdown,
+        });
+      }
+      const jeRes = ok<ApiResponse<{ data: JournalEntry[] }>>(4);
+      if (jeRes) setJournal(parseApiList<JournalEntry>(jeRes));
+      const bsRes = ok<ApiResponse<BalanceSheet>>(5);
+      if (bsRes?.data) setBS(bsRes.data);
+      const monthRes = ok<ApiResponse<PLData[]>>(6);
+      if (monthRes?.data) setMonthlyPL(Array.isArray(monthRes.data) ? monthRes.data : []);
+      const tmRes = ok<ApiResponse<PLReport>>(7);
+      if (tmRes?.data) setThisMonthPL(tmRes.data);
+      const arRes = ok<ApiResponse<ARData>>(8);
+      if (arRes?.data) setArData(arRes.data);
+      const apRes = ok<ApiResponse<APData>>(9);
+      if (apRes?.data) setApData(apRes.data);
+      const expSumRes = ok<ApiResponse<ExpenseSummary>>(10);
+      if (expSumRes?.data) setExpenseSummary(expSumRes.data);
+      const tbRes = ok<ApiResponse<TrialBalanceRow[]>>(11);
+      if (tbRes?.data) setTrialBalance(Array.isArray(tbRes.data) ? tbRes.data : []);
 
       const failed = results.filter((r) => r.status === "rejected").length;
       if (failed === results.length) toast.error("Failed to load accounting data");
@@ -488,9 +506,9 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
     ? ((lastM.profit - prevM.profit) / Math.abs(prevM.profit)) * 100 : null;
 
   // ── Balance sheet ratios
-  const bsAssets  = balanceSheet?.assets.total ?? 0;
-  const bsLiab    = balanceSheet?.liabilities.total ?? 0;
-  const bsEquity  = balanceSheet?.equity.total ?? 0;
+  const bsAssets  = balanceSheet?.assets?.total ?? 0;
+  const bsLiab    = balanceSheet?.liabilities?.total ?? 0;
+  const bsEquity  = balanceSheet?.equity?.total ?? 0;
   const bsRetained = balanceSheet?.equity?.retainedEarnings ?? 0;
   const debtRatio  = bsAssets > 0 ? (bsLiab / bsAssets) * 100 : 0;
   const equityRatio = bsAssets > 0 ? (bsEquity / bsAssets) * 100 : 0;
@@ -571,7 +589,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                   </Select>
                 </CardHeader>
                 <CardContent>
-                  {cashFlow && cashFlow.data.length > 0 ? (
+                  {Array.isArray(cashFlow?.data) && cashFlow.data.length > 0 ? (
                     <ResponsiveContainer width="100%" height={250}>
                       <LineChart data={cashFlow.data} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
@@ -1055,7 +1073,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             )}
 
             {/* Cash Flow Chart */}
-            {cashFlow && cashFlow.data.length > 0 && (
+            {Array.isArray(cashFlow?.data) && cashFlow.data.length > 0 && (
               <Card className="bg-card border shadow-sm">
                 <CardHeader className="pb-2 flex-row items-center justify-between">
                   <CardTitle className="text-sm font-semibold text-foreground">Cash Flow — Daily</CardTitle>
