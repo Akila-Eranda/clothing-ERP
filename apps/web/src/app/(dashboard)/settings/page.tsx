@@ -31,8 +31,8 @@ import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
 import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
 import { ReloadSettingsTab } from "@/components/settings/reload-settings-tab";
-import {
 import { parseApiList } from "@/lib/parse-api-list";
+import {
   ACCENT_PRESETS,
   type AccentId,
   loadStoredAccent,
