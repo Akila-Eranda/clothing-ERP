@@ -2,7 +2,12 @@ export const APP_NAME = "HexaOne";
 /** Free trial length for new Starter tenants (days). */
 export const STARTER_TRIAL_DAYS = 7;
 export const APP_TAGLINE = "ALL IN ONE BUSINESS PLATFORM";
-export const APP_LOGO_PATH = "/hexaone-logo.png";
+/** Colored wordmark — light sidebar / light UI */
+export const APP_LOGO_LIGHT_PATH = "/brand/hexaone-logo-light.png";
+/** White wordmark — dark sidebar / dark UI */
+export const APP_LOGO_DARK_PATH = "/brand/hexaone-logo-dark.png";
+/** Default (light) — backward compatible */
+export const APP_LOGO_PATH = APP_LOGO_LIGHT_PATH;
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 

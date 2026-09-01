@@ -3,7 +3,13 @@
 import * as React from "react";
 import { useTheme } from "next-themes";
 import { cn } from "@/lib/utils";
-import { APP_LOGO_PATH, APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import {
+  APP_LOGO_DARK_PATH,
+  APP_LOGO_LIGHT_PATH,
+  APP_LOGO_PATH,
+  APP_NAME,
+  APP_TAGLINE,
+} from "@/lib/constants";
 
 type AppLogoVariant = "login" | "hero" | "full" | "compact" | "sidebar";
 type LogoTheme = "dark" | "light" | "auto";
@@ -22,7 +28,7 @@ const HEIGHT: Record<AppLogoVariant, string> = {
   hero: "h-20 sm:h-24 md:h-28",
   full: "h-16 sm:h-[4.5rem]",
   compact: "h-12 sm:h-14",
-  sidebar: "h-9",
+  sidebar: "h-8 sm:h-9",
 };
 
 const MAX_WIDTH: Record<AppLogoVariant, string> = {
@@ -30,8 +36,12 @@ const MAX_WIDTH: Record<AppLogoVariant, string> = {
   hero: "max-w-[min(100%,420px)]",
   full: "max-w-[min(100%,320px)]",
   compact: "max-w-[min(100%,280px)]",
-  sidebar: "max-w-[min(100%,200px)]",
+  sidebar: "max-w-[min(100%,148px)]",
 };
+
+function resolveLogoSrc(onDark: boolean) {
+  return onDark ? APP_LOGO_DARK_PATH : APP_LOGO_LIGHT_PATH;
+}
 
 export function AppLogo({
   variant = "full",
@@ -47,13 +57,15 @@ export function AppLogo({
   const onDark =
     theme === "dark" || (theme === "auto" && mounted && resolvedTheme === "dark");
 
+  const src = mounted ? resolveLogoSrc(onDark) : APP_LOGO_PATH;
+
   return (
     <div className={cn("flex flex-col items-start", className)}>
       <img
-        src={APP_LOGO_PATH}
+        src={src}
         alt={alt}
         className={cn(
-          "w-auto object-contain object-center",
+          "w-auto object-contain object-left",
           HEIGHT[variant],
           MAX_WIDTH[variant],
         )}
@@ -72,6 +84,9 @@ export function AppLogo({
   );
 }
 
-export function useAppLogoSrc() {
-  return APP_LOGO_PATH;
+export function useAppLogoSrc(theme: LogoTheme = "auto") {
+  const { resolvedTheme } = useTheme();
+  const onDark =
+    theme === "dark" || (theme === "auto" && resolvedTheme === "dark");
+  return resolveLogoSrc(onDark);
 }

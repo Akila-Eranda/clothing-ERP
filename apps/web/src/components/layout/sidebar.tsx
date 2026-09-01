@@ -24,7 +24,6 @@ import { AppLogo } from "@/components/brand/app-logo";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
-import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -282,10 +281,6 @@ export function Sidebar() {
   const { profile } = useShopWorkspace();
   const { settings: receiptSettings } = useReceiptSettings();
 
-  const [logoFailed, setLogoFailed] = React.useState(false);
-  const logoSrc = resolvePublicAssetUrl(receiptSettings.logoUrl);
-  React.useEffect(() => setLogoFailed(false), [logoSrc]);
-  const showShopLogo = !!logoSrc && !logoFailed;
   const shopName = receiptSettings.shopName?.trim() || user?.branch?.name || APP_NAME;
   const planLabel = planTierFromRole(user?.role);
 
@@ -306,7 +301,6 @@ export function Sidebar() {
     hover: "var(--chrome-hover, rgba(255,255,255,0.05))",
     activeBg: "var(--chrome-active-bg, rgba(254,159,67,0.14))",
     activeFg: "var(--chrome-active-fg, #fe9f43)",
-    logoBg: "var(--chrome-logo-bg, #141414)",
   };
   const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #ffffff)");
   const border   = dreamsDarkChrome ? chrome.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
@@ -317,7 +311,6 @@ export function Sidebar() {
   const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(254, 159, 67, 0.14)" : "hsl(var(--sidebar-accent))") + ")";
   const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))") + ")";
   const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--primary))") + ")";
-  const logoBg   = dreamsDarkChrome ? chrome.logoBg : (darkUi ? "#141414" : "hsl(var(--card))");
   const planBadgeBg = dreamsDarkChrome ? chrome.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "hsl(var(--sidebar-accent))");
   const planBadgeFg = dreamsDarkChrome ? chrome.activeFg : (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))");
 
@@ -582,26 +575,22 @@ export function Sidebar() {
       >
 
         {/* ── Header: shop avatar + name + collapse btn ── */}
-        <div className={cn("flex items-center shrink-0 gap-2.5 px-3 py-3.5", sidebarCollapsed && "justify-center")}>
+        <div className={cn("flex items-center shrink-0 gap-2.5 px-3 py-3.5", sidebarCollapsed && "justify-center flex-col")}>
           <div
             className={cn(
-              "h-10 w-10 rounded-xl shrink-0 flex items-center justify-center select-none overflow-hidden",
-              !showShopLogo && "text-xl",
+              "shrink-0 flex items-center justify-center overflow-hidden rounded-lg",
+              sidebarCollapsed ? "h-9 w-9" : "h-9 w-[132px]",
             )}
-            style={showShopLogo
-              ? { background: logoBg, border: `1px solid ${border}` }
-              : { background: logoBg, border: `1px solid ${border}` }}
+            style={{
+              background: darkUi ? "transparent" : "#050505",
+            }}
           >
-            {showShopLogo ? (
-              <img
-                src={logoSrc}
-                alt={shopName}
-                className="h-full w-full object-contain p-1"
-                onError={() => setLogoFailed(true)}
-              />
-            ) : (
-              <AppLogo variant="sidebar" theme={darkUi ? "dark" : "light"} className="h-full w-full items-center justify-center" alt={APP_NAME} />
-            )}
+            <AppLogo
+              variant="sidebar"
+              theme={darkUi ? "dark" : "light"}
+              className="h-full w-full items-center justify-center"
+              alt={APP_NAME}
+            />
           </div>
 
           {!sidebarCollapsed && (
