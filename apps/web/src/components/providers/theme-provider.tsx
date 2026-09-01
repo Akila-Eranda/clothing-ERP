@@ -3,12 +3,12 @@
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider, useTheme } from "next-themes";
 import type { ThemeProviderProps } from "next-themes";
-import { applyAccentPreset, loadStoredAccent } from "@/lib/accent-theme";
+import { useThemeColorsStore } from "@/stores/theme-colors-store";
 
 function AccentSync() {
   const { resolvedTheme } = useTheme();
   React.useEffect(() => {
-    applyAccentPreset(loadStoredAccent());
+    useThemeColorsStore.getState().apply();
   }, [resolvedTheme]);
   React.useEffect(() => {
     if (typeof document === "undefined") return;
@@ -17,10 +17,19 @@ function AccentSync() {
   return null;
 }
 
+function ThemeColorsBootstrap() {
+  const apply = useThemeColorsStore((s) => s.apply);
+  React.useEffect(() => {
+    apply();
+  }, [apply]);
+  return null;
+}
+
 export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return (
     <NextThemesProvider {...props}>
       <AccentSync />
+      <ThemeColorsBootstrap />
       {children}
     </NextThemesProvider>
   );

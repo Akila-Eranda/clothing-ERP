@@ -5,10 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
-  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor,
+  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor, Home,
 } from "lucide-react";
 import { useTheme } from "next-themes";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -23,11 +22,10 @@ import { cn, getInitials } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
-import { AppLogo } from "@/components/brand/app-logo";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
 import { SupportDialog } from "@/components/layout/support-dialog";
-import { DREAMSPOS_DARK_CHROME, isDefaultLightTopbar } from "@/lib/theme-layout";
+import { isDefaultLightTopbar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -127,7 +125,7 @@ export function Header() {
   const { user, logoutApi } = useAuthStore();
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
-  const [searchOpen, setSearchOpen] = React.useState(false);
+  const searchRef = React.useRef<HTMLInputElement>(null);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
@@ -157,6 +155,11 @@ export function Header() {
     const onKeyDown = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target)) return;
 
+      if (isModKey(e) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        searchRef.current?.focus();
+        return;
+      }
       if (isModKey(e) && e.shiftKey && e.key.toLowerCase() === "p") {
         e.preventDefault();
         goProfile();
@@ -197,225 +200,235 @@ export function Header() {
     ? crumbLabel(breadcrumbs.length - 1)
     : pageTitle;
 
+  const notificationCount = isMaintenance ? 1 : 4;
+
   return (
     <header
       className={cn(
-        "hex-retail-header sticky top-0 z-40 flex h-[60px] items-center gap-2 border-b backdrop-blur-[12px] px-3 md:px-5 shrink-0",
-        dreamsDarkHeader && "hex-retail-header--dreams-dark",
+        "hex-retail-header hex-header sticky top-0 z-40 shrink-0",
+        dreamsDarkHeader && "hex-retail-header--dreams-dark hex-header--chrome",
       )}
       style={{
         background: dreamsDarkHeader
-          ? DREAMSPOS_DARK_CHROME.bg
+          ? "var(--chrome-bg, #0d0d0d)"
           : isDarkHeader
             ? "var(--retail-topbar-bg, #0d0d0d)"
             : "var(--retail-topbar-bg, hsl(var(--background) / 0.98))",
         color: dreamsDarkHeader
-          ? DREAMSPOS_DARK_CHROME.fg
+          ? "var(--chrome-fg, #d8dfee)"
           : "var(--retail-topbar-fg, hsl(var(--foreground)))",
         borderColor: dreamsDarkHeader
-          ? DREAMSPOS_DARK_CHROME.border
+          ? "var(--chrome-border, #1f2228)"
           : "var(--retail-topbar-border, hsl(var(--border)))",
       }}
     >
-      {/* ── Left: menu + page context ── */}
-      <div className="hex-header-start flex min-w-0 items-center gap-2 md:gap-3">
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="hex-header-icon-btn lg:hidden shrink-0"
-          onClick={toggleMobileSidebar}
-        >
-          <Menu className="h-4 w-4" />
-        </Button>
+      <div className="hex-header__inner">
+        {/* ── Left: context ── */}
+        <div className="hex-header__left">
+          <button
+            type="button"
+            className="hex-header__icon-btn lg:hidden"
+            onClick={toggleMobileSidebar}
+            aria-label="Open menu"
+          >
+            <Menu className="h-[18px] w-[18px]" />
+          </button>
 
-        <nav className="hex-header-breadcrumb min-w-0" aria-label="Breadcrumb">
-          {breadcrumbs.length > 1 && (
-            <ol className="hidden md:flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
-              {breadcrumbs.slice(0, -1).map((crumb, i) => {
+          <nav className="hex-header__context" aria-label="Breadcrumb">
+            <ol className="hex-header__crumbs hidden sm:flex">
+              <li>
+                <Link href="/dashboard" className="hex-header__crumb-home" aria-label="Dashboard">
+                  <Home className="h-3.5 w-3.5" />
+                </Link>
+              </li>
+              {breadcrumbs.map((_, i) => {
                 const href = "/" + breadcrumbs.slice(0, i + 1).join("/");
+                const isLast = i === breadcrumbs.length - 1;
                 return (
-                  <li key={href} className="flex items-center gap-1 min-w-0">
-                    {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 opacity-40" />}
-                    <Link href={href} className="truncate hover:text-foreground transition-colors">
-                      {crumbLabel(i)}
-                    </Link>
+                  <li key={href} className="hex-header__crumb-item">
+                    <ChevronRight className="hex-header__crumb-sep h-3 w-3" aria-hidden />
+                    {isLast ? (
+                      <span className="hex-header__crumb-current">{crumbLabel(i)}</span>
+                    ) : (
+                      <Link href={href} className="hex-header__crumb-link">
+                        {crumbLabel(i)}
+                      </Link>
+                    )}
                   </li>
                 );
               })}
             </ol>
-          )}
-          <div className="flex items-center gap-2 min-w-0">
-            <Link href="/dashboard" className="shrink-0 hidden lg:block opacity-90 hover:opacity-100">
-              <AppLogo variant="sidebar" theme="auto" />
-            </Link>
-            <h1 className="hex-header-title truncate text-[15px] font-semibold leading-tight text-foreground md:text-base">
-              {currentTitle}
-            </h1>
+
+            <h1 className="hex-header__title sm:hidden">{currentTitle}</h1>
+            <p className="hex-header__subtitle hidden sm:block">{currentTitle}</p>
+          </nav>
+        </div>
+
+        {/* ── Center: search ── */}
+        <div className="hex-header__search-wrap">
+          <div className="hex-header__search">
+            <Search className="hex-header__search-icon" />
+            <Input
+              ref={searchRef}
+              placeholder="Search products, customers, orders..."
+              className="hex-header__search-input"
+            />
+            <kbd className="hex-header__search-kbd">⌘K</kbd>
           </div>
-        </nav>
-      </div>
-
-      {/* ── Center: search ── */}
-      <div className="hex-header-center hidden flex-1 justify-center px-2 md:flex max-w-xl mx-auto">
-        <div className="hex-header-search relative w-full max-w-[420px]">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70 pointer-events-none" />
-          <Input
-            placeholder="Search products, customers..."
-            className="hex-header-search-input h-10 w-full rounded-[5px] border bg-muted/40 pl-10 pr-14 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-[#fe9f43]/40"
-            onFocus={() => setSearchOpen(true)}
-            onBlur={() => setSearchOpen(false)}
-          />
-          <kbd className="hex-header-kbd pointer-events-none absolute right-2.5 top-1/2 hidden h-6 -translate-y-1/2 select-none items-center rounded border border-border/80 bg-background/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
-            ⌘K
-          </kbd>
-        </div>
-      </div>
-
-      {/* ── Right: branch, POS, tools, user ── */}
-      <div className="hex-header-end flex shrink-0 items-center gap-2 md:gap-2.5 ml-auto">
-        <BranchSwitcher />
-
-        <span className="hex-header-divider hidden sm:block" aria-hidden />
-
-        <Button
-          onClick={openPos}
-          variant="pos"
-          size="sm"
-          className="hex-header-pos h-9 gap-1.5 rounded-[5px] px-3.5 text-xs font-semibold shadow-none"
-        >
-          <Monitor className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">POS</span>
-        </Button>
-
-        <div className="hex-header-live hidden lg:flex items-center gap-1.5 rounded-[5px] border border-emerald-200/80 bg-emerald-50 px-2.5 py-1.5 dark:border-emerald-500/25 dark:bg-emerald-500/10">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Live</span>
         </div>
 
-        <span className="hex-header-divider hidden md:block" aria-hidden />
+        {/* ── Right: actions ── */}
+        <div className="hex-header__right">
+          <BranchSwitcher className="hex-header__branch hidden md:flex" />
 
-        <div className="hex-header-tools flex items-center gap-0.5 rounded-[5px] border border-border/80 bg-muted/20 p-0.5 dark:bg-white/[0.04]">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="hex-header-icon-btn h-8 w-8 rounded-[4px]"
+          <button
+            type="button"
+            className="hex-header__pos"
+            onClick={openPos}
           >
-            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            className="hex-header-icon-btn h-8 w-8 rounded-[4px] hidden sm:inline-flex"
-            onClick={() => router.refresh()}
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
+            <Monitor className="h-4 w-4" />
+            <span className="hidden sm:inline">POS</span>
+          </button>
+
+          <div className="hex-header__live hidden xl:flex">
+            <span className="hex-header__live-dot" />
+            <span>Live</span>
+          </div>
+
+          <div className="hex-header__toolbar">
+            <button
+              type="button"
+              className="hex-header__icon-btn md:hidden"
+              onClick={() => searchRef.current?.focus()}
+              aria-label="Search"
+            >
+              <Search className="h-[18px] w-[18px]" />
+            </button>
+
+            <button
+              type="button"
+              className="hex-header__icon-btn"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="Toggle theme"
+            >
+              <Sun className="h-[18px] w-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-[18px] w-[18px] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            </button>
+
+            <button
+              type="button"
+              className="hex-header__icon-btn hidden sm:inline-flex"
+              onClick={() => router.refresh()}
+              aria-label="Refresh page"
+            >
+              <RefreshCw className="h-[17px] w-[17px]" />
+            </button>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" className="hex-header__icon-btn hex-header__icon-btn--badge relative" aria-label="Notifications">
+                  <Bell className="h-[18px] w-[18px]" />
+                  {notificationCount > 0 && (
+                    <span className="hex-header__badge">
+                      {isMaintenance ? "!" : notificationCount}
+                    </span>
+                  )}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-80">
+                <DropdownMenuLabel className="flex items-center justify-between">
+                  <span>Notifications</span>
+                  {isMaintenance && (
+                    <Badge variant="destructive" className="text-[10px] h-5">Maintenance</Badge>
+                  )}
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {isMaintenance && maintenance && (
+                  <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-default bg-amber-50/80 focus:bg-amber-50 dark:bg-amber-500/10 dark:focus:bg-amber-500/10">
+                    <div className="flex items-center gap-2 w-full">
+                      <span className="text-sm font-semibold text-amber-900 dark:text-amber-200">Maintenance Mode ON</span>
+                      <span className="text-[10px] text-amber-600 dark:text-amber-400 ml-auto">Now</span>
+                    </div>
+                    <span className="text-xs text-amber-800 dark:text-amber-300/90 leading-relaxed">{maintenance.message}</span>
+                  </DropdownMenuItem>
+                )}
+                {[
+                  { title: "Low stock alert", desc: "Running Sports Shoes (Size 9) — 2 left", time: "2m ago" },
+                  { title: "New order received", desc: "INV-0891 — LKR 12,500 via UPI", time: "15m ago" },
+                  { title: "Payment overdue", desc: "Supplier: DenimCo — LKR 85,000", time: "1h ago" },
+                  { title: "Birthday campaign sent", desc: "32 customers notified via WhatsApp", time: "3h ago" },
+                ].map((n, i) => (
+                  <DropdownMenuItem key={i} className="flex flex-col items-start gap-0.5 py-3 cursor-pointer">
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-sm font-medium">{n.title}</span>
+                      <span className="text-[10px] text-muted-foreground">{n.time}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">{n.desc}</span>
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="justify-center text-primary text-sm" onSelect={() => router.push("/notifications")}>
+                  View all notifications
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="hex-header-icon-btn relative h-8 w-8 rounded-[4px]">
-                <Bell className="h-4 w-4" />
-                {(isMaintenance || 4 > 0) && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#fe9f43] px-0.5 text-[9px] font-bold text-white">
-                    {isMaintenance ? "!" : "4"}
-                  </span>
-                )}
-              </Button>
+              <button type="button" className="hex-header__profile">
+                <Avatar className="hex-header__avatar">
+                  <AvatarImage src={user?.avatar} />
+                  <AvatarFallback className="hex-header__avatar-fallback">
+                    {getInitials(user?.name || "U")}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="hex-header__profile-meta hidden lg:block">
+                  <span className="hex-header__profile-name">{user?.name || "Admin"}</span>
+                  <span className="hex-header__profile-role">{user?.role?.replace(/_/g, " ") || "User"}</span>
+                </span>
+              </button>
             </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
-            <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              {isMaintenance && (
-                <Badge variant="destructive" className="text-[10px] h-5">Maintenance</Badge>
-              )}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {isMaintenance && maintenance && (
-              <DropdownMenuItem className="flex flex-col items-start gap-1 py-3 cursor-default bg-amber-50/80 focus:bg-amber-50">
-                <div className="flex items-center gap-2 w-full">
-                  <span className="text-sm font-semibold text-amber-900">Maintenance Mode ON</span>
-                  <span className="text-[10px] text-amber-600 ml-auto">Now</span>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
-                <span className="text-xs text-amber-800 leading-relaxed">{maintenance.message}</span>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={goProfile}>
+                <User className="mr-2 h-4 w-4" />
+                <span>Profile</span>
+                <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
               </DropdownMenuItem>
-            )}
-            {[
-              { title: "Low stock alert", desc: "Running Sports Shoes (Size 9) — 2 left", time: "2m ago", type: "warning" },
-              { title: "New order received", desc: "INV-0891 — LKR 12,500 via UPI", time: "15m ago", type: "success" },
-              { title: "Payment overdue", desc: "Supplier: DenimCo — LKR 85,000", time: "1h ago", type: "danger" },
-              { title: "Birthday campaign sent", desc: "32 customers notified via WhatsApp", time: "3h ago", type: "info" },
-            ].map((n, i) => (
-              <DropdownMenuItem key={i} className="flex flex-col items-start gap-0.5 py-3 cursor-pointer">
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-sm font-medium">{n.title}</span>
-                  <span className="text-[10px] text-muted-foreground">{n.time}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">{n.desc}</span>
+              <DropdownMenuItem onSelect={goSettings}>
+                <Settings className="mr-2 h-4 w-4" />
+                <span>Settings</span>
+                <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
               </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-primary text-sm" onSelect={() => router.push("/notifications")}>
-              View all notifications
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
+                <Keyboard className="mr-2 h-4 w-4" />
+                <span>Keyboard shortcuts</span>
+                <DropdownMenuShortcut>?</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setSupportOpen(true)}>
+                <LifeBuoy className="mr-2 h-4 w-4" />
+                <span>Support</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onSelect={() => { void handleLogout(); }}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span>Sign out</span>
+                <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="hex-header-user h-9 gap-2 rounded-[5px] border border-[#092c4c] bg-[#092c4c] px-2.5 text-white hover:bg-[#0a3558] hover:text-white dark:border-[#092c4c]">
-              <Avatar className="h-7 w-7 ring-1 ring-white/20">
-                <AvatarImage src={user?.avatar} />
-                <AvatarFallback className="bg-[#fe9f43] text-[10px] font-bold text-white">
-                  {getInitials(user?.name || "U")}
-                </AvatarFallback>
-              </Avatar>
-              <span className="hidden max-w-[110px] truncate text-xs font-semibold md:block">
-                {user?.name || "Admin"}
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted-foreground">{user?.email}</p>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={goProfile}>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
-              <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={goSettings}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
-              <DropdownMenuShortcut>⌘,</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => setShortcutsOpen(true)}>
-              <Keyboard className="mr-2 h-4 w-4" />
-              <span>Keyboard shortcuts</span>
-              <DropdownMenuShortcut>?</DropdownMenuShortcut>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => setSupportOpen(true)}>
-              <LifeBuoy className="mr-2 h-4 w-4" />
-              <span>Support</span>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onSelect={() => { void handleLogout(); }}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Sign out</span>
-              <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
 
       <KeyboardShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} />

@@ -22,7 +22,7 @@ import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
-import { DREAMSPOS_DARK_CHROME, isDefaultLightSidebar } from "@/lib/theme-layout";
+import { isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -298,20 +298,29 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* Retail theme skins — explicit DreamsPOS dark when default light skin + dark mode */
-  const d = DREAMSPOS_DARK_CHROME;
-  const bg       = dreamsDarkChrome ? d.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #F8FAFC)");
-  const border   = dreamsDarkChrome ? d.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
-  const textMut  = dreamsDarkChrome ? d.muted : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
-  const textFull = dreamsDarkChrome ? d.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
-  const hoverBg  = dreamsDarkChrome ? d.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
-  const sectLbl  = dreamsDarkChrome ? d.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
-  const activeBg = dreamsDarkChrome ? d.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
-  const activeFg = dreamsDarkChrome ? d.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
-  const activeIcon = dreamsDarkChrome ? d.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "#2563EB") + ")";
-  const logoBg   = dreamsDarkChrome ? d.logoBg : (darkUi ? "#141414" : "#FFFFFF");
-  const planBadgeBg = dreamsDarkChrome ? d.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "#EFF6FF");
-  const planBadgeFg = dreamsDarkChrome ? d.activeFg : (darkUi ? "#FE9F43" : "#1D4ED8");
+  /* Retail theme skins — chrome colors from Theme Customizer */
+  const chrome = {
+    bg: "var(--chrome-bg, #0d0d0d)",
+    border: "var(--chrome-border, #1f2228)",
+    muted: "var(--chrome-muted, #6b7280)",
+    fg: "var(--chrome-fg, #d8dfee)",
+    hover: "var(--chrome-hover, rgba(255,255,255,0.05))",
+    activeBg: "var(--chrome-active-bg, rgba(254,159,67,0.14))",
+    activeFg: "var(--chrome-active-fg, #fe9f43)",
+    logoBg: "var(--chrome-logo-bg, #141414)",
+  };
+  const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #F8FAFC)");
+  const border   = dreamsDarkChrome ? chrome.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
+  const textMut  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
+  const textFull = dreamsDarkChrome ? chrome.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
+  const hoverBg  = dreamsDarkChrome ? chrome.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
+  const sectLbl  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
+  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
+  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
+  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "#2563EB") + ")";
+  const logoBg   = dreamsDarkChrome ? chrome.logoBg : (darkUi ? "#141414" : "#FFFFFF");
+  const planBadgeBg = dreamsDarkChrome ? chrome.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "#EFF6FF");
+  const planBadgeFg = dreamsDarkChrome ? chrome.activeFg : (darkUi ? "#FE9F43" : "#1D4ED8");
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -704,7 +713,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
-                  style={{ background: isDark ? "#2563EB" : "#CBD5E1" }}
+                  style={{ background: isDark ? "#FE9F43" : "#CBD5E1" }}
                 >
                   <motion.span
                     className="absolute top-[3px] h-[14px] w-[14px] rounded-full bg-white shadow-sm"

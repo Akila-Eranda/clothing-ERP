@@ -35,7 +35,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
     return (
       <div
         className={cn(
-          "hex-header-branch flex h-9 items-center gap-2 rounded-[5px] border px-3 text-xs shrink-0 max-w-[180px] sm:max-w-[220px]",
+          "hex-header-branch flex h-9 items-center gap-2 rounded-[0.625rem] border px-3 text-xs shrink-0 max-w-[180px] sm:max-w-[220px]",
           className,
         )}
         title={label}
@@ -53,7 +53,7 @@ export function BranchSwitcher({ className }: { className?: string }) {
           variant="outline"
           size="sm"
           className={cn(
-            "hex-header-branch h-9 gap-2 rounded-[5px] text-xs shrink-0 max-w-[140px] sm:max-w-[220px] px-3 font-semibold",
+            "hex-header-branch h-9 gap-2 rounded-[0.625rem] text-xs shrink-0 max-w-[140px] sm:max-w-[220px] px-3 font-semibold",
             className,
           )}
           title={label}

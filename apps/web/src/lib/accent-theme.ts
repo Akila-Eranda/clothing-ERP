@@ -132,36 +132,12 @@ export function getAccentPreset(id: string | null | undefined): AccentPreset {
   return ACCENT_PRESETS.find((p) => p.id === id) ?? ACCENT_PRESETS[0];
 }
 
-/** Apply accent CSS variables on :root (works with light + dark class). */
+/** @deprecated Use useThemeColorsStore().setLightAccent — kept for legacy callers */
 export function applyAccentPreset(id: AccentId | string) {
-  if (typeof document === "undefined") return;
-  const p = getAccentPreset(id);
-  const root = document.documentElement;
-  const isDark = root.classList.contains("dark");
-  root.style.setProperty("--primary", p.primary);
-  root.style.setProperty("--primary-hover", p.primaryHover);
-  root.style.setProperty("--primary-light", p.primaryLight);
-  root.style.setProperty("--primary-soft", isDark ? "217 40% 14%" : p.primarySoft);
-  root.style.setProperty("--ring", p.primary);
-  root.style.setProperty("--chart-1", p.primary);
-  root.style.setProperty("--sidebar-primary", p.primary);
-  root.style.setProperty("--sidebar-ring", p.primary);
-  root.style.setProperty("--sidebar-active-text", p.activeTextLight);
-  root.style.setProperty("--sidebar-active-text-dark", p.activeTextDark);
-  root.style.setProperty("--sidebar-active-icon-dark", p.activeIconDark);
-  root.style.setProperty("--primary-glow", `hsl(${p.ringGlow} / ${isDark ? "0.30" : "0.18"})`);
-  if (!isDark) {
-    root.style.setProperty("--accent", p.softBg);
-    root.style.setProperty("--accent-foreground", p.primaryHover);
-    root.style.setProperty("--sidebar-accent", p.softBg);
-    root.style.setProperty("--sidebar-accent-foreground", p.activeTextLight);
-  } else {
-    root.style.removeProperty("--accent");
-    root.style.removeProperty("--accent-foreground");
-    root.style.removeProperty("--sidebar-accent");
-    root.style.removeProperty("--sidebar-accent-foreground");
-  }
-  root.dataset.accent = p.id;
+  if (typeof document === "undefined" || id === "custom") return;
+  void import("@/stores/theme-colors-store").then(({ useThemeColorsStore }) => {
+    useThemeColorsStore.getState().setLightAccent(id as AccentId);
+  });
 }
 
 export function loadStoredAccent(): AccentId {

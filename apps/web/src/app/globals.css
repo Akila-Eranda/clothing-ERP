@@ -27,25 +27,25 @@
 }
 
 .dark {
-  --tc-background: 220 47% 5%;
-  --tc-foreground: 210 40% 98%;
-  --tc-card: 217 36% 11%;
-  --tc-card-foreground: 210 40% 98%;
-  --tc-popover: 221 45% 7%;
-  --tc-popover-foreground: 210 40% 98%;
-  --tc-primary: 217 91% 53%;
+  --tc-background: 0 0% 5%;
+  --tc-foreground: 216 33% 89%;
+  --tc-card: 0 0% 10%;
+  --tc-card-foreground: 216 33% 89%;
+  --tc-popover: 0 0% 8%;
+  --tc-popover-foreground: 216 33% 89%;
+  --tc-primary: 32 99% 63%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 216 47% 7%;
-  --tc-secondary-foreground: 210 40% 98%;
-  --tc-muted: 216 47% 7%;
-  --tc-muted-foreground: 215 20% 65%;
-  --tc-accent: 217 40% 14%;
-  --tc-accent-foreground: 213 97% 87%;
+  --tc-secondary: 0 0% 8%;
+  --tc-secondary-foreground: 216 33% 89%;
+  --tc-muted: 0 0% 10%;
+  --tc-muted-foreground: 220 9% 46%;
+  --tc-accent: 0 0% 12%;
+  --tc-accent-foreground: 32 99% 63%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 217 25% 18%;
-  --tc-input: 217 25% 20%;
-  --tc-ring: 217 91% 60%;
+  --tc-border: 0 0% 15%;
+  --tc-input: 0 0% 16%;
+  --tc-ring: 32 99% 63%;
 }
 
 @layer base {
@@ -114,26 +114,27 @@
   }
 
   .dark {
-    --background: 220 47% 5%;                /* #080C14 */
-    --secondary-background: 216 47% 7%;      /* #0A101C */
-    --foreground: 210 40% 98%;               /* #F8FAFC */
-    --card: 217 36% 11%;                     /* #101827 */
-    --card-foreground: 210 40% 98%;
-    --card-hover: 221 41% 14%;               /* #151F33 */
-    --popover: 221 45% 7%;                   /* #0A0F1A */
-    --popover-foreground: 210 40% 98%;
-    --primary: 217 91% 53%;
+    /* DreamsPOS dark — neutral charcoal + orange accent (no blue wash) */
+    --background: 0 0% 5%;                 /* #0D0D0D */
+    --secondary-background: 0 0% 7%;         /* #121212 */
+    --foreground: 216 33% 89%;               /* #D8DFEE */
+    --card: 0 0% 10%;                        /* #1A1A1A */
+    --card-foreground: 216 33% 89%;
+    --card-hover: 0 0% 12%;                  /* #1F1F1F */
+    --popover: 0 0% 8%;
+    --popover-foreground: 216 33% 89%;
+    --primary: 32 99% 63%;                   /* #FE9F43 */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 224 76% 48%;
-    --primary-light: 217 91% 60%;
-    --primary-soft: 217 40% 14%;
-    --primary-glow: rgba(37, 99, 235, 0.30);
-    --secondary: 216 47% 7%;
-    --secondary-foreground: 214 32% 84%;     /* #CBD5E1 */
-    --muted: 216 47% 7%;
-    --muted-foreground: 215 20% 65%;         /* #94A3B8 */
-    --accent: 217 40% 14%;
-    --accent-foreground: 213 97% 87%;
+    --primary-hover: 28 90% 55%;
+    --primary-light: 32 99% 68%;
+    --primary-soft: 32 40% 14%;
+    --primary-glow: rgba(254, 159, 67, 0.28);
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 216 20% 78%;
+    --muted: 0 0% 10%;
+    --muted-foreground: 220 9% 46%;          /* #6B7280 */
+    --accent: 0 0% 12%;
+    --accent-foreground: 32 99% 63%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
@@ -142,30 +143,33 @@
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    --border: 217 25% 16%;                   /* soft white ~6% on navy */
-    --border-hsl: 217 25% 16%;
-    --input: 217 25% 20%;
-    --ring: 217 91% 60%;
-    --divider: 217 25% 14%;
-    --line: 217 25% 16%;
-    --chart-1: 217 91% 60%;
+    --border: 0 0% 15%;                      /* #262626 */
+    --border-hsl: 0 0% 15%;
+    --input: 0 0% 16%;
+    --ring: 32 99% 63%;
+    --divider: 0 0% 13%;
+    --line: 0 0% 15%;
+    --chart-1: 32 99% 63%;
     --chart-2: 0 84% 60%;
     --chart-3: 142 71% 45%;
     --chart-4: 263 70% 66%;
     --chart-5: 38 92% 50%;
     --chart-6: 189 94% 43%;
-    --sidebar-background: 221 45% 7%;        /* #0A0F1A */
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-background: 0 0% 5%;
+    --sidebar-foreground: 216 33% 89%;
+    --sidebar-primary: 32 99% 63%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 217 91% 53%;
-    --sidebar-accent-foreground: 213 97% 87%;
-    --sidebar-border: 217 25% 14%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-accent: 32 40% 14%;
+    --sidebar-accent-foreground: 32 99% 63%;
+    --sidebar-border: 0 0% 15%;
+    --sidebar-ring: 32 99% 63%;
+    --sidebar-active-text: 32 99% 63%;
+    --sidebar-active-text-dark: 32 98% 83%;
+    --sidebar-active-icon-dark: 32 99% 63%;
     --sidebar-hover: 0 0% 100%;
-    --header-background: 221 45% 7%;
-    --hover: 221 41% 14%;
-    --selected: 217 91% 53%;
+    --header-background: 0 0% 5%;
+    --hover: 0 0% 12%;
+    --selected: 32 50% 18%;
   }
 }
 
@@ -624,6 +628,15 @@
     color: #ffffff !important;
     box-shadow: none;
   }
+  .dark [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) {
+    background: hsl(0 0% 16%) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+  .dark [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) svg {
+    color: hsl(var(--foreground)) !important;
+  }
+
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) svg {
     color: #ffffff !important;
   }
@@ -708,7 +721,7 @@
     z-index: 2;
   }
   .dark [data-table-craft] thead {
-    background: hsl(217 36% 9% / 0.92);
+    background: hsl(0 0% 8% / 0.92);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
   }
@@ -880,10 +893,28 @@
   }
   [data-table-craft] nav[aria-label] button[aria-current="page"],
   [data-table-craft] nav[aria-label] button.bg-primary {
-    background: #2563eb !important;
-    border-color: #1d4ed8 !important;
+    background: #fe9f43 !important;
+    border-color: #e88a2a !important;
     color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 1px 2px rgba(254, 159, 67, 0.35);
+  }
+  .dark [data-table-craft] nav[aria-label] button {
+    background: hsl(0 0% 14%);
+    border: 1px solid hsl(var(--border));
+    color: hsl(var(--foreground));
+  }
+  .dark [data-table-craft] nav[aria-label] button svg {
+    color: hsl(var(--foreground));
+  }
+  .dark [data-table-craft] nav[aria-label] button[aria-current="page"],
+  .dark [data-table-craft] nav[aria-label] button.bg-primary {
+    background: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary-hover)) !important;
+    color: #ffffff !important;
+    box-shadow: 0 1px 2px hsl(var(--primary) / 0.35);
+  }
+  .dark [data-table-craft] nav[aria-label] button svg {
+    color: inherit;
   }
   [data-table-craft] nav[aria-label] select,
   [data-table-craft] nav[aria-label] button[role="combobox"] {
@@ -902,7 +933,7 @@
     background: hsl(var(--secondary-background) / 0.92);
   }
   .dark .enterprise-table thead {
-    background: hsl(217 36% 9% / 0.92);
+    background: hsl(0 0% 8% / 0.92);
   }
   .enterprise-table th {
     height: 42px;
@@ -1382,5 +1413,110 @@
 /* Overlay loaders sit on dark scrim — keep white */
 .pos-shell.pos-light [style*="var(--pos-overlay)"] .text-white,
 .pos-shell.pos-light [style*="rgba(0,0,0"] .text-white {
+  color: #ffffff !important;
+}
+
+/* ─── DreamsPOS dark: neutralize legacy blue utility classes system-wide ─── */
+.dark .text-blue-600,
+.dark .text-blue-500,
+.dark .text-blue-400,
+.dark .text-blue-700,
+.dark .text-blue-300,
+.dark .dark\:text-blue-400,
+.dark .dark\:text-blue-300 {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.dark .bg-blue-500\/10,
+.dark .bg-blue-500\/15,
+.dark .bg-blue-50,
+.dark .bg-blue-100,
+.dark .bg-blue-500\/5 {
+  background-color: hsl(0 0% 12%) !important;
+}
+
+.dark .border-blue-200\/70,
+.dark .border-blue-200\/80,
+.dark .border-blue-500\/15,
+.dark .border-blue-500\/20,
+.dark .border-blue-500\/30,
+.dark .dark\:border-blue-500\/20,
+.dark .dark\:border-blue-900,
+.dark .border-blue-100 {
+  border-color: hsl(var(--border)) !important;
+}
+
+.dark .from-blue-50,
+.dark .dark\:from-blue-50,
+.dark .dark\:from-blue-500\/10,
+.dark .dark\:from-blue-950\/30 {
+  --tw-gradient-from: hsl(0 0% 10%) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: hsl(0 0% 8% / 0) var(--tw-gradient-to-position) !important;
+}
+
+.dark .via-indigo-50\/50,
+.dark .dark\:via-indigo-950\/20 {
+  --tw-gradient-via: hsl(0 0% 9% / 0.5) var(--tw-gradient-via-position) !important;
+}
+
+.dark .to-white.dark\:to-transparent {
+  --tw-gradient-to: transparent var(--tw-gradient-to-position) !important;
+}
+
+.dark .bg-blue-600,
+.dark button.bg-blue-600 {
+  background-color: hsl(var(--primary)) !important;
+}
+
+.dark .hover\:bg-blue-700:hover,
+.dark button.hover\:bg-blue-700:hover {
+  background-color: hsl(var(--primary-hover)) !important;
+}
+
+.dark .hover\:text-blue-600:hover,
+.dark .hover\:bg-blue-50:hover {
+  color: hsl(var(--primary)) !important;
+  background-color: hsl(0 0% 14%) !important;
+}
+
+.dark .bg-gradient-to-br.from-blue-50,
+.dark .bg-gradient-to-r.from-blue-50\/80 {
+  background-image: linear-gradient(to bottom right, hsl(var(--card)), hsl(var(--background))) !important;
+}
+
+/* Stat card tints — neutral dark surfaces instead of blue wash */
+.dark [class*="dark:from-blue-500"] {
+  --tw-gradient-from: hsl(0 0% 10%) var(--tw-gradient-from-position) !important;
+}
+
+/* Section tabs in dark mode — neutral idle, orange active */
+.dark .dashboard-shell .hex-section-tabs button[type="button"],
+.dark .admin-app-shell .hex-section-tabs button[type="button"] {
+  background: hsl(0 0% 14%) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.dark .dashboard-shell .hex-section-tabs button[type="button"] svg,
+.dark .admin-app-shell .hex-section-tabs button[type="button"] svg {
+  color: hsl(var(--foreground)) !important;
+}
+.dark .dashboard-shell .hex-section-tabs button[type="button"].is-active,
+.dark .admin-app-shell .hex-section-tabs button[type="button"].is-active {
+  background: #fe9f43 !important;
+  color: #ffffff !important;
+}
+.dark .dashboard-shell .hex-section-tabs button[type="button"].is-active svg,
+.dark .admin-app-shell .hex-section-tabs button[type="button"].is-active svg {
+  color: #ffffff !important;
+}
+
+/* Segment controls in dark mode */
+.dark .dashboard-shell .hex-segment-control button[type="button"],
+.dark .admin-app-shell .hex-segment-control button[type="button"] {
+  background: hsl(0 0% 14%) !important;
+  color: hsl(var(--foreground)) !important;
+}
+.dark .dashboard-shell .hex-segment-control button[type="button"].is-active,
+.dark .admin-app-shell .hex-segment-control button[type="button"].is-active {
+  background: #fe9f43 !important;
   color: #ffffff !important;
 }
