@@ -35,7 +35,7 @@ export function getCardBg(c = "", light = false) {
     green: "linear-gradient(135deg,#1b5e20,#2e7d32)",
     gray: "linear-gradient(135deg,#37474f,#455a64)",
     pink: "linear-gradient(135deg,#880e4f,#ad1457)",
-    yellow: "linear-gradient(135deg,#f57f17,#f9a825)",
+    yellow: "linear-gradient(135deg,#7c3aed,#9333ea)",
   };
   return m[c.toLowerCase()] ?? "linear-gradient(135deg,#1a237e,#283593)";
 }

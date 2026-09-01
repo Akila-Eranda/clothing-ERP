@@ -203,7 +203,7 @@ export function PosPaymentPanel({
           {onCreditAmt > 0.01 && (
             <div className="flex justify-between text-xs">
               <span style={{ color: "var(--pos-muted)" }}>On credit (later)</span>
-              <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(onCreditAmt)}</span>
+              <span className="font-bold tabular-nums" style={{ color: "var(--pos-warn-soft)" }}>LKR {formatNumber(onCreditAmt)}</span>
             </div>
           )}
           {paidTotal > totalAmt + 0.01 && (

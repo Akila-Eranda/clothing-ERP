@@ -228,7 +228,7 @@ export function PosCartCustomerPicker({
                   {customer?.id === c.id ? (
                     <Check className="h-3.5 w-3.5 shrink-0" style={{ color: "var(--pos-success)" }} />
                   ) : (
-                    <span className="text-[9px] capitalize shrink-0" style={{ color: "var(--pos-warn)" }}>
+                    <span className="text-[9px] capitalize shrink-0" style={{ color: "var(--pos-muted)" }}>
                       {c.tier}
                     </span>
                   )}

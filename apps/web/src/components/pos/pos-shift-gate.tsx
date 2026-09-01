@@ -236,8 +236,8 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
         >
           <div className="p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ background: "rgba(245,158,11,0.15)" }}>
-                <AlertTriangle className="h-6 w-6 text-amber-400" />
+              <div className="h-12 w-12 rounded-xl flex items-center justify-center" style={{ background: "var(--pos-warn-bg)" }}>
+                <AlertTriangle className="h-6 w-6" style={{ color: "var(--pos-warn-soft)" }} />
               </div>
               <div>
                 <h2 className="text-white font-bold text-lg">Variance pending approval</h2>
@@ -255,7 +255,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
                 Approve variance
               </Button>
             ) : (
-              <p className="text-sm text-amber-300/90">Ask a manager to approve in Cash Management.</p>
+              <p className="text-sm" style={{ color: "var(--pos-warn-soft)" }}>Ask a manager to approve in Cash Management.</p>
             )}
             {onClose && (
               <Button type="button" variant="outline" className="w-full" onClick={onClose}>
@@ -367,7 +367,7 @@ export function PosShiftGate({ onShiftReady, onClose }: PosShiftGateProps) {
               </p>
             )}
             {counters.length === 0 && activeBranchId && (
-              <p className="text-[10px] text-amber-300/90">
+              <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
                 Add counters in Cash → Counters for this branch.
               </p>
             )}

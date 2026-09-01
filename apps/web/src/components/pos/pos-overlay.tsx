@@ -325,8 +325,8 @@ const BASE_NAV_ITEMS = [
   { id:"reports", label:"Reports", icon: BarChart2 },
   { id:"settings", label:"Settings", icon: Settings },
 ];
-const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn)"}, CANCELLED:{bg:"rgba(239,68,68,0.15)",color:"#ef4444"}, REFUNDED:{bg:"rgba(139,92,246,0.15)",color:"#8b5cf6"} };
-const TIER_COLOR: Record<string,string> = { bronze:"#cd7f32", silver:"#9ca3af", gold:"var(--pos-warn)", platinum:"#8b5cf6", diamond:"#a78bfa" };
+const STATUS_STYLE: Record<string,{bg:string;color:string}> = { COMPLETED:{bg:"#0f2a22",color:"var(--pos-success)"}, PENDING:{bg:"var(--pos-warn-bg)",color:"var(--pos-warn-soft)"}, CANCELLED:{bg:"#3f1515",color:"#f87171"}, REFUNDED:{bg:"#2e1a4a",color:"#c4b5fd"} };
+const TIER_COLOR: Record<string,string> = { bronze:"#78716c", silver:"#94a3b8", gold:"#22d3ee", platinum:"#8b5cf6", diamond:"#c084fc" };
 
 export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const { posOpen, closePos } = useUIStore();
@@ -4142,8 +4142,8 @@ ${rows}
             <div
               className="flex items-center gap-1.5 px-2.5 h-7 rounded-full text-xs font-semibold"
               style={{
-                background: isPosLight ? "var(--pos-success-2)" : "rgba(16,185,129,0.15)",
-                color: isPosLight ? "#ffffff" : "var(--pos-success)",
+                background: isPosLight ? "var(--pos-success-2)" : "#065f46",
+                color: "#ffffff",
               }}
             >
               <span className="h-1.5 w-1.5 rounded-full animate-pulse" style={{ background: isPosLight ? "#ffffff" : "#4ade80" }} />
@@ -4156,9 +4156,9 @@ ${rows}
               className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold hover:opacity-90"
               style={{
                 background: taxRate > 0
-                  ? (isPosLight ? "var(--pos-accent)" : "rgba(var(--pos-accent-rgb),0.15)")
-                  : (isPosLight ? "#475569" : "rgba(107,114,128,0.15)"),
-                color: isPosLight ? "#ffffff" : (taxRate > 0 ? "var(--pos-accent-soft)" : "var(--pos-muted)"),
+                  ? (isPosLight ? "var(--pos-accent)" : "var(--pos-accent)")
+                  : (isPosLight ? "#475569" : "#334155"),
+                color: "#ffffff",
               }}
             >
               <Receipt className="h-3.5 w-3.5"/>
@@ -4169,8 +4169,8 @@ ${rows}
                 onClick={openHeldBillsPopup}
                 className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold"
                 style={{
-                  background: isPosLight ? "var(--pos-warn)" : "var(--pos-warn-bg)",
-                  color: isPosLight ? "#ffffff" : "var(--pos-warn)",
+                  background: "#c026d3",
+                  color: "#ffffff",
                 }}
               >
                 <PauseCircle className="h-3.5 w-3.5"/>{serverHeldBills.length} Held
@@ -4184,8 +4184,8 @@ ${rows}
               title="Open customer-facing display on second screen"
               className="flex items-center gap-1 px-2.5 h-7 rounded-xl text-xs font-semibold transition-all hover:opacity-90 no-underline"
               style={{
-                background: isPosLight ? "#6D28D9" : "rgba(124,58,237,0.15)",
-                color: isPosLight ? "#ffffff" : "var(--pos-violet-soft)",
+                background: isPosLight ? "#6D28D9" : "#7c3aed",
+                color: "#ffffff",
               }}
             >
               <Monitor className="h-3.5 w-3.5"/>Customer Screen
@@ -4279,7 +4279,7 @@ ${rows}
                     <item.icon className="h-4 w-4 shrink-0" style={{color:active?"var(--pos-accent)":"var(--pos-muted)"}}/>
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-accent)",color:"#fff"}}>{itemCount()}</span>}
-                    {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-warn)",color:"#fff"}}>{serverHeldBills.length}</span>}
+                    {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"#c026d3",color:"#fff"}}>{serverHeldBills.length}</span>}
                     {item.id==="reload"&&<span className="ml-auto text-[9px] opacity-40 font-mono">L</span>}
                     {shortcutIdx>=0&&shortcutIdx<9&&item.id!=="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
                   </button>
@@ -4869,13 +4869,13 @@ ${rows}
                     {activePayment === "CASH" && payState.allowPartial && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (customer?.creditLimit ?? 0) > 0 && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Balance on credit</span>
-                        <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
+                        <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
                     {activePayment === "CUSTOMER_CREDIT" && numpad && parseFloat(numpad) > 0 && parseFloat(numpad) + 0.01 < totalAmt && (
                       <div className="flex justify-between text-xs mb-2 px-1">
                         <span style={{color:"var(--pos-muted)"}}>Remaining due</span>
-                        <span className="text-amber-400 font-bold tabular-nums">LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
+                        <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
                     <div className="grid gap-1.5 flex-1 content-start" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
@@ -4966,16 +4966,16 @@ ${rows}
               </div>
 
               <div className="mx-5 rounded-2xl border px-5 py-6 text-center" style={{
-                background: thankYouSale.changeDue > 0 ? "rgba(245,158,11,0.12)" : "rgba(16,185,129,0.1)",
-                borderColor: thankYouSale.changeDue > 0 ? "rgba(245,158,11,0.4)" : "rgba(16,185,129,0.35)",
+                background: thankYouSale.changeDue > 0 ? "var(--pos-change-bg)" : "rgba(16,185,129,0.1)",
+                borderColor: thankYouSale.changeDue > 0 ? "var(--pos-change-border)" : "rgba(16,185,129,0.35)",
               }}>
                 <p className="text-sm font-bold uppercase tracking-[0.16em]" style={{
-                  color: thankYouSale.changeDue > 0 ? "#fbbf24" : "#34d399",
+                  color: thankYouSale.changeDue > 0 ? "var(--pos-change)" : "#34d399",
                 }}>
                   {thankYouSale.changeDue > 0 ? "Change to Customer" : "No Change Due"}
                 </p>
                 <p className="mt-2 font-mono text-5xl font-black tabular-nums sm:text-6xl" style={{
-                  color: thankYouSale.changeDue > 0 ? "#fbbf24" : "#34d399",
+                  color: thankYouSale.changeDue > 0 ? "var(--pos-change)" : "#34d399",
                 }}>
                   LKR {formatNumber(thankYouSale.changeDue)}
                 </p>

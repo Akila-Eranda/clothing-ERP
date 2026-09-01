@@ -41,7 +41,7 @@ function digitsOnly(v: string) {
 }
 
 const ACCENT = "var(--pos-accent)";
-const CARD_AMBER = "#d97706";
+const CARD_ACCENT = "#c026d3";
 
 function chipStyle(opts: {
   selected: boolean;
@@ -476,7 +476,7 @@ export function PosReloadPanel({
             })}
           </div>
           {!operators.length && (
-            <p className="text-xs font-medium" style={{ color: CARD_AMBER }}>
+            <p className="text-xs font-medium" style={{ color: CARD_ACCENT }}>
               No providers — add them in Settings → Reload.
             </p>
           )}
@@ -505,7 +505,7 @@ export function PosReloadPanel({
               onClick={() => { setMode("PHYSICAL"); setFocusZone("mode"); }}
               className="flex items-center justify-center gap-2 h-11 rounded-xl text-sm font-bold transition-all"
               style={{
-                background: mode === "PHYSICAL" ? CARD_AMBER : (lightMode ? "#475569" : "var(--pos-elevated)"),
+                background: mode === "PHYSICAL" ? CARD_ACCENT : (lightMode ? "#475569" : "var(--pos-elevated)"),
                 color: "#ffffff",
                 boxShadow: focusZone === "mode" && mode === "PHYSICAL" ? "0 0 0 2px rgba(217,119,6,0.45)" : "none",
               }}
@@ -587,7 +587,7 @@ export function PosReloadPanel({
               })}
             </div>
             {!denoms.some((d) => d.availableCards > 0) && (
-              <p className="text-xs font-medium" style={{ color: CARD_AMBER }}>
+              <p className="text-xs font-medium" style={{ color: CARD_ACCENT }}>
                 No physical cards — import PINs in Settings → Reload.
               </p>
             )}

@@ -325,7 +325,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
               {customerLabel(sale.customer)} · Sold {new Date(sale.invoiceDate).toLocaleDateString()}
             </p>
             {!customerId && (
-              <p className="text-amber-400 font-medium">No customer on this sale — claim cannot be submitted.</p>
+              <p className="font-medium" style={{ color: "var(--pos-warn-soft)" }}>No customer on this sale — claim cannot be submitted.</p>
             )}
           </div>
           <p className="text-xs font-semibold text-white shrink-0">Select defective part (warranty-covered only)</p>

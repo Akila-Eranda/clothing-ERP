@@ -174,16 +174,16 @@ function CheckoutCashPanel({ state }: { state: CustomerDisplayState }) {
       {isCash && balanceDue > 0 && (
         <div
           className="rounded-xl px-4 py-3 text-center"
-          style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.3)" }}
+          style={{ background: "var(--pos-warn-bg)", border: "1px solid var(--pos-warn-border)" }}
         >
-          <p className="text-sm font-semibold" style={{ color: "#fcd34d" }}>
+          <p className="text-sm font-semibold" style={{ color: "var(--pos-warn-soft)" }}>
             Balance due: {state.currency} {formatNumber(balanceDue)}
           </p>
         </div>
       )}
 
       {!isCash && (
-        <p className="text-center text-sm font-semibold animate-pulse" style={{ color: "#f59e0b" }}>
+        <p className="text-center text-sm font-semibold animate-pulse" style={{ color: "var(--pos-accent)" }}>
           Processing payment…
         </p>
       )}

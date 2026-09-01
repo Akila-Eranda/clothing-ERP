@@ -57,7 +57,7 @@ function buildPrinterDisplay(
       return {
         label: name || "Print server",
         detail: `Offline${fallback}`,
-        color: mode === "server" ? "#ef4444" : "#f59e0b",
+        color: mode === "server" ? "#ef4444" : "#f43f5e",
       };
     }
     return { label: name || "Print server", detail: "Configured", color: "#6a8ab8" };

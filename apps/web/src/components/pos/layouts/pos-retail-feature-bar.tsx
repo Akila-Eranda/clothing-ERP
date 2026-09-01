@@ -68,7 +68,7 @@ export function PosRetailFeatureBar({
                 <span
                   className="text-[9px] font-bold rounded-full px-1.5 py-0.5 leading-none min-w-[1.1rem] text-center"
                   style={{
-                    background: item.id === "hold-bills" ? "var(--pos-warn)" : "var(--pos-accent)",
+                    background: "var(--pos-accent)",
                     color: "#fff",
                   }}
                 >
