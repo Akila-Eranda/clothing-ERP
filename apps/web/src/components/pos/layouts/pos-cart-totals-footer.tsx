@@ -6,8 +6,6 @@ import type { PosLayoutPayButtons } from "@/lib/pos-layouts";
 import { formatNumber } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { DISCOUNT_APPROVAL_THRESHOLD_PCT } from "@/lib/workflow-access";
-import { PosRetailCartActions } from "@/components/pos/layouts/pos-retail-cart-actions";
-
 type PendingDiscount = {
   type: "percentage" | "fixed";
   value: number;
@@ -43,11 +41,6 @@ type Props = {
   onApplyDiscount: () => void;
   onPayCash: () => void;
   onOpenCheckout: () => void;
-  onHoldBill: () => void;
-  onOpenHeldBills: () => void;
-  onOpenOrders: () => void;
-  onClearCart: () => void;
-  onOpenReload: () => void;
 };
 
 export function PosCartTotalsFooter({
@@ -79,11 +72,6 @@ export function PosCartTotalsFooter({
   onApplyDiscount,
   onPayCash,
   onOpenCheckout,
-  onHoldBill,
-  onOpenHeldBills,
-  onOpenOrders,
-  onClearCart,
-  onOpenReload,
 }: Props) {
   const inactiveToggleBg = lightUi ? "#334155" : "transparent";
   const payBtnClass =
@@ -321,20 +309,6 @@ export function PosCartTotalsFooter({
         </div>
       </div>
       )}
-      {retailUi ? (
-        <PosRetailCartActions
-          itemCount={itemCount}
-          checkoutLoading={checkoutLoading}
-          pendingApproval={!!pendingDiscountApproval}
-          onHoldBill={onHoldBill}
-          onOpenHeldBills={onOpenHeldBills}
-          onOpenOrders={onOpenOrders}
-          onClearCart={onClearCart}
-          onOpenCheckout={onOpenCheckout}
-          onPayCash={onPayCash}
-          onOpenReload={onOpenReload}
-        />
-      ) : (
       <div
         className={cn(
           "p-3",
@@ -373,7 +347,6 @@ export function PosCartTotalsFooter({
           </span>
         </button>
       </div>
-      )}
     </div>
   );
 }

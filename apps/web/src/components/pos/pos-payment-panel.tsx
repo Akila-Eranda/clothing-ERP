@@ -122,10 +122,15 @@ export function PosPaymentPanel({
   };
 
   return (
-    <div className="space-y-2 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold" style={{ color: "var(--pos-muted)" }}>Advanced Payment</span>
-        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: "var(--pos-input)", color: "var(--pos-muted)" }}>
+    <div className="pos-checkout-advanced space-y-3 px-4 py-3 border-t" style={{ borderColor: "var(--pos-border)" }}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: "var(--pos-muted-2)" }}>
+          Advanced Payment
+        </span>
+        <span
+          className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md"
+          style={{ background: "var(--pos-panel)", border: "1px solid var(--pos-border)", color: "var(--pos-muted)" }}
+        >
           {state.currency}
         </span>
       </div>
@@ -133,50 +138,68 @@ export function PosPaymentPanel({
       {tierPct > 0 && customerTier && (
         <div className="flex justify-between text-xs px-1" style={{ color: "var(--pos-success-soft)" }}>
           <span>{customerTier} tier discount ({tierPct}%)</span>
-          <span>-LKR {formatNumber(tierAmt)}</span>
+          <span>−LKR {formatNumber(tierAmt)}</span>
         </div>
       )}
 
-      <div className="flex gap-1.5">
+      <div className="flex gap-2">
         <Input
           ref={couponInputRef}
           value={state.couponCode}
           onChange={(e) => onStateChange({ couponCode: e.target.value })}
           onKeyDown={(e) => { if (e.key === "Enter") applyCoupon(); }}
           placeholder="Coupon / gift voucher"
-          className="h-8 text-xs text-white flex-1"
-          style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}
+          className="h-10 text-sm text-white flex-1 rounded-xl"
+          style={{ background: "var(--pos-panel)", borderColor: "var(--pos-border)" }}
         />
-        <button type="button" onClick={applyCoupon} data-pos-accent=""
-          className="pos-cta px-2.5 h-8 rounded-lg text-xs font-bold flex items-center gap-1"
-          style={{ background: "var(--pos-accent)", color: "#ffffff" }}>
-          <Tag className="h-3 w-3" /> Apply
+        <button
+          type="button"
+          onClick={applyCoupon}
+          data-pos-accent=""
+          className="pos-cta px-4 h-10 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0"
+          style={{ background: "var(--pos-accent)", color: "#ffffff", border: "1px solid var(--pos-accent-2)" }}
+        >
+          <Tag className="h-3.5 w-3.5" /> Apply
         </button>
       </div>
       {state.couponDiscount > 0 && (
-        <p className="text-[10px] px-1" style={{ color: "var(--pos-success-soft)" }}>Coupon discount: LKR {formatNumber(state.couponDiscount)}</p>
+        <p className="text-[11px] px-1 font-semibold" style={{ color: "var(--pos-success-soft)" }}>
+          Coupon discount: LKR {formatNumber(state.couponDiscount)}
+        </p>
       )}
 
-      <div className="flex items-center justify-between text-xs">
-        <label className="flex items-center gap-2 cursor-pointer" style={{ color: "var(--pos-muted)" }}>
-          <Switch checked={state.splitMode} onCheckedChange={(v) => {
-            onStateChange({
-              splitMode: v,
-              paymentLines: v
-                ? [{ method: "CASH", amount: "" }, { method: "CARD", amount: "" }]
-                : [{ method: "CASH", amount: "" }],
-            });
-          }} />
-          <Split className="h-3 w-3" /> Split payment
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer" style={{ color: "var(--pos-muted)" }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div
+          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+          style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <Split className="h-4 w-4 shrink-0" style={{ color: state.splitMode ? "var(--pos-accent)" : "var(--pos-muted)" }} />
+            <span className="text-sm font-semibold text-white truncate">Split payment</span>
+          </div>
+          <Switch
+            checked={state.splitMode}
+            onCheckedChange={(v) => {
+              onStateChange({
+                splitMode: v,
+                paymentLines: v
+                  ? [{ method: "CASH", amount: "" }, { method: "CARD", amount: "" }]
+                  : [{ method: "CASH", amount: "" }],
+              });
+            }}
+          />
+        </div>
+        <div
+          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+          style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+        >
+          <span className="text-sm font-semibold text-white truncate">Partial pay</span>
           <Switch checked={state.allowPartial} onCheckedChange={(v) => onStateChange({ allowPartial: v })} />
-          Partial pay
-        </label>
+        </div>
       </div>
 
       {state.allowPartial && hasCreditCustomer && !state.splitMode && (
-        <div className="rounded-xl px-3 py-2 space-y-2" style={{ background: "rgba(var(--pos-accent-rgb),0.08)" }}>
+        <div className="rounded-xl px-3 py-2.5 space-y-2" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}>
           <p className="text-[10px] font-semibold" style={{ color: "var(--pos-accent-soft)" }}>
             Pay part now — balance goes on customer credit account
           </p>
@@ -304,7 +327,10 @@ export function PosPaymentPanel({
             </div>
           )}
           {creditAvailable !== undefined && customerCreditLimit !== undefined && customerCreditLimit > 0 && (
-            <div className="space-y-1">
+            <div
+              className="rounded-xl px-3 py-2 space-y-1"
+              style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
+            >
               <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--pos-muted)" }}>
                 <span className="flex items-center gap-1"><UserCheck className="h-3 w-3" /> Credit available</span>
                 <span style={{ color: creditAvailable < totalAmt ? "var(--pos-warn)" : "var(--pos-success-soft)" }}>

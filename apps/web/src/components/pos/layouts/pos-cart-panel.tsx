@@ -286,11 +286,6 @@ export function PosCartPanel(props: Props) {
         onApplyDiscount={onApplyDiscount}
         onPayCash={onPayCash}
         onOpenCheckout={onOpenCheckout}
-        onHoldBill={onHoldBill}
-        onOpenHeldBills={onOpenHeldBills}
-        onOpenOrders={onOpenOrders}
-        onClearCart={onClearCart}
-        onOpenReload={onOpenReload}
       />
       {children}
     </div>

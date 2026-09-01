@@ -952,6 +952,16 @@
   color: var(--pos-price, #ffffff) !important;
 }
 
+.pos-shell .pos-checkout .pos-checkout-keypad button.pos-checkout-key-quick {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.pos-shell .pos-checkout .pos-checkout-actions button {
+  min-height: 3rem;
+}
+
 /* Dark-first markup uses text-white — remap for light panels (body copy) */
 .pos-shell.pos-light .text-white {
   color: var(--pos-text) !important;
