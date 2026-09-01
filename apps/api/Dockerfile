@@ -1,9 +1,10 @@
-# ── Stage 1: Builder ─────────────────────────────────────────
-FROM node:20-slim AS builder
+# Single-stage build — keeps generated Prisma client + enums intact (pnpm multi-stage broke re-exports).
+FROM node:20-slim
 
 WORKDIR /app
 
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 RUN npm install -g pnpm@9.15.9
 
@@ -13,44 +14,16 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
-
 RUN pnpm prisma generate
 RUN pnpm run build
 
-# ── Stage 2: Runner ───────────────────────────────────────────
-FROM node:20-slim AS runner
-
-WORKDIR /app
-
-RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
-  && apt-get purge -y wget curl 2>/dev/null || true \
-  && rm -f /usr/bin/wget /bin/wget /usr/bin/curl /bin/curl 2>/dev/null || true \
-  && printf '%s\n' '#!/bin/false' > /usr/local/bin/wget \
-  && printf '%s\n' '#!/bin/false' > /usr/local/bin/curl \
-  && chmod 755 /usr/local/bin/wget /usr/local/bin/curl \
-  && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-RUN npm install -g pnpm@9.15.9
-
 ENV NODE_ENV=production
-
-COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --prod --frozen-lockfile
-
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-# pnpm prod install does not wire enum re-exports — point @prisma/client at generated client
-RUN node -e "require('fs').writeFileSync('node_modules/@prisma/client/index.js', \"module.exports = require('../.prisma/client/default');\\n\");"
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
 RUN mkdir -p /app/uploads && chown -R nestjs:nodejs /app/uploads
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
-
-# Keep root for entrypoint (drops to nestjs). Do not USER nestjs here.
 
 EXPOSE 3001
 
