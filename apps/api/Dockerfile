@@ -39,6 +39,8 @@ RUN pnpm install --prod --frozen-lockfile
 
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+# pnpm prod install does not wire enum re-exports — point @prisma/client at generated client
+RUN node -e "require('fs').writeFileSync('node_modules/@prisma/client/index.js', \"module.exports = require('../.prisma/client/default');\\n\");"
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
