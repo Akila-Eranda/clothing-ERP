@@ -12,6 +12,7 @@ import {
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
   ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield,
+  LayoutGrid, MessageSquare,
 } from "lucide-react";
 import { cn, planTierFromRole } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -285,6 +286,8 @@ export function Sidebar() {
   const showShopLogo = !!logoSrc && !logoFailed;
   const shopName = receiptSettings.shopName?.trim() || user?.branch?.name || APP_NAME;
   const planLabel = planTierFromRole(user?.role);
+  const userDisplayName = user?.name?.trim() || "User";
+  const userRoleLabel = user?.role?.replace(/_/g, " ") || "Staff";
 
   const closeMobile = () => setMobileSidebarOpen(false);
 
@@ -294,15 +297,15 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* Hexalyte sidebar — soft slate (light) / near-black navy (dark) */
-  const bg       = darkUi ? "#0A0F1A" : "#F8FAFC";
-  const border   = darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)";
-  const textMut  = darkUi ? "#94A3B8" : "#64748B";
-  const textFull = darkUi ? "#F8FAFC" : "#0F172A";
-  const hoverBg  = darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9";
-  const sectLbl  = darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8";
-  const activeBg = darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF";
-  const activeFg = darkUi ? "#BFDBFE" : "#1D4ED8";
+  /* Retail theme skins (DreamsPOS) — CSS vars from retail-theme.css */
+  const bg       = darkUi ? "var(--retail-sidebar-bg, #0A0F1A)" : "var(--retail-sidebar-bg, #F8FAFC)";
+  const border   = "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
+  const textMut  = "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
+  const textFull = "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
+  const hoverBg  = "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
+  const sectLbl  = "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
+  const activeBg = "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
+  const activeFg = "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
   const activeIcon = darkUi ? "#93C5FD" : "#2563EB";
   const logoBg   = darkUi ? "#101827" : "#FFFFFF";
   const planBadgeBg = darkUi ? "rgba(37,99,235,0.22)" : "#EFF6FF";
@@ -564,7 +567,7 @@ export function Sidebar() {
         initial={false}
         animate={{ width: sidebarCollapsed ? 68 : 260 }}
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-        className="relative flex h-screen flex-col shrink-0 overflow-hidden"
+        className="hex-retail-sidebar relative flex h-screen flex-col shrink-0 overflow-hidden"
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
@@ -643,13 +646,45 @@ export function Sidebar() {
 
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
 
+        {!sidebarCollapsed && (
+          <div className="px-3 pt-3 pb-1 shrink-0 space-y-3">
+            <div className="hex-retail-profile-card rounded-xl p-3 text-center">
+              <div
+                className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full text-lg font-bold text-white"
+                style={{ background: "hsl(var(--primary))" }}
+              >
+                {userDisplayName[0]?.toUpperCase() ?? "U"}
+              </div>
+              <p className="text-sm font-bold truncate" style={{ color: textFull }}>{userDisplayName}</p>
+              <p className="text-[11px] capitalize truncate" style={{ color: textMut }}>{userRoleLabel}</p>
+            </div>
+            <div className="flex items-center justify-between gap-1">
+              {[
+                { href: "/dashboard", icon: LayoutGrid, label: "Dashboard" },
+                { href: "/notifications", icon: MessageSquare, label: "Notifications" },
+                { href: "/notifications", icon: Bell, label: "Alerts" },
+                { href: "/settings", icon: Settings, label: "Settings" },
+              ].map((action) => (
+                <Link
+                  key={action.label}
+                  href={action.href}
+                  onClick={closeMobile}
+                  title={action.label}
+                  className="hex-retail-quick-btn flex h-9 w-9 items-center justify-center rounded-lg transition-colors"
+                >
+                  <action.icon className="h-4 w-4" />
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <ScrollArea className="flex-1">
           <nav className={cn("py-2.5", sidebarCollapsed ? "px-1.5" : "px-2")}>
             {navGroups.map((group, gi) => (
               <div key={group.title} className={gi > 0 ? "mt-4" : ""}>
                 {!sidebarCollapsed && (
-                  <p className="px-2.5 mb-1.5 text-[11px] font-bold uppercase tracking-[0.12em] leading-none select-none"
-                    style={{ color: sectLbl }}>
+                  <p className="hex-retail-submenu-hdr px-2.5 mb-1.5 leading-none select-none">
                     {group.title}
                   </p>
                 )}

@@ -334,7 +334,11 @@ export function PosQuickGrnPanel({
         return;
       }
       if (found.supplierAssigned === false) {
-        toast.error(`${found.productName} is not assigned to this supplier`);
+        setSupplierProducts((prev) =>
+          prev.some((p) => p.variantId === found!.variantId) ? prev : [...prev, found!],
+        );
+        addMatchedProduct(found);
+        toast.info(`${found.productName} will be linked to this supplier when GRN is posted`);
         return;
       }
       setSupplierProducts((prev) =>

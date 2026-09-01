@@ -13,6 +13,8 @@ import { isPosOnlyRole } from "@/lib/role-access";
 import { PosOnlyLanding } from "@/components/pos/pos-only-landing";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
+import { ThemeCustomizer } from "@/components/layout/theme-customizer";
+import { ThemeLayoutApplier } from "@/components/layout/theme-layout-applier";
 
 const POSOverlay = dynamic(
   () => import("@/components/pos/pos-overlay").then((m) => m.POSOverlay),
@@ -90,7 +92,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <BranchProvider>
-      <div className="flex h-screen overflow-hidden bg-background">
+      <ThemeLayoutApplier />
+      <div className="dashboard-shell flex h-screen overflow-hidden bg-background">
         {/* Desktop Sidebar */}
         <div className="hidden lg:flex">
           <Sidebar />
@@ -122,6 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* POS full-screen overlay — remount when branch changes */}
         <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} />
+        <ThemeCustomizer />
       </div>
     </BranchProvider>
   );

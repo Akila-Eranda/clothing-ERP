@@ -2,6 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
+@import "./retail-theme.css";
+
 :root {
   /* react-table-craft — track Hexalyte surfaces */
   --tc-background: 0 0% 100%;
@@ -952,6 +954,67 @@
   color: var(--pos-price, #ffffff) !important;
 }
 
+.pos-shell .pos-checkout .pos-checkout-change-bar,
+.pos-shell .pos-checkout .pos-checkout-change-bar span {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.pos-shell .pos-checkout .pos-checkout-actions .pos-cta:not(:disabled) {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+.pos-shell .pos-checkout .pos-checkout-actions .pos-cta:not(:disabled) svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+  align-items: stretch;
+}
+
+/* Calculator-style grid lines between keys */
+.pos-shell .pos-checkout .pos-checkout-keypad,
+.pos-shell .pos-checkout .pos-checkout-quick-cash {
+  gap: 1px;
+  padding: 1px;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: var(--pos-border-strong);
+  border: 1px solid var(--pos-border-strong);
+}
+
+.pos-shell .pos-checkout .pos-checkout-key {
+  min-height: 3rem;
+  border: none;
+  border-radius: 0;
+  color: #ffffff;
+  background: var(--pos-input);
+}
+
+.pos-shell.pos-light .pos-checkout .pos-checkout-key {
+  background: #334155;
+}
+
+.pos-shell .pos-checkout .pos-checkout-key.pos-checkout-key-del {
+  background: #7f1d1d;
+}
+
+.pos-shell.pos-light .pos-checkout .pos-checkout-key.pos-checkout-key-del {
+  background: #dc2626;
+}
+
+.pos-shell .pos-checkout .pos-checkout-key.pos-checkout-key-quick {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  background: var(--pos-panel);
+}
+
+.pos-shell.pos-light .pos-checkout .pos-checkout-key.pos-checkout-key-quick {
+  background: #475569;
+}
+
 .pos-shell .pos-checkout .pos-checkout-keypad button,
 .pos-shell .pos-checkout .pos-checkout-quick-cash button {
   min-height: 3rem;
@@ -967,6 +1030,27 @@
 .pos-shell .pos-checkout .pos-checkout-methods-grid button {
   min-height: 0;
   padding: 0.35rem 0.25rem;
+}
+
+.pos-shell .pos-checkout .pos-checkout-method-btn {
+  border: 2px solid var(--pos-border-strong);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.pos-shell.pos-light .pos-checkout .pos-checkout-method-btn {
+  border-color: #64748b;
+}
+
+.pos-shell .pos-checkout .pos-checkout-method-btn-active {
+  border-color: var(--pos-accent-2);
+  box-shadow: 0 0 0 1px var(--pos-accent), inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.pos-shell .pos-checkout .pos-checkout-method-btn span,
+.pos-shell .pos-checkout .pos-checkout-method-btn svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 .pos-shell .pos-checkout .pos-checkout-methods-grid button svg {
@@ -1235,4 +1319,3 @@
 .pos-shell.pos-light [style*="rgba(0,0,0"] .text-white {
   color: #ffffff !important;
 }
-

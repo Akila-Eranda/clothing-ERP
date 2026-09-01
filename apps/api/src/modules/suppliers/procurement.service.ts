@@ -387,6 +387,29 @@ export class ProcurementService {
         await afterStock(tx, created);
       }
 
+      // Link received variants to this supplier (supports multi-supplier products).
+      const linkedVariantIds = new Set<string>();
+      for (const line of effectiveLines) {
+        if (line.receivedQty <= 0 || linkedVariantIds.has(line.variantId)) continue;
+        linkedVariantIds.add(line.variantId);
+        await tx.supplierProductAssignment.upsert({
+          where: {
+            supplierId_variantId: { supplierId, variantId: line.variantId },
+          },
+          create: {
+            tenantId,
+            supplierId,
+            variantId: line.variantId,
+            lastBuyingPrice: line.unitCost,
+            isActive: true,
+          },
+          update: {
+            lastBuyingPrice: line.unitCost,
+            isActive: true,
+          },
+        });
+      }
+
       // Direct/Quick GRN (no PO): auto-post supplier invoice so Outstanding includes it
       const receivedValue = effectiveLines.reduce(
         (s, l) => s + Math.max(0, l.receivedQty) * l.unitCost,

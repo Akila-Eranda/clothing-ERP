@@ -1303,7 +1303,12 @@ export class PosService {
     });
 
     if (!assignment || assignment.isActive === false) {
-      throw new NotFoundException('Product is not assigned to this supplier');
+      return {
+        ...result,
+        supplierAssigned: false,
+        supplierId,
+        lastBuyingPrice: result.lastBuyingPrice ?? null,
+      };
     }
 
     const insights = await this.attachSupplierPurchaseInsights(

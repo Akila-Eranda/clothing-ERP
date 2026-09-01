@@ -4710,25 +4710,22 @@ ${rows}
                       onClick={()=>setActivePayment(value)}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
-                        "flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-[11px] font-bold transition-all hover:opacity-95 h-[4.25rem] w-full",
+                        "pos-checkout-method-btn flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-[11px] font-bold transition-all hover:opacity-95 h-[4.25rem] w-full",
                         "pos-cta",
+                        active && "pos-checkout-method-btn-active",
                       )}
                       style={{
                         background: active ? "var(--pos-accent)" : (isPosLight ? "#334155" : "var(--pos-input)"),
                         color: "#ffffff",
-                        border: active ? "1px solid var(--pos-accent-2)" : "1px solid var(--pos-border)",
                       }}
                     >
                       <Icon
                         className={touchMode ? "h-5 w-5" : "h-4 w-4"}
                         strokeWidth={2.4}
-                        style={{ color: "inherit", stroke: "currentColor" }}
+                        style={{ color: "#ffffff", stroke: "currentColor" }}
                       />
-                      <span style={{ color: "inherit" }}>{label}</span>
-                      <span
-                        className="text-[9px] font-mono"
-                        style={{ color: "inherit", opacity: active ? 0.85 : (isPosLight ? 0.75 : 0.7) }}
-                      >
+                      <span style={{ color: "#ffffff" }}>{label}</span>
+                      <span className="text-[9px] font-mono" style={{ color: "#ffffff" }}>
                         {idx + 1}
                       </span>
                     </button>
@@ -4885,7 +4882,7 @@ ${rows}
                       </div>
                     )}
                     <div className="pos-checkout-keypad-wrap flex gap-2 w-full">
-                      <div className="pos-checkout-keypad grid grid-cols-3 gap-2 flex-1 min-w-0">
+                      <div className="pos-checkout-keypad grid grid-cols-3 flex-1 min-w-0">
                         {[["7","8","9"],["4","5","6"],["1","2","3"],["0",".","DEL"]].map((row,ri)=>row.map((k)=>{
                           const isDel=k==="DEL";
                           return(
@@ -4893,30 +4890,20 @@ ${rows}
                               key={`${ri}-${k}`}
                               type="button"
                               onClick={() => handleNumpad(k)}
-                              className={cn("h-12 rounded-xl text-base font-bold transition-all active:scale-[0.98] flex items-center justify-center", isDel && "pos-checkout-key-del")}
-                              style={{
-                                background: isDel ? (isPosLight ? "#DC2626" : "#7f1d1d") : (isPosLight ? "#334155" : "var(--pos-input)"),
-                                color: "#ffffff",
-                                border: isDel ? "1px solid rgba(239,68,68,0.45)" : "1px solid var(--pos-border)",
-                              }}
+                              className={cn("pos-checkout-key h-12 text-base font-bold transition-all active:opacity-80 flex items-center justify-center", isDel && "pos-checkout-key-del")}
                             >
                               {isDel ? <Delete className="h-4 w-4" strokeWidth={2.25}/> : k}
                             </button>
                           );
                         }))}
                       </div>
-                      <div className="pos-checkout-quick-cash grid grid-cols-1 gap-2 w-[4.75rem] shrink-0">
+                      <div className="pos-checkout-quick-cash grid grid-cols-1 w-[4.75rem] shrink-0">
                         {[500,1000,2000,5000].map((amt)=>(
                           <button
                             key={amt}
                             type="button"
                             onClick={()=>setQuickCash(amt)}
-                            className="pos-checkout-key-quick h-12 rounded-xl text-[11px] font-bold transition-all active:scale-[0.98] flex items-center justify-center"
-                            style={{
-                              background: isPosLight ? "#475569" : "var(--pos-panel)",
-                              color: "#ffffff",
-                              border: "1px solid var(--pos-border)",
-                            }}
+                            className="pos-checkout-key pos-checkout-key-quick h-12 text-[11px] font-bold transition-all active:opacity-80 flex items-center justify-center"
                           >
                             {amt}
                           </button>
@@ -4933,16 +4920,16 @@ ${rows}
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-auto mb-2 w-full max-w-lg" style={{ background: "#0f2a22", border: "1px solid rgba(16,185,129,0.35)" }}>
-                    <span className="text-sm font-bold" style={{color:"var(--pos-success-soft)"}}>Change</span>
-                    <span className="font-bold font-mono text-xl tabular-nums" style={{color:"var(--pos-success-soft)"}}>LKR {formatNumber(changeAmt)}</span>
+                  <div className="pos-checkout-change-bar flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-auto mb-2 w-full max-w-lg" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-success)" }}>
+                    <span className="text-sm font-bold" style={{ color: "#ffffff" }}>Change</span>
+                    <span className="font-bold font-mono text-xl tabular-nums" style={{ color: "#ffffff" }}>LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
                 <div className="pos-checkout-actions flex items-stretch gap-2 p-4 border-t shrink-0 mt-auto w-full max-w-lg mx-auto" style={{ borderColor: "var(--pos-border)" }}>
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-12 px-4 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 shrink-0 self-stretch flex items-center justify-center" style={{
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="pos-cta h-12 px-4 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 shrink-0 self-stretch flex items-center justify-center" style={{
                     color: "#ffffff",
                     background: isPosLight ? "#334155" : "var(--pos-input)",
-                    border: "1px solid var(--pos-border)",
+                    border: "1px solid var(--pos-border-strong)",
                     minWidth: "5.5rem",
                   }}>
                     Split Bill

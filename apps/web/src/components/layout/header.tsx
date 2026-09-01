@@ -191,7 +191,14 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 dark:bg-background/80 backdrop-blur-[12px] px-4 md:px-6 shrink-0">
+    <header
+      className="hex-retail-header sticky top-0 z-40 flex h-14 items-center gap-3 border-b backdrop-blur-[12px] px-4 md:px-6 shrink-0"
+      style={{
+        background: "var(--retail-topbar-bg, hsl(var(--background) / 0.9))",
+        color: "var(--retail-topbar-fg, hsl(var(--foreground)))",
+        borderColor: "var(--retail-topbar-border, hsl(var(--border)))",
+      }}
+    >
       {/* Mobile menu toggle */}
       <Button
         variant="ghost"
