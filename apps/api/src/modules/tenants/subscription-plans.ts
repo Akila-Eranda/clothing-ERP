@@ -1,4 +1,19 @@
-import { SubscriptionPlan, TenantStatus } from '@prisma/client';
+import type { SubscriptionPlan, TenantStatus } from '@prisma/client';
+
+/** Prisma enum values — avoid @prisma/client enum re-export issues in Docker prod builds. */
+export const Plan = {
+  STARTER: 'STARTER',
+  PROFESSIONAL: 'PROFESSIONAL',
+  ENTERPRISE: 'ENTERPRISE',
+  CUSTOM: 'CUSTOM',
+} as const satisfies Record<string, SubscriptionPlan>;
+
+export const TenantStatusEnum = {
+  TRIAL: 'TRIAL',
+  ACTIVE: 'ACTIVE',
+  SUSPENDED: 'SUSPENDED',
+  CANCELLED: 'CANCELLED',
+} as const satisfies Record<string, TenantStatus>;
 
 export const PLATFORM_CONFIG_SUBDOMAIN = '__platform_config__';
 /** STARTER plan includes a free trial (days). */
@@ -21,7 +36,7 @@ export interface SubscriptionPlanDef {
 export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
   {
     id: 'starter',
-    key: SubscriptionPlan.STARTER,
+    key: Plan.STARTER,
     name: 'Starter',
     price: 1199,
     currency: 'Rs.',
@@ -34,7 +49,7 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
   },
   {
     id: 'professional',
-    key: SubscriptionPlan.PROFESSIONAL,
+    key: Plan.PROFESSIONAL,
     name: 'Professional',
     price: 4799,
     currency: 'Rs.',
@@ -47,7 +62,7 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
   },
   {
     id: 'enterprise',
-    key: SubscriptionPlan.ENTERPRISE,
+    key: Plan.ENTERPRISE,
     name: 'Enterprise',
     price: 14399,
     currency: 'Rs.',
@@ -60,7 +75,7 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanDef[] = [
   },
   {
     id: 'custom',
-    key: SubscriptionPlan.CUSTOM,
+    key: Plan.CUSTOM,
     name: 'Custom',
     price: 0,
     currency: 'Rs.',
@@ -88,10 +103,10 @@ export function subscriptionFieldsForNewTenant(plan: SubscriptionPlan): {
   status: TenantStatus;
   trialEndsAt: Date | null;
 } {
-  if (plan === SubscriptionPlan.STARTER) {
-    return { status: TenantStatus.TRIAL, trialEndsAt: addTrialDays() };
+  if (plan === Plan.STARTER) {
+    return { status: TenantStatusEnum.TRIAL, trialEndsAt: addTrialDays() };
   }
-  return { status: TenantStatus.ACTIVE, trialEndsAt: null };
+  return { status: TenantStatusEnum.ACTIVE, trialEndsAt: null };
 }
 
 /** Plan change from admin: upgrade clears trial; downgrade to STARTER starts a new trial window. */
@@ -99,10 +114,10 @@ export function subscriptionFieldsForPlanChange(plan: SubscriptionPlan): {
   status: TenantStatus;
   trialEndsAt: Date | null;
 } {
-  if (plan === SubscriptionPlan.STARTER) {
-    return { status: TenantStatus.TRIAL, trialEndsAt: addTrialDays() };
+  if (plan === Plan.STARTER) {
+    return { status: TenantStatusEnum.TRIAL, trialEndsAt: addTrialDays() };
   }
-  return { status: TenantStatus.ACTIVE, trialEndsAt: null };
+  return { status: TenantStatusEnum.ACTIVE, trialEndsAt: null };
 }
 
 export function isStarterTrialExpired(trialEndsAt: Date | null | undefined): boolean {
@@ -117,7 +132,7 @@ export function resolvePlanLimits(
   const defs = catalog ?? DEFAULT_SUBSCRIPTION_PLANS;
   const def = defs.find((p) => p.key === plan);
   if (!def) {
-    const fallback = DEFAULT_SUBSCRIPTION_PLANS.find((p) => p.key === SubscriptionPlan.STARTER)!;
+    const fallback = DEFAULT_SUBSCRIPTION_PLANS.find((p) => p.key === Plan.STARTER)!;
     return {
       maxUsers: toDbLimit(fallback.maxUsers),
       maxBranches: toDbLimit(fallback.maxBranches),
