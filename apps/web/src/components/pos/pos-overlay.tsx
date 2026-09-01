@@ -815,8 +815,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     void (async () => {
       try {
         const r = await api.get<PosBankAccountOption[] | { data: PosBankAccountOption[] }>("/accounting/bank-accounts");
-        const rows = parseApiList(r.data);
-        const active = rows.filter((b) => (b as { isActive?: boolean }).isActive !== false);
+        const rows = parseApiList<PosBankAccountOption>(r.data);
+        const active = rows.filter((b) => b.isActive !== false);
         if (cancelled) return;
         setBankAccounts(active);
         setPayBankAccountId((prev) => {

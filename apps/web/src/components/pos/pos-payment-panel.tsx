@@ -31,6 +31,7 @@ export type PosBankAccountOption = {
   name: string;
   bankName?: string | null;
   currentBalance?: number;
+  isActive?: boolean;
 };
 
 export interface PosPaymentState {

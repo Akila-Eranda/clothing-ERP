@@ -28,6 +28,7 @@ import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
+import { SupportDialog } from "@/components/layout/support-dialog";
 import { DREAMSPOS_DARK_CHROME, isDefaultLightTopbar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 
