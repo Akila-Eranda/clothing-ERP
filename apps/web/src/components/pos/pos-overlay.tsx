@@ -16,6 +16,7 @@ import { useReceiptSettings, notifyReceiptSettingsUpdated, setLocalPosTheme, typ
 import { receiptMoney, receiptSoftwareCreditHtml, receiptThemeStyleBlock } from "@/lib/receipt-theme";
 import { posUiCssVars, resolvePosUiMode } from "@/lib/pos-ui-theme";
 import { POS_COLOR_DEFAULTS, usePosUiColors } from "@/lib/pos-ui-colors";
+import { posToolbarBtnStyle } from "@/lib/pos-toolbar-colors";
 import { getPosLayoutMeta, getPosLayoutUi } from "@/lib/pos-layouts";
 import { POS_LAYOUT_BRAIN } from "@/lib/pos-layout-contract";
 import { PosProductsPanel } from "@/components/pos/layouts/pos-products-panel";
@@ -4095,27 +4096,27 @@ ${rows}
             <kbd className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono rounded px-1.5 py-0.5" style={{background:"var(--pos-kbd)",color:"var(--pos-muted)"}}>F2</kbd>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {[{label:"Hold Bill",key:"F3",icon:PauseCircle,onClick:()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}},{label:"Held Bills",key:"F8",icon:PauseCircle,onClick:()=>openHeldBillsPopup()},{label:"Reload",key:"L",icon:Smartphone,onClick:()=>openReloadPopup()},{label: customer ? customer.name : "Walk-In Customer", key:"F4",icon:Users,onClick:()=>openCartCustomerDropdown()}].map((btn,i)=>(
+            {([
+              { id: "hold-bill" as const, label: "Hold Bill", key: "F3", icon: PauseCircle, onClick: () => { if (items.length > 0) { handleHoldBill(); } else toast.info("Cart is empty"); } },
+              { id: "held-bills" as const, label: "Held Bills", key: "F8", icon: PauseCircle, onClick: () => openHeldBillsPopup() },
+              { id: "reload" as const, label: "Reload", key: "L", icon: Smartphone, onClick: () => openReloadPopup() },
+              { id: "customer" as const, label: customer ? customer.name : "Walk-In Customer", key: "F4", icon: Users, onClick: () => openCartCustomerDropdown() },
+            ]).map((btn) => {
+              const active =
+                (btn.id === "customer" && !!customer) ||
+                (btn.id === "reload" && showReload);
+              const uiMode = isPosLight ? "light" : "dark";
+              return (
               <button
-                key={i}
+                key={btn.id}
                 onClick={btn.onClick}
-                className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", i===3&&"max-w-[180px]")}
-                style={{
-                  background: (i === 3 && customer) || (i === 2 && showReload)
-                    ? (isPosLight ? "var(--pos-accent)" : "rgba(var(--pos-accent-rgb),0.15)")
-                    : (isPosLight ? "#334155" : "var(--pos-input)"),
-                  color: (i === 3 && customer) || (i === 2 && showReload)
-                    ? "#ffffff"
-                    : (isPosLight ? "#ffffff" : "var(--pos-text-secondary)"),
-                  border: (i === 3 && customer) || (i === 2 && showReload)
-                    ? (isPosLight ? "1px solid var(--pos-accent-2)" : "1px solid rgba(var(--pos-accent-rgb),0.35)")
-                    : (isPosLight ? "1px solid #1E293B" : "none"),
-                }}
-                title={i===3?(customer?`${workspace.customerLabel}: ${customer.name}`:"Walk-In Customer") : i===2 ? "Reload / Recharge (L)" : undefined}
+                className={cn("flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-medium transition-all hover:opacity-90", btn.id === "customer" && "max-w-[180px]")}
+                style={posToolbarBtnStyle(btn.id, uiMode, active)}
+                title={btn.id === "customer" ? (customer ? `${workspace.customerLabel}: ${customer.name}` : "Walk-In Customer") : btn.id === "reload" ? "Reload / Recharge (L)" : undefined}
               >
-                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{i===3 ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-70 ml-0.5 shrink-0">{btn.key}</span>}
+                <btn.icon className="h-3.5 w-3.5 shrink-0"/>{btn.id === "customer" ? <span className="truncate">{btn.label}</span> : btn.label}{btn.key&&<span className="text-[10px] font-mono opacity-70 ml-0.5 shrink-0">{btn.key}</span>}
               </button>
-            ))}
+            );})}
           </div>
           <div className="flex items-center gap-2 ml-auto shrink-0">
             {(() => {
@@ -4203,6 +4204,7 @@ ${rows}
 
         <PosRetailFeatureBar
           posLayout={posLayout}
+          lightUi={isPosLight}
           items={navItems.filter((n) => n.id !== "demo-product")}
           activeNav={showReload ? "reload" : activeNav}
           cartCount={itemCount()}
@@ -4278,7 +4280,7 @@ ${rows}
                     {item.label}
                     {item.id==="products"&&itemCount()>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-accent)",color:"#fff"}}>{itemCount()}</span>}
                     {item.id==="hold-bills"&&serverHeldBills.length>0&&<span className="ml-auto text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none" style={{background:"var(--pos-warn)",color:"#fff"}}>{serverHeldBills.length}</span>}
-                    {item.id==="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">L</span>}
+                    {item.id==="reload"&&<span className="ml-auto text-[9px] opacity-40 font-mono">L</span>}
                     {shortcutIdx>=0&&shortcutIdx<9&&item.id!=="reload"&&!(item.id==="products"&&itemCount()>0)&&!(item.id==="hold-bills"&&serverHeldBills.length>0)&&<span className="ml-auto text-[9px] opacity-40 font-mono">Alt+{shortcutIdx+1}</span>}
                   </button>
                 );

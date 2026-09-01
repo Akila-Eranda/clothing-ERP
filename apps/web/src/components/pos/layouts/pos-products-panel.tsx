@@ -15,6 +15,8 @@ export type PosProductsPanelProduct = {
   productId?: string;
   productName: string;
   variantName: string;
+  sku: string;
+  costPrice: number;
   unitPrice: number;
   stock: number;
   category: string;
@@ -64,7 +66,7 @@ type Props = {
   products: PosProductsPanelProduct[];
   variantLabel: (p: PosProductsPanelProduct) => string;
   onPopularAdd: (p: PosProductsPanelProduct) => void;
-  onRecentAdd: (p: PosProductsPanelProduct | undefined) => void;
+  onRecentAdd: (p: PosProductsPanelProduct) => void;
   onClearRecent: () => void;
   onViewAll: () => void;
   searchFocusRef?: React.RefObject<HTMLInputElement | null>;

@@ -2,6 +2,7 @@
 
 import type { LucideIcon } from "lucide-react";
 import type { PosLayoutId } from "@/lib/pos-layouts";
+import { posToolbarBtnStyle } from "@/lib/pos-toolbar-colors";
 import { cn } from "@/lib/utils";
 
 export type PosRetailNavItem = {
@@ -12,6 +13,7 @@ export type PosRetailNavItem = {
 
 type Props = {
   posLayout: PosLayoutId;
+  lightUi: boolean;
   items: PosRetailNavItem[];
   activeNav: string;
   cartCount: number;
@@ -22,6 +24,7 @@ type Props = {
 /** Retail layouts: horizontal access to every main POS module (same as sidebar). */
 export function PosRetailFeatureBar({
   posLayout,
+  lightUi,
   items,
   activeNav,
   cartCount,
@@ -29,6 +32,8 @@ export function PosRetailFeatureBar({
   onNavigate,
 }: Props) {
   if (posLayout === "classic") return null;
+
+  const uiMode = lightUi ? "light" : "dark";
 
   return (
     <div
@@ -38,27 +43,24 @@ export function PosRetailFeatureBar({
     >
       <div className="flex items-center gap-1 min-w-max">
         {items.map((item) => {
-          const active = activeNav === item.id || (item.id === "reload" && activeNav === "products");
+          const active = activeNav === item.id;
           const badge =
             item.id === "products" && cartCount > 0
               ? cartCount
               : item.id === "hold-bills" && heldCount > 0
                 ? heldCount
                 : 0;
+          const btnStyle = posToolbarBtnStyle(item.id, uiMode, active);
           return (
             <button
               key={item.id}
               type="button"
               onClick={() => onNavigate(item.id)}
               className={cn(
-                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all",
-                active && "ring-1 ring-inset",
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all hover:opacity-90",
+                active && "ring-1 ring-inset shadow-sm",
               )}
-              style={{
-                background: active ? "rgba(var(--pos-accent-rgb),0.18)" : "var(--pos-input)",
-                color: active ? "var(--pos-accent)" : "var(--pos-text-secondary)",
-                border: `1px solid ${active ? "rgba(var(--pos-accent-rgb),0.4)" : "var(--pos-border)"}`,
-              }}
+              style={btnStyle}
             >
               <item.icon className="h-3.5 w-3.5 shrink-0" />
               {item.label}
