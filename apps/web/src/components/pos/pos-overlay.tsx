@@ -2736,7 +2736,7 @@ ${rows}
         variantLabel={(p) => variantDisplayLabel(p, profile)}
         onPopularAdd={(p) => commitAddProduct(p, 1, { keepSearchFocus: true })}
         onRecentAdd={handleAddProduct}
-ad        onClearRecent={() => setRecentScans([])}
+        onClearRecent={() => setRecentScans([])}
         onViewAll={() => {
           setActiveCategory("All");
           setSearch("");

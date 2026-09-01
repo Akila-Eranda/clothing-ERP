@@ -18,6 +18,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber, cn } from "@/lib/utils";
+import { parseApiList } from "@/lib/parse-api-list";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
 import { ModuleGate } from "@/components/shop/module-gate";
@@ -725,7 +726,7 @@ export default function ReturnsPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: ReturnRecord[] }>("/returns?limit=200");
-      setReturns((res.data?.data ?? res.data ?? []) as ReturnRecord[]);
+      setReturns(parseApiList<ReturnRecord>(res.data));
     } catch { toast.error("Failed to load returns"); }
     finally { setLoading(false); }
   }, []);
