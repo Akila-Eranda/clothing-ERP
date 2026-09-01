@@ -628,7 +628,7 @@ function ReturnsPanel() {
                 <>
                   {r.status === "DRAFT" && (
                     <>
-                      <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "refresh")}>Refresh</Button>
+                      <Button variant="outline" size="sm" className="h-8 px-3 text-xs" disabled={busy} onClick={() => void act(r.id, "refresh")}>Refresh</Button>
                       <Button variant="ghost" size="sm" className="h-8" disabled={busy} onClick={() => void act(r.id, "submit")}>Submit</Button>
                     </>
                   )}

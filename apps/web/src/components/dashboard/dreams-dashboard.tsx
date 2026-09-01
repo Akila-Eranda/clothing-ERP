@@ -450,9 +450,9 @@ export function DreamsDashboard() {
           </div>
           <div className="col-xxl-4 col-xl-5 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
-              <div className="card-header">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-info fs-16 me-2"><Info size={16} /></span>
+              <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-info"><Info size={16} /></span>
                   <h5 className="card-title mb-0">Overall Information</h5>
                 </div>
               </div>
@@ -506,8 +506,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-6 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-pink fs-16 me-2"><Box size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-pink"><Box size={16} /></span>
                   <h5 className="card-title mb-0">Top Selling Products</h5>
                 </div>
                 <span className="btn btn-sm btn-white"><CalendarDays size={14} className="me-1" />Today</span>
@@ -545,8 +545,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-6 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-danger fs-16 me-2"><AlertTriangle size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-danger"><AlertTriangle size={16} /></span>
                   <h5 className="card-title mb-0">Low Stock Products</h5>
                 </div>
                 <Link href="/inventory" className="fs-13 fw-bold text-decoration-underline link-primary">View All</Link>
@@ -580,8 +580,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-12 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-pink fs-16 me-2"><Box size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-pink"><Box size={16} /></span>
                   <h5 className="card-title mb-0">Recent Sales</h5>
                 </div>
                 <span className="btn btn-sm btn-white"><CalendarDays size={14} className="me-1" />Weekly</span>
@@ -635,8 +635,8 @@ export function DreamsDashboard() {
           <div className="col-xl-6 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex align-items-center justify-content-between flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-orange fs-16 me-2"><Flag size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-orange"><Flag size={16} /></span>
                   <h5 className="card-title mb-0">Recent Transactions</h5>
                 </div>
                 <Link href="/sales" className="fs-13 fw-medium text-decoration-underline link-primary">View All</Link>
@@ -699,8 +699,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-6 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-orange fs-16 me-2"><Users size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-orange"><Users size={16} /></span>
                   <h5 className="card-title mb-0">Top Customers</h5>
                 </div>
                 <Link href="/customers" className="fs-13 fw-medium text-decoration-underline link-primary">View All</Link>
@@ -734,8 +734,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-6 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-orange fs-16 me-2"><PieChart size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-orange"><PieChart size={16} /></span>
                   <h5 className="card-title mb-0">Top Categories</h5>
                 </div>
                 <span className="btn btn-sm btn-white"><CalendarDays size={14} className="me-1" />Weekly</span>
@@ -769,8 +769,8 @@ export function DreamsDashboard() {
           <div className="col-xxl-4 col-md-12 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-                <div className="d-inline-flex align-items-center">
-                  <span className="title-icon bg-soft-indigo fs-16 me-2"><Package size={16} /></span>
+                <div className="card-header-title">
+                  <span className="title-icon bg-soft-indigo"><Package size={16} /></span>
                   <h5 className="card-title mb-0">Order Statistics</h5>
                 </div>
                 <span className="btn btn-sm btn-white"><CalendarDays size={14} className="me-1" />Weekly</span>

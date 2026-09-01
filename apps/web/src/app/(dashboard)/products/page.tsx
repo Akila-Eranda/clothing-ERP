@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
+import { PlusCircle, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
+import { HEX_BTN } from "@/lib/app-button-classes";
 import { api } from "@/lib/api";
 import { parseApiList } from "@/lib/parse-api-list";
 import { type Product } from "@/lib/product-types";
@@ -380,8 +381,8 @@ export default function ProductsPage() {
           </Button>
           <input ref={importRef} type="file" accept=".csv" className="hidden" onChange={handleImport} />
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button onClick={() => router.push("/products/new")} className="gap-1.5">
-            <Plus className="h-[18px] w-[18px]" />
+          <Button onClick={() => router.push("/products/new")} className={HEX_BTN}>
+            <PlusCircle className="h-[18px] w-[18px]" />
             Add New
           </Button>
         </div>

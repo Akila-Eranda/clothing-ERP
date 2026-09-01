@@ -86,6 +86,26 @@ export function isDarkSidebarSkin(skin: SidebarSkin): boolean {
   return skin !== "light" && skin !== "sidebarcolorone";
 }
 
+export function isDefaultLightTopbar(topbarSkin: TopbarSkin): boolean {
+  return topbarSkin === "white" || topbarSkin === "topbarcolorone";
+}
+
+export function isDefaultLightSidebar(sidebarSkin: SidebarSkin): boolean {
+  return sidebarSkin === "light" || sidebarSkin === "sidebarcolorone";
+}
+
+/** DreamsPOS dark chrome palette (sidebar + header). */
+export const DREAMSPOS_DARK_CHROME = {
+  bg: "#0d0d0d",
+  fg: "#d8dfee",
+  muted: "#6b7280",
+  border: "#1f2228",
+  hover: "rgba(255, 255, 255, 0.05)",
+  activeBg: "rgba(254, 159, 67, 0.14)",
+  activeFg: "#fe9f43",
+  logoBg: "#141414",
+} as const;
+
 export function applyThemeLayout(state: ThemeLayoutState) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;

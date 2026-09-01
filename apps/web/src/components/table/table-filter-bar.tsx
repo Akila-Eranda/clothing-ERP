@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Search, X, Filter } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HEX_BTN } from "@/lib/app-button-classes";
 import { Button } from "@/components/ui/button";
 
 export type AppTableSearchColumn<TData> = {
@@ -107,10 +108,10 @@ export function TableFilterBar({
         {hasActive ? (
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={onClear}
-            className="h-9 gap-1.5 rounded-xl px-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground"
+            className={`h-9 ${HEX_BTN} text-xs`}
           >
             <X className="h-3.5 w-3.5" />
             Clear

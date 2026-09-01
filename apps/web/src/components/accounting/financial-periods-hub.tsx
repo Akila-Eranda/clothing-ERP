@@ -24,6 +24,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type PeriodStatus = "OPEN" | "CLOSED" | "LOCKED";
@@ -295,16 +296,16 @@ export function FinancialPeriodsHub() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button variant="outline" onClick={load} className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5">
+          <Button variant="outline" onClick={load} className={`h-10 ${HEX_BTN} text-sm`}>
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-          <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => setShowCreate(true)}>
+          <Button className={`h-10 ${HEX_BTN} text-sm px-4`} onClick={() => setShowCreate(true)}>
             <Plus className="h-[18px] w-[18px]" /> New Fiscal Year
           </Button>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 p-1 rounded-[14px] border bg-muted/40 w-fit max-w-full">
+      <div className={HEX_SECTION_TABS}>
         {([
           { id: "periods" as Tab, label: "Period Management", icon: CalendarRange },
           { id: "settings" as Tab, label: "Fiscal Year Settings", icon: Settings2 },
@@ -316,11 +317,7 @@ export function FinancialPeriodsHub() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[10px] text-sm font-semibold transition-all ${
-                active
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-              }`}
+              className={hexTabButton(active)}
             >
               <Icon className="h-3.5 w-3.5" />
               {t.label}

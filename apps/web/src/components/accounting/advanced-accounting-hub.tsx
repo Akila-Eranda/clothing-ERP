@@ -9,6 +9,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
+import { HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -380,7 +381,7 @@ export function AdvancedAccountingHub() {
         </Button>
       </div>
 
-      <div className="flex items-center gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card p-1.5 shadow-card">
+      <div className={`${HEX_SECTION_TABS} overflow-x-auto max-w-full`}>
         {TABS.map((item) => {
           const active = tab === item.id;
           return (
@@ -388,10 +389,7 @@ export function AdvancedAccountingHub() {
               key={item.id}
               type="button"
               onClick={() => setTab(item.id)}
-              className={cn(
-                "h-9 shrink-0 rounded-lg px-3 flex items-center gap-2 text-xs font-semibold transition-all",
-                active ? "bg-primary text-primary-foreground shadow-button" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
+              className={cn("shrink-0", hexTabButton(active))}
             >
               <item.icon className="h-3.5 w-3.5" />
               {item.label}

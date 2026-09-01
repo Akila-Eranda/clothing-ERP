@@ -22,6 +22,8 @@ import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { DREAMSPOS_DARK_CHROME, isDefaultLightSidebar } from "@/lib/theme-layout";
+import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -275,6 +277,8 @@ export function Sidebar() {
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => setMounted(true), []);
   const darkUi    = mounted && resolvedTheme === "dark";
+  const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
+  const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
   const navGroups = useNavGroups();
   const { profile } = useShopWorkspace();
   const { settings: receiptSettings } = useReceiptSettings();
@@ -294,19 +298,20 @@ export function Sidebar() {
     router.replace("/login");
   };
 
-  /* Retail theme skins (DreamsPOS) — CSS vars from retail-theme.css */
-  const bg       = darkUi ? "var(--retail-sidebar-bg, #0A0F1A)" : "var(--retail-sidebar-bg, #F8FAFC)";
-  const border   = "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
-  const textMut  = "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
-  const textFull = "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
-  const hoverBg  = "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
-  const sectLbl  = "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
-  const activeBg = "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
-  const activeFg = "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
-  const activeIcon = "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "#2563EB") + ")";
-  const logoBg   = darkUi ? "#141414" : "#FFFFFF";
-  const planBadgeBg = darkUi ? "rgba(254, 159, 67, 0.18)" : "#EFF6FF";
-  const planBadgeFg = darkUi ? "#FE9F43" : "#1D4ED8";
+  /* Retail theme skins — explicit DreamsPOS dark when default light skin + dark mode */
+  const d = DREAMSPOS_DARK_CHROME;
+  const bg       = dreamsDarkChrome ? d.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #F8FAFC)");
+  const border   = dreamsDarkChrome ? d.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
+  const textMut  = dreamsDarkChrome ? d.muted : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
+  const textFull = dreamsDarkChrome ? d.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
+  const hoverBg  = dreamsDarkChrome ? d.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
+  const sectLbl  = dreamsDarkChrome ? d.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
+  const activeBg = dreamsDarkChrome ? d.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
+  const activeFg = dreamsDarkChrome ? d.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
+  const activeIcon = dreamsDarkChrome ? d.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "#2563EB") + ")";
+  const logoBg   = dreamsDarkChrome ? d.logoBg : (darkUi ? "#141414" : "#FFFFFF");
+  const planBadgeBg = dreamsDarkChrome ? d.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "#EFF6FF");
+  const planBadgeFg = dreamsDarkChrome ? d.activeFg : (darkUi ? "#FE9F43" : "#1D4ED8");
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 

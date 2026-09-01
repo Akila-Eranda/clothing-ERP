@@ -25,6 +25,7 @@ import {
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type Tab =
@@ -157,7 +158,7 @@ export function AccountingSettingsHub() {
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 p-1 rounded-[14px] border bg-muted/40 w-fit max-w-full">
+      <div className={HEX_SECTION_TABS}>
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -166,11 +167,7 @@ export function AccountingSettingsHub() {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[10px] text-sm font-semibold transition-all ${
-                active
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-              }`}
+              className={hexTabButton(active)}
             >
               <Icon className="h-3.5 w-3.5" />
               {t.label}
@@ -330,7 +327,7 @@ function FiscalPanel() {
       {selected && (
         <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <div className="flex items-center gap-2.5 px-5 py-3 border-b bg-muted/30 rounded-t-[18px]">
-            <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
               <CalendarRange className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Current fiscal year</h3>
@@ -436,7 +433,7 @@ function CurrencyPanel() {
   return (
     <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-        <div className="h-8 w-8 rounded-[10px] bg-amber-500/15 text-amber-600 flex items-center justify-center">
+        <div className="h-8 w-8 rounded-[5px] bg-amber-500/15 text-amber-600 flex items-center justify-center">
           <Coins className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-semibold">Base currency</h3>
@@ -628,7 +625,7 @@ function NumberSeriesPanel() {
                     Active
                   </label>
                   <Button
-                    className="ml-auto h-9 rounded-[10px]"
+                    className="ml-auto h-9 rounded-[5px]"
                     disabled={!dirty || busyKey === r.key}
                     onClick={() => void save(r.key)}
                   >
@@ -764,7 +761,7 @@ function TaxSettingsPanel() {
         <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-[10px] bg-teal-500/15 text-teal-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-[5px] bg-teal-500/15 text-teal-600 flex items-center justify-center">
                 <Settings2 className="h-4 w-4" />
               </div>
               <h3 className="text-sm font-semibold">Tax rates</h3>
@@ -783,7 +780,7 @@ function TaxSettingsPanel() {
                   <Badge variant={r.isActive ? "default" : "secondary"} className="text-[10px] rounded-full">
                     {r.isActive ? "Active" : "Inactive"}
                   </Badge>
-                  <Button size="sm" variant="ghost" className="h-8 text-xs rounded-[10px]" onClick={() => void toggle(r)}>
+                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => void toggle(r)}>
                     {r.isActive ? "Disable" : "Enable"}
                   </Button>
                 </div>
@@ -905,7 +902,7 @@ function WorkflowPanel() {
                     <Badge variant={d.isActive ? "default" : "secondary"} className="text-[10px] rounded-full">
                       {d.isActive ? "Active" : "Inactive"}
                     </Badge>
-                    <Button variant="outline" className="h-9 rounded-[10px]" onClick={() => setExpanded(open ? null : d.key)}>
+                    <Button variant="outline" className="h-9 rounded-[5px]" onClick={() => setExpanded(open ? null : d.key)}>
                       {open ? "Collapse" : "Edit"}
                     </Button>
                   </div>
@@ -957,10 +954,10 @@ function WorkflowPanel() {
                       </div>
                     ))}
                     <div className="flex gap-2">
-                      <Button variant="outline" className="h-9 rounded-[10px] gap-1" onClick={() => addStep(d.key)}>
+                      <Button variant="outline" className="h-9 rounded-[5px] gap-1" onClick={() => addStep(d.key)}>
                         <Plus className="h-3.5 w-3.5" /> Add step
                       </Button>
-                      <Button className="h-9 rounded-[10px]" disabled={busyKey === d.key} onClick={() => void save(d)}>
+                      <Button className="h-9 rounded-[5px]" disabled={busyKey === d.key} onClick={() => void save(d)}>
                         {busyKey === d.key ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : "Save workflow"}
                       </Button>
                     </div>
@@ -1046,7 +1043,7 @@ function PreferencesPanel() {
       <div className="grid lg:grid-cols-2 gap-4">
         <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-            <div className="h-8 w-8 rounded-[10px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
               <ShieldCheck className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Journal & posting</h3>
@@ -1121,7 +1118,7 @@ function PreferencesPanel() {
 
         <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-            <div className="h-8 w-8 rounded-[10px] bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
               <Settings2 className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Defaults</h3>
@@ -1261,7 +1258,7 @@ function MappingsPanel() {
       <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
               <Settings2 className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">GL mappings</h3>

@@ -1,5 +1,16 @@
 /* DreamsPOS Admin Dashboard — scoped styles (ported from DreamsPOS theme) */
 
+/* Full-bleed page canvas (DreamsPOS body: #FAFBFE light / #0D0D0D dark) */
+.dreams-dashboard-page {
+  min-height: 100%;
+  width: 100%;
+  background: #fafbfe;
+}
+
+.dark .dreams-dashboard-page {
+  background: #0d0d0d;
+}
+
 .dreams-pos-dash {
   --dp-primary: #fe9f43;
   --dp-secondary: #092c4c;
@@ -84,6 +95,10 @@
 }
 
 .dreams-pos-dash .d-flex { display: flex !important; }
+.dreams-pos-dash .d-inline-flex {
+  display: inline-flex !important;
+  align-items: center !important;
+}
 .dreams-pos-dash .flex-fill {
   flex: 1 1 auto !important;
   min-width: 0;
@@ -302,11 +317,30 @@
 .dreams-pos-dash .title-icon {
   width: 32px;
   height: 32px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   border-radius: 8px;
   flex-shrink: 0;
+  line-height: 0;
+}
+
+/* Card header: icon + title always in one row */
+.dreams-pos-dash .card-header-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.dreams-pos-dash .card-header-title .card-title {
+  line-height: 1.25;
+  margin: 0;
+}
+
+.dreams-pos-dash .card-header .card-header-title .title-icon {
+  margin-right: 0;
 }
 
 /* ── Badges ── */
@@ -826,6 +860,11 @@
     grid-template-columns: 1fr;
   }
 
+  .dreams-pos-dash .card-header-title .card-title {
+    font-size: 15px;
+    white-space: normal;
+  }
+
   .dreams-pos-dash .dp-page-header {
     flex-direction: column;
     align-items: stretch !important;
@@ -919,19 +958,55 @@
   }
 }
 
-/* Dark mode — keep DreamsPOS light cards readable */
+/* Dark mode — DreamsPOS dark canvas + elevated cards */
 .dark .dreams-pos-dash {
-  --dp-border: hsl(var(--border));
-  --dp-text: hsl(var(--foreground));
-  --dp-muted: hsl(var(--muted-foreground));
-  --dp-light: hsl(var(--muted) / 0.35);
-  --dp-card-bg: hsl(var(--card));
+  --dp-border: hsl(0 0% 100% / 0.08);
+  --dp-text: #d8dfee;
+  --dp-muted: #9ca3af;
+  --dp-light: #1f2228;
+  --dp-card-bg: #171717;
 }
 
 .dark .dreams-pos-dash .bg-light {
-  background-color: hsl(var(--muted) / 0.35) !important;
+  background-color: #1f2228 !important;
+}
+
+.dark .dreams-pos-dash .btn.btn-sm.btn-white {
+  background: #1f2228;
+  border-color: hsl(0 0% 100% / 0.1);
+  color: #d8dfee;
+}
+
+.dark .dreams-pos-dash .btn-group.custom-btn-group {
+  border-color: hsl(0 0% 100% / 0.1);
+}
+
+.dark .dreams-pos-dash .btn-group.custom-btn-group .btn {
+  background: #1f2228;
+  border-right-color: hsl(0 0% 100% / 0.08);
+  color: #d8dfee;
+}
+
+.dark .dreams-pos-dash .custom-table thead.thead-light th {
+  background: #1f2228;
+  color: #9ca3af;
+}
+
+.dark .dreams-pos-dash .custom-table tbody tr:hover {
+  background: #1f2228;
+}
+
+.dark .dreams-pos-dash .dp-chart-summary > .border {
+  border-color: hsl(0 0% 100% / 0.08) !important;
+}
+
+.dark .dreams-pos-dash .dp-date-input,
+.dark .dreams-pos-dash .dp-date-range-trigger {
+  background: #171717;
+  border-color: hsl(0 0% 100% / 0.1);
+  color: #d8dfee;
 }
 
 .dark .dreams-pos-dash .dp-skeleton {
-  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted) / 0.6) 50%, hsl(var(--muted)) 75%);
+  background: linear-gradient(90deg, #1f2228 25%, #2f343c 50%, #1f2228 75%);
 }

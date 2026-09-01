@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { HEX_SEGMENT, hexTabButton } from "@/lib/app-button-classes";
 import { parseApiList } from "@/lib/parse-api-list";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
@@ -747,11 +748,9 @@ export function HrHub({ section }: { section: HrSection }) {
         {section === "attendance" && (
         <div className="mt-4 space-y-4">
           {/* View toggle */}
-          <div className="flex items-center gap-2 border rounded-lg p-1 w-fit bg-muted/30">
-            <button onClick={() => setAttnView("daily")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${attnView==="daily"?"bg-background shadow text-foreground":"text-muted-foreground hover:text-foreground"}`}>Daily</button>
-            <button onClick={() => setAttnView("monthly")}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${attnView==="monthly"?"bg-background shadow text-foreground":"text-muted-foreground hover:text-foreground"}`}>Monthly Summary</button>
+          <div className={HEX_SEGMENT}>
+            <button type="button" onClick={() => setAttnView("daily")} className={hexTabButton(attnView === "daily")}>Daily</button>
+            <button type="button" onClick={() => setAttnView("monthly")} className={hexTabButton(attnView === "monthly")}>Monthly Summary</button>
           </div>
 
           {attnView === "daily" ? (

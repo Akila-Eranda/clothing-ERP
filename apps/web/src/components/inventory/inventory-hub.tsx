@@ -23,6 +23,7 @@ import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use
 import { variantTableColumns } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
+import { HEX_BTN } from "@/lib/app-button-classes";
 
 export type InventorySection = "stock" | "ledger" | "abc" | "dead" | "aging" | "transfers";
 
@@ -87,9 +88,6 @@ function ageBucket(days: number) {
   if (days <= 90) return "61-90";
   return "90+";
 }
-
-/** Solid header actions — white label/icon in light and dark themes */
-const INV_HUB_BTN = "rounded-none gap-1.5 text-sm px-3.5";
 
 const ABC_COLUMNS: ColumnDef<AbcRow>[] = [
   {
@@ -652,7 +650,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" onClick={fetchData} className={INV_HUB_BTN}>
+            <Button variant="outline" onClick={fetchData} className={HEX_BTN}>
               <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
             </Button>
             {section === "stock" && (
@@ -661,23 +659,23 @@ export function InventoryHub({ section }: { section: InventorySection }) {
                   variant="danger"
                   disabled={zeroNegBusy || negativeCount === 0}
                   onClick={() => void zeroNegativeStock()}
-                  className={INV_HUB_BTN}
+                  className={HEX_BTN}
                 >
                   {zeroNegBusy ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <Ban className="h-[18px] w-[18px]" />}
                   Zero negatives{negativeCount > 0 ? ` (${negativeCount})` : ""}
                 </Button>
-                <Button variant="success" onClick={() => router.push("/purchases")} className={INV_HUB_BTN}>
+                <Button variant="success" onClick={() => router.push("/purchases")} className={HEX_BTN}>
                   <ShoppingBag className="h-[18px] w-[18px]" /> Purchase Orders
                 </Button>
-                <Button variant="violet" onClick={() => setTransferOpen(true)} className={INV_HUB_BTN}>
+                <Button variant="violet" onClick={() => setTransferOpen(true)} className={HEX_BTN}>
                   <ArrowLeftRight className="h-[18px] w-[18px]" /> Stock Transfer
                 </Button>
                 {(showBatch || showExpiry) && (
-                  <Button variant="warning" onClick={() => router.push("/inventory/expiry")} className={INV_HUB_BTN}>
+                  <Button variant="warning" onClick={() => router.push("/inventory/expiry")} className={HEX_BTN}>
                     <Clock className="h-[18px] w-[18px]" /> Expiry Dashboard
                   </Button>
                 )}
-                <Button variant="info" onClick={() => router.push("/warehouse")} className={INV_HUB_BTN}>
+                <Button variant="info" onClick={() => router.push("/warehouse")} className={HEX_BTN}>
                   <Layers className="h-[18px] w-[18px]" /> Warehouses
                 </Button>
               </>
@@ -686,7 +684,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           {section === "transfers" && (
             <>
               <div className="hidden sm:block h-6 w-px bg-border mx-0.5" aria-hidden />
-              <Button variant="default" onClick={() => setTransferOpen(true)} className={`${INV_HUB_BTN} px-4`}>
+              <Button variant="default" onClick={() => setTransferOpen(true)} className={`${HEX_BTN} px-4`}>
                 <Plus className="h-[18px] w-[18px]" /> New Transfer
               </Button>
             </>

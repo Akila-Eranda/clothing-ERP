@@ -4,6 +4,7 @@ import { QueryProvider } from "@/components/providers/query-provider";
 import { fontMono, fontSans } from "@/lib/fonts";
 import { Toaster } from "sonner";
 import "./globals.css";
+import "./retail-theme.css";
 import "./pos-layouts.css";
 import "./pos-retail-theme.css";
 

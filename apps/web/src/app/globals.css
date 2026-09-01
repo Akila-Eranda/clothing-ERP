@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import "./retail-theme.css";
-
 :root {
   /* react-table-craft — track Hexalyte surfaces */
   --tc-background: 0 0% 100%;
@@ -304,12 +302,81 @@
   }
 
   /*
-   * App-wide button shape — square corners on every dashboard/admin control.
-   * POS lives outside these shells and keeps its own styling.
+   * App-wide button shape — DreamsPOS rounded corners (5px).
+   * POS overlay lives outside these shells and keeps its own styling.
    */
   .dashboard-shell button:not([role="checkbox"]),
   .admin-app-shell button:not([role="checkbox"]) {
-    border-radius: 0 !important;
+    border-radius: 5px !important;
+  }
+
+  /* DreamsPOS — flat solid Shadcn Button (no shadow / pill overrides) */
+  .dashboard-shell button.inline-flex.items-center.justify-center.gap-2.whitespace-nowrap.font-semibold,
+  .admin-app-shell button.inline-flex.items-center.justify-center.gap-2.whitespace-nowrap.font-semibold {
+    box-shadow: none !important;
+  }
+
+  /* Hub section tabs — navy idle, orange active */
+  .dashboard-shell .hex-section-tabs button[type="button"],
+  .admin-app-shell .hex-section-tabs button[type="button"] {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 2.25rem;
+    padding-inline: 0.875rem;
+    border-radius: 5px !important;
+    font-size: 0.875rem;
+    font-weight: 600;
+    border: none !important;
+    box-shadow: none !important;
+    transition: filter 0.15s ease;
+    color: #ffffff !important;
+    background: #092c4c !important;
+  }
+  .dashboard-shell .hex-section-tabs button[type="button"] svg,
+  .admin-app-shell .hex-section-tabs button[type="button"] svg {
+    color: #ffffff !important;
+  }
+  .dashboard-shell .hex-section-tabs button[type="button"].is-active,
+  .admin-app-shell .hex-section-tabs button[type="button"].is-active {
+    background: #fe9f43 !important;
+  }
+  .dashboard-shell .hex-section-tabs button[type="button"]:hover,
+  .admin-app-shell .hex-section-tabs button[type="button"]:hover {
+    filter: brightness(1.06);
+  }
+
+  /* Compact segment controls — Today/Yesterday, chart period, etc. */
+  .dashboard-shell .hex-segment-control,
+  .admin-app-shell .hex-segment-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.125rem;
+    border-radius: 5px;
+    border: 1px solid hsl(var(--border));
+    background: hsl(var(--card));
+  }
+  .dashboard-shell .hex-segment-control button[type="button"],
+  .admin-app-shell .hex-segment-control button[type="button"] {
+    height: 2rem;
+    padding-inline: 0.75rem;
+    border-radius: 5px !important;
+    font-size: 0.75rem;
+    font-weight: 700;
+    border: none !important;
+    box-shadow: none !important;
+    color: #ffffff !important;
+    background: #092c4c !important;
+    transition: filter 0.15s ease;
+  }
+  .dashboard-shell .hex-segment-control button[type="button"].is-active,
+  .admin-app-shell .hex-segment-control button[type="button"].is-active {
+    background: #fe9f43 !important;
+  }
+  .dashboard-shell .hex-segment-control button[type="button"]:hover,
+  .admin-app-shell .hex-segment-control button[type="button"]:hover {
+    filter: brightness(1.06);
   }
 
   /* Premium panel — near-white surface, hairline border, soft layered shadow */
@@ -545,17 +612,17 @@
     border-color: hsl(var(--border));
   }
   [data-table-craft] > .max-md\:hidden button {
-    border-radius: 0;
+    border-radius: 5px;
     height: var(--dt-control-h);
     font-size: 0.8125rem;
     font-weight: 600;
     transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   }
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) {
-    background: #4f46e5 !important;
-    border: 1px solid #4338ca !important;
+    background: #092c4c !important;
+    border: none !important;
     color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+    box-shadow: none;
   }
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) svg {
     color: #ffffff !important;
@@ -567,7 +634,7 @@
   /* Faceted filter pills — compact, single-row with search */
   [data-table-craft] > .max-md\:hidden button[role="combobox"],
   [data-table-craft] button[role="combobox"] {
-    border-radius: 0 !important;
+    border-radius: 5px !important;
     padding-inline: 0.75rem;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
@@ -778,7 +845,7 @@
     height: var(--dt-control-h);
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
-    border-radius: 0;
+    border-radius: 5px;
     font-size: 0.8125rem;
   }
   .dark [data-table-craft] button[role="combobox"] {
@@ -798,14 +865,14 @@
     background: hsl(var(--secondary) / 0.45);
   }
   [data-table-craft] nav[aria-label] button {
-    border-radius: 0;
+    border-radius: 5px;
     height: 2rem;
     min-width: 2rem;
     font-size: 0.75rem;
     font-weight: 600;
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
-    background: #475569;
-    border: 1px solid #334155;
+    background: #092c4c;
+    border: none;
     color: #ffffff;
   }
   [data-table-craft] nav[aria-label] button svg {

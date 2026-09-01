@@ -44,8 +44,8 @@ export function DreamsSalesPurchaseChart({
   return (
     <>
       <div className="card-header d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <div className="d-inline-flex align-items-center">
-          <span className="title-icon bg-soft-primary fs-16 me-2">
+        <div className="card-header-title">
+          <span className="title-icon bg-soft-primary">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
@@ -141,8 +141,8 @@ export function DreamsSalesStaticsChart({
   return (
     <>
       <div className="card-header d-flex justify-content-between align-items-center">
-        <div className="d-inline-flex align-items-center">
-          <span className="title-icon bg-soft-danger fs-16 me-2">
+        <div className="card-header-title">
+          <span className="title-icon bg-soft-danger">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             </svg>

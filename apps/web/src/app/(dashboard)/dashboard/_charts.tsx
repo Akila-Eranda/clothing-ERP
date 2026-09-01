@@ -7,6 +7,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatNumber } from "@/lib/utils";
+import { HEX_SEGMENT, hexTabButton } from "@/lib/app-button-classes";
 
 const PMETHOD_COLORS: Record<string, string> = {
   CASH: "#10B981",
@@ -57,17 +58,13 @@ export function RevenueChart({
             <CardTitle className="text-base tracking-tight">Revenue Overview</CardTitle>
             <CardDescription>Daily revenue trend</CardDescription>
           </div>
-          <div className="flex gap-1 p-1 rounded-xl bg-muted/80">
+          <div className={HEX_SEGMENT}>
             {(["7d", "30d", "90d"] as const).map((p) => (
               <button
                 key={p}
                 type="button"
                 onClick={() => setPeriod(p)}
-                className={`px-3 py-1.5 rounded-[10px] text-xs font-semibold transition-all duration-150 ${
-                  period === p
-                    ? "bg-primary text-primary-foreground shadow-button"
-                    : "text-muted-foreground hover:text-foreground hover:bg-card"
-                }`}
+                className={hexTabButton(period === p)}
               >
                 {p.toUpperCase()}
               </button>

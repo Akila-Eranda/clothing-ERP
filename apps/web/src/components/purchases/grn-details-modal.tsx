@@ -11,6 +11,7 @@ import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { printGrnReceipt } from "@/lib/grn-receipt-print";
 import { useAuthStore } from "@/stores/auth-store";
+import { HEX_BTN } from "@/lib/app-button-classes";
 
 export type GrnDetails = {
   id: string;
@@ -377,7 +378,7 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
             {grn && !grn.purchase && (grn.source === "QUICK" || grn.source === "DIRECT") && (
               <Button
                 size="lg"
-                className="h-11 gap-2.5 px-5 rounded-[10px] shadow-button font-semibold"
+                className={`h-11 ${HEX_BTN} px-5 font-semibold`}
                 onClick={() => {
                   onClose();
                   router.push(`/purchases/new?fromGrn=${grn.id}`);

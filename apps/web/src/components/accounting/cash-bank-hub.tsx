@@ -26,6 +26,7 @@ import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 
 type Tab = "accounts" | "cash" | "bank" | "recon";
@@ -134,7 +135,7 @@ export function CashBankHub({ initialTab = "accounts" }: { initialTab?: Tab }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5 p-1 rounded-[14px] border bg-muted/40 w-fit max-w-full">
+      <div className={HEX_SECTION_TABS}>
         {tabs.map((t) => {
           const Icon = t.icon;
           const active = tab === t.id;
@@ -143,11 +144,7 @@ export function CashBankHub({ initialTab = "accounts" }: { initialTab?: Tab }) {
               key={t.id}
               type="button"
               onClick={() => setTab(t.id)}
-              className={`inline-flex items-center gap-1.5 px-3.5 h-9 rounded-[10px] text-sm font-semibold transition-all ${
-                active
-                  ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background/60"
-              }`}
+              className={hexTabButton(active)}
             >
               <Icon className="h-3.5 w-3.5" />
               {t.label}
@@ -418,27 +415,33 @@ function AccountsOverviewPanel({
           </div>
 
           <div className="grid grid-cols-3 gap-1.5 mt-auto">
-            <button
+            <Button
               type="button"
+              variant="success"
+              size="sm"
               onClick={() => openTxn(b, "DEPOSIT")}
-              className="inline-flex items-center justify-center gap-1 h-9 rounded-[10px] text-xs font-semibold bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-600/15 hover:bg-emerald-500/15 transition-colors"
+              className="h-9 w-full text-xs"
             >
               <ArrowDownCircle className="h-3.5 w-3.5" /> In
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              size="sm"
               onClick={() => openTxn(b, "WITHDRAWAL")}
-              className="inline-flex items-center justify-center gap-1 h-9 rounded-[10px] text-xs font-semibold bg-red-500/10 text-red-600 ring-1 ring-red-600/15 hover:bg-red-500/15 transition-colors"
+              className="h-9 w-full text-xs"
             >
               <ArrowUpCircle className="h-3.5 w-3.5" /> Out
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               onClick={() => { setXferFrom(b); setXferTo(""); setXferAmt(""); setXferDesc(""); }}
-              className="inline-flex items-center justify-center gap-1 h-9 rounded-[10px] text-xs font-semibold bg-muted text-muted-foreground ring-1 ring-border hover:text-foreground transition-colors"
+              className="h-9 w-full text-xs"
             >
               <ArrowLeftRight className="h-3.5 w-3.5" /> Move
-            </button>
+            </Button>
           </div>
         </CardContent>
       </Card>

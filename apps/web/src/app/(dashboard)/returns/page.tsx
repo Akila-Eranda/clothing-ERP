@@ -760,29 +760,33 @@ export default function ReturnsPage() {
       label: "Total",
       value: returns.length,
       icon: RotateCcw,
-      card: "bg-slate-600 border-slate-700 dark:bg-slate-600 dark:border-slate-500",
-      iconWrap: "bg-white/15",
+      color: "text-slate-600 dark:text-slate-400",
+      bg: "bg-slate-500/15",
+      tint: "border-slate-200/80 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
     },
     {
       label: "Exchanges",
       value: returns.filter((r) => r.returnType === "EXCHANGE").length,
       icon: ArrowLeftRight,
-      card: "bg-violet-600 border-violet-700 dark:bg-violet-600 dark:border-violet-500",
-      iconWrap: "bg-white/15",
+      color: "text-violet-600 dark:text-violet-400",
+      bg: "bg-violet-500/15",
+      tint: "border-violet-200/80 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
     },
     {
       label: "Pending",
       value: returns.filter((r) => r.status === "INITIATED").length,
       icon: Clock,
-      card: "bg-orange-600 border-orange-700 dark:bg-orange-600 dark:border-orange-500",
-      iconWrap: "bg-white/15",
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/15",
+      tint: "border-amber-200/80 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
     },
     {
       label: "Total Refunded",
       value: `LKR ${formatNumber(totalRefunded)}`,
       icon: DollarSign,
-      card: "bg-cyan-600 border-cyan-700 dark:bg-cyan-600 dark:border-cyan-500",
-      iconWrap: "bg-white/15",
+      color: "text-blue-600 dark:text-blue-400",
+      bg: "bg-blue-500/15",
+      tint: "border-blue-200/80 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
     },
   ];
 
@@ -933,17 +937,17 @@ export default function ReturnsPage() {
         {STATS.map((s) => (
           <Card
             key={s.label}
-            className={`rounded-[18px] border shadow-[0_2px_10px_rgba(15,23,42,0.08)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.12)] transition-all duration-150 ${s.card}`}
+            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
           >
             <CardContent className="h-[68px] p-4 flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.iconWrap}`}>
-                <s.icon className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
+              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
+                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
               </div>
               <div className="min-w-0">
-                <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums text-white truncate`}>
+                <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums truncate`}>
                   {s.value}
                 </p>
-                <p className="text-[11px] text-white/85 font-semibold mt-1 truncate">{s.label}</p>
+                <p className="text-[11px] text-secondary-foreground font-semibold mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>

@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
-  Settings, User, LogOut, LifeBuoy, Keyboard, ShoppingCart,
+  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { BranchSwitcher } from "@/components/branch/branch-switcher";
-import { getInitials } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { DUMMY_RECENT_SALES } from "@/lib/constants";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
@@ -28,7 +28,8 @@ import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
-import { SupportDialog } from "@/components/layout/support-dialog";
+import { DREAMSPOS_DARK_CHROME, isDefaultLightTopbar } from "@/lib/theme-layout";
+import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 
 function isTypingTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -132,6 +133,9 @@ export function Header() {
   const [supportOpen, setSupportOpen] = React.useState(false);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
   const { profile, workspace } = useShopWorkspace();
+  const isDarkHeader = resolvedTheme === "dark";
+  const topbarSkin = useThemeLayoutStore((s) => s.topbarSkin);
+  const dreamsDarkHeader = isDarkHeader && isDefaultLightTopbar(topbarSkin);
   const routeLabels = React.useMemo(
     () => ({ ...BASE_ROUTE_LABELS, ...getRouteLabels(workspace, profile) }),
     [workspace, profile],
@@ -181,7 +185,6 @@ export function Header() {
 
   const pageTitle = routeLabels[pathname] || APP_NAME;
   const breadcrumbs = pathname.split("/").filter(Boolean);
-  const isDarkHeader = resolvedTheme === "dark";
 
   const crumbLabel = (index: number) => {
     const fullPath = "/" + breadcrumbs.slice(0, index + 1).join("/");
@@ -193,13 +196,22 @@ export function Header() {
 
   return (
     <header
-      className="hex-retail-header sticky top-0 z-40 flex h-14 items-center gap-3 border-b backdrop-blur-[12px] px-4 md:px-6 shrink-0"
+      className={cn(
+        "hex-retail-header sticky top-0 z-40 flex h-14 items-center gap-3 border-b backdrop-blur-[12px] px-4 md:px-6 shrink-0",
+        dreamsDarkHeader && "hex-retail-header--dreams-dark",
+      )}
       style={{
-        background: isDarkHeader
-          ? "var(--retail-topbar-bg, #0d0d0d)"
-          : "var(--retail-topbar-bg, hsl(var(--background) / 0.95))",
-        color: "var(--retail-topbar-fg, hsl(var(--foreground)))",
-        borderColor: "var(--retail-topbar-border, hsl(var(--border)))",
+        background: dreamsDarkHeader
+          ? DREAMSPOS_DARK_CHROME.bg
+          : isDarkHeader
+            ? "var(--retail-topbar-bg, #0d0d0d)"
+            : "var(--retail-topbar-bg, hsl(var(--background) / 0.95))",
+        color: dreamsDarkHeader
+          ? DREAMSPOS_DARK_CHROME.fg
+          : "var(--retail-topbar-fg, hsl(var(--foreground)))",
+        borderColor: dreamsDarkHeader
+          ? DREAMSPOS_DARK_CHROME.border
+          : "var(--retail-topbar-border, hsl(var(--border)))",
       }}
     >
       {/* Mobile menu toggle */}
@@ -256,11 +268,12 @@ export function Header() {
         {/* POS button */}
         <Button
           onClick={openPos}
+          variant="pos"
           size="sm"
-          className="h-9 gap-1.5 text-xs"
+          className="h-9 gap-1.5 text-xs font-semibold px-3.5"
         >
-          <ShoppingCart className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">POS Terminal</span>
+          <Monitor className="h-3.5 w-3.5" />
+          <span>POS</span>
         </Button>
 
         {/* Live indicator */}

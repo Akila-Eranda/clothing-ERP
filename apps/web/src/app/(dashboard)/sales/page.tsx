@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { cn, formatNumber } from "@/lib/utils";
+import { HEX_SEGMENT, hexTabButton } from "@/lib/app-button-classes";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
@@ -617,18 +618,13 @@ export default function SalesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="inline-flex items-center gap-1 rounded-none border bg-card p-0.5">
+          <div className={HEX_SEGMENT}>
             {datePresets.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setDateFilter(p.value)}
-                className={cn(
-                  "h-8 px-3 rounded-none text-xs font-bold transition-all text-white",
-                  dateFilter === p.value
-                    ? "bg-indigo-600 shadow-sm"
-                    : "bg-slate-500 hover:bg-slate-600",
-                )}
+                className={hexTabButton(dateFilter === p.value)}
               >
                 {p.label}
               </button>

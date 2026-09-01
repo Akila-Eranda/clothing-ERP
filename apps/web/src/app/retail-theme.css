@@ -230,6 +230,24 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header button:hover {
 [data-topbar="topbarcolorthirteen"] .hex-retail-header { --retail-topbar-bg: linear-gradient(90deg, #760762, #883907); --retail-topbar-fg: #fff; --retail-topbar-border: transparent; }
 [data-topbar="topbarcolorfourteen"] .hex-retail-header { --retail-topbar-bg: linear-gradient(90deg, #4471cc, #ae7bd4); --retail-topbar-fg: #fff; --retail-topbar-border: transparent; }
 
+.hex-retail-header--dreams-dark .text-foreground {
+  color: #d8dfee;
+}
+
+.hex-retail-header--dreams-dark .text-muted-foreground {
+  color: #9ca3af;
+}
+
+.hex-retail-header--dreams-dark input {
+  background: #1a1a1a;
+  border-color: #2f343c;
+  color: #d8dfee;
+}
+
+.hex-retail-header--dreams-dark button:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 /* Retail sidebar profile blocks */
 .hex-retail-profile-card {
   background: var(--retail-sidebar-hover, rgba(0, 0, 0, 0.04));
