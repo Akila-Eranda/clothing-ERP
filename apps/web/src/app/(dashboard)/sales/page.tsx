@@ -85,12 +85,12 @@ function methodLabel(method?: string | null) {
 
 function methodTone(method?: string | null) {
   const key = (method ?? "").toUpperCase();
-  if (key === "CASH") return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-300";
-  if (key === "CARD") return "bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-300";
-  if (key === "BANK_TRANSFER") return "bg-sky-500/10 text-sky-700 border-sky-500/20 dark:text-sky-300";
-  if (key === "UPI" || key === "QR") return "bg-violet-500/10 text-violet-700 border-violet-500/20 dark:text-violet-300";
-  if (key === "WALLET") return "bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-300";
-  return "bg-muted text-muted-foreground border-border";
+  if (key === "CASH") return "bg-emerald-600 text-white border-emerald-700";
+  if (key === "CARD") return "bg-blue-600 text-white border-blue-700";
+  if (key === "BANK_TRANSFER") return "bg-cyan-600 text-white border-cyan-700";
+  if (key === "UPI" || key === "QR") return "bg-violet-600 text-white border-violet-700";
+  if (key === "WALLET") return "bg-orange-600 text-white border-orange-700";
+  return "bg-slate-600 text-white border-slate-700";
 }
 
 function paymentLabel(sale: Sale): { label: string; paid: boolean; className: string } {
@@ -100,29 +100,29 @@ function paymentLabel(sale: Sale): { label: string; paid: boolean; className: st
     return {
       label: remaining > 0 && (sale.amountPaid ?? 0) > 0 ? "Partial" : "Unpaid",
       paid: false,
-      className: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30",
+      className: "bg-rose-600 text-white border-rose-700",
     };
   }
   if (status === "REFUNDED" || sale.status === "REFUNDED") {
     return {
       label: "Refunded",
       paid: false,
-      className: "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30",
+      className: "bg-rose-600 text-white border-rose-700",
     };
   }
   return {
     label: "Paid",
     paid: true,
-    className: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30",
+    className: "bg-emerald-600 text-white border-emerald-700",
   };
 }
 
 function statusBadgeClass(status: string) {
   const s = status?.toUpperCase();
-  if (s === "COMPLETED") return "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30";
-  if (s === "REFUNDED") return "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30";
-  if (s === "PENDING") return "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30";
-  return "bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-500/10 dark:text-slate-300 dark:border-slate-500/30";
+  if (s === "COMPLETED") return "bg-emerald-600 text-white border-emerald-700";
+  if (s === "REFUNDED") return "bg-rose-600 text-white border-rose-700";
+  if (s === "PENDING") return "bg-orange-600 text-white border-orange-700";
+  return "bg-slate-600 text-white border-slate-700";
 }
 
 // ── Sale detail modal ─────────────────────────────────────────────────────
@@ -452,7 +452,7 @@ export default function SalesPage() {
       icon: DollarSign,
       color: "text-emerald-600 dark:text-emerald-400",
       bg: "bg-emerald-500/15",
-      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
+      tint: "border-emerald-300/80 bg-gradient-to-br from-emerald-100 to-emerald-50/40 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
     },
     {
       label: "Orders",
@@ -460,7 +460,7 @@ export default function SalesPage() {
       icon: ShoppingCart,
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-blue-500/15",
-      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
+      tint: "border-blue-300/80 bg-gradient-to-br from-blue-100 to-blue-50/40 dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
     },
     {
       label: "Avg order",
@@ -468,7 +468,7 @@ export default function SalesPage() {
       icon: TrendingUp,
       color: "text-violet-600 dark:text-violet-400",
       bg: "bg-violet-500/15",
-      tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
+      tint: "border-violet-300/80 bg-gradient-to-br from-violet-100 to-violet-50/40 dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
     },
     {
       label: "Discounts",
@@ -476,7 +476,7 @@ export default function SalesPage() {
       icon: Percent,
       color: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-500/15",
-      tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
+      tint: "border-orange-300/80 bg-gradient-to-br from-orange-100 to-orange-50/40 dark:border-orange-500/20 dark:from-orange-500/10 dark:to-transparent",
     },
   ];
 
@@ -507,7 +507,7 @@ export default function SalesPage() {
       accessorFn: (s) => s.invoiceDate,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
       cell: ({ row }) => (
-        <span className="text-xs text-muted-foreground tabular-nums">
+        <span className="text-xs text-secondary-foreground tabular-nums font-medium">
           {fmtTime(row.original.invoiceDate)}
         </span>
       ),
@@ -540,7 +540,7 @@ export default function SalesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Method" />,
       cell: ({ row }) => (
         <span className={cn(
-          "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+          "inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold",
           methodTone(row.original.paymentMethod),
         )}>
           {methodLabel(row.original.paymentMethod)}
@@ -573,7 +573,7 @@ export default function SalesPage() {
       cell: ({ row }) => (
         <Badge
           variant={row.original.status === "COMPLETED" ? "success" : row.original.status === "REFUNDED" ? "danger" : "warning"}
-          className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center capitalize"
+          className="h-6 rounded-md px-2.5 text-[11px] font-semibold inline-flex items-center capitalize"
         >
           {row.original.status?.toLowerCase()}
         </Badge>
@@ -617,25 +617,25 @@ export default function SalesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className="inline-flex items-center rounded-xl border bg-card p-0.5">
+          <div className="inline-flex items-center gap-1 rounded-md border bg-card p-0.5">
             {datePresets.map((p) => (
               <button
                 key={p.key}
                 type="button"
                 onClick={() => setDateFilter(p.value)}
                 className={cn(
-                  "h-8 px-3 rounded-[10px] text-xs font-semibold transition-colors",
+                  "h-8 px-3 rounded-md text-xs font-bold transition-all text-white",
                   dateFilter === p.value
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
+                    ? "bg-indigo-600 shadow-sm"
+                    : "bg-slate-500 hover:bg-slate-600",
                 )}
               >
                 {p.label}
               </button>
             ))}
           </div>
-          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-background text-sm cursor-pointer hover:bg-muted/40 transition-colors">
-            <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-md border border-input bg-card text-sm cursor-pointer hover:bg-muted/50 transition-colors">
+            <CalendarDays className="h-4 w-4 text-secondary-foreground shrink-0" />
             <input
               type="date"
               value={dateFilter}
@@ -669,7 +669,7 @@ export default function SalesPage() {
                 <p className={`${typeof s.value === "string" ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums truncate`}>
                   {s.value}
                 </p>
-                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+                <p className="text-[11px] text-secondary-foreground font-semibold mt-1 truncate">{s.label}</p>
               </div>
             </CardContent>
           </Card>

@@ -2,32 +2,36 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+const solidBadge =
+  "border text-white dark:text-white";
+
 const badgeVariants = cva(
-  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  "inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
   {
     variants: {
       variant: {
         default:
-          "border-transparent bg-primary/10 text-primary hover:bg-primary/15",
+          cn(solidBadge, "border-blue-700 bg-blue-600 dark:border-blue-500 dark:bg-blue-600"),
         secondary:
-          "border-border bg-muted text-muted-foreground hover:bg-muted/80",
+          cn(solidBadge, "border-slate-600 bg-slate-600 dark:border-slate-500 dark:bg-slate-600"),
         destructive:
-          "border-red-200 bg-red-50 text-red-600 hover:bg-red-100",
-        outline: "text-foreground border-border bg-card",
+          cn(solidBadge, "border-red-700 bg-red-600 dark:border-red-500 dark:bg-red-600"),
+        outline:
+          cn(solidBadge, "border-indigo-700 bg-indigo-600 dark:border-indigo-500 dark:bg-indigo-600"),
         success:
-          "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-transparent",
+          cn(solidBadge, "border-emerald-700 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-600"),
         warning:
-          "border-amber-200 bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400 dark:border-transparent",
+          cn(solidBadge, "border-orange-700 bg-orange-600 dark:border-orange-500 dark:bg-orange-600"),
         danger:
-          "border-red-200 bg-red-50 text-red-600 dark:bg-red-500/15 dark:text-red-400 dark:border-transparent",
+          cn(solidBadge, "border-rose-700 bg-rose-600 dark:border-rose-500 dark:bg-rose-600"),
         info:
-          "border-sky-200 bg-sky-50 text-sky-700 dark:bg-blue-500/15 dark:text-blue-400 dark:border-transparent",
+          cn(solidBadge, "border-cyan-700 bg-cyan-600 dark:border-cyan-500 dark:bg-cyan-600"),
         purple:
-          "border-violet-200 bg-violet-50 text-violet-700 dark:bg-purple-500/15 dark:text-purple-400 dark:border-transparent",
+          cn(solidBadge, "border-violet-700 bg-violet-600 dark:border-violet-500 dark:bg-violet-600"),
         gold:
-          "border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300 dark:border-transparent",
+          cn(solidBadge, "border-amber-700 bg-amber-600 dark:border-amber-500 dark:bg-amber-600"),
         teal:
-          "border-teal-200 bg-teal-50 text-teal-700 dark:bg-teal-500/15 dark:text-teal-400 dark:border-transparent",
+          cn(solidBadge, "border-teal-700 bg-teal-600 dark:border-teal-500 dark:bg-teal-600"),
       },
     },
     defaultVariants: {
