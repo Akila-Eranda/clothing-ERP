@@ -121,7 +121,7 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
 
 export function Header() {
   const pathname = usePathname();
-  const { theme, resolvedTheme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
   const { user, logoutApi } = useAuthStore();
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();
@@ -289,7 +289,7 @@ export function Header() {
                 className="hex-header__pos"
                 onClick={openPos}
               >
-                <Monitor className="h-4 w-4" />
+                <Monitor className="h-[18px] w-[18px]" />
                 <span className="hidden sm:inline">POS</span>
               </button>
 
@@ -315,7 +315,7 @@ export function Header() {
             <button
               type="button"
               className="hex-header__icon-btn"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              onClick={() => setTheme(isDarkHeader ? "light" : "dark")}
               aria-label="Toggle theme"
             >
               <Sun className="h-[18px] w-[18px] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />

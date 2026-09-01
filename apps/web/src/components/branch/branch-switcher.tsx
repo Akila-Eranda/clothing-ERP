@@ -35,12 +35,12 @@ export function BranchSwitcher({ className }: { className?: string }) {
     return (
       <div
         className={cn(
-          "hex-header-branch flex h-9 items-center gap-2 rounded-[0.625rem] border px-3 text-xs shrink-0 max-w-[180px] sm:max-w-[220px]",
+          "hex-header-branch flex h-10 items-center gap-2 rounded-[0.625rem] border px-3.5 text-sm shrink-0 max-w-[180px] sm:max-w-[240px]",
           className,
         )}
         title={label}
       >
-        <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <Building2 className="h-4 w-4 shrink-0 opacity-70" />
         <span className="truncate font-semibold">{label}</span>
       </div>
     );
@@ -53,12 +53,12 @@ export function BranchSwitcher({ className }: { className?: string }) {
           variant="outline"
           size="sm"
           className={cn(
-            "hex-header-branch h-9 gap-2 rounded-[0.625rem] text-xs shrink-0 max-w-[140px] sm:max-w-[220px] px-3 font-semibold",
+            "hex-header-branch h-10 gap-2 rounded-[0.625rem] text-sm shrink-0 max-w-[150px] sm:max-w-[240px] px-3.5 font-semibold",
             className,
           )}
           title={label}
         >
-          <Building2 className="h-3.5 w-3.5 shrink-0" />
+          <Building2 className="h-4 w-4 shrink-0" />
           <span className="truncate">{label}</span>
         </Button>
       </DropdownMenuTrigger>
