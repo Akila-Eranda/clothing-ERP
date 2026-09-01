@@ -16,7 +16,7 @@ const solidWhite =
  * Exceptions: POS shell (`pos-overlay`) and print HTML keep local controls.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:brightness-110 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:brightness-110 active:scale-[0.98]",
   {
     variants: {
       variant: {
