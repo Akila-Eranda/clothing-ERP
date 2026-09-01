@@ -185,7 +185,7 @@ export default function PODetailPage() {
   const amountDue  = po.total - po.paidAmount;
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-background">
       <div className="p-6 space-y-5">
 
         {/* ── Top 3-column ── */}

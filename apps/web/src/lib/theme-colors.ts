@@ -41,6 +41,16 @@ export type ThemeColorsState = {
 };
 
 export const THEME_COLORS_STORAGE_KEY = "hexalyte-theme-colors-v1";
+export const THEME_COLORS_STORE_VERSION = 2;
+
+/** Near-white canvas values from older builds — migrate to DreamsPOS gray. */
+const LEGACY_LIGHT_CANVAS = new Set([
+  "#fafbfe",
+  "#ffffff",
+  "#f8fafc",
+  "#f9fafb",
+  "#fbfcfe",
+]);
 
 export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   lightAccent: "blue",
@@ -48,16 +58,16 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   darkAccent: "orange",
   customDarkAccent: "#FE9F43",
 
-  lightBackground: "#FFFFFF",
+  lightBackground: "#F1F5F6",
   lightCard: "#FFFFFF",
-  lightForeground: "#0F172A",
-  lightBorder: "#E2E8F0",
-  lightMutedForeground: "#475569",
+  lightForeground: "#212B36",
+  lightBorder: "#E6EAED",
+  lightMutedForeground: "#646B72",
 
   darkBackground: "#0D0D0D",
-  darkCard: "#1A1A1A",
+  darkCard: "#171717",
   darkForeground: "#D8DFEE",
-  darkBorder: "#262626",
+  darkBorder: "#1F2228",
   darkMutedForeground: "#6B7280",
 
   darkChromeBg: "#0D0D0D",
@@ -67,6 +77,17 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   darkChromeActive: "#FE9F43",
   darkChromeLogoBg: "#141414",
 };
+
+export function normalizeThemeColorsState(
+  state?: Partial<ThemeColorsState> | null,
+): ThemeColorsState {
+  const merged = { ...DEFAULT_THEME_COLORS, ...state } as ThemeColorsState;
+  const bg = merged.lightBackground?.trim().toLowerCase();
+  if (!bg || LEGACY_LIGHT_CANVAS.has(bg)) {
+    merged.lightBackground = DEFAULT_THEME_COLORS.lightBackground;
+  }
+  return merged;
+}
 
 export function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
   const normalized = hex.trim().replace(/^#/, "");
@@ -258,8 +279,8 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--accent-foreground", preset.primaryHover);
     root.style.setProperty("--sidebar-accent", preset.softBg);
     root.style.setProperty("--sidebar-accent-foreground", preset.activeTextLight);
-    root.style.setProperty("--retail-sidebar-active-bg", `hsl(${preset.softBg})`);
-    root.style.setProperty("--retail-sidebar-active-fg", `hsl(${preset.activeTextLight})`);
+    root.style.setProperty("--retail-sidebar-active-bg", "rgba(254, 159, 67, 0.08)");
+    root.style.setProperty("--retail-sidebar-active-fg", "#FE9F43");
 
     root.style.removeProperty("--retail-sidebar-bg");
     root.style.removeProperty("--retail-sidebar-fg");
@@ -313,8 +334,9 @@ export function loadStoredThemeColors(): ThemeColorsState {
   try {
     const raw = localStorage.getItem(THEME_COLORS_STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<ThemeColorsState>;
-      return { ...DEFAULT_THEME_COLORS, ...parsed };
+      const parsed = JSON.parse(raw) as { state?: Partial<ThemeColorsState> } & Partial<ThemeColorsState>;
+      const colors = parsed.state ?? parsed;
+      return normalizeThemeColorsState(colors);
     }
   } catch {
     /* fall through */
@@ -324,7 +346,7 @@ export function loadStoredThemeColors(): ThemeColorsState {
   try {
     const legacy = localStorage.getItem(ACCENT_STORAGE_KEY) as AccentId | null;
     if (legacy && ACCENT_PRESETS.some((p) => p.id === legacy)) {
-      return { ...DEFAULT_THEME_COLORS, lightAccent: legacy };
+      return normalizeThemeColorsState({ lightAccent: legacy });
     }
   } catch {
     /* noop */

@@ -308,7 +308,7 @@ export function Sidebar() {
     activeFg: "var(--chrome-active-fg, #fe9f43)",
     logoBg: "var(--chrome-logo-bg, #141414)",
   };
-  const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #F8FAFC)");
+  const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #ffffff)");
   const border   = dreamsDarkChrome ? chrome.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
   const textMut  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
   const textFull = dreamsDarkChrome ? chrome.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";

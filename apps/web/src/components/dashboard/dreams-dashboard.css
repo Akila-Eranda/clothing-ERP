@@ -1,14 +1,14 @@
 /* DreamsPOS Admin Dashboard — scoped styles (ported from DreamsPOS theme) */
 
-/* Full-bleed page canvas (DreamsPOS body: #FAFBFE light / #0D0D0D dark) */
+/* Full-bleed page canvas — matches app --background (DreamsPOS #F1F5F6 light / #0D0D0D dark) */
 .dreams-dashboard-page {
   min-height: 100%;
   width: 100%;
-  background: #fafbfe;
+  background: hsl(var(--background));
 }
 
 .dark .dreams-dashboard-page {
-  background: #0d0d0d;
+  background: hsl(var(--background));
 }
 
 .dreams-pos-dash {

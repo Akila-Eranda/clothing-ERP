@@ -81,7 +81,7 @@ export default function NewSupplierPage() {
     <div className="h-full flex flex-col bg-background">
 
       {/* ── Top bar ── */}
-      <div className="bg-background border-b px-6 py-3 flex items-center justify-between shrink-0">
+      <div className="bg-card border-b px-6 py-3 flex items-center justify-between shrink-0">
         <button onClick={() => router.push("/suppliers")}
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
           <ArrowLeft className="h-4 w-4" /> {copy.backLabel}

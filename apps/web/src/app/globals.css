@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  /* react-table-craft — track Hexalyte surfaces */
-  --tc-background: 0 0% 100%;
+  /* react-table-craft — DreamsPOS light canvas */
+  --tc-background: 204 14% 96%;
   --tc-foreground: 222 47% 11%;
   --tc-card: 0 0% 100%;
   --tc-card-foreground: 222 47% 11%;
@@ -29,7 +29,7 @@
 .dark {
   --tc-background: 0 0% 5%;
   --tc-foreground: 216 33% 89%;
-  --tc-card: 0 0% 10%;
+  --tc-card: 0 0% 9%;
   --tc-card-foreground: 216 33% 89%;
   --tc-popover: 0 0% 8%;
   --tc-popover-foreground: 216 33% 89%;
@@ -51,15 +51,15 @@
 @layer base {
   :root {
     /*
-      Hexalyte Design System v2 — Light
-      Clean white UI + blue accent (user-switchable via --primary*)
+      Hexalyte / DreamsPOS — Light page canvas
+      Canvas: #F1F5F6 · Cards: #FFFFFF · Sidebar/Header: #FFFFFF
     */
-    --background: 0 0% 100%;                 /* #FFFFFF */
-    --secondary-background: 210 40% 98%;      /* #F8FAFC */
-    --foreground: 222 47% 11%;               /* #0F172A */
-    --card: 0 0% 100%;                       /* #FFFFFF */
+    --background: 204 14% 96%;                   /* #F1F5F6 — softer gray canvas */
+    --secondary-background: 210 18% 92%;         /* #E8EDF0 — nested / hover surfaces */
+    --foreground: 222 47% 11%;                 /* #0F172A */
+    --card: 0 0% 100%;                         /* #FFFFFF */
     --card-foreground: 222 47% 11%;
-    --card-hover: 210 40% 98%;               /* #F8FAFC */
+    --card-hover: 0 0% 97%;                    /* #F7F7F7 */
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
     --primary: 217 91% 53%;                  /* #2563EB — overridable by accent */
@@ -70,8 +70,8 @@
     --primary-glow: rgba(37, 99, 235, 0.18);
     --secondary: 210 40% 98%;
     --secondary-foreground: 215 19% 35%;     /* #334155 */
-    --muted: 210 40% 98%;
-    --muted-foreground: 215 19% 35%;         /* #475569 — readable on white */
+    --muted: 210 20% 98%;                      /* #F9FAFB */
+    --muted-foreground: 215 19% 35%;           /* #475569 */
     --accent: 214 100% 97%;                  /* Primary Soft */
     --accent-foreground: 224 76% 48%;
     --destructive: 0 84% 60%;                /* #EF4444 */
@@ -96,7 +96,7 @@
     --chart-4: 263 70% 58%;                  /* Orders */
     --chart-5: 38 92% 50%;                   /* Customers */
     --chart-6: 189 94% 43%;                  /* Products */
-    --sidebar-background: 210 40% 98%;       /* #F8FAFC */
+    --sidebar-background: 0 0% 100%;           /* #FFFFFF */
     --sidebar-foreground: 222 47% 11%;
     --sidebar-primary: 217 91% 53%;
     --sidebar-primary-foreground: 0 0% 100%;
@@ -107,20 +107,20 @@
     --sidebar-active-text: 224 76% 48%;
     --sidebar-active-text-dark: 213 97% 87%;
     --sidebar-active-icon-dark: 213 97% 78%;
-    --sidebar-hover: 210 40% 96%;            /* #F1F5F9 */
+    --sidebar-hover: 210 20% 96%;              /* #F1F5F9 */
     --header-background: 0 0% 100%;
-    --hover: 210 40% 98%;
+    --hover: 210 20% 98%;
     --selected: 214 100% 97%;
   }
 
   .dark {
-    /* DreamsPOS dark — neutral charcoal + orange accent (no blue wash) */
-    --background: 0 0% 5%;                 /* #0D0D0D */
-    --secondary-background: 0 0% 7%;         /* #121212 */
-    --foreground: 216 33% 89%;               /* #D8DFEE */
-    --card: 0 0% 10%;                        /* #1A1A1A */
+    /* DreamsPOS dark — body #0D0D0D · cards #171717 · chrome border #1F2228 */
+    --background: 0 0% 5%;                     /* #0D0D0D */
+    --secondary-background: 0 0% 7%;           /* #121212 */
+    --foreground: 216 33% 89%;                 /* #D8DFEE */
+    --card: 0 0% 9%;                           /* #171717 */
     --card-foreground: 216 33% 89%;
-    --card-hover: 0 0% 12%;                  /* #1F1F1F */
+    --card-hover: 0 0% 11%;                    /* #1C1C1C */
     --popover: 0 0% 8%;
     --popover-foreground: 216 33% 89%;
     --primary: 32 99% 63%;                   /* #FE9F43 */
@@ -143,8 +143,8 @@
     --warning-foreground: 0 0% 100%;
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
-    --border: 0 0% 15%;                      /* #262626 */
-    --border-hsl: 0 0% 15%;
+    --border: 220 13% 15%;                     /* #1F2228 */
+    --border-hsl: 220 13% 15%;
     --input: 0 0% 16%;
     --ring: 32 99% 63%;
     --divider: 0 0% 13%;
@@ -302,7 +302,7 @@
 
   /* Standard dashboard page shell — compact enterprise rhythm */
   .page-shell {
-    @apply p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto;
+    @apply p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto bg-background min-h-full;
   }
 
   /*

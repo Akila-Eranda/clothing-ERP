@@ -348,7 +348,7 @@ export function ThemeCustomizer() {
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent
           side="right"
-          className="theme-customizer-panel w-full sm:max-w-[440px] overflow-hidden p-0 border-l-0 gap-0 [&>button.absolute]:hidden"
+          className="theme-customizer-panel flex h-full max-h-[100dvh] w-full flex-col sm:max-w-[440px] overflow-hidden p-0 border-l-0 gap-0 [&>button.absolute]:hidden"
         >
           <SheetHeader className="theme-customizer-header relative shrink-0 overflow-hidden p-0 text-left space-y-0">
             <div className="theme-customizer-header__glow" aria-hidden />

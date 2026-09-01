@@ -99,7 +99,7 @@ export default function GRNPage() {
         }
       `}</style>
 
-      <div className="min-h-screen bg-muted/30 text-foreground">
+      <div className="min-h-screen bg-background text-foreground">
         {/* Screen toolbar */}
         <div className="no-print sticky top-0 z-40 bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">

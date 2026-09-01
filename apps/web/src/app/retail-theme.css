@@ -240,16 +240,18 @@
 
 /* ── Scroll body + footer ─────────────────────────────────────── */
 .tc-body {
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background:
     linear-gradient(180deg, hsl(var(--muted) / 0.35) 0%, hsl(var(--background)) 120px);
 }
 
 .tc-panel {
-  padding: 0.875rem;
+  padding: 0.875rem 0.875rem 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
@@ -381,17 +383,17 @@
 }
 
 .tc-section__body {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 0.22s ease;
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.28s ease;
 }
 
 .tc-section__body--open {
-  grid-template-rows: 1fr;
+  max-height: 32rem;
 }
 
 .tc-section__inner {
-  overflow: hidden;
+  overflow: visible;
   padding: 0 1rem 1rem;
 }
 
@@ -668,6 +670,25 @@
 }
 
 /* Boxed layout */
+/* DreamsPOS page canvas — system-wide (dashboard + admin) */
+.dashboard-shell,
+.admin-app-shell,
+.dashboard-shell > .flex-1 > main,
+.admin-app-shell > .flex-1 > main {
+  background-color: hsl(var(--background));
+}
+
+/* Hub / settings roots without page-shell */
+.dashboard-shell > .flex-1 > main > div[class*="p-"],
+.admin-app-shell > .flex-1 > main > div {
+  background-color: transparent;
+}
+
+.page-shell {
+  background-color: hsl(var(--background));
+  min-height: 100%;
+}
+
 body.layout-boxed .dashboard-shell {
   max-width: 1320px;
   margin-left: auto;
@@ -684,13 +705,13 @@ body.mini-sidebar .hex-retail-sidebar {
 }
 
 [data-sidebar="light"] .hex-retail-sidebar {
-  --retail-sidebar-bg: #f8fafc;
-  --retail-sidebar-fg: #0f172a;
-  --retail-sidebar-muted: #64748b;
+  --retail-sidebar-bg: #ffffff;
+  --retail-sidebar-fg: #212b36;
+  --retail-sidebar-muted: #646b72;
   --retail-sidebar-border: rgba(15, 23, 42, 0.08);
   --retail-sidebar-hover: #f1f5f9;
-  --retail-sidebar-active-bg: hsl(var(--sidebar-accent));
-  --retail-sidebar-active-fg: hsl(var(--sidebar-accent-foreground));
+  --retail-sidebar-active-bg: rgba(254, 159, 67, 0.08);
+  --retail-sidebar-active-fg: #fe9f43;
 }
 
 html.dark .hex-retail-sidebar {
@@ -770,8 +791,8 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
 }
 
 [data-topbar="white"] .hex-retail-header {
-  --retail-topbar-bg: rgba(255, 255, 255, 0.88);
-  --retail-topbar-fg: #0f172a;
+  --retail-topbar-bg: rgba(255, 255, 255, 0.96);
+  --retail-topbar-fg: #212b36;
   --retail-topbar-border: rgba(15, 23, 42, 0.07);
 }
 

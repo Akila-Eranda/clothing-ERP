@@ -7,9 +7,11 @@ import {
   applyThemeColors,
   clearThemeColorOverrides,
   DEFAULT_THEME_COLORS,
+  normalizeThemeColorsState,
   type DarkAccentChoice,
   type ThemeColorsState,
   THEME_COLORS_STORAGE_KEY,
+  THEME_COLORS_STORE_VERSION,
 } from "@/lib/theme-colors";
 
 type ThemeColorsStore = ThemeColorsState & {
@@ -71,9 +73,11 @@ export const useThemeColorsStore = create<ThemeColorsStore>()(
     }),
     {
       name: THEME_COLORS_STORAGE_KEY,
+      version: THEME_COLORS_STORE_VERSION,
       storage: createJSONStorage(() => localStorage),
+      migrate: (persisted) => normalizeThemeColorsState(persisted as Partial<ThemeColorsState>),
       onRehydrateStorage: () => (state) => {
-        if (state) commit(state);
+        if (state) commit(normalizeThemeColorsState(state));
       },
     },
   ),
