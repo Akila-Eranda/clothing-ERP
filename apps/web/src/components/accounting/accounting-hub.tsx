@@ -22,6 +22,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import Link from "next/link";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Expense {
@@ -409,14 +410,11 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
 
       const expRes = ok<{ data: Expense[] }>(0);
       const accRes = ok<{ data?: Account[] } | Account[]>(1);
-      if (expRes) setExpenses((expRes?.data ?? expRes ?? []) as Expense[]);
-      if (accRes) {
-        const tree = Array.isArray(accRes) ? accRes : (accRes.data ?? []);
-        setAccounts(Array.isArray(tree) ? tree : []);
-      }
+      if (expRes) setExpenses(parseApiList<Expense>(expRes));
+      if (accRes) setAccounts(parseApiList<Account>(accRes));
       const pl = ok<PLReport>(2); if (pl) setPlReport(pl);
       const cf = ok<{ data: CashFlowDay[]; totalInflow: number; totalOutflow: number; outflowBreakdown?: { expenses: number; supplierPayments: number; refunds: number } }>(3); if (cf) setCashFlow(cf as any);
-      const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal((je?.data ?? []) as JournalEntry[]);
+      const je = ok<{ data: JournalEntry[] }>(4); if (je) setJournal(parseApiList<JournalEntry>(je?.data));
       const bs = ok<BalanceSheet>(5); if (bs) setBS(bs);
       const month = ok<PLData[]>(6); if (month) setMonthlyPL(Array.isArray(month) ? month : []);
       const tm = ok<PLReport>(7); if (tm) setThisMonthPL(tm);

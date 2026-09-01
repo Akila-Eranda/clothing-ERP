@@ -8,6 +8,7 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES } from "@/lib/expense-categories";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
+import { parseApiList } from "@/lib/parse-api-list";
 
 const INPUT_CLS =
   "w-full h-10 rounded-xl px-3 text-sm outline-none focus:border-[var(--pos-accent)] transition-colors";
@@ -116,7 +117,7 @@ export function PosQuickExpensePanel({
   const loadRecent = React.useCallback(async () => {
     try {
       const res = await api.get<{ data: ExpenseRow[] }>("/accounting/expenses?limit=10");
-      setRecent(res.data?.data ?? []);
+      setRecent(parseApiList(res.data));
     } catch {
       /* ignore */
     }
@@ -126,7 +127,7 @@ export function PosQuickExpensePanel({
     try {
       const res = await api.get<BankAccountRow[] | { data: BankAccountRow[] }>("/accounting/bank-accounts");
       const raw = res.data;
-      const list = Array.isArray(raw) ? raw : raw?.data ?? [];
+      const list = parseApiList<BankAccountRow>(raw);
       setBankAccounts(list);
       setBankAccountId((prev) => {
         if (prev && list.some((b) => b.id === prev)) return prev;
@@ -145,8 +146,7 @@ export function PosQuickExpensePanel({
         api.get<{ data: SupplierRow[] } | SupplierRow[]>("/suppliers?limit=200"),
         api.get<{ payments: PaymentRow[] }>("/suppliers/ap/payments?limit=10"),
       ]);
-      const raw = supRes.data;
-      const list = Array.isArray(raw) ? raw : raw?.data ?? [];
+      const list = parseApiList<SupplierRow>(supRes.data);
       setSuppliers(
         [...list].sort((a, b) => (b.balance ?? 0) - (a.balance ?? 0) || a.name.localeCompare(b.name)),
       );

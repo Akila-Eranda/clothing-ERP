@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAY_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "CHEQUE", "UPI", "WALLET"];
@@ -129,7 +130,7 @@ export default function ExpensesPage() {
         api.get<{ data: Expense[] }>(`/accounting/expenses?limit=500&startDate=${range.start}&endDate=${range.end}`),
         api.get<Summary>(`/accounting/expenses/summary?startDate=${range.start}&endDate=${range.end}`),
       ]);
-      setExpenses((expRes.data as any)?.data ?? expRes.data ?? []);
+      setExpenses(parseApiList<Expense>(expRes.data));
       setSummary(sumRes.data as Summary);
     } catch { toast.error("Failed to load expenses"); }
     finally { setLoading(false); }

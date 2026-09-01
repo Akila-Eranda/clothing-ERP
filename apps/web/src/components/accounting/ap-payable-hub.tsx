@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
+import { parseApiList } from "@/lib/parse-api-list";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -349,8 +350,7 @@ function StatementPanel() {
     void (async () => {
       try {
         const res = await api.get<{ data: Supplier[] } | Supplier[]>("/suppliers?limit=200");
-        const raw = res.data;
-        setSuppliers(Array.isArray(raw) ? raw : raw?.data ?? []);
+        setSuppliers(parseApiList<Supplier>(res.data));
       } catch {
         /* ignore */
       }
@@ -530,8 +530,7 @@ function PaymentPanel() {
           supplier?: { name: string };
         }>>("/suppliers/ap/bills?limit=30"),
       ]);
-      const raw = s.data;
-      setSuppliers(Array.isArray(raw) ? raw : raw?.data ?? []);
+      setSuppliers(parseApiList(s.data));
       setPayments(p.data?.payments ?? []);
       setBills(Array.isArray(b.data) ? b.data : []);
     } catch (e: unknown) {

@@ -28,6 +28,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { useAuthStore } from "@/stores/auth-store";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type JournalStatus = "DRAFT" | "PENDING_APPROVAL" | "APPROVED" | "POSTED" | "VOID";
 
@@ -566,11 +567,13 @@ export function JournalsHub() {
           "/accounting/accounts?flat=true&includeInactive=false",
         ),
       ]);
-      setEntries(jRes.data?.data ?? (Array.isArray(jRes.data) ? (jRes.data as JournalEntry[]) : []));
-      const raw = aRes.data as { flat?: Account[]; data?: Account[] } | Account[];
+      setEntries(parseApiList<JournalEntry>(jRes.data));
+      const raw = aRes.data as { flat?: Account[] } | Account[] | { data?: Account[] };
       const list = Array.isArray(raw)
         ? raw
-        : raw?.flat ?? raw?.data ?? [];
+        : Array.isArray(raw?.flat)
+          ? raw.flat
+          : parseApiList<Account>(raw);
       setAccounts(list.filter((a) => a.isActive !== false));
     } catch {
       toast.error("Failed to load journals");

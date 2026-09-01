@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface Service {
   id: string;
@@ -369,7 +370,7 @@ export default function ServicesPage() {
         api.get<FleetCustomer[]>("/workshop/fleet-customers"),
       ]);
       const fleetIds = new Set((Array.isArray(fleetRes.data) ? fleetRes.data : []).filter((f) => f.isFleet).map((f) => f.id));
-      const list = custRes.data?.data ?? [];
+      const list = parseApiList<Customer>(custRes.data);
       setCustomers(list.map((c) => ({ ...c, isFleet: fleetIds.has(c.id) || c.isFleet })));
     } catch { /* optional */ }
   }, []);

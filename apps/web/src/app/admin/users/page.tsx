@@ -7,6 +7,7 @@ import { ClientSideTable, DataTableColumnHeader } from '@/components/table'
 import { fetchUsers, updateUserStatus, deleteUser, type UserRow } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { parseApiList } from "@/lib/parse-api-list";
 
 const STATUS_BADGE: Record<string, string> = {
   ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
@@ -28,7 +29,7 @@ export default function UsersPage() {
     setLoading(true)
     try {
       const d = await fetchUsers({ page: '1', limit: '500' })
-      setUsers(d.data ?? [])
+      setUsers(parseApiList(d.data))
     } catch {
       setUsers([])
       toast.error('Failed to load users')

@@ -18,6 +18,7 @@ import { api } from "@/lib/api";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { AddCustomerModal, type Customer } from "@/components/customers/add-customer-modal";
 import { ViewCustomerModal } from "@/components/customers/view-customer-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 // ── Tier config ───────────────────────────────────────────────────────────
 const TIER_CONF: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
   BRONZE:   { label: "Bronze",   color: "text-amber-800 dark:text-amber-300",  bg: "bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/30",  icon: Star },
@@ -156,7 +157,7 @@ export default function CustomersPage() {
         api.get<{ data: Customer[] }>("/customers?limit=500"),
         api.get<{ segments: { key: string; label: string; count: number }[] }>("/customers/segments"),
       ]);
-      setCustomers(res.data?.data ?? (res.data as unknown as Customer[]) ?? []);
+      setCustomers(parseApiList<Customer>(res.data));
       setSegments(segRes.data?.segments ?? []);
     } catch {
       toast.error("Failed to load customers");

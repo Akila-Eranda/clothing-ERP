@@ -14,6 +14,7 @@ import { type Supplier } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy, type SupplierPageCopy } from "@/lib/shop-vertical";
+import { parseApiList } from "@/lib/parse-api-list";
 // ── Column builder ────────────────────────────────────────────────────────
 function buildColumns(
   copy: SupplierPageCopy,
@@ -135,7 +136,7 @@ export default function SuppliersPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: Supplier[] }>("/suppliers?limit=200");
-      setSuppliers(res.data?.data ?? (res.data as unknown as Supplier[]) ?? []);
+      setSuppliers(parseApiList<Supplier>(res.data));
     } catch { toast.error(`Failed to load ${copy.plural.toLowerCase()}`); }
     finally { setLoading(false); }
   }, [copy.plural]);

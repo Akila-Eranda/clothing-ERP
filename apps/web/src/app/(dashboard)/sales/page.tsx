@@ -18,6 +18,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface Sale {
@@ -419,7 +420,7 @@ export default function SalesPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: Sale[] }>(`/pos/sales?limit=200${dateFilter ? `&date=${dateFilter}` : ""}`);
-      setSales((res.data?.data ?? res.data ?? []) as Sale[]);
+      setSales(parseApiList<Sale>(res.data));
     } catch {
       toast.error("Failed to load sales");
     } finally {

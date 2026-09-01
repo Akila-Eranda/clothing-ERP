@@ -16,6 +16,7 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { AddGrnModal } from "@/components/purchases/add-grn-modal";
 import { GrnDetailsModal } from "@/components/purchases/grn-details-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type GrnRow = {
   id: string;
@@ -40,7 +41,7 @@ export default function GrnPage() {
     setLoading(true);
     try {
       const grnR = await api.get<{ data: GrnRow[] }>("/procurement/grn?limit=200");
-      setGrns(grnR.data?.data ?? []);
+      setGrns(parseApiList<GrnRow>(grnR.data));
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load GRNs");
     } finally {

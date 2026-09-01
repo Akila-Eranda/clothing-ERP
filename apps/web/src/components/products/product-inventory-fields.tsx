@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export type ProductInventoryValues = {
   openingStock: string;
@@ -85,7 +86,7 @@ export function ProductInventoryFields({
 
   useEffect(() => {
     api.get<WarehouseOpt[]>("/warehouses")
-      .then((r) => setWarehouses((r.data ?? []).map((w) => ({ id: w.id, name: w.name }))))
+      .then((r) => setWarehouses(parseApiList<{id:string;name:string}>(r.data).map((w) => ({ id: w.id, name: w.name }))))
       .catch(() => setWarehouses([]));
   }, []);
 

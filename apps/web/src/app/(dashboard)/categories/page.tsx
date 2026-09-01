@@ -10,6 +10,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/compo
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddCategoryModal, type CategoryItem } from "@/components/categories/add-category-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Column definitions ────────────────────────────────────────────────────
 function buildColumns(
@@ -100,7 +101,7 @@ export default function CategoriesPage() {
     setLoading(true);
     try {
       const res = await api.get<CategoryItem[]>("/categories");
-      setCategories(res.data ?? []);
+      setCategories(parseApiList(res.data));
     } catch {
       toast.error("Failed to load categories");
     } finally {

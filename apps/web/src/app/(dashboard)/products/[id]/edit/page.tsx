@@ -27,6 +27,7 @@ import {
   type ProductInventoryValues,
 } from "@/components/products/product-inventory-fields";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -162,9 +163,9 @@ export default function EditProductPage() {
           0,
         ),
       );
-      setCategories(catRes.data ?? []);
-      setBrands(brandRes.data ?? []);
-      setSuppliers(supplierRes.data?.data ?? (supplierRes.data as unknown as SupplierOpt[]) ?? []);
+      setCategories(parseApiList(catRes.data));
+      setBrands(parseApiList(brandRes.data));
+      setSuppliers(parseApiList<SupplierOpt>(supplierRes.data));
       const assignedSupplierIds = Array.from(new Set(
         (p.variants ?? []).flatMap((v) =>
           (v.supplierAssignments ?? [])

@@ -29,6 +29,7 @@ import {
 } from "@/lib/product-tags";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 import { cn } from "@/lib/utils";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface Category {
   id: string;
@@ -374,10 +375,10 @@ export function GroceryProductForm() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => toast.error("Failed to load categories"));
-    api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
+    api.get<Category[]>("/categories").then((r) => setCategories(parseApiList(r.data))).catch(() => toast.error("Failed to load categories"));
+    api.get<Brand[]>("/brands").then((r) => setBrands(parseApiList(r.data))).catch(() => toast.error("Failed to load brands"));
     api.get<{ data: SupplierOpt[] }>("/suppliers?limit=200")
-      .then((r) => setSuppliers(r.data?.data ?? (r.data as unknown as SupplierOpt[]) ?? []))
+      .then((r) => setSuppliers(parseApiList<SupplierOpt>(r.data)))
       .catch(() => {});
   }, []);
 

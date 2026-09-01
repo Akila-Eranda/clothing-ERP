@@ -10,6 +10,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddBranchModal, type Branch } from "@/components/branches/add-branch-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Columns ───────────────────────────────────────────────────────────────
 function buildColumns(
@@ -123,7 +124,7 @@ export default function BranchesPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: Branch[] }>("/branches?limit=100");
-      setBranches(res.data?.data ?? (res.data as unknown as Branch[]) ?? []);
+      setBranches(parseApiList<Branch>(res.data));
     } catch { toast.error("Failed to load branches"); }
     finally { setLoading(false); }
   }, []);

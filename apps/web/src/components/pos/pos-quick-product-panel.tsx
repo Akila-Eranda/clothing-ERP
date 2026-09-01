@@ -5,6 +5,7 @@ import { Loader2, PackagePlus, RefreshCw, Truck } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type Category = { id: string; name: string };
 type SupplierRow = { id: string; name: string };
@@ -38,7 +39,7 @@ export function PosQuickProductPanel({
     setSuppliersLoading(true);
     try {
       const r = await api.get<{ data: SupplierRow[] }>("/suppliers?limit=100");
-      setSuppliers(r.data?.data ?? []);
+      setSuppliers(parseApiList(r.data));
     } catch {
       /* supplier list optional */
     } finally {

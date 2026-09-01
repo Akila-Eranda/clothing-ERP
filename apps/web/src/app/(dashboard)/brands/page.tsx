@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getBrandPageCopy, type BrandPageCopy } from "@/lib/shop-vertical";
 import { AddBrandModal, type BrandItem } from "@/components/brands/add-brand-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── CSV helpers ───────────────────────────────────────────────────────────
 async function parseCsvAndImport(file: File, onProgress: (d: number, t: number) => void) {
@@ -125,7 +126,7 @@ export default function BrandsPage() {
     setLoading(true);
     try {
       const res = await api.get<BrandItem[]>("/brands");
-      setBrands(res.data ?? []);
+      setBrands(parseApiList(res.data));
     } catch { toast.error(`Failed to load ${copy.plural.toLowerCase()}`); }
     finally { setLoading(false); }
   }, [copy.plural]);

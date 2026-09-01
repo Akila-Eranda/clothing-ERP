@@ -13,6 +13,7 @@ import { api } from "@/lib/api";
 import type { InventoryItem } from "@/components/inventory/stock-adjust-modal";
 import { useBranchStore } from "@/stores/branch-store";
 import { cn } from "@/lib/utils";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface Branch {
   id: string;
@@ -53,8 +54,7 @@ export function StockTransferModal({ open, onClose, onCreated, stock, currentBra
     if (!open) return;
     api.get<{ data: Branch[] } | Branch[]>("/branches?limit=100")
       .then((r) => {
-        const raw = r.data?.data ?? r.data;
-        setBranches(Array.isArray(raw) ? raw : []);
+        setBranches(parseApiList<Branch>(r.data));
       })
       .catch(() => toast.error("Failed to load branches"));
   }, [open]);

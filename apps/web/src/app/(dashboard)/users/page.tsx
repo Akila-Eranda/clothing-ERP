@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Role {
@@ -43,15 +44,6 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 const EMPTY_USER = { firstName: "", lastName: "", email: "", password: "", phone: "", branchId: "", roleId: "" };
-
-function parseList<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) return payload;
-  if (payload && typeof payload === "object" && "data" in payload) {
-    const inner = (payload as { data: unknown }).data;
-    if (Array.isArray(inner)) return inner as T[];
-  }
-  return [];
-}
 
 function roleLabel(role: Role): string {
   if (role.type === "BRANCH_MANAGER") return "Manager";
@@ -118,9 +110,9 @@ export default function UsersPage() {
         api.get<Role[]>("/roles"),
         api.get<Branch[]>("/branches"),
       ]);
-      setUsers(parseList<AppUser>(uRes.data?.data ?? uRes.data));
-      setRoles(parseList<Role>(rRes.data));
-      setBranches(parseList<Branch>(bRes.data));
+      setUsers(parseApiList<AppUser>(uRes.data));
+      setRoles(parseApiList<Role>(rRes.data));
+      setBranches(parseApiList<Branch>(bRes.data));
     } catch { toast.error("Failed to load data"); }
     finally { setLoading(false); }
   }, []);

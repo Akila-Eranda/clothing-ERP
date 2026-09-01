@@ -28,6 +28,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type Tab = "accounts" | "cash" | "bank" | "recon";
 
@@ -222,7 +223,7 @@ function AccountsOverviewPanel({
         api.get<{ data: GlAccount[] }>("/accounting/accounts?flat=true"),
       ]);
       setBanks(Array.isArray(b.data) ? b.data : []);
-      setGlAccounts(a.data?.data ?? []);
+      setGlAccounts(parseApiList(a.data));
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to load accounts");
     } finally {
@@ -682,7 +683,7 @@ function CashBookPanel() {
         api.get<{ data: GlAccount[] }>("/accounting/accounts?flat=true"),
       ]);
       setBook(cb.data ?? null);
-      setGlAccounts(acc.data?.data ?? []);
+      setGlAccounts(parseApiList(acc.data));
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to load cash book");
     } finally {
@@ -987,7 +988,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
       ]);
       const list = Array.isArray(b.data) ? b.data : [];
       setBanks(list);
-      setGlAccounts(a.data?.data ?? []);
+      setGlAccounts(parseApiList(a.data));
       if (!accountId && list[0]) setAccountId(list[0].id);
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Failed to load banks");

@@ -6,6 +6,7 @@ import { ColumnDef } from '@tanstack/react-table'
 import { ClientSideTable, DataTableColumnHeader } from '@/components/table'
 import { fetchPlatformAuditLogs, type AuditLogRow } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
+import { parseApiList } from "@/lib/parse-api-list";
 
 const SEV_FROM_ACTION: Record<string, 'INFO' | 'WARN' | 'ERROR'> = {
   DELETE: 'ERROR',
@@ -49,7 +50,7 @@ export default function ActivityLogsPage() {
     try {
       const res = await fetchPlatformAuditLogs({ page: '1', limit: '500' })
       setLogs(
-        (res.data ?? []).map((log) => {
+        parseApiList(res.data).map((log) => {
           const actor = log.user
             ? `${log.user.firstName ?? ''} ${log.user.lastName ?? ''}`.trim() || log.user.email
             : '—'

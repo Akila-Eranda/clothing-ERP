@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { parseApiList } from "@/lib/parse-api-list";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { HEX_BTN, HEX_SECTION_TABS, hexTabButton } from "@/lib/app-button-classes";
@@ -127,9 +128,7 @@ export function FinancialPeriodsHub() {
         return (list.find((y) => y.isCurrent) ?? list[0])?.id ?? "";
       });
 
-      const raw = coaRes.data;
-      const nodes = Array.isArray(raw) ? raw : ((raw as { data?: EquityAccount[] })?.data ?? []);
-      setEquityAccounts(nodes.filter((n) => n.type === "EQUITY"));
+      setEquityAccounts(parseApiList<EquityAccount>(coaRes.data).filter((n) => n.type === "EQUITY"));
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load periods");
     } finally {

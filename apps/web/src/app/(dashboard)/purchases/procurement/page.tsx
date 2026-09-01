@@ -19,6 +19,7 @@ import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use
 import { QuickGrnModal } from "@/components/procurement/quick-grn-modal";
 import { SupplierInvoiceModal } from "@/components/procurement/supplier-invoice-modal";
 import { InvoicePaymentModal } from "@/components/procurement/invoice-payment-modal";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type PrRow = {
   id: string;
@@ -115,11 +116,11 @@ export default function ProcurementHubPage() {
         api.get<{ data: Supplier[] }>("/suppliers?limit=100"),
         api.get<BankAccount[]>("/accounting/bank-accounts"),
       ]);
-      setPrs(prR.data?.data ?? []);
-      setGrns(grnR.data?.data ?? []);
-      setReturns(retR.data?.data ?? []);
-      setInvoices(invR.data?.data ?? []);
-      setSuppliers(supR.data?.data ?? []);
+      setPrs(parseApiList(prR.data));
+      setGrns(parseApiList<GrnRow>(grnR.data));
+      setReturns(parseApiList(retR.data));
+      setInvoices(parseApiList(invR.data));
+      setSuppliers(parseApiList<Supplier>(supR.data));
       setBanks(Array.isArray(bankR.data) ? bankR.data : []);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load procurement data");

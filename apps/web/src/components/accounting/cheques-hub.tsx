@@ -33,6 +33,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type ChequeDirection = "RECEIVED" | "ISSUED";
 type ChequeStatus =
@@ -151,7 +152,7 @@ export function ChequesHub() {
         api.get<BankAccount[]>("/accounting/bank-accounts"),
       ]);
       setDash(dRes.data ?? null);
-      setCheques(cRes.data?.data ?? []);
+      setCheques(parseApiList(cRes.data));
       setBanks(Array.isArray(bRes.data) ? bRes.data : []);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load cheques");

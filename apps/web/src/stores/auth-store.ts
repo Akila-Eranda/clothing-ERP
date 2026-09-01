@@ -9,6 +9,7 @@ import { normalizeRole } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
 import { clearPosCounterId } from "@/lib/pos-counter";
 import { posCashierStorage } from "@/lib/pos-cashier";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export type LoginResult =
   | { status: "ok" }
@@ -61,7 +62,7 @@ async function warmSessionAfterLogin(
       "/branches?limit=50",
     )
     .then((br) => {
-      const raw = br.data?.data ?? (Array.isArray(br.data) ? br.data : []);
+      const raw = parseApiList(br.data);
       const list = Array.isArray(raw) ? raw : [];
       const stored =
         typeof window !== "undefined" ? localStorage.getItem("fe_active_branch") : null;

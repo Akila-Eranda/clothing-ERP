@@ -11,6 +11,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn } from "@/lib/utils";
+import { parseApiList } from "@/lib/parse-api-list";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Supplier {
@@ -280,7 +281,7 @@ export default function CreatePOPage() {
 
   useEffect(() => {
     api.get<{ data: Supplier[] }>("/suppliers?limit=200").then((r) =>
-      setSuppliers(r.data?.data ?? (r.data as unknown as Supplier[]) ?? [])
+      setSuppliers(parseApiList<Supplier>(r.data))
     ).catch(() => {});
   }, []);
 

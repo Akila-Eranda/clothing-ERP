@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export interface Employee {
   id: string; code: string;
@@ -55,7 +56,7 @@ export function AddEmployeeModal({ open, onClose, onSaved, editEmployee }: Props
 
   useEffect(() => {
     if (!open) return;
-    api.get<{ data: Branch[] }>("/branches?limit=100").then((r) => setBranches(r.data?.data ?? (r.data as unknown as Branch[]) ?? [])).catch(() => {});
+    api.get<{ data: Branch[] }>("/branches?limit=100").then((r) => setBranches(parseApiList<Branch>(r.data))).catch(() => {});
     if (editEmployee) {
       setForm({
         firstName: editEmployee.firstName, lastName: editEmployee.lastName,

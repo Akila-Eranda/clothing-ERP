@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type Supplier = { id: string; name: string; phone?: string | null };
 
@@ -100,7 +101,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
       api.get<VariantOpt[]>("/pos/products?limit=2000"),
     ])
       .then(([supR, prodR]) => {
-        setSuppliers(supR.data?.data ?? (supR.data as unknown as Supplier[]) ?? []);
+        setSuppliers(parseApiList<Supplier>(supR.data));
         setAllVariants(Array.isArray(prodR.data) ? prodR.data : []);
       })
       .catch(() => toast.error("Failed to load GRN form data"))
@@ -124,7 +125,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     api
       .get<{ data: OpenPo[] }>("/purchases?limit=200")
       .then((r) => {
-        const all = r.data?.data ?? (r.data as unknown as OpenPo[]) ?? [];
+        const all = parseApiList<OpenPo>(r.data);
         const receivable = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"];
         setOpenPos(
           all.filter((p) => p.supplier?.id === supplierId && receivable.includes(p.status)),

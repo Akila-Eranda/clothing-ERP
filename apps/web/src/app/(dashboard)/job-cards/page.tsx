@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface JobLine {
   id: string; lineType: string; description?: string | null; quantity: number; unitPrice: number; total: number;
@@ -327,9 +328,9 @@ export default function JobCardsPage() {
 
   useEffect(() => { fetchJobs(); }, [fetchJobs]);
   useEffect(() => {
-    api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(r.data?.data ?? [])).catch(() => {});
+    api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(parseApiList<Customer>(r.data))).catch(() => {});
     api.get<Service[]>("/workshop/services").then((r) => setServices(Array.isArray(r.data) ? r.data : [])).catch(() => {});
-    api.get<{ data: UserOpt[] }>("/users?limit=50").then((r) => setUsers(r.data?.data ?? [])).catch(() => {});
+    api.get<{ data: UserOpt[] }>("/users?limit=50").then((r) => setUsers(parseApiList<UserOpt>(r.data))).catch(() => {});
   }, []);
 
   const resetForm = () => setForm({ customerId: "", complaintNotes: "", serviceId: "", technicianId: "" });

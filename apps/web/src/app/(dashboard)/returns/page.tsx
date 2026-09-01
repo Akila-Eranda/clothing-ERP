@@ -343,7 +343,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
     setSearchLoading(true);
     try {
       const listRes = await api.get<{ data: any[] }>(`/sales?search=${encodeURIComponent(query)}&limit=5`);
-      const list = (listRes.data?.data ?? listRes.data ?? []) as any[];
+      const list = parseApiList<any>(listRes.data);
       if (list.length === 0) { toast.error("Invoice not found"); return; }
       const detailRes = await api.get<any>(`/sales/${list[0].id}`);
       const s = detailRes.data as any;

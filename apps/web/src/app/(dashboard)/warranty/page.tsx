@@ -23,6 +23,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { productHasWarranty, warrantyPeriodLabel } from "@/lib/warranty";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface Claim {
   id: string;
@@ -274,7 +275,7 @@ export default function WarrantyPage() {
 
   useEffect(() => { fetchClaims(); }, [fetchClaims]);
   useEffect(() => {
-    api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(r.data?.data ?? [])).catch(() => {});
+    api.get<{ data: Customer[] }>("/customers?limit=200").then((r) => setCustomers(parseApiList<Customer>(r.data))).catch(() => {});
     api.get<VariantOpt[]>("/pos/products").then((r) => {
       const all = Array.isArray(r.data) ? r.data : [];
       setVariants(all.filter((v) => productHasWarranty(v.warrantyMonths)));

@@ -4,6 +4,7 @@ import * as React from "react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/auth-store";
 import { getStoredBranchId, useBranchStore } from "@/stores/branch-store";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export interface BranchOption {
   id: string;
@@ -68,7 +69,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       .get<{ data: BranchOption[] }>("/branches?limit=50")
       .then((r) => {
         if (cancelled) return;
-        const raw = r.data?.data ?? (Array.isArray(r.data) ? r.data : []);
+        const raw = parseApiList(r.data);
         const list = (Array.isArray(raw) ? raw : []).filter(
           (b) => b.isActive !== false,
         );

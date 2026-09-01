@@ -5,6 +5,7 @@ import { Building2 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { api } from "@/lib/api";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export type ProductBranchScope = "ALL" | "SINGLE";
 
@@ -35,7 +36,7 @@ export function ProductBranchScopeSelect({
     api
       .get<{ data: BranchOption[] } | BranchOption[]>("/branches?limit=100")
       .then((r) => {
-        const list = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        const list = parseApiList(r.data);
         setBranches(list);
       })
       .catch(() => setBranches([]));

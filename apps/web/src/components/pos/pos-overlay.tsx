@@ -76,6 +76,7 @@ import {
   parseGramsInput,
 } from "@/lib/pos-weight";
 import type { Customer } from "@/types";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface POSOverlayProps {
   /** Cashier mode â€” no ERP shell; exit returns to POS landing only. */
@@ -92,11 +93,7 @@ interface ApiCustomerRow {
 }
 
 function extractCustomerRows<T>(payload: unknown): T[] {
-  if (Array.isArray(payload)) return payload as T[];
-  if (payload && typeof payload === 'object' && Array.isArray((payload as { data?: unknown }).data)) {
-    return (payload as { data: T[] }).data;
-  }
-  return [];
+  return parseApiList<T>(payload);
 }
 
 function mapApiCustomer(c: ApiCustomerRow): CustomerItem {
@@ -818,7 +815,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     void (async () => {
       try {
         const r = await api.get<PosBankAccountOption[] | { data: PosBankAccountOption[] }>("/accounting/bank-accounts");
-        const rows = Array.isArray(r.data) ? r.data : (r.data?.data ?? []);
+        const rows = parseApiList(r.data);
         const active = rows.filter((b) => (b as { isActive?: boolean }).isActive !== false);
         if (cancelled) return;
         setBankAccounts(active);
@@ -984,7 +981,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     try {
       const today = new Date().toISOString().slice(0, 10);
       const r = await api.get<{ data?: SaleRow[] }>(`/pos/sales?limit=50&date=${today}`);
-      setOrders(r.data?.data ?? []);
+      setOrders(parseApiList(r.data));
     } catch { toast.error("Failed to load sales"); } finally { setOrdersLoading(false); }
   }, []);
 
@@ -1055,7 +1052,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   const loadVouchers = React.useCallback(async () => {
     try {
       const r = await api.get<{ data: { id: string; code: string; balance: number; initialAmount: number; status: string }[] }>("/pos/gift-vouchers?limit=30");
-      setVouchers(r.data?.data ?? []);
+      setVouchers(parseApiList(r.data));
     } catch { /* ignore */ }
   }, []);
 
@@ -3169,7 +3166,7 @@ ${rows}
       const searchSale = async () => {
         if (!returnQuery.trim()) return;
         setReturnSearchLoading(true);
-        try { const r = await api.get<{data?:SaleRow[]}>(`/sales?search=${encodeURIComponent(returnQuery)}&limit=5`); setReturnSearchRes(r.data?.data??[]); if((r.data?.data??[]).length===0) toast.error("No sales found"); }
+        try { const r = await api.get<{data?:SaleRow[]}>(`/sales?search=${encodeURIComponent(returnQuery)}&limit=5`); setReturnSearchRes(parseApiList(r.data)); if(parseApiList(r.data).length===0) toast.error("No sales found"); }
         catch { toast.error("Search failed"); } finally { setReturnSearchLoading(false); }
       };
 

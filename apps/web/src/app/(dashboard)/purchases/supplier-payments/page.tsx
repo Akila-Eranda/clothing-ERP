@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type Supplier = { id: string; code?: string; name: string; balance?: number; outstandingBalance?: number };
 type UnpaidPo = { id: string; poNumber: string; dueAmount: number; dueDate: string };
@@ -93,10 +94,9 @@ export default function SupplierPaymentsPage() {
         ),
         api.get<BankAccount[] | { data: BankAccount[] }>("/accounting/bank-accounts").catch(() => ({ data: [] })),
       ]);
-      setSuppliers(supplierRes.data?.data ?? []);
+      setSuppliers(parseApiList<Supplier>(supplierRes.data));
       setPayments(paymentRes.data?.payments ?? []);
-      const rawBanks = bankRes.data;
-      const bankList = Array.isArray(rawBanks) ? rawBanks : rawBanks?.data ?? [];
+      const bankList = parseApiList<BankAccount>(bankRes.data);
       setBanks(bankList);
       setForm((f) => {
         if (f.bankAccountId && bankList.some((b) => b.id === f.bankAccountId)) return f;

@@ -32,6 +32,7 @@ import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
 import { ReloadSettingsTab } from "@/components/settings/reload-settings-tab";
 import {
+import { parseApiList } from "@/lib/parse-api-list";
   ACCENT_PRESETS,
   type AccentId,
   loadStoredAccent,
@@ -91,7 +92,7 @@ function ReceiptPrintLogCard() {
     setLoading(true);
     try {
       const r = await api.get<{ data: ReceiptPrintLogEntry[] }>("/tenants/receipt-print/logs?limit=30");
-      setLogs(r.data?.data ?? []);
+      setLogs(parseApiList(r.data));
     } catch {
       toast.error("Failed to load print logs");
     } finally {
@@ -180,7 +181,7 @@ function LoginHistoryCard() {
     setLoading(true);
     try {
       const r = await api.get<{ data: LoginEntry[] }>("/audit-logs/login-history?limit=20");
-      setLogs(r.data?.data ?? []);
+      setLogs(parseApiList(r.data));
     } catch { toast.error("Failed to load login history"); }
     finally { setLoading(false); }
   }, []);
@@ -254,7 +255,7 @@ function AuditLogTab() {
       if (search) params.set("action", search);
       if (resource) params.set("resource", resource);
       const r = await api.get<{data:AuditEntry[];total:number}>(`/audit-logs?${params}`);
-      setLogs(r.data?.data ?? []);
+      setLogs(parseApiList(r.data));
       setTotal(r.data?.total ?? 0);
       setPage(p);
     } catch { toast.error("Failed to load audit logs"); }
@@ -520,7 +521,7 @@ export default function SettingsPage() {
     setBranchesLoading(true);
     try {
       const r = await api.get<{ data: Branch[] } | Branch[]>("/branches?limit=50");
-      setBranches(Array.isArray(r.data) ? r.data : r.data.data);
+      setBranches(parseApiList<Branch>(r.data));
     } catch { toast.error("Failed to load branches"); }
     finally { setBranchesLoading(false); }
   }

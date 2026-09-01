@@ -14,6 +14,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
+import { parseApiList } from "@/lib/parse-api-list";
 // ── Status config ─────────────────────────────────────────────────────────
 type Variant = "success" | "secondary" | "danger" | "warning" | "info";
 const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
@@ -129,7 +130,7 @@ export default function PurchasesPage() {
     setLoading(true);
     try {
       const res = await api.get<{ data: PurchaseOrder[] }>("/purchases?limit=200");
-      setPos(res.data?.data ?? (res.data as unknown as PurchaseOrder[]) ?? []);
+      setPos(parseApiList<PurchaseOrder>(res.data));
     } catch { toast.error("Failed to load purchase orders"); }
     finally { setLoading(false); }
   }, []);

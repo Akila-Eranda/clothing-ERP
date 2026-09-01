@@ -32,6 +32,7 @@ import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 import { type Product } from "@/lib/product-types";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export type { Product };
 
@@ -128,15 +129,15 @@ export function AddProductModal({ open, onClose, onCreated, editProduct }: Props
 
   useEffect(() => {
     if (!open) return;
-    api.get<Category[]>("/categories").then((r) => setCategories(r.data ?? [])).catch(() => toast.error("Failed to load categories"));
+    api.get<Category[]>("/categories").then((r) => setCategories(parseApiList(r.data))).catch(() => toast.error("Failed to load categories"));
     api.get<{ data: SupplierOpt[] } | SupplierOpt[]>("/suppliers?limit=200")
       .then((r) => {
         const payload = r.data as { data?: SupplierOpt[] } | SupplierOpt[];
-        setSuppliers(Array.isArray(payload) ? payload : (payload.data ?? []));
+        setSuppliers(parseApiList(payload));
       })
       .catch(() => toast.error("Failed to load suppliers"));
     if (formCopy.showBrand) {
-      api.get<Brand[]>("/brands").then((r) => setBrands(r.data ?? [])).catch(() => toast.error("Failed to load brands"));
+      api.get<Brand[]>("/brands").then((r) => setBrands(parseApiList(r.data))).catch(() => toast.error("Failed to load brands"));
     }
   }, [open, formCopy.showBrand]);
 

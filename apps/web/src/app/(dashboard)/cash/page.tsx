@@ -29,6 +29,7 @@ import { PosCountersPanel } from "@/components/cash/pos-counters-panel";
 import { useAuthStore } from "@/stores/auth-store";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
 import { readPosCounterId, writePosCounterId } from "@/lib/pos-counter";
+import { parseApiList } from "@/lib/parse-api-list";
 
 const TABS = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -204,7 +205,7 @@ export default function CashManagementPage() {
       const res = await api.get<{ data: CashRegister[] }>(
         `/cash/history?limit=100&from=${dateRange.from}&to=${dateRange.to}`,
       );
-      setHistory((res.data as { data?: CashRegister[] })?.data ?? []);
+      setHistory(parseApiList<CashRegister>(res.data));
     } catch {
       toast.error("Failed to load cash history");
     }

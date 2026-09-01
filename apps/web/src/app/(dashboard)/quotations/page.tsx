@@ -27,6 +27,7 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { QuotationApprovalPanel } from "@/components/quotations/quotation-approval-panel";
 import { QuotationPrintModal } from "@/components/quotations/quotation-print-modal";
 import { bypassesWorkflowApproval, type WorkflowInstanceLike } from "@/lib/workflow-access";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface Quotation {
   id: string;
@@ -376,7 +377,7 @@ export default function QuotationsPage() {
   useEffect(() => { fetchQuotes(); }, [fetchQuotes]);
   useEffect(() => {
     api.get<{ data: Customer[] }>("/customers?limit=200")
-      .then((r) => setCustomers(r.data?.data ?? (r.data as unknown as Customer[]) ?? []))
+      .then((r) => setCustomers(parseApiList<Customer>(r.data)))
       .catch(() => {});
     api.get<Array<VariantOpt & { sellingPrice?: number }>>("/pos/products")
       .then((r) => {

@@ -34,6 +34,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { ChequesHub } from "@/components/accounting/cheques-hub";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type AgingBuckets = Record<string, { count: number; amount: number }>;
 
@@ -231,7 +232,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
       setAp(apR.data ?? null);
       setAr(arR.data ?? null);
       setBanks(Array.isArray(bankR.data) ? bankR.data : []);
-      setCheques(chR.data?.data ?? []);
+      setCheques(parseApiList(chR.data));
       setCashBook(cbR.data ?? null);
       setRecons(Array.isArray(rcR.data) ? rcR.data : []);
     } catch (e: unknown) {

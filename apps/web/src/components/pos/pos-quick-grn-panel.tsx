@@ -11,6 +11,7 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { printGrnReceipt } from "@/lib/grn-receipt-print";
 import { useAuthStore } from "@/stores/auth-store";
 import { PosRegisterSupplier } from "@/components/pos/pos-register-supplier";
+import { parseApiList } from "@/lib/parse-api-list";
 
 const INPUT_CLS =
   "w-full h-9 rounded-xl px-3 text-sm text-white outline-none focus:border-[var(--pos-accent)] transition-colors";
@@ -180,7 +181,7 @@ export function PosQuickGrnPanel({
     setSupplierLoading(true);
     try {
       const res = await api.get<{ data: SupplierRow[] }>("/suppliers?limit=100");
-      setSuppliers(res.data?.data ?? []);
+      setSuppliers(parseApiList(res.data));
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load suppliers");
     } finally {
@@ -204,7 +205,7 @@ export function PosQuickGrnPanel({
       const rows = Array.isArray(prodRes.data) ? prodRes.data : [];
       setSupplierProducts(rows);
 
-      const allPos = poRes.data?.data ?? (poRes.data as unknown as OpenPo[]) ?? [];
+      const allPos = parseApiList<OpenPo>(poRes.data);
       const receivable = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"];
       setOpenPos(allPos.filter((p) => p.supplier?.id === sid && receivable.includes(p.status)));
 

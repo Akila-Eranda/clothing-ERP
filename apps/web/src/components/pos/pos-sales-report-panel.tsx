@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { formatNumber } from "@/lib/utils";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type Summary = {
   date: string;
@@ -96,7 +97,7 @@ export function PosSalesReportPanel({
         api.get<ActiveShift | null>("/cash/active").catch(() => ({ data: null })),
       ]);
       setSummary(sumR.data ?? null);
-      setSales(salesR.data?.data ?? []);
+      setSales(parseApiList(salesR.data));
       setActiveShift(activeR.data ?? null);
     } catch (e: unknown) {
       toast.error((e as Error).message ?? "Failed to load sales report");

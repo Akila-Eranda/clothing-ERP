@@ -20,6 +20,7 @@ import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api, logClientAuditEvent } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type AuditUser = { firstName?: string; lastName?: string | null; email?: string | null };
 
@@ -109,7 +110,7 @@ export function AuditTrailHub() {
         api.get<{ data: AuditRow[]; total: number }>(`/audit-logs?${params}`),
         api.get<Summary>("/audit-logs/summary?days=30"),
       ]);
-      setRows(listRes.data?.data ?? []);
+      setRows(parseApiList(listRes.data));
       setTotal(listRes.data?.total ?? 0);
       setPage(p);
       setSummary(sumRes.data ?? null);

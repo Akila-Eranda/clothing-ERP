@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { parseApiList } from "@/lib/parse-api-list";
 
 type AccountType = "ASSET" | "LIABILITY" | "EQUITY" | "REVENUE" | "EXPENSE";
 
@@ -266,7 +267,7 @@ export function ChartOfAccountsHub() {
       const res = await api.get<{ data: CoaNode[]; total: number }>(
         "/accounting/accounts?includeInactive=true",
       );
-      const data = Array.isArray(res.data) ? (res.data as unknown as CoaNode[]) : (res.data?.data ?? []);
+      const data = parseApiList<CoaNode>(res.data);
       setTree(data);
       // Expand roots by default
       setExpanded(new Set(data.map((n) => n.id)));

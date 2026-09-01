@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { productHasWarranty, warrantyPeriodLabel } from "@/lib/warranty";
+import { parseApiList } from "@/lib/parse-api-list";
 
 interface SaleRow {
   id: string;
@@ -146,7 +147,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
       const r = await api.get<{ data?: SaleRow[] }>(
         `/sales?search=${encodeURIComponent(query.trim())}&limit=8`,
       );
-      const rows = r.data?.data ?? [];
+      const rows = parseApiList(r.data);
       setSearchResults(rows);
       if (!rows.length) toast.error("No invoices found");
     } catch {

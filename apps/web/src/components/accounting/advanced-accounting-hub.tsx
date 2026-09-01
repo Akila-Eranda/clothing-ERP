@@ -19,6 +19,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import {
+import { parseApiList } from "@/lib/parse-api-list";
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 
@@ -187,13 +188,18 @@ export function AdvancedAccountingHub() {
       ]);
       setDashboard(dashboardRes.data);
       setDiagnostics(dashboardRes.data?.diagnostics ?? null);
-      const raw = accountsRes.data as { flat?: Account[]; data?: Account[] } | Account[];
-      setAccounts((Array.isArray(raw) ? raw : raw?.flat ?? raw?.data ?? []).filter((a) => a.isActive !== false));
-      setCostCenters(costRes.data ?? []);
-      setBudgets(budgetRes.data ?? []);
+      const raw = accountsRes.data as { flat?: Account[] } | Account[] | { data?: Account[] };
+      const accountList = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.flat)
+          ? raw.flat
+          : parseApiList<Account>(raw);
+      setAccounts(accountList.filter((a) => a.isActive !== false));
+      setCostCenters(parseApiList(costRes.data));
+      setBudgets(parseApiList(budgetRes.data));
       setVariance(varianceRes.data);
-      setRecurring(recurringRes.data ?? []);
-      setRates(ratesRes.data ?? []);
+      setRecurring(parseApiList(recurringRes.data));
+      setRates(parseApiList(ratesRes.data));
       setForecast(forecastRes.data);
       setConsolidation(consolidationRes.data);
     } catch (error) {

@@ -24,6 +24,7 @@ import { variantTableColumns } from "@/lib/shop-vertical";
 import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
 import { HEX_BTN } from "@/lib/app-button-classes";
+import { parseApiList } from "@/lib/parse-api-list";
 
 export type InventorySection = "stock" | "ledger" | "abc" | "dead" | "aging" | "transfers";
 
@@ -505,7 +506,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           api.get<{ data: InventoryItem[] }>("/inventory?limit=10000"),
           api.get<LedgerSummary>("/inventory/ledger/summary"),
         ]);
-        setStock(stockRes.data?.data ?? (stockRes.data as unknown as InventoryItem[]) ?? []);
+        setStock(parseApiList<InventoryItem>(stockRes.data));
         setSummary(summaryRes.data ?? null);
       }
       if (section === "ledger") {
@@ -513,7 +514,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           api.get<{ data: LedgerLog[] }>("/inventory/logs?limit=100"),
           api.get<LedgerSummary>("/inventory/ledger/summary"),
         ]);
-        setLogs(logsRes.data?.data ?? (logsRes.data as unknown as LedgerLog[]) ?? []);
+        setLogs(parseApiList<LedgerLog>(logsRes.data));
         setSummary(summaryRes.data ?? null);
       }
       if (section === "abc") {
