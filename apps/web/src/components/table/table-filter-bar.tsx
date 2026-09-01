@@ -55,7 +55,7 @@ export function TableFilterBar({
   return (
     <div
       className={cn(
-        "rounded-2xl border bg-card px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)]",
+        "rounded-2xl border bg-card px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]",
         className,
       )}
     >
@@ -68,7 +68,7 @@ export function TableFilterBar({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}
-              className="h-9 w-full rounded-xl border bg-background pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
+              className="h-10 w-full rounded-xl border bg-background pl-9 pr-8 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
             />
             {search ? (
               <button
@@ -84,7 +84,7 @@ export function TableFilterBar({
         )}
 
         {filters.map((f) => (
-          <label key={f.id} className="inline-flex h-9 items-center gap-1.5 rounded-xl border bg-background px-2.5 text-xs font-medium text-muted-foreground">
+          <label key={f.id} className="inline-flex h-10 items-center gap-1.5 rounded-xl border bg-background px-2.5 text-sm font-medium text-muted-foreground">
             <Filter className="h-3 w-3 shrink-0 opacity-70" />
             <span className="hidden sm:inline shrink-0">{f.title}</span>
             <select
@@ -111,16 +111,16 @@ export function TableFilterBar({
             variant="outline"
             size="sm"
             onClick={onClear}
-            className={`h-9 ${HEX_BTN} text-xs`}
+            className={`h-10 ${HEX_BTN} text-sm`}
           >
             <X className="h-3.5 w-3.5" />
             Clear
-            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">{activeCount}</span>
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs tabular-nums">{activeCount}</span>
           </Button>
         ) : null}
 
         {typeof resultCount === "number" && typeof totalCount === "number" ? (
-          <p className="ml-auto text-[11px] font-medium tabular-nums text-muted-foreground">
+          <p className="ml-auto text-xs font-medium tabular-nums text-muted-foreground">
             {hasActive ? (
               <>
                 {resultCount} of {totalCount}

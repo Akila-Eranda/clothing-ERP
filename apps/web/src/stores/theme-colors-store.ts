@@ -20,6 +20,7 @@ type ThemeColorsStore = ThemeColorsState & {
   setDarkAccent: (accent: DarkAccentChoice) => void;
   setCustomDarkAccent: (hex: string) => void;
   setColor: <K extends keyof ThemeColorsState>(key: K, value: ThemeColorsState[K]) => void;
+  patchColors: (partial: Partial<ThemeColorsState>) => void;
   reset: () => void;
   apply: () => void;
 };
@@ -56,6 +57,14 @@ export const useThemeColorsStore = create<ThemeColorsStore>()(
       setColor: (key, value) => {
         set((state) => {
           const next = { ...state, [key]: value } as ThemeColorsState;
+          applyThemeColors(next);
+          return next;
+        });
+      },
+
+      patchColors: (partial) => {
+        set((state) => {
+          const next = normalizeThemeColorsState({ ...state, ...partial });
           applyThemeColors(next);
           return next;
         });

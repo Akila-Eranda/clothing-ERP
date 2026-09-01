@@ -80,8 +80,18 @@
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;                   /* #F59E0B */
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;                     /* #0EA5E9 */
+    --info: 217 91% 53%;
     --info-foreground: 0 0% 100%;
+    /* Button tokens — overridden by Theme Customizer */
+    --btn-primary: var(--primary);
+    --btn-primary-hover: var(--primary-hover);
+    --btn-secondary: 210 68% 16%;
+    --btn-secondary-hover: 213 54% 24%;
+    --btn-success: 152 52% 48%;
+    --btn-danger: 18 82% 48%;
+    --btn-warning: 32 99% 63%;
+    --btn-destructive: 0 84% 60%;
+    --btn-info: 224 84% 51%;
     --border: 214 32% 91%;                   /* soft card edge ≈ rgba(15,23,42,.08) on white */
     --border-hsl: 214 32% 91%;
     --input: 215 20% 85%;                    /* stronger ≈ rgba(15,23,42,.12) */
@@ -184,6 +194,7 @@
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-size: 1rem;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -305,6 +316,40 @@
     @apply p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto bg-background min-h-full;
   }
 
+  /* Unified page titles + descriptions (list pages, hubs, admin) */
+  .dashboard-shell main h1,
+  .admin-app-shell main h1 {
+    font-size: clamp(1.75rem, 2.2vw, 2rem) !important;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: hsl(var(--foreground));
+  }
+  .dashboard-shell main h1 + p,
+  .admin-app-shell main h1 + p,
+  .page-shell h1 + p,
+  .page-shell .page-description {
+    font-size: 0.9375rem !important;
+    line-height: 1.45;
+    color: hsl(var(--muted-foreground));
+  }
+  .dashboard-shell main .page-kpi-value,
+  .page-shell .page-kpi-value,
+  .page-shell .grid .font-bold.tabular-nums.leading-none {
+    font-size: 1.5rem !important;
+    font-weight: 700;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .dashboard-shell main .page-kpi-label,
+  .page-shell .page-kpi-label,
+  .page-shell .grid p.text-muted-foreground.mt-1,
+  .page-shell .grid p.text-muted-foreground.font-medium.mt-1 {
+    font-size: 0.8125rem !important;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+  }
+
   /*
    * App-wide button shape — DreamsPOS rounded corners (5px).
    * POS overlay lives outside these shells and keeps its own styling.
@@ -329,13 +374,13 @@
     height: 2.25rem;
     padding-inline: 0.875rem;
     border-radius: 5px !important;
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     border: none !important;
     box-shadow: none !important;
     transition: filter 0.15s ease;
     color: #ffffff !important;
-    background: #092c4c !important;
+    background: hsl(var(--btn-secondary)) !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"] svg,
   .admin-app-shell .hex-section-tabs button[type="button"] svg {
@@ -343,7 +388,7 @@
   }
   .dashboard-shell .hex-section-tabs button[type="button"].is-active,
   .admin-app-shell .hex-section-tabs button[type="button"].is-active {
-    background: #fe9f43 !important;
+    background: hsl(var(--btn-primary)) !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"]:hover,
   .admin-app-shell .hex-section-tabs button[type="button"]:hover {
@@ -363,20 +408,20 @@
   }
   .dashboard-shell .hex-segment-control button[type="button"],
   .admin-app-shell .hex-segment-control button[type="button"] {
-    height: 2rem;
+    height: 2.125rem;
     padding-inline: 0.75rem;
     border-radius: 5px !important;
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 700;
     border: none !important;
     box-shadow: none !important;
     color: #ffffff !important;
-    background: #092c4c !important;
+    background: hsl(var(--btn-secondary)) !important;
     transition: filter 0.15s ease;
   }
   .dashboard-shell .hex-segment-control button[type="button"].is-active,
   .admin-app-shell .hex-segment-control button[type="button"].is-active {
-    background: #fe9f43 !important;
+    background: hsl(var(--btn-primary)) !important;
   }
   .dashboard-shell .hex-segment-control button[type="button"]:hover,
   .admin-app-shell .hex-segment-control button[type="button"]:hover {
@@ -503,11 +548,11 @@
   /* ── Modern data tables (all pages via [data-table-craft]) ──────────────
      One shell: toolbar → filters → rows → pagination. Hugs content. */
   [data-table-craft] {
-    --dt-row-h: 52px;
-    --dt-head-h: 42px;
-    --dt-pad-x: 1rem;
+    --dt-row-h: 58px;
+    --dt-head-h: 46px;
+    --dt-pad-x: 1.125rem;
     --dt-radius: 1rem;
-    --dt-control-h: 2.375rem;
+    --dt-control-h: 2.625rem;
     display: block;
     width: 100%;
     min-width: 0;
@@ -605,7 +650,7 @@
     max-width: 28rem;
     flex: 1 1 16rem;
     border-radius: 0.75rem;
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
   }
   [data-table-craft] > .max-md\:hidden .rounded-lg.border.bg-muted\/30 {
@@ -731,7 +776,7 @@
     padding: 0 var(--dt-pad-x);
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 700;
-    font-size: 0.6875rem;
+    font-size: 0.8125rem;
     line-height: 1.2;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -765,8 +810,8 @@
     height: var(--dt-row-h);
     padding: 0 var(--dt-pad-x);
     border-bottom: 1px solid hsl(var(--divider));
-    font-size: 0.8125rem;
-    line-height: 1.35;
+    font-size: 0.9375rem;
+    line-height: 1.4;
     color: hsl(var(--foreground));
     vertical-align: middle;
     overflow: hidden;
@@ -795,6 +840,17 @@
   }
   [data-table-craft] td .text-muted-foreground {
     color: hsl(var(--secondary-foreground));
+  }
+
+  /* Normalize per-cell text-xs overrides — keep table body even */
+  [data-table-craft] td .text-xs:not([class*="rounded-full"]):not([class*="badge"]) {
+    font-size: inherit;
+    line-height: inherit;
+  }
+  [data-table-craft] td .text-\[10px\],
+  [data-table-craft] td .text-\[11px\] {
+    font-size: 0.75rem;
+    line-height: 1.25;
   }
 
   /* Primary / link cells */
@@ -842,7 +898,7 @@
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
     border-radius: 0.75rem;
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
   }
   [data-table-craft] input:not([type="checkbox"]):not([type="radio"]):focus,
@@ -859,7 +915,7 @@
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
     border-radius: 5px;
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
   }
   .dark [data-table-craft] button[role="combobox"] {
     background: hsl(var(--secondary));
@@ -883,7 +939,7 @@
     height: 2rem !important;
     min-height: 2rem !important;
     border-radius: 5px !important;
-    font-size: 0.75rem !important;
+    font-size: 0.8125rem !important;
     font-weight: 600 !important;
     background: hsl(var(--card)) !important;
     border: 1px solid hsl(var(--border)) !important;
@@ -907,7 +963,7 @@
     height: 2rem !important;
     min-width: 2rem !important;
     min-height: 2rem !important;
-    font-size: 0.75rem !important;
+    font-size: 0.8125rem !important;
     font-weight: 600 !important;
     transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease !important;
     background: hsl(var(--card)) !important;
@@ -989,21 +1045,21 @@
     background: hsl(0 0% 8% / 0.92);
   }
   .enterprise-table th {
-    height: 42px;
-    padding: 0 1rem;
+    height: 46px;
+    padding: 0 1.125rem;
     border-bottom: 1px solid hsl(var(--border));
     font-weight: 600;
-    font-size: 0.6875rem;
+    font-size: 0.8125rem;
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: hsl(var(--muted-foreground));
     text-align: left;
   }
   .enterprise-table td {
-    height: 52px;
-    padding: 0 1rem;
+    height: 58px;
+    padding: 0 1.125rem;
     border-bottom: 1px solid hsl(var(--divider));
-    font-size: 0.8125rem;
+    font-size: 0.9375rem;
     vertical-align: middle;
   }
   .dark .enterprise-table td {
@@ -1017,6 +1073,46 @@
     background: hsl(var(--primary) / 0.04);
   }
   .dark .enterprise-table tbody tr:hover {
+    background: hsl(var(--primary) / 0.08);
+  }
+
+  /* Hub / report raw tables (w-full text-sm pattern — not ClientSideTable) */
+  .dashboard-shell main table.w-full.text-sm,
+  .admin-app-shell main table.w-full.text-sm {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: hsl(var(--card));
+  }
+  .dashboard-shell main table.w-full.text-sm th,
+  .admin-app-shell main table.w-full.text-sm th {
+    height: 46px;
+    padding: 0 1.125rem;
+    border-bottom: 1px solid hsl(var(--border));
+    font-weight: 700;
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: hsl(var(--muted-foreground));
+    text-align: left;
+    vertical-align: middle;
+  }
+  .dashboard-shell main table.w-full.text-sm td,
+  .admin-app-shell main table.w-full.text-sm td {
+    height: 58px;
+    padding: 0 1.125rem;
+    border-bottom: 1px solid hsl(var(--divider));
+    font-size: 0.9375rem;
+    line-height: 1.4;
+    color: hsl(var(--foreground));
+    vertical-align: middle;
+  }
+  .dashboard-shell main table.w-full.text-sm tbody tr:hover,
+  .admin-app-shell main table.w-full.text-sm tbody tr:hover {
+    background: hsl(var(--primary) / 0.04);
+  }
+  .dark .dashboard-shell main table.w-full.text-sm tbody tr:hover,
+  .dark .admin-app-shell main table.w-full.text-sm tbody tr:hover {
     background: hsl(var(--primary) / 0.08);
   }
 
@@ -1581,7 +1677,7 @@
 }
 .dark .dashboard-shell .hex-section-tabs button[type="button"].is-active,
 .dark .admin-app-shell .hex-section-tabs button[type="button"].is-active {
-  background: #fe9f43 !important;
+  background: hsl(var(--btn-primary)) !important;
   color: #ffffff !important;
 }
 .dark .dashboard-shell .hex-section-tabs button[type="button"].is-active svg,
@@ -1597,6 +1693,6 @@
 }
 .dark .dashboard-shell .hex-segment-control button[type="button"].is-active,
 .dark .admin-app-shell .hex-segment-control button[type="button"].is-active {
-  background: #fe9f43 !important;
+  background: hsl(var(--btn-primary)) !important;
   color: #ffffff !important;
 }

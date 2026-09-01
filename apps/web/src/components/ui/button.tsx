@@ -7,63 +7,67 @@ import { cn } from "@/lib/utils";
 const solidWhite =
   "text-white [&_svg]:text-white hover:text-white hover:[&_svg]:text-white dark:text-white dark:[&_svg]:text-white dark:hover:text-white dark:hover:[&_svg]:text-white";
 
-/** DreamsPOS retail palette — orange primary CTAs; neutral secondary in dark mode. */
-const dreamsOrange = "bg-[#fe9f43] hover:bg-[#fe9f43] dark:bg-[#fe9f43] dark:hover:bg-[#fe9f43]";
-const dreamsNavy = "bg-[#092c4c] hover:bg-[#092c4c] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:border dark:border-border";
+const btnPrimary =
+  "bg-[hsl(var(--btn-primary))] hover:bg-[hsl(var(--btn-primary-hover))] dark:bg-[hsl(var(--btn-primary))] dark:hover:bg-[hsl(var(--btn-primary-hover))]";
+
+const btnSecondary =
+  "bg-[hsl(var(--btn-secondary))] hover:bg-[hsl(var(--btn-secondary-hover))] dark:bg-[hsl(var(--btn-secondary))] dark:hover:bg-[hsl(var(--btn-secondary-hover))]";
+
+const btnSuccess =
+  "bg-[hsl(var(--btn-success))] hover:bg-[hsl(var(--btn-success))] dark:bg-[hsl(var(--btn-success))] dark:hover:bg-[hsl(var(--btn-success))]";
+
+const btnDanger =
+  "bg-[hsl(var(--btn-danger))] hover:bg-[hsl(var(--btn-danger))] dark:bg-[hsl(var(--btn-danger))] dark:hover:bg-[hsl(var(--btn-danger))]";
+
+const btnDestructive =
+  "bg-[hsl(var(--btn-destructive))] hover:bg-[hsl(var(--btn-destructive))] dark:bg-[hsl(var(--btn-destructive))] dark:hover:bg-[hsl(var(--btn-destructive))]";
+
+const btnInfo =
+  "bg-[hsl(var(--btn-info))] hover:bg-[hsl(var(--btn-info))] dark:bg-[hsl(var(--btn-info))] dark:hover:bg-[hsl(var(--btn-info))]";
+
+const btnWarning =
+  "bg-[hsl(var(--btn-warning))] hover:bg-[hsl(var(--btn-warning))] dark:bg-[hsl(var(--btn-warning))] dark:hover:bg-[hsl(var(--btn-warning))]";
 
 /**
  * App-wide button design system — the ONLY button module for dashboard / admin / hubs.
- *
- * Import: `import { Button } from "@/components/ui/button"`
- *
- * Prefer variants over one-off `className="bg-emerald-600 …"` overrides.
- * Exceptions: POS shell (`pos-overlay`) and print HTML keep local controls.
+ * Colors are driven by Theme Customizer CSS variables (`--btn-*`, `--primary`).
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[5px] text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fe9f43]/35 disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border-0 shadow-none hover:brightness-105 active:scale-[0.98]",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-[5px] text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[hsl(var(--btn-primary)/0.35)] disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border-0 shadow-none hover:brightness-105 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        /** Primary CTA — Add New, Save, Create */
-        default: cn(solidWhite, dreamsOrange),
-        /** POS Terminal — navy */
-        pos: cn(solidWhite, dreamsNavy),
-        /** Secondary — Refresh, filters, View */
-        outline: cn(solidWhite, dreamsNavy),
+        default: cn(solidWhite, btnPrimary),
+        pos: cn(solidWhite, btnSecondary),
+        outline: cn(
+          solidWhite,
+          btnSecondary,
+          "dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground dark:hover:text-foreground dark:hover:[&_svg]:text-foreground",
+        ),
         secondary: cn(
           solidWhite,
-          "bg-[#1e3a5f] hover:bg-[#1e3a5f] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground",
+          btnSecondary,
+          "dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground dark:hover:text-foreground dark:hover:[&_svg]:text-foreground",
         ),
         ghost: cn(
           solidWhite,
-          "bg-[#092c4c]/85 hover:bg-[#092c4c] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground",
+          "bg-[hsl(var(--btn-secondary)/0.85)] hover:bg-[hsl(var(--btn-secondary))]",
+          "dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground dark:hover:text-foreground dark:hover:[&_svg]:text-foreground",
         ),
         link: "font-medium text-primary underline-offset-4 hover:underline border-transparent shadow-none bg-transparent hover:brightness-100 active:scale-100",
-        gradient: cn(solidWhite, dreamsOrange),
-        success: cn(
-          solidWhite,
-          "bg-[#3eb780] hover:bg-[#3eb780] dark:bg-[#3eb780] dark:hover:bg-[#3eb780]",
-        ),
-        warning: cn(solidWhite, dreamsOrange),
-        danger: cn(
-          solidWhite,
-          "bg-[#e04f16] hover:bg-[#e04f16] dark:bg-[#e04f16] dark:hover:bg-[#e04f16]",
-        ),
-        destructive: cn(
-          solidWhite,
-          "bg-red-600 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-600",
-        ),
-        info: cn(
-          solidWhite,
-          "bg-[#155eef] hover:bg-[#155eef] dark:bg-[#155eef] dark:hover:bg-[#155eef]",
-        ),
+        gradient: cn(solidWhite, btnPrimary),
+        success: cn(solidWhite, btnSuccess),
+        warning: cn(solidWhite, btnWarning),
+        danger: cn(solidWhite, btnDanger),
+        destructive: cn(solidWhite, btnDestructive),
+        info: cn(solidWhite, btnInfo),
         violet: cn(
           solidWhite,
           "bg-violet-600 hover:bg-violet-600 dark:bg-violet-600 dark:hover:bg-violet-600",
         ),
         chip: cn(
           solidWhite,
-          "bg-[#646b72] hover:bg-[#092c4c] dark:bg-[#646b72] dark:hover:bg-[#092c4c]",
+          "bg-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--btn-secondary))] dark:bg-[hsl(var(--muted-foreground))] dark:hover:bg-[hsl(var(--btn-secondary))]",
         ),
       },
       size: {

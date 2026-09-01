@@ -17,7 +17,15 @@ const badgeVariants = cva(
         destructive:
           cn(solidBadge, "border-red-700 bg-red-600 dark:border-red-500 dark:bg-red-600"),
         outline:
-          cn(solidBadge, "border-indigo-700 bg-indigo-600 dark:border-indigo-500 dark:bg-indigo-600"),
+          "border-border bg-background text-foreground shadow-none dark:border-border dark:bg-card/60 dark:text-foreground",
+        softSuccess:
+          "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-500/25 dark:bg-emerald-500/15 dark:text-emerald-400",
+        softWarning:
+          "border-amber-500/35 bg-amber-500/10 text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-400",
+        softDanger:
+          "border-red-500/30 bg-red-500/10 text-red-700 dark:border-red-500/25 dark:bg-red-500/15 dark:text-red-400",
+        softInfo:
+          "border-sky-500/30 bg-sky-500/10 text-sky-800 dark:border-sky-500/25 dark:bg-sky-500/15 dark:text-sky-400",
         success:
           cn(solidBadge, "border-emerald-700 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-600"),
         warning:

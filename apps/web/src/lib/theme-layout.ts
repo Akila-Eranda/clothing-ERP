@@ -54,6 +54,159 @@ export const DEFAULT_THEME_LAYOUT: ThemeLayoutState = {
   topbarSkin: "white",
 };
 
+export type ChromeSkinPalette = {
+  bg: string;
+  fg: string;
+  muted: string;
+  border: string;
+  activeFg: string;
+  logoBg: string;
+};
+
+const LIGHT_SIDEBAR_PALETTE: ChromeSkinPalette = {
+  bg: "#FFFFFF",
+  fg: "#212B36",
+  muted: "#646B72",
+  border: "#E6EAED",
+  activeFg: "#FE9F43",
+  logoBg: "#FFFFFF",
+};
+
+const SNOW_SIDEBAR_PALETTE: ChromeSkinPalette = {
+  bg: "#FBFBFB",
+  fg: "#1F2937",
+  muted: "#6B7280",
+  border: "#E8EAED",
+  activeFg: "#FE9F43",
+  logoBg: "#FBFBFB",
+};
+
+const COLORED_SIDEBAR_TEXT: Omit<ChromeSkinPalette, "bg" | "logoBg"> = {
+  fg: "#FFFFFF",
+  muted: "#B8C4CE",
+  border: "rgba(255,255,255,0.12)",
+  activeFg: "#FFFFFF",
+};
+
+/** Full chrome palette per sidebar skin (DreamsPOS presets). */
+export const SIDEBAR_SKIN_PALETTES: Record<SidebarSkin, ChromeSkinPalette> = {
+  light: LIGHT_SIDEBAR_PALETTE,
+  sidebarcolorone: SNOW_SIDEBAR_PALETTE,
+  sidebarcolortwo: { bg: "#505969", logoBg: "#505969", ...COLORED_SIDEBAR_TEXT },
+  sidebarcolorthree: { bg: "#2C2C2C", logoBg: "#2C2C2C", ...COLORED_SIDEBAR_TEXT },
+  sidebarcolorfour: { bg: "#1D51B6", logoBg: "#1D51B6", ...COLORED_SIDEBAR_TEXT },
+  sidebarcolorfive: { bg: "#6C0BA9", logoBg: "#6C0BA9", ...COLORED_SIDEBAR_TEXT },
+  sidebarcolorsix: { bg: "#0B897D", logoBg: "#0B897D", ...COLORED_SIDEBAR_TEXT },
+  sidebarcolorseven: {
+    bg: "linear-gradient(180deg, #4B749F 0%, #243748 100%)",
+    logoBg: "#4B749F",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcoloreight: {
+    bg: "linear-gradient(180deg, #18ACCF 0%, #0F59AD 100%)",
+    logoBg: "#18ACCF",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcolornine: {
+    bg: "linear-gradient(180deg, #7D90B8 0%, #103783 100%)",
+    logoBg: "#7D90B8",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcolorten: {
+    bg: "linear-gradient(180deg, #8E4BEB 0%, #472282 100%)",
+    logoBg: "#8E4BEB",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcoloreleven: {
+    bg: "linear-gradient(180deg, #309F92 0%, #0C5666 100%)",
+    logoBg: "#309F92",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcolortwelve: {
+    bg: "linear-gradient(90deg, #FF9966 1.92%, #FF5E62 100%)",
+    logoBg: "#FF9966",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcolorthirteen: {
+    bg: "linear-gradient(90deg, #760762 1.92%, #883907 100%)",
+    logoBg: "#760762",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+  sidebarcolorfourteen: {
+    bg: "linear-gradient(90deg, #4471CC 1.92%, #AE7BD4 100%)",
+    logoBg: "#4471CC",
+    ...COLORED_SIDEBAR_TEXT,
+  },
+};
+
+function swatchDisplayHex(css: string): string {
+  if (/^#[0-9A-Fa-f]{6}$/.test(css.trim())) return css.trim().toUpperCase();
+  const match = css.match(/#[0-9A-Fa-f]{6}/i);
+  return match?.[0]?.toUpperCase() ?? "#FFFFFF";
+}
+
+function paletteToChromePatch(
+  palette: ChromeSkinPalette,
+  mode: "light" | "dark",
+): Partial<import("@/lib/theme-colors").ThemeColorsState> {
+  const bgCss = palette.bg.includes("gradient") ? palette.bg : "";
+  const bgHex = swatchDisplayHex(palette.bg);
+  if (mode === "light") {
+    return {
+      lightChromeBg: bgHex,
+      lightChromeBgCss: bgCss,
+      lightChromeFg: palette.fg,
+      lightChromeBorder: palette.border,
+      lightChromeMuted: palette.muted,
+      lightChromeActive: palette.activeFg,
+      lightChromeLogoBg: palette.logoBg,
+    };
+  }
+  return {
+    darkChromeBg: bgHex,
+    darkChromeBgCss: bgCss,
+    darkChromeFg: palette.fg,
+    darkChromeBorder: palette.border,
+    darkChromeMuted: palette.muted,
+    darkChromeActive: palette.activeFg,
+    darkChromeLogoBg: palette.logoBg,
+  };
+}
+
+export function sidebarSkinToSidebarId(topbarSkin: TopbarSkin): SidebarSkin {
+  if (topbarSkin === "white") return "light";
+  if (topbarSkin === "topbarcolorone") return "sidebarcolorone";
+  return topbarSkin.replace("topbar", "sidebar") as SidebarSkin;
+}
+
+/** Map a layout skin to theme color store fields for the active color mode. */
+export function getSidebarSkinChromePatch(
+  skin: SidebarSkin,
+  isDarkMode: boolean,
+): Partial<import("@/lib/theme-colors").ThemeColorsState> {
+  if (isDarkMode && isDefaultLightSidebar(skin)) {
+    return paletteToChromePatch(
+      {
+        bg: DREAMSPOS_DARK_CHROME.bg,
+        fg: DREAMSPOS_DARK_CHROME.fg,
+        muted: DREAMSPOS_DARK_CHROME.muted,
+        border: DREAMSPOS_DARK_CHROME.border,
+        activeFg: DREAMSPOS_DARK_CHROME.activeFg,
+        logoBg: DREAMSPOS_DARK_CHROME.logoBg,
+      },
+      "dark",
+    );
+  }
+  return paletteToChromePatch(SIDEBAR_SKIN_PALETTES[skin], isDarkMode ? "dark" : "light");
+}
+
+export function getTopbarSkinChromePatch(
+  skin: TopbarSkin,
+  isDarkMode: boolean,
+): Partial<import("@/lib/theme-colors").ThemeColorsState> {
+  return getSidebarSkinChromePatch(sidebarSkinToSidebarId(skin), isDarkMode);
+}
+
 /** Solid + gradient sidebar swatches (from DreamsPOS variables). */
 export const SIDEBAR_SKIN_SWATCHES: { id: SidebarSkin; label: string; css: string }[] = [
   { id: "light", label: "Light", css: "#F8FAFC" },

@@ -410,9 +410,9 @@ export default function CashManagementPage() {
       label: "Shift Status",
       value: isViewingToday && shiftOpen ? "Open" : isViewingToday && shiftPending ? "Pending" : `${today?.closedToday ?? 0} closed`,
       icon: isViewingToday && shiftOpen ? CheckCircle2 : Clock,
-      bg: isViewingToday && shiftOpen ? "bg-emerald-600" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
+      bg: isViewingToday && shiftOpen ? "bg-primary" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
       tint: isViewingToday && shiftOpen
-        ? "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent"
+        ? "border-primary/20 bg-gradient-to-br from-primary/5 to-white dark:border-primary/20 dark:from-primary/10 dark:to-transparent"
         : isViewingToday && shiftPending
           ? "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent"
           : "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
@@ -532,7 +532,7 @@ export default function CashManagementPage() {
         <div className="bg-card border-b sticky top-0 z-10">
           <div className="px-6 py-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="bg-emerald-600 rounded-xl p-2.5 shrink-0">
+              <div className="bg-primary rounded-xl p-2.5 shrink-0">
                 <Banknote className="h-5 w-5 text-white" />
               </div>
               <div className="min-w-0">
@@ -569,7 +569,7 @@ export default function CashManagementPage() {
                 <TabsTrigger
                   key={t.id}
                   value={t.id}
-                  className="h-12 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-emerald-600 data-[state=active]:text-emerald-600 data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors gap-1.5"
+                  className="h-12 px-4 rounded-none text-sm font-medium text-muted-foreground border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:text-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none hover:text-foreground transition-colors gap-1.5"
                 >
                   <t.icon className="h-3.5 w-3.5" />
                   {t.label}
@@ -588,7 +588,7 @@ export default function CashManagementPage() {
                 key={p.label}
                 type="button"
                 size="sm"
-                variant={dateRange.from === p.from && dateRange.to === p.to ? "success" : "chip"}
+                variant={dateRange.from === p.from && dateRange.to === p.to ? "default" : "secondary"}
                 onClick={() => applyPreset(p.from, p.to)}
               >
                 {p.label}
@@ -643,7 +643,7 @@ export default function CashManagementPage() {
                     Approve now
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl border-amber-500/60 text-amber-700 dark:text-amber-400" onClick={() => setTab("variance")}>
+                <Button size="sm" variant="secondary" className="h-9 px-4 rounded-xl" onClick={() => setTab("variance")}>
                   Review variances
                 </Button>
               </div>
@@ -692,7 +692,7 @@ export default function CashManagementPage() {
                       <PlayCircle className="h-4 w-4" /> Start Shift
                     </Button>
                   ) : (
-                    <Button variant="outline" className="h-10 px-5 rounded-xl" onClick={() => setTab("variance")}>
+                    <Button variant="secondary" className="h-10 px-5 rounded-xl" onClick={() => setTab("variance")}>
                       View pending variances
                     </Button>
                   )}
@@ -703,7 +703,7 @@ export default function CashManagementPage() {
                 <Card className="lg:col-span-2 border shadow-sm">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                      <Zap className="h-4 w-4 text-emerald-600" /> Live Shift Summary
+                      <Zap className="h-4 w-4 text-primary" /> Live Shift Summary
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3 text-sm">
@@ -735,7 +735,7 @@ export default function CashManagementPage() {
                       <RefreshCw className="h-3 w-3" /> Auto-refreshes every 30s · POS sales recorded automatically
                     </p>
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="flex-1" onClick={() => setTab("movements")}>Cash In/Out</Button>
+                      <Button size="sm" variant="secondary" className="flex-1" onClick={() => setTab("movements")}>Cash In/Out</Button>
                       <Button size="sm" variant="danger" className="flex-1" onClick={() => setTab("close")}>Close Shift</Button>
                     </div>
                   </CardContent>
@@ -744,7 +744,7 @@ export default function CashManagementPage() {
                 <Card className="lg:col-span-3 border shadow-sm">
                   <CardHeader className="pb-3 flex flex-row items-center justify-between">
                     <CardTitle className="text-sm font-semibold">Activity Log</CardTitle>
-                    <Badge variant="outline" className="text-[10px]">{movements.length} entries</Badge>
+                    <Badge variant="outline" className="text-[10px] font-medium">{movements.length} entries</Badge>
                   </CardHeader>
                   <CardContent className="max-h-[420px] overflow-y-auto">
                     <CashMovementLedger movements={movements} emptyMessage="Sales and movements appear here automatically" />
@@ -759,21 +759,21 @@ export default function CashManagementPage() {
             <Card className="card-hover">
               <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <PlayCircle className="h-4 w-4 text-emerald-600" /> Opening Cash
+                  <PlayCircle className="h-4 w-4 text-primary" /> Opening Cash
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4 max-w-xl">
                 {shiftOpen ? (
-                  <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-5">
+                  <div className="rounded-xl border border-primary/25 bg-primary/5 p-5">
                     <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                      <span className="font-semibold text-emerald-700 dark:text-emerald-400">Shift is open</span>
+                      <CheckCircle2 className="h-5 w-5 text-primary" />
+                      <span className="font-semibold text-primary">Shift is open</span>
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Opened with LKR {formatNumber(active!.openingCash)} at{" "}
                       {new Date(active!.openingTime).toLocaleTimeString("en-LK")}
                     </p>
-                    <Button className="mt-4 h-10 px-5 rounded-xl" variant="outline" onClick={() => setTab("overview")}>Go to Overview</Button>
+                    <Button className="mt-4 h-10 px-5 rounded-xl" variant="secondary" onClick={() => setTab("overview")}>Go to Overview</Button>
                   </div>
                 ) : shiftPending ? (
                   <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-3">
@@ -795,10 +795,10 @@ export default function CashManagementPage() {
                 ) : (
                   <>
                     {suggestion?.suggestedOpening != null && (
-                      <div className="rounded-xl border border-blue-500/30 bg-blue-500/5 p-4 flex items-start gap-3">
-                        <Zap className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="rounded-xl border border-sky-500/25 bg-sky-500/5 p-4 flex items-start gap-3">
+                        <Zap className="h-5 w-5 text-sky-600 dark:text-sky-400 shrink-0 mt-0.5" />
                         <div className="flex-1">
-                          <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">Suggested opening float</p>
+                          <p className="text-sm font-semibold text-sky-800 dark:text-sky-300">Suggested opening float</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             From last close
                             {suggestion.lastClosedAt && ` (${new Date(suggestion.lastClosedAt).toLocaleDateString("en-LK")})`}
@@ -808,8 +808,8 @@ export default function CashManagementPage() {
                           </p>
                           <Button
                             size="sm"
-                            variant="outline"
-                            className="mt-2 h-9 px-3.5 rounded-xl text-xs border-blue-500/50"
+                            variant="secondary"
+                            className="mt-2 h-9 px-3.5 rounded-xl text-xs"
                             onClick={() => setOpeningCash(String(suggestion.suggestedOpening))}
                           >
                             Use LKR {formatNumber(suggestion.suggestedOpening)}
@@ -834,7 +834,7 @@ export default function CashManagementPage() {
                       {counters.length === 0 ? (
                         <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground space-y-2">
                           <p>No counters yet.</p>
-                          <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl" onClick={() => setTab("counters")}>
+                          <Button size="sm" variant="secondary" className="h-9 px-4 rounded-xl" onClick={() => setTab("counters")}>
                             Create counters
                           </Button>
                         </div>
@@ -916,7 +916,7 @@ export default function CashManagementPage() {
                 <CardContent className="py-10 text-center text-muted-foreground">
                   <StopCircle className="h-12 w-12 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">No open shift. Start a shift from Cash Open first.</p>
-                  <Button className="mt-4 h-10 px-5 rounded-xl" variant="outline" onClick={() => setTab("open")}>Cash Open</Button>
+                  <Button className="mt-4 h-10 px-5 rounded-xl" variant="secondary" onClick={() => setTab("open")}>Cash Open</Button>
                 </CardContent>
               </Card>
             ) : (
@@ -971,7 +971,7 @@ export default function CashManagementPage() {
                           </span>
                         </div>
                         {needsApprovalPreview && (
-                          <Badge variant="outline" className="mt-2 border-amber-500 text-amber-600">
+                          <Badge variant="softWarning" className="mt-2">
                             Pending approval — variance &gt; LKR {VARIANCE_THRESHOLD}
                           </Badge>
                         )}
@@ -1109,11 +1109,16 @@ export default function CashManagementPage() {
                             )}>
                               {(r.variance ?? 0) >= 0 ? "+" : ""}{formatNumber(r.variance ?? 0)}
                             </span>
-                            <Button size="icon-sm" variant="ghost" className="shrink-0" onClick={() => setDetailShiftId(r.id)}>
+                            <Button
+                              size="icon-sm"
+                              variant="secondary"
+                              className="shrink-0 !bg-transparent !shadow-none border-0 text-muted-foreground hover:!bg-muted hover:text-foreground dark:!bg-transparent"
+                              onClick={() => setDetailShiftId(r.id)}
+                            >
                               <Eye className="h-3.5 w-3.5" />
                             </Button>
                             {r.status === "PENDING_APPROVAL" && (
-                              <Button size="sm" variant="outline" className="h-9 px-3 rounded-xl text-xs" onClick={() => void handleApprove(r.id)}>
+                              <Button size="sm" variant="success" className="h-9 px-3 rounded-xl text-xs" onClick={() => void handleApprove(r.id)}>
                                 Approve
                               </Button>
                             )}
@@ -1137,7 +1142,7 @@ export default function CashManagementPage() {
               <Card className="card-hover">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <ArrowDownCircle className="h-4 w-4 text-emerald-600" /> Record Movement
+                    <ArrowDownCircle className="h-4 w-4 text-primary" /> Record Movement
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1150,7 +1155,7 @@ export default function CashManagementPage() {
                           <Button
                             key={t}
                             size="sm"
-                            variant={movementType === t ? "success" : "outline"}
+                            variant={movementType === t ? "success" : "secondary"}
                             className="h-10 px-4 rounded-xl"
                             onClick={() => setMovementType(t)}
                           >

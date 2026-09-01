@@ -663,7 +663,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                 </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="enterprise-table w-full">
                       <thead>
                         <tr className="border-y bg-muted/30">
                           <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Date</th>
@@ -703,7 +703,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                   <button onClick={() => go("accounts")} className="text-xs text-blue-600 hover:underline font-medium">View All</button>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <table className="w-full">
+                  <table className="enterprise-table w-full">
                     <thead>
                       <tr className="border-y bg-muted/30">
                         <th className="px-4 py-2.5 text-left text-xs font-semibold text-muted-foreground">Account Name</th>
@@ -1185,7 +1185,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
               <button onClick={() => setTrialOpen(false)} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
             </div>
             <div className="overflow-auto flex-1 p-4">
-              <table className="w-full text-sm">
+              <table className="enterprise-table w-full text-sm">
                 <thead><tr className="text-xs uppercase text-muted-foreground border-b"><th className="text-left py-2">Code</th><th className="text-left py-2">Account</th><th className="text-left py-2">Type</th><th className="text-right py-2">Balance</th></tr></thead>
                 <tbody>
                   {trialBalance.map((row) => (

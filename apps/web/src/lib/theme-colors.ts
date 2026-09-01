@@ -38,10 +38,30 @@ export type ThemeColorsState = {
   darkChromeMuted: string;
   darkChromeActive: string;
   darkChromeLogoBg: string;
+
+  lightChromeBg: string;
+  /** Gradient or image CSS for sidebar/header bg; empty = solid `lightChromeBg`. */
+  lightChromeBgCss: string;
+  lightChromeFg: string;
+  lightChromeBorder: string;
+  lightChromeMuted: string;
+  lightChromeActive: string;
+  lightChromeLogoBg: string;
+
+  darkChromeBgCss: string;
+
+  /** System button palette (applies dashboard + admin; primary follows Brand accent) */
+  buttonSecondary: string;
+  buttonSecondaryHover: string;
+  buttonSuccess: string;
+  buttonDanger: string;
+  buttonWarning: string;
+  buttonDestructive: string;
+  buttonInfo: string;
 };
 
 export const THEME_COLORS_STORAGE_KEY = "hexalyte-theme-colors-v1";
-export const THEME_COLORS_STORE_VERSION = 2;
+export const THEME_COLORS_STORE_VERSION = 5;
 
 /** Near-white canvas values from older builds — migrate to DreamsPOS gray. */
 const LEGACY_LIGHT_CANVAS = new Set([
@@ -76,6 +96,24 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   darkChromeMuted: "#6B7280",
   darkChromeActive: "#FE9F43",
   darkChromeLogoBg: "#141414",
+
+  lightChromeBg: "#FFFFFF",
+  lightChromeBgCss: "",
+  lightChromeFg: "#0F172A",
+  lightChromeBorder: "#E6EAED",
+  lightChromeMuted: "#64748B",
+  lightChromeActive: "#FE9F43",
+  lightChromeLogoBg: "#FFFFFF",
+
+  darkChromeBgCss: "",
+
+  buttonSecondary: "#092C4C",
+  buttonSecondaryHover: "#1E3A5F",
+  buttonSuccess: "#3EB780",
+  buttonDanger: "#E04F16",
+  buttonWarning: "#FE9F43",
+  buttonDestructive: "#EF4444",
+  buttonInfo: "#155EEF",
 };
 
 export function normalizeThemeColorsState(
@@ -86,6 +124,13 @@ export function normalizeThemeColorsState(
   if (!bg || LEGACY_LIGHT_CANVAS.has(bg)) {
     merged.lightBackground = DEFAULT_THEME_COLORS.lightBackground;
   }
+  merged.buttonSecondary ??= DEFAULT_THEME_COLORS.buttonSecondary;
+  merged.buttonSecondaryHover ??= DEFAULT_THEME_COLORS.buttonSecondaryHover;
+  merged.buttonSuccess ??= DEFAULT_THEME_COLORS.buttonSuccess;
+  merged.buttonDanger ??= DEFAULT_THEME_COLORS.buttonDanger;
+  merged.buttonWarning ??= DEFAULT_THEME_COLORS.buttonWarning;
+  merged.buttonDestructive ??= DEFAULT_THEME_COLORS.buttonDestructive;
+  merged.buttonInfo ??= DEFAULT_THEME_COLORS.buttonInfo;
   return merged;
 }
 
@@ -238,8 +283,8 @@ export function applyThemeColors(state: ThemeColorsState) {
   root.style.setProperty("--primary-soft", accentSoft);
   root.style.setProperty("--ring", accentHsl);
   root.style.setProperty("--chart-1", accentHsl);
-  root.style.setProperty("--sidebar-background", secondaryBg);
-  root.style.setProperty("--sidebar-foreground", fg);
+  root.style.setProperty("--sidebar-background", isDark ? secondaryBg : hexToHslChannels(state.lightChromeBg));
+  root.style.setProperty("--sidebar-foreground", isDark ? fg : hexToHslChannels(state.lightChromeFg));
   root.style.setProperty("--sidebar-primary", accentHsl);
   root.style.setProperty("--sidebar-ring", accentHsl);
   root.style.setProperty("--sidebar-border", border);
@@ -260,52 +305,57 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--sidebar-accent", accentSoft);
     root.style.setProperty("--sidebar-accent-foreground", accentHsl);
 
-    /* Keep sidebar/header chrome aligned with dark shell */
-    root.style.setProperty("--retail-sidebar-bg", state.darkChromeBg);
+    const darkBg = state.darkChromeBgCss.trim() || state.darkChromeBg;
+    root.style.setProperty("--retail-sidebar-bg", darkBg);
     root.style.setProperty("--retail-sidebar-fg", state.darkChromeFg);
     root.style.setProperty("--retail-sidebar-muted", state.darkChromeMuted);
     root.style.setProperty("--retail-sidebar-border", state.darkChromeBorder);
     root.style.setProperty("--retail-sidebar-hover", "rgba(255, 255, 255, 0.05)");
     root.style.setProperty("--retail-sidebar-active-bg", hexToRgba(state.darkChromeActive, 0.14));
     root.style.setProperty("--retail-sidebar-active-fg", state.darkChromeActive);
-    root.style.setProperty("--retail-topbar-bg", state.darkChromeBg);
+    root.style.setProperty("--retail-topbar-bg", darkBg);
     root.style.setProperty("--retail-topbar-fg", state.darkChromeFg);
     root.style.setProperty("--retail-topbar-border", state.darkChromeBorder);
+
+    root.style.setProperty("--chrome-bg", darkBg);
+    root.style.setProperty("--chrome-fg", state.darkChromeFg);
+    root.style.setProperty("--chrome-border", state.darkChromeBorder);
+    root.style.setProperty("--chrome-muted", state.darkChromeMuted);
+    root.style.setProperty("--chrome-active-fg", state.darkChromeActive);
+    root.style.setProperty("--chrome-active-bg", hexToRgba(state.darkChromeActive, 0.14));
+    root.style.setProperty("--chrome-hover", "rgba(255, 255, 255, 0.05)");
+    root.style.setProperty("--chrome-logo-bg", state.darkChromeLogoBg);
   } else {
     const preset = getAccentPreset(
       state.lightAccent === "custom" ? DEFAULT_ACCENT : state.lightAccent,
     );
+    const lightActive = state.lightChromeActive || preset.hex;
+    const lightBg = state.lightChromeBgCss.trim() || state.lightChromeBg;
     root.style.setProperty("--accent", preset.softBg);
     root.style.setProperty("--accent-foreground", preset.primaryHover);
     root.style.setProperty("--sidebar-accent", preset.softBg);
     root.style.setProperty("--sidebar-accent-foreground", preset.activeTextLight);
-    root.style.setProperty("--retail-sidebar-active-bg", "rgba(254, 159, 67, 0.08)");
-    root.style.setProperty("--retail-sidebar-active-fg", "#FE9F43");
 
-    root.style.removeProperty("--retail-sidebar-bg");
-    root.style.removeProperty("--retail-sidebar-fg");
-    root.style.removeProperty("--retail-sidebar-muted");
-    root.style.removeProperty("--retail-sidebar-border");
-    root.style.removeProperty("--retail-sidebar-hover");
-    root.style.removeProperty("--retail-sidebar-active-bg");
-    root.style.removeProperty("--retail-sidebar-active-fg");
-    root.style.removeProperty("--retail-topbar-bg");
-    root.style.removeProperty("--retail-topbar-fg");
-    root.style.removeProperty("--retail-topbar-border");
+    root.style.setProperty("--retail-sidebar-bg", lightBg);
+    root.style.setProperty("--retail-sidebar-fg", state.lightChromeFg);
+    root.style.setProperty("--retail-sidebar-muted", state.lightChromeMuted);
+    root.style.setProperty("--retail-sidebar-border", state.lightChromeBorder);
+    root.style.setProperty("--retail-sidebar-hover", hexToRgba(state.lightChromeFg, 0.06));
+    root.style.setProperty("--retail-sidebar-active-bg", hexToRgba(lightActive, 0.1));
+    root.style.setProperty("--retail-sidebar-active-fg", lightActive);
+    root.style.setProperty("--retail-topbar-bg", lightBg);
+    root.style.setProperty("--retail-topbar-fg", state.lightChromeFg);
+    root.style.setProperty("--retail-topbar-border", state.lightChromeBorder);
+
+    root.style.setProperty("--chrome-bg", lightBg);
+    root.style.setProperty("--chrome-fg", state.lightChromeFg);
+    root.style.setProperty("--chrome-border", state.lightChromeBorder);
+    root.style.setProperty("--chrome-muted", state.lightChromeMuted);
+    root.style.setProperty("--chrome-active-fg", lightActive);
+    root.style.setProperty("--chrome-active-bg", hexToRgba(lightActive, 0.1));
+    root.style.setProperty("--chrome-hover", hexToRgba(state.lightChromeFg, 0.06));
+    root.style.setProperty("--chrome-logo-bg", state.lightChromeLogoBg);
   }
-
-  /* Chrome (sidebar/header in dark default skins) */
-  root.style.setProperty("--chrome-bg", state.darkChromeBg);
-  root.style.setProperty("--chrome-fg", state.darkChromeFg);
-  root.style.setProperty("--chrome-border", state.darkChromeBorder);
-  root.style.setProperty("--chrome-muted", state.darkChromeMuted);
-  root.style.setProperty("--chrome-active-fg", state.darkChromeActive);
-  root.style.setProperty(
-    "--chrome-active-bg",
-    hexToRgba(state.darkChromeActive, 0.14),
-  );
-  root.style.setProperty("--chrome-hover", "rgba(255, 255, 255, 0.05)");
-  root.style.setProperty("--chrome-logo-bg", state.darkChromeLogoBg);
 
   /* react-table-craft tokens */
   root.style.setProperty("--tc-background", bg);
@@ -324,6 +374,22 @@ export function applyThemeColors(state: ThemeColorsState) {
   root.style.setProperty("--tc-border", border);
   root.style.setProperty("--tc-input", input);
   root.style.setProperty("--tc-ring", accentHsl);
+
+  /* Buttons — primary follows brand accent; other variants from customizer */
+  root.style.setProperty("--btn-primary", accentHsl);
+  root.style.setProperty("--btn-primary-hover", accentHover);
+  root.style.setProperty("--btn-secondary", hexToHslChannels(state.buttonSecondary));
+  root.style.setProperty("--btn-secondary-hover", hexToHslChannels(state.buttonSecondaryHover));
+  root.style.setProperty("--btn-success", hexToHslChannels(state.buttonSuccess));
+  root.style.setProperty("--btn-danger", hexToHslChannels(state.buttonDanger));
+  root.style.setProperty("--btn-warning", hexToHslChannels(state.buttonWarning));
+  root.style.setProperty("--btn-destructive", hexToHslChannels(state.buttonDestructive));
+  root.style.setProperty("--btn-info", hexToHslChannels(state.buttonInfo));
+
+  root.style.setProperty("--success", hexToHslChannels(state.buttonSuccess));
+  root.style.setProperty("--destructive", hexToHslChannels(state.buttonDestructive));
+  root.style.setProperty("--warning", hexToHslChannels(state.buttonWarning));
+  root.style.setProperty("--info", hexToHslChannels(state.buttonInfo));
 
   root.dataset.accent = resolveAccentId(state, isDark);
 }
@@ -368,12 +434,18 @@ export function clearThemeColorOverrides() {
     "--sidebar-ring", "--sidebar-border", "--sidebar-active-text", "--sidebar-active-text-dark",
     "--sidebar-active-icon-dark", "--primary-glow", "--accent", "--accent-foreground",
     "--sidebar-accent", "--sidebar-accent-foreground",
+    "--retail-sidebar-bg", "--retail-sidebar-fg", "--retail-sidebar-muted",
+    "--retail-sidebar-border", "--retail-sidebar-hover",
+    "--retail-sidebar-active-bg", "--retail-sidebar-active-fg",
+    "--retail-topbar-bg", "--retail-topbar-fg", "--retail-topbar-border",
     "--chrome-bg", "--chrome-fg", "--chrome-border", "--chrome-muted",
     "--chrome-active-fg", "--chrome-active-bg", "--chrome-hover", "--chrome-logo-bg",
     "--tc-background", "--tc-foreground", "--tc-card", "--tc-card-foreground",
     "--tc-popover", "--tc-popover-foreground", "--tc-primary", "--tc-secondary",
     "--tc-secondary-foreground", "--tc-muted", "--tc-muted-foreground", "--tc-accent",
     "--tc-accent-foreground", "--tc-border", "--tc-input", "--tc-ring",
+    "--btn-primary", "--btn-primary-hover", "--btn-secondary", "--btn-secondary-hover",
+    "--btn-success", "--btn-danger", "--btn-warning", "--btn-destructive", "--btn-info",
   ];
   for (const prop of props) root.style.removeProperty(prop);
 }

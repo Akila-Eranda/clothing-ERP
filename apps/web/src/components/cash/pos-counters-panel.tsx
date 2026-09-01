@@ -121,7 +121,7 @@ export function PosCountersPanel() {
       <Card className="card-hover">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Plus className="h-4 w-4 text-emerald-600" /> Add cashier counter
+            <Plus className="h-4 w-4 text-primary" /> Add cashier counter
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -166,7 +166,7 @@ export function PosCountersPanel() {
       <Card className="card-hover">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
-            <Monitor className="h-4 w-4 text-emerald-600" /> Branch counters
+            <Monitor className="h-4 w-4 text-primary" /> Branch counters
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -196,7 +196,7 @@ export function PosCountersPanel() {
                         <Button variant="success" size="sm" className="h-9 px-4 rounded-xl" onClick={() => void handleSaveEdit()} disabled={saving}>
                           Save
                         </Button>
-                        <Button size="sm" variant="outline" className="h-9 px-4 rounded-xl" onClick={() => setEditingId(null)}>
+                        <Button size="sm" variant="secondary" className="h-9 px-4 rounded-xl" onClick={() => setEditingId(null)}>
                           Cancel
                         </Button>
                       </div>
@@ -216,8 +216,8 @@ export function PosCountersPanel() {
                       </div>
                       <Button
                         size="icon-sm"
-                        variant="ghost"
-                        className="shrink-0"
+                        variant="secondary"
+                        className="shrink-0 !bg-transparent !shadow-none border-0 text-muted-foreground hover:!bg-muted hover:text-foreground dark:!bg-transparent"
                         onClick={() => startEdit(row)}
                         title="Edit"
                       >
@@ -225,8 +225,8 @@ export function PosCountersPanel() {
                       </Button>
                       <Button
                         size="icon-sm"
-                        variant="ghost"
-                        className="shrink-0"
+                        variant="secondary"
+                        className="shrink-0 !bg-transparent !shadow-none border-0 hover:!bg-muted dark:!bg-transparent"
                         onClick={() => void toggleActive(row)}
                         disabled={saving}
                         title={row.isActive ? "Deactivate" : "Activate"}

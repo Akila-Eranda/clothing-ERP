@@ -67,7 +67,7 @@ export function CashMovementLedger({
               <div className="flex items-center gap-2 flex-wrap">
                 <p className="font-medium truncate">{m.description || cfg.label}</p>
                 {cfg.auto && (
-                  <Badge variant="outline" className="text-[9px] h-4 px-1 gap-0.5 border-emerald-500/40 text-emerald-600">
+                  <Badge variant="softSuccess" className="text-[9px] h-4 px-1.5 gap-0.5 rounded-full font-medium">
                     <Bot className="h-2.5 w-2.5" /> Auto
                   </Badge>
                 )}

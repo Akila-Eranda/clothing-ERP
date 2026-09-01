@@ -13,7 +13,7 @@ import {
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
   ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield,
 } from "lucide-react";
-import { cn, planTierFromRole } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -21,8 +21,7 @@ import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
-import { useReceiptSettings } from "@/lib/use-receipt-settings";
-import { isDefaultLightSidebar } from "@/lib/theme-layout";
+import { isDarkSidebarSkin, isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -277,12 +276,8 @@ export function Sidebar() {
   const isDark = darkUi;
   const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
+  const logoOnDarkBg = darkUi || dreamsDarkChrome || isDarkSidebarSkin(sidebarSkin);
   const navGroups = useNavGroups();
-  const { profile } = useShopWorkspace();
-  const { settings: receiptSettings } = useReceiptSettings();
-
-  const shopName = receiptSettings.shopName?.trim() || user?.branch?.name || APP_NAME;
-  const planLabel = planTierFromRole(user?.role);
 
   const closeMobile = () => setMobileSidebarOpen(false);
 
@@ -311,8 +306,6 @@ export function Sidebar() {
   const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(254, 159, 67, 0.14)" : "hsl(var(--sidebar-accent))") + ")";
   const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))") + ")";
   const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--primary))") + ")";
-  const planBadgeBg = dreamsDarkChrome ? chrome.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "hsl(var(--sidebar-accent))");
-  const planBadgeFg = dreamsDarkChrome ? chrome.activeFg : (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))");
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -574,73 +567,43 @@ export function Sidebar() {
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
-        {/* ── Header: shop avatar + name + collapse btn ── */}
-        <div className={cn("flex items-center shrink-0 gap-2.5 px-3 py-3.5", sidebarCollapsed && "justify-center flex-col")}>
-          <div
+        {/* ── Header: brand logo only ── */}
+        <div
+          className={cn(
+            "relative shrink-0 w-full",
+            sidebarCollapsed ? "px-2 py-3" : "px-3 pt-4 pb-3",
+          )}
+        >
+          <button
+            type="button"
+            onClick={toggleSidebar}
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "shrink-0 flex items-center justify-center overflow-hidden rounded-lg",
-              sidebarCollapsed ? "h-9 w-9" : "h-9 w-[132px]",
+              "absolute flex items-center justify-center rounded-lg border transition-colors z-10",
+              sidebarCollapsed
+                ? "right-0.5 top-2.5 h-6 w-6"
+                : "right-2 top-2 h-7 w-7",
             )}
-            style={{
-              background: darkUi ? "transparent" : "#050505",
-            }}
+            style={{ borderColor: border, color: textMut, background: bg }}
+            onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
+            onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = bg; }}
           >
-            <AppLogo
-              variant="sidebar"
-              theme={darkUi ? "dark" : "light"}
-              className="h-full w-full items-center justify-center"
-              alt={APP_NAME}
-            />
-          </div>
-
-          {!sidebarCollapsed && (
-            <>
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-[14.5px] font-bold leading-tight truncate"
-                  style={{ color: textFull }}
-                  title={shopName}
-                >
-                  {shopName}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1 min-w-0">
-                  <span className="text-[11px] font-medium leading-none truncate" style={{ color: textMut }}>
-                    {profile.label}
-                  </span>
-                  <span
-                    className="shrink-0 rounded-full px-1.5 py-[3px] text-[9px] font-bold uppercase tracking-wide leading-none"
-                    style={{ color: planBadgeFg, background: planBadgeBg }}
-                  >
-                    {planLabel}
-                  </span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={toggleSidebar}
-                aria-label="Collapse sidebar"
-                className="h-7 w-7 flex items-center justify-center rounded-lg border transition-colors shrink-0"
-                style={{ borderColor: border, color: textMut }}
-                onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
-                onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = ""; }}
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-            </>
-          )}
-
-          {sidebarCollapsed && (
-            <button
-              type="button"
-              onClick={toggleSidebar}
-              className="absolute right-1 top-4 h-6 w-6 flex items-center justify-center rounded-md border transition-colors"
-              style={{ borderColor: border, color: textMut, background: bg }}
-              onMouseEnter={e => { e.currentTarget.style.color = textFull; }}
-              onMouseLeave={e => { e.currentTarget.style.color = textMut; }}
-            >
+            {sidebarCollapsed ? (
               <ChevronRight className="h-3 w-3" />
-            </button>
-          )}
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5" />
+            )}
+          </button>
+
+          <AppLogo
+            variant="sidebar"
+            theme={logoOnDarkBg ? "dark" : "light"}
+            className={cn(
+              "w-full items-center justify-center",
+              sidebarCollapsed ? "px-1" : "px-1 pt-6",
+            )}
+            alt={APP_NAME}
+          />
         </div>
 
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />

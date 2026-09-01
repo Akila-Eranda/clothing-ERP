@@ -28,7 +28,7 @@ const HEIGHT: Record<AppLogoVariant, string> = {
   hero: "h-20 sm:h-24 md:h-28",
   full: "h-16 sm:h-[4.5rem]",
   compact: "h-12 sm:h-14",
-  sidebar: "h-8 sm:h-9",
+  sidebar: "",
 };
 
 const MAX_WIDTH: Record<AppLogoVariant, string> = {
@@ -36,7 +36,7 @@ const MAX_WIDTH: Record<AppLogoVariant, string> = {
   hero: "max-w-[min(100%,420px)]",
   full: "max-w-[min(100%,320px)]",
   compact: "max-w-[min(100%,280px)]",
-  sidebar: "max-w-[min(100%,148px)]",
+  sidebar: "max-w-full",
 };
 
 function resolveLogoSrc(onDark: boolean) {
@@ -65,8 +65,10 @@ export function AppLogo({
         src={src}
         alt={alt}
         className={cn(
-          "w-auto object-contain object-left",
-          HEIGHT[variant],
+          variant === "sidebar"
+            ? "h-auto w-full max-h-[76px] object-contain object-center mix-blend-screen"
+            : "w-auto object-contain object-left",
+          variant !== "sidebar" && HEIGHT[variant],
           MAX_WIDTH[variant],
         )}
       />

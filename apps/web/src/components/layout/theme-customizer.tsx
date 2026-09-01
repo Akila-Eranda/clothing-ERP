@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Layers,
   Monitor,
+  Mouse,
   Moon,
   Palette,
   PanelLeft,
@@ -30,6 +31,8 @@ import { ACCENT_PRESETS, type AccentId } from "@/lib/accent-theme";
 import {
   SIDEBAR_SKIN_SWATCHES,
   TOPBAR_SKIN_SWATCHES,
+  getSidebarSkinChromePatch,
+  getTopbarSkinChromePatch,
   type LayoutMode,
   type LayoutWidth,
   type SidebarSkin,
@@ -163,6 +166,43 @@ function ColorField({
   );
 }
 
+function ChromeColorFields({
+  isDark,
+  colors,
+  setColor,
+}: {
+  isDark: boolean;
+  colors: ReturnType<typeof useThemeColorsStore.getState>;
+  setColor: ReturnType<typeof useThemeColorsStore.getState>["setColor"];
+}) {
+  const bg = isDark ? colors.darkChromeBg : colors.lightChromeBg;
+  const fg = isDark ? colors.darkChromeFg : colors.lightChromeFg;
+  const border = isDark ? colors.darkChromeBorder : colors.lightChromeBorder;
+  const muted = isDark ? colors.darkChromeMuted : colors.lightChromeMuted;
+  const active = isDark ? colors.darkChromeActive : colors.lightChromeActive;
+  const logo = isDark ? colors.darkChromeLogoBg : colors.lightChromeLogoBg;
+  const bgCssKey = isDark ? "darkChromeBgCss" : "lightChromeBgCss";
+  const bgKey = isDark ? "darkChromeBg" : "lightChromeBg";
+
+  return (
+    <div className="tc-color-list tc-color-list--nested">
+      <ColorField
+        label="Background"
+        value={bg}
+        onChange={(v) => {
+          setColor(bgKey, v);
+          setColor(bgCssKey, "");
+        }}
+      />
+      <ColorField label="Text" value={fg} onChange={(v) => setColor(isDark ? "darkChromeFg" : "lightChromeFg", v)} />
+      <ColorField label="Border" value={border} onChange={(v) => setColor(isDark ? "darkChromeBorder" : "lightChromeBorder", v)} />
+      <ColorField label="Muted text" value={muted} onChange={(v) => setColor(isDark ? "darkChromeMuted" : "lightChromeMuted", v)} />
+      <ColorField label="Active / accent" value={active} onChange={(v) => setColor(isDark ? "darkChromeActive" : "lightChromeActive", v)} />
+      <ColorField label="Logo area" value={logo} onChange={(v) => setColor(isDark ? "darkChromeLogoBg" : "lightChromeLogoBg", v)} />
+    </div>
+  );
+}
+
 function AccentSwatches({
   value,
   customHex,
@@ -264,7 +304,7 @@ function ThemePreviewStrip({ isDark }: { isDark: boolean }) {
   return (
     <div className="tc-preview">
       <div className="tc-preview__frame" style={{ background: bg }}>
-        <div className="tc-preview__sidebar" style={{ background: isDark ? colors.darkChromeBg : "#F1F5F9" }} />
+        <div className="tc-preview__sidebar" style={{ background: isDark ? (colors.darkChromeBgCss || colors.darkChromeBg) : (colors.lightChromeBgCss || colors.lightChromeBg) }} />
         <div className="tc-preview__main">
           <div className="tc-preview__topbar" style={{ background: card, borderColor: isDark ? colors.darkBorder : colors.lightBorder }} />
           <div className="tc-preview__card" style={{ background: card, borderColor: isDark ? colors.darkBorder : colors.lightBorder }}>
@@ -310,11 +350,22 @@ export function ThemeCustomizer() {
     setDarkAccent,
     setCustomDarkAccent,
     setColor,
+    patchColors,
     reset: resetColors,
   } = colors;
 
   const activeTheme = theme === "light" || theme === "dark" ? theme : (resolvedTheme ?? "light");
   const previewIsDark = activeTheme === "dark";
+
+  const handleSidebarSkin = (skin: SidebarSkin) => {
+    setSidebarSkin(skin);
+    patchColors(getSidebarSkinChromePatch(skin, previewIsDark));
+  };
+
+  const handleTopbarSkin = (skin: TopbarSkin) => {
+    setTopbarSkin(skin);
+    patchColors(getTopbarSkinChromePatch(skin, previewIsDark));
+  };
 
   const pickLayout = (mode: LayoutMode) => {
     setLayout(mode);
@@ -467,6 +518,27 @@ export function ThemeCustomizer() {
                   />
                 </Section>
 
+                <Section title="Buttons" description="Primary follows Brand accent above; customize other button types" icon={Mouse} defaultOpen>
+                  <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+                    Primary / Save / Add New buttons use your <strong>Brand accent</strong>. Adjust secondary and status colors below.
+                  </p>
+                  <div className="tc-color-list">
+                    <ColorField label="Secondary (outline, POS)" value={colors.buttonSecondary} onChange={(v) => setColor("buttonSecondary", v)} />
+                    <ColorField label="Secondary hover" value={colors.buttonSecondaryHover} onChange={(v) => setColor("buttonSecondaryHover", v)} />
+                    <ColorField label="Success" value={colors.buttonSuccess} onChange={(v) => setColor("buttonSuccess", v)} />
+                    <ColorField label="Danger" value={colors.buttonDanger} onChange={(v) => setColor("buttonDanger", v)} />
+                    <ColorField label="Warning" value={colors.buttonWarning} onChange={(v) => setColor("buttonWarning", v)} />
+                    <ColorField label="Destructive" value={colors.buttonDestructive} onChange={(v) => setColor("buttonDestructive", v)} />
+                    <ColorField label="Info" value={colors.buttonInfo} onChange={(v) => setColor("buttonInfo", v)} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span className="inline-flex h-8 items-center rounded-[5px] px-3 text-xs font-semibold text-white" style={{ background: resolveAccentHex(colors, previewIsDark) }}>Primary</span>
+                    <span className="inline-flex h-8 items-center rounded-[5px] px-3 text-xs font-semibold text-white" style={{ background: colors.buttonSecondary }}>Secondary</span>
+                    <span className="inline-flex h-8 items-center rounded-[5px] px-3 text-xs font-semibold text-white" style={{ background: colors.buttonSuccess }}>Success</span>
+                    <span className="inline-flex h-8 items-center rounded-[5px] px-3 text-xs font-semibold text-white" style={{ background: colors.buttonDanger }}>Danger</span>
+                  </div>
+                </Section>
+
                 <Section title="Light Surfaces" description="Page, cards & text colors" icon={Sun} defaultOpen={false}>
                   <div className="tc-color-list">
                     <ColorField label="Page background" value={colors.lightBackground} onChange={(v) => setColor("lightBackground", v)} />
@@ -487,7 +559,18 @@ export function ThemeCustomizer() {
                   </div>
                 </Section>
 
-                <Section title="Sidebar & Header" description="Dark chrome navigation colors" icon={PanelLeft} defaultOpen={false}>
+                <Section title="Sidebar & Header — Light" description="Navigation colors in light mode" icon={Sun} badge="Light">
+                  <div className="tc-color-list">
+                    <ColorField label="Background" value={colors.lightChromeBg} onChange={(v) => setColor("lightChromeBg", v)} />
+                    <ColorField label="Text" value={colors.lightChromeFg} onChange={(v) => setColor("lightChromeFg", v)} />
+                    <ColorField label="Border" value={colors.lightChromeBorder} onChange={(v) => setColor("lightChromeBorder", v)} />
+                    <ColorField label="Muted text" value={colors.lightChromeMuted} onChange={(v) => setColor("lightChromeMuted", v)} />
+                    <ColorField label="Active / accent" value={colors.lightChromeActive} onChange={(v) => setColor("lightChromeActive", v)} />
+                    <ColorField label="Logo area" value={colors.lightChromeLogoBg} onChange={(v) => setColor("lightChromeLogoBg", v)} />
+                  </div>
+                </Section>
+
+                <Section title="Sidebar & Header — Dark" description="Navigation colors in dark mode" icon={Moon} badge="Dark" defaultOpen={false}>
                   <div className="tc-color-list">
                     <ColorField label="Background" value={colors.darkChromeBg} onChange={(v) => setColor("darkChromeBg", v)} />
                     <ColorField label="Text" value={colors.darkChromeFg} onChange={(v) => setColor("darkChromeFg", v)} />
@@ -506,16 +589,18 @@ export function ThemeCustomizer() {
                   <SwatchGrid<TopbarSkin>
                     value={topbarSkin}
                     options={TOPBAR_SKIN_SWATCHES}
-                    onChange={setTopbarSkin}
+                    onChange={handleTopbarSkin}
                   />
+                  <ChromeColorFields isDark={previewIsDark} colors={colors} setColor={setColor} />
                 </Section>
 
                 <Section title="Sidebar" description="Navigation panel style" icon={PanelLeft}>
                   <SwatchGrid<SidebarSkin>
                     value={sidebarSkin}
                     options={SIDEBAR_SKIN_SWATCHES}
-                    onChange={setSidebarSkin}
+                    onChange={handleSidebarSkin}
                   />
+                  <ChromeColorFields isDark={previewIsDark} colors={colors} setColor={setColor} />
                 </Section>
               </div>
             )}

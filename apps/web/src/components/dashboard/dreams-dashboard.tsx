@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FileText, Repeat, Gift, Wallet, Layers, PieChart, LifeBuoy, Hash,
-  X, Info, UserCheck, Users, ShoppingCart, CalendarDays, Package,
+  Info, UserCheck, Users, ShoppingCart, CalendarDays, Package,
   AlertTriangle, Box, Flag, MapPin,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -136,7 +136,6 @@ export function DreamsDashboard() {
   const displayName = user?.name?.split(" ")[0] || user?.name || "Admin";
 
   const [loading, setLoading] = React.useState(true);
-  const [alertDismissed, setAlertDismissed] = React.useState(false);
   const [chartPeriod, setChartPeriod] = React.useState("1Y");
   const [txnTab, setTxnTab] = React.useState<"sale" | "purchase">("sale");
   const [dateRange, setDateRange] = React.useState<DreamsDateRange>(() => defaultDreamsDateRange());
@@ -318,11 +317,6 @@ export function DreamsDashboard() {
     ? Math.min(100, Math.round(((overview.totalCustomers - (overview.today?.transactions ?? 0)) / overview.totalCustomers) * 100))
     : 30;
 
-  const topLow = lowStock[0];
-  const lowLabel = topLow
-    ? `${topLow.variant.product.name}${topLow.variant.name ? ` — ${topLow.variant.name}` : ""}`
-    : null;
-
   const ordersToday = summary?.totalSales ?? overview?.today?.transactions ?? 0;
 
   const kpiCards = [
@@ -354,23 +348,6 @@ export function DreamsDashboard() {
             <DreamsDateRangePicker value={dateRange} onChange={setDateRange} />
           </div>
         </div>
-
-        {/* Alert */}
-        {!alertDismissed && lowStock.length > 0 && lowLabel && (
-          <div className="alert bg-orange-transparent mb-4">
-            <div>
-              <Info size={14} className="text-orange me-2" style={{ display: "inline" }} />
-              Your Product <span className="text-orange fw-semibold">{lowLabel}</span> is running Low,
-              already below {topLow?.minStockLevel ?? 5} Pcs.,
-              <button type="button" className="link-orange text-decoration-underline fw-semibold" style={{ background: "none", border: "none", cursor: "pointer" }} onClick={() => router.push("/inventory")}>
-                Add Stock
-              </button>
-            </div>
-            <button type="button" className="btn-close" onClick={() => setAlertDismissed(true)} aria-label="Close">
-              <X size={16} />
-            </button>
-          </div>
-        )}
 
         {/* KPI row */}
         <div className="row">
