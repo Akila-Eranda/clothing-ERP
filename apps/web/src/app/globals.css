@@ -952,14 +952,37 @@
   color: var(--pos-price, #ffffff) !important;
 }
 
-.pos-shell .pos-checkout .pos-checkout-keypad button.pos-checkout-key-quick {
-  font-size: 0.8125rem;
+.pos-shell .pos-checkout .pos-checkout-keypad button,
+.pos-shell .pos-checkout .pos-checkout-quick-cash button {
+  min-height: 3rem;
+}
+
+.pos-shell .pos-checkout .pos-checkout-keypad button.pos-checkout-key-quick,
+.pos-shell .pos-checkout .pos-checkout-quick-cash button {
+  font-size: 0.75rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+}
+
+.pos-shell .pos-checkout .pos-checkout-methods-grid button {
+  min-height: 0;
+  padding: 0.35rem 0.25rem;
+}
+
+.pos-shell .pos-checkout .pos-checkout-methods-grid button svg {
+  flex-shrink: 0;
 }
 
 .pos-shell .pos-checkout .pos-checkout-actions button {
   min-height: 3rem;
+}
+
+@media (max-width: 720px) {
+  .pos-shell .pos-checkout .pos-checkout-methods-grid {
+    grid-template-columns: repeat(7, minmax(3.5rem, 1fr));
+    overflow-x: auto;
+    padding-bottom: 0.25rem;
+  }
 }
 
 /* Dark-first markup uses text-white — remap for light panels (body copy) */

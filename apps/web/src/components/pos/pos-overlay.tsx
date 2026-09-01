@@ -2777,6 +2777,9 @@ ${rows}
     if (activeNav === "customers") {
       const insightCustomer = customer ?? inlineCustomers.find((c) => c.id === previewCustomerId) ?? null;
       const cf = posCustomerFormStyles(isPosLight);
+      const warnRowStyle = { background: "var(--pos-warn-bg)", border: "1px solid var(--pos-warn-border)" } as const;
+      const warnText = { color: "#ffffff" } as const;
+      const warnSubtext = { color: "rgba(255,255,255,0.78)" } as const;
       return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         {/* Search bar + Register button */}
@@ -2788,7 +2791,7 @@ ${rows}
               data-pos-customer-search
               value={inlineCustomerSearch}
               onChange={e=>{setInlineCustomerSearch(e.target.value);}}
-              placeholder="Type phone number or nameâ€¦"
+              placeholder="Type phone number or name…"
               autoComplete="off"
               className="w-full pl-9 pr-9 h-10 rounded-xl text-sm outline-none"
               style={cf.input}
@@ -2807,21 +2810,21 @@ ${rows}
         </div>
         {/* Active bill customer */}
         {customer ? (
-          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl" style={{background:"rgba(var(--pos-accent-rgb),0.1)",border:"1px solid rgba(var(--pos-accent-rgb),0.3)"}}>
-            <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"var(--pos-accent-grad)"}}>{customer.name?.[0]}</div>
-            <div className="flex-1 min-w-0"><p className="text-white text-sm font-bold">{customer.name}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{customer.phone}{showLoyalty ? <> Â· <span className="capitalize">{customer.membershipTier}</span> Â· {customer.loyaltyPoints} pts</> : null}</p></div>
-            <span className="text-xs font-semibold px-2 py-1 rounded-lg shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>On bill</span>
-            <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="p-1.5 rounded-lg hover:bg-white/10"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
+          <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border" style={{background:"var(--pos-input)",borderColor:"var(--pos-success)"}}>
+            <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold text-sm shrink-0" style={{background:"var(--pos-accent)"}}>{customer.name?.[0]}</div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-bold" style={{color:"var(--pos-text)"}}>{customer.name}</p><p className="text-xs" style={{color:"var(--pos-muted)"}}>{customer.phone}{showLoyalty ? <> · <span className="capitalize">{customer.membershipTier}</span> · {customer.loyaltyPoints} pts</> : null}</p></div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-lg shrink-0" style={{background:"var(--pos-success)",color:"#ffffff"}}>On bill</span>
+            <button onClick={()=>{setCustomer(null);setCustomerInsight(null);setPreviewCustomerId(null);toast.info("Customer removed from bill");}} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10" style={{ border: "1px solid var(--pos-border)" }} aria-label="Remove from bill"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
           </div>
         ) : (
           <div className="shrink-0 flex items-center gap-3 p-3 rounded-xl border border-dashed" style={{borderColor:"var(--pos-border)",background:"var(--pos-card)"}}>
             <User className="h-5 w-5 shrink-0" style={{color:"var(--pos-muted)"}}/>
-            <p className="text-sm flex-1" style={{color:"var(--pos-muted)"}}>No {workspace.customerLabel.toLowerCase()} on bill â€” tap <span className="font-bold text-white">Select</span> below</p>
+            <p className="text-sm flex-1" style={{color:"var(--pos-muted)"}}>No {workspace.customerLabel.toLowerCase()} on bill — tap <span className="font-bold" style={{ color: "var(--pos-text)" }}>Select</span> below</p>
           </div>
         )}
         {/* List + insight */}
-        <div className="flex-1 min-h-0 grid gap-3" style={{gridTemplateColumns:"minmax(260px,1fr) minmax(280px,1.1fr)"}}>
-          <div className="min-h-0 overflow-y-auto rounded-xl border p-2" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
+        <div className="flex-1 min-h-0 grid gap-3 lg:grid-cols-2" style={{gridTemplateColumns:"minmax(280px,1fr) minmax(300px,1.15fr)"}}>
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-2.5" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
             {inlineCustomers.length===0&&!inlineCustomerSearch&&!inlineCustLoading&&<div className="flex flex-col items-center justify-center h-48" style={{color:"var(--pos-muted-2)"}}><Users className="h-12 w-12 mb-2 opacity-20"/><p className="text-sm">No customers yet â€” register a new customer</p></div>}
             {inlineCustomers.length===0&&inlineCustomerSearch&&!inlineCustLoading&&(
               <div className="flex flex-col items-center justify-center h-40 gap-3" style={{color:"var(--pos-muted-2)"}}>
@@ -2835,16 +2838,16 @@ ${rows}
                 <div key={c.id} role="button" tabIndex={0}
                   onClick={() => { setFocusedCustomerIdx(cIdx); void loadCustomerInsight(c.id); }}
                   onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); applyCustomer(c); } }}
-                  className="flex items-center gap-3 p-3 rounded-xl border transition-all hover:border-blue-500/40 cursor-pointer"
-                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"rgba(var(--pos-accent-rgb),0.12)":"var(--pos-card)",borderColor:customer?.id===c.id?"var(--pos-success)":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"var(--pos-accent)":"var(--pos-border)",boxShadow:focusedCustomerIdx===cIdx?"0 0 0 2px rgba(var(--pos-accent-rgb),0.35)":"none"}}>
-                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"var(--pos-accent-grad)"}}>{c.name?.[0]}</div>
-                  <div className="flex-1 min-w-0"><p className="text-white text-sm font-semibold truncate">{c.name}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"â€”"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{c.loyaltyPoints} pts</span>}</div></div>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center gap-1" style={{background:customer?.id===c.id?"var(--pos-success)":"var(--pos-accent)"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
+                  className="flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer"
+                  style={{background:focusedCustomerIdx===cIdx||previewCustomerId===c.id?"var(--pos-input)":"var(--pos-card)",borderColor:customer?.id===c.id?"var(--pos-success)":focusedCustomerIdx===cIdx||previewCustomerId===c.id?"var(--pos-accent)":"var(--pos-border)"}}>
+                  <div className="h-10 w-10 rounded-full flex items-center justify-center text-white font-bold shrink-0" style={{background:"var(--pos-accent)"}}>{c.name?.[0]}</div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold truncate" style={{ color: "var(--pos-text)" }}>{c.name}</p><p className="text-xs truncate" style={{color:"var(--pos-muted)"}}>{c.phone}</p><div className="flex items-center gap-2 mt-0.5"><span className="text-[10px] font-bold capitalize" style={{color:TIER_COLOR[c.tier?.toLowerCase()??"bronze"]}}>{c.tier??"—"}</span>{showLoyalty && <span className="text-[10px]" style={{color:"var(--pos-muted-2)"}}>{c.loyaltyPoints} pts</span>}</div></div>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); applyCustomer(c); }} className="min-w-[5.5rem] px-3 py-2 rounded-lg text-[11px] font-bold text-white transition-all hover:opacity-90 shrink-0 flex items-center justify-center gap-1" style={{background:customer?.id===c.id?"var(--pos-success)":"var(--pos-accent)"}}>{customer?.id===c.id?<><Check className="h-3 w-3"/> Selected</>:"Select"}</button>
                 </div>
               ))}
             </div>
           </div>
-          <div className="min-h-0 overflow-y-auto rounded-xl border p-3 flex flex-col gap-3" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
+          <div className="min-h-0 overflow-y-auto rounded-xl border p-3 flex flex-col gap-4" style={{borderColor:"var(--pos-border)",background:"var(--pos-panel)"}}>
             {!previewCustomerId && !customer ? (
               <div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}>
                 <FileText className="h-12 w-12 mb-2 opacity-20"/>
@@ -2855,21 +2858,21 @@ ${rows}
               <div className="flex items-center justify-center flex-1"><Loader2 className="h-7 w-7 animate-spin" style={{color:"var(--pos-accent)"}}/></div>
             ) : (
               <>
-                <div className="shrink-0">
-                  <p className="text-white text-sm font-bold truncate">{insightCustomer?.name ?? "Customer"}</p>
-                  <p className="text-xs" style={{color:"var(--pos-muted)"}}>
+                <div className="shrink-0 pb-3 border-b" style={{ borderColor: "var(--pos-border)" }}>
+                  <p className="text-sm font-bold truncate" style={{ color: "var(--pos-text)" }}>{insightCustomer?.name ?? "Customer"}</p>
+                  <p className="text-xs mt-0.5" style={{color:"var(--pos-muted)"}}>
                     {typeof customerInsight?.totalOrders === "number" ? `${customerInsight.totalOrders} orders` : `${customerInsight?.sales.length ?? 0} recent bills`}
-                    {typeof customerInsight?.totalSpent === "number" ? ` Â· LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
+                    {typeof customerInsight?.totalSpent === "number" ? ` · LKR ${formatNumber(customerInsight.totalSpent)} spent` : ""}
                   </p>
                   {(customerInsight?.creditBalance ?? 0) > 0 && (
-                    <div className="mt-2 flex items-center justify-between px-2.5 py-2 rounded-lg" style={{background:"var(--pos-warn-bg)",border:"1px solid var(--pos-warn-border)"}}>
-                      <span className="text-[10px] font-bold uppercase" style={{color:"var(--pos-warn-soft)"}}>Outstanding</span>
-                      <span className="text-sm font-bold tabular-nums" style={{color:"var(--pos-warn-soft)"}}>LKR {formatNumber(customerInsight!.creditBalance!)}</span>
+                    <div className="mt-2 flex items-center justify-between px-3 py-2.5 rounded-xl" style={warnRowStyle}>
+                      <span className="text-[10px] font-bold uppercase tracking-wide" style={warnText}>Outstanding</span>
+                      <span className="text-sm font-bold tabular-nums" style={warnText}>LKR {formatNumber(customerInsight!.creditBalance!)}</span>
                     </div>
                   )}
                   {(customerInsight?.creditLimit ?? 0) > 0 && (
-                    <p className="text-[10px] mt-1" style={{color:"var(--pos-muted)"}}>
-                      Credit limit LKR {formatNumber(customerInsight!.creditLimit!)} Â· Available LKR {formatNumber(customerInsight!.creditAvailable ?? 0)}
+                    <p className="text-[11px] mt-2" style={{color:"var(--pos-text-soft)"}}>
+                      Credit limit LKR {formatNumber(customerInsight!.creditLimit!)} · Available LKR {formatNumber(customerInsight!.creditAvailable ?? 0)}
                     </p>
                   )}
                 </div>
@@ -2946,29 +2949,29 @@ ${rows}
                 {(customerInsight?.outstandingSales?.length ?? 0) > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <AlertCircle className="h-3.5 w-3.5" style={{color:"var(--pos-warn-soft)"}}/>
-                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Unpaid bills</p>
+                      <AlertCircle className="h-3.5 w-3.5" style={{color:"#ffffff"}}/>
+                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Unpaid bills</p>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 rounded-xl p-2" style={warnRowStyle}>
                       {customerInsight!.outstandingSales!.map((sale) => (
-                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:"var(--pos-warn-bg)",border:"1px solid var(--pos-warn-border)"}}>
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg" style={{background:"rgba(0,0,0,0.2)",border:"1px solid rgba(255,255,255,0.12)"}}>
                           <div className="min-w-0">
-                            <p className="text-xs font-mono font-bold truncate" style={{color:"var(--pos-warn-soft)"}}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>
+                            <p className="text-xs font-mono font-bold truncate" style={warnText}>{sale.invoiceNumber}</p>
+                            <p className="text-[10px] mt-0.5" style={warnSubtext}>
                               {new Date(sale.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
-                              {" Â· "}Due LKR {formatNumber(sale.balanceDue ?? sale.total - (sale.amountPaid ?? 0))}
+                              {" · "}Due LKR {formatNumber(sale.balanceDue ?? sale.total - (sale.amountPaid ?? 0))}
                             </p>
                           </div>
-                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0" style={{background:"var(--pos-warn-bg)",color:"var(--pos-warn-soft)"}}>PENDING</span>
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wide" style={{background:"var(--pos-warn-pill)",color:"#ffffff"}}>Pending</span>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                  <div className="flex items-center gap-2 pt-2">
                     <Receipt className="h-3.5 w-3.5" style={{color:"var(--pos-accent)"}}/>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Previous bills</p>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Previous bills</p>
                   </div>
                   {(customerInsight?.sales.length ?? 0) === 0 ? (
                     <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No previous bills</p>
@@ -2978,22 +2981,22 @@ ${rows}
                         const isPending = sale.paymentStatus === "PENDING";
                         const due = sale.balanceDue ?? (isPending ? sale.total - (sale.amountPaid ?? 0) : 0);
                         return (
-                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg" style={{background:isPending?"var(--pos-warn-bg)":"var(--pos-card)",border:`1px solid ${isPending?"var(--pos-warn-border)":"var(--pos-border)"}`}}>
+                        <div key={sale.id} className="flex items-center justify-between gap-2 px-2.5 py-2.5 rounded-lg" style={{background:isPending?"var(--pos-warn-bg)":"var(--pos-card)",border:`1px solid ${isPending?"var(--pos-warn-border)":"var(--pos-border)"}`}}>
                           <div className="min-w-0">
-                            <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"var(--pos-warn-soft)":"var(--pos-accent)"}}>{sale.invoiceNumber}</p>
-                            <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} Â· {sale._count?.items ?? 0} items{isPending && due > 0 ? ` Â· Due LKR ${formatNumber(due)}` : ""}</p>
+                            <p className="text-xs font-mono font-bold truncate" style={{color:isPending?"#ffffff":"var(--pos-accent)"}}>{sale.invoiceNumber}</p>
+                            <p className="text-[10px] mt-0.5" style={{color:isPending?"rgba(255,255,255,0.78)":"var(--pos-muted)"}}>{new Date(sale.invoiceDate).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})} · {sale._count?.items ?? 0} items{isPending && due > 0 ? ` · Due LKR ${formatNumber(due)}` : ""}</p>
                           </div>
-                          <p className="text-xs font-bold font-mono text-white shrink-0">LKR {formatNumber(sale.total)}</p>
+                          <p className="text-xs font-bold font-mono shrink-0 tabular-nums" style={{ color: isPending ? "#ffffff" : "var(--pos-text)" }}>LKR {formatNumber(sale.total)}</p>
                         </div>
                         );
                       })}
                     </div>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
+                <div className="space-y-2 pt-1 border-t" style={{ borderColor: "var(--pos-border)" }}>
+                  <div className="flex items-center gap-2 pt-2">
                     <TrendingUp className="h-3.5 w-3.5" style={{color:"var(--pos-success)"}}/>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-muted)"}}>Top products</p>
+                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:"var(--pos-text)"}}>Top products</p>
                   </div>
                   {(customerInsight?.topProducts.length ?? 0) === 0 ? (
                     <p className="text-xs py-3 text-center" style={{color:"var(--pos-muted-2)"}}>No purchase history yet</p>
@@ -3003,7 +3006,7 @@ ${rows}
                         <div key={`${p.variantId}-${idx}`} className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg" style={{background:"var(--pos-card)",border:"1px solid var(--pos-border)"}}>
                           <span className="h-6 w-6 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0" style={{background:"rgba(16,185,129,0.15)",color:"var(--pos-success)"}}>{idx + 1}</span>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs text-white font-semibold truncate">{p.productName}</p>
+                            <p className="text-xs font-semibold truncate" style={{ color: "var(--pos-text)" }}>{p.productName}</p>
                             <p className="text-[10px]" style={{color:"var(--pos-muted)"}}>{p.qty} sold Â· LKR {formatNumber(p.spent)}</p>
                           </div>
                         </div>
@@ -4695,7 +4698,8 @@ ${rows}
 
                 {/* Right: methods + keypad + confirm */}
                 <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto" style={{ background: isPosLight ? "var(--pos-panel)" : "var(--pos-elevated)" }}>
-                <div className="pos-checkout-methods grid grid-cols-4 sm:grid-cols-7 gap-2 px-4 py-3 shrink-0 border-b" style={{ borderColor: "var(--pos-border)" }}>
+                <div className="pos-checkout-methods shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--pos-border)" }}>
+                  <div className="pos-checkout-methods-grid grid grid-cols-7 gap-2 w-full min-w-0">
                   {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>{
                     const active = activePayment === value;
                     return (
@@ -4706,15 +4710,13 @@ ${rows}
                       onClick={()=>setActivePayment(value)}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
-                        "flex flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-bold transition-all hover:opacity-95",
-                        "pos-cta min-h-[4.25rem]",
-                        touchMode ? "py-2.5" : "py-2",
+                        "flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-[11px] font-bold transition-all hover:opacity-95 h-[4.25rem] w-full",
+                        "pos-cta",
                       )}
                       style={{
                         background: active ? "var(--pos-accent)" : (isPosLight ? "#334155" : "var(--pos-input)"),
                         color: "#ffffff",
                         border: active ? "1px solid var(--pos-accent-2)" : "1px solid var(--pos-border)",
-                        boxShadow: active ? "0 0 0 1px var(--pos-accent)" : undefined,
                       }}
                     >
                       <Icon
@@ -4732,6 +4734,7 @@ ${rows}
                     </button>
                     );
                   })}
+                  </div>
                 </div>
                 {activePayment==="GIFT_VOUCHER"&&(
                   <input
@@ -4816,7 +4819,7 @@ ${rows}
                   </div>
                 )}
                 {(activePayment==="CASH"||activePayment==="CUSTOMER_CREDIT")&&(
-                  <div ref={cashPanelRef} className="px-4 py-3 flex-1 flex flex-col min-h-0">
+                  <div ref={cashPanelRef} className="px-4 py-3 flex-1 flex flex-col min-h-0 w-full max-w-lg mx-auto">
                     <div className="flex items-center justify-between mb-2 gap-2">
                       <span className="text-sm font-bold" style={{color:"var(--pos-text)"}}>
                         {activePayment === "CUSTOMER_CREDIT"
@@ -4881,17 +4884,44 @@ ${rows}
                         <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
-                    <div className="pos-checkout-keypad grid gap-2 flex-1 content-start" style={{gridTemplateColumns:"1fr 1fr 1fr 1fr"}}>
-                      {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
-                        const isQuick=ki===3;const isDel=k==="DEL";
-                        return(<button key={`${ri}-${ki}`} type="button" onClick={()=>isQuick?setQuickCash(parseInt(k,10)):handleNumpad(k)} className={cn("h-12 rounded-xl text-sm font-bold transition-all active:scale-[0.98]", isDel && "pos-checkout-key-del", isQuick && "pos-checkout-key-quick")} style={{
-                          background: isQuick ? (isPosLight ? "#475569" : "var(--pos-accent)") : isDel ? (isPosLight ? "#DC2626" : "#7f1d1d") : (isPosLight ? "#334155" : "var(--pos-input)"),
-                          color: "#ffffff",
-                          border: isDel ? "1px solid rgba(239,68,68,0.45)" : "1px solid var(--pos-border)",
-                        }}>
-                          {isDel?<Delete className="h-4 w-4 mx-auto" strokeWidth={2.25}/>:k}
-                        </button>);
-                      }))}
+                    <div className="pos-checkout-keypad-wrap flex gap-2 w-full">
+                      <div className="pos-checkout-keypad grid grid-cols-3 gap-2 flex-1 min-w-0">
+                        {[["7","8","9"],["4","5","6"],["1","2","3"],["0",".","DEL"]].map((row,ri)=>row.map((k)=>{
+                          const isDel=k==="DEL";
+                          return(
+                            <button
+                              key={`${ri}-${k}`}
+                              type="button"
+                              onClick={() => handleNumpad(k)}
+                              className={cn("h-12 rounded-xl text-base font-bold transition-all active:scale-[0.98] flex items-center justify-center", isDel && "pos-checkout-key-del")}
+                              style={{
+                                background: isDel ? (isPosLight ? "#DC2626" : "#7f1d1d") : (isPosLight ? "#334155" : "var(--pos-input)"),
+                                color: "#ffffff",
+                                border: isDel ? "1px solid rgba(239,68,68,0.45)" : "1px solid var(--pos-border)",
+                              }}
+                            >
+                              {isDel ? <Delete className="h-4 w-4" strokeWidth={2.25}/> : k}
+                            </button>
+                          );
+                        }))}
+                      </div>
+                      <div className="pos-checkout-quick-cash grid grid-cols-1 gap-2 w-[4.75rem] shrink-0">
+                        {[500,1000,2000,5000].map((amt)=>(
+                          <button
+                            key={amt}
+                            type="button"
+                            onClick={()=>setQuickCash(amt)}
+                            className="pos-checkout-key-quick h-12 rounded-xl text-[11px] font-bold transition-all active:scale-[0.98] flex items-center justify-center"
+                            style={{
+                              background: isPosLight ? "#475569" : "var(--pos-panel)",
+                              color: "#ffffff",
+                              border: "1px solid var(--pos-border)",
+                            }}
+                          >
+                            {amt}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -4903,16 +4933,17 @@ ${rows}
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-4 mb-2" style={{ background: "#0f2a22", border: "1px solid rgba(16,185,129,0.35)" }}>
+                  <div className="flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-auto mb-2 w-full max-w-lg" style={{ background: "#0f2a22", border: "1px solid rgba(16,185,129,0.35)" }}>
                     <span className="text-sm font-bold" style={{color:"var(--pos-success-soft)"}}>Change</span>
                     <span className="font-bold font-mono text-xl tabular-nums" style={{color:"var(--pos-success-soft)"}}>LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
-                <div className="pos-checkout-actions grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_auto] gap-2 p-4 border-t shrink-0 mt-auto" style={{ borderColor: "var(--pos-border)" }}>
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-12 px-3 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40" style={{
+                <div className="pos-checkout-actions flex items-stretch gap-2 p-4 border-t shrink-0 mt-auto w-full max-w-lg mx-auto" style={{ borderColor: "var(--pos-border)" }}>
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="h-12 px-4 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 shrink-0 self-stretch flex items-center justify-center" style={{
                     color: "#ffffff",
                     background: isPosLight ? "#334155" : "var(--pos-input)",
                     border: "1px solid var(--pos-border)",
+                    minWidth: "5.5rem",
                   }}>
                     Split Bill
                   </button>
@@ -4922,14 +4953,14 @@ ${rows}
                     data-pos-accent=""
                     onClick={() => void handleCheckout()}
                     disabled={checkoutLoading||items.length===0||(activePayment==="CASH"&&!payState.splitMode&&!(parseFloat(numpad)>0))}
-                    className="pos-cta h-12 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                    className="pos-cta flex-1 h-12 min-w-0 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
                     style={{ background: "var(--pos-success)", color: "#ffffff", border: "1px solid var(--pos-success-2)" }}
                   >
-                    {checkoutLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" strokeWidth={2.5} />}
-                    <span>Confirm Payment</span>
-                    <span className="text-xs font-mono opacity-90">(F9)</span>
+                    {checkoutLoading ? <Loader2 className="h-5 w-5 animate-spin shrink-0" /> : <Check className="h-5 w-5 shrink-0" strokeWidth={2.5} />}
+                    <span className="truncate">Confirm Payment</span>
+                    <span className="text-xs font-mono opacity-90 shrink-0">(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-12 w-12 rounded-xl flex items-center justify-center transition-all hover:opacity-90" style={{
+                  <button type="button" onClick={handleThermalPrint} className="h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all hover:opacity-90 self-stretch" style={{
                     background: isPosLight ? "#334155" : "var(--pos-input)",
                     color: "#ffffff",
                     border: "1px solid var(--pos-border)",
