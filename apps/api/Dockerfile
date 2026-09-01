@@ -15,7 +15,7 @@ COPY . .
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
 
 RUN npx prisma generate
-RUN pnpm build
+RUN npx nest build
 
 # ── Stage 2: Runner ───────────────────────────────────────────
 FROM node:20-slim AS runner
