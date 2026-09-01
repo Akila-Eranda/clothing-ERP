@@ -15,7 +15,7 @@ COPY . .
 
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
 RUN pnpm prisma generate
-RUN node -e "const fs=require('fs');const path=require('path');const pkg=path.dirname(require.resolve('@prisma/client/package.json'));const rel=path.relative(pkg,path.join('/app/node_modules/.prisma/client/default')).replace(/\\\\/g,'/');fs.writeFileSync(path.join(pkg,'index.js'),\"module.exports = require('\"+rel+\"');\\n\");const g=require('@prisma/client').Gender;if(!g)process.exit(1);"
+RUN node scripts/fix-prisma-client.js
 RUN pnpm run build
 
 ENV NODE_ENV=production
