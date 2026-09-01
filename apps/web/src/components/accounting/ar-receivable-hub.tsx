@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -248,9 +249,7 @@ function DashboardPanel() {
 
   if (loading && !data) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingCenter className="py-16" />
     );
   }
 

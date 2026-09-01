@@ -7,7 +7,7 @@ import {
   applyThemeColors,
   clearThemeColorOverrides,
   DEFAULT_THEME_COLORS,
-  type AccentChoice,
+  type DarkAccentChoice,
   type ThemeColorsState,
   THEME_COLORS_STORAGE_KEY,
 } from "@/lib/theme-colors";

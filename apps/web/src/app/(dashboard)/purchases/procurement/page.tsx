@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClipboardList, FileText, Loader2, PackageCheck, Plus, RefreshCw, RotateCcw,
@@ -487,7 +488,7 @@ export default function ProcurementHubPage() {
         <TabsContent value="requests" className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">Request stock → approve → convert to PO</p>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
               data={prs}
@@ -524,7 +525,7 @@ export default function ProcurementHubPage() {
             </Button>
           </div>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
               data={grns}
@@ -551,7 +552,7 @@ export default function ProcurementHubPage() {
         <TabsContent value="returns" className="mt-4 space-y-3">
           <p className="text-sm text-muted-foreground">Draft → Post deducts stock and reduces supplier balance.</p>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
               data={returns}
@@ -590,7 +591,7 @@ export default function ProcurementHubPage() {
             </div>
           </div>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
               data={invoices}

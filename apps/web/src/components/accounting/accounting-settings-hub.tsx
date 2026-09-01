@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -271,7 +272,7 @@ function FiscalPanel() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (
@@ -427,7 +428,7 @@ function CurrencyPanel() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (
@@ -509,7 +510,7 @@ function NumberSeriesPanel() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (
@@ -756,7 +757,7 @@ function TaxSettingsPanel() {
       </Dialog>
 
       {loading ? (
-        <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin" /></div>
+        <LoadingCenter className="py-8" size={56} />
       ) : (
         <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -868,7 +869,7 @@ function WorkflowPanel() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (
@@ -1035,7 +1036,7 @@ function PreferencesPanel() {
   );
 
   if (loading || !prefs) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (
@@ -1237,7 +1238,7 @@ function MappingsPanel() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter />;
   }
 
   return (

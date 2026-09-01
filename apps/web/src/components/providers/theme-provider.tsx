@@ -6,7 +6,12 @@ import type { ThemeProviderProps } from "next-themes";
 import { useThemeColorsStore } from "@/stores/theme-colors-store";
 
 function AccentSync() {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, theme, setTheme } = useTheme();
+  React.useEffect(() => {
+    if (theme === "system") {
+      setTheme(resolvedTheme === "dark" ? "dark" : "light");
+    }
+  }, [theme, resolvedTheme, setTheme]);
   React.useEffect(() => {
     useThemeColorsStore.getState().apply();
   }, [resolvedTheme]);
@@ -14,6 +19,15 @@ function AccentSync() {
     if (typeof document === "undefined") return;
     document.documentElement.setAttribute("data-theme", resolvedTheme === "dark" ? "dark" : "light");
   }, [resolvedTheme]);
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      useThemeColorsStore.getState().apply();
+    });
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
   return null;
 }
 

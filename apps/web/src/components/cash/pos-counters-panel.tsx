@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { Loader2, Monitor, Pencil, Plus, Power, PowerOff } from "lucide-react";
 import { toast } from "sonner";
@@ -170,9 +171,7 @@ export function PosCountersPanel() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="py-10 flex justify-center">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter className="py-10" />
           ) : rows.length === 0 ? (
             <p className="text-sm text-muted-foreground py-6 text-center">No counters yet. Create one on the left.</p>
           ) : (

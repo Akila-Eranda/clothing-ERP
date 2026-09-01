@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { Loader2, RefreshCw, Search, Wrench } from "lucide-react";
 import { toast } from "sonner";
@@ -147,7 +148,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
       const r = await api.get<{ data?: SaleRow[] }>(
         `/sales?search=${encodeURIComponent(query.trim())}&limit=8`,
       );
-      const rows = parseApiList(r.data);
+      const rows = parseApiList<SaleRow>(r.data);
       setSearchResults(rows);
       if (!rows.length) toast.error("No invoices found");
     } catch {
@@ -212,9 +213,7 @@ export function PosWarrantyPanel({ initialSaleId, onInitialSaleConsumed }: PosWa
 
   if (saleLoading && !sale) {
     return (
-      <div className="flex items-center justify-center flex-1">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
-      </div>
+      <LoadingCenter className="flex-1 py-0" size={88} />
     );
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { LoadingCenter } from "@/components/ui/loading";
 import { useParams, useRouter } from "next/navigation";
 import {
   Plus, Trash2, X, Loader2, Save,
@@ -380,11 +381,7 @@ export default function EditProductPage() {
   const margin = sp > 0 ? ((sp - cp) / sp * 100).toFixed(1) : "0.0";
 
   // ── Loading state ─────────────────────────────────────────────────────
-  if (fetchLoading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-    </div>
-  );
+  if (fetchLoading) return <LoadingCenter className="min-h-[60vh] py-0" size={88} />;
 
   // ── Return ────────────────────────────────────────────────────────────
   return (

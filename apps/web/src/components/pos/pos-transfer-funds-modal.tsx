@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { motion } from "framer-motion";
 import { ArrowLeftRight, Loader2, RefreshCw, X, Landmark, Monitor } from "lucide-react";
@@ -194,9 +195,7 @@ export function PosTransferFundsModal({ onClose, onTransferred }: PosTransferFun
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
-          </div>
+          <LoadingCenter className="py-16" size={88} />
         ) : shifts.length === 0 ? (
           <div className="p-6 text-center space-y-3">
             <p className="text-sm" style={{ color: "var(--pos-muted)" }}>

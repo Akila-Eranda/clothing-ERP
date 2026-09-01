@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -471,7 +472,7 @@ function AccountsOverviewPanel({
   );
 
   if (loading) {
-    return <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+    return <LoadingCenter className="py-16" />;
   }
 
   return (
@@ -920,7 +921,7 @@ function CashBookPanel() {
       </Dialog>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}
@@ -1399,7 +1400,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         </Dialog>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}
@@ -1720,7 +1721,7 @@ function ReconciliationPanel() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}

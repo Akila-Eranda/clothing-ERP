@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { X, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -65,7 +66,7 @@ export function ShiftDetailSheet({ shiftId, onClose }: { shiftId: string; onClos
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter size={88} />
           ) : shift ? (
             <>
               <div className="grid grid-cols-2 gap-3 text-sm">

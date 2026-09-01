@@ -50,6 +50,21 @@ export function tablePageCount(rowCount: number, pageSize = DEFAULT_PAGE_SIZE): 
 
 type CraftProps<TData, TValue> = Parameters<typeof BaseClientSideTable<TData, TValue>>[0];
 
+/** Strip server/query-mode props — this wrapper always filters client-side. */
+function stripQueryTableProps<T extends Record<string, unknown>>(p: T) {
+  const {
+    isQuerySearch: _iq,
+    searchableQuery: _sq,
+    filterableQuery: _fq,
+    isQueryPagination: _iqp,
+    paginationQuery: _pq,
+    isCursorPagination: _icp,
+    cursorPaginationQuery: _cpq,
+    ...rest
+  } = p;
+  return rest;
+}
+
 export type AppClientSideTableProps<TData, TValue> = Omit<
   CraftProps<TData, TValue>,
   "filterableColumns" | "searchableColumns"
@@ -184,13 +199,15 @@ export function ClientSideTable<TData, TValue>({
         <TableProvider config={mergedConfig}>
           <BaseClientSideTable
             key={filterKey}
-            {...props}
-            data={filteredRows}
-            pageCount={resolvedPageCount}
-            config={mergedConfig}
-            filterableColumns={[]}
-            searchableColumns={[]}
-            isShowExportButtons={isShowExportButtons ?? { isShow: false }}
+            {...({
+              ...stripQueryTableProps(props as Record<string, unknown>),
+              data: filteredRows,
+              pageCount: resolvedPageCount,
+              config: mergedConfig,
+              filterableColumns: [],
+              searchableColumns: [],
+              isShowExportButtons: isShowExportButtons ?? { isShow: false },
+            } as unknown as CraftProps<TData, TValue>)}
           />
         </TableProvider>
       </div>

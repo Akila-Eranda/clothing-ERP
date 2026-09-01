@@ -154,6 +154,25 @@ export const WORKSPACE: Record<ShopType, WorkspaceConfig> = {
       'Run promotions on weekends for higher foot traffic',
     ],
   },
+  [ShopType.BAKERY]: {
+    dashboardTitle: 'Bakery Dashboard',
+    dashboardSubtitle: 'Cakes, pastries, expiry tracking & custom orders',
+    customerLabel: 'Customers',
+    productLabel: 'Products',
+    topSellingLabel: 'Top Selling Items',
+    aiBrand: 'ShopAI™',
+    quickActions: [
+      { label: 'Open POS', pos: true, icon: 'pos' },
+      { label: 'Add Product', href: '/products', icon: 'product' },
+      { label: 'New Quotation', href: '/quotations', icon: 'report' },
+      { label: 'Expiry Check', href: '/inventory/expiry', icon: 'inventory' },
+    ],
+    tips: [
+      'Use Size and Flavour variants for cakes and pastries',
+      'Track expiry dates on fresh items and ingredients',
+      'Use quotations for custom cake orders',
+    ],
+  },
 };
 
 export function getWorkspace(type: ShopType | string | null | undefined): WorkspaceConfig {

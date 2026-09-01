@@ -82,7 +82,7 @@ export function ViewProductModal({ product, onClose, onEdit }: Props) {
                 { label: "Barcode",     value: product.barcode ?? "—" },
                 { label: "HSN / SAC",   value: product.hsn     ?? "—" },
                 { label: "Tax Rate",    value: `${product.taxRate}%` },
-                { label: "Variants",    value: `${product._count.variants} variant${product._count.variants !== 1 ? "s" : ""}` },
+                { label: "Variants",    value: `${product._count?.variants ?? 0} variant${(product._count?.variants ?? 0) !== 1 ? "s" : ""}` },
                 { label: "Has Variants",   value: product.hasVariants   ? "Yes" : "No" },
                 { label: "Track Inventory",value: product.trackInventory ? "Yes" : "No" },
               ].map((r) => (
@@ -139,7 +139,7 @@ export function ViewProductModal({ product, onClose, onEdit }: Props) {
             </span>
             <span className="flex items-center gap-1.5">
               <Layers className="h-3.5 w-3.5" />
-              {product._count.variants} variants
+              {product._count?.variants ?? 0} variants
             </span>
           </div>
         </div>

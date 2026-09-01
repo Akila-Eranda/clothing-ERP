@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -381,7 +382,7 @@ function ConfigPanel() {
         </Card>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}
@@ -685,7 +686,7 @@ function ReturnsPanel() {
       </Dialog>
 
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}

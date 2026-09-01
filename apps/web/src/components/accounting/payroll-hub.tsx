@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -220,9 +221,7 @@ function DashboardPanel({ onOpenPayslip }: { onOpenPayslip: (id: string) => void
 
   if (loading && !data) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingCenter className="py-16" />
     );
   }
 
@@ -736,7 +735,7 @@ function PayslipsPanel({
   return (
     <div className="grid lg:grid-cols-2 gap-4">
       {loading ? (
-        <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}

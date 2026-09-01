@@ -36,7 +36,7 @@ export function ProductBranchScopeSelect({
     api
       .get<{ data: BranchOption[] } | BranchOption[]>("/branches?limit=100")
       .then((r) => {
-        const list = parseApiList(r.data);
+        const list = parseApiList<BranchOption>(r.data);
         setBranches(list);
       })
       .catch(() => setBranches([]));

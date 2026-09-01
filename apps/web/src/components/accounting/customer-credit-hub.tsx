@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Bell, CalendarClock, CheckCircle2, FileBarChart, Loader2, Plus, RefreshCw, TrendingUp, Users, Wallet,
@@ -466,7 +467,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
         {section === "customers" && (
         <div className="mt-0">
           {loading && !customers.length ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
           fillHeight={false}
@@ -573,7 +574,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
         {section === "reminders" && (
         <div className="mt-4">
           {loading && !reminders.length ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
           fillHeight={false}

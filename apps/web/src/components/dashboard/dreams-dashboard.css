@@ -960,6 +960,8 @@
 
 /* Dark mode — DreamsPOS dark canvas + elevated cards */
 .dark .dreams-pos-dash {
+  --dp-secondary: #1a1a1a;
+  --dp-info: #fe9f43;
   --dp-border: hsl(0 0% 100% / 0.08);
   --dp-text: #d8dfee;
   --dp-muted: #9ca3af;

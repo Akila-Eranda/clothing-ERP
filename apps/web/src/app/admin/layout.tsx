@@ -1,5 +1,6 @@
 'use client'
 
+import { LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import AdminSidebar from '@/components/admin/AdminSidebar'
@@ -45,9 +46,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (!ready) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#f8fafc]">
-        <div className="w-8 h-8 border-2 border-gray-900 border-t-transparent rounded-full animate-spin" />
-      </div>
+      <LoadingScreen className="min-h-0 h-screen bg-background" />
     )
   }
 
@@ -59,7 +58,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (segments[1] === 'tenants' && segments[2]) title = 'Tenant Details'
 
   return (
-    <div className="admin-app-shell flex h-screen overflow-hidden bg-[#f8fafc]">
+    <div className="admin-app-shell flex h-screen overflow-hidden bg-background">
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black/30 z-40 lg:hidden"

@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { BarChart2, Loader2, RefreshCw, Receipt } from "lucide-react";
 import { toast } from "sonner";
@@ -186,9 +187,7 @@ export function PosSalesReportPanel({
       </div>
 
       {loading ? (
-        <div className="flex-1 flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
-        </div>
+        <LoadingCenter className="flex-1 py-0" size={88} />
       ) : (
         <div className="flex-1 min-h-0 overflow-y-auto space-y-3">
           {/* Live drawer — shift scoped */}

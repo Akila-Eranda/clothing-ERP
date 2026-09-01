@@ -1,5 +1,6 @@
 'use client'
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect } from 'react'
 import { X, Printer, Send, Loader2, FileText, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -151,7 +152,7 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
           <button
             onClick={handleSend}
             disabled={sending || loading || !invoice}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-primary text-white rounded-lg hover:brightness-105 disabled:opacity-50"
           >
             {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
             Send to Client
@@ -167,9 +168,7 @@ export default function SubscriptionInvoiceModal({ tenant, onClose }: Props) {
 
         <div className="flex-1 overflow-y-auto p-5">
           {loading ? (
-            <div className="flex items-center justify-center h-64">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
-            </div>
+            <LoadingCenter className="h-64 py-0" size={88} />
           ) : invoice ? (
             <SubscriptionInvoiceDocument invoice={invoice} monthLabel={monthLabel} />
           ) : null}

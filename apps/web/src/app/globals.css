@@ -1424,7 +1424,7 @@
 .dark .text-blue-300,
 .dark .dark\:text-blue-400,
 .dark .dark\:text-blue-300 {
-  color: hsl(var(--muted-foreground)) !important;
+  color: hsl(var(--primary)) !important;
 }
 
 .dark .bg-blue-500\/10,

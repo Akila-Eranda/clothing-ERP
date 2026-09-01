@@ -238,6 +238,18 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--accent-foreground", accentHsl);
     root.style.setProperty("--sidebar-accent", accentSoft);
     root.style.setProperty("--sidebar-accent-foreground", accentHsl);
+
+    /* Keep sidebar/header chrome aligned with dark shell */
+    root.style.setProperty("--retail-sidebar-bg", state.darkChromeBg);
+    root.style.setProperty("--retail-sidebar-fg", state.darkChromeFg);
+    root.style.setProperty("--retail-sidebar-muted", state.darkChromeMuted);
+    root.style.setProperty("--retail-sidebar-border", state.darkChromeBorder);
+    root.style.setProperty("--retail-sidebar-hover", "rgba(255, 255, 255, 0.05)");
+    root.style.setProperty("--retail-sidebar-active-bg", hexToRgba(state.darkChromeActive, 0.14));
+    root.style.setProperty("--retail-sidebar-active-fg", state.darkChromeActive);
+    root.style.setProperty("--retail-topbar-bg", state.darkChromeBg);
+    root.style.setProperty("--retail-topbar-fg", state.darkChromeFg);
+    root.style.setProperty("--retail-topbar-border", state.darkChromeBorder);
   } else {
     const preset = getAccentPreset(
       state.lightAccent === "custom" ? DEFAULT_ACCENT : state.lightAccent,
@@ -246,6 +258,19 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--accent-foreground", preset.primaryHover);
     root.style.setProperty("--sidebar-accent", preset.softBg);
     root.style.setProperty("--sidebar-accent-foreground", preset.activeTextLight);
+    root.style.setProperty("--retail-sidebar-active-bg", `hsl(${preset.softBg})`);
+    root.style.setProperty("--retail-sidebar-active-fg", `hsl(${preset.activeTextLight})`);
+
+    root.style.removeProperty("--retail-sidebar-bg");
+    root.style.removeProperty("--retail-sidebar-fg");
+    root.style.removeProperty("--retail-sidebar-muted");
+    root.style.removeProperty("--retail-sidebar-border");
+    root.style.removeProperty("--retail-sidebar-hover");
+    root.style.removeProperty("--retail-sidebar-active-bg");
+    root.style.removeProperty("--retail-sidebar-active-fg");
+    root.style.removeProperty("--retail-topbar-bg");
+    root.style.removeProperty("--retail-topbar-fg");
+    root.style.removeProperty("--retail-topbar-border");
   }
 
   /* Chrome (sidebar/header in dark default skins) */

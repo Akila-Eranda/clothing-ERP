@@ -1,8 +1,8 @@
 "use client";
 
+import { LoadingCenter } from "@/components/ui/loading";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { hasShopModule } from "@/lib/shop-vertical";
 import type { ShopProfile } from "@/lib/shop-profiles";
@@ -28,9 +28,7 @@ export function ModuleGate({
 
   if (!allowed) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <LoadingCenter className="min-h-[40vh] py-0" size={88} />
     );
   }
 

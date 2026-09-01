@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect } from "react";
 import { X, Phone, Mail, MapPin, Star, Crown, Diamond, Gift, Wallet, ShoppingBag, Calendar, Tag, Loader2, Plus, UserCheck, Car } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -244,7 +245,7 @@ export function ViewCustomerModal({ customerId, onClose, onEdit }: Props) {
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b shrink-0">
           {loading ? (
-            <div className="flex items-center justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter className="py-8" size={56} />
           ) : customer ? (
             <div className="flex items-start gap-4">
               <Avatar className="h-14 w-14 shrink-0">

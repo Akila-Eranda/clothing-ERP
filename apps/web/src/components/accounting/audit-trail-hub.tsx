@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Download, Eye, Loader2, LogIn, Printer, RefreshCw, Shield, Trash2, Pencil, Plus,
@@ -305,9 +306,7 @@ export function AuditTrailHub() {
       </Card>
 
       {loading && !rows.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter className="py-16" />
       ) : (
         <>
           <ClientSideTable

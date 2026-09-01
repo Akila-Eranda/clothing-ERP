@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { Loader2, Package, Scan, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -267,9 +268,7 @@ export function PosProductsPanel(props: Props) {
   const productArea = (
     <div className={cn("flex-1 overflow-y-auto p-3 min-w-0", retailUi && "pos-retail-product-grid")}>
       {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--pos-accent)" }} />
-        </div>
+        <LoadingCenter className="h-48 py-0" size={88} />
       ) : productCards.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-48" style={{ color: "var(--pos-muted-2)" }}>
           <Package className="h-12 w-12 mb-2 opacity-30" />

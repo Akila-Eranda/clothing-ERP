@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import {
   Loader2, Package, PackageCheck, Plus, Search, ScanLine, Trash2, X, Banknote,
@@ -362,9 +363,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
         </div>
 
         {booting ? (
-          <div className="flex-1 flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingCenter className="flex-1 py-20" />
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Supplier + notes */}

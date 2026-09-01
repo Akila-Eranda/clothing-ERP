@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -573,7 +574,7 @@ export default function WarehousePage() {
       {/* Locations */}
       {section === "locations" && (
         loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <LoadingCenter className="py-10" />
         ) : (
           <ClientSideTable
             data={locationRows}
@@ -614,7 +615,7 @@ export default function WarehousePage() {
             </Button>
           </div>
           {stockLoading ? (
-            <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter className="py-10" />
           ) : warehouses.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground border rounded-xl">
               <Warehouse className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -637,7 +638,7 @@ export default function WarehousePage() {
       {/* Transfers */}
       {section === "transfers" && (
         loading ? (
-          <div className="flex justify-center py-10"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <LoadingCenter className="py-10" />
         ) : (
           <ClientSideTable
             data={transfers}

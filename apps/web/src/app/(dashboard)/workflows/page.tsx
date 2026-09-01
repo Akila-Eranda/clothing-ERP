@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -366,9 +367,7 @@ export default function WorkflowsPage() {
 
       {/* Table */}
       {loading ? (
-        <div className="flex items-center justify-center py-24 rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter className="py-24 rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]" />
       ) : displayed.length === 0 ? (
         <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="flex flex-col items-center justify-center py-10 gap-3">

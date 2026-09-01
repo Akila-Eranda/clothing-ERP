@@ -62,7 +62,7 @@ async function warmSessionAfterLogin(
       "/branches?limit=50",
     )
     .then((br) => {
-      const raw = parseApiList(br.data);
+      const raw = parseApiList<{ id: string; name: string; code: string; isDefault?: boolean }>(br.data);
       const list = Array.isArray(raw) ? raw : [];
       const stored =
         typeof window !== "undefined" ? localStorage.getItem("fe_active_branch") : null;

@@ -255,11 +255,12 @@ function NavBadge({ text }: { text: string }) {
   const isPOS = text === "POS";
   return (
     <span
-      className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none"
-      style={      isPOS
-        ? { color: "#1D4ED8", background: "#EFF6FF" }
-        : { color: "#0891B2", background: "rgba(8,145,178,0.12)" }
-      }
+      className={cn(
+        "ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide leading-none",
+        isPOS
+          ? "bg-primary/15 text-primary"
+          : "bg-cyan-500/15 text-cyan-600 dark:text-cyan-400",
+      )}
     >
       {text}
     </span>
@@ -272,11 +273,9 @@ export function Sidebar() {
   const router    = useRouter();
   const { sidebarCollapsed, toggleSidebar, setMobileSidebarOpen } = useUIStore();
   const { logoutApi, user } = useAuthStore();
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const isDark    = theme === "dark";
-  const [mounted, setMounted] = React.useState(false);
-  React.useEffect(() => setMounted(true), []);
-  const darkUi    = mounted && resolvedTheme === "dark";
+  const { setTheme, resolvedTheme } = useTheme();
+  const darkUi = resolvedTheme === "dark";
+  const isDark = darkUi;
   const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
   const navGroups = useNavGroups();
@@ -315,12 +314,12 @@ export function Sidebar() {
   const textFull = dreamsDarkChrome ? chrome.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
   const hoverBg  = dreamsDarkChrome ? chrome.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
   const sectLbl  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
-  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(37,99,235,0.18)" : "#EFF6FF") + ")";
-  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#BFDBFE" : "#1D4ED8") + ")";
-  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "#2563EB") + ")";
-  const logoBg   = dreamsDarkChrome ? chrome.logoBg : (darkUi ? "#141414" : "#FFFFFF");
-  const planBadgeBg = dreamsDarkChrome ? chrome.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "#EFF6FF");
-  const planBadgeFg = dreamsDarkChrome ? chrome.activeFg : (darkUi ? "#FE9F43" : "#1D4ED8");
+  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(254, 159, 67, 0.14)" : "hsl(var(--sidebar-accent))") + ")";
+  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))") + ")";
+  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--primary))") + ")";
+  const logoBg   = dreamsDarkChrome ? chrome.logoBg : (darkUi ? "#141414" : "hsl(var(--card))");
+  const planBadgeBg = dreamsDarkChrome ? chrome.activeBg : (darkUi ? "rgba(254, 159, 67, 0.18)" : "hsl(var(--sidebar-accent))");
+  const planBadgeFg = dreamsDarkChrome ? chrome.activeFg : (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))");
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -590,7 +589,7 @@ export function Sidebar() {
               !showShopLogo && "text-xl",
             )}
             style={showShopLogo
-              ? { background: "#FFFFFF", border: `1px solid ${border}` }
+              ? { background: logoBg, border: `1px solid ${border}` }
               : { background: logoBg, border: `1px solid ${border}` }}
           >
             {showShopLogo ? (

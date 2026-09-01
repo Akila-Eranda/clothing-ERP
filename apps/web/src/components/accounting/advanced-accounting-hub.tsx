@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingCenter } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowRightLeft, BarChart3, Building2, CheckCircle2,
@@ -189,11 +190,12 @@ export function AdvancedAccountingHub() {
       setDashboard(dashboardRes.data);
       setDiagnostics(dashboardRes.data?.diagnostics ?? null);
       const raw = accountsRes.data as { flat?: Account[] } | Account[] | { data?: Account[] };
-      const accountList = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.flat)
-          ? raw.flat
-          : parseApiList<Account>(raw);
+      const accountList =
+        Array.isArray(raw)
+          ? raw
+          : raw && typeof raw === "object" && Array.isArray((raw as { flat?: Account[] }).flat)
+            ? (raw as { flat: Account[] }).flat
+            : parseApiList<Account>(raw);
       setAccounts(accountList.filter((a) => a.isActive !== false));
       setCostCenters(parseApiList(costRes.data));
       setBudgets(parseApiList(budgetRes.data));
@@ -356,12 +358,11 @@ export function AdvancedAccountingHub() {
 
   if (loading && !dashboard) {
     return (
-      <div className="page-shell min-h-[420px] grid place-items-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
-          <p className="text-sm text-muted-foreground mt-3">Loading advanced accounting…</p>
-        </div>
-      </div>
+      <LoadingCenter
+        className="min-h-[420px] py-0"
+        size={88}
+        label="Loading advanced accounting…"
+      />
     );
   }
 

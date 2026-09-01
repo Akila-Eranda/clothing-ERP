@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Loading } from "@/components/ui/loading";
 import { Loader2, MessageCircle, QrCode, RefreshCw, Unplug, Wifi } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -160,7 +161,7 @@ export function WhatsappSettingsTab() {
               ) : (
                 <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 bg-background/40 py-10 text-center">
                   {(status?.status === "connecting" || busy) ? (
-                    <Loader2 className="h-8 w-8 animate-spin text-amber-400" />
+                    <Loading size={64} />
                   ) : (
                     <QrCode className="h-8 w-8 text-muted-foreground/70" />
                   )}

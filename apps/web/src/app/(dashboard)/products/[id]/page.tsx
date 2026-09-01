@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { LoadingCenter } from "@/components/ui/loading";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, Edit2, Package, Tag, BarChart2, Layers,
@@ -107,11 +108,7 @@ export default function ProductDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-    </div>
-  );
+  if (loading) return <LoadingCenter className="min-h-[60vh] py-0" size={88} />;
 
   if (!product) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">

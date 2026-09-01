@@ -148,6 +148,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.SPARE_PARTS]: 'Manufacturers',
     [ShopType.TIRE_SHOP]: 'Tyre Brands',
     [ShopType.GENERAL]: 'Brands',
+    [ShopType.BAKERY]: 'Brands',
   };
 
   const supplierShort: Record<ShopType, string> = {
@@ -158,6 +159,7 @@ export function getSidebarLabels(ws: WorkspaceConfig, profile: ShopProfile): Rec
     [ShopType.SPARE_PARTS]: 'Distributors',
     [ShopType.TIRE_SHOP]: 'Distributors',
     [ShopType.GENERAL]: 'Suppliers',
+    [ShopType.BAKERY]: 'Suppliers',
   };
 
   return {
@@ -482,6 +484,26 @@ export function getBrandPageCopy(profile: ShopProfile, workspace: WorkspaceConfi
       ],
       csvFileName: 'general-brands-export',
     },
+    [ShopType.BAKERY]: {
+      pageTitle: 'Brands',
+      subtitle: 'Bakery & confectionery brands',
+      singular: 'Brand',
+      plural: 'Brands',
+      addButton: 'Add Brand',
+      addModalTitle: 'Add New Brand',
+      editModalTitle: 'Edit Brand',
+      addModalSubtitle: 'Create a bakery product brand',
+      nameLabel: 'Brand Name',
+      namePlaceholder: 'e.g. Local Bakery, Imported Chocolate',
+      descriptionPlaceholder: 'Brief description of this brand…',
+      activeHint: 'Brand visible in catalog and product forms',
+      tips: [
+        'Group cakes and pastries by brand for easier browsing',
+        'Filter reports by brand to see top sellers',
+        'Use brands on custom order quotations',
+      ],
+      csvFileName: 'bakery-brands-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -731,6 +753,36 @@ export function getSupplierPageCopy(profile: ShopProfile, _workspace: WorkspaceC
       ],
       csvFileName: 'general-suppliers-export',
     },
+    [ShopType.BAKERY]: {
+      pageTitle: 'Suppliers',
+      subtitle: 'Ingredient & packaging suppliers',
+      singular: 'Supplier',
+      plural: 'Suppliers',
+      addButton: 'Add Supplier',
+      addPageTitle: 'Add New Supplier',
+      editPageTitle: 'Edit Supplier',
+      editButton: 'Edit Supplier',
+      saveButton: 'Save Supplier',
+      updateButton: 'Update Supplier',
+      nameLabel: 'Supplier Name',
+      namePlaceholder: 'e.g. Flour Mill, Packaging Co.',
+      notesPlaceholder: 'Internal notes about this supplier…',
+      activeLabel: 'Active Supplier',
+      activeHint: 'Visible and available for purchase orders',
+      backLabel: 'Back to Suppliers',
+      backToDetailLabel: 'Back to Supplier',
+      addModalTitle: 'Add Supplier',
+      editModalTitle: 'Edit Supplier',
+      addModalSubtitle: 'Create a supplier profile',
+      paymentModalTitle: 'Record Supplier Payment',
+      detailsSectionTitle: 'Supplier Details',
+      tips: [
+        'Track flour, sugar and packaging suppliers separately',
+        'Record batch numbers on GRN for ingredients',
+        'Monitor expiry on incoming stock',
+      ],
+      csvFileName: 'bakery-suppliers-export',
+    },
   };
   const base = copies[profile.type] ?? copies[ShopType.CLOTHING];
   return {
@@ -749,6 +801,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.SPARE_PARTS]: 'Set OEM number, part type and warranty months. Map to compatible vehicles.',
     [ShopType.TIRE_SHOP]: 'Set tyre size, season, load index and speed rating. Map to compatible vehicles.',
     [ShopType.GENERAL]: 'Add products with optional Size/Variant attributes. Use barcodes for fast POS billing.',
+    [ShopType.BAKERY]: 'Use Size and Flavour variants. Track expiry on fresh items and ingredients.',
   };
   const placeholders: Record<ShopType, string> = {
     [ShopType.CLOTHING]: 'e.g. Premium Cotton T-Shirt',
@@ -758,6 +811,7 @@ export function getProductFormCopy(profile: ShopProfile, workspace: WorkspaceCon
     [ShopType.SPARE_PARTS]: 'e.g. Oil Filter — Toyota Axio',
     [ShopType.TIRE_SHOP]: 'e.g. Michelin Primacy 205/55R16',
     [ShopType.GENERAL]: 'e.g. Wireless Mouse, Shampoo 400ml',
+    [ShopType.BAKERY]: 'e.g. Chocolate Cake 1kg, Butter Croissant',
   };
   const lowTax = profile.type === ShopType.GROCERY || profile.type === ShopType.AGRICULTURE;
   return {

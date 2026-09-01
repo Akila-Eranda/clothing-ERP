@@ -862,7 +862,11 @@ export default function QuotationsPage() {
 
         {printQuote && (
           <QuotationPrintModal
-            quote={printQuote}
+            quote={{
+              ...printQuote,
+              taxAmount: printQuote.taxAmount ?? 0,
+              discountAmount: printQuote.discountAmount ?? 0,
+            }}
             shop={shopBranding}
             onClose={() => setPrintQuote(null)}
           />

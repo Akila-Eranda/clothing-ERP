@@ -1,5 +1,6 @@
 'use client'
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -148,9 +149,7 @@ export default function TenantDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
-      </div>
+      <LoadingCenter className="h-64 py-0" size={88} />
     )
   }
 

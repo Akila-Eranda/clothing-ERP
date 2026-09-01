@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect, useCallback } from "react";
 import {
   UserCog, Plus, Users, Clock, DollarSign, RefreshCw,
@@ -774,7 +775,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 </div>
               </div>
               {attnLoading ? (
-                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                <LoadingCenter />
               ) : attnRows.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground border rounded-xl"><Users className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load to fetch employees for this date</p></div>
               ) : (
@@ -806,7 +807,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 </Button>
               </div>
               {summaryLoading ? (
-                <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                <LoadingCenter />
               ) : summaryRows.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground border rounded-xl"><BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load Summary to view monthly attendance</p></div>
               ) : (
@@ -889,7 +890,7 @@ export function HrHub({ section }: { section: HrSection }) {
 
           {/* Payroll table */}
           {payLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : payrolls.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border rounded-xl">
               <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-30" />
@@ -944,7 +945,7 @@ export function HrHub({ section }: { section: HrSection }) {
           </div>
 
           {leaveLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : leaves.length === 0 ? (
             <div className="text-center py-12 text-muted-foreground border rounded-xl">
               <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-30" />

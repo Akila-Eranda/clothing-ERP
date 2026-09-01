@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, CalendarClock, CheckCircle2, Clock, FileBarChart, Loader2,
@@ -576,9 +577,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
 
       {section === "dashboard" && (
         loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingCenter />
         ) : (
           <ClientSideTable
           fillHeight={false}
@@ -598,9 +597,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             Showing lots expiring within {nearDays} days. Dispose write-offs or adjust quantities from Actions.
           </p>
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
           fillHeight={false}
@@ -621,9 +618,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             Expired stock is blocked at POS when Block Expired is ON. Use Dispose to write off as Damage.
           </p>
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
           fillHeight={false}
@@ -640,9 +635,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
 
       {section === "lots" && (
         loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingCenter />
         ) : (
           <ClientSideTable
           fillHeight={false}
@@ -658,9 +651,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
 
       {section === "transactions" && (
         loading ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingCenter />
         ) : (
           <ClientSideTable
           fillHeight={false}
@@ -712,9 +703,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter />
           ) : (
             <ClientSideTable
           fillHeight={false}

@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Sparkles,
   Sun,
-  Laptop,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,7 +25,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ACCENT_PRESETS, type AccentId } from "@/lib/accent-theme";
 import {
@@ -315,7 +313,8 @@ export function ThemeCustomizer() {
     reset: resetColors,
   } = colors;
 
-  const isDark = resolvedTheme === "dark";
+  const activeTheme = theme === "light" || theme === "dark" ? theme : (resolvedTheme ?? "light");
+  const previewIsDark = activeTheme === "dark";
 
   const pickLayout = (mode: LayoutMode) => {
     setLayout(mode);
@@ -335,8 +334,10 @@ export function ThemeCustomizer() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="theme-customizer-fab group"
+        className={cn("theme-customizer-fab group", open && "theme-customizer-fab--hidden")}
         aria-label="Open theme customizer"
+        aria-hidden={open}
+        tabIndex={open ? -1 : 0}
       >
         <span className="theme-customizer-fab__ring" aria-hidden />
         <span className="theme-customizer-fab__btn">
@@ -378,7 +379,7 @@ export function ThemeCustomizer() {
                 </button>
               </div>
 
-              <ThemePreviewStrip isDark={isDark} />
+              <ThemePreviewStrip isDark={previewIsDark} />
             </div>
 
             <div className="tc-tabs" role="tablist">
@@ -401,18 +402,17 @@ export function ThemeCustomizer() {
           <div className="tc-body">
             {tab === "general" && (
               <div className="tc-panel">
-                <Section title="Theme Mode" description="Choose light, dark or system" icon={Sun} defaultOpen>
-                  <div className="tc-segment">
+                <Section title="Theme Mode" description="Choose light or dark appearance" icon={Sun} defaultOpen>
+                  <div className="tc-segment tc-segment--two">
                     {([
                       { id: "light", label: "Light", icon: Sun },
                       { id: "dark", label: "Dark", icon: Moon },
-                      { id: "system", label: "Auto", icon: Laptop },
                     ] as const).map((item) => (
                       <button
                         key={item.id}
                         type="button"
                         onClick={() => setTheme(item.id)}
-                        className={cn("tc-segment__btn", theme === item.id && "tc-segment__btn--active")}
+                        className={cn("tc-segment__btn", activeTheme === item.id && "tc-segment__btn--active")}
                       >
                         <item.icon className="h-4 w-4" />
                         {item.label}
@@ -522,15 +522,14 @@ export function ThemeCustomizer() {
           </div>
 
           <div className="tc-footer">
-            <Button
+            <button
               type="button"
-              variant="outline"
               className="tc-reset-btn"
               onClick={handleReset}
             >
               <RotateCcw className="h-4 w-4" />
               Reset to defaults
-            </Button>
+            </button>
           </div>
         </SheetContent>
       </Sheet>

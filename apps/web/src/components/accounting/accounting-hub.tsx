@@ -60,7 +60,7 @@ const CAT_COLORS = ["#6366f1","#f43f5e","#10b981","#f59e0b","#3b82f6","#8b5cf6",
 const ACCT_TYPE_CFG: Record<string, { label: string; color: string; bg: string; grad: string }> = {
   ASSET:     { label: "Asset",     color: "text-emerald-600", bg: "bg-emerald-500/10", grad: "from-emerald-500 to-teal-500" },
   LIABILITY: { label: "Liability", color: "text-red-600",     bg: "bg-red-500/10",     grad: "from-red-500 to-rose-500" },
-  EQUITY:    { label: "Equity",    color: "text-blue-600",    bg: "bg-blue-500/10",    grad: "from-blue-500 to-indigo-500" },
+  EQUITY:    { label: "Equity",    color: "text-primary",    bg: "bg-primary/10",    grad: "from-primary to-primary/80" },
   REVENUE:   { label: "Revenue",   color: "text-violet-600",  bg: "bg-violet-500/10", grad: "from-violet-500 to-purple-500" },
   EXPENSE:   { label: "Expense",   color: "text-amber-600",   bg: "bg-amber-500/10",  grad: "from-amber-500 to-orange-500" },
 };
@@ -406,7 +406,9 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
       ]);
 
       const ok = <T,>(i: number): T | null =>
-        results[i].status === "fulfilled" ? (results[i] as PromiseFulfilledResult<{ data: T }>).value.data : null;
+        results[i].status === "fulfilled"
+          ? ((results[i] as PromiseFulfilledResult<unknown>).value as T)
+          : null;
 
       const expRes = ok<{ data: Expense[] }>(0);
       const accRes = ok<{ data?: Account[] } | Account[]>(1);
@@ -517,7 +519,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
               <Button variant="outline" size="sm" className="gap-1.5 h-8">
                 <Download className="h-3.5 w-3.5" /> Import Transaction
               </Button>
-              <Button size="sm" className="gap-1.5 h-8 bg-blue-600 hover:bg-blue-700" onClick={() => setAddJournalOpen(true)}>
+              <Button size="sm" className="gap-1.5 h-8" onClick={() => setAddJournalOpen(true)}>
                 <Plus className="h-3.5 w-3.5" /> New Journal Entry
               </Button>
           </div>
@@ -532,7 +534,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             {/* KPI Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
               {([
-                { label: "Total Assets",       value: bsAssets,   icon: CreditCard,  bg: "bg-blue-600",    up: bsEquity > 0,         change: bsAssets > 0 ? `Equity ratio: ${equityRatio.toFixed(1)}%` : "No balance sheet data" },
+                { label: "Total Assets",       value: bsAssets,   icon: CreditCard,  bg: "bg-primary",    up: bsEquity > 0,         change: bsAssets > 0 ? `Equity ratio: ${equityRatio.toFixed(1)}%` : "No balance sheet data" },
                 { label: "Total Liabilities",  value: bsLiab,     icon: Wallet,      bg: "bg-purple-600",  up: bsLiab < bsAssets,    change: bsAssets > 0 ? `Debt ratio: ${debtRatio.toFixed(1)}%` : "No balance sheet data" },
                 { label: "Total Equity",       value: bsEquity,   icon: BarChart2,   bg: "bg-emerald-600", up: bsEquity >= 0,        change: bsAssets > 0 ? `Retained: LKR ${formatNumber(Math.abs(bsRetained))}` : "No balance sheet data" },
                 { label: "Total Income (MTD)", value: tmRevenue,  icon: TrendingUp,  bg: "bg-orange-500",  up: revMoM !== null ? revMoM >= 0 : tmRevenue > 0,    change: revMoM !== null ? `${revMoM >= 0 ? "+" : ""}${revMoM.toFixed(1)}% from last month` : `${tmSales} sales this month` },
@@ -744,7 +746,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                 <Input type="date" value={plRange.end} onChange={(e) => setPlRange((p) => ({ ...p, end: e.target.value }))} className="h-7 text-xs w-32" />
                 <Button size="sm" variant="outline" onClick={loadAll} className="h-7 px-2"><RefreshCw className="h-3 w-3" /></Button>
               </div>
-              <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddExpenseOpen(true)}>
+              <Button size="sm" className="gap-1.5" onClick={() => setAddExpenseOpen(true)}>
                 <Plus className="h-3.5 w-3.5" /> Record Expense
               </Button>
             </div>
@@ -755,7 +757,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
               isShowExportButtons={{ isShow: true, fileName: "expenses-export" }} />
             <div className="flex items-center justify-between pt-2">
               <h2 className="text-sm font-semibold text-foreground">Journal Entries</h2>
-              <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddJournalOpen(true)}><Plus className="h-3.5 w-3.5" /> New Entry</Button>
+              <Button size="sm" className="gap-1.5" onClick={() => setAddJournalOpen(true)}><Plus className="h-3.5 w-3.5" /> New Entry</Button>
             </div>
             <ClientSideTable
           fillHeight={false} data={journalEntries} columns={journalCols} pageCount={Math.ceil(journalEntries.length / 20)}
@@ -771,7 +773,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
               <p className="text-sm text-muted-foreground">{accounts.length} accounts total</p>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setTrialOpen(true)}><Scale className="h-3.5 w-3.5" />Trial Balance</Button>
-                <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />New Account</Button>
+                <Button size="sm" className="gap-1.5" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />New Account</Button>
               </div>
             </div>
             {Object.entries(ACCT_TYPE_CFG).map(([typeKey, cfg]) => {
@@ -954,7 +956,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             {/* Cash Position Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { label: "Total Cash Position",  value: flatAccounts.filter(a=>a.type==="ASSET").reduce((s,a)=>s+a.balance,0),  icon: Wallet,    bg: "bg-blue-600",    sub: `${flatAccounts.filter(a=>a.type==="ASSET").length} asset accounts` },
+                { label: "Total Cash Position",  value: flatAccounts.filter(a=>a.type==="ASSET").reduce((s,a)=>s+a.balance,0),  icon: Wallet,    bg: "bg-primary",    sub: `${flatAccounts.filter(a=>a.type==="ASSET").length} asset accounts` },
                 { label: "Total Inflow (Period)", value: cashFlow?.totalInflow ?? 0,  icon: ArrowUpRight,   bg: "bg-emerald-600", sub: "From sales revenue" },
                 { label: "Total Outflow (Period)",value: cashFlow?.totalOutflow ?? 0, icon: ArrowDownRight, bg: "bg-red-500",     sub: "Expenses & payments" },
               ].map((item) => (
@@ -975,7 +977,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-foreground">Cash &amp; Bank Accounts</h3>
-                <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 h-8" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />Add Account</Button>
+                <Button size="sm" className="gap-1.5 h-8" onClick={() => setAddAccountOpen(true)}><Plus className="h-3.5 w-3.5" />Add Account</Button>
               </div>
               {flatAccounts.filter(a=>a.type==="ASSET").length === 0 ? (
                 <div className="h-32 flex items-center justify-center bg-card rounded-xl border text-muted-foreground text-sm">No asset accounts yet</div>

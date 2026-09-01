@@ -11,7 +11,7 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          cn(solidBadge, "border-blue-700 bg-blue-600 dark:border-blue-500 dark:bg-blue-600"),
+          cn(solidBadge, "border-primary/80 bg-primary dark:border-primary dark:bg-primary"),
         secondary:
           cn(solidBadge, "border-slate-600 bg-slate-600 dark:border-slate-500 dark:bg-slate-600"),
         destructive:

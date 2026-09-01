@@ -1,5 +1,6 @@
 'use client'
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect } from 'react'
 import { Settings, Shield, Database, Bell, Globe, Save, CheckCircle, Loader2, CreditCard } from 'lucide-react'
 import { toast } from 'sonner'
@@ -91,9 +92,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-300" />
-      </div>
+      <LoadingCenter className="h-64 py-0" size={88} />
     )
   }
 

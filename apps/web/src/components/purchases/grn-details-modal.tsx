@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -203,9 +204,7 @@ export function GrnDetailsModal({ grnId, onClose }: Props) {
         </div>
 
         {loading || !grn ? (
-          <div className="flex-1 flex items-center justify-center py-20">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <LoadingCenter className="flex-1 py-20" />
         ) : (
           <div className="flex-1 overflow-y-auto p-6 space-y-5">
             {/* Meta cards */}

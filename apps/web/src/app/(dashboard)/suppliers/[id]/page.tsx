@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import { LoadingCenter } from "@/components/ui/loading";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft, ChevronRight, Pencil, Phone, Mail, MapPin,
@@ -85,6 +86,7 @@ const PO_STATUS: Record<POStatus, { label: string; variant: "success" | "seconda
   CONFIRMED:          { label: "Confirmed",         variant: "default"   },
   PARTIALLY_RECEIVED: { label: "Partial",           variant: "warning"   },
   RECEIVED:           { label: "Received",          variant: "teal"      },
+  CLOSED:             { label: "Closed",              variant: "secondary" },
   CANCELLED:          { label: "Cancelled",         variant: "danger"    },
 };
 
@@ -454,11 +456,7 @@ export default function SupplierDetailPage() {
     }
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center min-h-[60vh]">
-      <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-    </div>
-  );
+  if (loading) return <LoadingCenter className="min-h-[60vh] py-0" size={88} />;
   if (!supplier) return null;
 
   const totalPOs     = supplier.purchases.length;

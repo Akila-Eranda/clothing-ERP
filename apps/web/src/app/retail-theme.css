@@ -689,8 +689,12 @@ body.mini-sidebar .hex-retail-sidebar {
   --retail-sidebar-muted: #64748b;
   --retail-sidebar-border: rgba(15, 23, 42, 0.08);
   --retail-sidebar-hover: #f1f5f9;
-  --retail-sidebar-active-bg: #eff6ff;
-  --retail-sidebar-active-fg: #1d4ed8;
+  --retail-sidebar-active-bg: hsl(var(--sidebar-accent));
+  --retail-sidebar-active-fg: hsl(var(--sidebar-accent-foreground));
+}
+
+html.dark .hex-retail-sidebar {
+  color-scheme: dark;
 }
 
 /* DreamsPOS dark mode — sidebar matches dark shell (not light strip) */
@@ -1296,8 +1300,8 @@ html.dark .hex-header__live {
 }
 
 .hex-retail-quick-btn:hover {
-  background: var(--retail-sidebar-active-bg, rgba(37, 99, 235, 0.1));
-  color: var(--retail-sidebar-active-fg, #1d4ed8);
+  background: var(--retail-sidebar-active-bg, hsl(var(--primary) / 0.1));
+  color: var(--retail-sidebar-active-fg, hsl(var(--primary)));
 }
 
 .hex-retail-submenu-hdr {

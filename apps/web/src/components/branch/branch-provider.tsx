@@ -69,8 +69,7 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
       .get<{ data: BranchOption[] }>("/branches?limit=50")
       .then((r) => {
         if (cancelled) return;
-        const raw = parseApiList(r.data);
-        const list = (Array.isArray(raw) ? raw : []).filter(
+        const list = parseApiList<BranchOption>(r.data).filter(
           (b) => b.isActive !== false,
         );
         setBranches(list);

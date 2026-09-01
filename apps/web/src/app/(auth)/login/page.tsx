@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { APP_NAME, STARTER_TRIAL_DAYS } from "@/lib/constants";
+import { Loading } from "@/components/ui/loading";
 import { AppLogo } from "@/components/brand/app-logo";
 import { AuthBrandPanel } from "@/components/auth/auth-brand-panel";
 import {
@@ -429,7 +430,7 @@ function LoginFallback() {
     <div className="min-h-screen flex flex-col lg:flex-row">
       <div className="hidden lg:block lg:w-1/2 bg-[#070d1a]" />
       <div className="flex-1 flex items-center justify-center bg-white min-h-screen">
-        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+        <Loading size={96} />
       </div>
     </div>
   );

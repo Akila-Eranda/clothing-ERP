@@ -343,7 +343,11 @@ export function PosQuickExpensePanel({
                 <PosRegisterSupplier
                   disabled={busy}
                   onRegistered={(s) => {
-                    setSuppliers((prev) => (prev.some((x) => x.id === s.id) ? prev : [{ ...s, balance: s.balance ?? 0 }, ...prev]));
+                    setSuppliers((prev) =>
+                      prev.some((x) => x.id === s.id)
+                        ? prev
+                        : [{ ...s, balance: s.balance ?? 0, code: s.code ?? undefined }, ...prev],
+                    );
                     setSupplierId(s.id);
                   }}
                 />

@@ -50,7 +50,7 @@ export default function ActivityLogsPage() {
     try {
       const res = await fetchPlatformAuditLogs({ page: '1', limit: '500' })
       setLogs(
-        parseApiList(res.data).map((log) => {
+        parseApiList<AuditLogRow>(res.data).map((log) => {
           const actor = log.user
             ? `${log.user.firstName ?? ''} ${log.user.lastName ?? ''}`.trim() || log.user.email
             : '—'

@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -88,7 +89,7 @@ function methodLabel(method?: string | null) {
 function methodTone(method?: string | null) {
   const key = (method ?? "").toUpperCase();
   if (key === "CASH") return "bg-emerald-600 text-white border-emerald-700";
-  if (key === "CARD") return "bg-blue-600 text-white border-blue-700";
+  if (key === "CARD") return "bg-primary text-white border-primary/80";
   if (key === "BANK_TRANSFER") return "bg-cyan-600 text-white border-cyan-700";
   if (key === "UPI" || key === "QR") return "bg-violet-600 text-white border-violet-700";
   if (key === "WALLET") return "bg-orange-600 text-white border-orange-700";
@@ -202,7 +203,7 @@ function SaleDetailModal({
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <LoadingCenter className="py-20" />
         ) : !sale ? (
           <div className="flex justify-center py-16 text-sm text-muted-foreground">Sale not found</div>
         ) : (

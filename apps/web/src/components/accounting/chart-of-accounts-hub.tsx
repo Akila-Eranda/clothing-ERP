@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ColumnDef } from "@tanstack/react-table";
 import {
@@ -634,9 +635,7 @@ export function ChartOfAccountsHub() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter className="py-16" />
       ) : visibleRows.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center text-sm text-muted-foreground space-y-3">

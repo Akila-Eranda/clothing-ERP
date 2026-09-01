@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 const solidWhite =
   "text-white [&_svg]:text-white hover:text-white hover:[&_svg]:text-white dark:text-white dark:[&_svg]:text-white dark:hover:text-white dark:hover:[&_svg]:text-white";
 
-/** DreamsPOS retail palette — orange primary CTAs, navy secondary / POS. */
+/** DreamsPOS retail palette — orange primary CTAs; neutral secondary in dark mode. */
 const dreamsOrange = "bg-[#fe9f43] hover:bg-[#fe9f43] dark:bg-[#fe9f43] dark:hover:bg-[#fe9f43]";
-const dreamsNavy = "bg-[#092c4c] hover:bg-[#092c4c] dark:bg-[#092c4c] dark:hover:bg-[#092c4c]";
+const dreamsNavy = "bg-[#092c4c] hover:bg-[#092c4c] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:border dark:border-border";
 
 /**
  * App-wide button design system — the ONLY button module for dashboard / admin / hubs.
@@ -32,11 +32,11 @@ const buttonVariants = cva(
         outline: cn(solidWhite, dreamsNavy),
         secondary: cn(
           solidWhite,
-          "bg-[#1e3a5f] hover:bg-[#1e3a5f] dark:bg-[#1e3a5f] dark:hover:bg-[#1e3a5f]",
+          "bg-[#1e3a5f] hover:bg-[#1e3a5f] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground",
         ),
         ghost: cn(
           solidWhite,
-          "bg-[#092c4c]/85 hover:bg-[#092c4c] dark:bg-[#092c4c]/90 dark:hover:bg-[#092c4c]",
+          "bg-[#092c4c]/85 hover:bg-[#092c4c] dark:bg-[hsl(var(--card))] dark:hover:bg-[hsl(var(--muted))] dark:text-foreground dark:[&_svg]:text-foreground",
         ),
         link: "font-medium text-primary underline-offset-4 hover:underline border-transparent shadow-none bg-transparent hover:brightness-100 active:scale-100",
         gradient: cn(solidWhite, dreamsOrange),

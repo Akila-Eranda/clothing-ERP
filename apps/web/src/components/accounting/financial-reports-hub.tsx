@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useState } from "react";
 import {
   FileSpreadsheet, FileText, Loader2, Printer, RefreshCw,
@@ -289,7 +290,7 @@ export function FinancialReportsHub() {
 
       <div id="financial-report-print" className="print:p-0">
         {loading ? (
-          <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          <LoadingCenter className="py-16" />
         ) : data ? (
           <ReportView reportId={reportId} data={data} />
         ) : (

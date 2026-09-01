@@ -215,7 +215,7 @@ export function DreamsCategoryDonut({
   totalProducts: number;
   totalCategories: number;
 }) {
-  const colors = ["#092C4C", "#E04F16", "#FE9F43", "#0E9384", "#6938EF"];
+  const colors = ["#FE9F43", "#E04F16", "#0E9384", "#6938EF", "#092C4C"];
   const slices = categories.slice(0, 3).map((c, i) => ({
     name: c.name,
     value: c.count,

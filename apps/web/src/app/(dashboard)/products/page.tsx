@@ -261,7 +261,7 @@ function buildColumns(
       size: 110,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Selling" />,
       cell: ({ row }) => (
-        <span className="whitespace-nowrap text-sm font-semibold text-blue-600">
+        <span className="whitespace-nowrap text-sm font-semibold text-primary">
           LKR {row.original.sellingPrice.toFixed(2)}
         </span>
       ),
@@ -345,7 +345,7 @@ export default function ProductsPage() {
   const inactive = products.filter((p) => p.status === "INACTIVE" || p.status === "OUT_OF_STOCK").length;
 
   const STATS = [
-    { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-primary", bg: "bg-primary/15", tint: "border-primary/20 bg-gradient-to-br from-primary/5 to-card dark:border-primary/20 dark:from-primary/10 dark:to-transparent" },
     { label: "Active", value: active, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
     { label: "Drafts", value: drafts, icon: FileText, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
     { label: "Inactive / OOS", value: inactive, icon: Archive, color: "text-rose-600", bg: "bg-rose-500/15", tint: "border-rose-200/70 bg-gradient-to-br from-rose-50 to-white dark:border-rose-500/20 dark:from-rose-500/10 dark:to-transparent" },

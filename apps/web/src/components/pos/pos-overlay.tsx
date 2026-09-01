@@ -1,4 +1,5 @@
 ﻿"use client";
+import { LoadingCenter } from "@/components/ui/loading";
 import * as React from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ShoppingCart, Plus, Minus, Trash2, User, Tag, Receipt, Banknote, CreditCard, PauseCircle, PlayCircle, Package, X, Check, Loader2, Star, CheckCircle2, Printer, Clock, Delete, Keyboard, Scan, BarChart2, RotateCcw, Settings, Lock, Users, FileText, ShoppingBag, Heart, RefreshCw, TrendingUp, TrendingDown, Menu, Wifi, ChevronRight, ChevronDown, ChevronLeft, AlertCircle, AlertTriangle, ExternalLink, UserCheck, Wrench, Monitor, Gift, Volume2, Hand, PackagePlus, FileCheck, Maximize2, Minimize2, Sparkles, Moon, Sun, MessageCircle, PanelLeftClose, PanelLeft, Landmark, QrCode, ArrowLeftRight, Smartphone } from "lucide-react";
@@ -19,7 +20,11 @@ import { POS_COLOR_DEFAULTS, usePosUiColors } from "@/lib/pos-ui-colors";
 import { posToolbarBtnStyle } from "@/lib/pos-toolbar-colors";
 import { getPosLayoutMeta, getPosLayoutUi } from "@/lib/pos-layouts";
 import { POS_LAYOUT_BRAIN } from "@/lib/pos-layout-contract";
-import { PosProductsPanel } from "@/components/pos/layouts/pos-products-panel";
+import {
+  PosProductsPanel,
+  type PosProductsPanelCard,
+  type PosProductsPanelProduct,
+} from "@/components/pos/layouts/pos-products-panel";
 import { PosCartPanel } from "@/components/pos/layouts/pos-cart-panel";
 import { PosLayoutCenterPanel, PosLayoutShell } from "@/components/pos/layouts/pos-layout-shell";
 import { PosRetailFeatureBar } from "@/components/pos/layouts/pos-retail-feature-bar";
@@ -83,7 +88,21 @@ interface POSOverlayProps {
   posOnly?: boolean;
 }
 
-interface ProductItem { variantId: string; productId?: string; productName: string; variantName: string; sku: string; barcode?: string; unitPrice: number; costPrice: number; mrp?: number; taxRate?: number; stock: number; category: string; color?: string; size?: string; material?: string; style?: string; imageUrl?: string; productKind?: string; unit?: string | null; allowDecimalSelling?: boolean; weightScaleReady?: boolean; }
+interface ProductItem extends PosProductsPanelProduct {
+  barcode?: string;
+  mrp?: number;
+  taxRate?: number;
+  size?: string;
+  style?: string;
+  productKind?: string;
+  unit?: string | null;
+  allowDecimalSelling?: boolean;
+  weightScaleReady?: boolean;
+}
+
+function mapEntries<K, V>(map: ReadonlyMap<K, V>): [K, V][] {
+  return Array.from(map.entries());
+}
 type AddPopupState = { productName: string; selected: ProductItem; variants: ProductItem[] };
 interface CustomerItem { id: string; name: string; phone: string; email?: string; tier?: string; loyaltyPoints: number; walletBalance: number; creditLimit: number; creditBalance: number; }
 
@@ -1305,8 +1324,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   }, [products, recentScans, liked]);
   /** Current page only (~20) â€” server already filtered by search/category */
   const filteredProducts = products;
-  const productCards = React.useMemo(() => {
-    const map = new Map<string, { rep: ProductItem; variants: ProductItem[]; totalStock: number; minPrice: number; maxPrice: number }>();
+  const productCards = React.useMemo((): PosProductsPanelCard[] => {
+    const map = new Map<string, PosProductsPanelCard>();
     for (const p of filteredProducts) {
       const key = p.productId || p.productName;
       if (map.has(key)) continue;
@@ -1404,13 +1423,14 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     }
   }, [addItem, profile, taxRate, soundAlerts, allowNegativeStock]);
 
-  const handleAddProduct = React.useCallback((p: ProductItem) => {
+  const handleAddProduct = React.useCallback((p: PosProductsPanelProduct) => {
+    const product = p as ProductItem;
     // Keyboard / recent-scan add: skip popup unless setting ON or weighted
-    if (confirmQtyPopup || needsPosWeightPopup(p)) {
-      openAddPopup(p);
+    if (confirmQtyPopup || needsPosWeightPopup(product)) {
+      openAddPopup(product);
       return;
     }
-    commitAddProduct(p, 1, { keepSearchFocus: true });
+    commitAddProduct(product, 1, { keepSearchFocus: true });
   }, [openAddPopup, commitAddProduct, confirmQtyPopup]);
 
   const scanAndAddProduct = React.useCallback(async (code: string) => {
@@ -1543,8 +1563,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     finishScan(found);
   }, [products, openAddPopup, commitAddProduct, soundAlerts, getVariants, confirmQtyPopup, lookupLocalBarcode]);
 
-  const handleCardClick = React.useCallback((p: ProductItem) => {
-    openAddPopup(p);
+  const handleCardClick = React.useCallback((p: PosProductsPanelProduct) => {
+    openAddPopup(p as ProductItem);
   }, [openAddPopup]);
 
   const handleSearchEnter = React.useCallback(() => {
@@ -2031,7 +2051,7 @@ ${receiptSoftwareCreditHtml()}
     }
     setCheckoutLoading(true);
     try {
-      const pm=new Map(products.map(p=>[p.variantId,p]));
+      const pm = new Map<string, ProductItem>(products.map((p) => [p.variantId, p]));
       const payload={
         customerId:customer?.id,
         items:items.map(i=>({
@@ -2731,7 +2751,7 @@ ${rows}
         recentScans={recentScans}
         products={products}
         variantLabel={(p) => variantDisplayLabel(p, profile)}
-        onPopularAdd={(p) => commitAddProduct(p, 1, { keepSearchFocus: true })}
+        onPopularAdd={(p) => commitAddProduct(p as ProductItem, 1, { keepSearchFocus: true })}
         onRecentAdd={handleAddProduct}
         onClearRecent={() => setRecentScans([])}
         onViewAll={() => {
@@ -2852,7 +2872,7 @@ ${rows}
                 <p className="text-xs mt-1 text-center opacity-70">Tap a customer to preview bills & top products, then Select to add to bill</p>
               </div>
             ) : customerInsightLoading ? (
-              <div className="flex items-center justify-center flex-1"><Loader2 className="h-7 w-7 animate-spin" style={{color:"var(--pos-accent)"}}/></div>
+              <LoadingCenter className="flex-1 py-0" size={80} />
             ) : (
               <>
                 <div className="shrink-0 pb-3 border-b" style={{ borderColor: "var(--pos-border)" }}>
@@ -3023,7 +3043,7 @@ ${rows}
     if (activeNav === "hold-bills") return (
       <div className="flex flex-col h-full overflow-hidden p-4 gap-3">
         <div className="flex items-center justify-between shrink-0"><h2 className="text-white font-bold text-base">Held Bills <span className="text-sm font-normal" style={{color:"var(--pos-muted)"}}>({serverHeldBills.length})</span></h2><div className="flex gap-2"><button onClick={loadHeldBills} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold border transition-all hover:bg-white/10" style={{borderColor:"var(--pos-border)",color:"var(--pos-muted)"}}><RefreshCw className={cn("h-3.5 w-3.5",holdsLoading&&"animate-spin")}/>Refresh</button><button onClick={()=>{if(items.length>0){handleHoldBill();}else toast.info("Cart is empty");}} className="flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold text-white" style={{background:"var(--pos-accent)"}}><PauseCircle className="h-3.5 w-3.5"/>Hold Current Bill</button></div></div>
-        {holdsLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 â€” stock is reserved on the server</p></div>):(
+        {holdsLoading?(<LoadingCenter className="flex-1 py-0" size={88} />):serverHeldBills.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><PauseCircle className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm font-medium">No bills on hold</p><p className="text-xs mt-1">Hold the current cart with F3 â€” stock is reserved on the server</p></div>):(
           <div className="flex-1 overflow-y-auto grid gap-3" style={{gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",alignContent:"start"}}>
             {serverHeldBills.map((bill,idx)=>{
               const billItems = bill.data?.items ?? [];
@@ -3054,7 +3074,7 @@ ${rows}
             <RefreshCw className={cn("h-3.5 w-3.5",ordersLoading&&"animate-spin")}/>Refresh
           </button>
         </div>
-        {ordersLoading?(<div className="flex items-center justify-center flex-1"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
+        {ordersLoading?(<LoadingCenter className="flex-1 py-0" size={88} />):orders.length===0?(<div className="flex flex-col items-center justify-center flex-1" style={{color:"var(--pos-muted-2)"}}><FileText className="h-16 w-16 mb-3 opacity-20"/><p className="text-sm">{viewAllSales ? "No sales today" : "No bills by you today"}</p><p className="text-xs mt-1 opacity-70">{viewAllSales ? "Branch sales appear here" : "Only your own sales are shown"}</p></div>):(
           <div className="flex-1 overflow-y-auto rounded-xl border" style={{borderColor:"var(--pos-border)"}}>
             <table className="w-full text-sm">
               <thead style={{position:"sticky",top:0,background:"var(--pos-panel)"}}><tr>{["Invoice","Customer","Items","Total","Method","Time","Status","Actions"].map(h=><th key={h} className="text-left px-3 py-2.5 text-[11px] font-semibold" style={{color:"var(--pos-muted)",borderBottom:"1px solid var(--pos-border)"}}>{h}</th>)}</tr></thead>
@@ -3155,10 +3175,10 @@ ${rows}
     // RETURNS FLOW
     if (activeNav === "returns") {
       const REASONS = returnReasons;
-      const selectedItems = Array.from(returnItems.entries()).filter(([,s])=>s.qty>0);
-      const refundTotal = selectedItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
-      const selectedExchangeItems = Array.from(exchangeItems.entries()).filter(([,s])=>s.qty>0);
-      const exchangeTotal = selectedExchangeItems.reduce((a,[,s])=>a+s.unitPrice*s.qty,0);
+      const selectedItems = mapEntries(returnItems).filter(([, s]) => s.qty > 0);
+      const refundTotal = selectedItems.reduce((a, [, s]) => a + s.unitPrice * s.qty, 0);
+      const selectedExchangeItems = mapEntries(exchangeItems).filter(([, s]) => s.qty > 0);
+      const exchangeTotal = selectedExchangeItems.reduce((a, [, s]) => a + s.unitPrice * s.qty, 0);
       const netRefund = returnType === "EXCHANGE" ? Math.max(0, refundTotal - exchangeTotal) : refundTotal;
       const exchangeDue = returnType === "EXCHANGE" ? Math.max(0, exchangeTotal - refundTotal) : 0;
       const exchangeProducts = products.filter(p=>{const q=exchangeSearch.toLowerCase();return !q||p.productName.toLowerCase().includes(q)||p.variantName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q);}).slice(0,30);
@@ -5309,7 +5329,7 @@ ${rows}
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                {holdsLoading?(<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin" style={{color:"var(--pos-accent)"}}/></div>):serverHeldBills.length===0?(
+                {holdsLoading?(<LoadingCenter size={88} />):serverHeldBills.length===0?(
                   <div className="flex flex-col items-center justify-center py-12" style={{color:"var(--pos-muted-2)"}}>
                     <PauseCircle className="h-12 w-12 mb-2 opacity-20"/>
                     <p className="text-sm">No bills on hold</p>

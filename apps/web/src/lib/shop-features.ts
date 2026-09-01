@@ -118,6 +118,18 @@ export const VERTICAL_FEATURES: Record<ShopType, ShopFeature[]> = {
     { label: 'Purchase Orders & GRN', live: true },
     { label: 'Sales & Profit Reports', live: true },
   ],
+  [ShopType.BAKERY]: [
+    { label: 'Fast POS Billing', live: true },
+    { label: 'Cake & Pastry Catalog', live: true },
+    { label: 'Size & Flavour Variants', live: true },
+    { label: 'Expiry Date Management', live: true },
+    { label: 'Batch Number Tracking', live: true },
+    { label: 'Custom Order Quotations', live: true },
+    { label: 'Supplier Management', live: true },
+    { label: 'Purchase Management', live: true },
+    { label: 'Stock Alerts', live: true },
+    { label: 'Daily Sales Reports', live: true },
+  ],
 };
 
 export function getVerticalFeatures(type: ShopType): ShopFeature[] {

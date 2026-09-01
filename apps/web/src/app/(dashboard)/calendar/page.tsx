@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle, Banknote, CalendarDays, CheckSquare, ChevronLeft, ChevronRight,
@@ -247,9 +248,7 @@ export default function BusinessCalendarPage() {
               </Button>
             </div>
             {loading ? (
-              <div className="flex justify-center py-16">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
+              <LoadingCenter className="py-16" />
             ) : (
               <>
                 <div className="grid grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground uppercase font-semibold">

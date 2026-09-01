@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import {
   createContext,
   useCallback,
@@ -827,9 +828,7 @@ export function PayableSection() {
     <div className="space-y-4">
       <AgingStrip buckets={ap?.buckets} />
       {loading && !ap ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}
@@ -851,9 +850,7 @@ export function ReceivableSection() {
     <div className="space-y-4">
       <AgingStrip buckets={ar?.buckets} />
       {loading && !ar ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter />
       ) : (
         <ClientSideTable
           fillHeight={false}

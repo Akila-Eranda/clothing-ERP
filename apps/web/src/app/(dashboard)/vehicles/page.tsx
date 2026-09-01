@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
@@ -452,9 +453,7 @@ export default function VehiclesPage() {
           </Card>
 
           {searching ? (
-            <div className="flex items-center justify-center py-12 rounded-xl border bg-card">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter className="py-12 rounded-xl border bg-card" size={88} />
           ) : !hasSearched ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
@@ -538,9 +537,7 @@ export default function VehiclesPage() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-10 rounded-xl border bg-card">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
+            <LoadingCenter className="py-10 rounded-xl border bg-card" size={88} />
           ) : (
             <div className="grid xl:grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -618,9 +615,7 @@ export default function VehiclesPage() {
           <div className="space-y-2">
             <h2 className="text-sm font-semibold">All Mappings ({allMappings.length})</h2>
             {loading ? (
-              <div className="flex items-center justify-center py-10 rounded-xl border bg-card">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
+              <LoadingCenter className="py-10 rounded-xl border bg-card" size={88} />
             ) : allMappings.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-12 gap-2">

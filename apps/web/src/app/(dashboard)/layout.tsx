@@ -1,5 +1,6 @@
 "use client";
 
+import { LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
@@ -60,17 +61,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   if (!mounted) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-      </div>
+      <LoadingScreen />
     );
   }
 
   if (!isAuthenticated && !hasStoredSession) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="h-8 w-8 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
-      </div>
+      <LoadingScreen />
     );
   }
 

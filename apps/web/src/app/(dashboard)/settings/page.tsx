@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -122,9 +123,7 @@ function ReceiptPrintLogCard() {
       </CardHeader>
       <CardContent>
         {loading && (
-          <div className="flex justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
+          <LoadingCenter className="py-8" />
         )}
         {!loading && logs.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-6">No print jobs logged yet</p>
@@ -202,7 +201,7 @@ function LoginHistoryCard() {
         </div>
       </CardHeader>
       <CardContent>
-        {loading && <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}
+        {loading && <LoadingCenter className="py-8" />}
         {!loading && (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -280,7 +279,7 @@ function AuditLogTab() {
             <Input value={resource} onChange={e=>setResource(e.target.value)} placeholder="Filter by resource..." className="w-48 h-9 text-sm"/>
             <Button size="sm" variant="outline" onClick={()=>load(1)} disabled={loading}><RefreshCw className={`h-3.5 w-3.5 ${loading?"animate-spin":""}`}/></Button>
           </div>
-          {loading&&<div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-primary"/></div>}
+          {loading&&<LoadingCenter className="py-8" />}
           {!loading&&(
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -379,7 +378,7 @@ function ReceiptPreview({ s, cashier }: { s: ReceiptSettings; cashier: string })
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, resolvedTheme } = useTheme();
   const [accent, setAccent] = React.useState<AccentId>("blue");
   React.useEffect(() => { setAccent(loadStoredAccent()); }, []);
   const pickAccent = (id: AccentId) => {
@@ -1159,7 +1158,7 @@ export default function SettingsPage() {
           </div>
 
           {branchesLoading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+            <LoadingCenter />
           ) : (
             <div className="grid gap-3">
               {branches.map(b => (
@@ -1282,22 +1281,24 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Palette className="h-4 w-4 text-primary" />Theme & Display</CardTitle>
-              <CardDescription>Choose light, dark, or follow the system</CardDescription>
+              <CardDescription>Choose light or dark appearance</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                {(["light","dark","system"] as const).map((t) => (
+              <div className="grid grid-cols-2 gap-3">
+                {(["light","dark"] as const).map((t) => {
+                  const active = (theme === "light" || theme === "dark" ? theme : resolvedTheme) === t;
+                  return (
                   <button
                     key={t}
                     type="button"
                     onClick={() => setTheme(t)}
-                    className={`p-4 rounded-[18px] border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${theme === t ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+                    className={`p-4 rounded-[18px] border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
                   >
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-[#080C14]" : t === "light" ? "bg-white border" : "bg-gradient-to-br from-white to-[#080C14]"}`} />
+                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-[#080C14]" : "bg-white border"}`} />
                     {t.charAt(0).toUpperCase() + t.slice(1)}
-                    {theme === t && <Check className="h-3.5 w-3.5" />}
+                    {active && <Check className="h-3.5 w-3.5" />}
                   </button>
-                ))}
+                );})}
               </div>
             </CardContent>
           </Card>

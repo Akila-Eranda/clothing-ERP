@@ -1,5 +1,6 @@
 "use client";
 
+import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarRange, CheckCircle2, Loader2, Lock, Plus, RefreshCw, Settings2,
@@ -326,9 +327,7 @@ export function FinancialPeriodsHub() {
       </div>
 
       {loading && !years.length ? (
-        <div className="flex justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <LoadingCenter className="py-16" />
       ) : !years.length ? (
         <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="p-12 text-center space-y-3">
