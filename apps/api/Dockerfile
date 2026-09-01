@@ -5,7 +5,7 @@ WORKDIR /app
 
 RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.9
 
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
@@ -14,7 +14,7 @@ COPY . .
 
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
 
-RUN pnpm prisma generate
+RUN npx prisma generate
 RUN pnpm build
 
 # ── Stage 2: Runner ───────────────────────────────────────────
@@ -30,7 +30,7 @@ RUN apt-get update -y && apt-get install -y --no-install-recommends openssl \
   && chmod 755 /usr/local/bin/wget /usr/local/bin/curl \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-RUN npm install -g pnpm
+RUN npm install -g pnpm@9.15.9
 
 ENV NODE_ENV=production
 
