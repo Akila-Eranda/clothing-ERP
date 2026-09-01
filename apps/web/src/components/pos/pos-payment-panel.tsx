@@ -170,12 +170,12 @@ export function PosPaymentPanel({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div
-          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 min-w-0"
           style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
         >
           <div className="flex items-center gap-2 min-w-0">
             <Split className="h-4 w-4 shrink-0" style={{ color: state.splitMode ? "var(--pos-accent)" : "var(--pos-muted)" }} />
-            <span className="text-sm font-semibold text-white truncate">Split payment</span>
+            <span className="text-sm font-semibold text-white leading-tight">Split pay</span>
           </div>
           <Switch
             checked={state.splitMode}
@@ -190,10 +190,10 @@ export function PosPaymentPanel({
           />
         </div>
         <div
-          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2"
+          className="rounded-xl px-3 py-2.5 flex items-center justify-between gap-2 min-w-0"
           style={{ background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}
         >
-          <span className="text-sm font-semibold text-white truncate">Partial pay</span>
+          <span className="text-sm font-semibold text-white leading-tight">Partial pay</span>
           <Switch checked={state.allowPartial} onCheckedChange={(v) => onStateChange({ allowPartial: v })} />
         </div>
       </div>

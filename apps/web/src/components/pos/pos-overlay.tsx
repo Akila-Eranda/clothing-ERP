@@ -4471,8 +4471,9 @@ ${rows}
                 </div>
               <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
                 {/* Left: bill + options */}
-                <div className={cn("pos-checkout-bill lg:w-[42%] lg:max-w-md lg:overflow-y-auto shrink-0 flex flex-col lg:border-r", posLayoutUi.checkoutWide && "lg:w-1/2 lg:max-w-none")} style={{ borderColor: "var(--pos-border)", background: isPosLight ? "var(--pos-elevated)" : "var(--pos-panel)" }}>
-                <div className="px-4 py-3 space-y-1.5">
+                <div className={cn("pos-checkout-bill lg:w-[42%] lg:max-w-md lg:overflow-y-auto shrink-0 flex flex-col lg:pr-1", posLayoutUi.checkoutWide && "lg:w-1/2 lg:max-w-none")} style={{ background: isPosLight ? "var(--pos-elevated)" : "transparent" }}>
+                <div className="px-4 py-3 space-y-2">
+                  <div className="rounded-xl border px-3 py-2.5 space-y-1.5" style={{ background: "var(--pos-input)", borderColor: "var(--pos-border)" }}>
                   <div className="flex justify-between text-sm" style={{color:"var(--pos-text-soft)"}}><span>Items</span><span style={{ color: "var(--pos-text)" }}>LKR {formatNumber(subtotal() + itemDiscountTotal)}</span></div>
                   {itemDiscountTotal>0.001&&<div className="flex justify-between text-sm" style={{color:"var(--pos-success-soft)"}}><span>Item discounts</span><span>âˆ’LKR {formatNumber(itemDiscountTotal)}</span></div>}
                   {cartDiscountAmt>0&&<div className="flex justify-between text-sm font-semibold" style={{color:"var(--pos-success-soft)"}}><span>Discount{discountType==="percentage"&&discount>0?` (${discount}%)`:discountType==="fixed"&&discount>0?` (LKR ${formatNumber(discount)})`:""}</span><span>âˆ’LKR {formatNumber(cartDiscountAmt)}</span></div>}
@@ -4485,8 +4486,9 @@ ${rows}
                     <span>LKR {formatNumber(taxAmount())}</span>
                   </div>
                   <div className="flex justify-between text-xl font-bold text-white pt-1 sm:hidden"><span>Pay</span><span style={{color:"var(--pos-price)"}}>LKR {formatNumber(totalAmt)}</span></div>
+                  </div>
 
-                  {/* Checkout discount â€” % or fixed LKR */}
+                  {/* Checkout discount — % or fixed LKR */}
                   <div className="pt-2 rounded-xl border px-3 py-2.5 space-y-2" style={{ background: "var(--pos-input)", borderColor: discount > 0 ? "rgba(16,185,129,0.4)" : "var(--pos-border)" }}>
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -4697,9 +4699,9 @@ ${rows}
                 </div>
 
                 {/* Right: methods + keypad + confirm */}
-                <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto" style={{ background: isPosLight ? "var(--pos-panel)" : "var(--pos-elevated)" }}>
-                <div className="pos-checkout-methods shrink-0 border-b px-4 py-3" style={{ borderColor: "var(--pos-border)" }}>
-                  <div className="pos-checkout-methods-grid grid grid-cols-7 gap-2 w-full min-w-0">
+                <div className="flex-1 flex flex-col min-w-0 lg:overflow-y-auto lg:border-l" style={{ borderColor: "var(--pos-border)", background: isPosLight ? "var(--pos-panel)" : "var(--pos-elevated)" }}>
+                <div className="pos-checkout-methods shrink-0 px-3 py-2.5">
+                  <div className="pos-checkout-methods-grid flex gap-1.5 flex-wrap w-full min-w-0">
                   {PAY_METHODS.map(({value,label,icon:Icon}, idx)=>{
                     const active = activePayment === value;
                     return (
@@ -4710,8 +4712,9 @@ ${rows}
                       onClick={()=>setActivePayment(value)}
                       {...(active ? { "data-pos-on-accent": "" } : {})}
                       className={cn(
-                        "pos-checkout-method-btn flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-[11px] font-bold transition-all hover:opacity-95 h-[4.25rem] w-full",
+                        "pos-checkout-method-btn flex-1 min-w-[4.5rem] flex flex-col items-center justify-center gap-0.5 rounded-xl text-[10px] sm:text-xs font-bold transition-all hover:opacity-95",
                         "pos-cta",
+                        touchMode ? "py-2.5" : "py-2",
                         active && "pos-checkout-method-btn-active",
                       )}
                       style={{
@@ -4725,7 +4728,7 @@ ${rows}
                         style={{ color: "#ffffff", stroke: "currentColor" }}
                       />
                       <span style={{ color: "#ffffff" }}>{label}</span>
-                      <span className="text-[9px] font-mono" style={{ color: "#ffffff" }}>
+                      <span className="text-[9px] font-mono opacity-80" style={{ color: "#ffffff" }}>
                         {idx + 1}
                       </span>
                     </button>
@@ -4816,9 +4819,9 @@ ${rows}
                   </div>
                 )}
                 {(activePayment==="CASH"||activePayment==="CUSTOMER_CREDIT")&&(
-                  <div ref={cashPanelRef} className="px-4 py-3 flex-1 flex flex-col min-h-0 w-full max-w-lg mx-auto">
+                  <div ref={cashPanelRef} className="px-4 py-3 flex-1 flex flex-col min-h-0">
                     <div className="flex items-center justify-between mb-2 gap-2">
-                      <span className="text-sm font-bold" style={{color:"var(--pos-text)"}}>
+                      <span className="text-base font-bold" style={{color:"var(--pos-text)"}}>
                         {activePayment === "CUSTOMER_CREDIT"
                           ? "Credit amount (LKR)"
                           : payState.allowPartial && (customer?.creditLimit ?? 0) > 0
@@ -4826,8 +4829,8 @@ ${rows}
                             : "Cash Received (LKR)"}
                       </span>
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md" style={{ color: "var(--pos-text-soft)", background: "var(--pos-input)", border: "1px solid var(--pos-border)" }}>F9</span>
-                        <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="h-8 w-8 rounded-lg flex items-center justify-center hover:bg-white/10" style={{ border: "1px solid var(--pos-border)" }} aria-label="Clear amount"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
+                        <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--pos-text-soft)" }}>F9</span>
+                        <button type="button" onClick={()=>{setNumpad("");setPartialPayAmount("");}} className="p-1 rounded-lg hover:bg-white/10" aria-label="Clear amount"><X className="h-4 w-4" style={{color:"var(--pos-muted)"}}/></button>
                       </div>
                     </div>
                     {activePayment === "CUSTOMER_CREDIT" && customer && (
@@ -4852,11 +4855,11 @@ ${rows}
                         if (activePayment === "CASH" && payState.allowPartial) setPartialPayAmount(clean);
                       }}
                       placeholder={activePayment === "CUSTOMER_CREDIT" ? formatNumber(totalAmt) : "Type amount…"}
-                      className="h-14 rounded-xl px-4 mb-2 font-bold text-2xl font-mono outline-none w-full"
+                      className="h-12 rounded-xl px-4 mb-2 font-bold text-2xl font-mono outline-none w-full"
                       style={{
-                        background: "var(--pos-panel)",
-                        color: "var(--pos-text)",
-                        border: activePayment === "CASH" && !(parseFloat(numpad) > 0) ? "2px solid #ef4444" : "1px solid var(--pos-border)",
+                        background: activePayment === "CUSTOMER_CREDIT" ? "rgba(79,110,247,0.12)" : "rgba(16,185,129,0.12)",
+                        color: activePayment === "CUSTOMER_CREDIT" ? "var(--pos-accent-soft)" : "var(--pos-success-soft)",
+                        border: activePayment === "CASH" && !(parseFloat(numpad) > 0) ? "1px solid rgba(239,68,68,0.55)" : "1px solid var(--pos-border)",
                       }}
                     />
                     {activePayment === "CASH" && !(parseFloat(numpad) > 0) && (
@@ -4881,34 +4884,33 @@ ${rows}
                         <span className="font-bold tabular-nums" style={{ color: "var(--pos-change)" }}>LKR {formatNumber(totalAmt - parseFloat(numpad))}</span>
                       </div>
                     )}
-                    <div className="pos-checkout-keypad-wrap flex gap-2 w-full">
-                      <div className="pos-checkout-keypad grid grid-cols-3 flex-1 min-w-0">
-                        {[["7","8","9"],["4","5","6"],["1","2","3"],["0",".","DEL"]].map((row,ri)=>row.map((k)=>{
-                          const isDel=k==="DEL";
-                          return(
-                            <button
-                              key={`${ri}-${k}`}
-                              type="button"
-                              onClick={() => handleNumpad(k)}
-                              className={cn("pos-checkout-key h-12 text-base font-bold transition-all active:opacity-80 flex items-center justify-center", isDel && "pos-checkout-key-del")}
-                            >
-                              {isDel ? <Delete className="h-4 w-4" strokeWidth={2.25}/> : k}
-                            </button>
-                          );
-                        }))}
-                      </div>
-                      <div className="pos-checkout-quick-cash grid grid-cols-1 w-[4.75rem] shrink-0">
-                        {[500,1000,2000,5000].map((amt)=>(
+                    <div className="pos-checkout-keypad grid gap-1.5 flex-1 content-start" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr" }}>
+                      {[["7","8","9","500"],["4","5","6","1000"],["1","2","3","2000"],["0",".","DEL","5000"]].map((row,ri)=>row.map((k,ki)=>{
+                        const isQuick = ki === 3;
+                        const isDel = k === "DEL";
+                        return (
                           <button
-                            key={amt}
+                            key={`${ri}-${ki}`}
                             type="button"
-                            onClick={()=>setQuickCash(amt)}
-                            className="pos-checkout-key pos-checkout-key-quick h-12 text-[11px] font-bold transition-all active:opacity-80 flex items-center justify-center"
+                            onClick={() => isQuick ? setQuickCash(parseInt(k, 10)) : handleNumpad(k)}
+                            className={cn(
+                              "pos-checkout-key h-11 rounded-lg text-sm font-bold transition-all active:scale-[0.98] flex items-center justify-center",
+                              isDel && "pos-checkout-key-del",
+                              isQuick && "pos-checkout-key-quick",
+                            )}
+                            style={{
+                              background: isQuick
+                                ? (isPosLight ? "#475569" : "var(--pos-border)")
+                                : isDel
+                                  ? (isPosLight ? "#dc2626" : "rgba(239,68,68,0.18)")
+                                  : (isPosLight ? "#334155" : "var(--pos-input)"),
+                              color: isDel && !isPosLight ? "#f87171" : "#ffffff",
+                            }}
                           >
-                            {amt}
+                            {isDel ? <Delete className="h-4 w-4" strokeWidth={2.25}/> : k}
                           </button>
-                        ))}
-                      </div>
+                        );
+                      }))}
                     </div>
                   </div>
                 )}
@@ -4920,17 +4922,17 @@ ${rows}
                   </div>
                 )}
                 {numpad&&parseFloat(numpad)>=totalAmt&&activePayment==="CASH"&&(
-                  <div className="pos-checkout-change-bar flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-auto mb-2 w-full max-w-lg" style={{ background: "var(--pos-input)", border: "1px solid var(--pos-success)" }}>
+                  <div className="pos-checkout-change-bar flex justify-between items-center px-4 py-2.5 shrink-0 rounded-xl mx-4 mb-1" style={{ background: "rgba(16,185,129,0.14)", border: "1px solid var(--pos-success)" }}>
                     <span className="text-sm font-bold" style={{ color: "#ffffff" }}>Change</span>
                     <span className="font-bold font-mono text-xl tabular-nums" style={{ color: "#ffffff" }}>LKR {formatNumber(changeAmt)}</span>
                   </div>
                 )}
-                <div className="pos-checkout-actions flex items-stretch gap-2 p-4 border-t shrink-0 mt-auto w-full max-w-lg mx-auto" style={{ borderColor: "var(--pos-border)" }}>
-                  <button onClick={handleSplitBill} disabled={items.length < 2} className="pos-cta h-12 px-4 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 shrink-0 self-stretch flex items-center justify-center" style={{
+                <div className="pos-checkout-actions flex items-stretch gap-2 p-3 border-t shrink-0 mt-auto" style={{ borderColor: "var(--pos-border)" }}>
+                  <button onClick={handleSplitBill} disabled={items.length < 2} className="pos-cta h-11 px-3 rounded-xl text-xs font-bold transition-all hover:opacity-90 disabled:opacity-40 shrink-0 flex items-center justify-center" style={{
                     color: "#ffffff",
                     background: isPosLight ? "#334155" : "var(--pos-input)",
-                    border: "1px solid var(--pos-border-strong)",
-                    minWidth: "5.5rem",
+                    border: "1px solid var(--pos-border)",
+                    minWidth: "5.25rem",
                   }}>
                     Split Bill
                   </button>
@@ -4940,20 +4942,20 @@ ${rows}
                     data-pos-accent=""
                     onClick={() => void handleCheckout()}
                     disabled={checkoutLoading||items.length===0||(activePayment==="CASH"&&!payState.splitMode&&!(parseFloat(numpad)>0))}
-                    className="pos-cta flex-1 h-12 min-w-0 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                    className="pos-cta flex-1 h-11 min-w-0 rounded-xl flex items-center justify-center gap-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
                     style={{ background: "var(--pos-success)", color: "#ffffff", border: "1px solid var(--pos-success-2)" }}
                   >
                     {checkoutLoading ? <Loader2 className="h-5 w-5 animate-spin shrink-0" /> : <Check className="h-5 w-5 shrink-0" strokeWidth={2.5} />}
                     <span className="truncate">Confirm Payment</span>
-                    <span className="text-xs font-mono opacity-90 shrink-0">(F9)</span>
+                    <span className="text-xs font-mono opacity-90 shrink-0 hidden sm:inline">(F9)</span>
                   </button>
-                  <button type="button" onClick={handleThermalPrint} className="h-12 w-12 shrink-0 rounded-xl flex items-center justify-center transition-all hover:opacity-90 self-stretch" style={{
+                  <button type="button" onClick={handleThermalPrint} className="h-11 w-11 shrink-0 rounded-xl flex items-center justify-center transition-all hover:opacity-90" style={{
                     background: isPosLight ? "#334155" : "var(--pos-input)",
                     color: "#ffffff",
                     border: "1px solid var(--pos-border)",
                   }} title="Print (F10)"><Printer className="h-5 w-5" style={{color: "#ffffff"}} strokeWidth={2.25}/></button>
                 </div>
-                <p className="px-4 pb-3 text-[11px] text-center shrink-0 font-medium" style={{ color: "var(--pos-text-soft)" }}>
+                <p className="px-4 pb-3 text-[10px] text-center shrink-0" style={{ color: "var(--pos-muted)" }}>
                   ← → / Tab method · 1–5 pick · / coupon · L partial · Shift+S split · Ctrl+1–4 quick cash · F9 confirm · Esc close
                 </p>
                 </div>
