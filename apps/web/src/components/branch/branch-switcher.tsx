@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useBranchStore } from "@/stores/branch-store";
 import { useBranchContext, type BranchOption } from "./branch-provider";
+import { cn } from "@/lib/utils";
 
 export function BranchSwitcher({ className }: { className?: string }) {
   const { branches } = useBranchContext();
