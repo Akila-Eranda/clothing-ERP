@@ -6,10 +6,16 @@ const generated = path.join(process.cwd(), 'node_modules', '.prisma', 'client', 
 let rel = path.relative(pkgDir, generated).replace(/\\/g, '/');
 if (!rel.startsWith('.')) rel = `./${rel}`;
 
-fs.writeFileSync(path.join(pkgDir, 'index.js'), `module.exports = require('${rel}');\n`);
+// pnpm: @prisma/client/default.js uses broken relative `.prisma/client` — repoint to hoisted generated client
+fs.writeFileSync(
+  path.join(pkgDir, 'default.js'),
+  `module.exports = { ...require('${rel}') };\n`,
+);
 
 const resolved = require.resolve('@prisma/client');
 delete require.cache[resolved];
+delete require.cache[path.join(pkgDir, 'default.js')];
+
 const client = require('@prisma/client');
 if (!client.Gender) {
   console.error('Prisma client enums missing after patch', Object.keys(client));
