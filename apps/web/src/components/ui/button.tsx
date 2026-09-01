@@ -3,6 +3,10 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/** Solid fills — white label + icon in light and dark themes. */
+const solidWhite =
+  "text-white [&_svg]:text-white hover:text-white hover:[&_svg]:text-white dark:text-white dark:[&_svg]:text-white dark:hover:text-white dark:hover:[&_svg]:text-white";
+
 /**
  * App-wide button design system — the ONLY button module for dashboard / admin / hubs.
  *
@@ -12,34 +16,60 @@ import { cn } from "@/lib/utils";
  * Exceptions: POS shell (`pos-overlay`) and print HTML keep local controls.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold leading-none transition-all duration-150 ease-out focus-visible:outline-none focus-visible:ring-[4px] focus-visible:ring-[var(--primary-glow)] disabled:pointer-events-none disabled:opacity-50 overflow-visible [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border shadow-sm hover:brightness-110 active:scale-[0.98]",
   {
     variants: {
       variant: {
-        default:
-          "bg-gradient-to-b from-[hsl(var(--primary-light))] to-[hsl(var(--primary))] text-primary-foreground shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-[hsl(var(--primary))] hover:to-[hsl(var(--primary-hover))] hover:shadow-[0_4px_14px_hsl(var(--primary)/0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98] active:shadow-none",
-        outline:
-          "border border-slate-200/90 bg-[#F8FAFC] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] [&_svg]:text-slate-500 hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:[&_svg]:text-slate-700 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/12 dark:bg-white/[0.04] dark:text-foreground dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))] dark:hover:border-white/25 dark:hover:[&_svg]:text-foreground",
-        secondary:
-          "border border-slate-200/90 bg-[#F8FAFC] text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.04)] [&_svg]:text-slate-500 hover:bg-white hover:border-slate-300 hover:-translate-y-px hover:shadow-[0_4px_12px_rgba(15,23,42,0.08)] active:translate-y-0 active:scale-[0.98] dark:border-white/12 dark:bg-white/[0.04] dark:text-foreground dark:shadow-none dark:hover:bg-[hsl(var(--card-hover))]",
-        ghost:
-          "font-medium hover:bg-[hsl(var(--primary-soft))] hover:text-[hsl(var(--primary-hover))] active:scale-[0.98] dark:hover:bg-white/[0.04]",
-        link: "font-medium text-primary underline-offset-4 hover:underline",
-        gradient:
-          "gradient-primary text-white shadow-button hover:opacity-90 hover:-translate-y-px hover:shadow-[0_4px_14px_hsl(var(--primary)/0.35)] active:translate-y-0 active:scale-[0.98]",
-        success:
-          "bg-gradient-to-b from-emerald-500 to-emerald-600 text-white shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-emerald-600 hover:to-emerald-700 hover:shadow-[0_4px_14px_rgba(16,185,129,0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
-        warning:
-          "bg-gradient-to-b from-amber-400 to-amber-500 text-white shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-amber-500 hover:to-amber-600 hover:shadow-[0_4px_14px_rgba(245,158,11,0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
-        /** Solid red CTA (close shift, hard delete confirm). Prefer over ad-hoc bg-red-600. */
-        danger:
-          "bg-gradient-to-b from-red-500 to-red-600 text-white shadow-[0_1px_2px_rgba(15,23,42,0.24),inset_0_1px_0_rgba(255,255,255,0.18)] hover:from-red-600 hover:to-red-700 hover:shadow-[0_4px_14px_rgba(239,68,68,0.35)] hover:-translate-y-px active:translate-y-0 active:scale-[0.98]",
-        /** Soft red outline (cancel / non-primary destructive). */
-        destructive:
-          "bg-white text-[#EF4444] border border-[#FCA5A5] shadow-[0_1px_2px_rgba(15,23,42,0.05)] hover:bg-red-50 hover:border-red-400 hover:-translate-y-px hover:shadow-[0_3px_10px_rgba(239,68,68,0.15)] active:translate-y-0 active:scale-[0.98] dark:bg-destructive dark:text-destructive-foreground dark:border-transparent dark:hover:bg-destructive/90",
-        /** Filter / date / float chips — pair with variant="success" when selected. */
-        chip:
-          "border border-border bg-background text-muted-foreground shadow-none hover:bg-muted hover:text-foreground active:scale-[0.98]",
+        default: cn(
+          solidWhite,
+          "bg-blue-600 border-blue-700 hover:bg-blue-600 dark:bg-blue-600 dark:border-blue-500",
+        ),
+        outline: cn(
+          solidWhite,
+          "bg-indigo-600 border-indigo-700 hover:bg-indigo-600 dark:bg-indigo-600 dark:border-indigo-500",
+        ),
+        secondary: cn(
+          solidWhite,
+          "bg-slate-600 border-slate-700 hover:bg-slate-600 dark:bg-slate-600 dark:border-slate-500",
+        ),
+        ghost: cn(
+          solidWhite,
+          "bg-slate-500/90 border-slate-600 hover:bg-slate-600 dark:bg-slate-600 dark:border-slate-500",
+        ),
+        link: "font-medium text-primary underline-offset-4 hover:underline border-transparent shadow-none bg-transparent hover:brightness-100 active:scale-100",
+        gradient: cn(
+          solidWhite,
+          "bg-blue-600 border-blue-700 hover:bg-blue-600 dark:bg-blue-600 dark:border-blue-500",
+        ),
+        success: cn(
+          solidWhite,
+          "bg-emerald-600 border-emerald-700 hover:bg-emerald-600 dark:bg-emerald-600 dark:border-emerald-500",
+        ),
+        warning: cn(
+          solidWhite,
+          "bg-orange-600 border-orange-700 hover:bg-orange-600 dark:bg-orange-600 dark:border-orange-500",
+        ),
+        danger: cn(
+          solidWhite,
+          "bg-rose-600 border-rose-700 hover:bg-rose-600 dark:bg-rose-600 dark:border-rose-500",
+        ),
+        destructive: cn(
+          solidWhite,
+          "bg-red-600 border-red-700 hover:bg-red-600 dark:bg-red-600 dark:border-red-500",
+        ),
+        info: cn(
+          solidWhite,
+          "bg-cyan-600 border-cyan-700 hover:bg-cyan-600 dark:bg-cyan-600 dark:border-cyan-500",
+        ),
+        violet: cn(
+          solidWhite,
+          "bg-violet-600 border-violet-700 hover:bg-violet-600 dark:bg-violet-600 dark:border-violet-500",
+        ),
+        /** Filter / date chips — unselected slate, selected = success elsewhere */
+        chip: cn(
+          solidWhite,
+          "bg-slate-500 border-slate-600 hover:bg-slate-600 dark:bg-slate-600 dark:border-slate-500",
+        ),
       },
       size: {
         default: "h-10 min-h-10 px-4 py-0",
