@@ -35,9 +35,9 @@ RUN npm install -g pnpm@9.15.9
 ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml* ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+RUN pnpm install --prod --frozen-lockfile && npx prisma generate
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
