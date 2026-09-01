@@ -536,7 +536,7 @@
     border-color: hsl(var(--border));
   }
   [data-table-craft] > .max-md\:hidden button {
-    border-radius: 0.375rem;
+    border-radius: 0;
     height: var(--dt-control-h);
     font-size: 0.8125rem;
     font-weight: 600;
@@ -558,7 +558,7 @@
   /* Faceted filter pills — compact, single-row with search */
   [data-table-craft] > .max-md\:hidden button[role="combobox"],
   [data-table-craft] button[role="combobox"] {
-    border-radius: 0.375rem !important;
+    border-radius: 0 !important;
     padding-inline: 0.75rem;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
@@ -789,7 +789,7 @@
     background: hsl(var(--secondary) / 0.45);
   }
   [data-table-craft] nav[aria-label] button {
-    border-radius: 0.375rem;
+    border-radius: 0;
     height: 2rem;
     min-width: 2rem;
     font-size: 0.75rem;

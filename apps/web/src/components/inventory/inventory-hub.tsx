@@ -89,7 +89,7 @@ function ageBucket(days: number) {
 }
 
 /** Solid header actions — white label/icon in light and dark themes */
-const INV_HUB_BTN = "rounded-md gap-1.5 text-sm px-3.5";
+const INV_HUB_BTN = "rounded-none gap-1.5 text-sm px-3.5";
 
 const ABC_COLUMNS: ColumnDef<AbcRow>[] = [
   {
