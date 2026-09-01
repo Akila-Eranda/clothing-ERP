@@ -491,7 +491,7 @@
   /* Table stripes — Hexalyte: zebra off; row hover only */
   .table-stripe tbody tr:nth-child(even),
   .table-stripe tbody tr:nth-child(odd) {
-    background: transparent;
+    background: hsl(var(--card));
   }
   .table-stripe tbody tr:hover {
     background: hsl(var(--hover)) !important;
@@ -610,7 +610,7 @@
   }
   [data-table-craft] > .max-md\:hidden .rounded-lg.border.bg-muted\/30 {
     border-radius: 0.75rem;
-    background: hsl(var(--muted) / 0.5);
+    background: hsl(var(--card));
     border-color: hsl(var(--border));
   }
   [data-table-craft] > .max-md\:hidden button {
@@ -715,7 +715,8 @@
 
   /* Sticky header band — white (override library bg-muted/50) */
   [data-table-craft] thead,
-  [data-table-craft] thead tr {
+  [data-table-craft] thead tr,
+  [data-table-craft] thead.bg-muted\/50 {
     background: hsl(var(--card)) !important;
     position: sticky;
     top: 0;
@@ -1012,12 +1013,39 @@
   }
   .enterprise-table tbody tr {
     transition: background-color 0.14s ease;
+    background: hsl(var(--card));
   }
   .enterprise-table tbody tr:hover {
     background: hsl(var(--primary) / 0.04);
   }
   .dark .enterprise-table tbody tr:hover {
     background: hsl(var(--primary) / 0.08);
+  }
+
+  /* ── White tables app-wide (dashboard, admin, hub grids) ───────────── */
+  .dashboard-shell main table,
+  .admin-app-shell main table {
+    background: hsl(var(--card));
+  }
+  .dashboard-shell main table thead,
+  .dashboard-shell main table thead tr,
+  .admin-app-shell main table thead,
+  .admin-app-shell main table thead tr,
+  .dashboard-shell main table thead.bg-muted\/50,
+  .admin-app-shell main table thead.bg-muted\/50 {
+    background: hsl(var(--card)) !important;
+  }
+  .dashboard-shell main table tbody tr,
+  .admin-app-shell main table tbody tr {
+    background: hsl(var(--card)) !important;
+  }
+  .dashboard-shell main table tbody tr:hover,
+  .admin-app-shell main table tbody tr:hover {
+    background: hsl(var(--primary) / 0.04) !important;
+  }
+  .dark .dashboard-shell main table tbody tr:hover,
+  .dark .admin-app-shell main table tbody tr:hover {
+    background: hsl(var(--primary) / 0.08) !important;
   }
 
   /* Animated border */
