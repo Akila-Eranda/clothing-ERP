@@ -549,8 +549,7 @@
       gap: 0.5rem;
       padding: 0.875rem 1rem;
       border-bottom: 1px solid hsl(var(--border) / 0.85);
-      background:
-        linear-gradient(180deg, hsl(var(--secondary-background) / 0.7), hsl(var(--card)));
+      background: hsl(var(--card));
     }
   }
 
@@ -558,8 +557,7 @@
   [data-table-craft] > .max-md\:hidden {
     padding: 0.875rem 1.125rem;
     border-bottom: 1px solid hsl(var(--border) / 0.85);
-    background:
-      linear-gradient(180deg, hsl(var(--secondary-background) / 0.85), hsl(var(--card)));
+    background: hsl(var(--card));
   }
   .dark [data-table-craft] > .max-md\:hidden {
     border-bottom-color: rgba(255, 255, 255, 0.06);
@@ -697,6 +695,8 @@
     height: auto !important;
     min-height: 0 !important;
     max-height: none !important;
+    background: hsl(var(--card));
+  }
     flex: none !important;
   }
   [data-table-craft][data-fill-height="true"] .relative.w-full.overflow-auto:has(table) {
@@ -713,9 +713,10 @@
     border-spacing: 0;
   }
 
-  /* Sticky header band */
-  [data-table-craft] thead {
-    background: hsl(var(--secondary-background) / 0.92);
+  /* Sticky header band — white (override library bg-muted/50) */
+  [data-table-craft] thead,
+  [data-table-craft] thead tr {
+    background: hsl(var(--card)) !important;
     position: sticky;
     top: 0;
     z-index: 2;
@@ -779,10 +780,10 @@
 
   [data-table-craft] tbody tr {
     transition: background-color 0.14s ease, box-shadow 0.14s ease;
-    background: transparent;
+    background: hsl(var(--card)) !important;
   }
   [data-table-craft] tbody tr:hover {
-    background: hsl(var(--primary) / 0.04);
+    background: hsl(var(--primary) / 0.04) !important;
   }
   .dark [data-table-craft] tbody tr:hover {
     background: hsl(var(--primary) / 0.08);
@@ -868,8 +869,7 @@
   /* ── Pagination footer ───────────────────────────────────────────────── */
   [data-table-craft] nav[aria-label] {
     border-top: 1px solid hsl(var(--border) / 0.9);
-    background:
-      linear-gradient(180deg, hsl(var(--secondary-background) / 0.55), hsl(var(--secondary-background) / 0.85));
+    background: hsl(var(--card));
     padding: 0.75rem 1.125rem !important;
     gap: 0.75rem !important;
   }
@@ -984,7 +984,7 @@
     border-spacing: 0;
   }
   .enterprise-table thead {
-    background: hsl(var(--secondary-background) / 0.92);
+    background: hsl(var(--card));
   }
   .dark .enterprise-table thead {
     background: hsl(0 0% 8% / 0.92);
