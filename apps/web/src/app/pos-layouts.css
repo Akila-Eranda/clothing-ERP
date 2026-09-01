@@ -1,0 +1,118 @@
+/**
+ * Tenant POS layout variants — same Hexalyte logic, different shell geometry.
+ * Classic = no overrides. Retail layouts map to purchased theme structures.
+ */
+
+/* Retail layouts — full POS feature strip (same modules as sidebar) */
+.pos-retail-feature-bar {
+  scrollbar-width: thin;
+}
+
+/* ── Retail 3: cart left of products ── */
+.pos-shell.pos-layout-retail-3 .pos-main-row {
+  flex-direction: row;
+}
+.pos-shell.pos-layout-retail-3 .pos-sidebar-panel {
+  order: 1;
+}
+.pos-shell.pos-layout-retail-3 .pos-cart-panel {
+  order: 2;
+  border-left: none;
+  border-right: 1px solid var(--pos-border);
+}
+.pos-shell.pos-layout-retail-3 .pos-cart-panel [role="separator"] {
+  left: auto;
+  right: 0;
+  translate: 50% 0;
+}
+.pos-shell.pos-layout-retail-3 .pos-center-panel {
+  order: 3;
+}
+
+/* ── Retail 5: 50/50 cart + square cards (respect user resize via inline width) ── */
+.pos-shell.pos-layout-retail-5 .pos-cart-panel {
+  max-width: 50vw !important;
+}
+.pos-shell.pos-layout-retail-5 .pos-product-card {
+  border-radius: 0.375rem;
+}
+
+/* ── Retail 4: image-top cards, denser grid ── */
+.pos-shell.pos-layout-retail-4 .pos-product-card .relative {
+  border-bottom: 1px solid var(--pos-product-border);
+}
+.pos-shell.pos-layout-retail-4 .pos-center-panel {
+  --pos-product-min: 150px;
+}
+
+/* ── Retail 1: vertical category rail ── */
+.pos-shell.pos-layout-retail-1 .pos-category-rail {
+  scrollbar-width: thin;
+}
+.pos-shell.pos-layout-retail-1 .pos-popular-strip {
+  height: 140px;
+}
+
+/* ── Retail 2: standard retail spacing ── */
+.pos-shell.pos-layout-retail-2 .pos-cart-panel {
+  max-width: 42vw;
+}
+
+/* ── Retail 3: cart-left checkout accent ── */
+.pos-checkout[data-pos-layout="retail-3"] {
+  border-radius: 0.75rem;
+}
+
+/* ── Retail cart header + pay buttons ── */
+.pos-shell.pos-layout-retail-1 .pos-cart-header,
+.pos-shell.pos-layout-retail-4 .pos-cart-header,
+.pos-shell.pos-layout-retail-5 .pos-cart-header {
+  background: rgba(255, 255, 255, 0.02);
+}
+.pos-shell.pos-layout-retail-1 .pos-cart-grand-total,
+.pos-shell.pos-layout-retail-4 .pos-cart-grand-total,
+.pos-shell.pos-layout-retail-5 .pos-cart-grand-total {
+  font-size: 1.125rem;
+}
+.pos-shell.pos-layout-retail-5 .pos-cart-panel .pos-cta {
+  border-radius: 0.5rem;
+}
+
+/* ── Retail cart table (layouts 1, 4, 5) ── */
+.pos-cart-table thead th {
+  border-bottom: 1px solid var(--pos-border);
+}
+.pos-cart-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.pos-shell.pos-layout-retail-1 .pos-cart-panel .pos-cart-table,
+.pos-shell.pos-layout-retail-4 .pos-cart-panel .pos-cart-table,
+.pos-shell.pos-layout-retail-5 .pos-cart-panel .pos-cart-table {
+  font-size: 12px;
+}
+
+/* ── Checkout shell per layout ── */
+.pos-checkout[data-pos-layout="retail-5"] .pos-checkout-bill {
+  width: 50% !important;
+  max-width: none !important;
+}
+.pos-checkout-retail .pos-checkout-title {
+  letter-spacing: 0.02em;
+}
+.pos-checkout[data-pos-layout="retail-4"] {
+  border-radius: 0.75rem;
+}
+.pos-checkout[data-pos-layout="retail-1"] .pos-checkout-pay-total {
+  font-size: 1.35rem;
+}
+
+/* Layout badge in POS settings (in-overlay) */
+.pos-layout-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--pos-border);
+  background: var(--pos-input);
+  color: var(--pos-text-soft);
+}

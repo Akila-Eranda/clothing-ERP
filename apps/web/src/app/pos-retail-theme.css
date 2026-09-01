@@ -1,0 +1,150 @@
+/**
+ * Retail POS theme skin — maps purchased template structure to Hexalyte CSS vars.
+ * Reference: retail-pos _pos-design.scss (product-order-list, order-head, etc.)
+ */
+
+/* ── Shell: lighter product column like retail pos-categories ── */
+.pos-shell[class*="pos-layout-retail"] .pos-center-panel {
+  background: var(--pos-elevated, var(--pos-bg));
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-sidebar-panel {
+  border-color: var(--pos-border);
+}
+
+/* ── Order list panel (cart) ── */
+.pos-shell[class*="pos-layout-retail"] .pos-cart-panel.product-order-list {
+  background: var(--pos-panel);
+  border-left: 1px solid var(--pos-border);
+  padding: 0;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-order-head {
+  background: rgba(var(--pos-accent-rgb), 0.08);
+  border-radius: 8px;
+  margin: 12px 12px 0;
+  padding: 10px 12px;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-block-section {
+  margin: 0 12px 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--pos-border);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-block-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--pos-text);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-order-details-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-items-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--pos-border);
+  background: var(--pos-input);
+  color: var(--pos-muted);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-items-badge span {
+  color: var(--pos-accent);
+  font-weight: 700;
+}
+
+/* ── Order total table (retail order-total) ── */
+.pos-order-total-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.pos-order-total-table td {
+  padding: 6px 0;
+  color: var(--pos-text-soft);
+}
+
+.pos-order-total-table td:last-child {
+  text-align: right;
+  font-weight: 600;
+  color: var(--pos-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.pos-order-total-table tr.pos-order-grand td {
+  padding-top: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  border-top: 1px solid var(--pos-border);
+}
+
+.pos-order-total-table tr.pos-order-grand td:last-child {
+  color: var(--pos-price);
+}
+
+.pos-order-total-wrap {
+  background: var(--pos-input);
+  border-radius: 8px;
+  padding: 16px;
+  margin: 0 12px 12px;
+}
+
+/* ── Retail cart action buttons (pos5 grid) ── */
+.pos-retail-action-btn {
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.pos-retail-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pos-retail-btn-orange { background: #f97316; }
+.pos-retail-btn-secondary { background: #64748b; }
+.pos-retail-btn-info { background: #0ea5e9; }
+.pos-retail-btn-indigo { background: #6366f1; }
+.pos-retail-btn-cyan { background: #06b6d4; }
+.pos-retail-btn-danger { background: #ef4444; }
+.pos-retail-btn-pay {
+  background: linear-gradient(135deg, var(--pos-success), var(--pos-success-2));
+}
+
+/* ── Category pills (feature bar + horizontal categories) ── */
+.pos-shell[class*="pos-layout-retail"] .pos-retail-feature-bar button {
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-category-rail button {
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Product cards — retail pos-products feel ── */
+.pos-shell[class*="pos-layout-retail"] .pos-product-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-popular-strip {
+  background: var(--pos-panel);
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-retail-product-grid {
+  padding: 12px 16px;
+}
+
+.pos-shell[class*="pos-layout-retail"] .pos-categories.tabs_wrapper {
+  background: var(--pos-elevated, var(--pos-bg));
+}

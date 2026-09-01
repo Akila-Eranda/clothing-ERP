@@ -69,6 +69,7 @@ export class PosSettingsDto {
   @ApiPropertyOptional() @IsOptional() @IsBoolean() roundOff?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() loyalty?: boolean;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() reloadEnabled?: boolean;
+  @ApiPropertyOptional() @IsOptional() @IsString() posLayout?: string;
 }
 
 export class PayslipSettingsDto {
@@ -1232,12 +1233,23 @@ export class TenantsService {
     const pos = (s['pos'] as Record<string, unknown>) ?? {};
     const bool = (v: unknown, fallback: boolean) =>
       typeof v === 'boolean' ? v : fallback;
+    const layoutRaw = pos['posLayout'];
+    const posLayout =
+      layoutRaw === 'classic' ||
+      layoutRaw === 'retail-1' ||
+      layoutRaw === 'retail-2' ||
+      layoutRaw === 'retail-3' ||
+      layoutRaw === 'retail-4' ||
+      layoutRaw === 'retail-5'
+        ? layoutRaw
+        : 'classic';
     return {
       allowNegativeStock: bool(pos['allowNegativeStock'] ?? s['allowNegativeStock'] ?? s['negativeStock'], true),
       autoPrint: bool(pos['autoPrint'] ?? s['autoPrint'], false),
       roundOff: bool(pos['roundOff'] ?? s['roundOff'], true),
       loyalty: bool(pos['loyalty'] ?? s['loyalty'], true),
       reloadEnabled: bool(pos['reloadEnabled'], true),
+      posLayout,
     };
   }
 
@@ -1258,6 +1270,7 @@ export class TenantsService {
             ...(dto.roundOff !== undefined ? { roundOff: dto.roundOff } : {}),
             ...(dto.loyalty !== undefined ? { loyalty: dto.loyalty } : {}),
             ...(dto.reloadEnabled !== undefined ? { reloadEnabled: dto.reloadEnabled } : {}),
+            ...(dto.posLayout !== undefined ? { posLayout: dto.posLayout } : {}),
           },
         },
       },

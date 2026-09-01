@@ -9,6 +9,9 @@ import {
   Printer, Image, Server, FileText, Upload, MessageCircle, Smartphone,
 } from "lucide-react";
 import { type ReceiptSettings, RECEIPT_DEFAULTS, notifyReceiptSettingsUpdated, setLocalPosTheme } from "@/lib/use-receipt-settings";
+import { POS_LAYOUT_OPTIONS, type PosLayoutId } from "@/lib/pos-layouts";
+import { POS_LAYOUT_BRAIN } from "@/lib/pos-layout-contract";
+import { notifyPosTenantSettingsUpdated } from "@/lib/use-pos-tenant-settings";
 import { RECEIPT_SOFTWARE_CREDIT, receiptMoney, receiptThemeColors } from "@/lib/receipt-theme";
 import { resolvePublicAssetUrl, uploadFile } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
@@ -416,6 +419,7 @@ export default function SettingsPage() {
     autoPrint: false,
     roundOff: true,
     loyalty: true,
+    posLayout: "classic" as PosLayoutId,
   });
   const [posSaving, setPosSaving] = React.useState(false);
 
@@ -447,12 +451,14 @@ export default function SettingsPage() {
       autoPrint?: boolean;
       roundOff?: boolean;
       loyalty?: boolean;
+      posLayout?: PosLayoutId;
     }>("/tenants/pos-settings").then((r) => {
       setPosForm({
         allowNegativeStock: Boolean(r.data?.allowNegativeStock),
         autoPrint: Boolean(r.data?.autoPrint),
         roundOff: r.data?.roundOff !== false,
         loyalty: r.data?.loyalty !== false,
+        posLayout: (r.data?.posLayout as PosLayoutId) || "classic",
       });
     }).catch(() => { /* optional */ });
 
@@ -670,6 +676,44 @@ export default function SettingsPage() {
               <CardDescription>Point of sale terminal settings</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <div className="space-y-2 pb-2 border-b">
+                <Label htmlFor="pos-layout" className="text-sm font-medium">POS screen layout</Label>
+                <p className="text-xs text-muted-foreground">
+                  All 6 layouts use the same POS engine ({POS_LAYOUT_BRAIN}): checkout, hold, reload, barcode, discounts, payments, print. Only screen layout differs.
+                </p>
+                <select
+                  id="pos-layout"
+                  disabled={posSaving}
+                  value={posForm.posLayout || "classic"}
+                  onChange={(e) => {
+                    const posLayout = e.target.value as PosLayoutId;
+                    const next = { ...posForm, posLayout };
+                    setPosForm(next);
+                    setPosSaving(true);
+                    api.put("/tenants/pos-settings", next)
+                      .then(() => {
+                        try { localStorage.setItem("pos_tenant_settings_cache", JSON.stringify(next)); } catch { /* noop */ }
+                        notifyPosTenantSettingsUpdated();
+                        toast.success("POS layout updated — reopen POS to apply");
+                      })
+                      .catch(() => {
+                        setPosForm(posForm);
+                        toast.error("Failed to save — admin permission required");
+                      })
+                      .finally(() => setPosSaving(false));
+                  }}
+                  className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  {POS_LAYOUT_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-[11px] text-muted-foreground">
+                  {POS_LAYOUT_OPTIONS.find((o) => o.id === posForm.posLayout)?.description}
+                </p>
+              </div>
               {[
                 { key: "autoPrint" as const, label: "Auto-print receipt after sale", desc: "Automatically print receipt on checkout" },
                 { key: "roundOff" as const, label: "Round off totals", desc: "Round total amount to nearest unit" },
@@ -690,6 +734,8 @@ export default function SettingsPage() {
                       setPosSaving(true);
                       api.put("/tenants/pos-settings", next)
                         .then(() => {
+                          try { localStorage.setItem("pos_tenant_settings_cache", JSON.stringify(next)); } catch { /* noop */ }
+                          notifyPosTenantSettingsUpdated();
                           if (s.key === "allowNegativeStock") {
                             try { localStorage.setItem("pos_allow_negative_stock", v ? "1" : "0"); } catch { /* noop */ }
                           }

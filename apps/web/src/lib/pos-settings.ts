@@ -1,3 +1,5 @@
+import type { PosLayoutId } from "@/lib/pos-layouts";
+
 /** POS terminal UX settings (per device localStorage). */
 
 export const POS_TAX_RATE_KEY = "pos_tax_rate";
@@ -193,4 +195,6 @@ export type PosTenantSettings = {
   roundOff: boolean;
   loyalty: boolean;
   reloadEnabled?: boolean;
+  /** Tenant default POS screen layout — admin selects in Settings → POS */
+  posLayout?: PosLayoutId;
 };
