@@ -248,6 +248,62 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header button:hover {
   background: rgba(255, 255, 255, 0.06);
 }
 
+/* ── Header layout zones (DreamsPOS) ── */
+.hex-retail-header .hex-header-start {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.hex-retail-header .hex-header-center {
+  flex: 1 1 auto;
+}
+
+.hex-retail-header .hex-header-end {
+  flex: 1 1 0;
+  justify-content: flex-end;
+}
+
+.hex-retail-header .hex-header-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--retail-topbar-border, rgba(15, 23, 42, 0.1));
+  flex-shrink: 0;
+}
+
+.hex-retail-header .hex-header-branch {
+  border-color: #092c4c !important;
+  background: #092c4c !important;
+  color: #fff !important;
+}
+
+.hex-retail-header .hex-header-branch:hover {
+  background: #0a3558 !important;
+  color: #fff !important;
+}
+
+.hex-retail-header .hex-header-tools .hex-header-icon-btn {
+  color: inherit;
+}
+
+.hex-retail-header .hex-header-tools .hex-header-icon-btn:hover {
+  background: rgba(9, 44, 76, 0.08);
+}
+
+html.dark .hex-retail-header .hex-header-tools .hex-header-icon-btn:hover,
+.hex-retail-header--dreams-dark .hex-header-tools .hex-header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 767px) {
+  .hex-retail-header .hex-header-start {
+    flex: 1 1 auto;
+  }
+
+  .hex-retail-header .hex-header-end {
+    flex: 0 0 auto;
+  }
+}
+
 /* Retail sidebar profile blocks */
 .hex-retail-profile-card {
   background: var(--retail-sidebar-hover, rgba(0, 0, 0, 0.04));

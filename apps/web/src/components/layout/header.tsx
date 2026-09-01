@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import Link from "next/link";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
   Settings, User, LogOut, LifeBuoy, Keyboard, Monitor,
@@ -20,10 +20,8 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useUIStore } from "@/stores/ui-store";
 import { BranchSwitcher } from "@/components/branch/branch-switcher";
 import { cn, getInitials } from "@/lib/utils";
-import { DUMMY_RECENT_SALES } from "@/lib/constants";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
-import Link from "next/link";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
@@ -195,10 +193,14 @@ export function Header() {
       || crumb.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
   };
 
+  const currentTitle = breadcrumbs.length > 0
+    ? crumbLabel(breadcrumbs.length - 1)
+    : pageTitle;
+
   return (
     <header
       className={cn(
-        "hex-retail-header sticky top-0 z-40 flex h-14 items-center gap-3 border-b backdrop-blur-[12px] px-4 md:px-6 shrink-0",
+        "hex-retail-header sticky top-0 z-40 flex h-[60px] items-center gap-2 border-b backdrop-blur-[12px] px-3 md:px-5 shrink-0",
         dreamsDarkHeader && "hex-retail-header--dreams-dark",
       )}
       style={{
@@ -206,7 +208,7 @@ export function Header() {
           ? DREAMSPOS_DARK_CHROME.bg
           : isDarkHeader
             ? "var(--retail-topbar-bg, #0d0d0d)"
-            : "var(--retail-topbar-bg, hsl(var(--background) / 0.95))",
+            : "var(--retail-topbar-bg, hsl(var(--background) / 0.98))",
         color: dreamsDarkHeader
           ? DREAMSPOS_DARK_CHROME.fg
           : "var(--retail-topbar-fg, hsl(var(--foreground)))",
@@ -215,103 +217,113 @@ export function Header() {
           : "var(--retail-topbar-border, hsl(var(--border)))",
       }}
     >
-      {/* Mobile menu toggle */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        className="lg:hidden"
-        onClick={toggleMobileSidebar}
-      >
-        <Menu className="h-4 w-4" />
-      </Button>
+      {/* ── Left: menu + page context ── */}
+      <div className="hex-header-start flex min-w-0 items-center gap-2 md:gap-3">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="hex-header-icon-btn lg:hidden shrink-0"
+          onClick={toggleMobileSidebar}
+        >
+          <Menu className="h-4 w-4" />
+        </Button>
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-1.5 text-sm min-w-0 flex-1">
-        <Link href="/dashboard" className="shrink-0 hidden sm:block">
-          <AppLogo variant="sidebar" theme="auto" />
-        </Link>
-        {breadcrumbs.map((crumb, i) => (
-          <React.Fragment key={`${crumb}-${i}`}>
-            <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 hidden sm:block shrink-0" />
-            <span
-              className={
-                i === breadcrumbs.length - 1
-                  ? "font-semibold text-foreground truncate"
-                  : "text-muted-foreground hidden sm:block truncate"
-              }
-            >
-              {crumbLabel(i)}
-            </span>
-          </React.Fragment>
-        ))}
+        <nav className="hex-header-breadcrumb min-w-0" aria-label="Breadcrumb">
+          {breadcrumbs.length > 1 && (
+            <ol className="hidden md:flex items-center gap-1 text-[11px] text-muted-foreground mb-0.5">
+              {breadcrumbs.slice(0, -1).map((crumb, i) => {
+                const href = "/" + breadcrumbs.slice(0, i + 1).join("/");
+                return (
+                  <li key={href} className="flex items-center gap-1 min-w-0">
+                    {i > 0 && <ChevronRight className="h-3 w-3 shrink-0 opacity-40" />}
+                    <Link href={href} className="truncate hover:text-foreground transition-colors">
+                      {crumbLabel(i)}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <div className="flex items-center gap-2 min-w-0">
+            <Link href="/dashboard" className="shrink-0 hidden lg:block opacity-90 hover:opacity-100">
+              <AppLogo variant="sidebar" theme="auto" />
+            </Link>
+            <h1 className="hex-header-title truncate text-[15px] font-semibold leading-tight text-foreground md:text-base">
+              {currentTitle}
+            </h1>
+          </div>
+        </nav>
       </div>
 
-      {/* Branch switcher — always visible when branches exist */}
-      <BranchSwitcher />
-
-      {/* Search */}
-      <div className="hidden md:flex items-center">
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+      {/* ── Center: search ── */}
+      <div className="hex-header-center hidden flex-1 justify-center px-2 md:flex max-w-xl mx-auto">
+        <div className="hex-header-search relative w-full max-w-[420px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70 pointer-events-none" />
           <Input
             placeholder="Search products, customers..."
-            className="w-64 pl-8 h-10 text-sm shadow-sm rounded-[10px]"
+            className="hex-header-search-input h-10 w-full rounded-[5px] border bg-muted/40 pl-10 pr-14 text-sm shadow-none focus-visible:ring-1 focus-visible:ring-[#fe9f43]/40"
             onFocus={() => setSearchOpen(true)}
             onBlur={() => setSearchOpen(false)}
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none hidden h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex text-muted-foreground">
+          <kbd className="hex-header-kbd pointer-events-none absolute right-2.5 top-1/2 hidden h-6 -translate-y-1/2 select-none items-center rounded border border-border/80 bg-background/80 px-1.5 font-mono text-[10px] font-medium text-muted-foreground sm:flex">
             ⌘K
           </kbd>
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 shrink-0">
-        {/* POS button */}
+      {/* ── Right: branch, POS, tools, user ── */}
+      <div className="hex-header-end flex shrink-0 items-center gap-2 md:gap-2.5 ml-auto">
+        <BranchSwitcher />
+
+        <span className="hex-header-divider hidden sm:block" aria-hidden />
+
         <Button
           onClick={openPos}
           variant="pos"
           size="sm"
-          className="h-9 gap-1.5 text-xs font-semibold px-3.5"
+          className="hex-header-pos h-9 gap-1.5 rounded-[5px] px-3.5 text-xs font-semibold shadow-none"
         >
           <Monitor className="h-3.5 w-3.5" />
-          <span>POS</span>
+          <span className="hidden sm:inline">POS</span>
         </Button>
 
-        {/* Live indicator */}
-        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20">
+        <div className="hex-header-live hidden lg:flex items-center gap-1.5 rounded-[5px] border border-emerald-200/80 bg-emerald-50 px-2.5 py-1.5 dark:border-emerald-500/25 dark:bg-emerald-500/10">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[11px] font-medium text-emerald-700 dark:text-emerald-500">Live</span>
+          <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400">Live</span>
         </div>
 
-        {/* Theme toggle */}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="h-9 w-9"
-        >
-          <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
-        </Button>
+        <span className="hex-header-divider hidden md:block" aria-hidden />
 
-        {/* Refresh */}
-        <Button variant="ghost" size="icon-sm" className="h-9 w-9" onClick={() => router.refresh()}>
-          <RefreshCw className="h-3.5 w-3.5" />
-        </Button>
-
-        {/* Notifications */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-9 w-9 relative">
-              <Bell className="h-4 w-4" />
-              {(isMaintenance || 4 > 0) && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
-                  {isMaintenance ? '!' : '4'}
-                </span>
-              )}
-            </Button>
-          </DropdownMenuTrigger>
+        <div className="hex-header-tools flex items-center gap-0.5 rounded-[5px] border border-border/80 bg-muted/20 p-0.5 dark:bg-white/[0.04]">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="hex-header-icon-btn h-8 w-8 rounded-[4px]"
+          >
+            <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="hex-header-icon-btn h-8 w-8 rounded-[4px] hidden sm:inline-flex"
+            onClick={() => router.refresh()}
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon-sm" className="hex-header-icon-btn relative h-8 w-8 rounded-[4px]">
+                <Bell className="h-4 w-4" />
+                {(isMaintenance || 4 > 0) && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#fe9f43] px-0.5 text-[9px] font-bold text-white">
+                    {isMaintenance ? "!" : "4"}
+                  </span>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel className="flex items-center justify-between">
               <span>Notifications</span>
@@ -349,18 +361,18 @@ export function Header() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
 
-        {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-8 gap-2 px-2 hover:bg-accent">
-              <Avatar className="h-6 w-6">
+            <Button variant="ghost" className="hex-header-user h-9 gap-2 rounded-[5px] border border-[#092c4c] bg-[#092c4c] px-2.5 text-white hover:bg-[#0a3558] hover:text-white dark:border-[#092c4c]">
+              <Avatar className="h-7 w-7 ring-1 ring-white/20">
                 <AvatarImage src={user?.avatar} />
-                <AvatarFallback className="text-[10px]">
+                <AvatarFallback className="bg-[#fe9f43] text-[10px] font-bold text-white">
                   {getInitials(user?.name || "U")}
                 </AvatarFallback>
               </Avatar>
-              <span className="hidden sm:block text-sm font-medium max-w-[120px] truncate">
+              <span className="hidden max-w-[110px] truncate text-xs font-semibold md:block">
                 {user?.name || "Admin"}
               </span>
             </Button>

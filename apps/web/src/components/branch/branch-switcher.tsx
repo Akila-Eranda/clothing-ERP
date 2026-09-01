@@ -14,7 +14,7 @@ import {
 import { useBranchStore } from "@/stores/branch-store";
 import { useBranchContext, type BranchOption } from "./branch-provider";
 
-export function BranchSwitcher() {
+export function BranchSwitcher({ className }: { className?: string }) {
   const { branches } = useBranchContext();
   const { activeBranchId, activeBranchName, setBranch } = useBranchStore();
 
@@ -33,11 +33,14 @@ export function BranchSwitcher() {
   if (branches.length === 1) {
     return (
       <div
-        className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-muted/30 px-2.5 text-xs shrink-0 max-w-[160px] sm:max-w-[200px]"
+        className={cn(
+          "hex-header-branch flex h-9 items-center gap-2 rounded-[5px] border px-3 text-xs shrink-0 max-w-[180px] sm:max-w-[220px]",
+          className,
+        )}
         title={label}
       >
-        <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-        <span className="truncate font-medium">{label}</span>
+        <Building2 className="h-3.5 w-3.5 shrink-0 opacity-70" />
+        <span className="truncate font-semibold">{label}</span>
       </div>
     );
   }
@@ -48,7 +51,10 @@ export function BranchSwitcher() {
         <Button
           variant="outline"
           size="sm"
-          className="h-8 gap-1.5 text-xs shrink-0 max-w-[120px] sm:max-w-[200px] px-2"
+          className={cn(
+            "hex-header-branch h-9 gap-2 rounded-[5px] text-xs shrink-0 max-w-[140px] sm:max-w-[220px] px-3 font-semibold",
+            className,
+          )}
           title={label}
         >
           <Building2 className="h-3.5 w-3.5 shrink-0" />
