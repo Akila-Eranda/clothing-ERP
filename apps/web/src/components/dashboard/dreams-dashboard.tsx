@@ -139,7 +139,7 @@ export function DreamsDashboard() {
   const [alertDismissed, setAlertDismissed] = React.useState(false);
   const [chartPeriod, setChartPeriod] = React.useState("1Y");
   const [txnTab, setTxnTab] = React.useState<"sale" | "purchase">("sale");
-  const [dateRange, setDateRange] = React.useState<DreamsDateRange>(defaultDreamsDateRange);
+  const [dateRange, setDateRange] = React.useState<DreamsDateRange>(() => defaultDreamsDateRange());
   const [salesRows, setSalesRows] = React.useState<SaleRow[]>([]);
 
   const [overview, setOverview] = React.useState<Overview | null>(null);
