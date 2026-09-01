@@ -14,8 +14,8 @@ COPY . .
 
 RUN npx esbuild prisma/seed.ts --bundle --outfile=prisma/seed.js --platform=node --format=cjs --external:@prisma/client --external:bcryptjs
 
-RUN npx prisma generate
-RUN npx nest build
+RUN pnpm prisma generate
+RUN pnpm run build
 
 # ── Stage 2: Runner ───────────────────────────────────────────
 FROM node:20-slim AS runner
@@ -35,9 +35,11 @@ RUN npm install -g pnpm@9.15.9
 ENV NODE_ENV=production
 
 COPY package.json pnpm-lock.yaml* ./
-COPY --from=builder /app/prisma ./prisma
-RUN pnpm install --prod --frozen-lockfile && npx prisma generate
+RUN pnpm install --prod --frozen-lockfile
+
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 RUN groupadd -g 1001 nodejs && useradd -u 1001 -g nodejs nestjs
