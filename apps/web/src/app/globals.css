@@ -697,8 +697,6 @@
     max-height: none !important;
     background: hsl(var(--card));
   }
-    flex: none !important;
-  }
   [data-table-craft][data-fill-height="true"] .relative.w-full.overflow-auto:has(table) {
     max-height: min(58vh, calc(100dvh - 300px)) !important;
   }
