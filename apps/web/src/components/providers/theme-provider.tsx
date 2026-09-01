@@ -10,6 +10,10 @@ function AccentSync() {
   React.useEffect(() => {
     applyAccentPreset(loadStoredAccent());
   }, [resolvedTheme]);
+  React.useEffect(() => {
+    if (typeof document === "undefined") return;
+    document.documentElement.setAttribute("data-theme", resolvedTheme === "dark" ? "dark" : "light");
+  }, [resolvedTheme]);
   return null;
 }
 

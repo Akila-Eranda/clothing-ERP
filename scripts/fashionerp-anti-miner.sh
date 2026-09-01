@@ -59,6 +59,18 @@ if [ -n "$CID" ]; then
     recreate_web
   elif docker logs --since 3m "$CID" 2>&1 | grep -qiE "$IOC_RE"; then
     recreate_web
+  elif docker logs --since 5m "$CID" 2>&1 | grep -qiE 'authorized_keys|Command failed: free -h|ipstresser|rebirthstress|return\.st'; then
+    # Runtime HTML/SSR shell hijack leaves these fingerprints in Next logs
+    recreate_web
+  fi
+fi
+
+# HTML body scan (blank-page SEO spam injection) — also covered by anti-hijack cron
+if command -v curl >/dev/null 2>&1; then
+  HTML=$(curl -sk --connect-timeout 6 --max-time 15 -H 'Host: grocery.shop.hexalyte.com' https://127.0.0.1/login 2>/dev/null || true)
+  if [ -n "$HTML" ] && echo "$HTML" | grep -qiE 'ipstresser|rebirthstress|return\.st|DiamWall|stresser\.rs'; then
+    log "HTML IOC in grocery login body"
+    recreate_web
   fi
 fi
 

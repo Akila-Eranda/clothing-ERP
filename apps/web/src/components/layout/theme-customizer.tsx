@@ -41,7 +41,7 @@ function SwatchGrid<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2.5">
       {options.map((opt) => (
         <button
           key={opt.id}
@@ -49,8 +49,10 @@ function SwatchGrid<T extends string>({
           title={opt.label}
           onClick={() => onChange(opt.id)}
           className={cn(
-            "h-9 w-9 rounded-md border-2 transition-all hover:scale-105",
-            value === opt.id ? "border-primary ring-2 ring-primary/30" : "border-border",
+            "theme-customizer-swatch h-9 w-9 rounded-lg border-2 transition-all duration-200",
+            value === opt.id
+              ? "border-primary scale-110 shadow-md ring-2 ring-primary/25"
+              : "border-border/80 hover:scale-105 hover:border-primary/40",
           )}
           style={{ background: opt.css }}
         />
@@ -67,8 +69,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border bg-card p-4 space-y-3">
-      <h3 className="text-sm font-bold text-foreground">{title}</h3>
+    <div className="theme-customizer-section rounded-2xl border border-border/60 bg-card/80 p-4 space-y-3 shadow-sm">
+      <h3 className="text-[13px] font-bold tracking-wide text-foreground">{title}</h3>
       {children}
     </div>
   );
@@ -107,27 +109,31 @@ export function ThemeCustomizer() {
 
   return (
     <>
-      {/* Floating cog — DreamsPOS style */}
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="theme-customizer-fab fixed z-[60] flex h-12 w-12 items-center justify-center rounded-l-xl bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105"
-        style={{ top: "50%", right: 0, transform: "translateY(-50%)" }}
+        className="theme-customizer-fab group"
         aria-label="Open theme customizer"
       >
-        <Cog className="h-5 w-5 animate-spin" style={{ animationDuration: "3s" }} />
+        <span className="theme-customizer-fab__ring" aria-hidden />
+        <span className="theme-customizer-fab__btn">
+          <Cog className="theme-customizer-fab__icon h-5 w-5" />
+        </span>
       </button>
 
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto p-0">
-          <SheetHeader className="bg-slate-900 text-white p-5 space-y-1 text-left">
-            <SheetTitle className="text-white text-lg">Theme Customizer</SheetTitle>
-            <SheetDescription className="text-slate-300">
+        <SheetContent side="right" className="theme-customizer-panel w-full sm:max-w-[420px] overflow-y-auto p-0 border-l-0">
+          <SheetHeader className="theme-customizer-header relative overflow-hidden p-6 pb-5 text-left space-y-1">
+            <div className="theme-customizer-header__glow" aria-hidden />
+            <SheetTitle className="relative text-white text-xl font-bold tracking-tight">
+              Theme Customizer
+            </SheetTitle>
+            <SheetDescription className="relative text-slate-300/90 text-sm">
               Choose your themes &amp; layouts
             </SheetDescription>
           </SheetHeader>
 
-          <div className="p-4 space-y-4">
+          <div className="p-4 pb-6 space-y-4 bg-muted/20">
             <Section title="Select Layout">
               <div className="grid grid-cols-2 gap-2">
                 {([
@@ -139,10 +145,10 @@ export function ThemeCustomizer() {
                     type="button"
                     onClick={() => pickLayout(item.id)}
                     className={cn(
-                      "flex flex-col items-center gap-2 rounded-lg border p-3 text-xs font-semibold transition-colors",
+                      "flex flex-col items-center gap-2 rounded-xl border p-3.5 text-xs font-semibold transition-all duration-200",
                       layout === item.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:bg-muted",
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/60",
                     )}
                   >
                     <item.icon className="h-5 w-5" />
@@ -163,10 +169,10 @@ export function ThemeCustomizer() {
                     type="button"
                     onClick={() => setWidth(item.id as LayoutWidth)}
                     className={cn(
-                      "rounded-lg border px-3 py-2 text-xs font-semibold transition-colors",
+                      "rounded-xl border px-3 py-2.5 text-xs font-semibold transition-all duration-200",
                       width === item.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:bg-muted",
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/60",
                     )}
                   >
                     {item.label}
@@ -203,10 +209,10 @@ export function ThemeCustomizer() {
                     type="button"
                     onClick={() => setTheme(item.id)}
                     className={cn(
-                      "flex flex-col items-center gap-1.5 rounded-lg border px-2 py-2.5 text-[11px] font-semibold",
+                      "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-[11px] font-semibold transition-all duration-200",
                       theme === item.id
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border hover:bg-muted",
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/60",
                     )}
                   >
                     <item.icon className="h-4 w-4" />
@@ -225,8 +231,10 @@ export function ThemeCustomizer() {
                     title={preset.name}
                     onClick={() => pickAccent(preset.id)}
                     className={cn(
-                      "h-9 w-9 rounded-full border-2 transition-transform hover:scale-105",
-                      accent === preset.id ? "border-foreground ring-2 ring-primary/40" : "border-transparent",
+                      "h-10 w-10 rounded-full border-2 transition-all duration-200 shadow-sm",
+                      accent === preset.id
+                        ? "border-foreground scale-110 ring-2 ring-primary/35 shadow-md"
+                        : "border-white/20 hover:scale-105",
                     )}
                     style={{ background: preset.hex }}
                   />
@@ -237,7 +245,7 @@ export function ThemeCustomizer() {
             <Button
               type="button"
               variant="outline"
-              className="w-full"
+              className="w-full h-11 rounded-xl border-dashed"
               onClick={() => {
                 reset();
                 setSidebarCollapsed(false);

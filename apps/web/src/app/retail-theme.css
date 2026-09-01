@@ -1,7 +1,94 @@
 /* DreamsPOS-inspired theme customizer + sidebar skins for Hexalyte ERP */
 
 .theme-customizer-fab {
-  box-shadow: 0 4px 20px hsl(var(--primary) / 0.35);
+  position: fixed;
+  top: 50%;
+  right: 14px;
+  z-index: 60;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.theme-customizer-fab__ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.22);
+  opacity: 0.75;
+  animation: theme-fab-pulse 2.8s ease-in-out infinite;
+}
+
+.theme-customizer-fab__btn {
+  position: relative;
+  display: flex;
+  height: 3rem;
+  width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--primary-hover, var(--primary))) 100%);
+  color: hsl(var(--primary-foreground));
+  box-shadow:
+    0 10px 28px hsl(var(--primary) / 0.38),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.theme-customizer-fab:hover .theme-customizer-fab__btn {
+  transform: scale(1.06);
+  box-shadow:
+    0 14px 32px hsl(var(--primary) / 0.45),
+    0 4px 12px rgba(0, 0, 0, 0.16);
+}
+
+.theme-customizer-fab:active .theme-customizer-fab__btn {
+  transform: scale(0.98);
+}
+
+.theme-customizer-fab__icon {
+  animation: theme-fab-spin 4s linear infinite;
+}
+
+.theme-customizer-header {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #0f172a 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.theme-customizer-header__glow {
+  position: absolute;
+  top: -40px;
+  right: -20px;
+  width: 140px;
+  height: 140px;
+  border-radius: 9999px;
+  background: hsl(var(--primary) / 0.35);
+  filter: blur(40px);
+  pointer-events: none;
+}
+
+.theme-customizer-panel {
+  box-shadow: -12px 0 40px rgba(15, 23, 42, 0.18);
+}
+
+.theme-customizer-section {
+  backdrop-filter: blur(6px);
+}
+
+.theme-customizer-swatch {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+@keyframes theme-fab-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes theme-fab-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50% { transform: scale(1.12); opacity: 0.9; }
 }
 
 /* Boxed layout */
@@ -28,6 +115,18 @@ body.mini-sidebar .hex-retail-sidebar {
   --retail-sidebar-hover: #f1f5f9;
   --retail-sidebar-active-bg: #eff6ff;
   --retail-sidebar-active-fg: #1d4ed8;
+}
+
+/* DreamsPOS dark mode — sidebar matches dark shell (not light strip) */
+.dark [data-sidebar="light"] .hex-retail-sidebar,
+.dark [data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
+  --retail-sidebar-bg: #0d0d0d;
+  --retail-sidebar-fg: #d8dfee;
+  --retail-sidebar-muted: #6b7280;
+  --retail-sidebar-border: #1f2228;
+  --retail-sidebar-hover: rgba(255, 255, 255, 0.05);
+  --retail-sidebar-active-bg: rgba(254, 159, 67, 0.14);
+  --retail-sidebar-active-fg: #fe9f43;
 }
 
 [data-sidebar="sidebarcolorone"] .hex-retail-sidebar {
@@ -84,6 +183,13 @@ body.mini-sidebar .hex-retail-sidebar {
   --retail-topbar-bg: #ffffff;
   --retail-topbar-fg: #0f172a;
   --retail-topbar-border: rgba(15, 23, 42, 0.08);
+}
+
+.dark [data-topbar="white"] .hex-retail-header,
+.dark [data-topbar="topbarcolorone"] .hex-retail-header {
+  --retail-topbar-bg: #0d0d0d;
+  --retail-topbar-fg: #d8dfee;
+  --retail-topbar-border: #1f2228;
 }
 
 [data-topbar="topbarcolorone"] .hex-retail-header { --retail-topbar-bg: #fbfbfb; --retail-topbar-fg: #1f2937; --retail-topbar-border: rgba(0,0,0,0.06); }
