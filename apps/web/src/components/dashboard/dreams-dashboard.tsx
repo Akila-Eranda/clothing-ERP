@@ -296,7 +296,7 @@ export function DreamsDashboard() {
     <div className="dreams-pos-dash">
       <div className="content">
         {/* Header */}
-        <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2">
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-2 dp-page-header">
           <div className="mb-3">
             <h1 className="mb-1">Welcome, {displayName}</h1>
             <p className="fw-medium">
@@ -336,7 +336,7 @@ export function DreamsDashboard() {
           {kpiCards.map((c) => {
             const Icon = c.icon;
             return (
-              <div key={c.title} className="col-xl-3 col-sm-6 col-12 d-flex">
+              <div key={c.title} className="col-xl-3 col-lg-3 col-sm-6 col-12 d-flex">
                 <button type="button" className={`card ${c.bg} sale-widget flex-fill`} style={{ cursor: "pointer", textAlign: "left" }} onClick={() => router.push(c.href)}>
                   <div className="card-body d-flex align-items-center">
                     <span className="sale-icon bg-white">
@@ -364,7 +364,7 @@ export function DreamsDashboard() {
             const Icon = c.icon;
             const ch = pctChange(c.value, c.prev);
             return (
-              <div key={c.title} className="col-xl-3 col-sm-6 col-12 d-flex">
+              <div key={c.title} className="col-xl-3 col-lg-3 col-sm-6 col-12 d-flex">
                 <div className="card revenue-widget flex-fill">
                   <div className="card-body">
                     <div className="d-flex align-items-center justify-content-between mb-3 pb-3 border-bottom">
@@ -395,7 +395,7 @@ export function DreamsDashboard() {
 
         {/* Sales chart + Overall info */}
         <div className="row">
-          <div className="col-xxl-8 col-xl-7 col-sm-12 col-12 d-flex">
+          <div className="col-xxl-8 col-xl-7 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
               <DreamsSalesPurchaseChart
                 data={chartData}
@@ -407,7 +407,7 @@ export function DreamsDashboard() {
               />
             </div>
           </div>
-          <div className="col-xxl-4 col-xl-5 d-flex">
+          <div className="col-xxl-4 col-xl-5 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
               <div className="card-header">
                 <div className="d-inline-flex align-items-center">
@@ -416,7 +416,7 @@ export function DreamsDashboard() {
                 </div>
               </div>
               <div className="card-body">
-                <div className="row g-3" style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", margin: 0 }}>
+                <div className="dp-info-grid">
                   {[
                     { label: "Suppliers", val: supplierTotal, icon: UserCheck, color: "text-info" },
                     { label: workspace.customerLabel, val: overview?.totalCustomers ?? 0, icon: Users, color: "text-orange" },
@@ -424,7 +424,7 @@ export function DreamsDashboard() {
                   ].map((item) => {
                     const Icon = item.icon;
                     return (
-                      <div key={item.label} style={{ flex: "1 1 30%", minWidth: 90 }}>
+                      <div key={item.label}>
                         <div className="info-item border bg-light p-3 text-center">
                           <div className={`mb-3 ${item.color} fs-24`}><Icon size={24} style={{ margin: "0 auto" }} /></div>
                           <p className="mb-1">{item.label}</p>
@@ -440,26 +440,18 @@ export function DreamsDashboard() {
                   <h6>Customers Overview</h6>
                   <span className="btn btn-sm btn-white"><CalendarDays size={14} className="me-1" />Today</span>
                 </div>
-                <div className="row align-items-center" style={{ display: "flex", flexWrap: "wrap" }}>
-                  <div className="col-sm-5">
-                    <DreamsCustomerRadialChart returnPct={returnCustomerPct} />
-                  </div>
-                  <div className="col-sm-7">
-                    <div className="row gx-0" style={{ display: "flex" }}>
-                      <div className="col-sm-6">
-                        <div className="text-center border-end">
-                          <h2 className="mb-1">{loading ? "—" : formatNumber(overview?.today?.transactions ?? 0)}</h2>
-                          <p className="text-orange mb-2">First Time</p>
-                          <span className="badge badge-success badge-xs">↑ 25%</span>
-                        </div>
-                      </div>
-                      <div className="col-sm-6">
-                        <div className="text-center">
-                          <h2 className="mb-1">{loading ? "—" : formatNumber(overview?.totalCustomers ?? 0)}</h2>
-                          <p className="text-teal mb-2">Return</p>
-                          <span className="badge badge-success badge-xs">↑ 21%</span>
-                        </div>
-                      </div>
+                <div className="dp-customer-overview">
+                  <DreamsCustomerRadialChart returnPct={returnCustomerPct} />
+                  <div className="dp-customer-stats">
+                    <div className="text-center border-end">
+                      <h2 className="mb-1">{loading ? "—" : formatNumber(overview?.today?.transactions ?? 0)}</h2>
+                      <p className="text-orange mb-2">First Time</p>
+                      <span className="badge badge-success badge-xs">↑ 25%</span>
+                    </div>
+                    <div className="text-center">
+                      <h2 className="mb-1">{loading ? "—" : formatNumber(overview?.totalCustomers ?? 0)}</h2>
+                      <p className="text-teal mb-2">Return</p>
+                      <span className="badge badge-success badge-xs">↑ 21%</span>
                     </div>
                   </div>
                 </div>
@@ -486,11 +478,11 @@ export function DreamsDashboard() {
                   <p className="text-center fs-13">No sales data yet</p>
                 ) : (
                   topProducts.slice(0, 5).map((p) => (
-                    <div key={p.variantId ?? p.sku} className="d-flex align-items-center justify-content-between border-bottom">
-                      <div className="d-flex align-items-center">
-                        <span className="avatar avatar-lg">{getInitials(p.productName)}</span>
-                        <div className="ms-2">
-                          <h6 className="fw-bold mb-1">
+                    <div key={p.variantId ?? p.sku} className="d-flex align-items-center justify-content-between border-bottom dp-list-row">
+                      <div className="d-flex align-items-center" style={{ minWidth: 0, flex: 1 }}>
+                        <span className="avatar avatar-lg flex-shrink-0">{getInitials(p.productName)}</span>
+                        <div className="ms-2" style={{ minWidth: 0 }}>
+                          <h6 className="fw-bold mb-1 dp-truncate">
                             <button type="button" style={{ background: "none", border: "none", cursor: "pointer", fontWeight: 700 }} onClick={() => router.push("/products")}>
                               {p.productName}
                             </button>
@@ -525,7 +517,7 @@ export function DreamsDashboard() {
                   <p className="text-center fs-13">All stock levels OK</p>
                 ) : (
                   lowStock.slice(0, 5).map((item, i) => (
-                    <div key={item.id} className={`d-flex align-items-center justify-content-between ${i < 4 ? "mb-4" : "mb-0"}`}>
+                    <div key={item.id} className={`d-flex align-items-center justify-content-between dp-list-row ${i < 4 ? "mb-4" : "mb-0"}`}>
                       <div className="d-flex align-items-center">
                         <span className="avatar avatar-lg"><Package size={20} /></span>
                         <div className="ms-2">
@@ -560,7 +552,7 @@ export function DreamsDashboard() {
                   <p className="text-center fs-13">No recent sales</p>
                 ) : (
                   recentSales.slice(0, 5).map((sale, i) => (
-                    <div key={sale.id} className={`d-flex align-items-center justify-content-between ${i < 4 ? "mb-4" : "mb-0"}`}>
+                    <div key={sale.id} className={`d-flex align-items-center justify-content-between dp-list-row ${i < 4 ? "mb-4" : "mb-0"}`}>
                       <div className="d-flex align-items-center">
                         <span className="avatar avatar-lg">{getInitials(custName(sale))}</span>
                         <div className="ms-2">
@@ -587,7 +579,7 @@ export function DreamsDashboard() {
 
         {/* Sales statics + Recent transactions */}
         <div className="row">
-          <div className="col-xl-6 col-sm-12 col-12 d-flex">
+          <div className="col-xl-6 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
               <DreamsSalesStaticsChart
                 data={monthlyPl}
@@ -599,7 +591,7 @@ export function DreamsDashboard() {
               />
             </div>
           </div>
-          <div className="col-xl-6 col-sm-12 col-12 d-flex">
+          <div className="col-xl-6 col-lg-12 col-md-12 col-12 d-flex">
             <div className="card flex-fill">
               <div className="card-header d-flex align-items-center justify-content-between flex-wrap gap-3">
                 <div className="d-inline-flex align-items-center">
@@ -623,7 +615,7 @@ export function DreamsDashboard() {
                       <tr>
                         <th>Date</th>
                         <th>{txnTab === "sale" ? "Customer" : "Supplier"}</th>
-                        <th>Status</th>
+                        <th className="dp-col-hide-sm">Status</th>
                         <th>Total</th>
                       </tr>
                     </thead>
@@ -641,7 +633,7 @@ export function DreamsDashboard() {
                                   </div>
                                 </div>
                               </td>
-                              <td><span className={`badge ${statusBadge(s.status)} badge-xs`}>● {s.status}</span></td>
+                              <td><span className={`badge ${statusBadge(s.status)} badge-xs dp-col-hide-sm`}>● {s.status}</span></td>
                               <td className="fs-16 fw-bold text-gray-9">LKR {formatNumber(s.total)}</td>
                             </tr>
                           ))
@@ -649,7 +641,7 @@ export function DreamsDashboard() {
                             <tr key={p.id} style={{ cursor: "pointer" }} onClick={() => router.push(`/purchases/${p.id}`)}>
                               <td>{new Date(p.orderDate).toLocaleDateString("en-LK", { day: "numeric", month: "short", year: "numeric" })}</td>
                               <td><span className="fw-semibold">{p.supplier?.name ?? "—"}</span></td>
-                              <td><span className={`badge ${statusBadge(p.status)} badge-xs`}>● {p.status}</span></td>
+                              <td><span className={`badge ${statusBadge(p.status)} badge-xs dp-col-hide-sm`}>● {p.status}</span></td>
                               <td className="text-gray-9">LKR {formatNumber(p.total)}</td>
                             </tr>
                           ))}

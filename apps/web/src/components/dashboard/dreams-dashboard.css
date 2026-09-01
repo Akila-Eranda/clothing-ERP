@@ -12,8 +12,12 @@
   --dp-text: #212b36;
   --dp-muted: #646b72;
   --dp-light: #f9fafb;
+  --dp-card-bg: #ffffff;
   font-family: inherit;
   color: var(--dp-text);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 .dreams-pos-dash * {
@@ -31,11 +35,60 @@
 .dreams-pos-dash .row > [class*="col-"] {
   padding-left: 12px;
   padding-right: 12px;
-  width: 100%;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dreams-pos-dash .row > [class*="col-"].d-flex {
+  flex-direction: column;
+}
+
+@media (min-width: 576px) {
+  .dreams-pos-dash .row > .col-sm-5 { flex: 0 0 41.666667%; max-width: 41.666667%; }
+  .dreams-pos-dash .row > .col-sm-6 { flex: 0 0 50%; max-width: 50%; }
+  .dreams-pos-dash .row > .col-sm-7 { flex: 0 0 58.333333%; max-width: 58.333333%; }
+  .dreams-pos-dash .row > .col-sm-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+@media (min-width: 768px) {
+  .dreams-pos-dash .row > .col-md-4 { flex: 0 0 33.333333%; max-width: 33.333333%; }
+  .dreams-pos-dash .row > .col-md-6 { flex: 0 0 50%; max-width: 50%; }
+  .dreams-pos-dash .row > .col-md-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+@media (min-width: 992px) {
+  .dreams-pos-dash .row > .col-lg-3 { flex: 0 0 25%; max-width: 25%; }
+  .dreams-pos-dash .row > .col-lg-4 { flex: 0 0 33.333333%; max-width: 33.333333%; }
+  .dreams-pos-dash .row > .col-lg-6 { flex: 0 0 50%; max-width: 50%; }
+  .dreams-pos-dash .row > .col-lg-7 { flex: 0 0 58.333333%; max-width: 58.333333%; }
+  .dreams-pos-dash .row > .col-lg-8 { flex: 0 0 66.666667%; max-width: 66.666667%; }
+  .dreams-pos-dash .row > .col-lg-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+@media (min-width: 1200px) {
+  .dreams-pos-dash .row > .col-xl-3 { flex: 0 0 25%; max-width: 25%; }
+  .dreams-pos-dash .row > .col-xl-5 { flex: 0 0 41.666667%; max-width: 41.666667%; }
+  .dreams-pos-dash .row > .col-xl-6 { flex: 0 0 50%; max-width: 50%; }
+  .dreams-pos-dash .row > .col-xl-7 { flex: 0 0 58.333333%; max-width: 58.333333%; }
+  .dreams-pos-dash .row > .col-xl-8 { flex: 0 0 66.666667%; max-width: 66.666667%; }
+  .dreams-pos-dash .row > .col-xl-12 { flex: 0 0 100%; max-width: 100%; }
+}
+
+@media (min-width: 1400px) {
+  .dreams-pos-dash .row > .col-xxl-4 { flex: 0 0 33.333333%; max-width: 33.333333%; }
+  .dreams-pos-dash .row > .col-xxl-8 { flex: 0 0 66.666667%; max-width: 66.666667%; }
 }
 
 .dreams-pos-dash .d-flex { display: flex !important; }
-.dreams-pos-dash .flex-fill { flex: 1 1 auto !important; }
+.dreams-pos-dash .flex-fill {
+  flex: 1 1 auto !important;
+  min-width: 0;
+  width: 100%;
+}
 .dreams-pos-dash .flex-wrap { flex-wrap: wrap !important; }
 .dreams-pos-dash .flex-shrink-0 { flex-shrink: 0 !important; }
 .dreams-pos-dash .align-items-center { align-items: center !important; }
@@ -77,32 +130,6 @@
 .dreams-pos-dash .text-decoration-underline { text-decoration: underline; }
 .dreams-pos-dash .position-relative { position: relative; }
 
-@media (min-width: 576px) {
-  .dreams-pos-dash .col-sm-5 { width: 41.666667%; }
-  .dreams-pos-dash .col-sm-6 { width: 50%; }
-  .dreams-pos-dash .col-sm-7 { width: 58.333333%; }
-  .dreams-pos-dash .col-sm-12 { width: 100%; }
-}
-
-@media (min-width: 768px) {
-  .dreams-pos-dash .col-md-4 { width: 33.333333%; }
-  .dreams-pos-dash .col-md-6 { width: 50%; }
-  .dreams-pos-dash .col-md-12 { width: 100%; }
-}
-
-@media (min-width: 1200px) {
-  .dreams-pos-dash .col-xl-3 { width: 25%; }
-  .dreams-pos-dash .col-xl-5 { width: 41.666667%; }
-  .dreams-pos-dash .col-xl-6 { width: 50%; }
-  .dreams-pos-dash .col-xl-7 { width: 58.333333%; }
-  .dreams-pos-dash .col-xl-8 { width: 66.666667%; }
-}
-
-@media (min-width: 1400px) {
-  .dreams-pos-dash .col-xxl-4 { width: 33.333333%; }
-  .dreams-pos-dash .col-xxl-8 { width: 66.666667%; }
-}
-
 /* ── Colors ── */
 .dreams-pos-dash .text-primary { color: var(--dp-primary) !important; }
 .dreams-pos-dash .text-secondary { color: var(--dp-secondary) !important; }
@@ -139,11 +166,12 @@
 /* ── Card ── */
 .dreams-pos-dash .card {
   margin-bottom: 0;
-  background: #fff;
+  background: var(--dp-card-bg);
   border-radius: 8px;
   border: 1px solid var(--dp-border);
   box-shadow: none;
   width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -159,6 +187,9 @@
   padding: 1rem 1.25rem;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: space-between;
 }
 
 .dreams-pos-dash .card-footer {
@@ -208,6 +239,15 @@
 /* ── Sale / Revenue widgets ── */
 .dreams-pos-dash .sale-widget {
   border: none !important;
+  min-height: 0;
+}
+
+.dreams-pos-dash button.card.sale-widget {
+  width: 100%;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-radius: 8px;
 }
 
 .dreams-pos-dash .sale-widget .sale-icon {
@@ -225,6 +265,18 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+.dreams-pos-dash .sale-widget h4 {
+  font-size: clamp(0.9rem, 2.2vw, 1.15rem);
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.dreams-pos-dash .sale-widget .ms-2 {
+  min-width: 0;
+  flex: 1;
 }
 
 .dreams-pos-dash .sale-widget.bg-primary .sale-icon { color: var(--dp-primary); }
@@ -531,9 +583,80 @@
   border: 1px solid var(--dp-border);
   border-radius: 8px;
   font-size: 13px;
-  background: #fff;
+  background: var(--dp-card-bg);
   color: var(--dp-text);
-  min-width: 200px;
+  width: 100%;
+  max-width: 220px;
+  min-width: 0;
+}
+
+/* ── Layout helpers ── */
+.dreams-pos-dash .dp-page-header {
+  width: 100%;
+}
+
+.dreams-pos-dash .dp-info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.dreams-pos-dash .dp-customer-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.dreams-pos-dash .dp-customer-overview {
+  display: grid;
+  grid-template-columns: minmax(120px, 40%) 1fr;
+  gap: 1rem;
+  align-items: center;
+}
+
+.dreams-pos-dash .dp-chart-wrap {
+  width: 100%;
+  min-width: 0;
+  min-height: 200px;
+}
+
+.dreams-pos-dash .dp-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.dreams-pos-dash .dp-chart-summary > .border {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.dreams-pos-dash .dp-list-row {
+  gap: 0.5rem;
+}
+
+.dreams-pos-dash .dp-list-row .ms-2 {
+  min-width: 0;
+  flex: 1;
+}
+
+.dreams-pos-dash .dp-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dreams-pos-dash .dp-period-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.dreams-pos-dash .dp-period-scroll .custom-btn-group {
+  flex-wrap: nowrap;
+  width: max-content;
+  max-width: none;
 }
 
 /* ── Customer radial ── */
@@ -570,12 +693,160 @@
   100% { background-position: -200% 0; }
 }
 
-/* Row spacing */
-.dreams-pos-dash .row > [class*="col-"] {
-  margin-bottom: 24px;
-  display: flex;
-}
-
 .dreams-pos-dash .content {
   padding: 0;
+}
+
+/* ── Mobile & tablet responsive ── */
+@media (max-width: 991px) {
+  .dreams-pos-dash .row {
+    margin-left: -8px;
+    margin-right: -8px;
+  }
+
+  .dreams-pos-dash .row > [class*="col-"] {
+    padding-left: 8px;
+    padding-right: 8px;
+    margin-bottom: 12px;
+  }
+
+  .dreams-pos-dash .card-body,
+  .dreams-pos-dash .card-header,
+  .dreams-pos-dash .card-footer {
+    padding: 0.875rem 1rem;
+  }
+
+  .dreams-pos-dash h1 {
+    font-size: 1.35rem;
+  }
+
+  .dreams-pos-dash .card-title {
+    font-size: 16px;
+  }
+
+  .dreams-pos-dash .dp-customer-overview {
+    grid-template-columns: 1fr;
+  }
+
+  .dreams-pos-dash .dp-customer-stats .border-end {
+    border-right: none !important;
+    border-bottom: 1px solid var(--dp-border);
+    padding-bottom: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .dreams-pos-dash .dp-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dreams-pos-dash .dp-page-header {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .dreams-pos-dash .dp-page-header .input-icon-start {
+    width: 100%;
+  }
+
+  .dreams-pos-dash .dp-date-input {
+    max-width: 100%;
+  }
+
+  .dreams-pos-dash .alert {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dreams-pos-dash .sale-widget .sale-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .dreams-pos-dash .sale-widget .sale-icon svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .dreams-pos-dash .revenue-widget h4 {
+    font-size: 1rem;
+  }
+
+  .dreams-pos-dash .custom-table thead .dp-col-hide-sm,
+  .dreams-pos-dash .custom-table tbody .dp-col-hide-sm {
+    display: none;
+  }
+
+  .dreams-pos-dash .transaction-tab .nav-link {
+    font-size: 12px;
+    padding: 0.6rem 0.35rem;
+  }
+
+  .dreams-pos-dash .sell-product > div {
+    flex-wrap: wrap;
+  }
+
+  .dreams-pos-dash .sell-product .badge {
+    margin-top: 0.25rem;
+  }
+
+  .dreams-pos-dash .dp-category-layout {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .dreams-pos-dash .dp-category-layout > div:first-child {
+    width: 160px !important;
+    height: 160px !important;
+  }
+}
+
+@media (max-width: 575px) {
+  .dreams-pos-dash .row > [class*="col-"].col-sm-6 {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+
+  .dreams-pos-dash .dp-list-row {
+    flex-direction: column;
+    align-items: flex-start !important;
+  }
+
+  .dreams-pos-dash .dp-list-row .text-end {
+    text-align: left !important;
+    width: 100%;
+  }
+
+  .dreams-pos-dash .custom-table {
+    font-size: 12px;
+  }
+
+  .dreams-pos-dash .custom-table thead th,
+  .dreams-pos-dash .custom-table tbody td {
+    padding: 8px 10px;
+  }
+
+  .dreams-pos-dash .avatar.avatar-lg {
+    width: 40px;
+    height: 40px;
+    font-size: 12px;
+  }
+}
+
+/* Dark mode — keep DreamsPOS light cards readable */
+.dark .dreams-pos-dash {
+  --dp-border: hsl(var(--border));
+  --dp-text: hsl(var(--foreground));
+  --dp-muted: hsl(var(--muted-foreground));
+  --dp-light: hsl(var(--muted) / 0.35);
+  --dp-card-bg: hsl(var(--card));
+}
+
+.dark .dreams-pos-dash .bg-light {
+  background-color: hsl(var(--muted) / 0.35) !important;
+}
+
+.dark .dreams-pos-dash .dp-skeleton {
+  background: linear-gradient(90deg, hsl(var(--muted)) 25%, hsl(var(--muted) / 0.6) 50%, hsl(var(--muted)) 75%);
 }

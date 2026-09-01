@@ -53,40 +53,43 @@ export function DreamsSalesPurchaseChart({
           </span>
           <h5 className="card-title mb-0">Sales &amp; Purchase</h5>
         </div>
-        <div className="btn-group custom-btn-group">
-          {periods.map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`btn btn-outline-light ${period === p ? "active" : ""}`}
-              onClick={() => onPeriod(p)}
-            >
-              {p}
-            </button>
-          ))}
+        <div className="dp-period-scroll">
+          <div className="btn-group custom-btn-group">
+            {periods.map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`btn btn-outline-light ${period === p ? "active" : ""}`}
+                onClick={() => onPeriod(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       <div className="card-body pb-0">
-        <div className="d-flex align-items-center gap-2 mb-3">
+        <div className="dp-chart-summary mb-3">
           <div className="border p-2 br-8">
             <p className="d-inline-flex align-items-center mb-1">
               <span className="text-primary-300 me-1">●</span>
               Total Purchase
             </p>
-            <h4>{loading ? "—" : `LKR ${formatNumber(purchaseTotal)}`}</h4>
+            <h4 style={{ fontSize: "clamp(0.9rem, 2.5vw, 1.15rem)" }}>{loading ? "—" : `LKR ${formatNumber(purchaseTotal)}`}</h4>
           </div>
           <div className="border p-2 br-8">
             <p className="d-inline-flex align-items-center mb-1">
               <span className="text-primary me-1">●</span>
               Total Sales
             </p>
-            <h4>{loading ? "—" : `LKR ${formatNumber(salesTotal)}`}</h4>
+            <h4 style={{ fontSize: "clamp(0.9rem, 2.5vw, 1.15rem)" }}>{loading ? "—" : `LKR ${formatNumber(salesTotal)}`}</h4>
           </div>
         </div>
         {loading ? (
-          <div className="dp-skeleton" style={{ height: 245 }} />
+          <div className="dp-skeleton dp-chart-wrap" style={{ height: 220 }} />
         ) : (
-          <ResponsiveContainer width="100%" height={245}>
+          <div className="dp-chart-wrap" style={{ height: 220 }}>
+            <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data} margin={{ top: 8, right: 8, left: -10, bottom: 0 }} barCategoryGap="20%">
               <CartesianGrid strokeDasharray="5 5" stroke="#E5E7EB" vertical={false} />
               <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#6B7280" }} axisLine={false} tickLine={false} />
@@ -106,7 +109,8 @@ export function DreamsSalesPurchaseChart({
               <Bar dataKey="purchase" stackId="a" fill={ORANGE_LIGHT} radius={[0, 0, 8, 8]} />
               <Bar dataKey="sales" stackId="a" fill={ORANGE} radius={[8, 8, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </>
@@ -148,9 +152,9 @@ export function DreamsSalesStaticsChart({
         <span className="btn btn-sm btn-white">{new Date().getFullYear()}</span>
       </div>
       <div className="card-body pb-0">
-        <div className="d-flex align-items-center flex-wrap gap-2 mb-3">
+        <div className="dp-chart-summary mb-3">
           <div className="border p-2 br-8">
-            <h5 className="d-inline-flex align-items-center text-teal mb-1">
+            <h5 className="d-inline-flex align-items-center flex-wrap text-teal mb-1" style={{ fontSize: "clamp(0.85rem, 2vw, 1rem)" }}>
               LKR {formatNumber(revenue)}
               <span className={`badge badge-${revenuePct.up ? "success" : "danger"} badge-xs ms-2`}>
                 {revenuePct.up ? "↑" : "↓"} {revenuePct.value}
@@ -159,7 +163,7 @@ export function DreamsSalesStaticsChart({
             <p>Revenue</p>
           </div>
           <div className="border p-2 br-8">
-            <h5 className="d-inline-flex align-items-center text-orange mb-1">
+            <h5 className="d-inline-flex align-items-center flex-wrap text-orange mb-1" style={{ fontSize: "clamp(0.85rem, 2vw, 1rem)" }}>
               LKR {formatNumber(expense)}
               <span className={`badge badge-${expensePct.up ? "success" : "danger"} badge-xs ms-2`}>
                 {expensePct.up ? "↑" : "↓"} {expensePct.value}
@@ -169,10 +173,11 @@ export function DreamsSalesStaticsChart({
           </div>
         </div>
         {loading ? (
-          <div className="dp-skeleton" style={{ height: 290 }} />
+          <div className="dp-skeleton dp-chart-wrap" style={{ height: 240 }} />
         ) : (
-          <ResponsiveContainer width="100%" height={290}>
-            <BarChart data={chartData} margin={{ top: 8, right: 8, left: -10, bottom: 0 }}>
+          <div className="dp-chart-wrap" style={{ height: 240 }}>
+            <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 8, right: 4, left: -16, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#6B7280" }} axisLine={false} tickLine={false} />
               <YAxis
@@ -191,7 +196,8 @@ export function DreamsSalesStaticsChart({
               <Bar dataKey="revenue" fill={REVENUE} radius={4} barSize={16} />
               <Bar dataKey="expenses" fill={EXPENSE} radius={4} barSize={16} />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         )}
       </div>
     </>
@@ -218,8 +224,8 @@ export function DreamsCategoryDonut({
   const top3 = categories.slice(0, 3);
 
   return (
-    <div className="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-4">
-      <div style={{ width: 200, height: 200 }}>
+    <div className="d-flex align-items-center justify-content-between flex-wrap gap-4 mb-4 dp-category-layout">
+      <div style={{ width: "100%", maxWidth: 200, height: 200, margin: "0 auto" }}>
         {loading ? (
           <div className="dp-skeleton" style={{ width: 200, height: 200, borderRadius: "50%" }} />
         ) : slices.length > 0 ? (
