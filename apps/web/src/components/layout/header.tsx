@@ -248,7 +248,9 @@ export function Header() {
                   <li key={href} className="hex-header__crumb-item">
                     <ChevronRight className="hex-header__crumb-sep h-3 w-3" aria-hidden />
                     {isLast ? (
-                      <span className="hex-header__crumb-current">{crumbLabel(i)}</span>
+                      <span className="hex-header__crumb-current" aria-current="page">
+                        {crumbLabel(i)}
+                      </span>
                     ) : (
                       <Link href={href} className="hex-header__crumb-link">
                         {crumbLabel(i)}
@@ -260,7 +262,6 @@ export function Header() {
             </ol>
 
             <h1 className="hex-header__title sm:hidden">{currentTitle}</h1>
-            <p className="hex-header__subtitle hidden sm:block">{currentTitle}</p>
           </nav>
         </div>
 
@@ -279,21 +280,27 @@ export function Header() {
 
         {/* ── Right: actions ── */}
         <div className="hex-header__right">
-          <BranchSwitcher className="hex-header__branch hidden md:flex" />
+          <div className="hex-header__actions">
+            <BranchSwitcher className="hex-header__branch hidden lg:flex" />
 
-          <button
-            type="button"
-            className="hex-header__pos"
-            onClick={openPos}
-          >
-            <Monitor className="h-4 w-4" />
-            <span className="hidden sm:inline">POS</span>
-          </button>
+            <div className="hex-header__actions-primary">
+              <button
+                type="button"
+                className="hex-header__pos"
+                onClick={openPos}
+              >
+                <Monitor className="h-4 w-4" />
+                <span className="hidden sm:inline">POS</span>
+              </button>
 
-          <div className="hex-header__live hidden xl:flex">
-            <span className="hex-header__live-dot" />
-            <span>Live</span>
+              <div className="hex-header__live hidden md:flex">
+                <span className="hex-header__live-dot" />
+                <span>Live</span>
+              </div>
+            </div>
           </div>
+
+          <span className="hex-header__vsep hidden sm:block" aria-hidden />
 
           <div className="hex-header__toolbar">
             <button
@@ -373,6 +380,8 @@ export function Header() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+
+          <span className="hex-header__vsep hidden lg:block" aria-hidden />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
