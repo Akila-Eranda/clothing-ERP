@@ -65,8 +65,12 @@ export default function AdminSidebar({ onClose }: Props) {
   return (
     <aside className="flex flex-col h-full bg-card border-r border-border w-[220px] flex-shrink-0">
       <div className="flex items-center justify-between h-14 px-4 border-b border-border flex-shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <AppLogo variant="sidebar" theme={logoOnDark ? "dark" : "light"} className="shrink-0" />
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <AppLogo
+            variant="compact"
+            theme={logoOnDark ? "dark" : "light"}
+            className="shrink-0 max-w-[140px]"
+          />
           <p className="text-[10px] text-muted-foreground leading-tight truncate">Platform Admin</p>
         </div>
         {onClose && (

@@ -23,6 +23,8 @@ import { isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppLogo } from "@/components/brand/app-logo";
+import { useSidebarLogoOnDark } from "@/hooks/use-sidebar-logo-theme";
 
 /* ── Types ─────────────────────────────────────────────── */
 interface NavItem {
@@ -280,6 +282,7 @@ export function Sidebar() {
   const isDark = darkUi;
   const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
+  const logoOnDark = useSidebarLogoOnDark();
   const navGroups = useNavGroups();
 
   const closeMobile = () => setMobileSidebarOpen(false);
@@ -571,28 +574,54 @@ export function Sidebar() {
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
-        {/* ── Header: collapse only ── */}
+        {/* ── Header: logo + collapse ── */}
         <div
           className={cn(
-            "relative flex items-center shrink-0 w-full py-2",
-            sidebarCollapsed ? "px-2 justify-center" : "px-2.5 justify-end",
+            "hex-sidebar-brand relative flex items-center shrink-0 w-full py-2.5 gap-2",
+            sidebarCollapsed ? "px-2 justify-center" : "px-2.5",
           )}
         >
-          <button
-            type="button"
-            onClick={toggleSidebar}
-            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border transition-colors shrink-0"
-            style={{ borderColor: border, color: textMut, background: bg }}
-            onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
-            onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = bg; }}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="h-3.5 w-3.5" />
-            ) : (
+          {!sidebarCollapsed ? (
+            <Link href="/dashboard" onClick={closeMobile} className="min-w-0 flex-1 flex items-center">
+              <AppLogo
+                variant="sidebar"
+                theme={logoOnDark ? "dark" : "light"}
+                className="!items-start !w-auto"
+              />
+            </Link>
+          ) : (
+            <Link href="/dashboard" onClick={closeMobile} className="flex items-center justify-center" aria-label="Dashboard">
+              <img
+                src={logoOnDark ? "/brand/hexalyte-white.png?v=20260903" : "/brand/hexalyte-innovation.png?v=20260903"}
+                alt="HEXALYTE"
+                className="h-7 w-7 object-contain"
+              />
+            </Link>
+          )}
+          {!sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Collapse sidebar"
+              className="flex h-7 w-7 items-center justify-center rounded-lg border transition-colors shrink-0"
+              style={{ borderColor: border, color: textMut, background: bg }}
+              onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
+              onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = bg; }}
+            >
               <ChevronLeft className="h-3.5 w-3.5" />
-            )}
-          </button>
+            </button>
+          )}
+          {sidebarCollapsed && (
+            <button
+              type="button"
+              onClick={toggleSidebar}
+              aria-label="Expand sidebar"
+              className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 flex h-6 w-6 items-center justify-center rounded-full border bg-card shadow-sm"
+              style={{ borderColor: border, color: textMut }}
+            >
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          )}
         </div>
 
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />
