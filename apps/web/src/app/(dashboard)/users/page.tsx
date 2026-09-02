@@ -1,10 +1,10 @@
 "use client";
 
-import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
+import { LoadingCenter } from "@/components/ui/loading";
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Shield, Plus, MoreHorizontal, CheckCircle, XCircle,
-  User, RefreshCw, Trash2, Key, Loader2,
+  User, RefreshCw, Trash2, Key, Eye,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,10 @@ import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
 import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
+import { PermissionMatrix } from "@/components/users/permission-matrix";
+import { RolePermissionDiff } from "@/components/users/role-permission-diff";
+import { type AppPermission } from "@/lib/permissions";
+import { Textarea } from "@/components/ui/textarea";
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface Role {
   id: string;
@@ -27,7 +31,7 @@ interface Role {
   type: string;
   isSystem: boolean;
   description?: string;
-  permissions: { permission: { id: string; resource: string; action: string } }[];
+  permissions: { permission: AppPermission }[];
   _count: { users: number };
 }
 interface UserRole { role: Role }
@@ -85,12 +89,17 @@ function inviteStaffRoles(roles: Role[], tenantId?: string | null): Role[] {
 export default function UsersPage() {
   const [users, setUsers]             = useState<AppUser[]>([]);
   const [roles, setRoles]             = useState<Role[]>([]);
+  const [allPermissions, setAllPermissions] = useState<AppPermission[]>([]);
   const [branches, setBranches]       = useState<Branch[]>([]);
   const [loading, setLoading]         = useState(true);
 
   const [userModal, setUserModal]     = useState(false);
   const [roleAssignModal, setRoleAssignModal] = useState<AppUser | null>(null);
+  const [roleDetailModal, setRoleDetailModal] = useState<Role | null>(null);
+  const [createRoleModal, setCreateRoleModal] = useState(false);
   const [selectedRoleId, setSelectedRoleId]  = useState("");
+  const [roleForm, setRoleForm] = useState({ name: "", description: "" });
+  const [rolePermissionIds, setRolePermissionIds] = useState<Set<string>>(new Set());
 
   const [userForm, setUserForm]       = useState({ ...EMPTY_USER });
   const [saving, setSaving]           = useState(false);
@@ -106,17 +115,24 @@ export default function UsersPage() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [uRes, rRes, bRes] = await Promise.all([
+      const [uRes, rRes, bRes, pRes] = await Promise.all([
         api.get<PaginatedUsers>("/users?limit=100"),
         api.get<Role[]>("/roles"),
         api.get<Branch[]>("/branches"),
+        api.get<AppPermission[]>("/roles/permissions"),
       ]);
       setUsers(parseApiList<AppUser>(uRes.data));
       setRoles(parseApiList<Role>(rRes.data));
       setBranches(parseApiList<Branch>(bRes.data));
+      setAllPermissions(parseApiList<AppPermission>(pRes.data));
     } catch { toast.error("Failed to load data"); }
     finally { setLoading(false); }
   }, []);
+
+  const roleById = useMemo(() => new Map(roles.map((r) => [r.id, r])), [roles]);
+  const assignCurrentRole = roleAssignModal?.roles?.[0]?.role;
+  const assignNewRole = selectedRoleId ? roleById.get(selectedRoleId) : undefined;
+  const inviteRole = userForm.roleId ? roleById.get(userForm.roleId) : undefined;
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
@@ -170,11 +186,42 @@ export default function UsersPage() {
     setSaving(true);
     try {
       await api.patch(`/users/${roleAssignModal.id}/roles`, { roleIds: [selectedRoleId] });
-      toast.success("Role updated");
+      const roleName = roleById.get(selectedRoleId)?.name ?? "role";
+      toast.success(`Role updated — ${roleName} permissions applied`);
       setRoleAssignModal(null);
       loadAll();
     } catch { toast.error("Failed to assign role"); }
     finally { setSaving(false); }
+  };
+
+  const handleCreateRole = async () => {
+    if (!roleForm.name.trim()) {
+      toast.error("Role name is required");
+      return;
+    }
+    if (rolePermissionIds.size === 0) {
+      toast.error("Select at least one permission");
+      return;
+    }
+    setSaving(true);
+    try {
+      await api.post("/roles", {
+        name: roleForm.name.trim(),
+        description: roleForm.description.trim() || undefined,
+        type: "CUSTOM",
+        permissionIds: [...rolePermissionIds],
+      });
+      toast.success(`Custom role "${roleForm.name}" created`);
+      setCreateRoleModal(false);
+      setRoleForm({ name: "", description: "" });
+      setRolePermissionIds(new Set());
+      loadAll();
+    } catch (e: unknown) {
+      const msg = (e as { data?: { message?: string } })?.data?.message;
+      toast.error(msg ?? "Failed to create role");
+    } finally {
+      setSaving(false);
+    }
   };
 
   // ── Columns ───────────────────────────────────────────────────────────────
@@ -229,6 +276,26 @@ export default function UsersPage() {
         },
       },
       {
+        id: "permissions",
+        accessorFn: (u) => String(u.roles?.[0]?.role?.permissions?.length ?? 0),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Permissions" />,
+        cell: ({ row }) => {
+          const role = row.original.roles?.[0]?.role;
+          const count = role?.permissions?.length ?? 0;
+          return (
+            <button
+              type="button"
+              className="text-sm text-primary font-medium hover:underline"
+              onClick={() => {
+                if (role) setRoleDetailModal(role);
+              }}
+            >
+              {count} access rule{count === 1 ? "" : "s"}
+            </button>
+          );
+        },
+      },
+      {
         id: "branch",
         accessorFn: (u) => u.branch?.name ?? "",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Branch" />,
@@ -277,6 +344,14 @@ export default function UsersPage() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem
+                  onClick={() => {
+                    const role = u.roles?.[0]?.role;
+                    if (role) setRoleDetailModal(role);
+                  }}
+                >
+                  <Eye className="h-3.5 w-3.5 mr-2" /> View Permissions
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
                     setRoleAssignModal(u);
@@ -384,14 +459,32 @@ export default function UsersPage() {
           )}
         </TabsContent>
 
-        {/* ── Roles Tab (read-only) ──────────────────────────────────────── */}
+        {/* ── Roles Tab ──────────────────────────────────────────────────── */}
         <TabsContent value="roles" className="mt-4 space-y-3">
-          <p className="text-xs text-muted-foreground">
-            Roles configured for your shop only — other tenants&apos; roles are not shown.
-          </p>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              Roles for your shop — click a role to see exactly which permissions it grants.
+            </p>
+            <Button
+              variant="outline"
+              className="gap-1.5"
+              onClick={() => {
+                setRoleForm({ name: "", description: "" });
+                setRolePermissionIds(new Set());
+                setCreateRoleModal(true);
+              }}
+            >
+              <Plus className="h-4 w-4" /> Create Custom Role
+            </Button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {tenantRoleCards.map((role) => (
-              <div key={role.id} className="rounded-[18px] border bg-card p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              <button
+                key={role.id}
+                type="button"
+                onClick={() => setRoleDetailModal(role)}
+                className="rounded-[18px] border bg-card p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-left hover:border-primary/40 hover:shadow-md transition-all"
+              >
                 <div className="flex items-start gap-2 mb-3">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
                     <Shield className="h-4 w-4 text-primary" />
@@ -412,9 +505,11 @@ export default function UsersPage() {
                   <span className="text-muted-foreground flex items-center gap-1 text-xs">
                     <User className="h-3.5 w-3.5" /> {role._count?.users ?? 0} users
                   </span>
-                  <span className="text-xs font-medium">{role.permissions?.length ?? 0} permissions</span>
+                  <span className="text-xs font-medium text-primary">
+                    {role.permissions?.length ?? 0} permissions →
+                  </span>
                 </div>
-              </div>
+              </button>
             ))}
             {tenantRoleCards.length === 0 && !loading && (
               <div className="col-span-full rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -427,7 +522,7 @@ export default function UsersPage() {
 
       {/* ── Create User Modal ─────────────────────────────────────────────── */}
       <Dialog open={userModal} onOpenChange={setUserModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Invite User</DialogTitle></DialogHeader>
           <div className="space-y-3 py-2">
             <div className="grid grid-cols-2 gap-3">
@@ -462,7 +557,7 @@ export default function UsersPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Cashier, Manager, and other staff roles for your shop
                 </p>
               </div>
@@ -472,6 +567,16 @@ export default function UsersPage() {
                   <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
                 </Select></div>
             </div>
+
+            {inviteRole && (
+              <div className="rounded-xl border bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                  Permissions this user will get
+                </p>
+                <RolePermissionDiff newRole={inviteRole} />
+              </div>
+            )}
+
             <div className={modalInlineFooterClass}>
               <Button variant="outline" onClick={() => setUserModal(false)} disabled={saving}>Cancel</Button>
               <Button
@@ -488,25 +593,110 @@ export default function UsersPage() {
 
       {/* ── Assign Role Modal ─────────────────────────────────────────────── */}
       <Dialog open={!!roleAssignModal} onOpenChange={(o) => { if (!o) setRoleAssignModal(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Change Role — {roleAssignModal?.firstName} {roleAssignModal?.lastName}</DialogTitle>
+            <DialogTitle>Assign Role & Permissions</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {roleAssignModal?.firstName} {roleAssignModal?.lastName} · {roleAssignModal?.email}
+            </p>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div><Label className="text-xs mb-1.5 block">Select Role</Label>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label className="text-xs mb-1.5 block">Select Role</Label>
               <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
                 <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                 <SelectContent>
                   {allAssignableRoles.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{roleLabel(r)}</SelectItem>
+                    <SelectItem key={r.id} value={r.id}>
+                      {roleLabel(r)} — {r.permissions?.length ?? 0} permissions
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-[10px] text-muted-foreground mt-1">Existing roles only</p>
             </div>
+
+            <RolePermissionDiff
+              currentRole={assignCurrentRole}
+              newRole={assignNewRole}
+            />
+
             <div className={modalInlineFooterClass}>
               <Button variant="outline" onClick={() => setRoleAssignModal(null)} disabled={saving}>Cancel</Button>
-              <Button variant="gradient" onClick={handleAssignRole} disabled={saving || !selectedRoleId}>{saving ? "Saving…" : "Assign Role"}</Button>
+              <Button variant="gradient" onClick={handleAssignRole} disabled={saving || !selectedRoleId}>
+                {saving ? "Saving…" : "Apply Role & Permissions"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Role Detail Modal ─────────────────────────────────────────────── */}
+      <Dialog open={!!roleDetailModal} onOpenChange={(o) => { if (!o) setRoleDetailModal(null); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" />
+              {roleDetailModal?.name} — Permissions
+            </DialogTitle>
+            {roleDetailModal?.description && (
+              <p className="text-sm text-muted-foreground">{roleDetailModal.description}</p>
+            )}
+          </DialogHeader>
+          <PermissionMatrix
+            permissions={allPermissions}
+            selectedIds={new Set((roleDetailModal?.permissions ?? []).map((rp) => rp.permission.id))}
+            readOnly
+            maxHeight="min(480px, 55vh)"
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Create Custom Role Modal ──────────────────────────────────────── */}
+      <Dialog open={createRoleModal} onOpenChange={setCreateRoleModal}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Custom Role</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Pick exactly which modules and actions this role can access.
+            </p>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs mb-1.5 block">Role Name *</Label>
+                <Input
+                  value={roleForm.name}
+                  onChange={(e) => setRoleForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Warehouse Staff"
+                />
+              </div>
+              <div>
+                <Label className="text-xs mb-1.5 block">Description</Label>
+                <Textarea
+                  value={roleForm.description}
+                  onChange={(e) => setRoleForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder="Optional — what this role is for"
+                  rows={2}
+                />
+              </div>
+            </div>
+
+            <PermissionMatrix
+              permissions={allPermissions}
+              selectedIds={rolePermissionIds}
+              onChange={setRolePermissionIds}
+              maxHeight="min(420px, 45vh)"
+            />
+
+            <div className={modalInlineFooterClass}>
+              <Button variant="outline" onClick={() => setCreateRoleModal(false)} disabled={saving}>Cancel</Button>
+              <Button
+                variant="gradient"
+                onClick={handleCreateRole}
+                disabled={saving || !roleForm.name.trim() || rolePermissionIds.size === 0}
+              >
+                {saving ? "Creating…" : `Create Role (${rolePermissionIds.size} permissions)`}
+              </Button>
             </div>
           </div>
         </DialogContent>

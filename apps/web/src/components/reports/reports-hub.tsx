@@ -4,20 +4,27 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Package,
-  RefreshCw, Printer, ArrowUpRight, ArrowDownRight, FileText,
+  FileText,
   CreditCard, AlertTriangle, BarChart2,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
+import { ReportsShell } from "@/components/reports/reports-shell";
+import { ReportKpiGrid, type ReportKpiItem } from "@/components/reports/reports-ui";
+import {
+  REPORTS_TABS,
+  reportsPath,
+  type ReportsSection,
+} from "@/components/reports/reports-config";
+
+export { REPORTS_TABS, reportsPath, type ReportsSection };
 
 // ── Types ─────────────────────────────────────────────────────────────────
 interface PLReport {
@@ -66,30 +73,6 @@ const TIER_CFG: Record<string, { color: string; bg: string }> = {
   SILVER:   { color: "text-slate-600",  bg: "bg-muted/50" },
   BRONZE:   { color: "text-orange-700", bg: "bg-orange-500/10" },
 };
-export type ReportsSection =
-  | "overview" | "sales" | "purchases" | "inventory" | "suppliers"
-  | "customers" | "cashier" | "branches" | "tax" | "expiry"
-  | "cheques" | "commission" | "financial";
-
-export const REPORTS_TABS: { value: ReportsSection; label: string }[] = [
-  { value: "overview",    label: "Overview" },
-  { value: "sales",       label: "Sales" },
-  { value: "purchases",   label: "Purchases" },
-  { value: "inventory",   label: "Inventory" },
-  { value: "suppliers",   label: "Suppliers" },
-  { value: "customers",   label: "Customers" },
-  { value: "cashier",     label: "Cashier" },
-  { value: "branches",    label: "Branches" },
-  { value: "tax",         label: "Tax" },
-  { value: "expiry",      label: "Expiry" },
-  { value: "cheques",     label: "Cheques" },
-  { value: "commission",  label: "Commission" },
-  { value: "financial",   label: "Financial" },
-];
-
-export function reportsPath(section: ReportsSection) {
-  return section === "overview" ? "/reports" : `/reports/${section}`;
-}
 
 function unwrapRows<T>(data: T[] | { rows?: T[] } | null | undefined): T[] {
   if (Array.isArray(data)) return data;
@@ -101,16 +84,6 @@ function unwrapRows<T>(data: T[] | { rows?: T[] } | null | undefined): T[] {
 const fmtDate = (d: Date) => d.toISOString().split("T")[0];
 const today     = () => fmtDate(new Date());
 const monthStart= () => { const d = new Date(); d.setDate(1); return fmtDate(d); };
-const yearStart = () => { const d = new Date(); d.setMonth(0, 1); return fmtDate(d); };
-const daysAgo   = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return fmtDate(d); };
-const PRESETS = [
-  { label: "Today",        start: today(),      end: today()      },
-  { label: "This Week",    start: daysAgo(6),   end: today()      },
-  { label: "This Month",   start: monthStart(), end: today()      },
-  { label: "Last 30 Days", start: daysAgo(29),  end: today()      },
-  { label: "Last 90 Days", start: daysAgo(89),  end: today()      },
-  { label: "This Year",    start: yearStart(),  end: today()      },
-];
 
 const TT_STYLE = { background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", borderRadius: "10px", fontSize: "11px" };
 
@@ -123,7 +96,6 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
   const router = useRouter();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const activeBranchName = useBranchStore((s) => s.activeBranchName);
-  const tabLabel = REPORTS_TABS.find((t) => t.value === section)?.label ?? "Reports";
   const [range, setRange]           = useState({ label: "This Month", start: monthStart(), end: today() });
   const [loading, setLoading]       = useState(true);
   const [pl,          setPL]        = useState<PLReport | null>(null);
@@ -240,83 +212,65 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
   }, [customers]);
 
   // ── KPI cards ─────────────────────────────────────────────────────────
-  const kpis = [
-    { label: "Net Revenue",    val: pl?.revenue.net ?? 0,              currency: true,  icon: DollarSign,  bg: "bg-emerald-600", pos: (pl?.revenue.net ?? 0) >= 0 },
-    { label: "Net Profit",     val: pl?.netProfit ?? 0,                currency: true,  icon: TrendingUp,  bg: "bg-teal-600",    pos: (pl?.netProfit ?? 0) >= 0 },
-    { label: "Expenses",       val: pl?.expenses.total ?? 0,           currency: true,  icon: TrendingDown,bg: "bg-red-500",     pos: false },
-    { label: "Orders",         val: pl?.salesCount ?? 0,               currency: false, icon: ShoppingCart,bg: "bg-blue-600",    pos: true },
-    { label: "Avg Order",      val: avgOrder,                          currency: true,  icon: BarChart2,   bg: "bg-violet-600",  pos: avgOrder > 0 },
-    { label: "Profit Margin",  val: parseFloat(pl?.profitMargin ?? "0"), currency: false, suffix: "%", icon: CreditCard, bg: "bg-orange-500", pos: parseFloat(pl?.profitMargin ?? "0") >= 0 },
+  const kpis: ReportKpiItem[] = [
+    {
+      label: "Net Revenue",
+      value: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`,
+      sub: range.label,
+      icon: DollarSign,
+      tone: (pl?.revenue.net ?? 0) >= 0 ? "emerald" : "red",
+    },
+    {
+      label: "Net Profit",
+      value: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`,
+      sub: `${pl?.profitMargin ?? 0}% margin`,
+      icon: TrendingUp,
+      tone: (pl?.netProfit ?? 0) >= 0 ? "teal" : "red",
+    },
+    {
+      label: "Expenses",
+      value: `LKR ${formatNumber(pl?.expenses.total ?? 0)}`,
+      sub: `${pl?.expenses.count ?? 0} records`,
+      icon: TrendingDown,
+      tone: "red",
+    },
+    {
+      label: "Orders",
+      value: String(pl?.salesCount ?? 0),
+      sub: "Completed sales",
+      icon: ShoppingCart,
+      tone: "blue",
+    },
+    {
+      label: "Avg Order",
+      value: `LKR ${formatNumber(avgOrder)}`,
+      sub: "Per transaction",
+      icon: BarChart2,
+      tone: "violet",
+    },
+    {
+      label: "Profit Margin",
+      value: `${pl?.profitMargin ?? 0}%`,
+      sub: "Net margin",
+      icon: CreditCard,
+      tone: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "orange" : "red",
+    },
   ];
 
   // ── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background">
-        <div className="bg-card border-b sticky top-0 z-10">
-          <div className="px-6 flex items-center justify-between h-14">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-sm font-bold text-foreground truncate">{tabLabel}</span>
-              {activeBranchName && (
-                <span className="text-[10px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">{activeBranchName}</span>
-              )}
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 h-8 hidden sm:flex">
-                <Printer className="h-3.5 w-3.5" /> Print
-              </Button>
-              <Button variant="outline" size="sm" onClick={loadAll} className="gap-1.5 h-8">
-                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-              </Button>
-            </div>
-          </div>
-        </div>
+    <ReportsShell
+      section={section}
+      branchName={activeBranchName}
+      range={range}
+      onRangeChange={setRange}
+      onRefresh={loadAll}
+      loading={loading}
+    >
 
-        {/* Date range filter */}
-        <div className="bg-card border-b px-6 py-2.5 flex items-center gap-3 flex-wrap">
-          <div className="flex gap-1 flex-wrap">
-            {PRESETS.map((p) => (
-              <button key={p.label} onClick={() => setRange({ ...p })}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${range.label === p.label ? "bg-primary text-primary-foreground" : "bg-muted/60 text-muted-foreground hover:bg-muted"}`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <div className="w-px h-4 bg-border" />
-          <div className="flex items-center gap-1.5">
-            <Input type="date" value={range.start} onChange={(e) => setRange((r) => ({ ...r, label: "Custom", start: e.target.value }))} className="h-7 text-xs w-32" />
-            <span className="text-xs text-muted-foreground">–</span>
-            <Input type="date" value={range.end}  onChange={(e) => setRange((r) => ({ ...r, label: "Custom", end: e.target.value }))}   className="h-7 text-xs w-32" />
-            <Button size="sm" variant="outline" onClick={loadAll} className="h-7 px-3 text-xs">Apply</Button>
-          </div>
-          {loading && <span className="text-xs text-muted-foreground animate-pulse ml-1">Loading…</span>}
-        </div>
-
-        <div className="px-6 py-6">
-
-          {/* ══════════════════════ OVERVIEW ══════════════════════ */}
           {section === "overview" && (
           <div className="m-0 space-y-5">
-
-            {/* KPI row */}
-            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-              {kpis.map((k) => (
-                <Card key={k.label} className="bg-card border shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-2 mb-2.5">
-                      <div className={`${k.bg} rounded-lg p-1.5 shrink-0`}><k.icon className="h-3.5 w-3.5 text-white" /></div>
-                      <p className="text-[11px] text-muted-foreground font-medium leading-tight">{k.label}</p>
-                    </div>
-                    <p className="text-lg font-bold text-foreground">
-                      {k.currency ? `LKR ${formatNumber(Math.abs(k.val))}` : k.suffix ? `${(k.val as number).toFixed(1)}${k.suffix}` : k.val}
-                    </p>
-                    <div className="flex items-center gap-1 mt-1">
-                      {k.pos ? <ArrowUpRight className="h-3 w-3 text-emerald-500" /> : <ArrowDownRight className="h-3 w-3 text-red-500" />}
-                      <span className={`text-[10px] font-medium ${k.pos ? "text-emerald-600" : "text-red-500"}`}>{k.pos ? "Positive" : "Negative"}</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ReportKpiGrid items={kpis} loading={loading} />
 
             {/* 12-month trend + cash flow */}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
@@ -1235,7 +1189,6 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           </div>
           )}
 
-        </div>
-    </div>
+    </ReportsShell>
   );
 }

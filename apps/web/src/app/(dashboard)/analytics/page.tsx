@@ -4,7 +4,7 @@ import * as React from "react";
 import { motion } from "framer-motion";
 import {
   BarChart3, TrendingUp, TrendingDown, DollarSign, RefreshCw, Package,
-  User, ShoppingCart, Percent, Award, AlertCircle, CalendarDays,
+  User, ShoppingCart, Percent, Award, AlertCircle,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, ComposedChart, Line,
@@ -19,6 +19,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
+import {
+  ReportDateFilterBar,
+  ReportTabNav,
+  ReportsPageHeader,
+  type ReportDateRange,
+} from "@/components/reports/reports-ui";
+import "@/components/reports/reports-hub.css";
 
 // ── constants ────────────────────────────────────────────────────────────────
 const C = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#3b82f6"];
@@ -26,14 +33,6 @@ const TT: React.CSSProperties = { background:"hsl(var(--popover))", border:"1px 
 const fmt = (d: Date) => d.toISOString().split("T")[0];
 const today   = () => fmt(new Date());
 const monStart= () => { const d=new Date(); d.setDate(1); return fmt(d); };
-const ago     = (n:number) => { const d=new Date(); d.setDate(d.getDate()-n); return fmt(d); };
-const PRESETS = [
-  { label:"Today",        start:today(),    end:today() },
-  { label:"This Week",    start:ago(6),     end:today() },
-  { label:"This Month",   start:monStart(), end:today() },
-  { label:"Last 30 Days", start:ago(29),    end:today() },
-  { label:"Last 90 Days", start:ago(89),    end:today() },
-];
 const CV = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.06}} };
 const IV = { hidden:{opacity:0,y:14}, show:{opacity:1,y:0,transition:{duration:0.3,ease:"easeOut"}} };
 
@@ -78,7 +77,7 @@ function Empty({ msg="No data for this period" }:{msg?:string}) {
 
 // ── page ──────────────────────────────────────────────────────────────────────
 export default function AnalyticsPage() {
-  const [range, setRange]           = React.useState({ label:"This Month", start:monStart(), end:today() });
+  const [range, setRange]           = React.useState<ReportDateRange>({ label:"This Month", start:monStart(), end:today() });
   const [loading, setLoading]       = React.useState(true);
   const [bestSelling, setBest]      = React.useState<BestItem[]>([]);
   const [cashier, setCashier]       = React.useState<CashierRow[]>([]);
@@ -138,31 +137,30 @@ export default function AnalyticsPage() {
   ];
 
   return (
-    <motion.div variants={CV} initial="hidden" animate="show" className="p-6 space-y-6 max-w-[1700px] mx-auto">
-
-      {/* ── Header ── */}
-      <motion.div variants={IV} className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="text-sm text-muted-foreground">Deep business intelligence — powered by live data</p>
+    <div className="reports-hub-page min-h-screen bg-background">
+      <div className="reports-shell-header sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border">
+        <div className="page-shell py-4 space-y-4">
+          <ReportsPageHeader
+            title="Analytics"
+            description="Deep business intelligence — profit, products, cashiers & branches"
+            icon={BarChart3}
+            actions={
+              <Button size="sm" variant="default" onClick={load} disabled={loading} className="gap-1.5 h-9">
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+                Refresh
+              </Button>
+            }
+          />
+          <ReportTabNav active="overview" />
         </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-muted/50">
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground ml-1.5"/>
-            {PRESETS.map(p=>(
-              <button key={p.label}
-                onClick={()=>setRange(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${range.label===p.label?"bg-primary text-primary-foreground shadow":"text-muted-foreground hover:text-foreground"}`}
-              >{p.label}</button>
-            ))}
+        <div className="border-t border-border/80 bg-muted/20">
+          <div className="page-shell py-3">
+            <ReportDateFilterBar range={range} onRangeChange={setRange} onApply={load} loading={loading} />
           </div>
-          <Button size="sm" variant="outline" onClick={load} disabled={loading} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading?"animate-spin":""}`}/>Refresh
-          </Button>
         </div>
-      </motion.div>
+      </div>
 
-      {/* ── KPI Grid ── */}
+    <motion.div variants={CV} initial="hidden" animate="show" className="page-shell py-6 space-y-6 max-w-[1700px]">
       <motion.div variants={IV} className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
         {kpis.map(k=><KpiCard key={k.label} {...k} loading={loading}/>)}
       </motion.div>
@@ -571,7 +569,7 @@ export default function AnalyticsPage() {
           </TabsContent>
         </Tabs>
       </motion.div>
-
     </motion.div>
+    </div>
   );
 }

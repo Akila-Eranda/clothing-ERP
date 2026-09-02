@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ReportsHub, REPORTS_TABS, reportsPath, type ReportsSection } from "@/components/reports/reports-hub";
+import { ReportsHub } from "@/components/reports/reports-hub";
+import { REPORTS_TABS, reportsPath, type ReportsSection } from "@/components/reports/reports-config";
 
 export default function ReportsOverviewPage() {
   const router = useRouter();

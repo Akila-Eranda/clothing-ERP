@@ -1,0 +1,110 @@
+/* Modern Reports UI — shared across /reports, /analytics, /accounting/reports */
+
+.reports-hub-page {
+  --reports-card-radius: 1rem;
+}
+
+.reports-kpi-card {
+  border-radius: var(--reports-card-radius);
+  background: linear-gradient(145deg, hsl(var(--card)) 0%, hsl(var(--card) / 0.92) 100%);
+}
+
+.reports-chart-card {
+  border-radius: var(--reports-card-radius);
+  overflow: hidden;
+}
+
+.reports-chart-card .recharts-cartesian-grid-horizontal line,
+.reports-chart-card .recharts-cartesian-grid-vertical line {
+  stroke: hsl(var(--border) / 0.55);
+}
+
+.reports-empty {
+  border-radius: 0.75rem;
+  background: hsl(var(--muted) / 0.25);
+  border: 1px dashed hsl(var(--border));
+}
+
+.reports-filter-bar {
+  min-height: 2.5rem;
+}
+
+.reports-tab-nav {
+  mask-image: linear-gradient(to right, transparent, black 8px, black calc(100% - 24px), transparent);
+}
+
+.reports-tab-nav__item:focus-visible {
+  outline: 2px solid hsl(var(--primary) / 0.45);
+  outline-offset: 2px;
+}
+
+/* Upgrade legacy cards & tables inside reports hub */
+.reports-hub-page .bg-card.border.shadow-sm,
+.reports-hub-page .card-hover {
+  border-radius: var(--reports-card-radius);
+  border-color: hsl(var(--border) / 0.85);
+  box-shadow: 0 1px 3px hsl(220 20% 10% / 0.04);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.reports-hub-page .bg-card.border.shadow-sm:hover {
+  box-shadow: 0 4px 14px hsl(220 20% 10% / 0.06);
+}
+
+.reports-hub-page table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.reports-hub-page table thead tr {
+  background: hsl(var(--muted) / 0.45);
+}
+
+.reports-hub-page table thead th {
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.reports-hub-page table tbody tr {
+  transition: background 0.15s ease;
+}
+
+.reports-hub-page table tbody tr:hover {
+  background: hsl(var(--muted) / 0.35);
+}
+
+.reports-hub-page table tbody td {
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  border-bottom: 1px solid hsl(var(--border) / 0.65);
+}
+
+.reports-hub-page table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Financial reports print area */
+.reports-financial-page .reports-chart-card,
+.reports-financial-page #financial-report-print > .rounded-xl,
+.reports-financial-page #financial-report-print > div > div {
+  border-radius: var(--reports-card-radius);
+}
+
+@media print {
+  .reports-shell-header,
+  .reports-tab-nav,
+  .reports-filter-bar,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  .reports-hub-page {
+    background: white !important;
+  }
+}

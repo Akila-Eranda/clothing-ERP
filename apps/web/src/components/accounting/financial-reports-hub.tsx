@@ -17,6 +17,8 @@ import { toast } from "sonner";
 import { api, tokenStorage, logClientAuditEvent } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { ReportsPageHeader, ReportTabNav } from "@/components/reports/reports-ui";
+import "@/components/reports/reports-hub.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
 
@@ -194,16 +196,27 @@ export function FinancialReportsHub() {
   };
 
   return (
-    <div className="space-y-4 p-4 md:p-6">
-      <div className="print:hidden">
-        <h1 className="text-xl font-bold tracking-tight">Financial Reports</h1>
-        <p className="text-sm text-muted-foreground">
-          Trial balance, P&amp;L, balance sheet, cash flow, GL, statements, and VAT — PDF, Excel, and print
-        </p>
+    <div className="reports-hub-page reports-financial-page min-h-screen bg-background">
+      <div className="reports-shell-header sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border print:hidden">
+        <div className="page-shell py-4 space-y-4">
+          <ReportsPageHeader
+            title="Financial Reports (GL)"
+            description="Trial balance, P&L, balance sheet, cash flow, GL, statements, and VAT — PDF, Excel, and print"
+            icon={FileText}
+            actions={
+              <Button type="button" variant="default" size="sm" className="h-9 gap-1.5" disabled={loading} onClick={() => void load()}>
+                {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+                Generate
+              </Button>
+            }
+          />
+          <ReportTabNav active="financial" />
+        </div>
       </div>
 
-      <Card className="print:hidden">
-        <CardContent className="p-4 space-y-3">
+      <div className="page-shell py-6 space-y-4">
+      <Card className="print:hidden border-border/70 shadow-sm rounded-2xl">
+        <CardContent className="p-4 md:p-5 space-y-4">
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1 sm:col-span-2">
               <Label className="text-xs">Report</Label>
@@ -300,6 +313,7 @@ export function FinancialReportsHub() {
             </CardContent>
           </Card>
         )}
+      </div>
       </div>
     </div>
   );

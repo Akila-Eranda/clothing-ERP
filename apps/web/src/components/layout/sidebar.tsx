@@ -561,7 +561,7 @@ export function Sidebar() {
     <TooltipProvider delayDuration={0}>
       <motion.aside
         initial={false}
-        animate={{ width: sidebarCollapsed ? 68 : 260 }}
+        animate={{ width: sidebarCollapsed ? 68 : 272 }}
         transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
         className="hex-retail-sidebar relative flex h-screen flex-col shrink-0 overflow-hidden"
         style={{ background: bg, borderRight: `1px solid ${border}` }}
@@ -571,7 +571,7 @@ export function Sidebar() {
         <div
           className={cn(
             "relative shrink-0 w-full",
-            sidebarCollapsed ? "px-2 py-3" : "px-3 pt-4 pb-3",
+            sidebarCollapsed ? "px-2 py-3" : "px-4 pt-5 pb-4",
           )}
         >
           <button
@@ -600,7 +600,7 @@ export function Sidebar() {
             theme={logoOnDarkBg ? "dark" : "light"}
             className={cn(
               "w-full items-center justify-center",
-              sidebarCollapsed ? "px-1" : "px-1 pt-6",
+              sidebarCollapsed ? "px-0.5" : "px-0 pt-7",
             )}
             alt={APP_NAME}
           />

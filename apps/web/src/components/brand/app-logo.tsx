@@ -66,7 +66,7 @@ export function AppLogo({
         alt={alt}
         className={cn(
           variant === "sidebar"
-            ? "h-auto w-full max-h-[76px] object-contain object-center mix-blend-screen"
+            ? "h-auto w-full max-h-[120px] min-h-[96px] object-contain object-center mix-blend-screen"
             : "w-auto object-contain object-left",
           variant !== "sidebar" && HEIGHT[variant],
           MAX_WIDTH[variant],
