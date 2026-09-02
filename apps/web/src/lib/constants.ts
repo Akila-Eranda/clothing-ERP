@@ -3,7 +3,7 @@ export const APP_NAME = "HEXALYTE";
 export const STARTER_TRIAL_DAYS = 7;
 export const APP_TAGLINE = "INNOVATION";
 /** Bust nginx/browser cache when brand PNGs change (nginx serves /brand/* with long TTL). */
-const BRAND_ASSET_VERSION = "20260902";
+const BRAND_ASSET_VERSION = "20260903";
 /** HEXALYTE INNOVATION wordmark — light UI / light sidebar */
 export const APP_LOGO_LIGHT_PATH = `/brand/hexalyte-innovation.png?v=${BRAND_ASSET_VERSION}`;
 /** White HEXALYTE INNOVATION — dark sidebar / dark UI */
