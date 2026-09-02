@@ -24,16 +24,16 @@ interface AppLogoProps {
 }
 
 const HEIGHT: Record<AppLogoVariant, string> = {
-  login: "h-28 sm:h-32 md:h-36 lg:h-40",
-  hero: "h-20 sm:h-24 md:h-28",
+  login: "h-14 sm:h-16 md:h-[4.5rem]",
+  hero: "h-11 sm:h-12 md:h-14",
   full: "h-16 sm:h-[4.5rem]",
   compact: "h-12 sm:h-14",
   sidebar: "",
 };
 
 const MAX_WIDTH: Record<AppLogoVariant, string> = {
-  login: "max-w-[min(100%,560px)]",
-  hero: "max-w-[min(100%,420px)]",
+  login: "max-w-[min(100%,280px)]",
+  hero: "max-w-[min(100%,220px)]",
   full: "max-w-[min(100%,320px)]",
   compact: "max-w-[min(100%,280px)]",
   sidebar: "max-w-full",

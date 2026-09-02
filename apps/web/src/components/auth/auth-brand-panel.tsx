@@ -32,7 +32,7 @@ export function AuthBrandPanel({
   const showVertical = Boolean(shopType) && !loading;
 
   return (
-    <div className="hidden lg:flex lg:w-1/2 relative flex-col min-h-screen overflow-hidden bg-[#070d1a] text-white">
+    <div className="hidden lg:flex lg:w-[38%] xl:w-[36%] lg:max-w-[520px] relative flex-col min-h-screen overflow-hidden bg-[#070d1a] text-white shrink-0">
       <div
         className="absolute inset-0 opacity-[0.03]"
         style={{
@@ -45,7 +45,7 @@ export function AuthBrandPanel({
       <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-violet-600/15 blur-3xl" />
       <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#0d1f3c]/95 to-[#070d1a]" />
 
-      <div className="relative z-10 flex flex-col flex-1 p-10 xl:p-12 max-w-xl mx-auto w-full">
+      <div className="relative z-10 flex flex-col flex-1 p-8 xl:p-10 max-w-md mx-auto w-full">
         {/* Logo */}
         <div className="shrink-0">
           <AppLogo variant="hero" theme="dark" className="items-start" />

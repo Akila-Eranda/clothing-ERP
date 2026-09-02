@@ -211,7 +211,7 @@ function LoginContent() {
         loading={Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview)}
       />
 
-      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden lg:w-1/2 text-slate-900">
+      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden text-slate-900">
         <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
         <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
@@ -223,8 +223,8 @@ function LoginContent() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-[420px]"
           >
-            <div className="mb-10 flex justify-center w-full">
-              <AppLogo variant="login" theme="light" className="items-center mx-auto w-full" />
+            <div className="mb-6 flex justify-center w-full">
+              <AppLogo variant="login" theme="light" className="items-center mx-auto max-w-[240px]" />
             </div>
 
             <div className="mb-8">
@@ -428,7 +428,7 @@ function LoginContent() {
 function LoginFallback() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
-      <div className="hidden lg:block lg:w-1/2 bg-[#070d1a]" />
+      <div className="hidden lg:block lg:w-[38%] xl:w-[36%] lg:max-w-[520px] shrink-0 bg-[#070d1a]" />
       <div className="flex-1 flex items-center justify-center bg-white min-h-screen">
         <Loading size={96} />
       </div>
