@@ -4,6 +4,8 @@ import Link from "next/link";
 import { Phone, Mail, Pencil } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { HR_CARD_CLASS } from "@/components/hr/hr-ui";
 import type { Employee } from "@/components/hr/add-employee-modal";
 
 function fmtLkr(n: number) {
@@ -26,7 +28,7 @@ export function EmployeeGridView({
         return (
           <div
             key={e.id}
-            className="rounded-xl border border-border/70 bg-card shadow-sm hover:shadow-md transition-all overflow-hidden group"
+            className={cn(HR_CARD_CLASS, "overflow-hidden group border")}
           >
             <div className="h-1 bg-gradient-to-r from-primary/80 to-primary/30" />
             <div className="p-4 space-y-3">

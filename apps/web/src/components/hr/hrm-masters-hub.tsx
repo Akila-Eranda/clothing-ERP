@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Building2, Briefcase, Clock, CalendarDays, Tag, Plus, RefreshCw,
+  Building2, Briefcase, Clock, CalendarDays, Tag, Plus,
   Loader2, Search, Users, UserCheck, UserX, UserPlus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,8 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/compo
 import { ColumnDef } from "@tanstack/react-table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { cn } from "@/lib/utils";
 import { modalInlineFooterClass } from "@/components/ui/modal-footer";
-import { ReportKpiGrid, ReportsPageHeader, type ReportKpiItem } from "@/components/reports/reports-ui";
+import { HrPageHeader, HrPageShell, HrStatCards, hrStat } from "@/components/hr/hr-ui";
 
 export type HrmSection = "departments" | "designations" | "shifts" | "holidays" | "leave-types";
 
@@ -103,25 +102,41 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const kpis: ReportKpiItem[] = useMemo(() => {
-    const all: ReportKpiItem[] = [
-      { label: "Total Staff", value: String(stats?.total ?? 0), sub: "All employees", icon: Users, tone: "blue" },
-      { label: "Active", value: String(stats?.active ?? 0), sub: "Currently working", icon: UserCheck, tone: "emerald" },
-      { label: "Inactive", value: String(stats?.inactive ?? 0), sub: "Deactivated", icon: UserX, tone: "slate" },
-      { label: "New Joiners", value: String(stats?.newJoiners ?? 0), sub: "This month", icon: UserPlus, tone: "orange" },
-      { label: "Present Today", value: String(stats?.todayPresent ?? 0), sub: "Clocked in", icon: Clock, tone: "teal" },
-      { label: "Pending Leaves", value: String(stats?.pendingLeaves ?? 0), sub: "Awaiting approval", icon: CalendarDays, tone: "amber" },
-    ];
-    const contextual: Record<HrmSection, string[]> = {
-      departments: ["Total Staff", "Active", "Inactive"],
-      designations: ["Total Staff", "Active", "New Joiners"],
-      shifts: ["Total Staff", "Active", "Present Today"],
-      holidays: ["Total Staff", "Pending Leaves"],
-      "leave-types": ["Pending Leaves", "Active", "Total Staff"],
+  const sectionStats = useMemo(() => {
+    const all = {
+      departments: [
+        hrStat("Departments", departments.length, Building2, "slate"),
+        hrStat("Active Staff", stats?.active ?? 0, UserCheck, "emerald"),
+        hrStat("Inactive", stats?.inactive ?? 0, UserX, "amber"),
+        hrStat("Total Staff", stats?.total ?? 0, Users, "blue"),
+      ],
+      designations: [
+        hrStat("Designations", designations.length, Briefcase, "slate"),
+        hrStat("Active Staff", stats?.active ?? 0, UserCheck, "emerald"),
+        hrStat("New Joiners", stats?.newJoiners ?? 0, UserPlus, "violet"),
+        hrStat("Total Staff", stats?.total ?? 0, Users, "blue"),
+      ],
+      shifts: [
+        hrStat("Shifts", shifts.length, Clock, "slate"),
+        hrStat("Present Today", stats?.todayPresent ?? 0, UserCheck, "emerald"),
+        hrStat("Active Staff", stats?.active ?? 0, Users, "blue"),
+        hrStat("Total Staff", stats?.total ?? 0, Users, "teal"),
+      ],
+      holidays: [
+        hrStat("Holidays", holidays.length, CalendarDays, "slate"),
+        hrStat("Pending Leaves", stats?.pendingLeaves ?? 0, Clock, "amber"),
+        hrStat("Active Staff", stats?.active ?? 0, UserCheck, "emerald"),
+        hrStat("Total Staff", stats?.total ?? 0, Users, "blue"),
+      ],
+      "leave-types": [
+        hrStat("Leave Types", leaveTypes.length, Tag, "slate"),
+        hrStat("Pending Leaves", stats?.pendingLeaves ?? 0, Clock, "amber"),
+        hrStat("Active Staff", stats?.active ?? 0, UserCheck, "emerald"),
+        hrStat("Total Staff", stats?.total ?? 0, Users, "blue"),
+      ],
     };
-    const keys = contextual[section];
-    return all.filter((k) => keys.includes(k.label));
-  }, [stats, section]);
+    return all[section];
+  }, [section, stats, departments.length, designations.length, shifts.length, holidays.length, leaveTypes.length]);
 
   const resetForm = () => {
     setEditId(null);
@@ -261,60 +276,45 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
   ], []);
 
   return (
-    <div className="hrm-masters-hub min-h-screen bg-background">
-      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border">
-        <div className="page-shell py-4">
-          <ReportsPageHeader
-            title={meta.title}
-            description={meta.description}
-            icon={meta.icon}
-            actions={
-              <>
-                <Button type="button" variant="secondary" size="sm" onClick={load} className="h-9 gap-1.5">
-                  <RefreshCw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
-                  Refresh
-                </Button>
-                <Button type="button" variant="default" size="sm" onClick={openAdd} className="h-9 gap-1.5">
-                  <Plus className="h-3.5 w-3.5" />
-                  {addLabel}
-                </Button>
-              </>
-            }
-          />
-        </div>
+    <HrPageShell>
+      <HrPageHeader
+        title={meta.title}
+        description={meta.description}
+        onRefresh={load}
+        refreshing={loading}
+        actions={
+          <Button type="button" onClick={openAdd} className="gap-1.5">
+            <Plus className="h-[18px] w-[18px]" />
+            {addLabel}
+          </Button>
+        }
+      />
 
-        <div className="border-t border-border/80 bg-muted/20">
-          <div className="page-shell py-3">
-            <div className="relative max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-              <Input
-                placeholder={`Search ${meta.title.toLowerCase()}…`}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 h-8 text-xs bg-background"
-              />
-            </div>
-          </div>
-        </div>
+      <HrStatCards stats={sectionStats} loading={loading && !stats} />
+
+      <div className="relative max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <Input
+          placeholder={`Search ${meta.title.toLowerCase()}…`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9 h-9 text-sm rounded-[14px] bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]"
+        />
       </div>
 
-      <div className="page-shell py-6 space-y-5">
-        <ReportKpiGrid items={kpis} loading={loading && !stats} cols={Math.min(kpis.length, 4) as 3 | 4} />
-
-        {loading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            {section === "departments" && <ClientSideTable columns={deptCols} data={filteredDepts} isShowExportButtons={{ isShow: true, fileName: "departments" }} />}
-            {section === "designations" && <ClientSideTable columns={desigCols} data={filteredDesigs} isShowExportButtons={{ isShow: true, fileName: "designations" }} />}
-            {section === "shifts" && <ClientSideTable columns={shiftCols} data={filteredShifts} isShowExportButtons={{ isShow: true, fileName: "shifts" }} />}
-            {section === "holidays" && <ClientSideTable columns={holidayCols} data={filteredHolidays} isShowExportButtons={{ isShow: true, fileName: "holidays" }} />}
-            {section === "leave-types" && <ClientSideTable columns={leaveTypeCols} data={filteredLeaveTypes} isShowExportButtons={{ isShow: true, fileName: "leave-types" }} />}
-          </>
-        )}
-      </div>
+      {loading ? (
+        <div className="flex justify-center py-20 rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : (
+        <>
+          {section === "departments" && <ClientSideTable columns={deptCols} data={filteredDepts} isShowExportButtons={{ isShow: true, fileName: "departments" }} />}
+          {section === "designations" && <ClientSideTable columns={desigCols} data={filteredDesigs} isShowExportButtons={{ isShow: true, fileName: "designations" }} />}
+          {section === "shifts" && <ClientSideTable columns={shiftCols} data={filteredShifts} isShowExportButtons={{ isShow: true, fileName: "shifts" }} />}
+          {section === "holidays" && <ClientSideTable columns={holidayCols} data={filteredHolidays} isShowExportButtons={{ isShow: true, fileName: "holidays" }} />}
+          {section === "leave-types" && <ClientSideTable columns={leaveTypeCols} data={filteredLeaveTypes} isShowExportButtons={{ isShow: true, fileName: "leave-types" }} />}
+        </>
+      )}
 
       <Dialog open={modalOpen} onOpenChange={(o) => { if (!o) { setModalOpen(false); resetForm(); } }}>
         <DialogContent className="sm:max-w-md">
@@ -399,6 +399,6 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </HrPageShell>
   );
 }

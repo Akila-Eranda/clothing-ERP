@@ -13,7 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-modal";
-import { ReportChartCard, ReportsPageHeader } from "@/components/reports/reports-ui";
+import { HrPageHeader, HrPageShell, HR_CARD_CLASS } from "@/components/hr/hr-ui";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface EmployeeDetail extends Employee {
   dateOfBirth?: string | null;
@@ -41,6 +42,18 @@ function fmtTime(iso?: string | null) {
 
 function fmtLkr(n?: number | null) {
   return `LKR ${(n ?? 0).toLocaleString()}`;
+}
+
+function DetailCard({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+  return (
+    <Card className={HR_CARD_CLASS}>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold">{title}</CardTitle>
+        <CardDescription className="text-xs">{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
+  );
 }
 
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: React.ReactNode }) {
@@ -91,37 +104,35 @@ export default function EmployeeDetailPage() {
   const bank = (emp.bankDetails ?? {}) as Record<string, string>;
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="page-shell py-6 space-y-5">
-        <button
-          type="button"
-          onClick={() => router.push("/hr")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground font-medium"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Employees
-        </button>
+    <HrPageShell>
+      <button
+        type="button"
+        onClick={() => router.push("/hr")}
+        className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground font-medium -mt-1"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to Employees
+      </button>
 
-        <ReportsPageHeader
-          title={`${emp.firstName} ${emp.lastName}`}
-          description={`${emp.code ?? "—"} · ${emp.designation ?? "No designation"} · ${emp.department ?? "No department"}`}
-          icon={UserCog}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" className="h-9 gap-1.5" asChild>
-                <Link href="/hr/attendance"><Clock className="h-3.5 w-3.5" /> Attendance</Link>
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5" asChild>
-                <Link href="/hr/leaves"><CalendarDays className="h-3.5 w-3.5" /> Leaves</Link>
-              </Button>
-              <Button variant="outline" size="sm" className="h-9 gap-1.5" asChild>
-                <Link href="/hr/payroll"><Banknote className="h-3.5 w-3.5" /> Payroll</Link>
-              </Button>
-              <Button variant="default" size="sm" className="h-9 gap-1.5" onClick={() => setEditOpen(true)}>
-                <Pencil className="h-3.5 w-3.5" /> Edit Profile
-              </Button>
-            </div>
-          }
-        />
+      <HrPageHeader
+        title={`${emp.firstName} ${emp.lastName}`}
+        description={`${emp.code ?? "—"} · ${emp.designation ?? "No designation"} · ${emp.department ?? "No department"}`}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="gap-1.5" asChild>
+              <Link href="/hr/attendance"><Clock className="h-[18px] w-[18px]" /> Attendance</Link>
+            </Button>
+            <Button variant="outline" className="gap-1.5" asChild>
+              <Link href="/hr/leaves"><CalendarDays className="h-[18px] w-[18px]" /> Leaves</Link>
+            </Button>
+            <Button variant="outline" className="gap-1.5" asChild>
+              <Link href="/hr/payroll"><Banknote className="h-[18px] w-[18px]" /> Payroll</Link>
+            </Button>
+            <Button className="gap-1.5" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-[18px] w-[18px]" /> Edit Profile
+            </Button>
+          </div>
+        }
+      />
 
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={emp.isActive ? "softSuccess" : "secondary"} className="rounded-full px-2.5 text-[10px] font-bold uppercase">
@@ -142,7 +153,7 @@ export default function EmployeeDetailPage() {
 
           <TabsContent value="overview" className="mt-4 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <ReportChartCard title="Basic Information" description="Contact and personal details">
+              <DetailCard title="Basic Information" description="Contact and personal details">
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 pb-4 border-b">
                     <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-lg font-bold text-primary">
@@ -160,9 +171,9 @@ export default function EmployeeDetailPage() {
                   {emp.dateOfBirth ? <InfoRow icon={CalendarDays} label="Date of Birth" value={fmtDate(emp.dateOfBirth)} /> : null}
                   {emp.address ? <InfoRow icon={MapPin} label="Address" value={emp.address} /> : null}
                 </div>
-              </ReportChartCard>
+              </DetailCard>
 
-              <ReportChartCard title="Work Details" description="Role, branch and compensation">
+              <DetailCard title="Work Details" description="Role, branch and compensation">
                 <div className="space-y-4">
                   <InfoRow icon={Building2} label="Department" value={emp.department ?? "—"} />
                   <InfoRow icon={Briefcase} label="Designation" value={emp.designation ?? "—"} />
@@ -172,9 +183,9 @@ export default function EmployeeDetailPage() {
                   {emp.epfNumber ? <InfoRow icon={FileText} label="EPF Number" value={emp.epfNumber} /> : null}
                   {emp.etfNumber ? <InfoRow icon={FileText} label="ETF Number" value={emp.etfNumber} /> : null}
                 </div>
-              </ReportChartCard>
+              </DetailCard>
 
-              <ReportChartCard title="Bank Information" description="Payment account details">
+              <DetailCard title="Bank Information" description="Payment account details">
                 {bank.bankName || bank.accountNumber ? (
                   <div className="space-y-4">
                     {bank.bankName ? <InfoRow icon={Banknote} label="Bank" value={bank.bankName} /> : null}
@@ -184,12 +195,12 @@ export default function EmployeeDetailPage() {
                 ) : (
                   <p className="text-sm text-muted-foreground py-4">No bank details on file</p>
                 )}
-              </ReportChartCard>
+              </DetailCard>
             </div>
           </TabsContent>
 
           <TabsContent value="attendance" className="mt-4">
-            <ReportChartCard title="Attendance History" description="Recent daily records">
+            <DetailCard title="Attendance History" description="Recent daily records">
               <div className="space-y-2">
                 {(emp.attendances ?? []).map((a) => (
                   <div key={a.id} className="flex items-center justify-between text-sm border-b last:border-0 pb-2 gap-4">
@@ -200,11 +211,11 @@ export default function EmployeeDetailPage() {
                 ))}
                 {!(emp.attendances?.length) ? <p className="text-sm text-muted-foreground py-4">No attendance records</p> : null}
               </div>
-            </ReportChartCard>
+            </DetailCard>
           </TabsContent>
 
           <TabsContent value="payroll" className="mt-4">
-            <ReportChartCard title="Payroll History" description="Salary records">
+            <DetailCard title="Payroll History" description="Salary records">
               <div className="space-y-2">
                 {(emp.payrolls ?? []).map((p) => (
                   <div key={p.id} className="flex items-center justify-between text-sm border-b last:border-0 pb-2">
@@ -217,11 +228,11 @@ export default function EmployeeDetailPage() {
                 ))}
                 {!(emp.payrolls?.length) ? <p className="text-sm text-muted-foreground py-4">No payroll records</p> : null}
               </div>
-            </ReportChartCard>
+            </DetailCard>
           </TabsContent>
 
           <TabsContent value="leaves" className="mt-4">
-            <ReportChartCard title="Leave Requests" description="All leave applications">
+            <DetailCard title="Leave Requests" description="All leave applications">
               <div className="space-y-2">
                 {(emp.leaveRequests ?? []).map((l) => (
                   <div key={l.id} className="flex items-center justify-between text-sm border-b last:border-0 pb-2 gap-3">
@@ -238,12 +249,11 @@ export default function EmployeeDetailPage() {
                   <p className="text-sm text-muted-foreground py-4">No leave requests — <Link href="/hr/leaves" className="text-primary hover:underline">create one</Link></p>
                 ) : null}
               </div>
-            </ReportChartCard>
+            </DetailCard>
           </TabsContent>
         </Tabs>
-      </div>
 
       <AddEmployeeModal open={editOpen} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); load(); }} editEmployee={emp} />
-    </div>
+    </HrPageShell>
   );
 }

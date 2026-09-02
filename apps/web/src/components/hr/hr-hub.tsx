@@ -28,10 +28,11 @@ import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-mo
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { usePayslipSettings } from "@/lib/use-payslip-settings";
 import { printThermalPayslip } from "@/lib/payslip-print";
-import { ReportKpiGrid, ReportsPageHeader, type ReportKpiItem } from "@/components/reports/reports-ui";
 import { HrEmptyState } from "@/components/hr/hr-empty-state";
 import { EmployeeGridView } from "@/components/hr/employee-grid-view";
+import { HrPageHeader, HrPageShell, HrPanel, HrStatCards, hrStat } from "@/components/hr/hr-ui";
 import { cn } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 function fmtLkr(value: number | null | undefined) {
   return `LKR ${(value ?? 0).toLocaleString()}`;
@@ -750,12 +751,60 @@ export function HrHub({ section }: { section: HrSection }) {
   const activeCount    = hrStats?.active ?? employeeList.filter((e) => e.isActive).length;
   const totalPayroll   = employeeList.reduce((s, e) => s + (e.basicSalary ?? 0), 0);
   const pendingLeaves  = hrStats?.pendingLeaves ?? leaveList.filter((l) => l.status === "PENDING").length;
-  const kpis: ReportKpiItem[] = [
-    { label: "Total Employees", value: String(hrStats?.total ?? employeeList.length), sub: "All staff records", icon: Users, tone: "blue" },
-    { label: "Active", value: String(activeCount), sub: "Currently working", icon: UserCog, tone: "emerald" },
-    { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, sub: "Basic salary total", icon: DollarSign, tone: "violet" },
-    { label: "Pending Leaves", value: String(pendingLeaves), sub: "Awaiting approval", icon: FileText, tone: "amber" },
-  ];
+  const payrollList = Array.isArray(payrolls) ? payrolls : [];
+  const filteredLeaves = leaveList.filter((l) => {
+    if (!leaveMonth) return true;
+    const start = l.startDate.slice(0, 7);
+    const end = l.endDate.slice(0, 7);
+    return start <= leaveMonth && end >= leaveMonth;
+  });
+  const markedCount    = Object.keys(attnMap).length;
+  const presentCount   = Object.values(attnMap).filter((s) => s === "PRESENT" || s === "LATE").length;
+  const absentCount    = Object.values(attnMap).filter((s) => s === "ABSENT").length;
+  const paidPayrolls   = payrollList.filter((p) => p.isPaid).length;
+  const totalNetPay    = payrollList.reduce((s, p) => s + p.netSalary, 0);
+
+  const sectionStats = {
+    employees: [
+      hrStat("Total Staff", hrStats?.total ?? employeeList.length, Users, "slate"),
+      hrStat("Active", activeCount, UserCog, "emerald"),
+      hrStat("Monthly Payroll", `LKR ${formatNumber(Math.round(totalPayroll / 1000))}K`, DollarSign, "violet"),
+      hrStat("Pending Leaves", pendingLeaves, FileText, "amber"),
+    ],
+    attendance: [
+      hrStat("Staff Today", attnRows.length, Users, "slate"),
+      hrStat("Marked", markedCount, CheckCircle2, "blue"),
+      hrStat("Present / Late", presentCount, Clock, "emerald"),
+      hrStat("Absent", absentCount, XCircle, "red"),
+    ],
+    payroll: [
+      hrStat("Entries", payrollList.length, Banknote, "slate"),
+      hrStat("Paid", paidPayrolls, CheckCircle2, "emerald"),
+      hrStat("Pending", payrollList.length - paidPayrolls, Clock, "amber"),
+      hrStat("Total Net", `LKR ${formatNumber(totalNetPay)}`, DollarSign, "violet"),
+    ],
+    leaves: [
+      hrStat("Total", filteredLeaves.length, CalendarDays, "slate"),
+      hrStat("Pending", filteredLeaves.filter((l) => l.status === "PENDING").length, Clock, "amber"),
+      hrStat("Approved", filteredLeaves.filter((l) => l.status === "APPROVED").length, CheckCircle2, "emerald"),
+      hrStat("Rejected", filteredLeaves.filter((l) => l.status === "REJECTED").length, XCircle, "red"),
+    ],
+  }[section];
+
+  const sectionLoading = {
+    employees: empLoading,
+    attendance: attnView === "daily" ? attnLoading : summaryLoading,
+    payroll: payLoading,
+    leaves: leaveLoading,
+  }[section];
+
+  const handleRefresh = () => {
+    if (section === "employees") void fetchEmployees();
+    else if (section === "attendance") void (attnView === "daily" ? fetchAttendance() : fetchMonthlySummary());
+    else if (section === "payroll") void fetchPayrolls();
+    else void fetchLeaves();
+    void fetchHrMeta();
+  };
 
   const empColumns         = buildEmpColumns((e) => { setEditEmployee(e); setAddOpen(true); }, handleDeactivate);
   const attnColumns        = buildAttnColumns(attnMap, setAttnMap, attnTimes, setAttnTimes);
@@ -763,64 +812,42 @@ export function HrHub({ section }: { section: HrSection }) {
   const payrollColumns     = buildPayrollColumns(markPaid, handlePrintPayslip, printingPayslipId);
   const leaveColumns       = buildLeaveColumns(updateLeaveStatus);
 
-  const payrollList = Array.isArray(payrolls) ? payrolls : [];
   const unpaidEmployees = employeeList.filter((e) => e.isActive && !payrollList.find((p) => p.employeeId === e.id));
-  const filteredLeaves = leaveList.filter((l) => {
-    if (!leaveMonth) return true;
-    const start = l.startDate.slice(0, 7);
-    const end = l.endDate.slice(0, 7);
-    return start <= leaveMonth && end >= leaveMonth;
-  });
   const leaveTypeOptions = (leaveTypes.length ? leaveTypes : LEAVE_TYPES.map((n) => ({ name: n }))).map((t) => ({
     value: t.name,
     label: t.name.charAt(0) + t.name.slice(1).toLowerCase(),
   }));
 
-  const sectionIcon = {
-    employees: Users,
-    attendance: Clock,
-    payroll: DollarSign,
-    leaves: CalendarDays,
+  const headerActions = {
+    employees: (
+      <Button type="button" onClick={() => { setEditEmployee(undefined); setAddOpen(true); }} className="gap-1.5">
+        <Plus className="h-[18px] w-[18px]" /> Add Employee
+      </Button>
+    ),
+    attendance: null,
+    payroll: (
+      <Button type="button" variant="success" onClick={() => setGenAllOpen(true)} className="gap-1.5">
+        <DollarSign className="h-[18px] w-[18px]" /> Generate All
+      </Button>
+    ),
+    leaves: (
+      <Button type="button" onClick={() => setNewLeaveOpen(true)} className="gap-1.5">
+        <Plus className="h-[18px] w-[18px]" /> New Leave Request
+      </Button>
+    ),
   }[section];
 
   return (
-    <div className="hr-hub min-h-screen bg-background">
-      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border">
-        <div className="page-shell py-4">
-          <ReportsPageHeader
-            title={SECTION_META[section].title}
-            description={SECTION_META[section].description}
-            icon={sectionIcon}
-            actions={
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => {
-                    if (section === "employees") void fetchEmployees();
-                    else if (section === "attendance") void (attnView === "daily" ? fetchAttendance() : fetchMonthlySummary());
-                    else if (section === "payroll") void fetchPayrolls();
-                    else void fetchLeaves();
-                  }}
-                  className="h-9 gap-1.5"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${empLoading || attnLoading || payLoading || leaveLoading ? "animate-spin" : ""}`} />
-                  Refresh
-                </Button>
-                {section === "employees" && (
-                  <Button type="button" variant="default" size="sm" className="h-9 gap-1.5" onClick={() => { setEditEmployee(undefined); setAddOpen(true); }}>
-                    <Plus className="h-3.5 w-3.5" /> Add Employee
-                  </Button>
-                )}
-              </>
-            }
-          />
-        </div>
-      </div>
+    <HrPageShell>
+      <HrPageHeader
+        title={SECTION_META[section].title}
+        description={SECTION_META[section].description}
+        onRefresh={handleRefresh}
+        refreshing={sectionLoading}
+        actions={headerActions}
+      />
 
-      <div className="page-shell py-6 space-y-5">
-      {section === "employees" && <ReportKpiGrid items={kpis} loading={empLoading} cols={4} />}
+      <HrStatCards stats={sectionStats} loading={sectionLoading} />
 
         {/* ── Employees ── */}
         {section === "employees" && (
@@ -968,7 +995,7 @@ export function HrHub({ section }: { section: HrSection }) {
 
         {/* ── Payroll ── */}
         {section === "payroll" && (
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           {/* Month selector */}
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1.5">
@@ -990,12 +1017,9 @@ export function HrHub({ section }: { section: HrSection }) {
                 className="p-1.5 rounded-lg border hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
             </div>
             <Button size="sm" variant="outline" onClick={fetchPayrolls} className="gap-1.5" disabled={payLoading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${payLoading ? "animate-spin" : ""}`} /> Load
+              <RefreshCw className={`h-3.5 w-3.5 ${payLoading ? "animate-spin" : ""}`} />
             </Button>
-            <Button size="sm" variant="success" className="gap-1.5 ml-auto" onClick={() => setGenAllOpen(true)}>
-              <DollarSign className="h-3.5 w-3.5" /> Generate All
-            </Button>
-            <Button size="sm" variant="outline" asChild className="gap-1.5">
+            <Button size="sm" variant="outline" asChild className="gap-1.5 ml-auto">
               <Link href="/settings?tab=payslip">
                 <FileText className="h-3.5 w-3.5" /> Customize payslip
               </Link>
@@ -1003,7 +1027,7 @@ export function HrHub({ section }: { section: HrSection }) {
           </div>
 
           {/* Generate for individual */}
-          <div className="rounded-xl border bg-muted/10 p-4">
+          <HrPanel>
             <p className="text-xs font-semibold mb-3">Generate Payroll for an Employee</p>
             <div className="flex gap-2 flex-wrap items-end">
               <div className="space-y-1">
@@ -1033,7 +1057,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 {genLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />} Generate
               </Button>
             </div>
-          </div>
+          </HrPanel>
 
           {/* Unpaid / missing payroll */}
           {!payLoading && unpaidEmployees.length > 0 ? (
@@ -1080,7 +1104,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 isShowExportButtons={{ isShow: true, fileName: `payroll-${MONTHS[payMonth-1]}-${payYear}` }}
               />
               {/* Totals summary */}
-              <div className="rounded-xl border bg-muted/10 p-4 flex flex-wrap gap-6 text-sm">
+              <div className="rounded-[18px] border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Total Basic</p><p className="font-bold">LKR {payrolls.reduce((s,p) => s+p.basicSalary, 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Total Bonus + Allow.</p><p className="font-bold text-emerald-600">+LKR {payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="font-bold text-red-500">-LKR {payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</p></div>
@@ -1094,23 +1118,17 @@ export function HrHub({ section }: { section: HrSection }) {
 
         {/* ── Leaves ── */}
         {section === "leaves" && (
-        <div className="mt-4 space-y-4">
+        <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30 text-xs">
+            <div className="flex items-center gap-1 border rounded-[14px] p-1 bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-xs">
               {["ALL","PENDING","APPROVED","REJECTED"].map((s) => (
                 <button key={s} type="button" onClick={() => { setLeaveStatus(s); }}
-                  className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
-                    leaveStatus === s ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
+                  className={`px-3 py-1.5 rounded-[10px] font-semibold transition-all ${
+                    leaveStatus === s ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                   }`}>{s}</button>
               ))}
             </div>
-            <Input type="month" value={leaveMonth} onChange={(e) => setLeaveMonth(e.target.value)} className="w-40 h-9 text-sm" />
-            <Button size="sm" variant="outline" onClick={fetchLeaves} className="gap-1.5" disabled={leaveLoading}>
-              <RefreshCw className={`h-3.5 w-3.5 ${leaveLoading ? "animate-spin" : ""}`} /> Refresh
-            </Button>
-            <Button size="sm" className="gap-1.5 ml-auto" onClick={() => setNewLeaveOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> New Leave Request
-            </Button>
+            <Input type="month" value={leaveMonth} onChange={(e) => setLeaveMonth(e.target.value)} className="w-40 h-9 text-sm rounded-[14px]" />
           </div>
 
           {leaveLoading ? (
@@ -1139,7 +1157,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 }]}
                 isShowExportButtons={{ isShow: true, fileName: "leave-requests" }}
               />
-              <div className="rounded-xl border bg-muted/10 p-4 flex flex-wrap gap-6 text-sm">
+              <div className="rounded-[18px] border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Showing</p><p className="font-bold">{filteredLeaves.length}</p></div>
                 <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{filteredLeaves.filter((l)=>l.status==="PENDING").length}</p></div>
                 <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{filteredLeaves.filter((l)=>l.status==="APPROVED").length}</p></div>
@@ -1159,7 +1177,6 @@ export function HrHub({ section }: { section: HrSection }) {
       />
       {genAllOpen && <GenerateAllModal month={payMonth} year={payYear} onClose={() => setGenAllOpen(false)} onDone={fetchPayrolls} />}
       {newLeaveOpen && <NewLeaveModal employees={employeeList} leaveTypes={leaveTypes} onClose={() => setNewLeaveOpen(false)} onSaved={() => { fetchLeaves(); fetchHrMeta(); }} />}
-      </div>
-    </div>
+    </HrPageShell>
   );
 }
