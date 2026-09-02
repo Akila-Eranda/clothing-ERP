@@ -455,15 +455,15 @@ export default function SalesPage() {
       value: fmtMoney(summary?.totalRevenue ?? 0),
       icon: DollarSign,
       color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/15",
-      tint: "border-emerald-300/80 bg-gradient-to-br from-emerald-100 to-emerald-50/40 dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
+      bg: "bg-emerald-500/10",
+      tint: "bg-card border-border",
     },
     {
       label: "Orders",
       value: summary?.totalSales ?? 0,
       icon: ShoppingCart,
       color: "text-blue-600 dark:text-blue-400",
-      bg: "bg-blue-500/15",
+      bg: "bg-primary/10",
       tint: "border-blue-300/80 bg-gradient-to-br from-blue-100 to-blue-50/40 dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
     },
     {
@@ -471,7 +471,7 @@ export default function SalesPage() {
       value: fmtMoney(avgOrder),
       icon: TrendingUp,
       color: "text-violet-600 dark:text-violet-400",
-      bg: "bg-violet-500/15",
+      bg: "bg-slate-500/10",
       tint: "border-violet-300/80 bg-gradient-to-br from-violet-100 to-violet-50/40 dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
     },
     {
@@ -479,7 +479,7 @@ export default function SalesPage() {
       value: fmtMoney(summary?.totalDiscount ?? 0),
       icon: Percent,
       color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/15",
+      bg: "bg-amber-500/10",
       tint: "border-orange-300/80 bg-gradient-to-br from-orange-100 to-orange-50/40 dark:border-orange-500/20 dark:from-orange-500/10 dark:to-transparent",
     },
   ];

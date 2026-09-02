@@ -186,8 +186,8 @@ export default function BusinessCalendarPage() {
       sub: `${day.sales.count} orders`,
       icon: TrendingUp,
       color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/15",
-      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
+      bg: "bg-emerald-500/10",
+      tint: "bg-card border-border",
     },
     {
       label: "Net Profit",
@@ -195,7 +195,7 @@ export default function BusinessCalendarPage() {
       sub: `${day.profit.netMarginPct}% margin`,
       icon: Wallet,
       color: day.profit.netProfit >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-red-600 dark:text-red-400",
-      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/15" : "bg-red-500/15",
+      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/15" : "bg-red-500/10",
       tint: day.profit.netProfit >= 0
         ? "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent"
         : "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent",
@@ -206,8 +206,8 @@ export default function BusinessCalendarPage() {
       sub: `${day.expenses.items.length} items`,
       icon: Banknote,
       color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/15",
-      tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
+      bg: "bg-amber-500/10",
+      tint: "bg-card border-border",
     },
     {
       label: "Customer Due",
@@ -215,7 +215,7 @@ export default function BusinessCalendarPage() {
       sub: `${day.customerDue.length} due`,
       icon: AlertTriangle,
       color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-500/15",
+      bg: "bg-red-500/10",
       tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent",
     },
   ] : [];

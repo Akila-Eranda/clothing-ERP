@@ -24,7 +24,7 @@ export function ShopFeatureList({ features, compact, showComingSoon = true, clas
             className={cn(
               'flex h-5 w-5 shrink-0 items-center justify-center rounded-full mt-0.5',
               f.live
-                ? onDark ? 'bg-white/20 text-white' : 'bg-emerald-500/15 text-emerald-600'
+                ? onDark ? 'bg-white/20 text-white' : 'bg-emerald-500/10 text-emerald-600'
                 : onDark ? 'bg-white/10 text-white/50' : 'bg-muted text-muted-foreground',
             )}
           >

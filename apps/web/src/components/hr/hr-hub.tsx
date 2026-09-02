@@ -1149,7 +1149,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 isShowExportButtons={{ isShow: true, fileName: `payroll-${MONTHS[payMonth-1]}-${payYear}` }}
               />
               {/* Totals summary */}
-              <div className="rounded-[18px] border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              <div className="rounded-xl border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Total Basic</p><p className="font-bold">LKR {payrolls.reduce((s,p) => s+p.basicSalary, 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Total Bonus + Allow.</p><p className="font-bold text-emerald-600">+LKR {payrolls.reduce((s,p) => s+p.bonus+p.allowances, 0).toLocaleString()}</p></div>
                 <div><p className="text-xs text-muted-foreground">Total Deductions</p><p className="font-bold text-red-500">-LKR {payrolls.reduce((s,p) => s+p.deductions, 0).toLocaleString()}</p></div>
@@ -1202,7 +1202,7 @@ export function HrHub({ section }: { section: HrSection }) {
                 }]}
                 isShowExportButtons={{ isShow: true, fileName: "leave-requests" }}
               />
-              <div className="rounded-[18px] border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              <div className="rounded-xl border bg-card p-4 flex flex-wrap gap-6 text-sm shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div><p className="text-xs text-muted-foreground">Showing</p><p className="font-bold">{filteredLeaves.length}</p></div>
                 <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{filteredLeaves.filter((l)=>l.status==="PENDING").length}</p></div>
                 <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{filteredLeaves.filter((l)=>l.status==="APPROVED").length}</p></div>

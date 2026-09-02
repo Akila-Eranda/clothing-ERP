@@ -496,7 +496,7 @@ export default function ReturnsPage() {
       value: returns.filter((r) => r.returnType === "EXCHANGE").length,
       icon: ArrowLeftRight,
       color: "text-violet-600 dark:text-violet-400",
-      bg: "bg-violet-500/15",
+      bg: "bg-slate-500/10",
       tint: "border-violet-200/80 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
     },
     {
@@ -504,7 +504,7 @@ export default function ReturnsPage() {
       value: returns.filter((r) => r.status === "INITIATED").length,
       icon: Clock,
       color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/15",
+      bg: "bg-amber-500/10",
       tint: "border-amber-200/80 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
     },
     {
@@ -512,7 +512,7 @@ export default function ReturnsPage() {
       value: `LKR ${formatNumber(totalRefunded)}`,
       icon: DollarSign,
       color: "text-blue-600 dark:text-blue-400",
-      bg: "bg-blue-500/15",
+      bg: "bg-primary/10",
       tint: "border-blue-200/80 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
     },
   ];

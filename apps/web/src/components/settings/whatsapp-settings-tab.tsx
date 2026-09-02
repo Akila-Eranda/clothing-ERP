@@ -18,9 +18,9 @@ type WhatsappStatus = {
 };
 
 function statusBadgeClass(status?: string | null, connected?: boolean) {
-  if (connected) return "border-emerald-500/40 bg-emerald-500/15 text-emerald-400";
-  if (status === "qr" || status === "connecting") return "border-amber-500/40 bg-amber-500/15 text-amber-400";
-  if (status === "error" || status === "logged_out") return "border-red-500/40 bg-red-500/15 text-red-400";
+  if (connected) return "border-emerald-500/40 bg-emerald-500/10 text-emerald-400";
+  if (status === "qr" || status === "connecting") return "border-amber-500/40 bg-amber-500/10 text-amber-400";
+  if (status === "error" || status === "logged_out") return "border-red-500/40 bg-red-500/10 text-red-400";
   return "border-white/15 bg-white/5 text-muted-foreground";
 }
 
@@ -96,7 +96,7 @@ export function WhatsappSettingsTab() {
       <section className="rounded-2xl border border-border bg-card overflow-hidden">
         <header className="flex items-start justify-between gap-3 flex-wrap px-5 py-4 border-b border-border/80 bg-muted/25">
           <div className="flex items-start gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0">
+            <div className="h-10 w-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
               <MessageCircle className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -201,7 +201,7 @@ export function WhatsappSettingsTab() {
                 disabled={busy}
                 className={cn(
                   btnBase,
-                  "border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/15",
+                  "border border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/10",
                 )}
               >
                 {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Unplug className="h-4 w-4" />}

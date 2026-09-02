@@ -331,8 +331,8 @@ export default function ProductsPage() {
 
   const STATS = [
     { label: `Total ${workspace.productLabel}`, value: total, icon: Package, color: "text-primary", bg: "bg-primary/15", tint: "border-primary/20 bg-gradient-to-br from-primary/5 to-card dark:border-primary/20 dark:from-primary/10 dark:to-transparent" },
-    { label: "Active", value: active, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
-    { label: "Drafts", value: drafts, icon: FileText, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "Active", value: active, icon: TrendingUp, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Drafts", value: drafts, icon: FileText, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
     { label: "Inactive / OOS", value: inactive, icon: Archive, color: "text-rose-600", bg: "bg-rose-500/15", tint: "border-rose-200/70 bg-gradient-to-br from-rose-50 to-white dark:border-rose-500/20 dark:from-rose-500/10 dark:to-transparent" },
   ];
 

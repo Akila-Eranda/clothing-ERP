@@ -24,7 +24,7 @@ export function HrEmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-[18px] border border-dashed border-border bg-card px-6 py-14 text-center shadow-[0_2px_10px_rgba(15,23,42,0.04)]",
+        "flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-card px-6 py-14 text-center shadow-[0_2px_10px_rgba(15,23,42,0.04)]",
         className,
       )}
     >

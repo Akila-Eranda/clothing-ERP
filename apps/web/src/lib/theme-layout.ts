@@ -68,7 +68,7 @@ const LIGHT_SIDEBAR_PALETTE: ChromeSkinPalette = {
   fg: "#212B36",
   muted: "#646B72",
   border: "#E6EAED",
-  activeFg: "#FE9F43",
+  activeFg: "#1D4ED8",
   logoBg: "#FFFFFF",
 };
 
@@ -77,7 +77,7 @@ const SNOW_SIDEBAR_PALETTE: ChromeSkinPalette = {
   fg: "#1F2937",
   muted: "#6B7280",
   border: "#E8EAED",
-  activeFg: "#FE9F43",
+  activeFg: "#1D4ED8",
   logoBg: "#FBFBFB",
 };
 
@@ -265,8 +265,8 @@ export const DREAMSPOS_DARK_CHROME = {
   muted: "#6b7280",
   border: "#1f2228",
   hover: "rgba(255, 255, 255, 0.05)",
-  activeBg: "rgba(254, 159, 67, 0.14)",
-  activeFg: "#fe9f43",
+  activeBg: "rgba(59, 130, 246, 0.14)",
+  activeFg: "#60a5fa",
   logoBg: "#141414",
 } as const;
 

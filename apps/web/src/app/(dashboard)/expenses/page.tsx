@@ -150,14 +150,15 @@ export default function ExpensesPage() {
   const avg     = expenses.length > 0 ? total / expenses.length : 0;
   const largest = expenses.length > 0 ? Math.max(...expenses.map((e) => e.amount)) : 0;
 
+  const catData = (summary?.byCategory ?? []).map((c, i) => ({ ...c, color: CAT_COLORS[i % CAT_COLORS.length] }));
+  const methodData = (summary?.byPaymentMethod ?? []).map((m) => ({ name: m.method.replace(/_/g, " "), value: m.amount }));
+
   const EXPENSE_KPIS = [
     { ...pageKpi("Total Expenses", `LKR ${formatNumber(total)}`, TrendingDown, "red"), sub: `${expenses.length} entries in period` },
     { ...pageKpi("Average per Entry", `LKR ${formatNumber(avg)}`, Activity, "amber"), sub: "Per recorded expense" },
     { ...pageKpi("Largest Expense", `LKR ${formatNumber(largest)}`, ArrowUpRight, "violet"), sub: "Single highest entry" },
     { ...pageKpi("Categories Used", String(catData.length), BarChart2, "blue"), sub: `of ${EXPENSE_CATEGORIES.length} total categories` },
   ];
-  const catData = (summary?.byCategory ?? []).map((c, i) => ({ ...c, color: CAT_COLORS[i % CAT_COLORS.length] }));
-  const methodData = (summary?.byPaymentMethod ?? []).map((m) => ({ name: m.method.replace(/_/g, " "), value: m.amount }));
 
   // ── Table columns ──────────────────────────────────────────────────────────
   const columns: ColumnDef<Expense>[] = [
@@ -307,11 +308,11 @@ export default function ExpensesPage() {
 
         {/* ── Expenses Table ───────────────────────────────────────────────── */}
         {loading ? (
-          <div className="h-40 flex items-center justify-center text-muted-foreground rounded-[18px] border bg-card">
+          <div className="h-40 flex items-center justify-center text-muted-foreground rounded-xl border bg-card">
             <RefreshCw className="h-5 w-5 animate-spin mr-2" /> Loading…
           </div>
         ) : expenses.length === 0 ? (
-          <div className="h-40 flex flex-col items-center justify-center text-muted-foreground rounded-[18px] border bg-card">
+          <div className="h-40 flex flex-col items-center justify-center text-muted-foreground rounded-xl border bg-card">
             <TrendingDown className="h-10 w-10 mb-2 opacity-20" />
             <p className="text-sm font-medium text-muted-foreground">No expenses for this period</p>
             <button onClick={() => setAddOpen(true)} className="mt-2 text-xs text-red-500 hover:underline">Record the first one →</button>

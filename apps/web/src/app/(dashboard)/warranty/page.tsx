@@ -328,10 +328,10 @@ export default function WarrantyPage() {
   const resolvedCount = claims.filter((c) => ["REPLACED", "CLOSED"].includes(c.status)).length;
 
   const STATS = [
-    { label: "Total Claims", value: claims.length, icon: ShieldCheck, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "Pending", value: pendingCount, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
-    { label: "Resolved", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
-    { label: "Rejected", value: claims.filter((c) => c.status === "REJECTED").length, icon: XCircle, color: "text-red-600", bg: "bg-red-500/15", tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
+    { label: "Total Claims", value: claims.length, icon: ShieldCheck, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Pending", value: pendingCount, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Resolved", value: resolvedCount, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Rejected", value: claims.filter((c) => c.status === "REJECTED").length, icon: XCircle, color: "text-red-600", bg: "bg-red-500/10", tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
   ];
 
   const columns = useMemo(
@@ -395,7 +395,7 @@ export default function WarrantyPage() {
         </div>
 
         {displayed.length === 0 && !loading ? (
-          <Card className="border-dashed rounded-[18px]">
+          <Card className="border-dashed rounded-xl">
             <CardContent className="p-10 flex flex-col items-center text-center gap-3">
               <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <ShieldCheck className="h-7 w-7 text-primary" />

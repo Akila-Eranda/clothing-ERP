@@ -303,7 +303,7 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-20 rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <div className="flex justify-center py-20 rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (

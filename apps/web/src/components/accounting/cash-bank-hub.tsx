@@ -341,7 +341,7 @@ function AccountsOverviewPanel({
       sub: `${banks.length} accounts`,
       icon: Wallet,
       color: "text-blue-600",
-      bg: "bg-blue-500/15",
+      bg: "bg-primary/10",
       tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
     },
     {
@@ -350,8 +350,8 @@ function AccountsOverviewPanel({
       sub: `${cashAccounts.length} registers`,
       icon: Banknote,
       color: "text-emerald-600",
-      bg: "bg-emerald-500/15",
-      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
+      bg: "bg-emerald-500/10",
+      tint: "bg-card border-border",
     },
     {
       label: "Bank Balances",
@@ -378,8 +378,8 @@ function AccountsOverviewPanel({
           sub: "In · Out · Transfer",
           icon: ArrowLeftRight,
           color: "text-amber-600",
-          bg: "bg-amber-500/15",
-          tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
+          bg: "bg-amber-500/10",
+          tint: "bg-card border-border",
         }]),
   ];
 
@@ -389,7 +389,7 @@ function AccountsOverviewPanel({
     return (
       <Card
         key={b.id}
-        className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150"
+        className="rounded-xl shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors duration-150"
       >
         <CardContent className="p-4 flex flex-col gap-3">
           <div className="flex items-start justify-between gap-2">
@@ -406,7 +406,7 @@ function AccountsOverviewPanel({
                 {typeLabel(b.type)}{b.bankName ? ` · ${b.bankName}` : ""} · <span className="font-mono">{b.code}</span>
               </p>
             </div>
-            <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${isCash ? "bg-emerald-500/15 text-emerald-600" : "bg-indigo-500/15 text-indigo-600"}`}>
+            <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${isCash ? "bg-emerald-500/10 text-emerald-600" : "bg-indigo-500/15 text-indigo-600"}`}>
               {isCash ? <Banknote className="h-[18px] w-[18px]" /> : <Landmark className="h-[18px] w-[18px]" />}
             </div>
           </div>
@@ -453,7 +453,7 @@ function AccountsOverviewPanel({
   };
 
   const section = (id: string, title: string, icon: ReactNode, tone: string, accounts: BankAccount[]) => (
-    <div id={id} className="rounded-[18px] border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+    <div id={id} className="rounded-xl border bg-card overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2.5">
           <div className={`h-8 w-8 rounded-[10px] flex items-center justify-center ${tone}`}>{icon}</div>
@@ -494,7 +494,7 @@ function AccountsOverviewPanel({
       <PageKpiGrid items={summaryRows} />
 
       <div className="space-y-4">
-        {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/15 text-emerald-600", cashAccounts)}
+        {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/10 text-emerald-600", cashAccounts)}
         {section("bank-accounts", "Bank accounts", <Landmark className="h-4 w-4" />, "bg-indigo-500/15 text-indigo-600", bankAccounts)}
         {otherAccounts.length > 0 &&
           section("other-accounts", "Other accounts", <Wallet className="h-4 w-4" />, "bg-teal-500/15 text-teal-600", otherAccounts)}
@@ -794,9 +794,9 @@ function CashBookPanel() {
       </div>
 
       <div className="grid grid-cols-2 gap-3">
-        <Card className="rounded-[18px] border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+        <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <CardContent className="h-[72px] p-4 flex items-center gap-3">
-            <div className="h-9 w-9 rounded-[12px] bg-emerald-500/15 flex items-center justify-center shrink-0">
+            <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
               <ArrowDownCircle className="h-[18px] w-[18px] text-emerald-600" />
             </div>
             <div className="min-w-0">
@@ -805,7 +805,7 @@ function CashBookPanel() {
             </div>
           </CardContent>
         </Card>
-        <Card className="rounded-[18px] border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent">
+        <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
           <CardContent className="h-[72px] p-4 flex items-center gap-3">
             <div className="h-9 w-9 rounded-[12px] bg-indigo-500/15 flex items-center justify-center shrink-0">
               <Wallet className="h-[18px] w-[18px] text-indigo-600" />
@@ -1190,9 +1190,9 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
 
       {book && (
         <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
-          <Card className="rounded-[18px] border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+          <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <CardContent className="h-[72px] p-4 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-[12px] bg-emerald-500/15 flex items-center justify-center shrink-0">
+              <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
                 <ArrowDownCircle className="h-[18px] w-[18px] text-emerald-600" />
               </div>
               <div className="min-w-0">
@@ -1201,7 +1201,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-[18px] border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent">
+          <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <CardContent className="h-[72px] p-4 flex items-center gap-3">
               <div className="h-9 w-9 rounded-[12px] bg-indigo-500/15 flex items-center justify-center shrink-0">
                 <Wallet className="h-[18px] w-[18px] text-indigo-600" />
@@ -1212,9 +1212,9 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
               </div>
             </CardContent>
           </Card>
-          <Card className="rounded-[18px] border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent col-span-2 xl:col-span-1">
+          <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)] col-span-2 xl:col-span-1">
             <CardContent className="h-[72px] p-4 flex items-center gap-3">
-              <div className="h-9 w-9 rounded-[12px] bg-amber-500/15 flex items-center justify-center shrink-0">
+              <div className="h-9 w-9 rounded-[12px] bg-amber-500/10 flex items-center justify-center shrink-0">
                 <Landmark className="h-[18px] w-[18px] text-amber-600" />
               </div>
               <div className="min-w-0">
@@ -1577,9 +1577,9 @@ function ReconciliationPanel() {
 
   return (
     <div className="space-y-4">
-      <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+      <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-          <div className="h-8 w-8 rounded-[10px] bg-amber-500/15 text-amber-600 flex items-center justify-center">
+          <div className="h-8 w-8 rounded-[10px] bg-amber-500/10 text-amber-600 flex items-center justify-center">
             <Scale className="h-4 w-4" />
           </div>
           <h3 className="text-sm font-semibold">Start reconciliation</h3>
@@ -1617,7 +1617,7 @@ function ReconciliationPanel() {
       </Card>
 
       {active && (
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <CardContent className="p-4 space-y-4">
             <div className="flex flex-wrap justify-between gap-2">
               <div>
@@ -1652,13 +1652,13 @@ function ReconciliationPanel() {
                   <p className="text-lg font-bold tabular-nums mt-1">{formatNumber(active.statementBalance)}</p>
                 </CardContent>
               </Card>
-              <Card className="rounded-[14px] border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+              <Card className="rounded-[14px] bg-card border-border">
                 <CardContent className="p-3">
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">System</p>
                   <p className="text-lg font-bold tabular-nums mt-1">{formatNumber(active.systemBalance)}</p>
                 </CardContent>
               </Card>
-              <Card className="rounded-[14px] border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
+              <Card className="rounded-[14px] bg-card border-border">
                 <CardContent className="p-3">
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Unmatched</p>
                   <p className="text-lg font-bold tabular-nums mt-1">{unmatched.length}</p>

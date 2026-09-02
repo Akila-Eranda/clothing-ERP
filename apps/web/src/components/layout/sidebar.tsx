@@ -301,8 +301,8 @@ export function Sidebar() {
     muted: "var(--chrome-muted, #6b7280)",
     fg: "var(--chrome-fg, #d8dfee)",
     hover: "var(--chrome-hover, rgba(255,255,255,0.05))",
-    activeBg: "var(--chrome-active-bg, rgba(254,159,67,0.14))",
-    activeFg: "var(--chrome-active-fg, #fe9f43)",
+    activeBg: "var(--chrome-active-bg, rgba(22,119,255,0.08))",
+    activeFg: "var(--chrome-active-fg, hsl(var(--primary)))",
   };
   const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #ffffff)");
   const border   = dreamsDarkChrome ? chrome.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
@@ -310,9 +310,9 @@ export function Sidebar() {
   const textFull = dreamsDarkChrome ? chrome.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
   const hoverBg  = dreamsDarkChrome ? chrome.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
   const sectLbl  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
-  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, " + (darkUi ? "rgba(254, 159, 67, 0.14)" : "hsl(var(--sidebar-accent))") + ")";
-  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--sidebar-accent-foreground))") + ")";
-  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, " + (darkUi ? "#FE9F43" : "hsl(var(--primary))") + ")";
+  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, hsl(var(--primary) / 0.08))";
+  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, hsl(var(--primary)))";
+  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, hsl(var(--primary)))";
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 
@@ -341,10 +341,11 @@ export function Sidebar() {
     const Icon = item.icon;
 
     const className = cn(
-      "group relative flex items-center gap-3 rounded-lg transition-all duration-150 select-none",
+      "group relative flex items-center gap-3 rounded-lg transition-colors duration-150 select-none",
       sidebarCollapsed ? "h-10 w-10 justify-center mx-auto" : "h-10 w-full",
-      !sidebarCollapsed && (nested ? "pl-8 pr-2.5" : "px-2.5"),
-      isActive && !sidebarCollapsed && "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-[3px] before:rounded-full before:bg-primary",
+      !sidebarCollapsed && (nested ? "pl-8 pr-2.5" : "px-2.5 pl-2.5"),
+      isActive && !sidebarCollapsed && "border-l-2 border-l-primary",
+      isActive && "font-semibold",
     );
 
     const style = isActive
@@ -366,8 +367,8 @@ export function Sidebar() {
             <span
               className={cn(
                 "flex-1 truncate leading-none",
-                nested ? "text-[13px]" : "text-[14.5px]",
-                isActive ? "font-bold" : "font-semibold",
+                nested ? "text-[13px]" : "text-[14px]",
+                isActive ? "font-semibold text-primary" : "font-medium",
               )}
               title={item.label}
             >
@@ -667,7 +668,7 @@ export function Sidebar() {
                   type="button"
                   onClick={() => setTheme(isDark ? "light" : "dark")}
                   className="relative h-5 w-9 rounded-full transition-colors duration-200 shrink-0"
-                  style={{ background: isDark ? "#FE9F43" : "#CBD5E1" }}
+                  style={{ background: isDark ? "hsl(var(--primary))" : "#CBD5E1" }}
                 >
                   <motion.span
                     className="absolute top-[3px] h-[14px] w-[14px] rounded-full bg-white shadow-sm"

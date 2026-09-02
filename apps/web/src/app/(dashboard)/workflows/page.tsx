@@ -262,10 +262,10 @@ export default function WorkflowsPage() {
     : tasks.filter((t) => t.instance.definition.key === typeFilter);
 
   const STATS = [
-    { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
-    { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-600",    bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-600",  bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
-    { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(() => buildColumns(acting, act), [acting]);
@@ -303,7 +303,7 @@ export default function WorkflowsPage() {
         <Card className="border-emerald-500/30 bg-emerald-500/5">
           <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center gap-3 flex-1">
-              <div className="p-2.5 rounded-xl bg-emerald-500/15">
+              <div className="p-2.5 rounded-xl bg-emerald-500/10">
                 <CheckCircle2 className="h-6 w-6 text-emerald-500" />
               </div>
               <div>
@@ -348,9 +348,9 @@ export default function WorkflowsPage() {
 
       {/* Table */}
       {loading ? (
-        <LoadingCenter className="py-24 rounded-[18px] border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]" />
+        <LoadingCenter className="py-24 rounded-xl border border-border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]" />
       ) : displayed.length === 0 ? (
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
             <div className="p-4 rounded-2xl bg-emerald-500/10">
               <CheckCircle2 className="h-10 w-10 text-emerald-500" />

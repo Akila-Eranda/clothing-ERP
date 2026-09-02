@@ -471,7 +471,7 @@ export default function UsersPage() {
                 key={role.id}
                 type="button"
                 onClick={() => setRoleDetailModal(role)}
-                className="rounded-[18px] border bg-card p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-left hover:border-primary/40 hover:shadow-md transition-all"
+                className="rounded-xl border bg-card p-4 shadow-[0_2px_10px_rgba(15,23,42,0.04)] text-left hover:border-primary/40 hover:shadow-md transition-all"
               >
                 <div className="flex items-start gap-2 mb-3">
                   <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">

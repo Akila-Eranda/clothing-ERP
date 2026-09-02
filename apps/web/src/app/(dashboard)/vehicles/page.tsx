@@ -320,10 +320,10 @@ export default function VehiclesPage() {
   ];
 
   const STATS = [
-    { label: "Vehicle Brands", value: brands.length, icon: Building2, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "Vehicle Models", value: models.length, icon: Car, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
-    { label: "Part Mappings", value: totalMappings, icon: Link2, color: "text-violet-600", bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
-    { label: "Models w/ Parts", value: modelsWithParts, icon: Package, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "Vehicle Brands", value: brands.length, icon: Building2, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Vehicle Models", value: models.length, icon: Car, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
+    { label: "Part Mappings", value: totalMappings, icon: Link2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Models w/ Parts", value: modelsWithParts, icon: Package, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
   ];
 
   const brandColumns = useMemo(() => buildBrandColumns(), []);

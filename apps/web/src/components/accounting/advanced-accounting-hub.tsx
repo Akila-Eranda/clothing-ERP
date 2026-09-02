@@ -106,19 +106,28 @@ function money(value: number) {
 }
 
 function StatCard({
-  label, value, hint, icon: Icon, tone,
+  label, value, hint, icon: Icon, tone = "neutral",
 }: {
-  label: string; value: string; hint: string; icon: typeof Activity; tone: string;
+  label: string; value: string; hint: string; icon: typeof Activity; tone?: "neutral" | "primary" | "success" | "warning" | "danger" | "info";
 }) {
+  const chip = {
+    neutral: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
+    primary: "bg-primary/10 text-primary",
+    success: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    warning: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+    danger: "bg-red-500/10 text-red-600 dark:text-red-400",
+    info: "bg-primary/10 text-primary",
+  }[tone];
+
   return (
     <Card className="overflow-hidden">
-      <CardContent className="p-5 flex items-center gap-4">
-        <div className={cn("h-11 w-11 rounded-xl grid place-items-center text-white shadow-md", tone)}>
-          <Icon className="h-5 w-5" />
+      <CardContent className="p-4 flex items-center gap-3">
+        <div className={cn("h-9 w-9 rounded-lg grid place-items-center shrink-0", chip)}>
+          <Icon className="h-4 w-4" strokeWidth={1.75} />
         </div>
         <div className="min-w-0">
-          <p className="text-xl font-bold tracking-tight tabular-nums truncate">{value}</p>
-          <p className="text-xs font-semibold text-muted-foreground mt-0.5">{label}</p>
+          <p className="text-[22px] font-bold tracking-tight tabular-nums truncate leading-none">{value}</p>
+          <p className="text-xs font-medium text-muted-foreground mt-1">{label}</p>
           <p className="text-[11px] text-muted-foreground/80 mt-0.5 truncate">{hint}</p>
         </div>
       </CardContent>
@@ -371,7 +380,7 @@ export function AdvancedAccountingHub() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 grid place-items-center text-white shadow-button">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 grid place-items-center text-primary">
               <Sparkles className="h-4.5 w-4.5" />
             </div>
             <div>
@@ -413,28 +422,28 @@ export function AdvancedAccountingHub() {
               value={`${dashboard.diagnostics.healthScore}%`}
               hint={dashboard.diagnostics.status.replace(/_/g, " ")}
               icon={ShieldCheck}
-              tone={dashboard.diagnostics.healthScore >= 90 ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-amber-500 to-orange-600"}
+              tone={dashboard.diagnostics.healthScore >= 90 ? "success" : "warning"}
             />
             <StatCard
               label="Budget Remaining"
               value={money(dashboard.budget.variance)}
               hint={`${money(dashboard.budget.actual)} used`}
               icon={Target}
-              tone="bg-gradient-to-br from-indigo-500 to-violet-600"
+              tone="primary"
             />
             <StatCard
               label="Active Automations"
               value={String(dashboard.activeRecurring)}
               hint={`${dashboard.activeCostCenters} cost centers`}
               icon={Repeat2}
-              tone="bg-gradient-to-br from-sky-500 to-blue-600"
+              tone="info"
             />
             <StatCard
               label="Growth Forecast"
               value={`${dashboard.monthlyGrowthPct >= 0 ? "+" : ""}${dashboard.monthlyGrowthPct}%`}
               hint={`${dashboard.activeExchangeRates} active FX rates`}
               icon={TrendingUp}
-              tone="bg-gradient-to-br from-fuchsia-500 to-pink-600"
+              tone="neutral"
             />
           </div>
 
@@ -524,9 +533,9 @@ export function AdvancedAccountingHub() {
 
           {variance?.budget && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard label="Approved Budget" value={money(variance.totals.budget)} hint={variance.budget.name} icon={Target} tone="bg-gradient-to-br from-indigo-500 to-violet-600" />
-              <StatCard label="Actual Spend" value={money(variance.totals.actual)} hint={`${variance.rows.length} ledger accounts`} icon={CircleDollarSign} tone="bg-gradient-to-br from-amber-500 to-orange-600" />
-              <StatCard label="Remaining" value={money(variance.totals.variance)} hint={variance.totals.variance >= 0 ? "Within budget" : "Over budget"} icon={WalletCards} tone={variance.totals.variance >= 0 ? "bg-gradient-to-br from-emerald-500 to-teal-600" : "bg-gradient-to-br from-red-500 to-rose-600"} />
+              <StatCard label="Approved Budget" value={money(variance.totals.budget)} hint={variance.budget.name} icon={Target} tone="primary" />
+              <StatCard label="Actual Spend" value={money(variance.totals.actual)} hint={`${variance.rows.length} ledger accounts`} icon={CircleDollarSign} tone="warning" />
+              <StatCard label="Remaining" value={money(variance.totals.variance)} hint={variance.totals.variance >= 0 ? "Within budget" : "Over budget"} icon={WalletCards} tone={variance.totals.variance >= 0 ? "success" : "danger"} />
             </div>
           )}
 

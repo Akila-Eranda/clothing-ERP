@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { useShopProfile, hasBatchTracking, hasExpiryTracking } from "@/lib/use-shop-profile";
-import { parseApiList } from "@/lib/parse-api-list";
+import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
 type Supplier = { id: string; name: string; phone?: string | null };
 

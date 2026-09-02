@@ -411,7 +411,7 @@ export default function CashManagementPage() {
       tint: isViewingToday && shiftOpen
         ? "border-primary/20 bg-gradient-to-br from-primary/5 to-white dark:border-primary/20 dark:from-primary/10 dark:to-transparent"
         : isViewingToday && shiftPending
-          ? "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent"
+          ? "bg-card border-border"
           : "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
       sub: isViewingToday && shiftOpen
         ? `Opened LKR ${formatNumber(active?.openingCash ?? 0)}`

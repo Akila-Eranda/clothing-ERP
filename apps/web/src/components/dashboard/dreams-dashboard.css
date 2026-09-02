@@ -12,13 +12,13 @@
 }
 
 .dreams-pos-dash {
-  --dp-primary: #fe9f43;
-  --dp-secondary: #092c4c;
-  --dp-teal: #0e9384;
-  --dp-info: #155eef;
-  --dp-orange: #e04f16;
-  --dp-success: #3eb780;
-  --dp-danger: #ff0000;
+  --dp-primary: #1677ff;
+  --dp-secondary: #1f2937;
+  --dp-teal: #1677ff;
+  --dp-info: #1677ff;
+  --dp-orange: #ef4444;
+  --dp-success: #10b981;
+  --dp-danger: #ef4444;
   --dp-border: #e6eaed;
   --dp-text: #212b36;
   --dp-muted: #646b72;
@@ -646,14 +646,14 @@
 
 .dreams-pos-dash .dp-date-range-trigger:hover,
 .dp-date-range-trigger:hover {
-  border-color: #fe9f43;
+  border-color: #1677ff;
 }
 
 .dreams-pos-dash .dp-date-range-trigger:focus-visible,
 .dp-date-range-trigger:focus-visible {
   outline: none;
-  border-color: #fe9f43;
-  box-shadow: 0 0 0 3px rgba(254, 159, 67, 0.2);
+  border-color: #1677ff;
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.2);
 }
 
 .dp-date-range-icon {
@@ -682,8 +682,8 @@
 
 .dp-day-picker-wrap {
   --rdp-cell-size: 36px;
-  --rdp-accent-color: #fe9f43;
-  --rdp-background-color: rgba(254, 159, 67, 0.12);
+  --rdp-accent-color: #1677ff;
+  --rdp-background-color: rgba(22, 119, 255, 0.12);
 }
 
 .dp-day-picker-wrap .rdp {
@@ -694,7 +694,7 @@
 .dp-day-picker-wrap .rdp-day_selected,
 .dp-day-picker-wrap .rdp-day_selected:focus-visible,
 .dp-day-picker-wrap .rdp-day_selected:hover {
-  background-color: #fe9f43;
+  background-color: #1677ff;
 }
 
 .dp-day-picker-wrap .rdp-day_range_middle {
@@ -961,7 +961,7 @@
 /* Dark mode — DreamsPOS dark canvas + elevated cards */
 .dark .dreams-pos-dash {
   --dp-secondary: #1a1a1a;
-  --dp-info: #fe9f43;
+  --dp-info: #1677ff;
   --dp-border: hsl(0 0% 100% / 0.08);
   --dp-text: #d8dfee;
   --dp-muted: #9ca3af;

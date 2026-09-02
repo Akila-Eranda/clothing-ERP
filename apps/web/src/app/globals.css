@@ -26,160 +26,157 @@
   --tc-radius: 0.75rem;
 }
 
-.dark {
-  --tc-background: 0 0% 5%;
-  --tc-foreground: 216 33% 89%;
-  --tc-card: 0 0% 9%;
-  --tc-card-foreground: 216 33% 89%;
-  --tc-popover: 0 0% 8%;
-  --tc-popover-foreground: 216 33% 89%;
-  --tc-primary: 32 99% 63%;
+  .dark {
+  --tc-background: 220 13% 7%;
+  --tc-foreground: 220 14% 92%;
+  --tc-card: 220 13% 10%;
+  --tc-card-foreground: 220 14% 92%;
+  --tc-popover: 220 13% 9%;
+  --tc-popover-foreground: 220 14% 92%;
+  --tc-primary: 214 100% 54%;
   --tc-primary-foreground: 0 0% 100%;
-  --tc-secondary: 0 0% 8%;
-  --tc-secondary-foreground: 216 33% 89%;
-  --tc-muted: 0 0% 10%;
-  --tc-muted-foreground: 220 9% 46%;
-  --tc-accent: 0 0% 12%;
-  --tc-accent-foreground: 32 99% 63%;
+  --tc-secondary: 220 13% 12%;
+  --tc-secondary-foreground: 220 14% 92%;
+  --tc-muted: 220 13% 12%;
+  --tc-muted-foreground: 215 20% 65%;
+  --tc-accent: 220 13% 14%;
+  --tc-accent-foreground: 214 100% 65%;
   --tc-destructive: 0 84% 60%;
   --tc-destructive-foreground: 0 0% 100%;
-  --tc-border: 0 0% 15%;
-  --tc-input: 0 0% 16%;
-  --tc-ring: 32 99% 63%;
+  --tc-border: 220 13% 18%;
+  --tc-input: 220 13% 16%;
+  --tc-ring: 214 100% 54%;
 }
 
 @layer base {
   :root {
     /*
-      Hexalyte / DreamsPOS — Light page canvas
-      Canvas: #F1F5F6 · Cards: #FFFFFF · Sidebar/Header: #FFFFFF
+      Hexalyte ERP — enterprise design system (light)
     */
-    --background: 204 14% 96%;                   /* #F1F5F6 — softer gray canvas */
-    --secondary-background: 210 18% 92%;         /* #E8EDF0 — nested / hover surfaces */
-    --foreground: 222 47% 11%;                 /* #0F172A */
-    --card: 0 0% 100%;                         /* #FFFFFF */
-    --card-foreground: 222 47% 11%;
-    --card-hover: 0 0% 97%;                    /* #F7F7F7 */
+    --background: 220 23% 97%;                   /* #F5F7FA */
+    --secondary-background: 220 20% 95%;
+    --foreground: 220 13% 18%;                   /* #1F2937 */
+    --card: 0 0% 100%;                           /* #FFFFFF */
+    --card-foreground: 220 13% 18%;
+    --card-hover: 220 20% 98%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 217 91% 53%;                  /* #2563EB — overridable by accent */
+    --popover-foreground: 220 13% 18%;
+    --primary: 214 100% 54%;                     /* #1677FF */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 224 76% 48%;            /* #1D4ED8 */
-    --primary-light: 217 91% 60%;            /* #3B82F6 */
-    --primary-soft: 214 100% 97%;            /* #EFF6FF */
-    --primary-glow: rgba(37, 99, 235, 0.18);
-    --secondary: 210 40% 98%;
-    --secondary-foreground: 215 19% 35%;     /* #334155 */
-    --muted: 210 20% 98%;                      /* #F9FAFB */
-    --muted-foreground: 215 19% 35%;           /* #475569 */
-    --accent: 214 100% 97%;                  /* Primary Soft */
-    --accent-foreground: 224 76% 48%;
-    --destructive: 0 84% 60%;                /* #EF4444 */
+    --primary-hover: 214 84% 48%;                /* #1268E6 */
+    --primary-light: 214 100% 60%;
+    --primary-soft: 214 100% 97%;
+    --primary-glow: rgba(22, 119, 255, 0.15);
+    --secondary: 220 20% 98%;
+    --secondary-foreground: 215 16% 47%;         /* #64748B */
+    --muted: 220 20% 98%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 214 100% 97%;
+    --accent-foreground: 214 100% 54%;
+    --destructive: 0 84% 60%;                    /* #EF4444 */
     --destructive-foreground: 0 0% 100%;
-    --success: 142 76% 36%;                  /* #16A34A */
+    --success: 160 84% 39%;                      /* #10B981 */
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;                   /* #F59E0B */
+    --warning: 38 92% 50%;                       /* #F59E0B */
     --warning-foreground: 0 0% 100%;
-    --info: 217 91% 53%;
+    --info: 214 100% 54%;
     --info-foreground: 0 0% 100%;
-    /* Button tokens — overridden by Theme Customizer */
     --btn-primary: var(--primary);
     --btn-primary-hover: var(--primary-hover);
-    --btn-secondary: 210 68% 16%;
-    --btn-secondary-hover: 213 54% 24%;
-    --btn-success: 152 52% 48%;
-    --btn-danger: 18 82% 48%;
-    --btn-warning: 32 99% 63%;
+    --btn-secondary: 220 13% 18%;
+    --btn-secondary-hover: 220 13% 24%;
+    --btn-success: 160 84% 39%;
+    --btn-danger: 0 84% 60%;
+    --btn-warning: 38 92% 50%;
     --btn-destructive: 0 84% 60%;
-    --btn-info: 224 84% 51%;
-    --border: 214 32% 91%;                   /* soft card edge ≈ rgba(15,23,42,.08) on white */
-    --border-hsl: 214 32% 91%;
-    --input: 215 20% 85%;                    /* stronger ≈ rgba(15,23,42,.12) */
-    --ring: 217 91% 53%;
-    --divider: 214 32% 94%;
-    --line: 214 32% 91%;
-    --radius: 1.125rem;                      /* 18px cards */
-    --radius-control: 0.75rem;               /* 12px inputs */
-    --chart-1: 217 91% 53%;                  /* Revenue / Primary */
-    --chart-2: 0 84% 60%;                    /* Expense */
-    --chart-3: 142 76% 36%;                  /* Profit */
-    --chart-4: 263 70% 58%;                  /* Orders */
-    --chart-5: 38 92% 50%;                   /* Customers */
-    --chart-6: 189 94% 43%;                  /* Products */
-    --sidebar-background: 0 0% 100%;           /* #FFFFFF */
-    --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 217 91% 53%;
+    --btn-info: 214 100% 54%;
+    --border: 220 13% 91%;                       /* #E5E7EB */
+    --border-hsl: 220 13% 91%;
+    --input: 220 13% 88%;
+    --ring: 214 100% 54%;
+    --divider: 220 13% 93%;
+    --line: 220 13% 91%;
+    --radius: 0.75rem;                             /* 12px cards */
+    --radius-control: 0.5rem;                      /* 8px inputs/buttons */
+    --chart-1: 214 100% 54%;
+    --chart-2: 0 84% 60%;
+    --chart-3: 160 84% 39%;
+    --chart-4: 263 70% 58%;
+    --chart-5: 38 92% 50%;
+    --chart-6: 189 94% 43%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 13% 18%;
+    --sidebar-primary: 214 100% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 214 100% 97%;          /* active bg #EFF6FF */
-    --sidebar-accent-foreground: 224 76% 48%; /* #1D4ED8 */
-    --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 217 91% 53%;
-    --sidebar-active-text: 224 76% 48%;
-    --sidebar-active-text-dark: 213 97% 87%;
-    --sidebar-active-icon-dark: 213 97% 78%;
-    --sidebar-hover: 210 20% 96%;              /* #F1F5F9 */
+    --sidebar-accent: 214 100% 97%;
+    --sidebar-accent-foreground: 214 100% 54%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 214 100% 54%;
+    --sidebar-active-text: 214 100% 54%;
+    --sidebar-active-text-dark: 214 100% 65%;
+    --sidebar-active-icon-dark: 214 100% 65%;
+    --sidebar-hover: 220 20% 96%;
     --header-background: 0 0% 100%;
-    --hover: 210 20% 98%;
+    --hover: 220 20% 98%;
     --selected: 214 100% 97%;
   }
 
   .dark {
-    /* DreamsPOS dark — body #0D0D0D · cards #171717 · chrome border #1F2228 */
-    --background: 0 0% 5%;                     /* #0D0D0D */
-    --secondary-background: 0 0% 7%;           /* #121212 */
-    --foreground: 216 33% 89%;                 /* #D8DFEE */
-    --card: 0 0% 9%;                           /* #171717 */
-    --card-foreground: 216 33% 89%;
-    --card-hover: 0 0% 11%;                    /* #1C1C1C */
-    --popover: 0 0% 8%;
-    --popover-foreground: 216 33% 89%;
-    --primary: 32 99% 63%;                   /* #FE9F43 */
+    --background: 220 13% 7%;
+    --secondary-background: 220 13% 9%;
+    --foreground: 220 14% 92%;
+    --card: 220 13% 10%;
+    --card-foreground: 220 14% 92%;
+    --card-hover: 220 13% 12%;
+    --popover: 220 13% 9%;
+    --popover-foreground: 220 14% 92%;
+    --primary: 214 100% 54%;                     /* blue — NOT orange */
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 28 90% 55%;
-    --primary-light: 32 99% 68%;
-    --primary-soft: 32 40% 14%;
-    --primary-glow: rgba(254, 159, 67, 0.28);
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 216 20% 78%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 220 9% 46%;          /* #6B7280 */
-    --accent: 0 0% 12%;
-    --accent-foreground: 32 99% 63%;
+    --primary-hover: 214 84% 48%;
+    --primary-light: 214 100% 60%;
+    --primary-soft: 214 50% 14%;
+    --primary-glow: rgba(22, 119, 255, 0.2);
+    --secondary: 220 13% 12%;
+    --secondary-foreground: 215 16% 65%;
+    --muted: 220 13% 12%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 220 13% 14%;
+    --accent-foreground: 214 100% 65%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --success: 160 84% 39%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    --info: 199 89% 48%;
+    --info: 214 100% 54%;
     --info-foreground: 0 0% 100%;
-    --border: 220 13% 15%;                     /* #1F2228 */
-    --border-hsl: 220 13% 15%;
-    --input: 0 0% 16%;
-    --ring: 32 99% 63%;
-    --divider: 0 0% 13%;
-    --line: 0 0% 15%;
-    --chart-1: 32 99% 63%;
+    --border: 220 13% 18%;
+    --border-hsl: 220 13% 18%;
+    --input: 220 13% 16%;
+    --ring: 214 100% 54%;
+    --divider: 220 13% 15%;
+    --line: 220 13% 18%;
+    --chart-1: 214 100% 54%;
     --chart-2: 0 84% 60%;
-    --chart-3: 142 71% 45%;
+    --chart-3: 160 84% 39%;
     --chart-4: 263 70% 66%;
     --chart-5: 38 92% 50%;
     --chart-6: 189 94% 43%;
-    --sidebar-background: 0 0% 5%;
-    --sidebar-foreground: 216 33% 89%;
-    --sidebar-primary: 32 99% 63%;
+    --sidebar-background: 220 13% 7%;
+    --sidebar-foreground: 220 14% 92%;
+    --sidebar-primary: 214 100% 54%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 32 40% 14%;
-    --sidebar-accent-foreground: 32 99% 63%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 32 99% 63%;
-    --sidebar-active-text: 32 99% 63%;
-    --sidebar-active-text-dark: 32 98% 83%;
-    --sidebar-active-icon-dark: 32 99% 63%;
-    --sidebar-hover: 0 0% 100%;
-    --header-background: 0 0% 5%;
-    --hover: 0 0% 12%;
-    --selected: 32 50% 18%;
+    --sidebar-accent: 214 50% 14%;
+    --sidebar-accent-foreground: 214 100% 65%;
+    --sidebar-border: 220 13% 18%;
+    --sidebar-ring: 214 100% 54%;
+    --sidebar-active-text: 214 100% 65%;
+    --sidebar-active-text-dark: 214 100% 70%;
+    --sidebar-active-icon-dark: 214 100% 70%;
+    --sidebar-hover: 220 13% 14%;
+    --header-background: 220 13% 7%;
+    --hover: 220 13% 14%;
+    --selected: 214 50% 14%;
   }
 }
 
@@ -199,7 +196,7 @@
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     line-height: 1.55;
-    font-weight: 500;
+    font-weight: 400;
   }
 
   /* Hexalyte — flat white canvas, no purple wash */
@@ -316,27 +313,26 @@
     @apply p-4 md:p-5 space-y-4 max-w-[1600px] mx-auto bg-background min-h-full;
   }
 
-  /* Unified page titles + descriptions (list pages, hubs, admin) */
   .dashboard-shell main h1,
   .admin-app-shell main h1 {
-    font-size: clamp(1.75rem, 2.2vw, 2rem) !important;
-    font-weight: 700;
+    font-size: clamp(1.75rem, 2vw, 1.875rem) !important;
+    font-weight: 600;
     letter-spacing: -0.02em;
-    line-height: 1.2;
+    line-height: 1.25;
     color: hsl(var(--foreground));
   }
   .dashboard-shell main h1 + p,
   .admin-app-shell main h1 + p,
   .page-shell h1 + p,
   .page-shell .page-description {
-    font-size: 0.9375rem !important;
-    line-height: 1.45;
+    font-size: 0.8125rem !important;
+    line-height: 1.5;
     color: hsl(var(--muted-foreground));
   }
   .dashboard-shell main .page-kpi-value,
   .page-shell .page-kpi-value,
   .page-shell .grid .font-bold.tabular-nums.leading-none {
-    font-size: 1.5rem !important;
+    font-size: 1.375rem !important;
     font-weight: 700;
     line-height: 1.1;
     font-variant-numeric: tabular-nums;
@@ -345,27 +341,12 @@
   .page-shell .page-kpi-label,
   .page-shell .grid p.text-muted-foreground.mt-1,
   .page-shell .grid p.text-muted-foreground.font-medium.mt-1 {
-    font-size: 0.8125rem !important;
+    font-size: 0.75rem !important;
     font-weight: 500;
     color: hsl(var(--muted-foreground));
   }
 
-  /*
-   * App-wide button shape — DreamsPOS rounded corners (5px).
-   * POS overlay lives outside these shells and keeps its own styling.
-   */
-  .dashboard-shell button:not([role="checkbox"]),
-  .admin-app-shell button:not([role="checkbox"]) {
-    border-radius: 5px !important;
-  }
-
-  /* DreamsPOS — flat solid Shadcn Button (no shadow / pill overrides) */
-  .dashboard-shell button.inline-flex.items-center.justify-center.gap-2.whitespace-nowrap.font-semibold,
-  .admin-app-shell button.inline-flex.items-center.justify-center.gap-2.whitespace-nowrap.font-semibold {
-    box-shadow: none !important;
-  }
-
-  /* Hub section tabs — navy idle, orange active */
+  /* Hub section tabs — enterprise underline style */
   .dashboard-shell .hex-section-tabs button[type="button"],
   .admin-app-shell .hex-section-tabs button[type="button"] {
     display: inline-flex;
@@ -373,65 +354,69 @@
     gap: 0.375rem;
     height: 2.25rem;
     padding-inline: 0.875rem;
-    border-radius: 5px !important;
-    font-size: 0.9375rem;
+    border-radius: var(--radius-control) !important;
+    font-size: 0.8125rem;
     font-weight: 600;
-    border: none !important;
+    border: 1px solid hsl(var(--border)) !important;
     box-shadow: none !important;
-    transition: filter 0.15s ease;
-    color: #ffffff !important;
-    background: hsl(var(--btn-secondary)) !important;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    color: hsl(var(--muted-foreground)) !important;
+    background: hsl(var(--card)) !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"] svg,
   .admin-app-shell .hex-section-tabs button[type="button"] svg {
-    color: #ffffff !important;
+    color: inherit !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"].is-active,
   .admin-app-shell .hex-section-tabs button[type="button"].is-active {
-    background: hsl(var(--btn-primary)) !important;
+    background: hsl(var(--primary) / 0.08) !important;
+    border-color: hsl(var(--primary) / 0.35) !important;
+    color: hsl(var(--primary)) !important;
   }
   .dashboard-shell .hex-section-tabs button[type="button"]:hover,
   .admin-app-shell .hex-section-tabs button[type="button"]:hover {
-    filter: brightness(1.06);
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
   }
 
-  /* Compact segment controls — Today/Yesterday, chart period, etc. */
   .dashboard-shell .hex-segment-control,
   .admin-app-shell .hex-segment-control {
     display: inline-flex;
     align-items: center;
     gap: 0.25rem;
     padding: 0.125rem;
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     border: 1px solid hsl(var(--border));
     background: hsl(var(--card));
   }
   .dashboard-shell .hex-segment-control button[type="button"],
   .admin-app-shell .hex-segment-control button[type="button"] {
-    height: 2.125rem;
+    height: 2rem;
     padding-inline: 0.75rem;
-    border-radius: 5px !important;
-    font-size: 0.8125rem;
-    font-weight: 700;
+    border-radius: calc(var(--radius-control) - 2px) !important;
+    font-size: 0.75rem;
+    font-weight: 600;
     border: none !important;
     box-shadow: none !important;
-    color: #ffffff !important;
-    background: hsl(var(--btn-secondary)) !important;
-    transition: filter 0.15s ease;
+    color: hsl(var(--muted-foreground)) !important;
+    background: transparent !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
   }
   .dashboard-shell .hex-segment-control button[type="button"].is-active,
   .admin-app-shell .hex-segment-control button[type="button"].is-active {
-    background: hsl(var(--btn-primary)) !important;
+    background: hsl(var(--primary) / 0.1) !important;
+    color: hsl(var(--primary)) !important;
   }
   .dashboard-shell .hex-segment-control button[type="button"]:hover,
   .admin-app-shell .hex-segment-control button[type="button"]:hover {
-    filter: brightness(1.06);
+    background: hsl(var(--muted)) !important;
+    color: hsl(var(--foreground)) !important;
   }
 
-  /* Premium panel — near-white surface, hairline border, soft layered shadow */
   .panel-edge,
   .surface-panel {
-    @apply bg-card text-card-foreground rounded-[18px] border border-border shadow-card;
+    @apply bg-card text-card-foreground rounded-xl border border-border;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
   }
   .dark .panel-edge,
   .dark .surface-panel {
@@ -548,7 +533,7 @@
   /* ── Modern data tables (all pages via [data-table-craft]) ──────────────
      One shell: toolbar → filters → rows → pagination. Hugs content. */
   [data-table-craft] {
-    --dt-row-h: 58px;
+    --dt-row-h: 46px;
     --dt-head-h: 46px;
     --dt-pad-x: 1.125rem;
     --dt-radius: 1rem;
@@ -659,20 +644,20 @@
     border-color: hsl(var(--border));
   }
   [data-table-craft] > .max-md\:hidden button {
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     height: var(--dt-control-h);
     font-size: 0.8125rem;
     font-weight: 600;
-    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
   }
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) {
-    background: #092c4c !important;
-    border: none !important;
-    color: #ffffff !important;
+    background: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
     box-shadow: none;
   }
   .dark [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) {
-    background: hsl(0 0% 16%) !important;
+    background: hsl(var(--card)) !important;
     border: 1px solid hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
   }
@@ -681,16 +666,18 @@
   }
 
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) svg {
-    color: #ffffff !important;
+    color: hsl(var(--muted-foreground)) !important;
   }
   [data-table-craft] > .max-md\:hidden button:hover {
-    filter: brightness(1.08);
+    background: hsl(var(--muted)) !important;
+    border-color: hsl(var(--primary) / 0.3) !important;
+    color: hsl(var(--primary)) !important;
   }
 
   /* Faceted filter pills — compact, single-row with search */
   [data-table-craft] > .max-md\:hidden button[role="combobox"],
   [data-table-craft] button[role="combobox"] {
-    border-radius: 5px !important;
+    border-radius: var(--radius-control) !important;
     padding-inline: 0.75rem;
     background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
@@ -914,7 +901,7 @@
     height: var(--dt-control-h);
     background: hsl(0 0% 100%);
     border-color: hsl(var(--input));
-    border-radius: 5px;
+    border-radius: var(--radius-control);
     font-size: 0.9375rem;
   }
   .dark [data-table-craft] button[role="combobox"] {
@@ -938,7 +925,7 @@
   [data-table-craft] nav[aria-label] [data-radix-select-trigger] {
     height: 2rem !important;
     min-height: 2rem !important;
-    border-radius: 5px !important;
+    border-radius: var(--radius-control) !important;
     font-size: 0.8125rem !important;
     font-weight: 600 !important;
     background: hsl(var(--card)) !important;
@@ -959,7 +946,7 @@
 
   /* Page controls — outline style (not solid navy blocks) */
   [data-table-craft] nav[aria-label] button:not([role="combobox"]) {
-    border-radius: 5px !important;
+    border-radius: var(--radius-control) !important;
     height: 2rem !important;
     min-width: 2rem !important;
     min-height: 2rem !important;
@@ -985,14 +972,14 @@
     color: hsl(var(--primary)) !important;
   }
 
-  /* Active page — Dreams orange */
+  /* Active page — primary blue */
   [data-table-craft] nav[aria-label] button[aria-current="page"],
   [data-table-craft] nav[aria-label] button.bg-brand,
   [data-table-craft] nav[aria-label] button.bg-primary {
-    background: #fe9f43 !important;
-    border-color: #e88a2a !important;
+    background: hsl(var(--primary)) !important;
+    border-color: hsl(var(--primary-hover, var(--primary))) !important;
     color: #ffffff !important;
-    box-shadow: 0 1px 2px rgba(254, 159, 67, 0.35) !important;
+    box-shadow: none !important;
   }
   [data-table-craft] nav[aria-label] button[aria-current="page"] svg,
   [data-table-craft] nav[aria-label] button.bg-brand svg,
@@ -1164,14 +1151,11 @@
 
   /* Card hover — Hexalyte elevation */
   .card-hover {
-    @apply transition-all duration-150 ease-out hover:-translate-y-0.5;
+    @apply transition-colors duration-150;
   }
   .card-hover:hover {
     background: hsl(var(--card-hover));
-    box-shadow: 0 8px 28px rgba(15, 23, 42, 0.08);
-  }
-  .dark .card-hover:hover {
-    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+    border-color: hsl(var(--primary) / 0.15);
   }
 
   /* Input focus glow */

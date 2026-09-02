@@ -10,8 +10,8 @@ import { ExternalLink, Filter } from "lucide-react";
 import { APP_NAME } from "@/lib/constants";
 
 const STATUS_STYLE: Record<CapabilityStatus, string> = {
-  live: "bg-emerald-500/15 text-emerald-700 border-emerald-500/30",
-  partial: "bg-amber-500/15 text-amber-700 border-amber-500/30",
+  live: "bg-emerald-500/10 text-emerald-700 border-emerald-500/30",
+  partial: "bg-amber-500/10 text-amber-700 border-amber-500/30",
   planned: "bg-slate-500/10 text-slate-600 border-slate-500/20",
 };
 

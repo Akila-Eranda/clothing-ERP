@@ -325,7 +325,7 @@ export default function PODetailPage() {
 
       {/* ── Meta + Supplier + Totals ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
+        <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
           <CardContent className="p-5 space-y-4">
             <h3 className="text-sm font-bold">Order Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
@@ -358,7 +358,7 @@ export default function PODetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
+        <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
           <CardContent className="p-5 space-y-4">
             <div className="flex items-center justify-between gap-2">
               <h3 className="text-sm font-bold">Supplier</h3>
@@ -396,7 +396,7 @@ export default function PODetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
+        <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] xl:col-span-1">
           <CardContent className="p-5 space-y-3">
             <h3 className="text-sm font-bold">Financial Summary</h3>
             {[
@@ -430,7 +430,7 @@ export default function PODetailPage() {
       </div>
 
       {/* ── Items table ── */}
-      <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+      <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
         <div className="flex items-center justify-between gap-3 border-b px-5 py-4">
           <div>
             <h3 className="text-sm font-bold">Order Items</h3>
@@ -493,7 +493,7 @@ export default function PODetailPage() {
 
       {/* ── Bottom row ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="p-5">
             <h3 className="text-sm font-bold mb-4">Audit Trail</h3>
             <div className="space-y-3">
@@ -511,7 +511,7 @@ export default function PODetailPage() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="p-5">
             <h3 className="text-sm font-bold mb-5">Order Progress</h3>
             <StatusTimeline status={po.status} orderDate={po.orderDate} />

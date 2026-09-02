@@ -330,9 +330,9 @@ export function FinancialPeriodsHub() {
       {loading && !years.length ? (
         <LoadingCenter className="py-16" />
       ) : !years.length ? (
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <CardContent className="p-12 text-center space-y-3">
-            <div className="mx-auto h-12 w-12 rounded-[14px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+            <div className="mx-auto h-12 w-12 rounded-[14px] bg-primary/10 text-blue-600 flex items-center justify-center">
               <CalendarRange className="h-6 w-6" />
             </div>
             <p className="text-sm text-muted-foreground">No fiscal year yet. Create one to generate 12 monthly periods.</p>
@@ -373,9 +373,9 @@ export function FinancialPeriodsHub() {
           {tab === "periods" && selected && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-                <Card className="rounded-[18px] border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent">
+                <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <CardContent className="h-[72px] p-4 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-[12px] bg-emerald-500/15 flex items-center justify-center shrink-0">
+                    <div className="h-9 w-9 rounded-[12px] bg-emerald-500/10 flex items-center justify-center shrink-0">
                       <Unlock className="h-[18px] w-[18px] text-emerald-600" />
                     </div>
                     <div className="min-w-0">
@@ -384,9 +384,9 @@ export function FinancialPeriodsHub() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[18px] border-amber-200/70 bg-gradient-to-br from-amber-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent">
+                <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <CardContent className="h-[72px] p-4 flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-[12px] bg-amber-500/15 flex items-center justify-center shrink-0">
+                    <div className="h-9 w-9 rounded-[12px] bg-amber-500/10 flex items-center justify-center shrink-0">
                       <Lock className="h-[18px] w-[18px] text-amber-600" />
                     </div>
                     <div className="min-w-0">
@@ -395,7 +395,7 @@ export function FinancialPeriodsHub() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[18px] border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent">
+                <Card className="rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                   <CardContent className="h-[72px] p-4 flex items-center gap-3">
                     <div className="h-9 w-9 rounded-[12px] bg-indigo-500/15 flex items-center justify-center shrink-0">
                       <CalendarRange className="h-[18px] w-[18px] text-indigo-600" />
@@ -406,7 +406,7 @@ export function FinancialPeriodsHub() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-[18px] border-slate-200/70 bg-gradient-to-br from-slate-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
+                <Card className="rounded-xl border-slate-200/70 bg-gradient-to-br from-slate-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
                   <CardContent className="h-[72px] p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[11px] text-muted-foreground font-medium">Bulk action</p>
@@ -424,10 +424,10 @@ export function FinancialPeriodsHub() {
                 </Card>
               </div>
 
-              <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+              <Card className="rounded-xl overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-[10px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+                    <div className="h-8 w-8 rounded-[10px] bg-primary/10 text-blue-600 flex items-center justify-center">
                       <CalendarRange className="h-4 w-4" />
                     </div>
                     <h3 className="text-sm font-semibold">Monthly periods</h3>
@@ -487,7 +487,7 @@ export function FinancialPeriodsHub() {
               </Card>
 
               {selected.status === "CLOSED" && (
-                <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+                <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
                   <CardContent className="p-4 flex items-center justify-between flex-wrap gap-3">
                     <div>
                       <h3 className="text-sm font-semibold">Year closed</h3>
@@ -509,10 +509,10 @@ export function FinancialPeriodsHub() {
               )}
 
               {selected.status === "OPEN" && (
-                <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+                <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
                   <div className="flex items-center justify-between flex-wrap gap-3 px-4 py-3 border-b bg-muted/30">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="h-8 w-8 rounded-[10px] bg-red-500/15 text-red-600 flex items-center justify-center shrink-0">
+                      <div className="h-8 w-8 rounded-[10px] bg-red-500/10 text-red-600 flex items-center justify-center shrink-0">
                         <ShieldCheck className="h-4 w-4" />
                       </div>
                       <div className="min-w-0">
@@ -583,7 +583,7 @@ export function FinancialPeriodsHub() {
           )}
 
           {tab === "settings" && selected && (
-            <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+            <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
               <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
                 <div className="h-8 w-8 rounded-[10px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
                   <Settings2 className="h-4 w-4" />

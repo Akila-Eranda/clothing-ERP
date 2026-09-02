@@ -1,20 +1,21 @@
 "use client";
 
-import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
+import { Loading, LoadingCenter } from "@/components/ui/loading";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   AlertTriangle, CalendarClock, CheckCircle2, Clock, FileBarChart, Loader2,
-  Package, RefreshCw, Scale, ShieldCheck, Skull, TrendingDown,
+  Package, RefreshCw, Scale, ShieldCheck, Skull, TrendingDown, ScrollText, List,
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
-import { PageKpiGrid, PAGE_KPI_PRESETS, pageKpi } from "@/components/ui/page-kpi";
+import { PageHeader, PageKpiGrid, pageKpi, type PageKpiItem } from "@/components/ui/page-kpi";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { formatNumber } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 import { useShopWorkspace, hasExpiryTracking, hasBatchTracking } from "@/lib/use-shop-profile";
 import { useRouter } from "next/navigation";
 import {
@@ -26,13 +27,34 @@ import {
 export type ExpirySection = "dashboard" | "near" | "expired" | "lots" | "transactions" | "reconcile";
 
 const SECTION_META: Record<ExpirySection, { title: string; description: string }> = {
-  dashboard: { title: "Expiry Dashboard", description: "Urgent lots needing attention" },
-  near: { title: "Near Expiry", description: "Lots approaching expiry soon" },
-  expired: { title: "Expired", description: "Expired stock blocked at POS when enabled" },
-  lots: { title: "All Active Lots", description: "Every active batch/lot on hand" },
-  transactions: { title: "Batch Transactions", description: "Lot movement history" },
-  reconcile: { title: "Reconciliation", description: "Compare on-hand vs lot quantities" },
+  dashboard: { title: "Expiry Dashboard", description: "Urgent lots needing attention across your inventory" },
+  near: { title: "Near Expiry", description: "Lots approaching expiry — dispose or adjust before they expire" },
+  expired: { title: "Expired Stock", description: "Expired batches blocked at POS when policy is enabled" },
+  lots: { title: "All Active Lots", description: "Every active batch and lot currently on hand" },
+  transactions: { title: "Batch Transactions", description: "Lot movement and adjustment history" },
+  reconcile: { title: "Lot Reconciliation", description: "Compare branch on-hand quantities vs lot totals" },
 };
+
+const EXPIRY_NAV: { section: ExpirySection; label: string; href: string; icon: typeof CalendarClock }[] = [
+  { section: "dashboard", label: "Dashboard", href: "/inventory/expiry", icon: CalendarClock },
+  { section: "near", label: "Near Expiry", href: "/inventory/expiry/near", icon: AlertTriangle },
+  { section: "expired", label: "Expired", href: "/inventory/expiry/expired", icon: Skull },
+  { section: "lots", label: "All Lots", href: "/inventory/expiry/lots", icon: List },
+  { section: "transactions", label: "Transactions", href: "/inventory/expiry/transactions", icon: ScrollText },
+  { section: "reconcile", label: "Reconcile", href: "/inventory/expiry/reconcile", icon: Scale },
+];
+
+function sumLotQty(rows: LotRow[]) {
+  return rows.reduce((s, r) => s + r.quantity, 0);
+}
+
+function sumLotAvail(rows: LotRow[]) {
+  return rows.reduce((s, r) => s + r.availableQty, 0);
+}
+
+function sumLotValue(rows: LotRow[]) {
+  return rows.reduce((s, r) => s + (r.value ?? r.quantity * (r.unitCost || 0)), 0);
+}
 
 interface LotRow {
   id: string;
@@ -264,9 +286,7 @@ function buildTxnColumns(): ColumnDef<BatchTxn>[] {
       id: "type",
       accessorKey: "movementType",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-      cell: ({ row }) => (
-        <Badge variant="secondary" className="text-[9px]">{row.original.movementType}</Badge>
-      ),
+      cell: ({ row }) => <TableValueBadge label={row.original.movementType} />,
     },
     {
       id: "qty",
@@ -398,12 +418,20 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
         setDash(dashRes.data ?? null);
       }
       if (section === "lots") {
-        const lotsRes = await api.get("/inventory/lots?limit=500");
+        const [lotsRes, dashRes] = await Promise.all([
+          api.get("/inventory/lots?limit=500"),
+          api.get<ExpiryDashboard>("/inventory/lots/expiry-dashboard"),
+        ]);
         setLots(unwrapLots(lotsRes.data));
+        setDash(dashRes.data ?? null);
       }
       if (section === "transactions") {
-        const txnRes = await api.get("/inventory/lots/transactions?limit=200");
+        const [txnRes, dashRes] = await Promise.all([
+          api.get("/inventory/lots/transactions?limit=200"),
+          api.get<ExpiryDashboard>("/inventory/lots/expiry-dashboard"),
+        ]);
         setTxns(unwrapList<BatchTxn>(txnRes.data));
+        setDash(dashRes.data ?? null);
       }
       if (section === "reconcile") {
         const recRes = await api.get<{ summary: ReconcileSummary; mismatches: ReconcileRow[] }>("/inventory/lots/reconcile");
@@ -431,69 +459,75 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
     }
   };
 
+  const sectionKpis = useMemo((): PageKpiItem[] => {
+    if (section === "dashboard") {
+      return [
+        { ...pageKpi("Expired Qty", formatNumber(dash?.summary.expired.qty ?? 0), Skull, "danger"), sub: `${dash?.summary.expired.lots ?? 0} lots`, href: "/inventory/expiry/expired" },
+        { ...pageKpi("Near Expiry (≤7d)", formatNumber(dash?.summary.within7Days.qty ?? 0), AlertTriangle, "warning"), sub: `${dash?.summary.within7Days.lots ?? 0} lots`, href: "/inventory/expiry/near" },
+        { ...pageKpi("8–30 Days", formatNumber(dash?.summary.within30Days.qty ?? 0), Clock, "warning"), sub: `${dash?.summary.within30Days.lots ?? 0} lots`, href: "/inventory/expiry/near" },
+        { ...pageKpi("Matched SKUs", reconcile?.summary.matched ?? 0, CheckCircle2, "success"), sub: `${reconcile?.summary.totalSkus ?? 0} total`, href: "/inventory/expiry/reconcile" },
+      ];
+    }
+    if (section === "near") {
+      const critical = nearLots.filter((l) => l.daysToExpiry != null && l.daysToExpiry <= 7).length;
+      return [
+        { ...pageKpi("Lots in Window", nearLots.length, Package, "warning"), sub: `Within ${nearDays} days` },
+        { ...pageKpi("Total Qty", formatNumber(sumLotQty(nearLots)), AlertTriangle, "warning"), sub: "Units at risk" },
+        { ...pageKpi("Critical ≤7d", critical, Clock, "danger"), sub: "Needs urgent action" },
+        { ...pageKpi("Est. Value", `LKR ${formatNumber(sumLotValue(nearLots))}`, TrendingDown, "primary"), sub: "Stock value" },
+      ];
+    }
+    if (section === "expired") {
+      return [
+        { ...pageKpi("Expired Lots", expiredLots.length, Skull, "danger"), sub: `${formatNumber(sumLotQty(expiredLots))} units` },
+        { ...pageKpi("Expired Value", `LKR ${formatNumber(dash?.summary.expired.value ?? sumLotValue(expiredLots))}`, TrendingDown, "danger"), sub: "Write-off exposure" },
+        { ...pageKpi("POS Block", dash?.policy?.posBlockExpired ? "ON" : "OFF", ShieldCheck, dash?.policy?.posBlockExpired ? "success" : "warning"), sub: "Expired sales policy" },
+        { ...pageKpi("Available Qty", formatNumber(sumLotAvail(expiredLots)), Package, "neutral"), sub: "Still on hand" },
+      ];
+    }
+    if (section === "lots") {
+      const skus = new Set(lots.map((l) => l.variant.sku)).size;
+      return [
+        { ...pageKpi("Active Lots", lots.length, Package, "primary"), sub: `${skus} SKUs` },
+        { ...pageKpi("Total Qty", formatNumber(sumLotQty(lots)), List, "info"), sub: "On hand" },
+        { ...pageKpi("Available", formatNumber(sumLotAvail(lots)), CheckCircle2, "success"), sub: "Sellable units" },
+        { ...pageKpi("Stock Value", `LKR ${formatNumber(sumLotValue(lots))}`, TrendingDown, "neutral"), sub: "At cost" },
+      ];
+    }
+    if (section === "transactions") {
+      const inbound = txns.filter((t) => t.quantityChange > 0).length;
+      const outbound = txns.filter((t) => t.quantityChange < 0).length;
+      const net = txns.reduce((s, t) => s + t.quantityChange, 0);
+      return [
+        { ...pageKpi("Movements", txns.length, ScrollText, "neutral"), sub: "Recent entries" },
+        { ...pageKpi("Inbound", inbound, TrendingDown, "success"), sub: "Qty increases" },
+        { ...pageKpi("Outbound", outbound, AlertTriangle, "danger"), sub: "Qty decreases" },
+        { ...pageKpi("Net Qty Δ", net > 0 ? `+${net}` : String(net), Scale, net >= 0 ? "primary" : "warning"), sub: "Period total" },
+      ];
+    }
+    if (section === "reconcile") {
+      return [
+        { ...pageKpi("Matched", reconcile?.summary.matched ?? 0, CheckCircle2, "success"), sub: `${reconcile?.summary.totalSkus ?? 0} SKUs checked` },
+        { ...pageKpi("Lot Short", reconcile?.summary.lotShort ?? 0, TrendingDown, "warning"), sub: "Below on-hand" },
+        { ...pageKpi("Lot Over", reconcile?.summary.lotOver ?? 0, AlertTriangle, "warning"), sub: "Above on-hand" },
+        { ...pageKpi("No Lots", reconcile?.summary.noLots ?? 0, Package, "danger"), sub: "Missing batch data" },
+      ];
+    }
+    return [];
+  }, [section, dash, reconcile, nearLots, nearDays, expiredLots, lots, txns]);
+
   if (!showExpiry && !showBatch) {
     return (
-      <div className="p-6 max-w-lg mx-auto text-center space-y-3">
-        <CalendarClock className="h-10 w-10 mx-auto text-muted-foreground" />
-        <h1 className="text-xl font-bold">Expiry tracking not enabled</h1>
-        <p className="text-sm text-muted-foreground">
-          This shop type does not use batch/expiry modules. Switch to Grocery or Agriculture, or enable expiry in vertical settings.
-        </p>
-        <Button variant="outline" onClick={() => router.push("/inventory")}>Back to Inventory</Button>
+      <div className="page-shell">
+        <EmptyState
+          icon={CalendarClock}
+          title="Expiry tracking not enabled"
+          description="This shop type does not use batch/expiry modules. Switch to Grocery or Agriculture, or enable expiry in vertical settings."
+          action={<Button variant="outline" size="sm" onClick={() => router.push("/inventory")}>Back to Inventory</Button>}
+        />
       </div>
     );
   }
-
-  const showSummaryStats = section === "dashboard";
-  const STATS = [
-    {
-      label: "Expired Qty",
-      value: formatNumber(dash?.summary.expired.qty ?? 0),
-      sub: `${dash?.summary.expired.lots ?? 0} lots`,
-      icon: Skull,
-      color: "text-red-600 dark:text-red-400",
-      bg: "bg-red-500/15",
-      tint: PAGE_KPI_PRESETS.red.tint,
-      href: "/inventory/expiry/expired",
-    },
-    {
-      label: "Near Expiry (≤7d)",
-      value: formatNumber(dash?.summary.within7Days.qty ?? 0),
-      sub: `${dash?.summary.within7Days.lots ?? 0} lots`,
-      icon: AlertTriangle,
-      color: "text-amber-600 dark:text-amber-400",
-      bg: "bg-amber-500/15",
-      tint: PAGE_KPI_PRESETS.amber.tint,
-      href: "/inventory/expiry/near",
-    },
-    {
-      label: "8–30 Days",
-      value: formatNumber(dash?.summary.within30Days.qty ?? 0),
-      sub: `${dash?.summary.within30Days.lots ?? 0} lots`,
-      icon: Clock,
-      color: "text-orange-600 dark:text-orange-400",
-      bg: "bg-orange-500/15",
-      tint: PAGE_KPI_PRESETS.orange.tint,
-      href: "/inventory/expiry/near",
-    },
-    {
-      label: "Matched SKUs",
-      value: reconcile?.summary.matched ?? 0,
-      sub: `${reconcile?.summary.totalSkus ?? 0} total`,
-      icon: CheckCircle2,
-      color: "text-emerald-600 dark:text-emerald-400",
-      bg: "bg-emerald-500/15",
-      tint: PAGE_KPI_PRESETS.emerald.tint,
-      href: "/inventory/expiry/reconcile",
-    },
-  ];
-
-  const RECONCILE_KPI = [
-    pageKpi("Matched", reconcile?.summary.matched ?? 0, CheckCircle2, "emerald"),
-    pageKpi("Lot Short", reconcile?.summary.lotShort ?? 0, TrendingDown, "amber"),
-    pageKpi("Lot Over", reconcile?.summary.lotOver ?? 0, AlertTriangle, "orange"),
-    pageKpi("No Lots", reconcile?.summary.noLots ?? 0, Package, "red"),
-  ];
 
   const lotSearch = [
     { id: "product", title: "Product" },
@@ -502,70 +536,97 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
   ];
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{meta.title}</h1>
-          <p className="text-sm text-muted-foreground">
-            {profile.label} · {meta.description}
-            {section === "dashboard" && reconcile?.summary?.strategy ? ` · ${reconcile.summary.strategy}` : ""}
-          </p>
-        </div>
-        <div className="flex gap-2 flex-wrap">
-          {section === "near" && (
-            <div className="flex rounded-lg border overflow-hidden">
-              {[7, 30, 90].map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setNearDays(d)}
-                  className={`px-3 h-8 text-xs font-semibold transition-colors ${
-                    nearDays === d ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                  }`}
-                >
-                  ≤{d}d
-                </button>
-              ))}
-            </div>
-          )}
-          <Button variant="outline" size="sm" onClick={load} className="gap-1.5">
-            <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/reports/expiry")} className="gap-1.5">
-            <FileBarChart className="h-3.5 w-3.5" /> Expiry Reports
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => router.push("/inventory")} className="gap-1.5">
-            <Package className="h-3.5 w-3.5" /> Inventory
-          </Button>
-        </div>
-      </div>
+    <div className="page-shell space-y-4">
+      <PageHeader
+        title={meta.title}
+        description={`${profile.label} · ${meta.description}${section === "dashboard" && reconcile?.summary?.strategy ? ` · ${reconcile.summary.strategy}` : ""}`}
+        onRefresh={load}
+        refreshing={loading}
+        actions={(
+          <>
+            {section === "near" && (
+              <div className="flex rounded-lg border border-border overflow-hidden bg-card">
+                {[7, 30, 90].map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setNearDays(d)}
+                    className={cn(
+                      "px-3 h-9 text-xs font-semibold transition-colors",
+                      nearDays === d ? "bg-primary text-primary-foreground" : "hover:bg-muted text-muted-foreground",
+                    )}
+                  >
+                    ≤{d}d
+                  </button>
+                ))}
+              </div>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/reports/expiry")}
+              className="gap-1.5"
+            >
+              <FileBarChart className="h-4 w-4" /> Expiry Reports
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/inventory")}
+              className="gap-1.5"
+            >
+              <Package className="h-4 w-4" /> Inventory
+            </Button>
+          </>
+        )}
+      />
 
-      {section === "dashboard" && dash?.policy && (
-        <div className="flex flex-wrap gap-2">
-          <Badge variant={dash.policy.posBlockExpired ? "default" : "warning"} className="gap-1 text-[10px]">
-            <ShieldCheck className="h-3 w-3" />
-            POS Block Expired: {dash.policy.posBlockExpired ? "ON" : "OFF"}
-          </Badge>
-          <Badge variant="outline" className="text-[10px]">
-            Allocation: {dash.policy.lotAllocation}
-            {dash.policy.fefoSales ? " · FEFO sales" : ""}
-          </Badge>
-          {dash.summary.expired.value != null && (
-            <Badge variant="outline" className="text-[10px] gap-1">
-              <TrendingDown className="h-3 w-3" />
-              Expired value LKR {formatNumber(dash.summary.expired.value)}
-            </Badge>
-          )}
-          {dash.summary.nearExpiryValue != null && (
-            <Badge variant="outline" className="text-[10px]">
-              Near-expiry value LKR {formatNumber(dash.summary.nearExpiryValue)}
-            </Badge>
-          )}
-        </div>
+      <nav className="flex flex-wrap gap-0 border-b border-border -mx-1 px-1">
+        {EXPIRY_NAV.map((item) => {
+          const Icon = item.icon;
+          const active = section === item.section;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-b-2 -mb-px transition-colors",
+                active
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+              )}
+            >
+              <Icon className="h-3.5 w-3.5 shrink-0" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <PageKpiGrid items={sectionKpis} loading={loading} />
+
+      {section === "near" && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Showing lots expiring within {nearDays} days. Dispose write-offs or adjust quantities from row actions.
+        </p>
       )}
 
-      {showSummaryStats && (
-        <PageKpiGrid items={STATS} />
+      {section === "expired" && (
+        <p className="text-xs text-muted-foreground -mt-1">
+          Expired stock is blocked at POS when Block Expired is ON. Use Dispose to write off as damage.
+        </p>
+      )}
+
+      {section === "reconcile" && (
+        <div className="flex flex-wrap items-center justify-between gap-3 -mt-1">
+          <p className="text-xs text-muted-foreground">
+            Compare branch on-hand vs lot quantities. LOT_SHORT / NO_LOTS can be synced into an UNLOTTED-SYNC lot.
+          </p>
+          <Button size="sm" onClick={syncUnlotted} disabled={syncing} className="gap-1.5 shrink-0">
+            {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scale className="h-4 w-4" />}
+            Sync Unlotted → Lots
+          </Button>
+        </div>
       )}
 
       {section === "dashboard" && (
@@ -585,45 +646,35 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       )}
 
       {section === "near" && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Showing lots expiring within {nearDays} days. Dispose write-offs or adjust quantities from Actions.
-          </p>
-          {loading ? (
-            <LoadingCenter />
-          ) : (
-            <ClientSideTable
-          fillHeight={false}
-              data={nearLots}
-              columns={lotColumns}
-              pageCount={Math.ceil(nearLots.length / 10) || 1}
-              searchableColumns={lotSearch}
-              filterableColumns={[]}
-              isShowExportButtons={{ isShow: true, fileName: "expiry-near" }}
-            />
-          )}
-        </div>
+        loading ? (
+          <LoadingCenter />
+        ) : (
+          <ClientSideTable
+            fillHeight={false}
+            data={nearLots}
+            columns={lotColumns}
+            pageCount={Math.ceil(nearLots.length / 10) || 1}
+            searchableColumns={lotSearch}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "expiry-near" }}
+          />
+        )
       )}
 
       {section === "expired" && (
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            Expired stock is blocked at POS when Block Expired is ON. Use Dispose to write off as Damage.
-          </p>
-          {loading ? (
-            <LoadingCenter />
-          ) : (
-            <ClientSideTable
-          fillHeight={false}
-              data={expiredLots}
-              columns={lotColumns}
-              pageCount={Math.ceil(expiredLots.length / 10) || 1}
-              searchableColumns={lotSearch}
-              filterableColumns={[]}
-              isShowExportButtons={{ isShow: true, fileName: "expiry-expired" }}
-            />
-          )}
-        </div>
+        loading ? (
+          <LoadingCenter />
+        ) : (
+          <ClientSideTable
+            fillHeight={false}
+            data={expiredLots}
+            columns={lotColumns}
+            pageCount={Math.ceil(expiredLots.length / 10) || 1}
+            searchableColumns={lotSearch}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "expiry-expired" }}
+          />
+        )
       )}
 
       {section === "lots" && (
@@ -663,37 +714,23 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       )}
 
       {section === "reconcile" && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-muted-foreground">
-              Compare branch on-hand vs lot quantities. LOT_SHORT / NO_LOTS can be synced into an UNLOTTED-SYNC lot.
-            </p>
-            <Button size="sm" onClick={syncUnlotted} disabled={syncing} className="gap-1.5">
-              {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Scale className="h-3.5 w-3.5" />}
-              Sync Unlotted → Lots
-            </Button>
-          </div>
-
-          <PageKpiGrid items={RECONCILE_KPI} />
-
-          {loading ? (
-            <LoadingCenter />
-          ) : (
-            <ClientSideTable
-          fillHeight={false}
-              data={reconcile?.mismatches ?? []}
-              columns={reconcileColumns}
-              pageCount={Math.ceil((reconcile?.mismatches?.length ?? 0) / 10) || 1}
-              searchableColumns={[
-                { id: "name", title: "Product" },
-                { id: "sku", title: "SKU" },
-                { id: "status", title: "Status" },
-              ]}
-              filterableColumns={[]}
-              isShowExportButtons={{ isShow: true, fileName: "lot-reconcile" }}
-            />
-          )}
-        </div>
+        loading ? (
+          <LoadingCenter />
+        ) : (
+          <ClientSideTable
+            fillHeight={false}
+            data={reconcile?.mismatches ?? []}
+            columns={reconcileColumns}
+            pageCount={Math.ceil((reconcile?.mismatches?.length ?? 0) / 10) || 1}
+            searchableColumns={[
+              { id: "name", title: "Product" },
+              { id: "sku", title: "SKU" },
+              { id: "status", title: "Status" },
+            ]}
+            filterableColumns={[]}
+            isShowExportButtons={{ isShow: true, fileName: "lot-reconcile" }}
+          />
+        )
       )}
 
       <LotActionModal

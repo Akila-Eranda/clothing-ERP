@@ -45,16 +45,16 @@ const STATUS_MAP: Record<string, { variant: TableStatusVariant; label?: string }
   NEGATIVE: { variant: "danger", label: "Negative" },
   IN_TRANSIT: { variant: "info", label: "In Transit" },
 
-  PENDING: { variant: "info", label: "Pending" },
-  PENDING_APPROVAL: { variant: "info", label: "Pending" },
-  INITIATED: { variant: "info", label: "Pending" },
+  PENDING: { variant: "warning", label: "Pending" },
+  PENDING_APPROVAL: { variant: "warning", label: "Pending" },
+  INITIATED: { variant: "warning", label: "Pending" },
   CONFIRMED: { variant: "info", label: "Ordered" },
   SENT: { variant: "info", label: "Ordered" },
   ORDERED: { variant: "info", label: "Ordered" },
   IN_PROGRESS: { variant: "info", label: "In Progress" },
 
-  PARTIALLY_RECEIVED: { variant: "gold", label: "Partial" },
-  PARTIALLY_PAID: { variant: "gold", label: "Partial" },
+  PARTIALLY_RECEIVED: { variant: "warning", label: "Partial" },
+  PARTIALLY_PAID: { variant: "warning", label: "Partial" },
   DRAFT: { variant: "secondary", label: "Draft" },
   INACTIVE: { variant: "secondary", label: "Inactive" },
   CLOSED: { variant: "secondary", label: "Closed" },
@@ -66,10 +66,10 @@ const STATUS_MAP: Record<string, { variant: TableStatusVariant; label?: string }
   VOID: { variant: "danger", label: "Void" },
   EXPIRED: { variant: "danger", label: "Expired" },
 
-  CONVERTED: { variant: "purple", label: "Converted" },
+  CONVERTED: { variant: "info", label: "Converted" },
   SUSPENDED: { variant: "warning", label: "Suspended" },
   UNPAID: { variant: "danger", label: "Unpaid" },
-  PARTIAL: { variant: "gold", label: "Partial" },
+  PARTIAL: { variant: "warning", label: "Partial" },
 };
 
 /** Semantic colors for categorical column values (type, category, channel, etc.) */
@@ -141,12 +141,9 @@ const VALUE_MAP: Record<string, TableStatusVariant> = {
 
 const VALUE_PALETTE: TableStatusVariant[] = [
   "info",
-  "teal",
-  "purple",
-  "gold",
   "success",
   "warning",
-  "default",
+  "secondary",
   "danger",
 ];
 
@@ -170,7 +167,7 @@ export function resolveValueVariant(value: string): TableStatusVariant {
 }
 
 function inferVariant(key: string): TableStatusVariant {
-  if (key.includes("PEND") || key.includes("INIT")) return "info";
+  if (key.includes("PEND") || key.includes("INIT")) return "warning";
   if (
     key.includes("RECEIV") ||
     key.includes("COMPLETE") ||
@@ -185,7 +182,7 @@ function inferVariant(key: string): TableStatusVariant {
   if (key.includes("CANCEL") || key.includes("REJECT") || key.includes("REFUND") || key.includes("VOID") || key.includes("FAIL")) {
     return "danger";
   }
-  if (key.includes("PARTIAL")) return "gold";
+  if (key.includes("PARTIAL")) return "warning";
   if (key.includes("DRAFT") || key.includes("INACTIVE") || key.includes("CLOSED")) return "secondary";
   return "secondary";
 }

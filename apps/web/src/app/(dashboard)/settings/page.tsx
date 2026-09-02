@@ -264,7 +264,7 @@ function AuditLogTab() {
   React.useEffect(() => { load(1); }, [load]);
 
   const totalPages = Math.ceil(total / 25);
-  const ACTION_COLORS: Record<string,string> = { CREATE:"bg-emerald-500/15 text-emerald-500", UPDATE:"bg-blue-500/15 text-blue-500", DELETE:"bg-red-500/15 text-red-500", DAY_END:"bg-violet-500/15 text-violet-500" };
+  const ACTION_COLORS: Record<string,string> = { CREATE:"bg-emerald-500/10 text-emerald-500", UPDATE:"bg-primary/10 text-blue-500", DELETE:"bg-red-500/10 text-red-500", DAY_END:"bg-slate-500/10 text-violet-500" };
 
   return (
     <TabsContent value="audit-log" className="mt-6">
@@ -1289,7 +1289,7 @@ export default function SettingsPage() {
                     key={t}
                     type="button"
                     onClick={() => setTheme(t)}
-                    className={`p-4 rounded-[18px] border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
+                    className={`p-4 rounded-xl border-2 text-sm font-medium transition-all capitalize flex flex-col items-center gap-2 ${active ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/50"}`}
                   >
                     <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${t === "dark" ? "bg-[#080C14]" : "bg-white border"}`} />
                     {t.charAt(0).toUpperCase() + t.slice(1)}
@@ -1314,7 +1314,7 @@ export default function SettingsPage() {
                       key={p.id}
                       type="button"
                       onClick={() => pickAccent(p.id)}
-                      className={`flex items-center gap-3 rounded-[18px] border-2 p-3 text-left transition-all ${
+                      className={`flex items-center gap-3 rounded-xl border-2 p-3 text-left transition-all ${
                         selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
                       }`}
                     >

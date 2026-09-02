@@ -477,10 +477,10 @@ export default function WarehousePage() {
   const lowStockTotal = dash?.totals.lowStockSkus ?? 0;
 
   const STATS = [
-    { label: "Warehouses", value: dash?.totals.warehouses ?? warehouses.length, icon: Warehouse, color: "text-blue-600", bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "On Hand Qty", value: formatNumber(dash?.totals.onHandQty ?? 0), icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Warehouses", value: dash?.totals.warehouses ?? warehouses.length, icon: Warehouse, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "On Hand Qty", value: formatNumber(dash?.totals.onHandQty ?? 0), icon: Package, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
     { label: "Stock Value", value: `LKR ${formatNumber(dash?.totals.stockValue ?? 0)}`, icon: CheckCircle2, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent" },
-    { label: "Open Transfers", value: dash?.totals.openTransfers ?? 0, icon: ArrowRightLeft, color: "text-amber-600", bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
+    { label: "Open Transfers", value: dash?.totals.openTransfers ?? 0, icon: ArrowRightLeft, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
   ];
 
   return (

@@ -326,9 +326,9 @@ function FiscalPanel() {
       </Dialog>
 
       {selected && (
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <div className="flex items-center gap-2.5 px-5 py-3 border-b bg-muted/30 rounded-t-[18px]">
-            <div className="h-8 w-8 rounded-[5px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-primary/10 text-blue-600 flex items-center justify-center">
               <CalendarRange className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Current fiscal year</h3>
@@ -432,9 +432,9 @@ function CurrencyPanel() {
   }
 
   return (
-    <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+    <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
       <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-        <div className="h-8 w-8 rounded-[5px] bg-amber-500/15 text-amber-600 flex items-center justify-center">
+        <div className="h-8 w-8 rounded-[5px] bg-amber-500/10 text-amber-600 flex items-center justify-center">
           <Coins className="h-4 w-4" />
         </div>
         <h3 className="text-sm font-semibold">Base currency</h3>
@@ -528,7 +528,7 @@ function NumberSeriesPanel() {
           const d = draftOf(r);
           const dirty = !!drafts[r.key];
           return (
-            <Card key={r.key} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+            <Card key={r.key} className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between flex-wrap gap-2">
                   <div>
@@ -759,7 +759,7 @@ function TaxSettingsPanel() {
       {loading ? (
         <LoadingCenter className="py-8" size={56} />
       ) : (
-        <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+        <Card className="rounded-xl overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
           <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
             <div className="flex items-center gap-2.5">
               <div className="h-8 w-8 rounded-[5px] bg-teal-500/15 text-teal-600 flex items-center justify-center">
@@ -892,7 +892,7 @@ function WorkflowPanel() {
         {defs.map((d) => {
           const open = expanded === d.key;
           return (
-            <Card key={d.key} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] ${open ? "lg:col-span-2" : ""}`}>
+            <Card key={d.key} className={`rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] ${open ? "lg:col-span-2" : ""}`}>
               <CardContent className="p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <button type="button" className="text-left" onClick={() => setExpanded(open ? null : d.key)}>
@@ -1042,7 +1042,7 @@ function PreferencesPanel() {
   return (
     <div className="space-y-4">
       <div className="grid lg:grid-cols-2 gap-4">
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
             <div className="h-8 w-8 rounded-[5px] bg-indigo-500/15 text-indigo-600 flex items-center justify-center">
               <ShieldCheck className="h-4 w-4" />
@@ -1117,9 +1117,9 @@ function PreferencesPanel() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
+        <Card className="rounded-xl shadow-[0_2px_10px_rgba(15,23,42,0.04)] overflow-hidden">
           <div className="flex items-center gap-2.5 px-4 py-3 border-b bg-muted/30">
-            <div className="h-8 w-8 rounded-[5px] bg-emerald-500/15 text-emerald-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-emerald-500/10 text-emerald-600 flex items-center justify-center">
               <Settings2 className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">Defaults</h3>
@@ -1256,10 +1256,10 @@ function MappingsPanel() {
           </Button>
         </div>
       </div>
-      <Card className="rounded-[18px] overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
+      <Card className="rounded-xl overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
         <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-[5px] bg-blue-500/15 text-blue-600 flex items-center justify-center">
+            <div className="h-8 w-8 rounded-[5px] bg-primary/10 text-blue-600 flex items-center justify-center">
               <Settings2 className="h-4 w-4" />
             </div>
             <h3 className="text-sm font-semibold">GL mappings</h3>

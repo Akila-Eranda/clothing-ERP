@@ -139,7 +139,7 @@ export function DreamsDateRangePicker({
             ))}
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="cursor-pointer rounded-none px-4 py-2.5 text-sm font-medium text-[#fe9f43]"
+              className="cursor-pointer rounded-none px-4 py-2.5 text-sm font-medium text-primary"
               onSelect={(e) => {
                 e.preventDefault();
                 setShowCalendar(true);
@@ -171,7 +171,7 @@ export function DreamsDateRangePicker({
               </button>
               <button
                 type="button"
-                className="text-xs font-semibold text-white bg-[#fe9f43] hover:bg-[#f08a2a] rounded-md px-3 py-1.5 disabled:opacity-50"
+                className="text-xs font-semibold text-white bg-primary hover:bg-primary/90 rounded-md px-3 py-1.5 disabled:opacity-50"
                 disabled={!draft?.from || !draft?.to}
                 onClick={applyCustom}
               >

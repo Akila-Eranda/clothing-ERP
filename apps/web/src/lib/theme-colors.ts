@@ -67,7 +67,7 @@ export type ThemeColorsState = {
 };
 
 export const THEME_COLORS_STORAGE_KEY = "hexalyte-theme-colors-v1";
-export const THEME_COLORS_STORE_VERSION = 5;
+export const THEME_COLORS_STORE_VERSION = 7;
 
 /** Near-white canvas values from older builds — migrate to DreamsPOS gray. */
 const LEGACY_LIGHT_CANVAS = new Set([
@@ -80,15 +80,15 @@ const LEGACY_LIGHT_CANVAS = new Set([
 
 export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   lightAccent: "blue",
-  customLightAccent: "#2563EB",
-  darkAccent: "orange",
-  customDarkAccent: "#FE9F43",
+  customLightAccent: "#1677FF",
+  darkAccent: "match-light",
+  customDarkAccent: "#1677FF",
 
-  lightBackground: "#F1F5F6",
+  lightBackground: "#F5F7FA",
   lightCard: "#FFFFFF",
-  lightForeground: "#212B36",
-  lightBorder: "#E6EAED",
-  lightMutedForeground: "#646B72",
+  lightForeground: "#1F2937",
+  lightBorder: "#E5E7EB",
+  lightMutedForeground: "#64748B",
 
   darkBackground: "#0D0D0D",
   darkCard: "#171717",
@@ -100,26 +100,26 @@ export const DEFAULT_THEME_COLORS: ThemeColorsState = {
   darkChromeFg: "#D8DFEE",
   darkChromeBorder: "#1F2228",
   darkChromeMuted: "#6B7280",
-  darkChromeActive: "#FE9F43",
+  darkChromeActive: "#1677FF",
   darkChromeLogoBg: "#141414",
 
   lightChromeBg: "#FFFFFF",
   lightChromeBgCss: "",
-  lightChromeFg: "#0F172A",
-  lightChromeBorder: "#E6EAED",
+  lightChromeFg: "#1F2937",
+  lightChromeBorder: "#E5E7EB",
   lightChromeMuted: "#64748B",
-  lightChromeActive: "#FE9F43",
+  lightChromeActive: "#1677FF",
   lightChromeLogoBg: "#FFFFFF",
 
   darkChromeBgCss: "",
 
-  buttonSecondary: "#092C4C",
-  buttonSecondaryHover: "#1E3A5F",
-  buttonSuccess: "#3EB780",
-  buttonDanger: "#E04F16",
-  buttonWarning: "#FE9F43",
+  buttonSecondary: "#64748B",
+  buttonSecondaryHover: "#475569",
+  buttonSuccess: "#10B981",
+  buttonDanger: "#EF4444",
+  buttonWarning: "#F59E0B",
   buttonDestructive: "#EF4444",
-  buttonInfo: "#155EEF",
+  buttonInfo: "#1677FF",
 };
 
 export function normalizeThemeColorsState(
@@ -137,6 +137,21 @@ export function normalizeThemeColorsState(
   merged.buttonWarning ??= DEFAULT_THEME_COLORS.buttonWarning;
   merged.buttonDestructive ??= DEFAULT_THEME_COLORS.buttonDestructive;
   merged.buttonInfo ??= DEFAULT_THEME_COLORS.buttonInfo;
+
+  const legacyOrange = new Set(["#fe9f43", "#e88a2a", "#ea580c", "#f97316"]);
+  if (legacyOrange.has(merged.lightChromeActive?.trim().toLowerCase() ?? "")) {
+    merged.lightChromeActive = DEFAULT_THEME_COLORS.lightChromeActive;
+  }
+  if (legacyOrange.has(merged.darkChromeActive?.trim().toLowerCase() ?? "")) {
+    merged.darkChromeActive = DEFAULT_THEME_COLORS.darkChromeActive;
+  }
+  if (merged.darkAccent === "orange") {
+    merged.darkAccent = "match-light";
+  }
+  if (legacyOrange.has(merged.customDarkAccent?.trim().toLowerCase() ?? "")) {
+    merged.customDarkAccent = DEFAULT_THEME_COLORS.customDarkAccent;
+  }
+
   return merged;
 }
 
@@ -260,7 +275,7 @@ function chromeFromPatch(
       active,
       logoBg: patch.darkChromeLogoBg ?? state.darkChromeLogoBg,
       hover: "rgba(255, 255, 255, 0.05)",
-      activeBg: hexToRgba(active, 0.14),
+      activeBg: hexToRgba(active, 0.08),
     };
   }
   const bgCss = (patch.lightChromeBgCss ?? state.lightChromeBgCss).trim();
@@ -274,7 +289,7 @@ function chromeFromPatch(
     active,
     logoBg: patch.lightChromeLogoBg ?? state.lightChromeLogoBg,
     hover: hexToRgba(fg, 0.06),
-    activeBg: hexToRgba(active, 0.1),
+    activeBg: hexToRgba(active, 0.08),
   };
 }
 

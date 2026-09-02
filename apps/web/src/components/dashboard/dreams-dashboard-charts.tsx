@@ -16,11 +16,11 @@ import {
 } from "recharts";
 import { formatNumber } from "@/lib/utils";
 
-const ORANGE = "#FE9F43";
-const ORANGE_LIGHT = "#FFE3CB";
-const TEAL = "#0E9384";
-const EXPENSE = "#E04F16";
-const REVENUE = "#0E9384";
+const ORANGE = "#1677FF";
+const ORANGE_LIGHT = "#DBEAFE";
+const TEAL = "#10B981";
+const EXPENSE = "#EF4444";
+const REVENUE = "#10B981";
 
 export type SalesPurchasePoint = { label: string; sales: number; purchase: number };
 
@@ -215,7 +215,7 @@ export function DreamsCategoryDonut({
   totalProducts: number;
   totalCategories: number;
 }) {
-  const colors = ["#FE9F43", "#E04F16", "#0E9384", "#6938EF", "#092C4C"];
+  const colors = ["#1677FF", "#10B981", "#64748B", "#F59E0B", "#EF4444"];
   const slices = categories.slice(0, 3).map((c, i) => ({
     name: c.name,
     value: c.count,

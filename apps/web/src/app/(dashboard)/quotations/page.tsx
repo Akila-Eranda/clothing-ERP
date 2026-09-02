@@ -568,10 +568,10 @@ export default function QuotationsPage() {
   );
 
   const STATS = [
-    { label: "Total Quotes",  value: quotes.length,  icon: FileText,     color: "text-blue-600",    bg: "bg-blue-500/15", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "Draft",         value: draftCount,     icon: Clock,        color: "text-amber-600",   bg: "bg-amber-500/15", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
-    { label: "Sent",          value: sentCount,      icon: Send,         color: "text-violet-600",  bg: "bg-violet-500/15", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
-    { label: "Pipeline Value", value: `LKR ${formatNumber(totalValue)}`, icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
+    { label: "Total Quotes",  value: quotes.length,  icon: FileText,     color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Draft",         value: draftCount,     icon: Clock,        color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
+    { label: "Sent",          value: sentCount,      icon: Send,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Pipeline Value", value: `LKR ${formatNumber(totalValue)}`, icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
   ];
 
   const columns = useMemo(
@@ -636,7 +636,7 @@ export default function QuotationsPage() {
 
         {/* Table */}
         {displayed.length === 0 && !loading ? (
-          <Card className="border-dashed rounded-[18px]">
+          <Card className="border-dashed rounded-xl">
             <CardContent className="p-10 flex flex-col items-center text-center gap-3">
               <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center">
                 <FileText className="h-7 w-7 text-primary" />

@@ -202,7 +202,7 @@ export default function CustomersPage() {
             icon: Crown,
             color: "text-amber-600",
             bg: "bg-amber-50 border border-amber-200",
-            tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
+            tint: "bg-card border-border",
           },
           {
             label: "Loyalty Points",
@@ -220,7 +220,7 @@ export default function CustomersPage() {
       icon: Wallet,
       color: "text-emerald-600",
       bg: "bg-emerald-50 border border-emerald-200",
-      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
   ];
 

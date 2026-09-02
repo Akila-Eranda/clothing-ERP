@@ -271,7 +271,7 @@ export default function SupplierPaymentsPage() {
             icon: Banknote,
           },
         ].map((item) => (
-          <Card key={item.label} className="rounded-[18px]">
+          <Card key={item.label} className="rounded-xl">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="h-10 w-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
                 <item.icon className="h-5 w-5" />
@@ -287,7 +287,7 @@ export default function SupplierPaymentsPage() {
         ))}
       </div>
 
-      <Card className="rounded-[18px]">
+      <Card className="rounded-xl">
         <CardContent className="p-4">
           <div className="flex items-center gap-2 flex-wrap mb-4">
             <Input type="date" value={range.start} onChange={(e) => setRange((r) => ({ ...r, start: e.target.value }))} className="w-36" />
