@@ -10,7 +10,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
-import { type Supplier } from "@/components/suppliers/add-supplier-modal";
+import { type Supplier, AddSupplierModal } from "@/components/suppliers/add-supplier-modal";
 import { useRouter } from "next/navigation";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy, type SupplierPageCopy } from "@/lib/shop-vertical";
@@ -131,6 +131,8 @@ export default function SuppliersPage() {
 
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading]     = useState(true);
+  const [modalOpen, setModalOpen]   = useState(false);
+  const [editSupplier, setEditSupplier] = useState<Supplier | undefined>();
 
   const fetchSuppliers = useCallback(async () => {
     setLoading(true);
@@ -166,7 +168,7 @@ export default function SuppliersPage() {
   const columns = buildColumns(
     copy,
     (s) => router.push(`/suppliers/${s.id}`),
-    (s) => router.push(`/suppliers/${s.id}/edit`),
+    (s) => { setEditSupplier(s); setModalOpen(true); },
     handleDelete,
   );
 
@@ -182,7 +184,7 @@ export default function SuppliersPage() {
             <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
           <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-          <Button className="gap-1.5" onClick={() => router.push("/suppliers/new")}>
+          <Button className="gap-1.5" onClick={() => { setEditSupplier(undefined); setModalOpen(true); }}>
             <Plus className="h-[18px] w-[18px]" /> {copy.addButton}
           </Button>
         </div>
@@ -237,6 +239,13 @@ export default function SuppliersPage() {
           ]}
           isShowExportButtons={{ isShow: true, fileName: copy.csvFileName }}
         />
+
+      <AddSupplierModal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setEditSupplier(undefined); }}
+        onSaved={() => { void fetchSuppliers(); setModalOpen(false); setEditSupplier(undefined); }}
+        editSupplier={editSupplier}
+      />
     </div>
   );
 }

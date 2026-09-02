@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Printer, ArrowLeft, Minus, Plus, Tag } from "lucide-react";
+import { Printer, ArrowLeft, Minus, Plus, Tag, Check, RotateCcw, Maximize2, Package } from "lucide-react";
 import JsBarcode from "jsbarcode";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { useShopProfile, variantColumnLabelsFromProfile } from "@/lib/use-shop-p
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { executeReceiptPrint } from "@/lib/receipt-print";
 import { buildPrintTagsHtml, type LabelFormat as TagLabelFormat } from "@/lib/print-tag-document";
+import { cn } from "@/lib/utils";
 import {
   printTagBaseCode,
   printTagBarcodeValue,
@@ -35,6 +36,8 @@ interface POItem {
     size?: string | null;
     style?: string | null;
     material?: string | null;
+    images?: string[];
+    imageUrl?: string | null;
     product?: {
       name: string;
       barcode?: string | null;
@@ -57,9 +60,9 @@ interface PO {
 type LabelFormat = TagLabelFormat;
 
 const FORMAT_LABELS: Record<LabelFormat, string> = {
-  sticker: "🏷️ Sticker",
-  hangtag: "🎫 Hang Tag",
-  shelf: "📋 Shelf Label",
+  sticker: "Sticker",
+  hangtag: "Hang Tag",
+  shelf: "Shelf Label",
 };
 
 // ── Barcode SVG component ─────────────────────────────────────────────────
@@ -316,6 +319,9 @@ export default function PrintTagsPage() {
   const [qtys, setQtys] = useState<Record<string, number>>({});
   const [format, setFormat] = useState<LabelFormat>(defaultFormat);
   const [printing, setPrinting] = useState(false);
+  const [previewZoom, setPreviewZoom] = useState(100);
+  const [previewCols, setPreviewCols] = useState(5);
+  const [fullPreview, setFullPreview] = useState(false);
 
   useEffect(() => {
     if (!templates.includes(format)) setFormat(defaultFormat);
@@ -343,6 +349,19 @@ export default function PrintTagsPage() {
 
   const adjustQty = (itemId: string, delta: number) =>
     setQtys((p) => ({ ...p, [itemId]: Math.max(0, (p[itemId] ?? 1) + delta) }));
+
+  const resetQtys = () => {
+    if (!po) return;
+    const init: Record<string, number> = {};
+    po.items.forEach((it) => {
+      init[it.id] = it.receivedQty > 0 ? it.receivedQty : it.orderedQty;
+    });
+    setQtys(init);
+    toast.success("Quantities reset to received qty");
+  };
+
+  const itemThumb = (item: POItem) =>
+    item.variant?.images?.[0] ?? item.variant?.imageUrl ?? null;
 
   const totalLabels = Object.values(qtys).reduce((s, v) => s + v, 0);
 
@@ -405,153 +424,300 @@ export default function PrintTagsPage() {
   }, [totalLabels, po, qtys, shopName, format, expandedLabels, shopProfile.defaultUnit, receiptSettings]);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">Loading...</div>;
+    return <div className="flex items-center justify-center min-h-screen bg-[#0a0c10] text-white/50">Loading...</div>;
   }
   if (!po) {
-    return <div className="flex items-center justify-center min-h-screen text-muted-foreground">PO not found</div>;
+    return <div className="flex items-center justify-center min-h-screen bg-[#0a0c10] text-white/50">PO not found</div>;
   }
 
   const [colA, colB] = variantColumnLabelsFromProfile(shopProfile);
   const attrA = shopProfile.variantAttributes[0]?.mapsTo;
   const attrB = shopProfile.variantAttributes[1]?.mapsTo;
 
+  const previewGridClass = {
+    3: "grid-cols-3",
+    4: "grid-cols-4",
+    5: "grid-cols-5",
+    6: "grid-cols-6",
+  }[previewCols] ?? "grid-cols-5";
+
+  const PreviewGrid = ({ className }: { className?: string }) => (
+    <div
+      className={cn("grid gap-2 origin-top-left", previewGridClass, className)}
+      style={{ transform: `scale(${previewZoom / 100})`, transformOrigin: "top left" }}
+    >
+      {expandedLabels.map(({ item, key, serial }) => (
+        <LabelPreview
+          key={key}
+          format={format}
+          item={item}
+          shopName={shopName}
+          serial={serial}
+          unit={shopProfile.defaultUnit}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <div className="print-root">
       <style>{PRINT_CSS}</style>
 
-      <div className="no-print min-h-screen bg-background">
-        <div className="bg-background border-b px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push(`/purchases/${id}`)}>
+      <div className="no-print min-h-screen bg-[#0a0c10] text-white">
+        {/* Header */}
+        <div className="border-b border-white/10 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push(`/purchases/${id}`)}
+              className="shrink-0 text-white/80 hover:text-white hover:bg-white/10"
+            >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
-                <Tag className="h-5 w-5 text-primary" /> Print Barcode Tags
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-white">
+                <Tag className="h-5 w-5 text-orange-400 shrink-0" />
+                Print Barcode Tags
               </h1>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-white/50 truncate">
                 {po.poNumber} · {po.supplier.name}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground font-medium">
-              Total: <strong className="text-foreground">{totalLabels}</strong> labels
-            </span>
+
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            <div className="text-right">
+              <p className="text-[11px] uppercase tracking-wide text-white/45 font-semibold">Total Labels</p>
+              <p className="text-2xl font-bold tabular-nums leading-none">{totalLabels}</p>
+            </div>
+
             {receiptSettings.printServerEnabled && receiptSettings.printServerUrl ? (
-              <span className="text-xs text-muted-foreground hidden md:inline">
-                Printer: <strong className="text-foreground">{receiptSettings.printerName || "default"}</strong>
+              <span className="text-xs text-white/50 hidden lg:inline max-w-[140px]">
+                Printer: <strong className="text-white">{receiptSettings.printerName || "default"}</strong>
               </span>
             ) : (
-              <span className="text-xs text-amber-700 hidden md:inline">Enable Store Print Server in Settings</span>
+              <span className="text-xs text-orange-400 font-medium hidden sm:inline">
+                Enable Store Print Server in Settings
+              </span>
             )}
-            <div className="flex rounded-lg border overflow-hidden">
+
+            <div className="flex rounded-lg border border-white/15 overflow-hidden bg-[#12151a]">
               {templates.map((tpl, i) => (
                 <button
                   key={tpl}
+                  type="button"
                   onClick={() => setFormat(tpl)}
-                  className={`px-3 py-1.5 text-xs font-medium transition-colors ${i > 0 ? "border-l" : ""} ${
-                    format === tpl ? "bg-primary text-primary-foreground" : "bg-background hover:bg-muted"
-                  }`}
+                  className={cn(
+                    "px-4 py-2 text-xs font-semibold transition-colors inline-flex items-center gap-1.5",
+                    i > 0 && "border-l border-white/10",
+                    format === tpl
+                      ? "bg-orange-500 text-white"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
                 >
+                  {format === tpl && <Check className="h-3.5 w-3.5" />}
                   {FORMAT_LABELS[tpl]}
                 </button>
               ))}
             </div>
-            <Button onClick={handlePrint} disabled={printing || totalLabels === 0} className="gap-2 px-5">
-              <Printer className="h-4 w-4" /> {printing ? "Sending…" : "Print to Printer"}
+
+            <Button
+              onClick={handlePrint}
+              disabled={printing || totalLabels === 0}
+              className="gap-2 px-5 bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
+            >
+              <Printer className="h-4 w-4" />
+              {printing ? "Sending…" : "Print to Printer"}
             </Button>
           </div>
         </div>
 
-        <div className="p-6 space-y-5">
-          <div className="panel-edge overflow-hidden ">
-            <div className="px-5 py-3 border-b bg-muted/20">
-              <h3 className="font-semibold text-sm">Set Label Quantity Per Variant</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Defaults to received qty. Each tag gets a unique serial suffix (001, 002, …) for POS scanning.
-              </p>
+        <div className="p-4 sm:p-6 space-y-5">
+          {/* Quantity table */}
+          <div className="rounded-xl border border-white/10 bg-[#12151a] overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-sm text-white">Set Label Quantity Per Variant</h3>
+                <p className="text-xs text-white/45 mt-1 max-w-2xl">
+                  Defaults to received quantity. Each tag gets a unique serial suffix (001, 002, …) for POS scanning.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePrint}
+                  disabled={printing || totalLabels === 0}
+                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                >
+                  <Printer className="h-3.5 w-3.5" />
+                  Print All ({totalLabels})
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={resetQtys}
+                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  Reset
+                </Button>
+              </div>
             </div>
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wide text-muted-foreground bg-muted/10">
-                <tr>
-                  <th className="px-5 py-2.5 text-left">Item</th>
-                  <th className="px-5 py-2.5 text-left w-28">SKU</th>
-                  <th className="px-5 py-2.5 text-left w-32">Barcode</th>
-                  <th className="px-5 py-2.5 text-left w-32">Tags</th>
-                  <th className="px-5 py-2.5 text-left w-20">{colA}</th>
-                  <th className="px-5 py-2.5 text-left w-20">{colB}</th>
-                  <th className="px-5 py-2.5 text-right w-24">Ordered</th>
-                  <th className="px-5 py-2.5 text-right w-24">Received</th>
-                  <th className="px-5 py-2.5 text-center w-36">Print Qty</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {po.items.map((item) => {
-                  const base = printTagBaseCode(item);
-                  const sample = base ? printTagBarcodeValue(base, 1) : "";
-                  return (
-                    <tr key={item.id} className="hover:bg-muted/10">
-                      <td className="px-5 py-3 font-medium">{item.productName}</td>
-                      <td className="px-5 py-3 font-mono text-xs text-muted-foreground">{item.sku}</td>
-                      <td className="px-5 py-3 font-mono text-xs text-muted-foreground" title={sample}>
-                        {base || <span className="text-red-600">Missing</span>}
-                        {sample && qtys[item.id] > 0 && (
-                          <span className="block text-[10px] text-muted-foreground/80">→ {sample}</span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3 text-xs text-muted-foreground max-w-[8rem] truncate" title={tagsLine(item)}>
-                        {tagsLine(item) || "—"}
-                      </td>
-                      <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrA)}</td>
-                      <td className="px-5 py-3 text-xs">{variantFieldValue(item.variant, attrB)}</td>
-                      <td className="px-5 py-3 text-right text-muted-foreground">{item.orderedQty}</td>
-                      <td className="px-5 py-3 text-right text-green-600 font-medium">{item.receivedQty}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => adjustQty(item.id, -1)}
-                            className="h-7 w-7 rounded-lg border flex items-center justify-center hover:bg-muted transition-colors"
-                          >
-                            <Minus className="h-3 w-3" />
-                          </button>
-                          <span className="w-8 text-center font-semibold">{qtys[item.id] ?? 0}</span>
-                          <button
-                            onClick={() => adjustQty(item.id, 1)}
-                            className="h-7 w-7 rounded-lg border flex items-center justify-center hover:bg-muted transition-colors"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[960px]">
+                <thead className="text-[10px] uppercase tracking-wider text-white/40 border-b border-white/10 bg-white/[0.02]">
+                  <tr>
+                    <th className="px-5 py-3 text-left font-semibold">Item</th>
+                    <th className="px-4 py-3 text-left font-semibold w-32">SKU</th>
+                    <th className="px-4 py-3 text-left font-semibold w-36">Barcode (Base)</th>
+                    <th className="px-4 py-3 text-left font-semibold w-28">Tags</th>
+                    <th className="px-4 py-3 text-left font-semibold w-24">{colA}</th>
+                    <th className="px-4 py-3 text-left font-semibold w-24">{colB}</th>
+                    <th className="px-4 py-3 text-right font-semibold w-20">Ordered</th>
+                    <th className="px-4 py-3 text-right font-semibold w-20">Received</th>
+                    <th className="px-4 py-3 text-center font-semibold w-36">Print Qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {po.items.map((item) => {
+                    const base = printTagBaseCode(item);
+                    const sample = base ? printTagBarcodeValue(base, 1) : "";
+                    const thumb = itemThumb(item);
+                    return (
+                      <tr key={item.id} className="hover:bg-white/[0.03]">
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="h-10 w-10 rounded-lg border border-white/10 bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
+                              {thumb ? (
+                                <img src={thumb} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <Package className="h-4 w-4 text-white/30" />
+                              )}
+                            </div>
+                            <span className="font-medium text-white text-sm leading-snug">{item.productName}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-mono text-xs text-white/55">{item.sku}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-white/55" title={sample}>
+                          {base || <span className="text-red-400">Missing</span>}
+                          {sample && qtys[item.id] > 0 && (
+                            <span className="block text-[10px] text-white/35 mt-0.5">→ {sample}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/55 max-w-[7rem] truncate" title={tagsLine(item)}>
+                          {tagsLine(item) || "—"}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-white/70">{variantFieldValue(item.variant, attrA)}</td>
+                        <td className="px-4 py-3 text-xs text-white/70">{variantFieldValue(item.variant, attrB)}</td>
+                        <td className="px-4 py-3 text-right text-white/50 tabular-nums">{item.orderedQty}</td>
+                        <td className="px-4 py-3 text-right text-emerald-400 font-semibold tabular-nums">{item.receivedQty}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => adjustQty(item.id, -1)}
+                              className="h-8 w-8 rounded-lg border border-white/15 flex items-center justify-center hover:bg-white/10 transition-colors text-white/70"
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </button>
+                            <span className="w-8 text-center font-bold tabular-nums">{qtys[item.id] ?? 0}</span>
+                            <button
+                              type="button"
+                              onClick={() => adjustQty(item.id, 1)}
+                              className="h-8 w-8 rounded-lg border border-white/15 flex items-center justify-center hover:bg-white/10 transition-colors text-white/70"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <div className="panel-edge p-5 ">
-            <h3 className="font-semibold text-sm mb-4">Label Preview ({totalLabels} labels)</h3>
-            {totalLabels === 0 ? (
-              <div className="py-12 text-center text-muted-foreground text-sm">Set qty above to preview labels</div>
-            ) : (
-              <div className="flex flex-wrap gap-3">
-                {expandedLabels.map(({ item, key, serial }) => (
-                  <LabelPreview
-                    key={key}
-                    format={format}
-                    item={item}
-                    shopName={shopName}
-                    serial={serial}
-                    unit={shopProfile.defaultUnit}
-                  />
-                ))}
+          {/* Label preview */}
+          <div className="rounded-xl border border-white/10 bg-[#12151a] overflow-hidden">
+            <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
+              <h3 className="font-semibold text-sm text-white">Label Preview</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center rounded-lg border border-white/15 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white/10 text-white/70"
+                  >
+                    <Minus className="h-3.5 w-3.5" />
+                  </button>
+                  <span className="px-3 text-xs font-semibold tabular-nums min-w-[52px] text-center">{previewZoom}%</span>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))}
+                    className="h-8 w-8 flex items-center justify-center hover:bg-white/10 text-white/70"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <select
+                  value={previewCols}
+                  onChange={(e) => setPreviewCols(Number(e.target.value))}
+                  className="h-8 rounded-lg border border-white/15 bg-[#0a0c10] text-xs font-medium px-3 text-white/80"
+                >
+                  {[3, 4, 5, 6].map((n) => (
+                    <option key={n} value={n}>Grid: {n} × 4</option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFullPreview(true)}
+                  disabled={totalLabels === 0}
+                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                >
+                  <Maximize2 className="h-3.5 w-3.5" />
+                  Full Preview
+                </Button>
               </div>
-            )}
+            </div>
+
+            <div className="p-5 min-h-[280px] overflow-auto bg-[#0a0c10]/50">
+              {totalLabels === 0 ? (
+                <div className="py-16 text-center text-white/40 text-sm">Set qty above to preview labels</div>
+              ) : (
+                <PreviewGrid />
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Full preview overlay */}
+      {fullPreview && totalLabels > 0 && (
+        <div className="no-print fixed inset-0 z-50 bg-black/90 flex flex-col">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+            <h3 className="font-semibold text-white">Label Preview — {totalLabels} labels</h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setFullPreview(false)}
+              className="border-white/15 text-white hover:bg-white/10"
+            >
+              Close
+            </Button>
+          </div>
+          <div className="flex-1 overflow-auto p-6">
+            <PreviewGrid />
+          </div>
+        </div>
+      )}
 
       <div className="print-grid hidden">
         {expandedLabels.map(({ item, key, serial }) => (

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Trash2, Loader2, Package, ArrowLeft, Search, Check,
-  Scale, Boxes, Package2, Save,
+  Scale, Boxes, Package2, Save, FileText, ClipboardList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,10 @@ import {
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
+import {
+  FORM_CARD, FORM_FIELD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN, FORM_PAGE,
+} from "@/lib/form-shell-theme";
+import { useAuthStore } from "@/stores/auth-store";
 
 interface Category {
   id: string;
@@ -111,17 +115,17 @@ function Section({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="panel-edge  overflow-hidden">
-      <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 bg-background">
+    <section className={FORM_CARD}>
+      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           {step ? (
-            <span className="mt-0.5 h-6 min-w-6 px-1.5 rounded-md bg-primary/10 text-primary text-[11px] font-bold tabular-nums flex items-center justify-center shrink-0">
+            <span className="mt-0.5 h-7 w-7 rounded-full bg-orange-500 text-white text-xs font-bold tabular-nums flex items-center justify-center shrink-0">
               {step}
             </span>
           ) : null}
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-foreground tracking-tight">{title}</h2>
-            {subtitle ? <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{subtitle}</p> : null}
+            <h2 className="text-sm font-semibold text-white tracking-tight">{title}</h2>
+            {subtitle ? <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{subtitle}</p> : null}
           </div>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
@@ -146,12 +150,12 @@ function Field({
 }) {
   return (
     <div className={cn("space-y-1.5", className)}>
-      <Label className="text-xs font-medium text-muted-foreground">
+      <Label className={FORM_LABEL}>
         {label}
-        {required ? <span className="text-destructive ml-0.5">*</span> : null}
+        {required ? <span className="text-orange-400 ml-0.5">*</span> : null}
       </Label>
       {children}
-      {hint ? <p className="text-[11px] text-muted-foreground/80 leading-snug">{hint}</p> : null}
+      {hint ? <p className="text-[11px] text-white/40 leading-snug">{hint}</p> : null}
     </div>
   );
 }
@@ -176,8 +180,8 @@ function ChoiceCard({
       className={cn(
         "rounded-xl border p-3.5 text-left transition-all h-full",
         selected
-          ? "border-primary bg-primary/10  "
-          : "border-border bg-card hover:border-primary/40 hover:bg-background",
+          ? "border-orange-500 bg-orange-500/10"
+          : "border-white/10 bg-[#0a0c10]/50 hover:border-orange-500/40 hover:bg-white/[0.03]",
       )}
     >
       <div className="flex items-start gap-3">
@@ -186,8 +190,8 @@ function ChoiceCard({
             className={cn(
               "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 border",
               selected
-                ? "bg-primary text-primary-foreground border-primary"
-                : "bg-muted/50 text-muted-foreground border-transparent",
+                ? "bg-orange-500 text-white border-orange-500"
+                : "bg-white/5 text-white/50 border-white/10",
             )}
           >
             <Icon className="h-4 w-4" />
@@ -195,15 +199,17 @@ function ChoiceCard({
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-foreground">{title}</p>
+            <p className="text-sm font-semibold text-white">{title}</p>
             <span
               className={cn(
-                "h-4 w-4 rounded-full border-2 shrink-0",
-                selected ? "border-primary bg-primary" : "border-muted-foreground/40",
+                "h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center",
+                selected ? "border-orange-500 bg-orange-500" : "border-white/30",
               )}
-            />
+            >
+              {selected ? <Check className="h-2.5 w-2.5 text-white" /> : null}
+            </span>
           </div>
-          <p className="text-[11px] mt-1 leading-snug text-muted-foreground">{hint}</p>
+          <p className="text-[11px] mt-1 leading-snug text-white/45">{hint}</p>
         </div>
       </div>
     </button>
@@ -212,18 +218,21 @@ function ChoiceCard({
 
 function SidebarCard({
   title,
+  icon: Icon,
   children,
   className,
 }: {
   title?: string;
+  icon?: React.ElementType;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <div className={cn("panel-edge   overflow-hidden", className)}>
+    <div className={cn(FORM_CARD, className)}>
       {title ? (
-        <div className="px-4 py-3 border-b bg-background">
-          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
+          {Icon ? <Icon className="h-4 w-4 text-orange-400 shrink-0" /> : null}
+          <h3 className="text-sm font-semibold text-white">{title}</h3>
         </div>
       ) : null}
       <div className="p-4 space-y-3">{children}</div>
@@ -273,7 +282,7 @@ function SearchableBrandSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full h-10 px-3 rounded-lg border bg-background text-sm text-left flex items-center justify-between gap-2 hover:border-muted-foreground/30 focus:outline-none focus:ring-2 focus:ring-ring"
+        className={cn("w-full h-10 px-3 text-sm text-left flex items-center justify-between gap-2 hover:border-white/25 focus:outline-none focus:ring-2 focus:ring-orange-500/40", FORM_FIELD)}
       >
         <span className={selected ? "text-foreground truncate" : "text-muted-foreground"}>
           {selected?.name ?? "Search or create brand…"}
@@ -283,7 +292,7 @@ function SearchableBrandSelect({
       {open ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-1 w-full rounded-xl border bg-background shadow-lg overflow-hidden">
+          <div className="absolute z-50 mt-1 w-full rounded-xl border border-white/15 bg-[#12151a] shadow-2xl overflow-hidden">
             <div className="p-2 border-b">
               <Input
                 autoFocus
@@ -335,6 +344,8 @@ export function GroceryProductForm() {
   const router = useRouter();
   const shopProfile = useShopProfile();
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
+  const activeBranchName = useBranchStore((s) => s.activeBranchName);
+  const userName = useAuthStore((s) => s.user?.name);
 
   const [name, setName] = useState("");
   const [brandId, setBrandId] = useState("");
@@ -738,25 +749,55 @@ export function GroceryProductForm() {
   );
 
 return (
-    <div className="h-full flex flex-col bg-background">
-      <div className="bg-background border-b px-4 sm:px-6 py-3 flex items-center justify-between gap-3 shrink-0">
+    <div className={cn(FORM_PAGE, "h-full flex flex-col pb-8")}>
+      <div className="border-b border-white/10 px-4 sm:px-6 py-4 shrink-0">
         <button
           type="button"
           onClick={() => router.push("/products")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium"
+          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors font-medium mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
-          <span className="hidden sm:inline">Back to Products</span>
-          <span className="sm:hidden">Back</span>
+          Back to Products
         </button>
-        <div className="text-center min-w-0">
-          <h1 className="text-base font-semibold text-foreground">New Product</h1>
-          <p className="text-[11px] text-muted-foreground truncate">Grocery product master</p>
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className="h-10 w-10 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
+                <Package className="h-5 w-5 text-orange-400" />
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-white">New Product</h1>
+              <span className="rounded-md border border-orange-500/50 bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
+                {statusActive ? "Active" : "Draft"}
+              </span>
+            </div>
+            <p className="text-sm text-white/45 mt-1.5 ml-12 sm:ml-[3.25rem]">
+              Grocery product master · {activeBranchName || "Main Store"} · Created by {userName ?? "Admin"}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => submit("DRAFT")}
+              className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
+            >
+              <Save className="h-3.5 w-3.5" />
+              Save Draft
+            </Button>
+            <Button
+              size="sm"
+              disabled={loading}
+              onClick={() => submit("ACTIVE")}
+              className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+              Save Product
+            </Button>
+          </div>
         </div>
-        <Button size="sm" className="gap-1.5 h-9 shrink-0" disabled={loading} onClick={() => submit("ACTIVE")}>
-          {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-          <span className="hidden sm:inline">Save</span>
-        </Button>
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -780,7 +821,7 @@ return (
             <Section step="2" title="General Information" subtitle="Name, brand, category and identity">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Product Name" required className="sm:col-span-2">
-                  <Input placeholder="e.g. Samba Rice" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} className="h-10" />
+                  <Input placeholder="e.g. Samba Rice" value={name} maxLength={120} onChange={(e) => setName(e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </Field>
                 <Field label="Brand" required>
                   <SearchableBrandSelect
@@ -792,7 +833,7 @@ return (
                 </Field>
                 <Field label="Unit" required>
                   <Select value={unit} onValueChange={setUnit} disabled={isWeighted}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={cn(FORM_FIELD, "h-10")}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {shopProfile.units.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                     </SelectContent>
@@ -800,7 +841,7 @@ return (
                 </Field>
                 <Field label="Category" required>
                   <Select value={categoryId || undefined} onValueChange={(v) => { setCategoryId(v); setSubCategoryId(""); }}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectTrigger className={cn(FORM_FIELD, "h-10")}><SelectValue placeholder="Select category" /></SelectTrigger>
                     <SelectContent>
                       {categories.length === 0
                         ? <SelectItem value="_none" disabled>No categories found</SelectItem>
@@ -810,7 +851,7 @@ return (
                 </Field>
                 <Field label="Sub Category">
                   <Select value={subCategoryId || "_none"} onValueChange={(v) => setSubCategoryId(v === "_none" ? "" : v)} disabled={!categoryId}>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Optional" /></SelectTrigger>
+                    <SelectTrigger className={cn(FORM_FIELD, "h-10")}><SelectValue placeholder="Optional" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="_none">None</SelectItem>
                       {subCategories.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
@@ -819,18 +860,18 @@ return (
                 </Field>
                 {!isWeighted ? (
                   <Field label="Barcode" hint={hasVariants && barcodeMode === "SHARED" ? "Shared across all variants" : undefined}>
-                    <Input placeholder="Scan or enter barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className="h-10 font-mono text-sm" />
+                    <Input placeholder="Scan or enter barcode" value={barcode} onChange={(e) => setBarcode(e.target.value)} className={cn(FORM_FIELD, "h-10 font-mono text-sm")} />
                   </Field>
                 ) : (
                   <Field label="Barcode" hint="Not required for weighted products">
-                    <Input disabled placeholder="Not required" className="h-10 bg-muted/40" />
+                    <Input disabled placeholder="Not required" className={cn(FORM_FIELD, "h-10 bg-white/5")} />
                   </Field>
                 )}
                 <Field label="SKU" hint="Optional — leave blank to auto-generate">
-                  <Input placeholder="e.g. RICE-SAMBA" value={skuHint} onChange={(e) => setSkuHint(e.target.value)} className="h-10 font-mono text-sm" />
+                  <Input placeholder="e.g. RICE-SAMBA" value={skuHint} onChange={(e) => setSkuHint(e.target.value)} className={cn(FORM_FIELD, "h-10 font-mono text-sm")} />
                 </Field>
                 <Field label="Batch Number" className="sm:col-span-2 sm:max-w-sm">
-                  <Input placeholder="Optional batch / lot" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} className="h-10" />
+                  <Input placeholder="Optional batch / lot" value={batchNumber} onChange={(e) => setBatchNumber(e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </Field>
                 <Field label="Description" className="sm:col-span-2">
                   <Textarea rows={3} placeholder="Short description for staff…" value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -857,34 +898,34 @@ return (
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Field label="Buying Price" required={!hasVariants}>
-                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={costPrice} onChange={(e) => setCostPrice(sanitizePrice(e.target.value))} className="h-10" />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={costPrice} onChange={(e) => setCostPrice(sanitizePrice(e.target.value))} className={cn(FORM_FIELD, "h-10")} />
                 </Field>
                 <Field label={isWeighted ? "Selling Price / Kg" : "Selling Price"} required={!hasVariants}>
-                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={sellingPrice} onChange={(e) => setSellingPrice(sanitizePrice(e.target.value))} className="h-10" disabled={hasVariants} />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={sellingPrice} onChange={(e) => setSellingPrice(sanitizePrice(e.target.value))} className={cn(FORM_FIELD, "h-10")} disabled={hasVariants} />
                 </Field>
                 <Field label="Wholesale Price">
-                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={wholesalePrice} onChange={(e) => setWholesalePrice(sanitizePrice(e.target.value))} className="h-10" />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={wholesalePrice} onChange={(e) => setWholesalePrice(sanitizePrice(e.target.value))} className={cn(FORM_FIELD, "h-10")} />
                 </Field>
                 <Field label="MRP" required={!hasVariants && !isWeighted}>
-                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={mrp} onChange={(e) => setMrp(sanitizePrice(e.target.value))} className="h-10" disabled={hasVariants} />
+                  <Input type="number" min={0} step="0.01" placeholder="0.00" value={mrp} onChange={(e) => setMrp(sanitizePrice(e.target.value))} className={cn(FORM_FIELD, "h-10")} disabled={hasVariants} />
                 </Field>
                 <Field label="Tax Rate">
                   <Select value={taxRate} onValueChange={setTaxRate}>
-                    <SelectTrigger className="h-10"><SelectValue /></SelectTrigger>
+                    <SelectTrigger className={cn(FORM_FIELD, "h-10")}><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {["0", "5", "12", "18", "28"].map((t) => <SelectItem key={t} value={t}>{t}%</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
                 <Field label="Profit Margin" hint="Auto from buying & selling">
-                  <div className="h-10 rounded-lg border bg-muted/40 px-3 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
-                    <span className="text-muted-foreground tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
+                  <div className="h-10 rounded-lg border border-white/10 bg-white/[0.03] px-3 flex items-center justify-between text-sm">
+                    <span className="font-semibold text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
+                    <span className="text-white/45 tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
                   </div>
                 </Field>
               </div>
               {hasVariants ? (
-                <p className="text-xs text-muted-foreground rounded-lg bg-muted/40 border border-dashed px-3 py-2">
+                <p className="text-xs text-white/45 rounded-lg bg-white/[0.03] border border-dashed border-white/10 px-3 py-2">
                   Selling price and MRP are set on each variant row below.
                 </p>
               ) : null}
@@ -893,17 +934,17 @@ return (
             {isWeighted ? (
               <Section step="4" title="Weight Sale Settings" subtitle="Loose / scale-sold items">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
+                  <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-[#0a0c10]/50">
                     <div>
-                      <p className="text-sm font-medium">Allow Decimal Selling</p>
-                      <p className="text-[11px] text-muted-foreground">e.g. 0.350 kg</p>
+                      <p className="text-sm font-medium text-white">Allow Decimal Selling</p>
+                      <p className="text-[11px] text-white/45">e.g. 0.350 kg</p>
                     </div>
                     <Switch checked={allowDecimalSelling} onCheckedChange={setAllowDecimalSelling} />
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border px-4 py-3 bg-card">
+                  <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-[#0a0c10]/50">
                     <div>
-                      <p className="text-sm font-medium">Weight Scale Ready</p>
-                      <p className="text-[11px] text-muted-foreground">POS scale workflows</p>
+                      <p className="text-sm font-medium text-white">Weight Scale Ready</p>
+                      <p className="text-[11px] text-white/45">POS scale workflows</p>
                     </div>
                     <Switch checked={weightScaleReady} onCheckedChange={setWeightScaleReady} />
                   </div>
@@ -917,7 +958,7 @@ return (
                 title="Variants"
                 subtitle="Pack sizes — e.g. 1kg · 5kg · 10kg"
                 action={
-                  <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>
+                  <Button type="button" size="sm" className={cn("h-8 text-xs gap-1.5", FORM_ORANGE_BTN)} onClick={() => addVariantRow()}>
                     <Plus className="h-3.5 w-3.5" /> Add
                   </Button>
                 }
@@ -929,11 +970,11 @@ return (
                     </button>
                   ))}
                 </div>
-                <div className="rounded-xl border overflow-hidden">
+                <div className="rounded-xl border border-white/10 overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted/40 border-b">
-                        <tr className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <thead className="bg-white/[0.03] border-b border-white/10">
+                        <tr className="text-[10px] uppercase tracking-wider text-white/40">
                           <th className="px-3 py-2.5 text-left font-medium">Variant</th>
                           <th className="px-3 py-2.5 text-left font-medium">Weight</th>
                           <th className="px-3 py-2.5 text-left font-medium">SKU</th>
@@ -1075,7 +1116,7 @@ return (
           </div>
 
           <aside className="space-y-4 lg:sticky lg:top-4">
-            <SidebarCard title="Product Summary">
+            <SidebarCard title="Product Summary" icon={ClipboardList}>
               <div className="space-y-2.5">
                 {([
                   ["Name", name || "—"],
@@ -1091,53 +1132,53 @@ return (
                   ["Status", statusActive ? "Active" : "Draft"],
                 ] as const).map(([label, val]) => (
                   <div key={label} className="flex justify-between gap-3 text-xs">
-                    <span className="text-muted-foreground shrink-0">{label}</span>
-                    <span className="font-medium text-right text-foreground truncate max-w-[150px]">{val}</span>
+                    <span className="text-white/45 shrink-0">{label}</span>
+                    <span className="font-medium text-right text-white/90 truncate max-w-[150px]">{val}</span>
                   </div>
                 ))}
               </div>
             </SidebarCard>
 
-            <SidebarCard title="Status & Availability">
+            <SidebarCard title="Status & Availability" icon={FileText}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Active</p>
-                  <p className="text-[11px] text-muted-foreground">Visible in POS</p>
+                  <p className="text-sm font-medium text-white">Active</p>
+                  <p className="text-[11px] text-white/45">Visible in POS</p>
                 </div>
                 <Switch checked={statusActive} onCheckedChange={setStatusActive} />
               </div>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium">Track Inventory</p>
-                  <p className="text-[11px] text-muted-foreground">Stock monitoring</p>
+                  <p className="text-sm font-medium text-white">Track Inventory</p>
+                  <p className="text-[11px] text-white/45">Stock monitoring</p>
                 </div>
                 <Switch checked={trackInventory} onCheckedChange={setTrackInventory} />
               </div>
               {trackInventory ? (
-                <div className="rounded-lg bg-muted/40 border px-3 py-2 text-[11px] text-muted-foreground">
-                  Branches: <span className="font-semibold text-foreground">{branchScope === "ALL" ? "All Branches" : "Single Branch"}</span>
+                <div className="rounded-lg bg-white/[0.03] border border-white/10 px-3 py-2 text-[11px] text-white/45">
+                  Branches: <span className="font-semibold text-white">{branchScope === "ALL" ? "All Branches" : "Single Branch"}</span>
                 </div>
               ) : null}
             </SidebarCard>
 
             <SidebarCard>
-              <Button className="w-full gap-2 h-10" disabled={loading} onClick={() => submit("ACTIVE")}>
+              <Button className={cn("w-full gap-2 h-10", FORM_ORANGE_BTN)} disabled={loading} onClick={() => submit("ACTIVE")}>
                 {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 Save Product
               </Button>
-              <Button variant="outline" className="w-full gap-2 h-10" disabled={loading} onClick={() => submit("ADD_ANOTHER")}>
+              <Button variant="outline" className={cn("w-full gap-2 h-10", FORM_OUTLINE_BTN)} disabled={loading} onClick={() => submit("ADD_ANOTHER")}>
                 <Plus className="h-4 w-4" />
                 Save & Add Another
               </Button>
-              <Button variant="secondary" className="w-full h-10" disabled={loading} onClick={() => submit("DRAFT")}>
+              <Button variant="outline" className={cn("w-full h-10", FORM_OUTLINE_BTN)} disabled={loading} onClick={() => submit("DRAFT")}>
                 Save Draft
               </Button>
-              <Button variant="ghost" className="w-full h-9 text-muted-foreground" onClick={() => router.push("/products")}>
+              <Button variant="ghost" className="w-full h-9 text-white/45 hover:text-white hover:bg-white/5" onClick={() => router.push("/products")}>
                 Cancel
               </Button>
             </SidebarCard>
 
-            <p className="text-[11px] text-muted-foreground leading-relaxed px-1">
+            <p className="text-[11px] text-white/40 leading-relaxed px-1">
               <Package className="h-3.5 w-3.5 inline mr-1 opacity-70" />
               Assigned suppliers only see this product when creating a PO.
             </p>
