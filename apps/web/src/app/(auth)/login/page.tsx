@@ -211,23 +211,23 @@ function LoginContent() {
         loading={Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview)}
       />
 
-      <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden text-slate-900">
+      <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden">
         <div
           className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
           style={{ backgroundImage: "url(/auth/login-side.png)" }}
           aria-hidden
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-white/92 via-white/88 to-white/80" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-transparent to-white/70" />
+        <div className="absolute inset-0 bg-slate-900/40" aria-hidden />
 
         <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10">
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="w-full max-w-[420px]"
+            className="w-full max-w-[440px]"
           >
-            <div className="mb-5 flex justify-center w-full">
+            <div className="rounded-2xl border border-slate-200/90 bg-white shadow-xl shadow-slate-900/15 px-8 py-9 sm:px-10 sm:py-10">
+            <div className="mb-6 flex justify-center w-full">
               <AppLogo variant="login" theme="light" className="items-center mx-auto max-w-[180px]" />
             </div>
 
@@ -238,7 +238,7 @@ function LoginContent() {
               <h2 className="text-3xl font-bold text-slate-900 tracking-tight">
                 {pending2fa ? "Verify it is you" : "Welcome back"}
               </h2>
-              <p className="text-sm text-slate-500 mt-2">
+              <p className="text-sm text-slate-600 mt-2 leading-relaxed">
                 {pending2fa
                   ? "Enter the 6-digit code from your authenticator app"
                   : tenantPreview
@@ -410,18 +410,19 @@ function LoginContent() {
               </form>
             )}
 
-            <div className="mt-8 pt-6 border-t border-slate-100">
-              <p className="text-center text-sm text-slate-500">
+            <div className="mt-8 pt-6 border-t border-slate-200">
+              <p className="text-center text-sm text-slate-600">
                 Don&apos;t have an account?{" "}
                 <Link href="/register" className="font-semibold text-primary hover:underline">
                   Start {STARTER_TRIAL_DAYS}-day free trial
                 </Link>
               </p>
             </div>
+            </div>
           </motion.div>
         </div>
 
-        <p className="relative shrink-0 text-center text-[11px] text-slate-400 pb-6 px-4">
+        <p className="relative shrink-0 text-center text-[11px] text-white/90 pb-6 px-4 drop-shadow-sm">
           © {new Date().getFullYear()} {APP_NAME} · Secure multi-tenant retail platform
         </p>
       </div>
@@ -439,7 +440,7 @@ function LoginFallback() {
           style={{ backgroundImage: "url(/auth/login-side.png)" }}
           aria-hidden
         />
-        <div className="absolute inset-0 bg-white/90" />
+        <div className="absolute inset-0 bg-slate-900/40" aria-hidden />
         <Loading size={96} />
       </div>
     </div>
