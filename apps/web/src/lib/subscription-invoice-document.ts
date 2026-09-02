@@ -107,7 +107,7 @@ const INVOICE_CSS = `
 
 export function buildSubscriptionInvoicePrintHtml(
   inv: SubscriptionInvoice,
-  logoUrl = INVOICE_LOGO_URL || 'https://admin3.hexalyte.com/hexaone-logo.png',
+  logoUrl = INVOICE_LOGO_URL || 'https://admin3.hexalyte.com/brand/hexalyte-innovation.png',
 ): string {
   const monthLabel = inv.months === 1 ? '1 Month' : `${inv.months} Months`
   const b = inv.billing

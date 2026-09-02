@@ -10,6 +10,7 @@ import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButt
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { ReceiveItemsModal, type PurchaseOrder } from "@/components/purchases/receive-items-modal";
+import { ViewPOModal, type FullPurchaseOrder } from "@/components/purchases/view-po-modal";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
@@ -125,6 +126,7 @@ export default function PurchasesPage() {
   const [pos, setPos]             = useState<PurchaseOrder[]>([]);
   const [loading, setLoading]     = useState(true);
   const [receivePO, setReceivePO] = useState<PurchaseOrder | null>(null);
+  const [viewPO, setViewPO] = useState<PurchaseOrder | null>(null);
 
   const fetchPOs = useCallback(async () => {
     setLoading(true);
@@ -145,11 +147,20 @@ export default function PurchasesPage() {
     } catch (e: unknown) { toast.error((e as Error).message ?? "Status update failed"); }
   };
 
-  const loadReceive = async (po: PurchaseOrder) => {
+  const loadReceive = async (po: PurchaseOrder | FullPurchaseOrder) => {
     try {
       const res = await api.get<PurchaseOrder>(`/purchases/${po.id}`);
       setReceivePO(res.data);
     } catch { toast.error("Failed to load PO details"); }
+  };
+
+  const openViewPO = async (po: PurchaseOrder) => {
+    try {
+      const res = await api.get<PurchaseOrder>(`/purchases/${po.id}`);
+      setViewPO(res.data ?? po);
+    } catch {
+      setViewPO(po);
+    }
   };
 
   // Stats
@@ -165,7 +176,7 @@ export default function PurchasesPage() {
     { label: "Received",    value: received,                                icon: CheckCircle2,  color: "text-emerald-600", bg: "bg-emerald-500/15", tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
   ];
 
-  const columns = buildColumns((po) => router.push(`/purchases/${po.id}`), loadReceive, handleUpdateStatus);
+  const columns = buildColumns(openViewPO, loadReceive, handleUpdateStatus);
 
   return (
     <div className="page-shell">
@@ -231,6 +242,14 @@ export default function PurchasesPage() {
         />
 
       <ReceiveItemsModal po={receivePO} onClose={() => setReceivePO(null)} onReceived={fetchPOs} />
+      <ViewPOModal
+        po={viewPO}
+        onClose={() => setViewPO(null)}
+        onReceive={loadReceive}
+        onStatusUpdate={handleUpdateStatus}
+        showPrintLabels={profile.labelTemplates.length > 0}
+        printLabel={routeLabels.printTags ?? "Print Labels"}
+      />
     </div>
   );
 }

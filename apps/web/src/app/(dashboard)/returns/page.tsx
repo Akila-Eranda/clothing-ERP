@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Plus, CheckCircle, Clock, XCircle, Package, RefreshCw, X, Loader2,
-  Search, RotateCcw, DollarSign, ArrowLeftRight, ChevronRight, Printer,
+  Search, RotateCcw, DollarSign, ArrowLeftRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalFooterButtonClass } from "@/components/ui/modal-footer";
@@ -22,6 +22,7 @@ import { parseApiList } from "@/lib/parse-api-list";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
 import { ModuleGate } from "@/components/shop/module-gate";
+import { ViewReturnModal, printReturnBill, type ReturnRecord } from "@/components/returns/view-return-modal";
 type ReasonOption = { value: string; label: string };
 
 function buildReasons(type: string | null | undefined): ReasonOption[] {
@@ -34,16 +35,6 @@ function reasonLabel(value: string, reasons: ReasonOption[]) {
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface ExchangeItem { variantId: string; quantity: number; unitPrice: number; productName?: string; variantName?: string; sku?: string; }
-interface ReturnRecord {
-  id: string; returnNumber: string; reason: string; status: string;
-  returnType: string; notes?: string;
-  totalAmount: number; refundAmount: number; exchangeAmount: number;
-  exchangeData?: ExchangeItem[] | null;
-  restockItems: boolean; createdAt: string;
-  originalSale?: { invoiceNumber: string } | null;
-  items?: { id: string; variantId: string; quantity: number; unitPrice: number; totalAmount: number;
-    variant?: { sku: string; product?: { name: string } | null } | null }[];
-}
 interface SaleLookup {
   id: string; invoiceNumber: string; total: number;
   customer?: { firstName: string; lastName?: string } | null;
@@ -63,263 +54,6 @@ const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.E
   REFUND_PROCESSED: { label: "Refund Processed", variant: "success", icon: DollarSign },
 };
 
-// ── Thermal bill printer (80mm) ──────────────────────────────────────────────
-function printBill(record: ReturnRecord, reasons: ReasonOption[]) {
-  const isExchange = record.returnType === "EXCHANGE";
-  const fmt  = (n: number) => n.toLocaleString("en-LK", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  const date = new Date(record.createdAt);
-  const dateStr = date.toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
-  const timeStr = date.toLocaleTimeString("en-LK", { hour: "2-digit", minute: "2-digit" });
-  const reason  = reasonLabel(record.reason, reasons);
-
-  // Pad text to fill thermal width (32 chars usable at 10px Courier on 80mm)
-  const pad = (left: string, right: string, width = 32) => {
-    const gap = Math.max(1, width - left.length - right.length);
-    return left + " ".repeat(gap) + right;
-  };
-
-  const returnItemRows = (record.items ?? []).map((item) => {
-    const name = item.variant?.product?.name ?? "Unknown Item";
-    const sku  = item.variant?.sku ?? "—";
-    const qty  = item.quantity;
-    const total = fmt(item.totalAmount);
-    return `<div class="item-name">${name}</div>
-            <div class="item-detail">${pad(`  ${sku}  x${qty}`, `LKR ${total}`)}</div>`;
-  }).join('<div class="gap"></div>');
-
-  const exchangeItemRows = (record.exchangeData ?? []).map((item) => {
-    const name  = item.productName ?? "Unknown Item";
-    const sku   = item.sku ?? "—";
-    const qty   = item.quantity;
-    const total = fmt(item.unitPrice * item.quantity);
-    return `<div class="item-name exch">${name}</div>
-            <div class="item-detail">${pad(`  ${sku}  x${qty}`, `LKR ${total}`)}</div>`;
-  }).join('<div class="gap"></div>');
-
-  const balanceLabel = isExchange
-    ? record.refundAmount > 0
-      ? "REFUND TO CUSTOMER"
-      : record.exchangeAmount > record.totalAmount
-        ? "BALANCE DUE"
-        : "NO BALANCE DUE"
-    : "TOTAL REFUND";
-  const balanceValue = isExchange
-    ? record.refundAmount > 0
-      ? `LKR ${fmt(record.refundAmount)}`
-      : record.exchangeAmount > record.totalAmount
-        ? `LKR ${fmt(record.exchangeAmount - record.totalAmount)}`
-        : "LKR 0.00"
-    : `LKR ${fmt(record.refundAmount)}`;
-
-  const html = `<!DOCTYPE html><html><head>
-<meta charset="UTF-8">
-<title>${isExchange ? "EXC" : "RET"}-${record.returnNumber}</title>
-<style>
-  @page { size: 80mm auto; margin: 3mm 2mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 10.5px;
-    line-height: 1.4;
-    width: 72mm;
-    max-width: 72mm;
-    color: #000;
-    background: #fff;
-  }
-  .center { text-align: center; }
-  .right  { text-align: right; }
-  .bold   { font-weight: bold; }
-  .pre    { white-space: pre; font-family: inherit; font-size: inherit; }
-  .dash   { border-top: 1px dashed #000; margin: 3px 0; }
-  .solid  { border-top: 1.5px solid #000; margin: 3px 0; }
-  .dbl    { border-top: 3px double #000; margin: 4px 0; }
-  .section { font-weight: bold; margin: 4px 0 2px; font-size: 10px; letter-spacing: 0.5px; }
-  .exch-section { font-weight: bold; margin: 4px 0 2px; font-size: 10px; }
-  .item-name   { font-size: 10.5px; word-break: break-word; font-weight: bold; margin-top: 3px; }
-  .item-detail { font-size: 10px; white-space: pre; }
-  .exch { font-style: italic; }
-  .gap  { height: 1px; }
-  .meta-row { display: flex; justify-content: space-between; font-size: 10px; line-height: 1.5; }
-  .meta-label { font-weight: bold; }
-  .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; padding: 2px 0; }
-  .grand-row  { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; padding: 3px 0; }
-  .sig-table  { width: 100%; margin-top: 14px; }
-  .sig-table td { width: 50%; text-align: center; font-size: 9px; padding-top: 20px; border-top: 1px solid #000; }
-  .print-btn { display: block; margin: 10px auto; padding: 7px 20px; background: #111; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: sans-serif; }
-  @media print { .print-btn { display: none !important; } }
-</style></head><body>
-
-<div class="center bold" style="font-size:15px;letter-spacing:3px;">HEXALYTE</div>
-<div class="center" style="font-size:9px;letter-spacing:4px;">INNOVATION</div>
-<div class="center" style="font-size:9px;margin-top:2px;">No. 45, Textile Road, Colombo 11</div>
-<div class="center" style="font-size:9px;">Tel: 077 123 4567</div>
-<div class="dbl"></div>
-<div class="center bold" style="font-size:12px;letter-spacing:2px;">${isExchange ? "** EXCHANGE BILL **" : "** RETURN RECEIPT **"}</div>
-<div class="dbl"></div>
-
-<div class="meta-row"><span class="meta-label">${isExchange ? "Exchange No" : "Return No"}</span><span>${record.returnNumber}</span></div>
-<div class="meta-row"><span class="meta-label">Invoice</span><span>${record.originalSale?.invoiceNumber ?? "—"}</span></div>
-<div class="meta-row"><span class="meta-label">Date</span><span>${dateStr}</span></div>
-<div class="meta-row"><span class="meta-label">Time</span><span>${timeStr}</span></div>
-<div class="meta-row"><span class="meta-label">Reason</span><span>${reason}</span></div>
-<div class="meta-row"><span class="meta-label">Status</span><span>${record.status}</span></div>
-${record.notes ? `<div class="meta-row"><span class="meta-label">Notes</span><span style="max-width:55%;text-align:right;font-size:9px;">${record.notes}</span></div>` : ""}
-
-<div class="dash"></div>
-<div class="section">ITEMS RETURNED BY CUSTOMER</div>
-<div class="dash"></div>
-${returnItemRows || '<div style="font-size:10px;font-style:italic;">No items recorded</div>'}
-<div class="dash"></div>
-<div class="total-row"><span>Return Value</span><span>LKR ${fmt(record.totalAmount)}</span></div>
-
-${isExchange ? `
-<div class="dash"></div>
-<div class="exch-section">&#9654; ITEMS GIVEN TO CUSTOMER</div>
-<div class="dash"></div>
-${exchangeItemRows || '<div style="font-size:10px;font-style:italic;">No exchange items</div>'}
-<div class="dash"></div>
-<div class="total-row"><span>Exchange Value</span><span>LKR ${fmt(record.exchangeAmount)}</span></div>
-` : ""}
-
-<div class="solid"></div>
-<div class="grand-row"><span>${balanceLabel}</span><span>${balanceValue}</span></div>
-<div class="solid"></div>
-
-<div style="margin-top:6px;font-size:9px;text-align:center;">
-  ${record.restockItems ? "&#10003; Items restocked to inventory" : "&#9675; Items not restocked"}
-</div>
-
-<table class="sig-table">
-  <tr>
-    <td>Staff</td>
-    <td>Customer</td>
-  </tr>
-</table>
-
-<div class="dash" style="margin-top:10px;"></div>
-<div class="center" style="font-size:9px;margin-top:3px;">Thank you &amp; please keep this receipt</div>
-<div class="center" style="font-size:9px;">${new Date().getFullYear()} &copy; Hexalyte Innovation</div>
-
-<button class="print-btn" onclick="window.print()">&#128438; Print Receipt</button>
-</body></html>`;
-
-  const win = window.open("", "_blank");
-  if (!win) { alert("Please allow popups to print the receipt."); return; }
-  win.document.write(html);
-  win.document.close();
-  // Auto-trigger print after a short delay for rendering
-  setTimeout(() => { try { win.print(); } catch (_) { /* user can click button */ } }, 400);
-}
-
-// ── Detail Modal ────────────────────────────────────────────────────────────
-function DetailModal({ record, onClose, reasons }: { record: ReturnRecord; onClose: () => void; reasons: ReasonOption[] }) {
-  const cfg = STATUS_CFG[record.status] ?? STATUS_CFG.INITIATED;
-  const Icon = cfg.icon;
-  const isExchange = record.returnType === "EXCHANGE";
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b shrink-0">
-          <div className="flex items-center gap-2">
-            <div className={`h-8 w-8 rounded-xl flex items-center justify-center ${isExchange ? "bg-violet-500/10" : "bg-primary/10"}`}>
-              {isExchange ? <ArrowLeftRight className="h-4 w-4 text-violet-600" /> : <RotateCcw className="h-4 w-4 text-primary" />}
-            </div>
-            <div>
-              <h2 className="font-bold font-mono text-sm">{record.returnNumber}</h2>
-              <p className="text-xs text-muted-foreground">{record.originalSale?.invoiceNumber ?? "—"}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant={cfg.variant as "success"|"warning"|"danger"|"default"} className="text-[10px] gap-1">
-              <Icon className="h-3 w-3" />{cfg.label}
-            </Badge>
-            <button onClick={() => printBill(record, reasons)}
-              className={`p-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:bg-muted ${
-                isExchange ? "text-violet-600 border-violet-200" : "text-primary border-primary/20"
-              }`}>
-              <Printer className="h-3.5 w-3.5" /> Print
-            </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          {(() => {
-            const excDue = isExchange ? Math.max(0, (record.exchangeAmount ?? 0) - record.totalAmount) : 0;
-            const netRef = isExchange ? Math.max(0, record.totalAmount - (record.exchangeAmount ?? 0)) : record.refundAmount;
-            const balLabel = isExchange
-              ? excDue > 0 ? "Collect from Customer" : netRef > 0 ? "Refund to Customer" : "Even Exchange"
-              : "Refund to Customer";
-            const balColor = isExchange && excDue > 0 ? "text-amber-600" : "text-emerald-600";
-            const balBg    = isExchange && excDue > 0 ? "bg-amber-500/10" : "bg-emerald-500/10";
-            return (
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div className="p-3 rounded-xl border bg-muted/10">
-                  <p className="text-xs text-muted-foreground">Return Value</p>
-                  <p className="font-bold text-sm">LKR {formatNumber(record.totalAmount)}</p>
-                </div>
-                {isExchange && (
-                  <div className="p-3 rounded-xl border bg-violet-500/10">
-                    <p className="text-xs text-muted-foreground">Exchange Value</p>
-                    <p className="font-bold text-sm text-violet-600">LKR {formatNumber(record.exchangeAmount ?? 0)}</p>
-                  </div>
-                )}
-                <div className={`p-3 rounded-xl border ${balBg}`}>
-                  <p className="text-xs text-muted-foreground">{balLabel}</p>
-                  <p className={`font-bold text-sm ${balColor}`}>LKR {formatNumber(isExchange ? (excDue > 0 ? excDue : netRef) : record.refundAmount)}</p>
-                </div>
-              </div>
-            );
-          })()}
-          <div>
-            <p className="text-xs font-semibold mb-2">Returned Items</p>
-            <div className="rounded-xl border divide-y overflow-hidden">
-              {(record.items ?? []).map((item, i) => (
-                <div key={i} className="flex items-center justify-between px-3 py-2.5 text-xs">
-                  <div>
-                    <p className="font-medium">{item.variant?.product?.name ?? "—"}</p>
-                    <p className="text-muted-foreground font-mono">{item.variant?.sku ?? "—"}</p>
-                  </div>
-                  <div className="text-right">
-                    <p>Qty: {item.quantity}</p>
-                    <p className="font-semibold">LKR {formatNumber(item.totalAmount)}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          {isExchange && (record.exchangeData ?? []).length > 0 && (
-            <div>
-              <p className="text-xs font-semibold mb-2 text-violet-600">Exchange Items (Given to Customer)</p>
-              <div className="rounded-xl border border-violet-500/20 divide-y overflow-hidden">
-                {(record.exchangeData ?? []).map((item, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2.5 text-xs bg-violet-500/5">
-                    <div>
-                      <p className="font-medium">{item.productName ?? "—"}</p>
-                      <p className="text-muted-foreground font-mono">{item.sku ?? "—"}</p>
-                    </div>
-                    <div className="text-right">
-                      <p>Qty: {item.quantity}</p>
-                      <p className="font-semibold text-violet-600">LKR {formatNumber(item.unitPrice * item.quantity)}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {record.notes && (
-            <div className="p-3 rounded-xl border bg-muted/10 text-xs">
-              <p className="font-semibold mb-1">Notes</p>
-              <p className="text-muted-foreground">{record.notes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── New Return / Exchange Modal — 4-step wizard ─────────────────────────────
 const STEPS = ["Type", "Invoice", "Items", "Confirm"];
 
 function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose: () => void; onSaved: () => void; initialInvoice?: string; reasons: ReasonOption[] }) {
@@ -890,7 +624,7 @@ export default function ReturnsPage() {
         const s = row.original.status;
         const isExchange = row.original.returnType === "EXCHANGE";
         const moreActions = [
-          { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printBill(row.original, reasons) },
+          { text: isExchange ? "Print Exchange Bill" : "Print Return Receipt", function: () => printReturnBill(row.original, reasons) },
         ];
         if (s === "INITIATED") {
           moreActions.push({ text: "Approve",        function: () => updateStatus(row.original.id, "APPROVED", "Approved") });
@@ -991,7 +725,14 @@ export default function ReturnsPage() {
           reasons={reasons}
         />
       )}
-      {detailRecord && <DetailModal record={detailRecord} onClose={() => setDetailRecord(null)} reasons={reasons} />}
+      {detailRecord && (
+        <ViewReturnModal
+          record={detailRecord}
+          onClose={() => setDetailRecord(null)}
+          reasons={reasons}
+          onStatusUpdate={updateStatus}
+        />
+      )}
     </div>
     </ModuleGate>
   );

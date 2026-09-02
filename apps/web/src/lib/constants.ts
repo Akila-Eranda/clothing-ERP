@@ -1,13 +1,13 @@
-export const APP_NAME = "HexaOne";
+export const APP_NAME = "HEXALYTE";
 /** Free trial length for new Starter tenants (days). */
 export const STARTER_TRIAL_DAYS = 7;
-export const APP_TAGLINE = "ALL IN ONE BUSINESS PLATFORM";
-/** Colored wordmark — light sidebar / light UI */
-export const APP_LOGO_LIGHT_PATH = "/hexaone-logo-light.png";
-/** White wordmark — dark sidebar / dark UI */
-export const APP_LOGO_DARK_PATH = "/hexaone-logo-dark.png";
-/** Default (light) — backward compatible */
-export const APP_LOGO_PATH = "/hexaone-logo.png";
+export const APP_TAGLINE = "INNOVATION";
+/** HEXALYTE INNOVATION wordmark — light UI / light sidebar */
+export const APP_LOGO_LIGHT_PATH = "/brand/hexalyte-innovation.png";
+/** White HEXALYTE INNOVATION — dark sidebar / dark UI */
+export const APP_LOGO_DARK_PATH = "/brand/hexalyte-white.png";
+/** Default brand mark */
+export const APP_LOGO_PATH = "/brand/hexalyte-innovation.png";
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 

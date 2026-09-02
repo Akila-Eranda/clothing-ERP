@@ -721,18 +721,18 @@ body.mini-sidebar .hex-retail-sidebar {
   height: 2.5rem;
   width: auto;
   max-width: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: left center;
 }
 
-/* Light sidebar: colored wordmark — never blend (hides logo on white) */
+/* Light sidebar: transparent blue INNOVATION logo — no blend needed */
 [data-sidebar="light"] .hex-sidebar-brand .hex-sidebar-logo,
 [data-sidebar="sidebarcolorone"] .hex-sidebar-brand .hex-sidebar-logo {
   mix-blend-mode: normal !important;
   filter: none;
 }
 
-/* Dark UI or colored sidebar: white wordmark */
+/* Dark / colored sidebar: white transparent INNOVATION logo */
 html.dark .hex-sidebar-brand .hex-sidebar-logo,
 html:not(.dark) [data-sidebar="sidebarcolortwo"] .hex-sidebar-brand .hex-sidebar-logo,
 html:not(.dark) [data-sidebar="sidebarcolorthree"] .hex-sidebar-brand .hex-sidebar-logo,
@@ -747,7 +747,8 @@ html:not(.dark) [data-sidebar="sidebarcoloreleven"] .hex-sidebar-brand .hex-side
 html:not(.dark) [data-sidebar="sidebarcolortwelve"] .hex-sidebar-brand .hex-sidebar-logo,
 html:not(.dark) [data-sidebar="sidebarcolorthirteen"] .hex-sidebar-brand .hex-sidebar-logo,
 html:not(.dark) [data-sidebar="sidebarcolorfourteen"] .hex-sidebar-brand .hex-sidebar-logo {
-  mix-blend-mode: screen;
+  mix-blend-mode: normal !important;
+  filter: none;
 }
 
 [data-sidebar="light"] .hex-retail-sidebar {

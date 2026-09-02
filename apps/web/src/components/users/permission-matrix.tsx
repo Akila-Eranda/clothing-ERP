@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { Search, Check, Minus } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   type AppPermission,
@@ -21,7 +20,7 @@ interface PermissionMatrixProps {
   onChange?: (next: Set<string>) => void;
   readOnly?: boolean;
   className?: string;
-  maxHeight?: string;
+  maxHeightClass?: string;
 }
 
 export function PermissionMatrix({
@@ -30,7 +29,7 @@ export function PermissionMatrix({
   onChange,
   readOnly = false,
   className,
-  maxHeight = "min(420px, 50vh)",
+  maxHeightClass = "max-h-[min(420px,55vh)]",
 }: PermissionMatrixProps) {
   const [query, setQuery] = useState("");
   const grouped = useMemo(() => groupPermissionsByResource(permissions), [permissions]);
@@ -76,8 +75,8 @@ export function PermissionMatrix({
   }
 
   return (
-    <div className={cn("rounded-xl border bg-muted/20", className)}>
-      <div className="p-3 border-b bg-card/80">
+    <div className={cn("rounded-xl border bg-muted/20 flex flex-col min-h-0", className)}>
+      <div className="p-3 border-b bg-card/80 shrink-0">
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -94,8 +93,12 @@ export function PermissionMatrix({
         )}
       </div>
 
-      <ScrollArea style={{ maxHeight }}>
-        <div className="p-3 space-y-3">
+      <div
+        className={cn(
+          "overflow-y-auto overscroll-contain p-3 space-y-3",
+          maxHeightClass,
+        )}
+      >
           {filteredResources.map((resource) => {
             const items = grouped.get(resource) ?? [];
             const selectedInGroup = items.filter((p) => selectedIds.has(p.id)).length;
@@ -177,8 +180,7 @@ export function PermissionMatrix({
           {filteredResources.length === 0 && (
             <p className="text-sm text-muted-foreground text-center py-6">No matching permissions</p>
           )}
-        </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }

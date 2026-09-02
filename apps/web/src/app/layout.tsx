@@ -10,17 +10,17 @@ import "./pos-retail-theme.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "HexaOne — Enterprise Retail Management",
-    template: "%s | HexaOne",
+    default: "Hexalyte — Enterprise Retail Management",
+    template: "%s | Hexalyte",
   },
   description:
-    "HexaOne — AI-powered ERP, POS & inventory management for retail stores, boutiques, and multi-branch businesses.",
-  keywords: ["hexaone", "pos system", "retail management", "inventory", "erp"],
-  authors: [{ name: "HexaOne" }],
-  creator: "HexaOne",
+    "Hexalyte — AI-powered ERP, POS & inventory management for retail stores, boutiques, and multi-branch businesses.",
+  keywords: ["hexalyte", "pos system", "retail management", "inventory", "erp"],
+  authors: [{ name: "Hexalyte" }],
+  creator: "Hexalyte",
   icons: {
-    icon: "/hexaone-logo.png",
-    apple: "/hexaone-logo.png",
+    icon: "/brand/hexalyte-innovation.png",
+    apple: "/brand/hexalyte-innovation.png",
   },
 };
 

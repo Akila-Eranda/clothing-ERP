@@ -67,7 +67,7 @@ function fmtDate(d: Date): string {
 
 const DEFAULT_INVOICE_LOGO_URL =
   process.env.INVOICE_LOGO_URL ||
-  `${process.env.ADMIN_FRONTEND_URL || 'https://admin3.hexalyte.com'}/hexaone-logo.png`;
+  `${process.env.ADMIN_FRONTEND_URL || 'https://admin3.hexalyte.com'}/brand/hexalyte-innovation.png`;
 
 const INVOICE_CSS = `
   *{margin:0;padding:0;box-sizing:border-box}

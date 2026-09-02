@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { api, tokenStorage } from "@/lib/api";
+import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 import { PermissionMatrix } from "@/components/users/permission-matrix";
@@ -660,8 +661,8 @@ export default function UsersPage() {
 
       {/* ── Role Detail Modal ─────────────────────────────────────────────── */}
       <Dialog open={!!roleDetailModal} onOpenChange={(o) => { if (!o) setRoleDetailModal(null); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Shield className="h-5 w-5 text-primary" />
               {roleDetailModal?.name} — Permissions
@@ -674,22 +675,23 @@ export default function UsersPage() {
             permissions={allPermissions}
             selectedIds={new Set((roleDetailModal?.permissions ?? []).map((rp) => rp.permission.id))}
             readOnly
-            maxHeight="min(480px, 55vh)"
+            className="min-h-0"
+            maxHeightClass="max-h-[min(520px,60vh)]"
           />
         </DialogContent>
       </Dialog>
 
       {/* ── Create Custom Role Modal ──────────────────────────────────────── */}
       <Dialog open={createRoleModal} onOpenChange={setCreateRoleModal}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Create Custom Role</DialogTitle>
             <p className="text-sm text-muted-foreground">
               Pick exactly which modules and actions this role can access.
             </p>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="flex flex-col gap-4 py-2 min-h-0 flex-1 overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 shrink-0">
               <div>
                 <Label className="text-xs mb-1.5 block">Role Name *</Label>
                 <Input
@@ -713,10 +715,11 @@ export default function UsersPage() {
               permissions={allPermissions}
               selectedIds={rolePermissionIds}
               onChange={setRolePermissionIds}
-              maxHeight="min(420px, 45vh)"
+              className="min-h-0 flex-1"
+              maxHeightClass="max-h-[min(400px,48vh)]"
             />
 
-            <div className={modalInlineFooterClass}>
+            <div className={cn(modalInlineFooterClass, "shrink-0")}>
               <Button variant="outline" onClick={() => setCreateRoleModal(false)} disabled={saving}>Cancel</Button>
               <Button
                 variant="gradient"

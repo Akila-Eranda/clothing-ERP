@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import type { SubscriptionInvoice } from '@/lib/admin-api'
 import { fmtInvoiceDate, fmtInvoiceMoney } from '@/lib/subscription-invoice-document'
+import { APP_LOGO_PATH } from '@/lib/constants'
 
 interface Props {
   invoice: SubscriptionInvoice
@@ -21,7 +22,7 @@ export function SubscriptionInvoiceDocument({ invoice, monthLabel }: Props) {
           <div className="flex gap-4 items-start">
             <div className="relative w-[120px] h-[52px] shrink-0" data-invoice-logo>
               <Image
-                src="/hexaone-logo.png"
+                src={APP_LOGO_PATH}
                 alt={b.companyBrandName}
                 fill
                 className="object-contain object-left"

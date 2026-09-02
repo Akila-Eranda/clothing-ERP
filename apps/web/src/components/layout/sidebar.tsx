@@ -21,7 +21,8 @@ import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { APP_NAME } from "@/lib/constants";
 import { AppLogo } from "@/components/brand/app-logo";
-import { isDarkSidebarSkin, isDefaultLightSidebar } from "@/lib/theme-layout";
+import { useSidebarLogoOnDark } from "@/hooks/use-sidebar-logo-theme";
+import { isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -276,7 +277,7 @@ export function Sidebar() {
   const isDark = darkUi;
   const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
-  const logoOnDarkBg = darkUi || dreamsDarkChrome || isDarkSidebarSkin(sidebarSkin);
+  const logoOnDarkBg = useSidebarLogoOnDark();
   const navGroups = useNavGroups();
 
   const closeMobile = () => setMobileSidebarOpen(false);
