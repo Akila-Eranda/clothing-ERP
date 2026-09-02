@@ -58,17 +58,28 @@ export function AppLogo({
     theme === "dark" || (theme === "auto" && mounted && resolvedTheme === "dark");
 
   const src = mounted ? resolveLogoSrc(onDark) : APP_LOGO_PATH;
+  const isSidebar = variant === "sidebar";
+  const [imgSrc, setImgSrc] = React.useState(src);
+
+  React.useEffect(() => {
+    setImgSrc(mounted ? resolveLogoSrc(onDark) : APP_LOGO_PATH);
+  }, [mounted, onDark]);
+
+  const handleLogoError = () => {
+    if (imgSrc !== APP_LOGO_PATH) setImgSrc(APP_LOGO_PATH);
+  };
 
   return (
     <div className={cn("flex flex-col items-start", className)}>
       <img
-        src={src}
+        src={imgSrc}
         alt={alt}
+        onError={handleLogoError}
         className={cn(
-          variant === "sidebar"
-            ? "h-auto w-full max-h-[120px] min-h-[96px] object-contain object-center mix-blend-screen"
+          isSidebar
+            ? "hex-sidebar-logo h-auto w-full max-h-[64px] object-contain object-left"
             : "w-auto object-contain object-left",
-          variant !== "sidebar" && HEIGHT[variant],
+          !isSidebar && HEIGHT[variant],
           MAX_WIDTH[variant],
         )}
       />

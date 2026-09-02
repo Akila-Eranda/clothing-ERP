@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Package,
   FileText,
-  CreditCard, AlertTriangle, BarChart2,
+  CreditCard, AlertTriangle, BarChart2, Percent, Award, Banknote,
+  Building2, Store, Truck, Wallet, Receipt,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -17,7 +18,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useBranchStore } from "@/stores/branch-store";
 import { ReportsShell } from "@/components/reports/reports-shell";
-import { ReportKpiGrid, type ReportKpiItem } from "@/components/reports/reports-ui";
+import { ReportKpiGrid, ReportChartCard, ReportEmpty, type ReportKpiItem } from "@/components/reports/reports-ui";
 import {
   REPORTS_TABS,
   reportsPath,
@@ -63,6 +64,16 @@ interface ExpiryRow {
 interface TaxRate     { taxRate: number; _sum: { taxAmount: number; total: number; quantity: number } }
 interface TaxReport   { summary: { total: number; taxAmount: number; subtotal: number; discountAmount: number } | null; count: number; byTaxRate: TaxRate[] }
 interface CashierRow  { cashierName: string; salesCount: number; totalRevenue: number; totalDiscount: number; totalTax: number }
+interface CommSaleRow {
+  id: string;
+  invoiceNumber: string;
+  invoiceDate: string;
+  total: number;
+  helperName: string | null;
+  helperCommission: number;
+  cashierName: string | null;
+  branchName: string | null;
+}
 
 // ── Constants ─────────────────────────────────────────────────────────────
 const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#ec4899","#84cc16","#f97316","#6366f1"];
@@ -91,6 +102,18 @@ const TT_STYLE = { background: "hsl(var(--popover))", border: "1px solid hsl(var
 function fmtLKR(v: number) { return `LKR ${formatNumber(v)}`; }
 function invUnitCost(v?: InvVariant | null) { return v?.costPrice ?? 0; }
 
+function ShareCell({ value, total }: { value: number; total: number }) {
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-[10px] text-muted-foreground w-8 tabular-nums text-right">{pct.toFixed(1)}%</span>
+    </div>
+  );
+}
+
 // ── Hub ───────────────────────────────────────────────────────────────────
 export function ReportsHub({ section }: { section: ReportsSection }) {
   const router = useRouter();
@@ -116,6 +139,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
   const [chequeSum,   setChequeSum] = useState<{ count: number; totalAmount: number; overdue: number; dueSoon: number } | null>(null);
   const [commRows,    setCommRows]  = useState<{ helperName: string; salesCount: number; salesTotal: number; commissionTotal: number }[]>([]);
   const [commSum,     setCommSum]   = useState<{ helpers: number; salesCount: number; salesTotal: number; commissionTotal: number } | null>(null);
+  const [commSales,   setCommSales] = useState<CommSaleRow[]>([]);
 
   const branchQ = activeBranchId ? `&branchId=${activeBranchId}` : "";
 
@@ -138,7 +162,7 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
         api.get<{ summary?: { orderCount: number; total: number; paidAmount: number; outstanding: number; paymentsTotal: number }; rows?: { poNumber: string; supplierName: string; status: string; total: number; paidAmount: number; outstanding: number; orderDate: string }[] }>(`/reports/purchases?startDate=${start}&endDate=${end}${branchQ}`),
         api.get<{ rows?: { name: string; phone: string; totalPaid: number; paymentCount: number; _count?: { purchases: number } }[] }>(`/reports/suppliers`),
         api.get<{ summary?: { count: number; totalAmount: number; overdue: number; dueSoon: number }; rows?: { chequeNumber: string; direction: string; status: string; amount: number; partyName: string | null; dueDate: string | null }[] }>(`/reports/cheques?startDate=${start}&endDate=${end}`),
-        api.get<{ summary?: { helpers: number; salesCount: number; salesTotal: number; commissionTotal: number }; rows?: { helperName: string; salesCount: number; salesTotal: number; commissionTotal: number }[] }>(`/reports/commission?startDate=${start}&endDate=${end}${branchQ}`),
+        api.get<{ summary?: { helpers: number; salesCount: number; salesTotal: number; commissionTotal: number }; rows?: { helperName: string; salesCount: number; salesTotal: number; commissionTotal: number }[]; sales?: CommSaleRow[] }>(`/reports/commission?startDate=${start}&endDate=${end}${branchQ}`),
       ]);
       setPL(plR.data);
       setMonthlyPL(Array.isArray(mplR.data) ? mplR.data : []);
@@ -158,6 +182,11 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
       setChequeSum(chqR.data && !Array.isArray(chqR.data) ? chqR.data.summary ?? null : null);
       setCommRows(unwrapRows(comR.data));
       setCommSum(comR.data && !Array.isArray(comR.data) ? comR.data.summary ?? null : null);
+      setCommSales(
+        comR.data && !Array.isArray(comR.data) && Array.isArray(comR.data.sales)
+          ? comR.data.sales
+          : [],
+      );
     } catch { toast.error("Failed to load report data"); }
     finally { setLoading(false); }
   }, [range.start, range.end, branchQ, activeBranchId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -211,7 +240,164 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
     return Object.entries(map).map(([tier, count]) => ({ tier, count })).sort((a, b) => b.count - a.count);
   }, [customers]);
 
-  // ── KPI cards ─────────────────────────────────────────────────────────
+  const totalCommission = commSum?.commissionTotal ?? commRows.reduce((s, r) => s + r.commissionTotal, 0);
+  const totalCommSales = commSum?.salesTotal ?? commRows.reduce((s, r) => s + r.salesTotal, 0);
+  const avgCommissionRate = totalCommSales > 0 ? (totalCommission / totalCommSales) * 100 : 0;
+  const topHelper = commRows[0] ?? null;
+
+  const commChartData = useMemo(
+    () =>
+      commRows.slice(0, 8).map((r) => ({
+        name: r.helperName.length > 14 ? `${r.helperName.slice(0, 14)}…` : r.helperName,
+        commission: r.commissionTotal,
+        sales: r.salesTotal,
+      })),
+    [commRows],
+  );
+
+  const commissionKpis: ReportKpiItem[] = [
+    {
+      label: "Active Helpers",
+      value: String(commSum?.helpers ?? commRows.length),
+      sub: "Staff with commission sales",
+      icon: Users,
+      tone: "blue",
+    },
+    {
+      label: "Commission Sales",
+      value: String(commSum?.salesCount ?? commSales.length),
+      sub: "Invoices with helper commission",
+      icon: ShoppingCart,
+      tone: "violet",
+    },
+    {
+      label: "Sales Total",
+      value: `LKR ${formatNumber(totalCommSales)}`,
+      sub: range.label,
+      icon: DollarSign,
+      tone: "teal",
+    },
+    {
+      label: "Commission Paid",
+      value: `LKR ${formatNumber(totalCommission)}`,
+      sub: topHelper ? `Top: ${topHelper.helperName}` : "Helper earnings",
+      icon: Banknote,
+      tone: "emerald",
+    },
+    {
+      label: "Avg Commission Rate",
+      value: `${avgCommissionRate.toFixed(2)}%`,
+      sub: "Of attributed sales value",
+      icon: Percent,
+      tone: "orange",
+    },
+  ];
+
+  const cashierTotalRev = useMemo(() => cashiers.reduce((s, c) => s + c.totalRevenue, 0), [cashiers]);
+  const cashierTotalOrders = useMemo(() => cashiers.reduce((s, c) => s + c.salesCount, 0), [cashiers]);
+  const cashierChartData = useMemo(
+    () =>
+      cashiers.slice(0, 8).map((c) => ({
+        name: c.cashierName.length > 14 ? `${c.cashierName.slice(0, 14)}…` : c.cashierName,
+        revenue: c.totalRevenue,
+        orders: c.salesCount,
+      })),
+    [cashiers],
+  );
+
+  const branchTotalRev = useMemo(() => branches.reduce((s, b) => s + b.totalRevenue, 0), [branches]);
+  const branchTotalOrders = useMemo(() => branches.reduce((s, b) => s + b.salesCount, 0), [branches]);
+  const branchChartData = useMemo(
+    () =>
+      branches.slice(0, 8).map((b) => ({
+        name: b.branchName.length > 14 ? `${b.branchName.slice(0, 14)}…` : b.branchName,
+        revenue: b.totalRevenue,
+        orders: b.salesCount,
+      })),
+    [branches],
+  );
+
+  const supplierTotalPaid = useMemo(() => suppliers.reduce((s, r) => s + r.totalPaid, 0), [suppliers]);
+  const supplierTotalPos = useMemo(() => suppliers.reduce((s, r) => s + (r._count?.purchases ?? 0), 0), [suppliers]);
+
+  const purchaseChartData = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of purchases) map.set(p.supplierName, (map.get(p.supplierName) ?? 0) + p.total);
+    return Array.from(map.entries())
+      .map(([name, total]) => ({
+        name: name.length > 14 ? `${name.slice(0, 14)}…` : name,
+        total,
+      }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 8);
+  }, [purchases]);
+
+  const purchaseStatusData = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const p of purchases) map.set(p.status, (map.get(p.status) ?? 0) + 1);
+    return Array.from(map.entries()).map(([status, count], i) => ({
+      status,
+      count,
+      fill: COLORS[i % COLORS.length],
+    }));
+  }, [purchases]);
+
+  const chequeByStatus = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const c of cheques) map.set(c.status, (map.get(c.status) ?? 0) + c.amount);
+    return Array.from(map.entries()).map(([status, amount], i) => ({
+      status,
+      amount,
+      fill: COLORS[i % COLORS.length],
+    }));
+  }, [cheques]);
+
+  const salesKpis: ReportKpiItem[] = [
+    { label: "Net Revenue", value: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`, sub: range.label, icon: DollarSign, tone: "emerald" },
+    { label: "Total Orders", value: String(pl?.salesCount ?? doneSales.length), sub: "Completed sales", icon: ShoppingCart, tone: "blue" },
+    { label: "Avg Order", value: `LKR ${formatNumber(avgOrder)}`, sub: "Per transaction", icon: BarChart2, tone: "violet" },
+    { label: "Gross Profit", value: `LKR ${formatNumber(pl?.grossProfit ?? pl?.netProfit ?? 0)}`, sub: `${pl?.profitMargin ?? 0}% margin`, icon: TrendingUp, tone: "teal" },
+    { label: "Returns", value: `LKR ${formatNumber(pl?.revenue.returns ?? 0)}`, sub: "Refunds & returns", icon: TrendingDown, tone: "red" },
+    { label: "Top Products", value: String(topProducts.length), sub: "By revenue", icon: Award, tone: "orange" },
+  ];
+
+  const purchaseKpis: ReportKpiItem[] = [
+    { label: "Purchase Orders", value: String(purchaseSum?.orderCount ?? purchases.length), sub: range.label, icon: Truck, tone: "blue" },
+    { label: "PO Total", value: `LKR ${formatNumber(purchaseSum?.total ?? 0)}`, sub: "Order value", icon: DollarSign, tone: "violet" },
+    { label: "Paid", value: `LKR ${formatNumber(purchaseSum?.paidAmount ?? 0)}`, sub: "Settled amount", icon: Banknote, tone: "emerald" },
+    { label: "Outstanding", value: `LKR ${formatNumber(purchaseSum?.outstanding ?? 0)}`, sub: "Pending payment", icon: AlertTriangle, tone: "amber" },
+  ];
+
+  const supplierKpis: ReportKpiItem[] = [
+    { label: "Suppliers", value: String(suppliers.length), sub: "Active vendors", icon: Store, tone: "blue" },
+    { label: "Purchase Orders", value: String(supplierTotalPos), sub: "Total PO count", icon: Truck, tone: "violet" },
+    { label: "Total Paid", value: `LKR ${formatNumber(supplierTotalPaid)}`, sub: "Payments made", icon: DollarSign, tone: "emerald" },
+    { label: "Avg per Supplier", value: `LKR ${formatNumber(suppliers.length ? supplierTotalPaid / suppliers.length : 0)}`, sub: "Payment average", icon: BarChart2, tone: "orange" },
+  ];
+
+  const cashierKpis: ReportKpiItem[] = [
+    { label: "Cashiers", value: String(cashiers.length), sub: "Staff with sales", icon: Users, tone: "blue" },
+    { label: "Total Orders", value: String(cashierTotalOrders), sub: range.label, icon: ShoppingCart, tone: "violet" },
+    { label: "Revenue", value: `LKR ${formatNumber(cashierTotalRev)}`, sub: "Gross sales", icon: DollarSign, tone: "emerald" },
+    { label: "Tax Collected", value: `LKR ${formatNumber(cashiers.reduce((s, c) => s + c.totalTax, 0))}`, sub: "Total tax", icon: Receipt, tone: "teal" },
+    { label: "Discounts", value: `LKR ${formatNumber(cashiers.reduce((s, c) => s + c.totalDiscount, 0))}`, sub: "Given to customers", icon: Percent, tone: "orange" },
+  ];
+
+  const branchKpis: ReportKpiItem[] = [
+    { label: "Branches", value: String(branches.length), sub: "With sales activity", icon: Building2, tone: "blue" },
+    { label: "Total Revenue", value: `LKR ${formatNumber(branchTotalRev)}`, sub: range.label, icon: DollarSign, tone: "emerald" },
+    { label: "Total Orders", value: String(branchTotalOrders), sub: "Across branches", icon: ShoppingCart, tone: "violet" },
+    { label: "Avg per Branch", value: `LKR ${formatNumber(branches.length ? branchTotalRev / branches.length : 0)}`, sub: "Revenue average", icon: BarChart2, tone: "orange" },
+  ];
+
+  const chequeKpis: ReportKpiItem[] = [
+    { label: "Cheques", value: String(chequeSum?.count ?? cheques.length), sub: range.label, icon: CreditCard, tone: "blue" },
+    { label: "Total Amount", value: `LKR ${formatNumber(chequeSum?.totalAmount ?? cheques.reduce((s, c) => s + c.amount, 0))}`, sub: "Cheque value", icon: DollarSign, tone: "violet" },
+    { label: "Overdue", value: `LKR ${formatNumber(chequeSum?.overdue ?? 0)}`, sub: "Past due date", icon: AlertTriangle, tone: "red" },
+    { label: "Due ≤ 7 Days", value: `LKR ${formatNumber(chequeSum?.dueSoon ?? 0)}`, sub: "Upcoming", icon: Wallet, tone: "amber" },
+  ];
+
+  // ── KPI cards (overview) ───────────────────────────────────────────────
   const kpis: ReportKpiItem[] = [
     {
       label: "Net Revenue",
@@ -383,95 +569,108 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ SALES ══════════════════════ */}
           {section === "sales" && (
           <div className="m-0 space-y-5">
+            <ReportKpiGrid items={salesKpis} loading={loading} cols={6} />
 
-            <Card className="bg-card border shadow-sm">
-              <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Daily Revenue & Orders</CardTitle></CardHeader>
-              <CardContent>
-                {dailySales.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={260}>
-                    <BarChart data={dailySales} barCategoryGap="30%">
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} axisLine={false} tickLine={false} interval={Math.max(0,Math.floor(dailySales.length/10)-1)} />
-                      <YAxis yAxisId="r" tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <YAxis yAxisId="o" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v: number, name: string) => [name === "Revenue" ? fmtLKR(v) : v, name]} contentStyle={TT_STYLE} />
-                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
-                      <Bar yAxisId="r" dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[3,3,0,0]} />
-                      <Bar yAxisId="o" dataKey="orders"  name="Orders"  fill="#10b981" radius={[3,3,0,0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : <div className="h-[260px] flex items-center justify-center text-muted-foreground text-sm">No sales data for this period</div>}
-              </CardContent>
-            </Card>
+            <ReportChartCard title="Daily Revenue & Orders" description="Sales trend for selected period">
+              {loading ? (
+                <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+              ) : dailySales.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={dailySales} barCategoryGap="30%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} axisLine={false} tickLine={false} interval={Math.max(0, Math.floor(dailySales.length / 10) - 1)} />
+                    <YAxis yAxisId="r" tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="o" orientation="right" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v: number, name: string) => [name === "Revenue" ? fmtLKR(v) : v, name]} contentStyle={TT_STYLE} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar yAxisId="r" dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                    <Bar yAxisId="o" dataKey="orders" name="Orders" fill="#10b981" radius={[3, 3, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ReportEmpty message="No sales data for this period" />
+              )}
+            </ReportChartCard>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-
-              {/* Payment methods */}
-              <Card className="bg-card border shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Payment Methods</CardTitle></CardHeader>
-                <CardContent>
-                  {payBreakdown.length > 0 ? (
-                    <div className="flex items-center gap-6">
-                      <ResponsiveContainer width={150} height={160}>
-                        <PieChart>
-                          <Pie data={payBreakdown} dataKey="amount" cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2}>
-                            {payBreakdown.map((e, i) => <Cell key={i} fill={e.fill} />)}
-                          </Pie>
-                          <Tooltip formatter={(v: number) => [fmtLKR(v), ""]} contentStyle={TT_STYLE} />
-                        </PieChart>
-                      </ResponsiveContainer>
-                      <div className="flex-1 space-y-2">
-                        {payBreakdown.map((p) => {
-                          const tot = payBreakdown.reduce((s, x) => s + x.amount, 0);
-                          return (
-                            <div key={p.method} className="flex items-center justify-between text-xs">
-                              <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full" style={{ background: p.fill }} />{p.method.replace(/_/g," ")}</span>
-                              <div className="text-right">
-                                <span className="font-bold">LKR {formatNumber(p.amount)}</span>
-                                <span className="text-[10px] text-muted-foreground ml-1">({tot > 0 ? ((p.amount/tot)*100).toFixed(1) : 0}%)</span>
-                              </div>
+              <ReportChartCard title="Payment Methods" description="Revenue by payment type">
+                {loading ? (
+                  <div className="h-[200px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : payBreakdown.length > 0 ? (
+                  <div className="flex items-center gap-6">
+                    <ResponsiveContainer width={150} height={160}>
+                      <PieChart>
+                        <Pie data={payBreakdown} dataKey="amount" cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={2}>
+                          {payBreakdown.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [fmtLKR(v), ""]} contentStyle={TT_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="flex-1 space-y-2">
+                      {payBreakdown.map((p) => {
+                        const tot = payBreakdown.reduce((s, x) => s + x.amount, 0);
+                        const pct = tot > 0 ? (p.amount / tot) * 100 : 0;
+                        return (
+                          <div key={p.method}>
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="flex items-center gap-1.5 font-medium">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.fill }} />
+                                {p.method.replace(/_/g, " ")}
+                              </span>
+                              <span className="font-bold tabular-nums">LKR {formatNumber(p.amount)}</span>
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">No payment data</div>}
-                </CardContent>
-              </Card>
+                  </div>
+                ) : (
+                  <ReportEmpty message="No payment data" />
+                )}
+              </ReportChartCard>
 
-              {/* Period summary */}
-              <Card className="bg-card border shadow-sm">
-                <CardHeader className="pb-2"><CardTitle className="text-sm font-semibold">Period Summary</CardTitle></CardHeader>
-                <CardContent className="space-y-2.5">
-                  {[
-                    { label: "Gross Revenue",    val: `LKR ${formatNumber(pl?.revenue.gross ?? 0)}`,              color: "text-foreground" },
-                    { label: "Less: Returns",    val: `− LKR ${formatNumber(pl?.revenue.returns ?? 0)}`,          color: "text-red-500" },
-                    { label: "Net Revenue",      val: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`,                color: "text-emerald-600", bold: true },
-                    { label: "Cost of Goods",    val: `− LKR ${formatNumber(pl?.costOfGoodsSold ?? 0)}`,          color: "text-orange-600", hide: !(pl?.costOfGoodsSold ?? 0) },
-                    { label: "Gross Profit",     val: `LKR ${formatNumber(pl?.grossProfit ?? 0)}`,               color: (pl?.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true, hide: !(pl?.costOfGoodsSold ?? 0) },
-                    { label: "Expenses",         val: `− LKR ${formatNumber(pl?.expenses.total ?? 0)}`,           color: "text-red-500" },
-                    { label: "Net Profit",       val: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`,        color: (pl?.netProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true },
-                    { label: "Profit Margin",    val: `${pl?.profitMargin ?? 0}%`,                                color: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "text-emerald-600" : "text-red-600" },
-                    { label: "Avg Order Value",  val: `LKR ${formatNumber(avgOrder)}`,                           color: "text-foreground" },
-                    { label: "Total Orders",     val: `${pl?.salesCount ?? 0} orders`,                           color: "text-foreground" },
-                  ].filter((r) => !("hide" in r && r.hide)).map((r) => (
-                    <div key={r.label} className={`flex justify-between items-center text-xs ${r.bold ? "border-t pt-2 mt-1" : ""}`}>
-                      <span className="text-muted-foreground">{r.label}</span>
-                      <span className={`${r.bold ? "font-bold text-sm" : "font-semibold"} ${r.color}`}>{r.val}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
+              <ReportChartCard title="Period Summary" description="P&L breakdown for selected range">
+                {loading ? (
+                  <div className="h-[200px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : (
+                  <div className="space-y-2.5">
+                    {[
+                      { label: "Gross Revenue", val: `LKR ${formatNumber(pl?.revenue.gross ?? 0)}`, color: "text-foreground" },
+                      { label: "Less: Returns", val: `− LKR ${formatNumber(pl?.revenue.returns ?? 0)}`, color: "text-red-500" },
+                      { label: "Net Revenue", val: `LKR ${formatNumber(pl?.revenue.net ?? 0)}`, color: "text-emerald-600", bold: true },
+                      { label: "Cost of Goods", val: `− LKR ${formatNumber(pl?.costOfGoodsSold ?? 0)}`, color: "text-orange-600", hide: !(pl?.costOfGoodsSold ?? 0) },
+                      { label: "Gross Profit", val: `LKR ${formatNumber(pl?.grossProfit ?? 0)}`, color: (pl?.grossProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true, hide: !(pl?.costOfGoodsSold ?? 0) },
+                      { label: "Expenses", val: `− LKR ${formatNumber(pl?.expenses.total ?? 0)}`, color: "text-red-500" },
+                      { label: "Net Profit", val: `LKR ${formatNumber(Math.abs(pl?.netProfit ?? 0))}`, color: (pl?.netProfit ?? 0) >= 0 ? "text-emerald-600" : "text-red-600", bold: true },
+                      { label: "Profit Margin", val: `${pl?.profitMargin ?? 0}%`, color: parseFloat(pl?.profitMargin ?? "0") >= 0 ? "text-emerald-600" : "text-red-600" },
+                      { label: "Avg Order Value", val: `LKR ${formatNumber(avgOrder)}`, color: "text-foreground" },
+                      { label: "Total Orders", val: `${pl?.salesCount ?? 0} orders`, color: "text-foreground" },
+                    ].filter((r) => !("hide" in r && r.hide)).map((r) => (
+                      <div key={r.label} className={`flex justify-between items-center text-xs ${r.bold ? "border-t pt-2 mt-1" : ""}`}>
+                        <span className="text-muted-foreground">{r.label}</span>
+                        <span className={`${r.bold ? "font-bold text-sm" : "font-semibold"} ${r.color}`}>{r.val}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ReportChartCard>
             </div>
 
-            {/* Top products full table */}
             <Card className="bg-card border shadow-sm">
-              <CardHeader className="pb-0"><CardTitle className="text-sm font-semibold">Top Products by Revenue</CardTitle></CardHeader>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Award className="h-4 w-4 text-primary" />
+                  Top Products by Revenue
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["#","Product","Units Sold","Revenue","% of Total"].map((h, i) => (
+                      {["#", "Product", "Units Sold", "Revenue", "Share"].map((h, i) => (
                         <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 2 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
@@ -483,16 +682,9 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
                         <tr key={p.name} className="hover:bg-muted/50 transition-colors">
                           <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                           <td className="px-4 py-2.5 text-xs font-medium">{p.name}</td>
-                          <td className="px-4 py-2.5 text-xs text-right">{p.qty}</td>
-                          <td className="px-4 py-2.5 text-xs font-bold text-right">LKR {formatNumber(p.rev)}</td>
-                          <td className="px-4 py-2.5 text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
-                                <div className="h-full rounded-full bg-primary" style={{ width: `${tot > 0 ? (p.rev/tot)*100 : 0}%` }} />
-                              </div>
-                              <span className="text-[10px] text-muted-foreground w-8 text-right">{tot > 0 ? ((p.rev/tot)*100).toFixed(1) : 0}%</span>
-                            </div>
-                          </td>
+                          <td className="px-4 py-2.5 text-xs text-right tabular-nums">{p.qty}</td>
+                          <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(p.rev)}</td>
+                          <td className="px-4 py-2.5 text-right"><ShareCell value={p.rev} total={tot} /></td>
                         </tr>
                       );
                     }) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No product sales data for this period</td></tr>}
@@ -502,26 +694,33 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
             </Card>
 
             <Card className="bg-card border shadow-sm">
-              <CardHeader className="pb-0"><CardTitle className="text-sm font-semibold">Cashier Performance</CardTitle></CardHeader>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  Cashier Performance
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Cashier","Orders","Revenue","Discounts","Tax"].map((h, i) => (
-                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 1 ? "text-right" : "text-left"}`}>{h}</th>
+                      {["#", "Cashier", "Orders", "Revenue", "Discounts", "Tax", "Share"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 2 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {cashiers.length > 0 ? cashiers.map((c) => (
+                    {cashiers.length > 0 ? cashiers.map((c, i) => (
                       <tr key={c.cashierName} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
-                        <td className="px-4 py-2.5 text-xs text-right">{c.salesCount}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold text-right">LKR {formatNumber(c.totalRevenue)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-amber-600">LKR {formatNumber(c.totalDiscount)}</td>
-                        <td className="px-4 py-2.5 text-xs text-right text-blue-600">LKR {formatNumber(c.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">{c.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(c.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-right"><ShareCell value={c.totalRevenue} total={cashierTotalRev} /></td>
                       </tr>
-                    )) : <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier data for this period</td></tr>}
+                    )) : <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier data for this period</td></tr>}
                   </tbody>
                 </table>
               </CardContent>
@@ -694,42 +893,96 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ PURCHASES ══════════════════════ */}
           {section === "purchases" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "PO Count", val: purchaseSum?.orderCount ?? purchases.length, curr: false },
-                { label: "PO Total", val: purchaseSum?.total ?? 0, curr: true },
-                { label: "Paid", val: purchaseSum?.paidAmount ?? 0, curr: true },
-                { label: "Outstanding", val: purchaseSum?.outstanding ?? 0, curr: true },
-              ].map((k) => (
-                <Card key={k.label} className="bg-card border shadow-sm">
-                  <CardContent className="p-4">
-                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
-                    <p className="text-xs text-muted-foreground">{k.label}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            <ReportKpiGrid items={purchaseKpis} loading={loading} cols={4} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+              <ReportChartCard title="Purchases by Supplier" description="Top suppliers by PO value" className="lg:col-span-3">
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : purchaseChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={purchaseChartData} barCategoryGap="22%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => [fmtLKR(v), "PO Total"]} contentStyle={TT_STYLE} />
+                      <Bar dataKey="total" name="PO Total" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ReportEmpty message="No purchases in range" />
+                )}
+              </ReportChartCard>
+
+              <ReportChartCard title="PO Status Mix" description="Orders by status" className="lg:col-span-2">
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : purchaseStatusData.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={purchaseStatusData} dataKey="count" nameKey="status" cx="50%" cy="50%" innerRadius={42} outerRadius={68} paddingAngle={2}>
+                          {purchaseStatusData.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [v, "Orders"]} contentStyle={TT_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2">
+                      {purchaseStatusData.map((s) => {
+                        const tot = purchaseStatusData.reduce((a, x) => a + x.count, 0);
+                        const pct = tot > 0 ? (s.count / tot) * 100 : 0;
+                        return (
+                          <div key={s.status}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-medium">{s.status}</span>
+                              <span className="font-bold">{s.count} ({pct.toFixed(0)}%)</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <ReportEmpty message="No purchase status data" />
+                )}
+              </ReportChartCard>
             </div>
+
             <Card className="bg-card border shadow-sm">
-              <CardHeader className="pb-0"><CardTitle className="text-sm font-semibold">Purchase Orders</CardTitle></CardHeader>
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Truck className="h-4 w-4 text-primary" />
+                  Purchase Orders
+                </CardTitle>
+              </CardHeader>
               <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["PO", "Supplier", "Date", "Status", "Total", "Paid", "Due"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["PO", "Supplier", "Date", "Status", "Total", "Paid", "Due"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 4 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border">
                     {purchases.length ? purchases.map((p) => (
-                      <tr key={p.poNumber} className="hover:bg-muted/50">
+                      <tr key={p.poNumber} className="hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-2.5 text-xs font-mono">{p.poNumber}</td>
-                        <td className="px-4 py-2.5 text-xs">{p.supplierName}</td>
-                        <td className="px-4 py-2.5 text-xs">{p.orderDate ? new Date(p.orderDate).toLocaleDateString("en-LK") : "—"}</td>
-                        <td className="px-4 py-2.5 text-[10px] font-semibold">{p.status}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(p.total)}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(p.paidAmount)}</td>
-                        <td className="px-4 py-2.5 text-xs text-amber-600">LKR {formatNumber(p.outstanding)}</td>
+                        <td className="px-4 py-2.5 text-xs font-medium">{p.supplierName}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{p.orderDate ? new Date(p.orderDate).toLocaleDateString("en-LK") : "—"}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            p.status === "RECEIVED" || p.status === "COMPLETED" ? "bg-emerald-500/10 text-emerald-600"
+                            : p.status === "CANCELLED" ? "bg-red-500/10 text-red-600"
+                            : "bg-amber-500/10 text-amber-600"
+                          }`}>{p.status}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(p.total)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-emerald-600 tabular-nums">LKR {formatNumber(p.paidAmount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(p.outstanding)}</td>
                       </tr>
                     )) : (
                       <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No purchases in range</td></tr>
@@ -744,32 +997,61 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ SUPPLIERS ══════════════════════ */}
           {section === "suppliers" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{suppliers.length}</p><p className="text-xs text-muted-foreground">Suppliers</p></CardContent></Card>
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{suppliers.reduce((s, r) => s + (r._count?.purchases ?? 0), 0)}</p><p className="text-xs text-muted-foreground">Purchase orders</p></CardContent></Card>
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">LKR {formatNumber(suppliers.reduce((s, r) => s + r.totalPaid, 0))}</p><p className="text-xs text-muted-foreground">Total paid</p></CardContent></Card>
-            </div>
+            <ReportKpiGrid items={supplierKpis} loading={loading} cols={4} />
+
+            <ReportChartCard title="Top Suppliers by Payments" description="Highest paid vendors">
+              {loading ? (
+                <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+              ) : suppliers.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart
+                    data={suppliers.slice(0, 8).map((s) => ({
+                      name: s.name.length > 14 ? `${s.name.slice(0, 14)}…` : s.name,
+                      paid: s.totalPaid,
+                    }))}
+                    barCategoryGap="22%"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v: number) => [fmtLKR(v), "Paid"]} contentStyle={TT_STYLE} />
+                    <Bar dataKey="paid" name="Paid" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ReportEmpty message="No supplier data" />
+              )}
+            </ReportChartCard>
+
             <Card className="bg-card border shadow-sm">
-              <CardContent className="p-0">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Store className="h-4 w-4 text-primary" />
+                  Supplier Ledger
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Supplier", "Phone", "POs", "Payments", "Paid"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["#", "Supplier", "Phone", "POs", "Payments", "Paid", "Share"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {suppliers.length ? suppliers.map((s) => (
-                      <tr key={s.name + s.phone} className="hover:bg-muted/50">
+                  <tbody className="divide-y divide-border">
+                    {suppliers.length ? suppliers.map((s, i) => (
+                      <tr key={s.name + s.phone} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-medium">{s.name}</td>
-                        <td className="px-4 py-2.5 text-xs">{s.phone}</td>
-                        <td className="px-4 py-2.5 text-xs">{s._count?.purchases ?? 0}</td>
-                        <td className="px-4 py-2.5 text-xs">{s.paymentCount}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(s.totalPaid)}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.phone}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">{s._count?.purchases ?? 0}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">{s.paymentCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(s.totalPaid)}</td>
+                        <td className="px-4 py-2.5 text-right"><ShareCell value={s.totalPaid} total={supplierTotalPaid} /></td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No suppliers</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No suppliers</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -781,42 +1063,57 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ CASHIER ══════════════════════ */}
           {section === "cashier" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Cashiers", val: cashiers.length },
-                { label: "Sales", val: cashiers.reduce((s, c) => s + c.salesCount, 0) },
-                { label: "Revenue", val: cashiers.reduce((s, c) => s + c.totalRevenue, 0), curr: true },
-                { label: "Tax", val: cashiers.reduce((s, c) => s + c.totalTax, 0), curr: true },
-              ].map((k) => (
-                <Card key={k.label} className="bg-card border shadow-sm">
-                  <CardContent className="p-4">
-                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
-                    <p className="text-xs text-muted-foreground">{k.label}</p>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ReportKpiGrid items={cashierKpis} loading={loading} cols={5} />
+
+            <ReportChartCard title="Revenue by Cashier" description="Staff sales comparison">
+              {loading ? (
+                <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+              ) : cashierChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={cashierChartData} barCategoryGap="22%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v: number, name: string) => [name === "revenue" ? fmtLKR(v) : v, name === "revenue" ? "Revenue" : "Orders"]} contentStyle={TT_STYLE} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="orders" name="Orders" fill="#10b981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ReportEmpty message="No cashier sales in range" />
+              )}
+            </ReportChartCard>
+
             <Card className="bg-card border shadow-sm">
-              <CardContent className="p-0">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4 text-primary" />
+                  Cashier Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Cashier", "Sales", "Revenue", "Discount", "Tax"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["#", "Cashier", "Sales", "Revenue", "Discount", "Tax", "Share"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 2 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {cashiers.length ? cashiers.map((c) => (
-                      <tr key={c.cashierName} className="hover:bg-muted/50">
+                  <tbody className="divide-y divide-border">
+                    {cashiers.length ? cashiers.map((c, i) => (
+                      <tr key={c.cashierName} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-medium">{c.cashierName}</td>
-                        <td className="px-4 py-2.5 text-xs">{c.salesCount}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(c.totalRevenue)}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(c.totalDiscount)}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(c.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">{c.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(c.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(c.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-right"><ShareCell value={c.totalRevenue} total={cashierTotalRev} /></td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier sales in range</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">No cashier sales in range</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -828,33 +1125,58 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ BRANCHES ══════════════════════ */}
           {section === "branches" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{branches.length}</p><p className="text-xs text-muted-foreground">Branches with sales</p></CardContent></Card>
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">LKR {formatNumber(branches.reduce((s, b) => s + b.totalRevenue, 0))}</p><p className="text-xs text-muted-foreground">Total revenue</p></CardContent></Card>
-              <Card className="bg-card border shadow-sm"><CardContent className="p-4"><p className="text-lg font-bold">{branches.reduce((s, b) => s + b.salesCount, 0)}</p><p className="text-xs text-muted-foreground">Orders</p></CardContent></Card>
-            </div>
+            <ReportKpiGrid items={branchKpis} loading={loading} cols={4} />
+
+            <ReportChartCard title="Revenue by Branch" description="Branch sales comparison">
+              {loading ? (
+                <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+              ) : branchChartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={branchChartData} barCategoryGap="22%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                    <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                    <Tooltip formatter={(v: number, name: string) => [name === "revenue" ? fmtLKR(v) : v, name === "revenue" ? "Revenue" : "Orders"]} contentStyle={TT_STYLE} />
+                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
+                    <Bar dataKey="revenue" name="Revenue" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="orders" name="Orders" fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <ReportEmpty message="No branch sales in range" />
+              )}
+            </ReportChartCard>
+
             <Card className="bg-card border shadow-sm">
-              <CardContent className="p-0">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-primary" />
+                  Branch Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Branch", "Code", "Sales", "Revenue", "Tax", "Discount"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["#", "Branch", "Code", "Sales", "Revenue", "Tax", "Discount", "Share"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 3 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {branches.length ? branches.map((b) => (
-                      <tr key={b.branchName + b.branchCode} className="hover:bg-muted/50">
+                  <tbody className="divide-y divide-border">
+                    {branches.length ? branches.map((b, i) => (
+                      <tr key={b.branchName + b.branchCode} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
                         <td className="px-4 py-2.5 text-xs font-medium">{b.branchName}</td>
-                        <td className="px-4 py-2.5 text-xs font-mono">{b.branchCode}</td>
-                        <td className="px-4 py-2.5 text-xs">{b.salesCount}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(b.totalRevenue)}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(b.totalTax)}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(b.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-xs font-mono text-muted-foreground">{b.branchCode}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">{b.salesCount}</td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(b.totalRevenue)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-blue-600 tabular-nums">LKR {formatNumber(b.totalTax)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right text-amber-600 tabular-nums">LKR {formatNumber(b.totalDiscount)}</td>
+                        <td className="px-4 py-2.5 text-right"><ShareCell value={b.totalRevenue} total={branchTotalRev} /></td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No branch sales in range</td></tr>
+                      <tr><td colSpan={8} className="px-4 py-8 text-center text-sm text-muted-foreground">No branch sales in range</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -866,40 +1188,99 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ CHEQUES ══════════════════════ */}
           {section === "cheques" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Cheques", val: chequeSum?.count ?? cheques.length, curr: false },
-                { label: "Total amount", val: chequeSum?.totalAmount ?? 0, curr: true },
-                { label: "Overdue", val: chequeSum?.overdue ?? 0, curr: true },
-                { label: "Due ≤7d", val: chequeSum?.dueSoon ?? 0, curr: true },
-              ].map((k) => (
-                <Card key={k.label} className="bg-card border shadow-sm">
-                  <CardContent className="p-4">
-                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
-                    <p className="text-xs text-muted-foreground">{k.label}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            <ReportKpiGrid items={chequeKpis} loading={loading} cols={4} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+              <ReportChartCard title="Cheques by Status" description="Amount by cheque status" className="lg:col-span-3">
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : chequeByStatus.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={chequeByStatus} barCategoryGap="22%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="status" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => [fmtLKR(v), "Amount"]} contentStyle={TT_STYLE} />
+                      <Bar dataKey="amount" name="Amount" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ReportEmpty message="No cheques in range" />
+                )}
+              </ReportChartCard>
+
+              <ReportChartCard title="Status Mix" description="Share of total cheque value" className="lg:col-span-2">
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : chequeByStatus.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie data={chequeByStatus} dataKey="amount" nameKey="status" cx="50%" cy="50%" innerRadius={42} outerRadius={68} paddingAngle={2}>
+                          {chequeByStatus.map((e, i) => <Cell key={i} fill={e.fill} />)}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [fmtLKR(v), "Amount"]} contentStyle={TT_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2">
+                      {chequeByStatus.map((s) => {
+                        const tot = chequeByStatus.reduce((a, x) => a + x.amount, 0);
+                        const pct = tot > 0 ? (s.amount / tot) * 100 : 0;
+                        return (
+                          <div key={s.status}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="font-medium">{s.status}</span>
+                              <span className="font-bold">{pct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <ReportEmpty message="No cheque breakdown" />
+                )}
+              </ReportChartCard>
             </div>
+
             <Card className="bg-card border shadow-sm">
-              <CardContent className="p-0">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-primary" />
+                  Cheque Register
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Cheque #", "Direction", "Party", "Due", "Status", "Amount"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["Cheque #", "Direction", "Party", "Due", "Status", "Amount"].map((h, i) => (
+                        <th key={h} className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i === 5 ? "text-right" : "text-left"}`}>{h}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
+                  <tbody className="divide-y divide-border">
                     {cheques.length ? cheques.map((c) => (
-                      <tr key={c.chequeNumber + c.status} className="hover:bg-muted/50">
+                      <tr key={c.chequeNumber + c.status} className="hover:bg-muted/50 transition-colors">
                         <td className="px-4 py-2.5 text-xs font-mono">{c.chequeNumber}</td>
-                        <td className="px-4 py-2.5 text-xs">{c.direction}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            c.direction === "IN" ? "bg-emerald-500/10 text-emerald-600" : "bg-blue-500/10 text-blue-600"
+                          }`}>{c.direction}</span>
+                        </td>
                         <td className="px-4 py-2.5 text-xs">{c.partyName ?? "—"}</td>
-                        <td className="px-4 py-2.5 text-xs">{c.dueDate ? new Date(c.dueDate).toLocaleDateString("en-LK") : "—"}</td>
-                        <td className="px-4 py-2.5 text-[10px] font-semibold">{c.status}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold">LKR {formatNumber(c.amount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{c.dueDate ? new Date(c.dueDate).toLocaleDateString("en-LK") : "—"}</td>
+                        <td className="px-4 py-2.5">
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                            c.status === "CLEARED" ? "bg-emerald-500/10 text-emerald-600"
+                            : c.status === "BOUNCED" || c.status === "CANCELLED" ? "bg-red-500/10 text-red-600"
+                            : "bg-amber-500/10 text-amber-600"
+                          }`}>{c.status}</span>
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-bold text-right tabular-nums">LKR {formatNumber(c.amount)}</td>
                       </tr>
                     )) : (
                       <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-muted-foreground">No cheques in range</td></tr>
@@ -914,44 +1295,187 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
           {/* ══════════════════════ COMMISSION ══════════════════════ */}
           {section === "commission" && (
           <div className="m-0 space-y-5">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Helpers", val: commSum?.helpers ?? commRows.length, curr: false },
-                { label: "Sales", val: commSum?.salesCount ?? 0, curr: false },
-                { label: "Sales total", val: commSum?.salesTotal ?? 0, curr: true },
-                { label: "Commission", val: commSum?.commissionTotal ?? 0, curr: true },
-              ].map((k) => (
-                <Card key={k.label} className="bg-card border shadow-sm">
-                  <CardContent className="p-4">
-                    <p className="text-lg font-bold">{k.curr ? `LKR ${formatNumber(k.val)}` : k.val}</p>
-                    <p className="text-xs text-muted-foreground">{k.label}</p>
-                  </CardContent>
-                </Card>
-              ))}
+            <ReportKpiGrid items={commissionKpis} loading={loading} cols={5} />
+
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
+              <ReportChartCard
+                title="Commission by Helper"
+                description="Top earners for selected period"
+                className="lg:col-span-3"
+              >
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : commChartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={commChartData} barCategoryGap="22%">
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number, name: string) => [fmtLKR(v), name === "commission" ? "Commission" : "Sales"]} contentStyle={TT_STYLE} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
+                      <Bar dataKey="commission" name="Commission" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="sales" name="Sales" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ReportEmpty message="No helper commission for this period" />
+                )}
+              </ReportChartCard>
+
+              <ReportChartCard
+                title="Commission Mix"
+                description="Share of total commission"
+                className="lg:col-span-2"
+              >
+                {loading ? (
+                  <div className="h-[260px] rounded-xl bg-muted/40 animate-pulse" />
+                ) : commRows.length > 0 ? (
+                  <div className="flex flex-col gap-4">
+                    <ResponsiveContainer width="100%" height={160}>
+                      <PieChart>
+                        <Pie
+                          data={commRows.slice(0, 5)}
+                          dataKey="commissionTotal"
+                          nameKey="helperName"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={42}
+                          outerRadius={68}
+                          paddingAngle={2}
+                        >
+                          {commRows.slice(0, 5).map((_, i) => (
+                            <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={(v: number) => [fmtLKR(v), "Commission"]} contentStyle={TT_STYLE} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="space-y-2">
+                      {commRows.slice(0, 5).map((r, i) => {
+                        const pct = totalCommission > 0 ? (r.commissionTotal / totalCommission) * 100 : 0;
+                        return (
+                          <div key={r.helperName}>
+                            <div className="flex justify-between text-xs mb-1">
+                              <span className="flex items-center gap-1.5 font-medium truncate">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: COLORS[i % COLORS.length] }} />
+                                {r.helperName}
+                              </span>
+                              <span className="font-bold shrink-0">{pct.toFixed(1)}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <ReportEmpty message="No commission breakdown" />
+                )}
+              </ReportChartCard>
             </div>
+
             <Card className="bg-card border shadow-sm">
-              <CardContent className="p-0">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                  <Award className="h-4 w-4 text-primary" />
+                  Helper Performance
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
                 <table className="w-full">
                   <thead>
                     <tr className="border-y bg-muted/30">
-                      {["Helper", "Sales", "Sales total", "Commission"].map((h) => (
-                        <th key={h} className="px-4 py-2 text-[10px] font-semibold text-muted-foreground uppercase text-left">{h}</th>
+                      {["#", "Helper", "Sales", "Sales Total", "Commission", "Rate", "Share"].map((h, i) => (
+                        <th
+                          key={h}
+                          className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 2 ? "text-right" : "text-left"}`}
+                        >
+                          {h}
+                        </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y">
-                    {commRows.length ? commRows.map((r) => (
-                      <tr key={r.helperName} className="hover:bg-muted/50">
-                        <td className="px-4 py-2.5 text-xs font-medium">{r.helperName}</td>
-                        <td className="px-4 py-2.5 text-xs">{r.salesCount}</td>
-                        <td className="px-4 py-2.5 text-xs">LKR {formatNumber(r.salesTotal)}</td>
-                        <td className="px-4 py-2.5 text-xs font-bold text-emerald-600">LKR {formatNumber(r.commissionTotal)}</td>
+                  <tbody className="divide-y divide-border">
+                    {commRows.length > 0 ? commRows.map((r, i) => {
+                      const rate = r.salesTotal > 0 ? (r.commissionTotal / r.salesTotal) * 100 : 0;
+                      const share = totalCommission > 0 ? (r.commissionTotal / totalCommission) * 100 : 0;
+                      return (
+                        <tr key={r.helperName} className="hover:bg-muted/50 transition-colors">
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{i + 1}</td>
+                          <td className="px-4 py-2.5 text-xs font-medium">{r.helperName}</td>
+                          <td className="px-4 py-2.5 text-xs text-right tabular-nums">{r.salesCount}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-semibold tabular-nums">LKR {formatNumber(r.salesTotal)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right font-bold text-emerald-600 tabular-nums">LKR {formatNumber(r.commissionTotal)}</td>
+                          <td className="px-4 py-2.5 text-xs text-right text-muted-foreground tabular-nums">{rate.toFixed(2)}%</td>
+                          <td className="px-4 py-2.5 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <div className="w-16 h-1.5 rounded-full bg-muted overflow-hidden">
+                                <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
+                              </div>
+                              <span className="text-[10px] text-muted-foreground w-8 tabular-nums">{share.toFixed(1)}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          No helper commission in range — assign helpers on POS sales to track earnings
+                        </td>
                       </tr>
-                    )) : (
-                      <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-muted-foreground">No helper commission in range</td></tr>
                     )}
                   </tbody>
                 </table>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card border shadow-sm">
+              <CardHeader className="pb-0">
+                <CardTitle className="text-sm font-semibold">Commission Transactions</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0 mt-3">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-y bg-muted/30">
+                      {["Invoice", "Date", "Helper", "Cashier", "Branch", "Sale", "Commission"].map((h, i) => (
+                        <th
+                          key={h}
+                          className={`px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide ${i >= 5 ? "text-right" : "text-left"}`}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {commSales.length > 0 ? commSales.slice(0, 50).map((s) => (
+                      <tr key={s.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-4 py-2.5 text-xs font-mono">{s.invoiceNumber}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">
+                          {new Date(s.invoiceDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" })}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs font-medium">{s.helperName ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.cashierName ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.branchName ?? "—"}</td>
+                        <td className="px-4 py-2.5 text-xs text-right tabular-nums">LKR {formatNumber(s.total)}</td>
+                        <td className="px-4 py-2.5 text-xs text-right font-bold text-emerald-600 tabular-nums">LKR {formatNumber(s.helperCommission)}</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan={7} className="px-4 py-8 text-center text-sm text-muted-foreground">
+                          No commission transactions for this period
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {commSales.length > 50 && (
+                  <p className="px-4 py-2 text-[10px] text-muted-foreground border-t">
+                    Showing latest 50 of {commSales.length} transactions
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>

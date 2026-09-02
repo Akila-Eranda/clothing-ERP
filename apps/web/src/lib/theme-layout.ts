@@ -173,10 +173,19 @@ function paletteToChromePatch(
   };
 }
 
-export function sidebarSkinToSidebarId(topbarSkin: TopbarSkin): SidebarSkin {
+export function topbarSkinToSidebarSkin(topbarSkin: TopbarSkin): SidebarSkin {
   if (topbarSkin === "white") return "light";
   if (topbarSkin === "topbarcolorone") return "sidebarcolorone";
   return topbarSkin.replace("topbar", "sidebar") as SidebarSkin;
+}
+
+/** @deprecated Use topbarSkinToSidebarSkin */
+export const sidebarSkinToSidebarId = topbarSkinToSidebarSkin;
+
+export function sidebarSkinToTopbarSkin(sidebarSkin: SidebarSkin): TopbarSkin {
+  if (sidebarSkin === "light") return "white";
+  if (sidebarSkin === "sidebarcolorone") return "topbarcolorone";
+  return sidebarSkin.replace("sidebar", "topbar") as TopbarSkin;
 }
 
 /** Map a layout skin to theme color store fields for the active color mode. */
@@ -204,7 +213,7 @@ export function getTopbarSkinChromePatch(
   skin: TopbarSkin,
   isDarkMode: boolean,
 ): Partial<import("@/lib/theme-colors").ThemeColorsState> {
-  return getSidebarSkinChromePatch(sidebarSkinToSidebarId(skin), isDarkMode);
+  return getSidebarSkinChromePatch(topbarSkinToSidebarSkin(skin), isDarkMode);
 }
 
 /** Solid + gradient sidebar swatches (from DreamsPOS variables). */

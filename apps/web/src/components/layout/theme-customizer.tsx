@@ -31,8 +31,6 @@ import { ACCENT_PRESETS, type AccentId } from "@/lib/accent-theme";
 import {
   SIDEBAR_SKIN_SWATCHES,
   TOPBAR_SKIN_SWATCHES,
-  getSidebarSkinChromePatch,
-  getTopbarSkinChromePatch,
   type LayoutMode,
   type LayoutWidth,
   type SidebarSkin,
@@ -162,43 +160,6 @@ function ColorField({
           spellCheck={false}
         />
       </div>
-    </div>
-  );
-}
-
-function ChromeColorFields({
-  isDark,
-  colors,
-  setColor,
-}: {
-  isDark: boolean;
-  colors: ReturnType<typeof useThemeColorsStore.getState>;
-  setColor: ReturnType<typeof useThemeColorsStore.getState>["setColor"];
-}) {
-  const bg = isDark ? colors.darkChromeBg : colors.lightChromeBg;
-  const fg = isDark ? colors.darkChromeFg : colors.lightChromeFg;
-  const border = isDark ? colors.darkChromeBorder : colors.lightChromeBorder;
-  const muted = isDark ? colors.darkChromeMuted : colors.lightChromeMuted;
-  const active = isDark ? colors.darkChromeActive : colors.lightChromeActive;
-  const logo = isDark ? colors.darkChromeLogoBg : colors.lightChromeLogoBg;
-  const bgCssKey = isDark ? "darkChromeBgCss" : "lightChromeBgCss";
-  const bgKey = isDark ? "darkChromeBg" : "lightChromeBg";
-
-  return (
-    <div className="tc-color-list tc-color-list--nested">
-      <ColorField
-        label="Background"
-        value={bg}
-        onChange={(v) => {
-          setColor(bgKey, v);
-          setColor(bgCssKey, "");
-        }}
-      />
-      <ColorField label="Text" value={fg} onChange={(v) => setColor(isDark ? "darkChromeFg" : "lightChromeFg", v)} />
-      <ColorField label="Border" value={border} onChange={(v) => setColor(isDark ? "darkChromeBorder" : "lightChromeBorder", v)} />
-      <ColorField label="Muted text" value={muted} onChange={(v) => setColor(isDark ? "darkChromeMuted" : "lightChromeMuted", v)} />
-      <ColorField label="Active / accent" value={active} onChange={(v) => setColor(isDark ? "darkChromeActive" : "lightChromeActive", v)} />
-      <ColorField label="Logo area" value={logo} onChange={(v) => setColor(isDark ? "darkChromeLogoBg" : "lightChromeLogoBg", v)} />
     </div>
   );
 }
@@ -350,7 +311,6 @@ export function ThemeCustomizer() {
     setDarkAccent,
     setCustomDarkAccent,
     setColor,
-    patchColors,
     reset: resetColors,
   } = colors;
 
@@ -359,12 +319,10 @@ export function ThemeCustomizer() {
 
   const handleSidebarSkin = (skin: SidebarSkin) => {
     setSidebarSkin(skin);
-    patchColors(getSidebarSkinChromePatch(skin, previewIsDark));
   };
 
   const handleTopbarSkin = (skin: TopbarSkin) => {
     setTopbarSkin(skin);
-    patchColors(getTopbarSkinChromePatch(skin, previewIsDark));
   };
 
   const pickLayout = (mode: LayoutMode) => {
@@ -591,7 +549,6 @@ export function ThemeCustomizer() {
                     options={TOPBAR_SKIN_SWATCHES}
                     onChange={handleTopbarSkin}
                   />
-                  <ChromeColorFields isDark={previewIsDark} colors={colors} setColor={setColor} />
                 </Section>
 
                 <Section title="Sidebar" description="Navigation panel style" icon={PanelLeft}>
@@ -600,7 +557,6 @@ export function ThemeCustomizer() {
                     options={SIDEBAR_SKIN_SWATCHES}
                     onChange={handleSidebarSkin}
                   />
-                  <ChromeColorFields isDark={previewIsDark} colors={colors} setColor={setColor} />
                 </Section>
               </div>
             )}

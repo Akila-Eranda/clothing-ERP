@@ -196,11 +196,13 @@ export function ReportKpiGrid({
 }: {
   items: ReportKpiItem[];
   loading?: boolean;
-  cols?: 2 | 3 | 4 | 6;
+  cols?: 2 | 3 | 4 | 5 | 6;
 }) {
   const grid =
     cols === 6
       ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-6"
+      : cols === 5
+        ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-5"
       : cols === 4
         ? "grid-cols-2 md:grid-cols-4"
         : cols === 3

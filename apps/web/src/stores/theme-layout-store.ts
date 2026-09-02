@@ -11,6 +11,11 @@ import {
   type ThemeLayoutState,
   type TopbarSkin,
 } from "@/lib/theme-layout";
+import { useThemeColorsStore } from "@/stores/theme-colors-store";
+
+function refreshChromeColors() {
+  useThemeColorsStore.getState().apply();
+}
 
 interface ThemeLayoutStore extends ThemeLayoutState {
   setLayout: (layout: LayoutMode) => void;
@@ -39,11 +44,13 @@ export const useThemeLayoutStore = create<ThemeLayoutStore>()(
       setSidebarSkin: (sidebarSkin) => {
         set({ sidebarSkin });
         applyThemeLayout({ ...get(), sidebarSkin });
+        refreshChromeColors();
       },
 
       setTopbarSkin: (topbarSkin) => {
         set({ topbarSkin });
         applyThemeLayout({ ...get(), topbarSkin });
+        refreshChromeColors();
       },
 
       reset: () => {

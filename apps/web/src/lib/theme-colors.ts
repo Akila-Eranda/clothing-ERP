@@ -10,6 +10,14 @@ import {
   getAccentPreset,
   type AccentId,
 } from "@/lib/accent-theme";
+import {
+  getSidebarSkinChromePatch,
+  getTopbarSkinChromePatch,
+  isDefaultLightSidebar,
+  isDefaultLightTopbar,
+  type SidebarSkin,
+  type TopbarSkin,
+} from "@/lib/theme-layout";
 
 export type LightAccentChoice = AccentId | "custom";
 export type DarkAccentChoice = AccentId | "custom" | "match-light";
@@ -224,6 +232,114 @@ function resolveAccentId(state: ThemeColorsState, isDark: boolean): string {
   return state.lightAccent === "custom" ? "custom" : state.lightAccent;
 }
 
+type ChromeTokens = {
+  bg: string;
+  fg: string;
+  border: string;
+  muted: string;
+  active: string;
+  logoBg: string;
+  hover: string;
+  activeBg: string;
+};
+
+function chromeFromPatch(
+  patch: Partial<ThemeColorsState>,
+  state: ThemeColorsState,
+  isDark: boolean,
+): ChromeTokens {
+  const preset = getAccentPreset(
+    state.lightAccent === "custom" ? DEFAULT_ACCENT : state.lightAccent,
+  );
+  if (isDark) {
+    const bgCss = (patch.darkChromeBgCss ?? state.darkChromeBgCss).trim();
+    const active = patch.darkChromeActive ?? state.darkChromeActive;
+    return {
+      bg: bgCss || patch.darkChromeBg || state.darkChromeBg,
+      fg: patch.darkChromeFg ?? state.darkChromeFg,
+      border: patch.darkChromeBorder ?? state.darkChromeBorder,
+      muted: patch.darkChromeMuted ?? state.darkChromeMuted,
+      active,
+      logoBg: patch.darkChromeLogoBg ?? state.darkChromeLogoBg,
+      hover: "rgba(255, 255, 255, 0.05)",
+      activeBg: hexToRgba(active, 0.14),
+    };
+  }
+  const bgCss = (patch.lightChromeBgCss ?? state.lightChromeBgCss).trim();
+  const active = patch.lightChromeActive ?? (state.lightChromeActive || preset.hex);
+  const fg = patch.lightChromeFg ?? state.lightChromeFg;
+  return {
+    bg: bgCss || patch.lightChromeBg || state.lightChromeBg,
+    fg,
+    border: patch.lightChromeBorder ?? state.lightChromeBorder,
+    muted: patch.lightChromeMuted ?? state.lightChromeMuted,
+    active,
+    logoBg: patch.lightChromeLogoBg ?? state.lightChromeLogoBg,
+    hover: hexToRgba(fg, 0.06),
+    activeBg: hexToRgba(active, 0.1),
+  };
+}
+
+function resolveSidebarChrome(state: ThemeColorsState, isDark: boolean): ChromeTokens {
+  const skin = (document.documentElement.dataset.sidebar ?? "light") as SidebarSkin;
+  if (isDefaultLightSidebar(skin)) {
+    return chromeFromPatch(
+      isDark
+        ? {
+            darkChromeBg: state.darkChromeBg,
+            darkChromeBgCss: state.darkChromeBgCss,
+            darkChromeFg: state.darkChromeFg,
+            darkChromeBorder: state.darkChromeBorder,
+            darkChromeMuted: state.darkChromeMuted,
+            darkChromeActive: state.darkChromeActive,
+            darkChromeLogoBg: state.darkChromeLogoBg,
+          }
+        : {
+            lightChromeBg: state.lightChromeBg,
+            lightChromeBgCss: state.lightChromeBgCss,
+            lightChromeFg: state.lightChromeFg,
+            lightChromeBorder: state.lightChromeBorder,
+            lightChromeMuted: state.lightChromeMuted,
+            lightChromeActive: state.lightChromeActive,
+            lightChromeLogoBg: state.lightChromeLogoBg,
+          },
+      state,
+      isDark,
+    );
+  }
+  return chromeFromPatch(getSidebarSkinChromePatch(skin, isDark), state, isDark);
+}
+
+function resolveTopbarChrome(state: ThemeColorsState, isDark: boolean): ChromeTokens {
+  const skin = (document.documentElement.dataset.topbar ?? "white") as TopbarSkin;
+  if (isDefaultLightTopbar(skin)) {
+    return chromeFromPatch(
+      isDark
+        ? {
+            darkChromeBg: state.darkChromeBg,
+            darkChromeBgCss: state.darkChromeBgCss,
+            darkChromeFg: state.darkChromeFg,
+            darkChromeBorder: state.darkChromeBorder,
+            darkChromeMuted: state.darkChromeMuted,
+            darkChromeActive: state.darkChromeActive,
+            darkChromeLogoBg: state.darkChromeLogoBg,
+          }
+        : {
+            lightChromeBg: state.lightChromeBg,
+            lightChromeBgCss: state.lightChromeBgCss,
+            lightChromeFg: state.lightChromeFg,
+            lightChromeBorder: state.lightChromeBorder,
+            lightChromeMuted: state.lightChromeMuted,
+            lightChromeActive: state.lightChromeActive,
+            lightChromeLogoBg: state.lightChromeLogoBg,
+          },
+      state,
+      isDark,
+    );
+  }
+  return chromeFromPatch(getTopbarSkinChromePatch(skin, isDark), state, isDark);
+}
+
 /** Apply all customizable system colors to :root. */
 export function applyThemeColors(state: ThemeColorsState) {
   if (typeof document === "undefined") return;
@@ -305,56 +421,59 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--sidebar-accent", accentSoft);
     root.style.setProperty("--sidebar-accent-foreground", accentHsl);
 
-    const darkBg = state.darkChromeBgCss.trim() || state.darkChromeBg;
-    root.style.setProperty("--retail-sidebar-bg", darkBg);
-    root.style.setProperty("--retail-sidebar-fg", state.darkChromeFg);
-    root.style.setProperty("--retail-sidebar-muted", state.darkChromeMuted);
-    root.style.setProperty("--retail-sidebar-border", state.darkChromeBorder);
-    root.style.setProperty("--retail-sidebar-hover", "rgba(255, 255, 255, 0.05)");
-    root.style.setProperty("--retail-sidebar-active-bg", hexToRgba(state.darkChromeActive, 0.14));
-    root.style.setProperty("--retail-sidebar-active-fg", state.darkChromeActive);
-    root.style.setProperty("--retail-topbar-bg", darkBg);
-    root.style.setProperty("--retail-topbar-fg", state.darkChromeFg);
-    root.style.setProperty("--retail-topbar-border", state.darkChromeBorder);
+    const sidebarChrome = resolveSidebarChrome(state, true);
+    const topbarChrome = resolveTopbarChrome(state, true);
 
-    root.style.setProperty("--chrome-bg", darkBg);
-    root.style.setProperty("--chrome-fg", state.darkChromeFg);
-    root.style.setProperty("--chrome-border", state.darkChromeBorder);
-    root.style.setProperty("--chrome-muted", state.darkChromeMuted);
-    root.style.setProperty("--chrome-active-fg", state.darkChromeActive);
-    root.style.setProperty("--chrome-active-bg", hexToRgba(state.darkChromeActive, 0.14));
-    root.style.setProperty("--chrome-hover", "rgba(255, 255, 255, 0.05)");
-    root.style.setProperty("--chrome-logo-bg", state.darkChromeLogoBg);
+    root.style.setProperty("--retail-sidebar-bg", sidebarChrome.bg);
+    root.style.setProperty("--retail-sidebar-fg", sidebarChrome.fg);
+    root.style.setProperty("--retail-sidebar-muted", sidebarChrome.muted);
+    root.style.setProperty("--retail-sidebar-border", sidebarChrome.border);
+    root.style.setProperty("--retail-sidebar-hover", sidebarChrome.hover);
+    root.style.setProperty("--retail-sidebar-active-bg", sidebarChrome.activeBg);
+    root.style.setProperty("--retail-sidebar-active-fg", sidebarChrome.active);
+    root.style.setProperty("--retail-topbar-bg", topbarChrome.bg);
+    root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
+    root.style.setProperty("--retail-topbar-border", topbarChrome.border);
+
+    root.style.setProperty("--chrome-bg", sidebarChrome.bg);
+    root.style.setProperty("--chrome-fg", sidebarChrome.fg);
+    root.style.setProperty("--chrome-border", sidebarChrome.border);
+    root.style.setProperty("--chrome-muted", sidebarChrome.muted);
+    root.style.setProperty("--chrome-active-fg", sidebarChrome.active);
+    root.style.setProperty("--chrome-active-bg", sidebarChrome.activeBg);
+    root.style.setProperty("--chrome-hover", sidebarChrome.hover);
+    root.style.setProperty("--chrome-logo-bg", sidebarChrome.logoBg);
   } else {
     const preset = getAccentPreset(
       state.lightAccent === "custom" ? DEFAULT_ACCENT : state.lightAccent,
     );
-    const lightActive = state.lightChromeActive || preset.hex;
-    const lightBg = state.lightChromeBgCss.trim() || state.lightChromeBg;
     root.style.setProperty("--accent", preset.softBg);
     root.style.setProperty("--accent-foreground", preset.primaryHover);
     root.style.setProperty("--sidebar-accent", preset.softBg);
     root.style.setProperty("--sidebar-accent-foreground", preset.activeTextLight);
 
-    root.style.setProperty("--retail-sidebar-bg", lightBg);
-    root.style.setProperty("--retail-sidebar-fg", state.lightChromeFg);
-    root.style.setProperty("--retail-sidebar-muted", state.lightChromeMuted);
-    root.style.setProperty("--retail-sidebar-border", state.lightChromeBorder);
-    root.style.setProperty("--retail-sidebar-hover", hexToRgba(state.lightChromeFg, 0.06));
-    root.style.setProperty("--retail-sidebar-active-bg", hexToRgba(lightActive, 0.1));
-    root.style.setProperty("--retail-sidebar-active-fg", lightActive);
-    root.style.setProperty("--retail-topbar-bg", lightBg);
-    root.style.setProperty("--retail-topbar-fg", state.lightChromeFg);
-    root.style.setProperty("--retail-topbar-border", state.lightChromeBorder);
+    const sidebarChrome = resolveSidebarChrome(state, false);
+    const topbarChrome = resolveTopbarChrome(state, false);
 
-    root.style.setProperty("--chrome-bg", lightBg);
-    root.style.setProperty("--chrome-fg", state.lightChromeFg);
-    root.style.setProperty("--chrome-border", state.lightChromeBorder);
-    root.style.setProperty("--chrome-muted", state.lightChromeMuted);
-    root.style.setProperty("--chrome-active-fg", lightActive);
-    root.style.setProperty("--chrome-active-bg", hexToRgba(lightActive, 0.1));
-    root.style.setProperty("--chrome-hover", hexToRgba(state.lightChromeFg, 0.06));
-    root.style.setProperty("--chrome-logo-bg", state.lightChromeLogoBg);
+    root.style.setProperty("--retail-sidebar-bg", sidebarChrome.bg);
+    root.style.setProperty("--retail-sidebar-fg", sidebarChrome.fg);
+    root.style.setProperty("--retail-sidebar-muted", sidebarChrome.muted);
+    root.style.setProperty("--retail-sidebar-border", sidebarChrome.border);
+    root.style.setProperty("--retail-sidebar-hover", sidebarChrome.hover);
+    root.style.setProperty("--retail-sidebar-active-bg", sidebarChrome.activeBg);
+    root.style.setProperty("--retail-sidebar-active-fg", sidebarChrome.active);
+    root.style.setProperty("--retail-topbar-bg", topbarChrome.bg);
+    root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
+    root.style.setProperty("--retail-topbar-border", topbarChrome.border);
+
+    root.style.setProperty("--chrome-bg", sidebarChrome.bg);
+    root.style.setProperty("--chrome-fg", sidebarChrome.fg);
+    root.style.setProperty("--chrome-border", sidebarChrome.border);
+    root.style.setProperty("--chrome-muted", sidebarChrome.muted);
+    root.style.setProperty("--chrome-active-fg", sidebarChrome.active);
+    root.style.setProperty("--chrome-active-bg", sidebarChrome.activeBg);
+    root.style.setProperty("--chrome-hover", sidebarChrome.hover);
+    root.style.setProperty("--chrome-logo-bg", sidebarChrome.logoBg);
   }
 
   /* react-table-craft tokens */

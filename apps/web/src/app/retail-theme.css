@@ -710,6 +710,45 @@ body.mini-sidebar .hex-retail-sidebar {
   transition: background 0.25s ease, color 0.25s ease;
 }
 
+/* DreamsPOS-style compact logo row — visible on light sidebar, no excess height */
+.hex-sidebar-brand {
+  min-height: 3.25rem;
+  max-height: 4rem;
+  display: flex;
+  align-items: center;
+}
+
+.hex-sidebar-brand .hex-sidebar-logo {
+  display: block;
+  width: 100%;
+  max-height: 4rem;
+}
+
+/* Light sidebar: colored wordmark — never blend (hides logo on white) */
+[data-sidebar="light"] .hex-sidebar-brand .hex-sidebar-logo,
+[data-sidebar="sidebarcolorone"] .hex-sidebar-brand .hex-sidebar-logo {
+  mix-blend-mode: normal !important;
+  filter: none;
+}
+
+/* Dark UI or colored sidebar: white wordmark */
+html.dark .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolortwo"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorthree"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorfour"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorfive"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorsix"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorseven"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcoloreight"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolornine"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorten"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcoloreleven"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolortwelve"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorthirteen"] .hex-sidebar-brand .hex-sidebar-logo,
+html:not(.dark) [data-sidebar="sidebarcolorfourteen"] .hex-sidebar-brand .hex-sidebar-logo {
+  mix-blend-mode: screen;
+}
+
 [data-sidebar="light"] .hex-retail-sidebar {
   --retail-sidebar-bg: var(--chrome-bg, #ffffff);
   --retail-sidebar-fg: var(--chrome-fg, #212b36);

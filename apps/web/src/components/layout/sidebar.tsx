@@ -567,11 +567,11 @@ export function Sidebar() {
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
-        {/* ── Header: brand logo only ── */}
+        {/* ── Header: brand logo only (DreamsPOS compact) ── */}
         <div
           className={cn(
-            "relative shrink-0 w-full",
-            sidebarCollapsed ? "px-2 py-3" : "px-4 pt-5 pb-4",
+            "hex-sidebar-brand relative shrink-0 w-full",
+            sidebarCollapsed ? "px-2 py-2" : "px-3 py-2.5",
           )}
         >
           <button
@@ -581,7 +581,7 @@ export function Sidebar() {
             className={cn(
               "absolute flex items-center justify-center rounded-lg border transition-colors z-10",
               sidebarCollapsed
-                ? "right-0.5 top-2.5 h-6 w-6"
+                ? "right-0.5 top-1.5 h-6 w-6"
                 : "right-2 top-2 h-7 w-7",
             )}
             style={{ borderColor: border, color: textMut, background: bg }}
@@ -599,8 +599,8 @@ export function Sidebar() {
             variant="sidebar"
             theme={logoOnDarkBg ? "dark" : "light"}
             className={cn(
-              "w-full items-center justify-center",
-              sidebarCollapsed ? "px-0.5" : "px-0 pt-7",
+              "w-full",
+              sidebarCollapsed ? "items-center px-0.5" : "items-start pr-9",
             )}
             alt={APP_NAME}
           />
