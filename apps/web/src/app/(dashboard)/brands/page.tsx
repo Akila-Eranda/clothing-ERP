@@ -168,10 +168,10 @@ export default function BrandsPage() {
   );
 
   const STATS = [
-    { label: `Total ${copy.plural}`, value: brands.length, icon: Layers, color: "text-slate-600 dark:text-slate-300", bg: "bg-slate-500/15", tint: "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent" },
+    { label: `Total ${copy.plural}`, value: brands.length, icon: Layers, color: "text-slate-600 dark:text-slate-300", bg: "bg-slate-500/15", tint: "bg-card border-border" },
     { label: "Active", value: activeCount, icon: CheckCircle2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Inactive", value: inactiveCount, icon: Ban, color: "text-muted-foreground", bg: "bg-muted", tint: "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent" },
-    { label: `Total ${workspace.productLabel}`, value: totalProducts, icon: Package, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Inactive", value: inactiveCount, icon: Ban, color: "text-muted-foreground", bg: "bg-muted", tint: "bg-card border-border" },
+    { label: `Total ${workspace.productLabel}`, value: totalProducts, icon: Package, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
   ];
 
   return (

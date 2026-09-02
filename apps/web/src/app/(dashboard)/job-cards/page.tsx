@@ -387,9 +387,9 @@ export default function JobCardsPage() {
   const totalValue = jobs.reduce((s, j) => s + j.total, 0);
 
   const STATS = [
-    { label: "Total Jobs",     value: jobs.length,                        icon: ClipboardList, color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Total Jobs",     value: jobs.length,                        icon: ClipboardList, color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Open",           value: openCount,                          icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "In Progress",    value: activeCount,                        icon: Wrench,        color: "text-violet-600",  bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "In Progress",    value: activeCount,                        icon: Wrench,        color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
     { label: "Workshop Value", value: `LKR ${formatNumber(totalValue)}`,  icon: Banknote,      color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
   ];
 

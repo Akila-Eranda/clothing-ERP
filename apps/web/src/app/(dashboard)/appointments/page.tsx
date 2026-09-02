@@ -372,9 +372,9 @@ export default function AppointmentsPage() {
   }).length;
 
   const STATS = [
-    { label: "Total Bookings", value: items.length, icon: Calendar, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Total Bookings", value: items.length, icon: Calendar, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Today", value: todayCount, icon: Clock, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "Confirmed", value: items.filter((a) => a.status === "CONFIRMED").length, icon: CheckCircle2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Confirmed", value: items.filter((a) => a.status === "CONFIRMED").length, icon: CheckCircle2, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
     { label: "Completed", value: items.filter((a) => a.status === "COMPLETED").length, icon: Wrench, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
   ];
 

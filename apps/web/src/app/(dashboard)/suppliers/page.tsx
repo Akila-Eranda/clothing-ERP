@@ -157,9 +157,9 @@ export default function SuppliersPage() {
   const outstanding = suppliers.reduce((sum, s) => sum + (s.balance ?? 0), 0);
 
   const STATS = [
-    { label: `Total ${copy.plural}`, value: suppliers.length, icon: Truck,       color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: `Total ${copy.plural}`, value: suppliers.length, icon: Truck,       color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Active",               value: activeCount,      icon: Users,       color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Credit Limit",         value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-600", bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Credit Limit",         value: `LKR ${formatNumber(totalCredit)}`, icon: CreditCard, color: "text-violet-600", bg: "bg-slate-500/10", tint: "bg-card border-border" },
     { label: "Outstanding",          value: `LKR ${formatNumber(outstanding)}`, icon: ShoppingBag, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
   ];
 

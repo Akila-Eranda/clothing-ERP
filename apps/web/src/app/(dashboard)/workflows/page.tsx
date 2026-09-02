@@ -263,8 +263,8 @@ export default function WorkflowsPage() {
 
   const STATS = [
     { label: "Pending Approvals", value: tasks.length, icon: Clock,         color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-    { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Purchase Orders",   value: poCount,      icon: ShoppingBag,    color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
+    { label: "Other Requests",    value: otherCount,   icon: Shield,         color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
     { label: "Active Workflows",  value: catalog?.workflows.length ?? GUIDE.length, icon: GitBranch, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
   ];
 

@@ -363,10 +363,10 @@ export default function ProcurementHubPage() {
   );
 
   const STATS = [
-    { label: "Purchase Requests", value: String(prs.length), icon: ClipboardList, color: "text-blue-600", bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Purchase Requests", value: String(prs.length), icon: ClipboardList, color: "text-blue-600", bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Goods Receipts", value: String(grns.length), icon: PackageCheck, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
     { label: "Payables Due", value: `LKR ${formatNumber(totalDue)}`, icon: Wallet, color: "text-amber-600", bg: "bg-amber-500/10", tint: "bg-card border-border" },
-    { label: "Pending Actions", value: String(openDrafts), icon: AlertCircle, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent" },
+    { label: "Pending Actions", value: String(openDrafts), icon: AlertCircle, color: "text-indigo-600", bg: "bg-indigo-500/15", tint: "bg-card border-border" },
   ];
 
   const payableInvoices = useMemo(

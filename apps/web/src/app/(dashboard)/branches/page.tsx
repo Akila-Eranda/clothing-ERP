@@ -143,9 +143,9 @@ export default function BranchesPage() {
   const activeCount = branches.filter((b) => b.isActive).length;
 
   const STATS = [
-    { label: "Total Branches",  value: branches.length,          icon: Building2, color: "text-blue-600",    bg: "bg-primary/10", tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
+    { label: "Total Branches",  value: branches.length,          icon: Building2, color: "text-blue-600",    bg: "bg-primary/10", tint: "bg-card border-border" },
     { label: "Active Branches", value: activeCount,              icon: Building2, color: "text-emerald-600", bg: "bg-emerald-500/10", tint: "bg-card border-border" },
-    { label: "Total Staff",     value: totalStaff,               icon: Users,     color: "text-violet-600",  bg: "bg-slate-500/10", tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent" },
+    { label: "Total Staff",     value: totalStaff,               icon: Users,     color: "text-violet-600",  bg: "bg-slate-500/10", tint: "bg-card border-border" },
     { label: "Stock Items",     value: totalStock.toLocaleString(), icon: Package, color: "text-amber-600",   bg: "bg-amber-500/10", tint: "bg-card border-border" },
   ];
 

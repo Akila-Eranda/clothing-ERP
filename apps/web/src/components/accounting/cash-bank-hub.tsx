@@ -342,7 +342,7 @@ function AccountsOverviewPanel({
       icon: Wallet,
       color: "text-blue-600",
       bg: "bg-primary/10",
-      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     {
       label: "Cash on Hand",
@@ -360,7 +360,7 @@ function AccountsOverviewPanel({
       icon: Landmark,
       color: "text-indigo-600",
       bg: "bg-indigo-500/15",
-      tint: "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     ...(otherAccounts.length
       ? [{
@@ -370,7 +370,7 @@ function AccountsOverviewPanel({
           icon: Wallet,
           color: "text-teal-600",
           bg: "bg-teal-500/15",
-          tint: "border-teal-200/70 bg-gradient-to-br from-teal-50 to-white dark:border-teal-500/20 dark:from-teal-500/10 dark:to-transparent",
+          tint: "bg-card border-border",
         }]
       : [{
           label: "Quick Actions",
@@ -1646,7 +1646,7 @@ function ReconciliationPanel() {
             </div>
 
             <div className="grid sm:grid-cols-3 gap-3">
-              <Card className="rounded-[14px] border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent">
+              <Card className="rounded-[14px] bg-card border-border">
                 <CardContent className="p-3">
                   <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Statement</p>
                   <p className="text-lg font-bold tabular-nums mt-1">{formatNumber(active.statementBalance)}</p>

@@ -489,7 +489,7 @@ export default function ReturnsPage() {
       icon: RotateCcw,
       color: "text-slate-600 dark:text-slate-400",
       bg: "bg-slate-500/15",
-      tint: "border-slate-200/80 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     {
       label: "Exchanges",
@@ -497,7 +497,7 @@ export default function ReturnsPage() {
       icon: ArrowLeftRight,
       color: "text-violet-600 dark:text-violet-400",
       bg: "bg-slate-500/10",
-      tint: "border-violet-200/80 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     {
       label: "Pending",
@@ -505,7 +505,7 @@ export default function ReturnsPage() {
       icon: Clock,
       color: "text-amber-600 dark:text-amber-400",
       bg: "bg-amber-500/10",
-      tint: "border-amber-200/80 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     {
       label: "Total Refunded",
@@ -513,7 +513,7 @@ export default function ReturnsPage() {
       icon: DollarSign,
       color: "text-blue-600 dark:text-blue-400",
       bg: "bg-primary/10",
-      tint: "border-blue-200/80 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
   ];
 

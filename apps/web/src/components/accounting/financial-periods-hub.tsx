@@ -406,7 +406,7 @@ export function FinancialPeriodsHub() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="rounded-xl border-slate-200/70 bg-gradient-to-br from-slate-50 to-white shadow-[0_2px_10px_rgba(15,23,42,0.04)] dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent">
+                <Card className="rounded-xl bg-card border-border">
                   <CardContent className="h-[72px] p-4 flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[11px] text-muted-foreground font-medium">Bulk action</p>

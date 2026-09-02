@@ -409,10 +409,10 @@ export default function CashManagementPage() {
       color: "text-white",
       bg: isViewingToday && shiftOpen ? "bg-primary" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
       tint: isViewingToday && shiftOpen
-        ? "border-primary/20 bg-gradient-to-br from-primary/5 to-white dark:border-primary/20 dark:from-primary/10 dark:to-transparent"
+        ? "bg-card border-border"
         : isViewingToday && shiftPending
           ? "bg-card border-border"
-          : "border-slate-200/70 bg-gradient-to-br from-slate-50 to-white dark:border-slate-500/20 dark:from-slate-500/10 dark:to-transparent",
+          : "bg-card border-border",
       sub: isViewingToday && shiftOpen
         ? `Opened LKR ${formatNumber(active?.openingCash ?? 0)}`
         : isViewingToday && shiftPending
@@ -425,7 +425,7 @@ export default function CashManagementPage() {
       icon: DollarSign,
       color: "text-white",
       bg: "bg-blue-600",
-      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
       sub: isViewingToday && shiftOpen ? "Live · updates from POS" : rangeLabel,
     },
     {
@@ -435,8 +435,8 @@ export default function CashManagementPage() {
       color: "text-white",
       bg: (today?.difference ?? 0) < 0 ? "bg-red-500" : "bg-teal-600",
       tint: (today?.difference ?? 0) < 0
-        ? "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent"
-        : "border-teal-200/70 bg-gradient-to-br from-teal-50 to-white dark:border-teal-500/20 dark:from-teal-500/10 dark:to-transparent",
+        ? "bg-card border-border"
+        : "bg-card border-border",
       sub: (today?.difference ?? 0) >= 0 ? "Over / balanced" : "Short count",
     },
     {
@@ -445,7 +445,7 @@ export default function CashManagementPage() {
       icon: AlertTriangle,
       color: "text-white",
       bg: "bg-orange-500",
-      tint: "border-orange-200/70 bg-gradient-to-br from-orange-50 to-white dark:border-orange-500/20 dark:from-orange-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
       sub: rangeLabel,
     },
   ];

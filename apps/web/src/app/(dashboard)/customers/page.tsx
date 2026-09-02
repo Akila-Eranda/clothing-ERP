@@ -192,7 +192,7 @@ export default function CustomersPage() {
       icon: Users,
       color: "text-blue-600",
       bg: "bg-blue-50 border border-blue-200",
-      tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
+      tint: "bg-card border-border",
     },
     ...(showLoyalty
       ? [
@@ -210,7 +210,7 @@ export default function CustomersPage() {
             icon: Gift,
             color: "text-violet-600",
             bg: "bg-violet-50 border border-violet-200",
-            tint: "border-violet-200/70 bg-gradient-to-br from-violet-50 to-white dark:border-violet-500/20 dark:from-violet-500/10 dark:to-transparent",
+            tint: "bg-card border-border",
           },
         ]
       : []),
