@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
-import { parseApiList } from "@/lib/parse-api-list";
+import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
 interface Supplier { id: string; name: string; contactPerson?: string | null; phone: string; }
 interface VariantOpt {
@@ -54,8 +54,8 @@ export function CreatePOModal({ open, onClose, onCreated, prefillVariantId }: Pr
     api.get<{ data: Supplier[] }>("/suppliers?limit=200")
       .then((r) => setSuppliers(parseApiList<Supplier>(r.data)))
       .catch(() => {});
-    api.get<VariantOpt[]>("/pos/products")
-      .then((r) => setAllVariants(Array.isArray(r.data) ? r.data : []))
+    api.get<VariantOpt[]>("/pos/products?limit=2000")
+      .then((r) => setAllVariants(parsePosProducts<VariantOpt>(r)))
       .catch(() => {});
   }, [open]);
 

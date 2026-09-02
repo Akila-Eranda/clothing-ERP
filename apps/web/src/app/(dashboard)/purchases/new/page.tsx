@@ -11,7 +11,7 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn } from "@/lib/utils";
-import { parseApiList } from "@/lib/parse-api-list";
+import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Supplier {
@@ -167,6 +167,7 @@ export default function CreatePOPage() {
   const [items,        setItems]        = useState<LineItem[]>([]);
   const [saving,       setSaving]       = useState(false);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [catalogFallback, setCatalogFallback] = useState(false);
   const [fromGrnId, setFromGrnId] = useState<string | null>(null);
   const [fromGrnNumber, setFromGrnNumber] = useState<string | null>(null);
   const [grnPrefillLoading, setGrnPrefillLoading] = useState(false);
@@ -189,6 +190,7 @@ export default function CreatePOPage() {
   const [selectedRowIdx, setSelectedRowIdx] = useState<number | null>(null);
 
   const productSearchRef = useRef<HTMLInputElement>(null);
+  const itemsSectionRef = useRef<HTMLDivElement>(null);
   const qtyInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const costInputRefs = useRef<Record<number, HTMLInputElement | null>>({});
   const supplierSelectRef = useRef<HTMLSelectElement>(null);
@@ -196,29 +198,50 @@ export default function CreatePOPage() {
 
   const catalogReqRef = useRef(0);
 
+  const scrollToItems = useCallback(() => {
+    window.setTimeout(() => {
+      itemsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }, 80);
+  }, []);
+
   const loadSupplierCatalog = useCallback(async (sid: string) => {
     if (!sid) {
       setAllVariants([]);
+      setCatalogFallback(false);
       return;
     }
     const reqId = ++catalogReqRef.current;
     setLoadingProducts(true);
     setAllVariants([]);
+    setCatalogFallback(false);
     try {
-      const res = await api.get<VariantOpt[]>(
+      const res = await api.get<VariantOpt[] | { items: VariantOpt[] }>(
         `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
       );
       if (reqId !== catalogReqRef.current) return;
-      const rows = Array.isArray(res.data) ? res.data : [];
-      // Strict: only this supplier's assigned catalog (never widen to all products)
+      let rows = parsePosProducts<VariantOpt>(res);
+      let fallback = false;
+      if (!rows.length) {
+        const allRes = await api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000");
+        if (reqId !== catalogReqRef.current) return;
+        rows = parsePosProducts<VariantOpt>(allRes);
+        fallback = rows.length > 0;
+        if (fallback) {
+          toast.info("No products linked to this supplier — showing full catalog");
+        }
+      }
+      setCatalogFallback(fallback);
       setAllVariants(
-        rows
-          .filter((v) => !v.supplierId || v.supplierId === sid)
-          .map((v) => ({ ...v, supplierId: sid })),
+        fallback
+          ? rows
+          : rows
+              .filter((v) => !v.supplierId || v.supplierId === sid)
+              .map((v) => ({ ...v, supplierId: sid })),
       );
     } catch {
       if (reqId !== catalogReqRef.current) return;
       setAllVariants([]);
+      setCatalogFallback(false);
       toast.error("Failed to load supplier products");
     } finally {
       if (reqId === catalogReqRef.current) setLoadingProducts(false);
@@ -302,10 +325,11 @@ export default function CreatePOPage() {
     }
     if (id) {
       void loadSupplierCatalog(id);
-      window.setTimeout(() => productSearchRef.current?.focus(), 50);
+      window.setTimeout(() => productSearchRef.current?.focus(), 120);
     } else {
       catalogReqRef.current += 1;
       setAllVariants([]);
+      setCatalogFallback(false);
       setLoadingProducts(false);
       supplierDetailReqRef.current += 1;
       setLoadingSupplierDetail(false);
@@ -475,8 +499,9 @@ export default function CreatePOPage() {
 
   const filteredVariants = (q: string) => {
     if (!supplierId) return [];
-    // Catalog is loaded only for the selected supplier — search within that set only
-    const scoped = allVariants.filter((v) => v.supplierId === supplierId);
+    const scoped = catalogFallback
+      ? allVariants
+      : allVariants.filter((v) => !v.supplierId || v.supplierId === supplierId);
     if (!q.trim()) return scoped.slice(0, 40);
     const lq = q.trim().toLowerCase();
     return scoped
@@ -599,7 +624,7 @@ export default function CreatePOPage() {
       toast.error("Select a supplier first");
       return;
     }
-    if (v.supplierId && v.supplierId !== supplierId) {
+    if (!catalogFallback && v.supplierId && v.supplierId !== supplierId) {
       toast.error("Product is not assigned to this supplier");
       return;
     }
@@ -638,6 +663,7 @@ export default function CreatePOPage() {
     setProductSearchOpen(false);
     setProductSearchQ("");
     setSearchHighlight(0);
+    scrollToItems();
     window.setTimeout(() => qtyInputRefs.current[newIdx]?.focus(), 40);
   };
 
@@ -927,15 +953,17 @@ export default function CreatePOPage() {
 
             <SectionCard
               step="2"
-              title="Purchase Items"
-              subtitle={supplierId ? (loadingProducts ? "Loading supplier catalog…" : `${allVariants.length} products available for this supplier`) : "Select a supplier to search products"}
-              action={
-                <Button size="sm" onClick={addRow} disabled={saving || !supplierId} className="gap-1.5 h-8">
-                  <Plus className="h-3.5 w-3.5" /> Add row
-                </Button>
+              title="Add Products"
+              subtitle={
+                supplierId
+                  ? loadingProducts
+                    ? "Loading product catalog…"
+                    : catalogFallback
+                      ? `${allVariants.length} products (full catalog)`
+                      : `${allVariants.length} products for this supplier`
+                  : "Select a supplier first — then search or scan here"
               }
             >
-              {/* Search stays fixed; only the added lines scroll below */}
               <div className="relative shrink-0">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <ScanLine className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/70" />
@@ -950,18 +978,18 @@ export default function CreatePOPage() {
                   }}
                   onFocus={() => setProductSearchOpen(true)}
                   onKeyDown={handleBigSearchKeyDown}
-                  placeholder={supplierId ? "Search & add product…" : "Select supplier first"}
+                  placeholder={supplierId ? "Search name, SKU, barcode…" : "Select supplier above first"}
                   className="h-12 w-full rounded-xl border bg-background pl-10 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
                 />
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
-                  ↑↓ select product · Enter add · Enter on qty → buying price → next item
+                  ↑↓ pick product · Enter adds to order lines below · Enter on qty → cost → next item
                 </p>
                 {productSearchOpen && supplierId && (
                   <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border bg-background shadow-xl">
                     <div className="max-h-80 overflow-y-auto">
                       {bigMatches.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
-                          {productSearchQ.trim() ? "No match — press Enter to scan barcode/SKU" : "Type to search supplier products"}
+                          {productSearchQ.trim() ? "No match — press Enter to scan barcode/SKU" : "Type to search products"}
                         </p>
                       ) : (
                         bigMatches.map((v, i) => (
@@ -997,8 +1025,6 @@ export default function CreatePOPage() {
                             <div className="shrink-0 text-right text-[11px]">
                               <p className="font-semibold tabular-nums">LKR {fmt(v.lastBuyingPrice ?? v.costPrice)}</p>
                               <p className="text-muted-foreground tabular-nums">Stock {v.stock}</p>
-                              <p className="text-muted-foreground">{fmtDate(v.lastPurchaseDate)}</p>
-                              <p className="text-muted-foreground">Last qty {dash(v.lastPurchaseQty)}</p>
                             </div>
                           </button>
                         ))
@@ -1007,8 +1033,19 @@ export default function CreatePOPage() {
                   </div>
                 )}
               </div>
+            </SectionCard>
 
-              <div className="max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain rounded-xl border bg-muted/5">
+            <SectionCard
+              step="3"
+              title="Order Lines"
+              subtitle={items.length ? `${items.length} line${items.length === 1 ? "" : "s"} · ${totalQty} units` : "Added products appear here"}
+              action={
+                <Button size="sm" onClick={addRow} disabled={saving || !supplierId} className="gap-1.5 h-8">
+                  <Plus className="h-3.5 w-3.5" /> Add row
+                </Button>
+              }
+            >
+              <div ref={itemsSectionRef} className="max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain rounded-xl border bg-muted/5">
               {/* Mobile / tablet cards */}
               <div className="divide-y lg:hidden">
                 {items.length === 0 ? (
@@ -1408,7 +1445,7 @@ export default function CreatePOPage() {
             </SectionCard>
 
             <SectionCard
-              step="3"
+              step="4"
               title="Supplier payment"
               subtitle="Optional — record advance / pay now when creating this PO"
             >

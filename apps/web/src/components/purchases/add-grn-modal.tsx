@@ -103,7 +103,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     ])
       .then(([supR, prodR]) => {
         setSuppliers(parseApiList<Supplier>(supR.data));
-        setAllVariants(Array.isArray(prodR.data) ? prodR.data : []);
+        setAllVariants(parsePosProducts<VariantOpt>(prodR));
       })
       .catch(() => toast.error("Failed to load GRN form data"))
       .finally(() => setBooting(false));
@@ -118,7 +118,7 @@ export function AddGrnModal({ open, onClose, onCreated }: Props) {
     api
       .get<VariantOpt[]>(`/pos/products?supplierId=${encodeURIComponent(supplierId)}&limit=2000`)
       .then((r) => {
-        const list = Array.isArray(r.data) ? r.data : [];
+        const list = parsePosProducts<VariantOpt>(r);
         if (list.length > 0) setAllVariants(list);
       })
       .catch(() => {});

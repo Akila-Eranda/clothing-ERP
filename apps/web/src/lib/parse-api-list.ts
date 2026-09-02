@@ -12,3 +12,19 @@ export function parseApiList<T>(payload: unknown): T[] {
   }
   return [];
 }
+
+/** POS /pos/products — plain array or paginated { items } wrapper. */
+export function parsePosProducts<T>(payload: unknown): T[] {
+  const direct = parseApiList<T>(payload);
+  if (direct.length) return direct;
+  if (payload && typeof payload === "object" && payload !== null) {
+    const items = (payload as { items?: unknown }).items;
+    if (Array.isArray(items)) return items as T[];
+    const data = (payload as { data?: unknown }).data;
+    if (data && typeof data === "object" && data !== null) {
+      const nestedItems = (data as { items?: unknown }).items;
+      if (Array.isArray(nestedItems)) return nestedItems as T[];
+    }
+  }
+  return [];
+}
