@@ -1,8 +1,8 @@
 export const TABLE_STATUS_BADGE_CLASS =
-  "inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize whitespace-nowrap border-0 shadow-none leading-tight";
+  "inline-flex items-center justify-center rounded-md px-2 py-0.5 text-[10px] font-semibold capitalize whitespace-nowrap border shadow-none leading-tight";
 
 export const TABLE_VALUE_BADGE_CLASS =
-  "inline-flex max-w-full items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap border-0 shadow-none leading-tight truncate";
+  "inline-flex max-w-full items-center justify-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap border shadow-none leading-tight truncate";
 
 export type TableStatusVariant =
   | "success"

@@ -533,7 +533,7 @@
   /* ── Modern data tables (all pages via [data-table-craft]) ──────────────
      One shell: toolbar → filters → rows → pagination. Hugs content. */
   [data-table-craft] {
-    --dt-row-h: 46px;
+    --dt-row-h: 48px;
     --dt-head-h: 46px;
     --dt-pad-x: 1.125rem;
     --dt-radius: 1rem;
@@ -762,19 +762,21 @@
     height: var(--dt-head-h);
     padding: 0 var(--dt-pad-x);
     border-bottom: 1px solid hsl(var(--border));
-    font-weight: 700;
-    font-size: 0.8125rem;
+    font-weight: 600;
+    font-size: 0.6875rem;
     line-height: 1.2;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: hsl(var(--secondary-foreground));
+    color: hsl(var(--muted-foreground));
     white-space: nowrap;
     text-align: left;
     vertical-align: middle;
+    background: hsl(var(--muted) / 0.35);
   }
   .dark [data-table-craft] th {
     border-bottom-color: rgba(255, 255, 255, 0.07);
-    color: hsl(215 20% 72%);
+    color: hsl(215 20% 65%);
+    background: hsl(var(--muted) / 0.25);
   }
   /* Quiet sort affordance */
   [data-table-craft] th button {

@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { PageHeader, PageKpiGrid, pageKpi, type PageKpiItem } from "@/components/ui/page-kpi";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ERP_SUBNAV_CLASS, ERP_SUBNAV_LINK_ACTIVE, ERP_SUBNAV_LINK_IDLE } from "@/lib/design-tokens";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -581,7 +582,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
         )}
       />
 
-      <nav className="flex flex-wrap gap-0 border-b border-border -mx-1 px-1">
+      <nav className={ERP_SUBNAV_CLASS}>
         {EXPIRY_NAV.map((item) => {
           const Icon = item.icon;
           const active = section === item.section;
@@ -589,12 +590,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
-                "inline-flex items-center gap-1.5 h-9 px-3 text-xs font-semibold border-b-2 -mb-px transition-colors",
-                active
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
-              )}
+              className={cn(active ? ERP_SUBNAV_LINK_ACTIVE : ERP_SUBNAV_LINK_IDLE)}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" />
               {item.label}

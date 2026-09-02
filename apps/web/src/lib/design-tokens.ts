@@ -32,12 +32,12 @@ export const ERP_SPACING = {
 } as const;
 
 export const ERP_TYPOGRAPHY = {
-  pageTitle: "text-[28px] md:text-[30px] font-semibold tracking-tight",
-  sectionTitle: "text-lg font-semibold",
-  body: "text-sm",
-  secondary: "text-xs text-muted-foreground",
-  tableHeader: "text-[11px] font-semibold uppercase tracking-wide",
-  kpiValue: "text-[22px] font-bold tabular-nums leading-none",
+  pageTitle: "text-[28px] md:text-[30px] font-semibold tracking-tight text-foreground",
+  sectionTitle: "text-lg font-semibold text-foreground",
+  body: "text-sm text-foreground",
+  secondary: "text-[13px] text-muted-foreground",
+  tableHeader: "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+  kpiValue: "text-[22px] md:text-2xl font-bold tabular-nums leading-none text-foreground",
   kpiLabel: "text-xs font-medium text-muted-foreground",
 } as const;
 
@@ -46,22 +46,27 @@ export const ERP_SHADOW = {
   dropdown: "0 4px 12px rgba(15, 23, 42, 0.08)",
 } as const;
 
-/** Enterprise KPI card shell — white, bordered, compact */
+/** Enterprise KPI card shell — white, bordered, soft lift */
 export const ERP_KPI_CARD_CLASS =
   "rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
 
-/** Enterprise panel shell */
-export const ERP_PANEL_CLASS = "rounded-xl border border-border bg-card";
+/** Enterprise panel / table shell */
+export const ERP_PANEL_CLASS =
+  "rounded-xl border border-border bg-card shadow-[0_1px_2px_rgba(15,23,42,0.04)]";
+
+/** Filter / toolbar row inside a panel */
+export const ERP_TOOLBAR_CLASS =
+  "flex flex-wrap items-center gap-2 p-3 border-b border-border bg-card";
 
 /** Sub-navigation tabs (border-bottom style container) */
 export const ERP_SUBNAV_CLASS =
   "flex flex-wrap gap-0 border-b border-border bg-transparent";
 
 export const ERP_SUBNAV_LINK_ACTIVE =
-  "border-b-2 border-primary text-primary font-semibold";
+  "inline-flex items-center gap-1.5 px-3 py-2.5 text-sm border-b-2 border-primary text-primary font-semibold -mb-px";
 
 export const ERP_SUBNAV_LINK_IDLE =
-  "border-b-2 border-transparent text-muted-foreground hover:text-foreground";
+  "inline-flex items-center gap-1.5 px-3 py-2.5 text-sm border-b-2 border-transparent text-muted-foreground hover:text-foreground -mb-px";
 
 /** Native select / control shell for forms outside Radix Select */
 export const ERP_SELECT_CLASS =

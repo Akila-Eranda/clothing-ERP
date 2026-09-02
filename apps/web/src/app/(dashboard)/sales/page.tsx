@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
-import { PageKpiGrid, pageKpi } from "@/components/ui/page-kpi";
+import { PageHeader, PageKpiGrid, pageKpi } from "@/components/ui/page-kpi";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { cn, formatNumber } from "@/lib/utils";
@@ -471,7 +471,7 @@ export default function SalesPage() {
       cell: ({ row }) => (
         <OpenRecordButton
           onClick={() => setViewId(row.original.id)}
-          className="font-mono text-xs"
+          className="font-mono text-xs text-primary hover:underline"
           title="View sale"
         >
           {row.original.invoiceNumber}
@@ -571,12 +571,11 @@ export default function SalesPage() {
   ] as const;
 
   return (
-    <div className="page-shell">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="min-w-0">
-          <h1 className="text-[26px] md:text-3xl font-bold tracking-tight leading-tight">Sales</h1>
-          <p className="text-xs text-muted-foreground mt-0.5 truncate">
+    <div className="page-shell space-y-4">
+      <PageHeader
+        title="Sales"
+        description={
+          <>
             Transactions for <span className="font-medium text-foreground/80">{dateLabel}</span>
             {summary ? (
               <>
@@ -584,55 +583,49 @@ export default function SalesPage() {
                 Tax {fmtMoney(summary.totalTax)}
               </>
             ) : null}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <div className={HEX_SEGMENT}>
-            {datePresets.map((p) => (
-              <button
-                key={p.key}
-                type="button"
-                onClick={() => setDateFilter(p.value)}
-                className={hexTabButton(dateFilter === p.value)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <label className="inline-flex items-center gap-2 h-9 px-3 rounded-none border border-input bg-card text-sm cursor-pointer hover:bg-muted/50 transition-colors">
-            <CalendarDays className="h-4 w-4 text-secondary-foreground shrink-0" />
-            <input
-              type="date"
-              value={dateFilter}
-              onChange={(e) => setDateFilter(e.target.value)}
-              className="h-full bg-transparent border-0 outline-none text-sm text-foreground leading-none [color-scheme:dark] dark:[color-scheme:dark]"
-            />
-          </label>
-          <Button
-            variant="outline"
-            onClick={() => { void fetchSales(); void fetchSummary(); }}
-            className="gap-1.5"
-          >
-            <RefreshCw className={`h-[18px] w-[18px] ${loading ? "animate-spin" : ""}`} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+        onRefresh={() => { void fetchSales(); void fetchSummary(); }}
+        refreshing={loading}
+        actions={(
+          <>
+            <div className={HEX_SEGMENT}>
+              {datePresets.map((p) => (
+                <button
+                  key={p.key}
+                  type="button"
+                  onClick={() => setDateFilter(p.value)}
+                  className={hexTabButton(dateFilter === p.value)}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+            <label className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-input bg-card text-sm cursor-pointer hover:bg-muted/50 transition-colors">
+              <CalendarDays className="h-4 w-4 text-muted-foreground shrink-0" />
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="h-full bg-transparent border-0 outline-none text-sm text-foreground leading-none"
+              />
+            </label>
+          </>
+        )}
+      />
 
-      {/* KPIs */}
       <PageKpiGrid items={STATS} />
 
-      {/* Payment mix */}
       {summary && Object.keys(summary.byPaymentMethod).length > 0 && (
         <div className="flex gap-2 flex-wrap">
           {Object.entries(summary.byPaymentMethod).map(([method, amount]) => (
             <div
               key={method}
-              className="inline-flex items-center gap-2 h-9 px-3 rounded-xl border bg-card text-xs font-medium"
+              className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card text-xs font-medium shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
             >
               <Banknote className="h-3.5 w-3.5 text-muted-foreground shrink-0" strokeWidth={1.75} />
               <span className="text-muted-foreground">{methodLabel(method)}</span>
-              <span className="font-bold tabular-nums text-foreground">{fmtMoney(amount)}</span>
+              <span className="font-semibold tabular-nums text-foreground">{fmtMoney(amount)}</span>
             </div>
           ))}
         </div>
