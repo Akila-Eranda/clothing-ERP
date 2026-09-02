@@ -62,3 +62,11 @@ export const ERP_SUBNAV_LINK_ACTIVE =
 
 export const ERP_SUBNAV_LINK_IDLE =
   "border-b-2 border-transparent text-muted-foreground hover:text-foreground";
+
+/** Native select / control shell for forms outside Radix Select */
+export const ERP_SELECT_CLASS =
+  "flex h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+
+/** Settings / preference toggle row */
+export const ERP_TOGGLE_ROW_CLASS =
+  "flex items-center justify-between gap-4 py-3 border-b border-border last:border-0";

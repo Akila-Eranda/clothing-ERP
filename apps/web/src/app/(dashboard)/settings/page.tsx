@@ -33,12 +33,18 @@ import { PayslipSettingsTab } from "@/components/settings/payslip-settings-tab";
 import { WhatsappSettingsTab } from "@/components/settings/whatsapp-settings-tab";
 import { ReloadSettingsTab } from "@/components/settings/reload-settings-tab";
 import { parseApiList } from "@/lib/parse-api-list";
+import { PageHeader } from "@/components/ui/page-kpi";
+import { ERP_SELECT_CLASS, ERP_TOGGLE_ROW_CLASS } from "@/lib/design-tokens";
+import { cn } from "@/lib/utils";
 import {
   ACCENT_PRESETS,
   type AccentId,
   loadStoredAccent,
   persistAccent,
 } from "@/lib/accent-theme";
+
+const SETTINGS_TAB_TRIGGER =
+  "rounded-none border-b-2 border-transparent bg-transparent px-3 py-2.5 text-xs font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none";
 
 type Tenant = {
   id: string; name: string; email: string; phone?: string;
@@ -267,7 +273,7 @@ function AuditLogTab() {
   const ACTION_COLORS: Record<string,string> = { CREATE:"bg-emerald-500/10 text-emerald-500", UPDATE:"bg-primary/10 text-blue-500", DELETE:"bg-red-500/10 text-red-500", DAY_END:"bg-slate-500/10 text-violet-500" };
 
   return (
-    <TabsContent value="audit-log" className="mt-6">
+    <TabsContent value="audit-log" className="mt-0">
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2"><ClipboardList className="h-4 w-4 text-primary"/>Audit Log</CardTitle>
@@ -590,90 +596,99 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="page-shell">
-      <p className="page-description text-sm text-muted-foreground">Configure your {APP_NAME} workspace · {profile.emoji} {profile.label}</p>
+    <div className="page-shell space-y-4">
+      <PageHeader
+        title="Settings"
+        description={`Configure your ${APP_NAME} workspace · ${profile.emoji} ${profile.label}`}
+      />
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(parseSettingsTab(v))}>
-        <TabsList className="flex-wrap h-auto gap-1">
-          <TabsTrigger value="general" className="gap-1.5"><Store className="h-3.5 w-3.5" />General</TabsTrigger>
-          <TabsTrigger value="receipt" className="gap-1.5"><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
-          <TabsTrigger value="whatsapp" className="gap-1.5"><MessageCircle className="h-3.5 w-3.5" />WhatsApp</TabsTrigger>
-          <TabsTrigger value="payslip" className="gap-1.5"><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
-          <TabsTrigger value="reload" className="gap-1.5"><Smartphone className="h-3.5 w-3.5" />Reload</TabsTrigger>
-          <TabsTrigger value="profile" className="gap-1.5"><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
-          <TabsTrigger value="security" className="gap-1.5"><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
-          <TabsTrigger value="branches" className="gap-1.5"><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-1.5"><Bell className="h-3.5 w-3.5" />Notifications</TabsTrigger>
-          <TabsTrigger value="appearance" className="gap-1.5"><Palette className="h-3.5 w-3.5" />Appearance</TabsTrigger>
-          <TabsTrigger value="billing" className="gap-1.5"><CreditCard className="h-3.5 w-3.5" />Billing</TabsTrigger>
-          <TabsTrigger value="audit-log" className="gap-1.5"><ClipboardList className="h-3.5 w-3.5" />Audit Log</TabsTrigger>
-        </TabsList>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(parseSettingsTab(v))} className="space-y-4">
+        <div className="overflow-x-auto -mx-1 px-1">
+          <TabsList className="h-auto w-max min-w-full justify-start gap-0 rounded-none border-b border-border bg-transparent p-0">
+            <TabsTrigger value="general" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Store className="h-3.5 w-3.5" />General</TabsTrigger>
+            <TabsTrigger value="receipt" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Printer className="h-3.5 w-3.5" />Receipt Print</TabsTrigger>
+            <TabsTrigger value="whatsapp" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><MessageCircle className="h-3.5 w-3.5" />WhatsApp</TabsTrigger>
+            <TabsTrigger value="payslip" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><FileText className="h-3.5 w-3.5" />Payslip</TabsTrigger>
+            <TabsTrigger value="reload" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Smartphone className="h-3.5 w-3.5" />Reload</TabsTrigger>
+            <TabsTrigger value="profile" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><User className="h-3.5 w-3.5" />My Profile</TabsTrigger>
+            <TabsTrigger value="security" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Shield className="h-3.5 w-3.5" />Security</TabsTrigger>
+            <TabsTrigger value="branches" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><GitBranch className="h-3.5 w-3.5" />Branches</TabsTrigger>
+            <TabsTrigger value="notifications" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Bell className="h-3.5 w-3.5" />Notifications</TabsTrigger>
+            <TabsTrigger value="appearance" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><Palette className="h-3.5 w-3.5" />Appearance</TabsTrigger>
+            <TabsTrigger value="billing" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><CreditCard className="h-3.5 w-3.5" />Billing</TabsTrigger>
+            <TabsTrigger value="audit-log" className={cn(SETTINGS_TAB_TRIGGER, "gap-1.5")}><ClipboardList className="h-3.5 w-3.5" />Audit Log</TabsTrigger>
+          </TabsList>
+        </div>
 
-        <TabsContent value="general" className="mt-6 space-y-6">
-          <Card className="border-primary/20 bg-primary/5">
+        <TabsContent value="general" className="mt-0 space-y-4">
+          <Card>
             <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <p className="font-semibold text-sm">Business Type QA Audit</p>
-                <p className="text-xs text-muted-foreground">Scan all pages for {profile.label} before production go-live</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Scan all pages for {profile.label} before production go-live</p>
               </div>
               <Button variant="outline" size="sm" asChild>
                 <a href="/settings/vertical-audit">Open audit checklist →</a>
               </Button>
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Business Information</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" />Business Information</CardTitle>
               <CardDescription>Details about your business synced from server</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Store className="h-3.5 w-3.5" />Business Name</Label>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5"><Store className="h-3.5 w-3.5 text-muted-foreground" />Business Name</Label>
                   <Input value={bizForm.name} onChange={e => setBizForm(f => ({ ...f, name: e.target.value }))} placeholder="My Shop Name" />
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" />Phone</Label>
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 text-muted-foreground" />Phone</Label>
                   <Input value={bizForm.phone} onChange={e => setBizForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 77 123 4567" />
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" />Country</Label>
-                  <select value={bizForm.country} onChange={e => setBizForm(f => ({ ...f, country: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-muted-foreground" />Country</Label>
+                  <select value={bizForm.country} onChange={e => setBizForm(f => ({ ...f, country: e.target.value }))} className={ERP_SELECT_CLASS}>
                     {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5" />Currency</Label>
-                  <select value={bizForm.currency} onChange={e => setBizForm(f => ({ ...f, currency: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <div className="space-y-1.5">
+                  <Label className="flex items-center gap-1.5"><Hash className="h-3.5 w-3.5 text-muted-foreground" />Currency</Label>
+                  <select value={bizForm.currency} onChange={e => setBizForm(f => ({ ...f, currency: e.target.value }))} className={ERP_SELECT_CLASS}>
                     {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="space-y-2 md:col-span-2">
-                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" />Timezone</Label>
-                  <select value={bizForm.timezone} onChange={e => setBizForm(f => ({ ...f, timezone: e.target.value }))} className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5 text-muted-foreground" />Timezone</Label>
+                  <select value={bizForm.timezone} onChange={e => setBizForm(f => ({ ...f, timezone: e.target.value }))} className={ERP_SELECT_CLASS}>
                     {TIMEZONES.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
               {tenant && (
-                <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
-                  <span>Plan: <Badge variant="outline" className="text-xs">{tenant.plan}</Badge></span>
-                  <span>Status: <Badge variant={tenant.status === "ACTIVE" ? "default" : "secondary"} className="text-xs">{tenant.status}</Badge></span>
+                <div className="flex flex-wrap items-center gap-3 pt-1">
+                  <span className="text-xs text-muted-foreground">Plan: <Badge variant="neutral" className="ml-1">{tenant.plan}</Badge></span>
+                  <span className="text-xs text-muted-foreground">Status: <Badge variant={tenant.status === "ACTIVE" ? "success" : "neutral"} className="ml-1">{tenant.status}</Badge></span>
                 </div>
               )}
-              <Button variant="gradient" size="sm" onClick={saveBiz} disabled={bizSaving}>
-                {bizSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}Save Changes
-              </Button>
+              <div className="flex justify-end pt-1">
+                <Button size="sm" onClick={saveBiz} disabled={bizSaving} className="gap-1.5">
+                  {bizSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                  Save Changes
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">POS Configuration</CardTitle>
+              <CardTitle className="flex items-center gap-2"><Store className="h-4 w-4 text-primary" />POS Configuration</CardTitle>
               <CardDescription>Point of sale terminal settings</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2 pb-2 border-b">
+            <CardContent className="space-y-1">
+              <div className="space-y-2 pb-4 mb-1 border-b border-border">
                 <Label htmlFor="pos-layout" className="text-sm font-medium">POS screen layout</Label>
                 <p className="text-xs text-muted-foreground">
                   All 6 layouts use the same POS engine ({POS_LAYOUT_BRAIN}): checkout, hold, reload, barcode, discounts, payments, print. Only screen layout differs.
@@ -699,7 +714,7 @@ export default function SettingsPage() {
                       })
                       .finally(() => setPosSaving(false));
                   }}
-                  className="flex h-10 w-full max-w-md rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={cn(ERP_SELECT_CLASS, "max-w-md")}
                 >
                   {POS_LAYOUT_OPTIONS.map((opt) => (
                     <option key={opt.id} value={opt.id}>
@@ -717,10 +732,10 @@ export default function SettingsPage() {
                 { key: "allowNegativeStock" as const, label: "Allow negative stock", desc: "Enable sales even when stock is 0 (inventory can go minus)" },
                 ...(showLoyalty ? [{ key: "loyalty" as const, label: "Loyalty points on every sale", desc: "Auto-apply loyalty program" }] : []),
               ].map((s) => (
-                <div key={s.key} className="flex items-center justify-between py-0.5">
-                  <div>
+                <div key={s.key} className={ERP_TOGGLE_ROW_CLASS}>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium">{s.label}</p>
-                    <p className="text-xs text-muted-foreground">{s.desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{s.desc}</p>
                   </div>
                   <Switch
                     checked={posForm[s.key]}
@@ -747,15 +762,15 @@ export default function SettingsPage() {
                   />
                 </div>
               ))}
-              <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                {posSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 pt-3">
+                {posSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-emerald-500" />}
                 {posSaving ? "Saving…" : "Changes save automatically"}
               </p>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="receipt" className="mt-6">
+        <TabsContent value="receipt" className="mt-0">
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* ── Form ── */}
             <div className="space-y-5">
@@ -802,7 +817,7 @@ export default function SettingsPage() {
                             <Button
                               type="button"
                               variant="outline"
-                              size="sm"
+ size="sm"
                               disabled={logoUploading}
                               onClick={() => logoInputRef.current?.click()}
                             >
@@ -817,7 +832,7 @@ export default function SettingsPage() {
                               <Button
                                 type="button"
                                 variant="ghost"
-                                size="sm"
+ size="sm"
                                 onClick={() => setReceiptForm((f) => ({ ...f, logoUrl: "" }))}
                               >
                                 <X className="h-4 w-4 mr-1" /> Remove
@@ -1037,7 +1052,7 @@ export default function SettingsPage() {
                 </CardContent>
               </Card>
 
-              <Button variant="gradient" onClick={saveReceipt} disabled={receiptSaving}>
+              <Button onClick={saveReceipt} disabled={receiptSaving}>
                 {receiptSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
                 Save Receipt Settings
               </Button>
@@ -1059,7 +1074,7 @@ export default function SettingsPage() {
           <ReceiptPrintLogCard />
         </TabsContent>
 
-        <TabsContent value="whatsapp" className="mt-6">
+        <TabsContent value="whatsapp" className="mt-0">
           <WhatsappSettingsTab />
         </TabsContent>
 
@@ -1067,11 +1082,11 @@ export default function SettingsPage() {
           <PayslipSettingsTab receiptSettings={receiptForm} />
         </TabsContent>
 
-        <TabsContent value="reload" className="mt-6">
+        <TabsContent value="reload" className="mt-0">
           <ReloadSettingsTab />
         </TabsContent>
 
-        <TabsContent value="profile" className="mt-6 space-y-6">
+        <TabsContent value="profile" className="mt-0 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><User className="h-4 w-4 text-primary" />Personal Information</CardTitle>
@@ -1096,14 +1111,14 @@ export default function SettingsPage() {
                   <Input value={profileForm.phone} onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} placeholder="+94 77 123 4567" />
                 </div>
               </div>
-              <Button variant="gradient" size="sm" onClick={saveProfile} disabled={profileSaving}>
+              <Button size="sm" onClick={saveProfile} disabled={profileSaving}>
                 {profileSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}Update Profile
               </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
-        <TabsContent value="security" className="mt-6 space-y-6">
+        <TabsContent value="security" className="mt-0 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Key className="h-4 w-4 text-primary" />Change Password</CardTitle>
@@ -1135,7 +1150,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-destructive flex items-center gap-1"><X className="h-3 w-3" />Passwords do not match</p>
               )}
               <Separator />
-              <Button variant="gradient" size="sm" onClick={changePassword} disabled={pwSaving || !pwForm.currentPassword || !pwForm.newPassword}>
+              <Button size="sm" onClick={changePassword} disabled={pwSaving || !pwForm.currentPassword || !pwForm.newPassword}>
                 {pwSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Shield className="h-3.5 w-3.5 mr-1.5" />}Change Password
               </Button>
             </CardContent>
@@ -1143,13 +1158,13 @@ export default function SettingsPage() {
           <LoginHistoryCard />
         </TabsContent>
 
-        <TabsContent value="branches" className="mt-6 space-y-4">
+        <TabsContent value="branches" className="mt-0 space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-semibold">Branches</h3>
               <p className="text-sm text-muted-foreground">{branches.length} branch{branches.length !== 1 ? "es" : ""} configured</p>
             </div>
-            <Button variant="gradient" size="sm" onClick={() => openBranchModal()}>
+            <Button size="sm" onClick={() => openBranchModal()}>
               <Plus className="h-3.5 w-3.5 mr-1.5" />Add Branch
             </Button>
           </div>
@@ -1233,7 +1248,7 @@ export default function SettingsPage() {
                     </div>
                   </div>
                   <div className="flex gap-2 pt-2">
-                    <Button variant="gradient" size="sm" onClick={saveBranch} disabled={branchSaving} className="flex-1">
+                    <Button size="sm" onClick={saveBranch} disabled={branchSaving} className="flex-1">
                       {branchSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Check className="h-3.5 w-3.5 mr-1.5" />}
                       {branchModal.editing ? "Update" : "Create"} Branch
                     </Button>
@@ -1245,7 +1260,7 @@ export default function SettingsPage() {
           )}
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-6">
+        <TabsContent value="notifications" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Bell className="h-4 w-4 text-primary" />Notification Preferences</CardTitle>
@@ -1262,10 +1277,10 @@ export default function SettingsPage() {
                 { label: "New purchase orders", desc: "Notify when purchase orders are created", default: true },
                 { label: "Return & exchange alerts", desc: "Notify when returns or exchanges are processed", default: false },
               ].map((n) => (
-                <div key={n.label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
-                  <div>
+                <div key={n.label} className={ERP_TOGGLE_ROW_CLASS}>
+                  <div className="min-w-0">
                     <p className="text-sm font-medium">{n.label}</p>
-                    <p className="text-xs text-muted-foreground">{n.desc}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{n.desc}</p>
                   </div>
                   <Switch defaultChecked={n.default} />
                 </div>
@@ -1274,7 +1289,7 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="appearance" className="mt-6 space-y-6">
+        <TabsContent value="appearance" className="mt-0 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><Palette className="h-4 w-4 text-primary" />Theme & Display</CardTitle>
@@ -1335,16 +1350,16 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="billing" className="mt-6">
+        <TabsContent value="billing" className="mt-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base flex items-center gap-2"><CreditCard className="h-4 w-4 text-primary" />Subscription Plan</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="p-5 rounded-xl gradient-primary text-white mb-5">
-                <p className="text-xs font-semibold opacity-70 uppercase tracking-wide">Current Plan</p>
-                <p className="text-3xl font-bold mt-1">{tenant?.plan ?? "Enterprise"}</p>
-                <p className="text-sm opacity-70 mt-1">Full access · All features unlocked</p>
+              <div className="p-5 rounded-xl border border-border bg-muted/40 mb-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Current Plan</p>
+                <p className="text-2xl font-semibold mt-1 tracking-tight">{tenant?.plan ?? "Enterprise"}</p>
+                <p className="text-sm text-muted-foreground mt-1">Full access · All features unlocked</p>
               </div>
               <div className="grid grid-cols-2 gap-2 text-sm mb-4">
                 {["Unlimited products & variants", "All POS terminals", "AI insights & analytics", "Multi-branch support", "Priority support", "API access", "Advanced reports", "Custom roles & permissions"].map((f) => (
