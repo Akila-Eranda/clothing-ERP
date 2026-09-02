@@ -63,8 +63,12 @@ export class PlatformOpsController {
   }
 
   @Patch('announcements/:id/send')
-  sendAnnouncement(@Param('id') id: string) {
-    return this.ops.sendAnnouncement(id)
+  sendAnnouncement(@Param('id') id: string, @CurrentUser() user: IAuthUser) {
+    return this.ops.sendAnnouncement(id, {
+      userId: user.id,
+      email: user.email,
+      tenantId: user.tenantId,
+    })
   }
 
   @Delete('announcements/:id')
@@ -295,8 +299,8 @@ export class PlatformOpsController {
   }
 
   @Get('security-scan')
-  @ApiOperation({ summary: 'Run platform security scan (GET alias)' })
+  @ApiOperation({ summary: 'Return last security scan result (no side effects)' })
   getSecurityScan() {
-    return this.securityScan.runScan()
+    return this.securityScan.getLastScan()
   }
 }

@@ -1,22 +1,31 @@
 'use client'
 
-import { Loading, LoadingCenter, LoadingScreen } from "@/components/ui/loading";
-import { useState, useEffect } from 'react'
-import { Settings, Shield, Database, Bell, Globe, Save, CheckCircle, Loader2, CreditCard } from 'lucide-react'
+import { LoadingCenter } from "@/components/ui/loading";
+import { useState, useEffect, useCallback } from 'react'
+import { Settings, Shield, Database, Bell, Globe, Save, CheckCircle, Loader2, CreditCard, MessageCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { fetchPlatformConfig, updatePlatformConfig, fetchHealth, fetchBillingSettings, updateBillingSettings, type PlatformConfig, type PlatformBillingSettings } from '@/lib/admin-api'
+import {
+  fetchPlatformConfig, updatePlatformConfig, fetchHealth, fetchBillingSettings, updateBillingSettings,
+  fetchBillingWhatsAppStatus, connectBillingWhatsApp, disconnectBillingWhatsApp,
+  sendBillingWhatsAppTest, setBillingWhatsAppTenant,
+  type PlatformConfig, type PlatformBillingSettings, type BillingWhatsAppStatus,
+} from '@/lib/admin-api'
 import MaintenanceModeCard from '@/components/admin/MaintenanceModeCard'
 import { Button } from '@/components/ui/button'
+import { PageHeader } from '@/components/ui/page-kpi'
+import { ADMIN_CARD, ADMIN_INPUT, ADMIN_SELECT } from '@/lib/admin-ui'
+import { cn } from '@/lib/utils'
 
 interface Section { id: string; label: string; icon: React.ElementType }
 
 const SECTIONS: Section[] = [
-  { id: 'general',       label: 'General',       icon: Settings  },
-  { id: 'security',      label: 'Security',      icon: Shield    },
-  { id: 'database',      label: 'Database',      icon: Database  },
-  { id: 'notifications', label: 'Notifications', icon: Bell      },
-  { id: 'platform',      label: 'Platform',      icon: Globe     },
-  { id: 'billing',       label: 'Invoicing',     icon: CreditCard },
+  { id: 'general',       label: 'General',         icon: Settings      },
+  { id: 'security',      label: 'Security',        icon: Shield        },
+  { id: 'database',      label: 'Database',        icon: Database      },
+  { id: 'notifications', label: 'Notifications',   icon: Bell          },
+  { id: 'platform',      label: 'Platform',        icon: Globe         },
+  { id: 'billing',       label: 'Invoicing',       icon: CreditCard    },
+  { id: 'whatsapp',      label: 'WhatsApp Billing', icon: MessageCircle },
 ]
 
 export default function SettingsPage() {
@@ -39,6 +48,12 @@ export default function SettingsPage() {
     invoiceDueDays: 20,
     taxRate: 0,
   })
+  const [waStatus, setWaStatus] = useState<BillingWhatsAppStatus | null>(null)
+  const [waLoading, setWaLoading] = useState(false)
+  const [waBusy, setWaBusy] = useState<string | null>(null)
+  const [waTestPhone, setWaTestPhone] = useState('')
+  const [waTestMessage, setWaTestMessage] = useState('Hexalyte billing WhatsApp test')
+  const [waTenantId, setWaTenantId] = useState('')
 
   const [config, setConfig] = useState<PlatformConfig>({
     platformName: 'HexaOne',
@@ -59,17 +74,39 @@ export default function SettingsPage() {
     notificationEmail: '',
   })
 
+  const loadWhatsApp = useCallback(async () => {
+    setWaLoading(true)
+    try {
+      const status = await fetchBillingWhatsAppStatus()
+      setWaStatus(status)
+      if (status.tenantId) setWaTenantId(status.tenantId)
+    } catch {
+      setWaStatus(null)
+    } finally {
+      setWaLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     Promise.all([
       fetchPlatformConfig().catch(() => null),
       fetchBillingSettings().catch(() => null),
       fetchHealth().catch(() => null),
-    ]).then(([cfg, bill, health]) => {
+      fetchBillingWhatsAppStatus().catch(() => null),
+    ]).then(([cfg, bill, health, wa]) => {
       if (cfg) setConfig(cfg)
       if (bill) setBilling(bill)
       if (health?.environment) setHealthEnv(health.environment)
+      if (wa) {
+        setWaStatus(wa)
+        if (wa.tenantId) setWaTenantId(wa.tenantId)
+      }
     }).finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => {
+    if (active === 'whatsapp') void loadWhatsApp()
+  }, [active, loadWhatsApp])
 
   async function handleSave() {
     setSaving(true)
@@ -98,20 +135,16 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-base font-bold text-gray-900">Settings</h1>
-          <p className="text-xs text-gray-500 mt-0.5">Platform-wide configuration — persisted to database</p>
-        </div>
-        <Button
-          variant="default"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
-          {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Changes'}
-        </Button>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Platform-wide configuration — persisted to database"
+        actions={
+          <Button variant="default" onClick={handleSave} disabled={saving}>
+            {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <CheckCircle size={13} /> : <Save size={13} />}
+            {saved ? 'Saved!' : saving ? 'Saving…' : 'Save Changes'}
+          </Button>
+        }
+      />
 
       <MaintenanceModeCard config={config} onUpdate={setConfig} />
 
@@ -134,10 +167,10 @@ export default function SettingsPage() {
           })}
         </div>
 
-        <div className="flex-1 bg-white rounded-xl border border-gray-200 p-6">
+        <div className={cn(ADMIN_CARD, 'flex-1 p-6')}>
           {active === 'general' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">General Settings</h2>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">General Settings</h2>
               <div className="grid grid-cols-2 gap-4">
                 {([
                   { label: 'Platform Name', key: 'platformName' as const },
@@ -146,18 +179,18 @@ export default function SettingsPage() {
                   { label: 'Default Timezone', key: 'defaultTimezone' as const },
                 ]).map(f => (
                   <div key={f.key}>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">{f.label}</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{f.label}</label>
                     <input
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-900/10"
+                      className={ADMIN_INPUT}
                       value={config[f.key]}
                       onChange={e => setConfig(c => ({ ...c, [f.key]: e.target.value }))}
                     />
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Default Language</label>
+                  <label className="block text-xs font-medium text-foreground mb-1">Default Language</label>
                   <select
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                    className={ADMIN_SELECT}
                     value={config.defaultLanguage}
                     onChange={e => setConfig(c => ({ ...c, defaultLanguage: e.target.value }))}
                   >
@@ -170,7 +203,7 @@ export default function SettingsPage() {
 
           {active === 'security' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">Security Settings</h2>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">Security Settings</h2>
               <div className="grid grid-cols-2 gap-4">
                 {([
                   { label: 'Session Timeout (minutes)', key: 'sessionTimeoutMins' as const },
@@ -178,19 +211,19 @@ export default function SettingsPage() {
                   { label: 'Min Password Length', key: 'passwordMinLength' as const },
                 ]).map(f => (
                   <div key={f.key}>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">{f.label}</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{f.label}</label>
                     <input
                       type="number"
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-900/10"
+                      className={ADMIN_INPUT}
                       value={config[f.key]}
                       onChange={e => setConfig(c => ({ ...c, [f.key]: parseInt(e.target.value, 10) || 0 }))}
                     />
                   </div>
                 ))}
                 <div className="col-span-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Allowed Origins (CORS)</label>
+                  <label className="block text-xs font-medium text-foreground mb-1">Allowed Origins (CORS)</label>
                   <textarea
-                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none font-mono"
+                    className={cn(ADMIN_INPUT, 'font-mono')}
                     rows={2}
                     value={config.allowedOrigins}
                     onChange={e => setConfig(c => ({ ...c, allowedOrigins: e.target.value }))}
@@ -200,11 +233,11 @@ export default function SettingsPage() {
                   <label className="flex items-center gap-2.5 cursor-pointer">
                     <div
                       onClick={() => setConfig(c => ({ ...c, requireMFA: !c.requireMFA }))}
-                      className={`w-10 h-5 rounded-full transition-colors relative ${config.requireMFA ? 'bg-gray-900' : 'bg-gray-200'}`}
+                      className={cn('w-10 h-5 rounded-full transition-colors relative', config.requireMFA ? 'bg-foreground' : 'bg-muted')}
                     >
-                      <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${config.requireMFA ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                      <div className={cn('absolute top-0.5 w-4 h-4 bg-card rounded-full shadow transition-transform', config.requireMFA ? 'translate-x-5' : 'translate-x-0.5')} />
                     </div>
-                    <span className="text-sm text-gray-700 font-medium">Require MFA for admin users</span>
+                    <span className="text-sm text-foreground font-medium">Require MFA for admin users</span>
                   </label>
                 </div>
               </div>
@@ -213,7 +246,7 @@ export default function SettingsPage() {
 
           {active === 'database' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">Database Info</h2>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">Database Info</h2>
               <div className="space-y-3">
                 {[
                   { label: 'Environment', value: healthEnv || 'production' },
@@ -221,55 +254,55 @@ export default function SettingsPage() {
                   { label: 'Database', value: 'PostgreSQL (fashionerp)' },
                   { label: 'Cache', value: 'Redis' },
                 ].map(r => (
-                  <div key={r.label} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                    <span className="text-xs text-gray-500">{r.label}</span>
-                    <span className="text-xs font-mono font-medium text-gray-800">{r.value}</span>
+                  <div key={r.label} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
+                    <span className="text-xs text-muted-foreground">{r.label}</span>
+                    <span className="text-xs font-mono font-medium text-foreground">{r.value}</span>
                   </div>
                 ))}
               </div>
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <p className="text-xs text-amber-700 font-medium">Database connection is managed via environment variables on the server.</p>
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Database connection is managed via environment variables on the server.</p>
               </div>
             </div>
           )}
 
           {active === 'notifications' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">Notification Settings</h2>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">Notification Settings</h2>
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Admin Notification Email</label>
+                <label className="block text-xs font-medium text-foreground mb-1">Admin Notification Email</label>
                 <input
                   type="email"
-                  className="w-full max-w-md px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  className={cn(ADMIN_INPUT, 'max-w-md')}
                   placeholder="admin@hexalyte.com"
                   value={config.notificationEmail}
                   onChange={e => setConfig(c => ({ ...c, notificationEmail: e.target.value }))}
                 />
-                <p className="text-[10px] text-gray-400 mt-1">Receives alerts for new tenants, trials expiring, and system issues</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Receives alerts for new tenants, trials expiring, and system issues</p>
               </div>
             </div>
           )}
 
           {active === 'platform' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">Platform Configuration</h2>
-              <p className="text-xs text-gray-500">Maintenance Mode is controlled in the card above.</p>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">Platform Configuration</h2>
+              <p className="text-xs text-muted-foreground">Maintenance Mode is controlled in the card above.</p>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Trial Period (days)</label>
-                  <input type="number" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  <label className="block text-xs font-medium text-foreground mb-1">Trial Period (days)</label>
+                  <input type="number" className={ADMIN_INPUT}
                     value={config.trialDays}
                     onChange={e => setConfig(c => ({ ...c, trialDays: parseInt(e.target.value, 10) || 7 }))} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">API Rate Limit/min</label>
-                  <input type="number" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  <label className="block text-xs font-medium text-foreground mb-1">API Rate Limit/min</label>
+                  <input type="number" className={ADMIN_INPUT}
                     value={config.apiRateLimitPerMin}
                     onChange={e => setConfig(c => ({ ...c, apiRateLimitPerMin: parseInt(e.target.value, 10) || 100 }))} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Default Plan</label>
-                  <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  <label className="block text-xs font-medium text-foreground mb-1">Default Plan</label>
+                  <select className={ADMIN_SELECT}
                     value={config.defaultPlan}
                     onChange={e => setConfig(c => ({ ...c, defaultPlan: e.target.value }))}>
                     <option value="STARTER">Starter</option>
@@ -283,8 +316,8 @@ export default function SettingsPage() {
 
           {active === 'billing' && (
             <div className="space-y-5">
-              <h2 className="text-sm font-bold text-gray-900 pb-3 border-b border-gray-100">Subscription Invoice Settings</h2>
-              <p className="text-xs text-gray-500">Used when generating invoices from Admin → Subscriptions or Tenant detail.</p>
+              <h2 className="text-sm font-bold text-foreground pb-3 border-b border-border">Subscription Invoice Settings</h2>
+              <p className="text-xs text-muted-foreground">Used when generating invoices from Admin → Subscriptions or Tenant detail.</p>
               <div className="grid grid-cols-2 gap-4">
                 {([
                   { label: 'Brand Name', key: 'companyBrandName' as const },
@@ -298,25 +331,166 @@ export default function SettingsPage() {
                   { label: 'SWIFT Code', key: 'bankSwift' as const },
                 ]).map(f => (
                   <div key={f.key}>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">{f.label}</label>
+                    <label className="block text-xs font-medium text-foreground mb-1">{f.label}</label>
                     <input
-                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                      className={ADMIN_INPUT}
                       value={billing[f.key]}
                       onChange={e => setBilling(b => ({ ...b, [f.key]: e.target.value }))}
                     />
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Payment due (days)</label>
-                  <input type="number" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  <label className="block text-xs font-medium text-foreground mb-1">Payment due (days)</label>
+                  <input type="number" className={ADMIN_INPUT}
                     value={billing.invoiceDueDays}
                     onChange={e => setBilling(b => ({ ...b, invoiceDueDays: parseInt(e.target.value, 10) || 20 }))} />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Tax rate (%)</label>
-                  <input type="number" className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+                  <label className="block text-xs font-medium text-foreground mb-1">Tax rate (%)</label>
+                  <input type="number" className={ADMIN_INPUT}
                     value={billing.taxRate}
                     onChange={e => setBilling(b => ({ ...b, taxRate: parseFloat(e.target.value) || 0 }))} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {active === 'whatsapp' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between gap-3 pb-3 border-b border-border">
+                <h2 className="text-sm font-bold text-foreground">WhatsApp Billing</h2>
+                <Button type="button" variant="outline" size="sm" onClick={() => void loadWhatsApp()} disabled={waLoading}>
+                  {waLoading ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Refresh
+                </Button>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/40 p-4 space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Status</span>
+                  <span className={cn('font-semibold', waStatus?.connected ? 'text-green-600' : 'text-foreground')}>
+                    {waLoading ? 'Loading…' : waStatus?.connected ? 'Connected' : 'Disconnected'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Billing tenant</span>
+                  <span className="font-mono text-xs text-foreground">{waStatus?.tenantId || '—'}</span>
+                </div>
+                {waStatus?.phone && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Phone</span>
+                    <span className="font-mono text-xs text-foreground">{waStatus.phone}</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  disabled={waBusy === 'connect' || !!waStatus?.connected}
+                  onClick={async () => {
+                    setWaBusy('connect')
+                    try {
+                      const s = await connectBillingWhatsApp()
+                      setWaStatus(s)
+                      toast.success('WhatsApp connected')
+                    } catch (e: unknown) {
+                      toast.error(e instanceof Error ? e.message : 'Connect failed')
+                    } finally {
+                      setWaBusy(null)
+                    }
+                  }}
+                >
+                  {waBusy === 'connect' ? <Loader2 size={13} className="animate-spin" /> : <MessageCircle size={13} />}
+                  Connect
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={waBusy === 'disconnect' || !waStatus?.connected}
+                  onClick={async () => {
+                    setWaBusy('disconnect')
+                    try {
+                      const s = await disconnectBillingWhatsApp()
+                      setWaStatus(s)
+                      toast.success('WhatsApp disconnected')
+                    } catch (e: unknown) {
+                      toast.error(e instanceof Error ? e.message : 'Disconnect failed')
+                    } finally {
+                      setWaBusy(null)
+                    }
+                  }}
+                >
+                  Disconnect
+                </Button>
+              </div>
+              <div className="space-y-3 pt-2 border-t border-border">
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Test message</h3>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Phone</label>
+                    <input
+                      className={ADMIN_INPUT}
+                      placeholder="+94771234567"
+                      value={waTestPhone}
+                      onChange={e => setWaTestPhone(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground mb-1">Message</label>
+                    <input
+                      className={ADMIN_INPUT}
+                      value={waTestMessage}
+                      onChange={e => setWaTestMessage(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={waBusy === 'test' || !waTestPhone.trim()}
+                  onClick={async () => {
+                    setWaBusy('test')
+                    try {
+                      await sendBillingWhatsAppTest(waTestPhone.trim(), waTestMessage.trim() || undefined)
+                      toast.success('Test message sent')
+                    } catch (e: unknown) {
+                      toast.error(e instanceof Error ? e.message : 'Test failed')
+                    } finally {
+                      setWaBusy(null)
+                    }
+                  }}
+                >
+                  {waBusy === 'test' ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Send test message
+                </Button>
+              </div>
+              <div className="space-y-3 pt-2 border-t border-border">
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Set billing tenant</h3>
+                <div className="flex flex-col sm:flex-row gap-2 max-w-lg">
+                  <input
+                    className={cn(ADMIN_INPUT, 'flex-1 font-mono')}
+                    placeholder="Tenant ID"
+                    value={waTenantId}
+                    onChange={e => setWaTenantId(e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    disabled={waBusy === 'tenant' || !waTenantId.trim()}
+                    onClick={async () => {
+                      setWaBusy('tenant')
+                      try {
+                        await setBillingWhatsAppTenant(waTenantId.trim())
+                        toast.success('Billing tenant updated')
+                        await loadWhatsApp()
+                      } catch (e: unknown) {
+                        toast.error(e instanceof Error ? e.message : 'Update failed')
+                      } finally {
+                        setWaBusy(null)
+                      }
+                    }}
+                  >
+                    {waBusy === 'tenant' ? <Loader2 size={13} className="animate-spin" /> : null}
+                    Save tenant
+                  </Button>
                 </div>
               </div>
             </div>

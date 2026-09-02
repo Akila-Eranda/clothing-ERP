@@ -17,6 +17,7 @@ import {
 import {
   fetchTenants, fetchPlatformStats, updateTenant, registerTenant, fetchPlans,
   plansForOnboarding, formatPlanLimit, DEFAULT_PLANS, STARTER_TRIAL_DAYS,
+  sendBillingWhatsAppOnboard,
   type TenantRow, type PlatformStats, type PlanDef,
 } from '@/lib/admin-api'
 import { SHOP_TYPE_LIST, ShopType, getShopProfile } from '@/lib/shop-profiles'
@@ -24,17 +25,11 @@ import { getVerticalFeatures } from '@/lib/shop-features'
 import { ShopFeatureList } from '@/components/shop/shop-feature-list'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { PageHeader, PageKpiGrid, pageKpi, PAGE_HEADER_BTN_TONES } from '@/components/ui/page-kpi'
+import { AdminStatusBadge, AdminPlanBadge } from '@/components/admin/admin-badges'
+import { ADMIN_INPUT, ADMIN_SELECT, ADMIN_MODAL_PANEL } from '@/lib/admin-ui'
+import { cn } from '@/lib/utils'
 
-const STATUS_BADGE: Record<string, string> = {
-  ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
-  SUSPENDED: 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700',
-  INACTIVE:  'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500',
-}
-const PLAN_BADGE: Record<string, string> = {
-  STARTER:      'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600',
-  PROFESSIONAL: 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700',
-  ENTERPRISE:   'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-purple-50 text-purple-700',
-}
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
@@ -92,7 +87,7 @@ export default function TenantsPage() {
         const t = row.original
         return (
           <div className={`flex items-center gap-2 ${actionLoading === t.id ? 'opacity-50' : ''}`}>
-            <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-foreground text-background text-[11px] font-bold flex items-center justify-center flex-shrink-0">
               {t.name.charAt(0)}
             </div>
             <OpenRecordButton
@@ -113,7 +108,7 @@ export default function TenantsPage() {
       cell: ({ row }) => {
         const profile = getShopProfile(row.original.shopType)
         return (
-          <span className="inline-flex items-center gap-1 text-xs text-gray-600">
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <span>{profile.emoji}</span>
             <span className="whitespace-nowrap">{profile.label.replace(' Shop', '')}</span>
           </span>
@@ -124,28 +119,28 @@ export default function TenantsPage() {
       accessorKey: 'subdomain',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Subdomain" />,
       cell: ({ row }) => (
-        <span className="text-xs font-mono text-gray-500">{row.original.subdomain}</span>
+        <span className="text-xs font-mono text-muted-foreground">{row.original.subdomain}</span>
       ),
     },
     {
       accessorKey: 'email',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Email" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-500">{row.original.email}</span>
+        <span className="text-xs text-muted-foreground">{row.original.email}</span>
       ),
     },
     {
       accessorKey: 'plan',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
       cell: ({ row }) => (
-        <span className={PLAN_BADGE[row.original.plan] ?? PLAN_BADGE.STARTER}>{row.original.plan}</span>
+        <AdminPlanBadge plan={row.original.plan} />
       ),
     },
     {
       accessorKey: 'status',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <span className={STATUS_BADGE[row.original.status] ?? STATUS_BADGE.INACTIVE}>{row.original.status}</span>
+        <AdminStatusBadge status={row.original.status} />
       ),
     },
     {
@@ -153,7 +148,7 @@ export default function TenantsPage() {
       accessorFn: (t) => t._count?.users ?? 0,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Users" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-600">{row.original._count?.users ?? '—'}</span>
+        <span className="text-xs text-muted-foreground">{row.original._count?.users ?? '—'}</span>
       ),
     },
     {
@@ -161,14 +156,14 @@ export default function TenantsPage() {
       accessorFn: (t) => t._count?.branches ?? 0,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Branches" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-600">{row.original._count?.branches ?? '—'}</span>
+        <span className="text-xs text-muted-foreground">{row.original._count?.branches ?? '—'}</span>
       ),
     },
     {
       accessorKey: 'createdAt',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-500 whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{fmtDate(row.original.createdAt)}</span>
       ),
     },
     {
@@ -198,45 +193,33 @@ export default function TenantsPage() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-        <div>
-          <h1 className="text-base font-bold text-gray-900">Tenants</h1>
-          <p className="text-sm text-gray-500">{loading ? 'Loading…' : `${total.toLocaleString()} tenants`}</p>
-        </div>
-        <div className="sm:ml-auto flex gap-2">
-          <Button variant="outline" onClick={() => load()} disabled={loading}>
-            <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-          </Button>
-          <Button variant="default" onClick={() => setShowCreate(true)}>
+      <PageHeader
+        title="Tenants"
+        description={loading ? 'Loading…' : `${total.toLocaleString()} tenants`}
+        onRefresh={() => load()}
+        refreshing={loading}
+        actions={
+          <Button variant="default" onClick={() => setShowCreate(true)} className={cn('gap-1.5', PAGE_HEADER_BTN_TONES.blue)}>
             <Plus size={14} />Onboard Tenant
           </Button>
-        </div>
-      </div>
+        }
+      />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total',      value: stats?.totalTenants ?? '—',      icon: Building2,  color: 'text-gray-600',   bg: 'bg-gray-100'   },
-          { label: 'Active',     value: stats?.activeTenants ?? '—',     icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-50'   },
-          { label: 'Suspended',  value: stats?.suspendedTenants ?? '—',  icon: AlertCircle,color: 'text-amber-600',  bg: 'bg-amber-50'   },
-          { label: 'New Month',  value: stats?.newThisMonth ?? '—',      icon: Users,      color: 'text-blue-600',   bg: 'bg-blue-50'    },
-        ].map(k => (
-          <div key={k.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl ${k.bg} flex items-center justify-center flex-shrink-0`}>
-              <k.icon size={15} className={k.color} />
-            </div>
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase tracking-wide">{k.label}</p>
-              <p className="text-xl font-bold text-gray-900 leading-none mt-0.5">{String(k.value)}</p>
-            </div>
-          </div>
-        ))}
-      </div>
+      <PageKpiGrid
+        loading={loading && !stats}
+        cols={4}
+        items={[
+          pageKpi('Total', stats?.totalTenants ?? '—', Building2, 'neutral'),
+          pageKpi('Active', stats?.activeTenants ?? '—', CheckCircle, 'success'),
+          pageKpi('Suspended', stats?.suspendedTenants ?? '—', AlertCircle, 'warning'),
+          pageKpi('New Month', stats?.newThisMonth ?? '—', Users, 'primary'),
+        ]}
+      />
 
       {/* Filters — server-side status/plan; table search covers identity */}
       <div className="flex flex-wrap gap-3">
         <select
-          className="px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg outline-none text-gray-700"
+          className={ADMIN_SELECT}
           value={statusFilter}
           onChange={e => { setStatusFilter(e.target.value); load({ status: e.target.value }) }}
         >
@@ -246,7 +229,7 @@ export default function TenantsPage() {
           <option value="INACTIVE">Inactive</option>
         </select>
         <select
-          className="px-3 py-2 text-sm border border-gray-200 bg-white rounded-lg outline-none text-gray-700"
+          className={ADMIN_SELECT}
           value={planFilter}
           onChange={e => { setPlanFilter(e.target.value); load({ plan: e.target.value }) }}
         >
@@ -320,34 +303,34 @@ function EditTenantModal({ tenant, onClose, onSaved }: { tenant: TenantRow; onCl
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl">
+      <div className={cn(ADMIN_MODAL_PANEL, "max-w-md")}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-sm font-bold text-gray-900">Edit Tenant — {tenant.name}</h3>
-          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={16} /></Button>
+          <h3 className="text-sm font-bold text-foreground">Edit Tenant — {tenant.name}</h3>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-muted-foreground hover:text-muted-foreground"><X size={16} /></Button>
         </div>
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-            <input className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-900/10"
+            <label className="block text-xs font-medium text-foreground mb-1">Name</label>
+            <input className={ADMIN_INPUT}
               value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Plan</label>
-            <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+            <label className="block text-xs font-medium text-foreground mb-1">Plan</label>
+            <select className={ADMIN_SELECT}
               value={form.plan} onChange={e => setForm({ ...form, plan: e.target.value })}>
               {plans.map(p => (
                 <option key={p.key} value={p.key}>{p.name}</option>
               ))}
             </select>
             {selectedPlan && form.plan !== tenant.plan && (
-              <p className="text-[10px] text-gray-500 mt-1">
+              <p className="text-[10px] text-muted-foreground mt-1">
                 New limits: {formatPlanLimit(selectedPlan.maxUsers)} users, {formatPlanLimit(selectedPlan.maxBranches)} branches
               </p>
             )}
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-            <select className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none"
+            <label className="block text-xs font-medium text-foreground mb-1">Status</label>
+            <select className={ADMIN_SELECT}
               value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
               <option value="TRIAL">Trial</option>
               <option value="ACTIVE">Active</option>
@@ -438,6 +421,17 @@ function OnboardTenantWizard({ onClose, onCreated }: { onClose: () => void; onCr
       setTrialEndsAt(result.tenant?.trialEndsAt ?? null)
       setProvisionedPassword(result.initialPassword)
       setForm(f => ({ ...f, password: result.initialPassword }))
+      if (form.phone.trim()) {
+        sendBillingWhatsAppOnboard({
+          phone: form.phone.trim(),
+          businessName: form.shopName,
+          subdomain: form.subdomain,
+          ownerEmail: form.email,
+          tempPassword: result.initialPassword,
+        }).catch(() => {
+          toast.warning('Tenant created, but WhatsApp onboard message failed')
+        })
+      }
       for (const item of provItems) {
         await new Promise<void>(r => setTimeout(r, 380))
         setProvDone(prev => [...prev, item.key])

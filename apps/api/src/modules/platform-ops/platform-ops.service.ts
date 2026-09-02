@@ -75,12 +75,52 @@ export class PlatformOpsService {
     return this.prisma.platformAnnouncement.update({ where: { id }, data: patch })
   }
 
-  async sendAnnouncement(id: string) {
+  async sendAnnouncement(
+    id: string,
+    actor?: { userId?: string; email?: string; tenantId?: string },
+  ) {
     await this.requireAnnouncement(id)
-    return this.prisma.platformAnnouncement.update({
+    const updated = await this.prisma.platformAnnouncement.update({
       where: { id },
       data: { status: 'SENT', sentAt: new Date() },
     })
+
+    // Auditable publish — status flip only (no email/push fan-out in v1)
+    try {
+      const platformSlug =
+        this.config.get<string>('app.platformTenantSubdomain') ?? 'platform'
+      const platformTenant =
+        (actor?.tenantId
+          ? await this.prisma.tenant.findUnique({ where: { id: actor.tenantId }, select: { id: true } })
+          : null) ??
+        (await this.prisma.tenant.findUnique({
+          where: { subdomain: platformSlug },
+          select: { id: true },
+        }))
+
+      if (platformTenant) {
+        await this.prisma.auditLog.create({
+          data: {
+            tenantId: platformTenant.id,
+            userId: actor?.userId || null,
+            action: 'ANNOUNCEMENT_PUBLISH',
+            resource: 'PlatformAnnouncement',
+            resourceId: id,
+            newData: {
+              title: updated.title,
+              status: updated.status,
+              sentAt: updated.sentAt,
+              publishedBy: actor?.email ?? null,
+              note: 'Published to platform feed (no delivery pipeline)',
+            },
+          },
+        })
+      }
+    } catch {
+      /* audit must never break publish */
+    }
+
+    return updated
   }
 
   async deleteAnnouncement(id: string) {

@@ -27,11 +27,23 @@ export type SecurityScanResult = {
 @Injectable()
 export class SecurityScanService {
   private readonly logger = new Logger(SecurityScanService.name);
+  private lastResult: SecurityScanResult | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {}
+
+  /** Non-side-effecting read of the last scan (if any). */
+  getLastScan(): SecurityScanResult | { scannedAt: null; message: string; summary: null; checks: [] } {
+    if (this.lastResult) return this.lastResult;
+    return {
+      scannedAt: null,
+      message: 'No scan has been run yet. POST /platform/security-scan to run one.',
+      summary: null,
+      checks: [],
+    };
+  }
 
   async runScan(): Promise<SecurityScanResult> {
     const checks: SecurityScanCheck[] = [];
@@ -61,11 +73,13 @@ export class SecurityScanService {
     );
     summary.score = scored;
 
-    return {
+    const result: SecurityScanResult = {
       scannedAt: new Date().toISOString(),
       summary,
       checks: checks.sort((a, b) => severityRank(a.status) - severityRank(b.status)),
     };
+    this.lastResult = result;
+    return result;
   }
 
   private async checkDatabase(push: (c: SecurityScanCheck) => void) {
@@ -330,11 +344,20 @@ export class SecurityScanService {
   }
 
   private async checkPublicEndpoints(push: (c: SecurityScanCheck) => void) {
-    const hosts = [
+    const defaultHosts = [
       'https://shop.hexalyte.com/login',
       'https://grocery.shop.hexalyte.com/login',
       'https://shop.clothing.api.hexalyte.com/api/v1/health',
     ];
+    const fromEnv = String(
+      this.config.get<string>('SECURITY_SCAN_HOSTS') ||
+        process.env.SECURITY_SCAN_HOSTS ||
+        '',
+    )
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const hosts = fromEnv.length > 0 ? fromEnv : defaultHosts;
 
     for (const url of hosts) {
       try {

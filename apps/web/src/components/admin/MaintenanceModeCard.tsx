@@ -8,6 +8,9 @@ import {
   type PlatformConfig,
 } from '@/lib/admin-api'
 import { clearMaintenanceCache } from '@/lib/platform-status'
+import { ADMIN_CARD, ADMIN_INPUT } from '@/lib/admin-ui'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 interface Props {
   config: PlatformConfig
@@ -57,24 +60,22 @@ export default function MaintenanceModeCard({ config, onUpdate }: Props) {
   const isOn = config.maintenanceMode
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+    <div className={cn(ADMIN_CARD, 'p-5 space-y-4')}>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-sm font-bold text-gray-900">Maintenance Mode</h2>
-          <p className="text-xs text-gray-500 mt-1">
+          <h2 className="text-sm font-bold text-foreground">Maintenance Mode</h2>
+          <p className="text-xs text-muted-foreground mt-1">
             {isOn
               ? 'On — new logins and registrations are disabled'
               : 'Off — shops can log in normally'}
           </p>
         </div>
-        <button
+        <Button
+          type="button"
+          variant={isOn ? 'outline' : 'default'}
           onClick={toggleMaintenance}
           disabled={toggling}
-          className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
-            isOn
-              ? 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              : 'border-gray-900 bg-gray-900 text-white hover:bg-gray-800'
-          }`}
+          className="gap-1.5"
         >
           {toggling ? (
             <Loader2 size={14} className="animate-spin" />
@@ -82,34 +83,37 @@ export default function MaintenanceModeCard({ config, onUpdate }: Props) {
             <Eye size={14} />
           )}
           {isOn ? 'Turn Off' : 'Turn On'}
-        </button>
+        </Button>
       </div>
 
       {isOn && (
-        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-200">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
           <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-xs font-semibold text-red-700">Maintenance Mode ACTIVE — visible to all users</span>
+          <span className="text-xs font-semibold text-red-600 dark:text-red-400">Maintenance Mode ACTIVE — visible to all users</span>
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-gray-700 mb-1.5">User notification message</label>
+        <label className="block text-xs font-medium text-foreground mb-1.5">User notification message</label>
         <textarea
-          className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-gray-900/10 min-h-[88px] resize-y"
+          className={cn(ADMIN_INPUT, 'min-h-[88px] resize-y')}
           value={message}
           onChange={e => setMessage(e.target.value)}
           placeholder="Hexalyte is currently in maintenance mode. New logins are disabled and some features may be unavailable."
         />
-        <p className="text-[10px] text-gray-400 mt-1.5">
+        <p className="text-[10px] text-muted-foreground mt-1.5">
           Shown on login page, dashboard banner, and bell notifications when maintenance is ON.
         </p>
-        <button
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
           onClick={saveMessage}
           disabled={savingMsg}
-          className="mt-2 text-xs font-medium text-gray-600 hover:text-gray-900 underline disabled:opacity-50"
+          className="mt-2 h-auto px-0 text-xs"
         >
           {savingMsg ? 'Saving…' : 'Save message only'}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
-  Building2, Users, Activity, RefreshCw,
-  AlertTriangle, CheckCircle, ArrowUpRight, DollarSign, Clock, Loader2,
+  Building2, Users, Activity,
+  AlertTriangle, CheckCircle, DollarSign, Clock, Loader2,
 } from 'lucide-react'
 import { ColumnDef } from '@tanstack/react-table'
 import {
@@ -15,25 +15,23 @@ import {
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from '@/components/table'
 import { fetchPlatformOverview, fetchHealth, type PlatformOverview, type HealthData } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
+import { PageHeader, PageKpiGrid, pageKpi } from '@/components/ui/page-kpi'
+import { AdminStatusBadge, AdminPlanBadge } from '@/components/admin/admin-badges'
+import { ADMIN_CARD } from '@/lib/admin-ui'
+import { cn } from '@/lib/utils'
 
 type RecentTenant = PlatformOverview['recentTenants'][number]
 
 function Skeleton({ h = 'h-8', w = 'w-full' }: { h?: string; w?: string }) {
-  return <div className={`${h} ${w} bg-gray-100 rounded-lg animate-pulse`} />
+  return <div className={cn(h, w, 'bg-muted rounded-lg animate-pulse')} />
 }
 
 function fmtDate(s: string) {
   return new Date(s).toLocaleDateString('en-LK', { day: 'numeric', month: 'short', year: '2-digit' })
 }
 
-const STATUS_BADGE: Record<string, string> = {
-  ACTIVE:    'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-green-50 text-green-700',
-  SUSPENDED: 'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-700',
-  TRIAL:     'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-50 text-blue-700',
-  INACTIVE:  'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-500',
-}
 const PLAN_COLORS: Record<string, string> = {
-  STARTER: '#6b7280', PROFESSIONAL: '#374151', ENTERPRISE: '#f59e0b', CUSTOM: '#8b5cf6',
+  STARTER: '#6b7280', PROFESSIONAL: '#3b82f6', ENTERPRISE: '#f59e0b', CUSTOM: '#8b5cf6',
 }
 
 export default function AdminDashboardPage() {
@@ -72,7 +70,7 @@ export default function AdminDashboardPage() {
           const t = row.original
           return (
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-gray-900 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">
+              <div className="w-7 h-7 rounded-lg bg-foreground text-background text-[11px] font-bold flex items-center justify-center flex-shrink-0">
                 {t.name.charAt(0)}
               </div>
               <div>
@@ -83,7 +81,7 @@ export default function AdminDashboardPage() {
                 >
                   {t.name}
                 </OpenRecordButton>
-                <p className="text-[10px] text-gray-400">{t.email}</p>
+                <p className="text-[10px] text-muted-foreground">{t.email}</p>
               </div>
             </div>
           )
@@ -94,41 +92,33 @@ export default function AdminDashboardPage() {
         accessorKey: 'subdomain',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Subdomain" />,
         cell: ({ row }) => (
-          <span className="text-xs font-mono text-gray-500">{row.original.subdomain}</span>
+          <span className="text-xs font-mono text-muted-foreground">{row.original.subdomain}</span>
         ),
       },
       {
         id: 'plan',
         accessorKey: 'plan',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Plan" />,
-        cell: ({ row }) => (
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-gray-100 text-gray-600">
-            {row.original.plan}
-          </span>
-        ),
+        cell: ({ row }) => <AdminPlanBadge plan={row.original.plan} />,
       },
       {
         id: 'status',
         accessorKey: 'status',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) => (
-          <span className={STATUS_BADGE[row.original.status] ?? STATUS_BADGE.INACTIVE}>
-            {row.original.status}
-          </span>
-        ),
+        cell: ({ row }) => <AdminStatusBadge status={row.original.status} />,
       },
       {
         id: 'users',
         accessorKey: 'userCount',
         header: ({ column }) => <DataTableColumnHeader column={column} title="Users" />,
-        cell: ({ row }) => <span className="text-xs text-gray-600">{row.original.userCount}</span>,
+        cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.userCount}</span>,
       },
       {
         id: 'joined',
         accessorFn: (t) => fmtDate(t.createdAt),
         header: ({ column }) => <DataTableColumnHeader column={column} title="Joined" />,
         cell: ({ row }) => (
-          <span className="text-xs text-gray-500">{fmtDate(row.original.createdAt)}</span>
+          <span className="text-xs text-muted-foreground">{fmtDate(row.original.createdAt)}</span>
         ),
       },
     ],
@@ -137,13 +127,22 @@ export default function AdminDashboardPage() {
 
   const stats = overview?.stats
   const recentTenants = overview?.recentTenants ?? []
-  const statCards = stats ? [
-    { label: 'Total Tenants',  value: stats.totalTenants,    icon: Building2,   color: 'text-blue-600',   bg: 'bg-blue-50',    href: '/admin/tenants' },
-    { label: 'Active',         value: stats.activeTenants,   icon: CheckCircle, color: 'text-green-600',  bg: 'bg-green-50',   href: '/admin/tenants?status=ACTIVE' },
-    { label: 'On Trial',       value: stats.trialTenants,    icon: Clock,       color: 'text-cyan-600',   bg: 'bg-cyan-50',    href: '/admin/subscriptions' },
-    { label: 'Total Users',    value: stats.totalUsers,      icon: Users,       color: 'text-violet-600', bg: 'bg-violet-50',  href: '/admin/users' },
-    { label: 'MRR',            value: `Rs.${stats.mrr.toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50', href: '/admin/subscriptions' },
-    { label: 'System Health',  value: health?.status === 'ok' ? 'Healthy' : 'Check', icon: Activity, color: health?.status === 'ok' ? 'text-green-600' : 'text-red-600', bg: health?.status === 'ok' ? 'bg-green-50' : 'bg-red-50', href: '/admin/system-health' },
+
+  const kpiItems = stats ? [
+    { ...pageKpi('Total Tenants', stats.totalTenants, Building2, 'primary'), href: '/admin/tenants' },
+    { ...pageKpi('Active', stats.activeTenants, CheckCircle, 'success'), href: '/admin/tenants?status=ACTIVE' },
+    { ...pageKpi('On Trial', stats.trialTenants, Clock, 'info'), href: '/admin/subscriptions' },
+    { ...pageKpi('Total Users', stats.totalUsers, Users, 'neutral'), href: '/admin/users' },
+    { ...pageKpi('MRR', `Rs.${stats.mrr.toLocaleString()}`, DollarSign, 'success'), href: '/admin/subscriptions' },
+    {
+      ...pageKpi(
+        'System Health',
+        health?.status === 'ok' ? 'Healthy' : 'Check',
+        Activity,
+        health?.status === 'ok' ? 'success' : 'danger',
+      ),
+      href: '/admin/system-health',
+    },
   ] : []
 
   const planDonut = overview?.planBreakdown.filter(p => p.count > 0).map(p => ({
@@ -153,90 +152,76 @@ export default function AdminDashboardPage() {
   if (error) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3 text-center">
       <AlertTriangle size={32} className="text-amber-400" />
-      <p className="text-sm font-medium text-gray-700">Could not load dashboard</p>
-      <p className="text-xs text-gray-400">{error}</p>
-      <Button variant="default" size="sm" onClick={load}>
-        <RefreshCw size={12} />Retry
-      </Button>
+      <p className="text-sm font-medium text-foreground">Could not load dashboard</p>
+      <p className="text-xs text-muted-foreground">{error}</p>
+      <Button variant="default" size="sm" onClick={load}>Retry</Button>
     </div>
   )
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Dashboard"
+        description="Platform overview and recent activity"
+        onRefresh={load}
+        refreshing={loading}
+      />
 
-      {/* Alerts strip */}
       {!loading && overview && overview.alerts.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {overview.alerts.map((a, i) => (
             <Link key={i} href={a.href ?? '/admin/dashboard'}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border ${
-                a.severity === 'error' ? 'bg-red-50 border-red-200 text-red-700' :
-                a.severity === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-700' :
-                'bg-blue-50 border-blue-200 text-blue-700'
-              }`}>
+              className={cn(
+                'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border',
+                a.severity === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-700 dark:text-red-400' :
+                a.severity === 'warning' ? 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400' :
+                'bg-primary/10 border-primary/20 text-primary',
+              )}>
               <AlertTriangle size={12} /> {a.message}
             </Link>
           ))}
         </div>
       )}
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {loading ? Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 space-y-2">
-            <Skeleton h="h-4" w="w-1/2" /><Skeleton h="h-8" /><Skeleton h="h-3" w="w-2/3" />
-          </div>
-        )) : statCards.map(c => (
-          <Link key={c.label} href={c.href} className="bg-white rounded-xl border border-gray-200 p-5 flex items-start gap-4 hover:border-gray-300 hover:shadow-sm transition-all group">
-            <div className={`w-10 h-10 rounded-xl ${c.bg} flex items-center justify-center flex-shrink-0`}>
-              <c.icon size={18} className={c.color} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-500 mb-0.5">{c.label}</p>
-              <p className="text-2xl font-bold text-gray-900">{c.value}</p>
-            </div>
-            <ArrowUpRight size={14} className="text-gray-300 group-hover:text-gray-500 flex-shrink-0 mt-1 transition-colors" />
-          </Link>
-        ))}
-      </div>
+      <PageKpiGrid items={kpiItems} loading={loading} cols={6} />
 
-      {/* Charts + Trials expiring */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5 lg:col-span-2">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Tenants by Plan</h2>
+        <div className={cn(ADMIN_CARD, 'p-5 lg:col-span-2')}>
+          <h2 className="text-sm font-semibold text-foreground mb-4">Tenants by Plan</h2>
           {loading ? <Skeleton h="h-48" /> : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={overview?.planBreakdown ?? []} barSize={40}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis dataKey="plan" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="plan" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} />
                 <Tooltip formatter={(v: number) => [v + ' tenants']} />
-                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="#111827"
-                  label={{ position: 'top', fontSize: 11, fill: '#6b7280' }} />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]} fill="hsl(var(--foreground))"
+                  label={{ position: 'top', fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
               </BarChart>
             </ResponsiveContainer>
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className={cn(ADMIN_CARD, 'p-5')}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-gray-900">Trials Expiring</h2>
-            <Link href="/admin/subscriptions" className="text-[10px] text-gray-400 hover:text-gray-700">View all →</Link>
+            <h2 className="text-sm font-semibold text-foreground">Trials Expiring</h2>
+            <Link href="/admin/subscriptions" className="text-[10px] text-muted-foreground hover:text-foreground">View all →</Link>
           </div>
           {loading ? <Skeleton h="h-40" /> : (overview?.trialsExpiring.length ?? 0) === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-10">No trials expiring soon</p>
+            <p className="text-xs text-muted-foreground text-center py-10">No trials expiring soon</p>
           ) : (
             <div className="space-y-2">
               {overview!.trialsExpiring.slice(0, 5).map(t => (
                 <Link key={t.id} href={`/admin/tenants/${t.id}`}
-                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-gray-50 group">
+                  className="flex items-center justify-between p-2.5 rounded-lg hover:bg-muted/60 group">
                   <div>
-                    <p className="text-xs font-semibold text-gray-800 group-hover:text-gray-900">{t.name}</p>
-                    <p className="text-[10px] text-gray-400 font-mono">{t.subdomain}</p>
+                    <p className="text-xs font-semibold text-foreground">{t.name}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">{t.subdomain}</p>
                   </div>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    t.daysLeft <= 2 ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'
-                  }`}>{t.daysLeft}d left</span>
+                  <span className={cn(
+                    'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                    t.daysLeft <= 2 ? 'bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-amber-500/10 text-amber-600 dark:text-amber-400',
+                  )}>{t.daysLeft}d left</span>
                 </Link>
               ))}
             </div>
@@ -244,12 +229,11 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Plan donut + Recent tenants */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-4">Plan Distribution</h2>
+        <div className={cn(ADMIN_CARD, 'p-5')}>
+          <h2 className="text-sm font-semibold text-foreground mb-4">Plan Distribution</h2>
           {loading ? <Skeleton h="h-40" /> : planDonut.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-10">No data yet</p>
+            <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={160}>
@@ -268,9 +252,9 @@ export default function AdminDashboardPage() {
                   <div key={p.name} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ background: PLAN_COLORS[p.name] ?? '#9ca3af' }} />
-                      <span className="text-gray-600">{p.name}</span>
+                      <span className="text-muted-foreground">{p.name}</span>
                     </div>
-                    <span className="font-semibold text-gray-800">{p.value}</span>
+                    <span className="font-semibold text-foreground">{p.value}</span>
                   </div>
                 ))}
               </div>
@@ -278,20 +262,15 @@ export default function AdminDashboardPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden lg:col-span-2">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-900">Recent Tenants</h2>
-            <div className="flex items-center gap-2">
-              <Link href="/admin/tenants" className="text-xs text-gray-500 hover:text-gray-800">View all →</Link>
-              <Button variant="ghost" size="icon-sm" onClick={load} disabled={loading} className="text-gray-400 hover:text-gray-700">
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              </Button>
-            </div>
+        <div className={cn(ADMIN_CARD, 'overflow-hidden lg:col-span-2')}>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">Recent Tenants</h2>
+            <Link href="/admin/tenants" className="text-xs text-muted-foreground hover:text-foreground">View all →</Link>
           </div>
           <div className="p-3">
             {loading ? (
               <div className="flex justify-center py-8">
-                <Loader2 size={16} className="animate-spin text-gray-300" />
+                <Loader2 size={16} className="animate-spin text-muted-foreground" />
               </div>
             ) : (
               <ClientSideTable
@@ -308,7 +287,6 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* Quick actions */}
       {!loading && (
         <div className="grid sm:grid-cols-4 gap-3">
           {[
@@ -318,9 +296,9 @@ export default function AdminDashboardPage() {
             { label: 'Platform Settings', href: '/admin/settings', desc: 'Configuration' },
           ].map(a => (
             <Link key={a.href} href={a.href}
-              className="p-4 bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all">
-              <p className="text-sm font-semibold text-gray-900">{a.label}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{a.desc}</p>
+              className={cn(ADMIN_CARD, 'p-4 hover:border-primary/25 transition-colors block')}>
+              <p className="text-sm font-semibold text-foreground">{a.label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{a.desc}</p>
             </Link>
           ))}
         </div>

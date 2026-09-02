@@ -18,6 +18,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/activity-logs': 'Activity Logs',
   '/admin/plans':         'Plans',
   '/admin/settings':      'Settings',
+  '/admin/announcements': 'Announcements',
+  '/admin/releases':      'Releases',
+  '/admin/suggestions':   'Suggestions',
+  '/admin/support':       'Support',
+  '/admin/admins':        'Admins',
 }
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

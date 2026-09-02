@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { RefreshCw, AlertTriangle, Info, AlertCircle } from 'lucide-react'
+import { AlertTriangle, Info, AlertCircle, ScrollText } from 'lucide-react'
 import { ColumnDef } from '@tanstack/react-table'
 import { ClientSideTable, DataTableColumnHeader } from '@/components/table'
 import { fetchPlatformAuditLogs, type AuditLogRow } from '@/lib/admin-api'
-import { Button } from '@/components/ui/button'
-import { parseApiList } from "@/lib/parse-api-list";
+import { parseApiList } from '@/lib/parse-api-list'
+import { PageHeader, PageKpiGrid, pageKpi } from '@/components/ui/page-kpi'
+import { cn } from '@/lib/utils'
 
 const SEV_FROM_ACTION: Record<string, 'INFO' | 'WARN' | 'ERROR'> = {
   DELETE: 'ERROR',
@@ -22,7 +23,7 @@ function severity(log: AuditLogRow): 'INFO' | 'WARN' | 'ERROR' {
 }
 
 const SEV_DOT: Record<string, string> = {
-  INFO: 'bg-blue-400',
+  INFO: 'bg-primary',
   WARN: 'bg-amber-400',
   ERROR: 'bg-red-500',
 }
@@ -32,9 +33,9 @@ const SEV_ICON: Record<string, React.ElementType> = {
   ERROR: AlertCircle,
 }
 const SEV_TEXT: Record<string, string> = {
-  INFO: 'text-blue-600 bg-blue-50',
-  WARN: 'text-amber-600 bg-amber-50',
-  ERROR: 'text-red-600 bg-red-50',
+  INFO: 'text-primary bg-primary/10',
+  WARN: 'text-amber-600 dark:text-amber-400 bg-amber-500/10',
+  ERROR: 'text-red-600 dark:text-red-400 bg-red-500/10',
 }
 
 type LogRow = AuditLogRow & { _severity: 'INFO' | 'WARN' | 'ERROR'; _actor: string }
@@ -72,7 +73,7 @@ export default function ActivityLogsPage() {
       accessorKey: 'createdAt',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Time" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-500 whitespace-nowrap">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
           {new Date(row.original.createdAt).toLocaleString('en-LK')}
         </span>
       ),
@@ -85,8 +86,8 @@ export default function ActivityLogsPage() {
         const sev = row.original._severity
         const Icon = SEV_ICON[sev]
         return (
-          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold ${SEV_TEXT[sev]}`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${SEV_DOT[sev]}`} />
+          <span className={cn('inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold', SEV_TEXT[sev])}>
+            <span className={cn('w-1.5 h-1.5 rounded-full', SEV_DOT[sev])} />
             <Icon size={10} /> {sev}
           </span>
         )
@@ -97,16 +98,16 @@ export default function ActivityLogsPage() {
       accessorFn: (l) =>
         `${l.action} ${l.resource ?? ''} ${l.tenant?.name ?? ''} ${l._actor ?? ''}`.trim(),
       header: ({ column }) => <DataTableColumnHeader column={column} title="Action" />,
-      cell: ({ row }) => <span className="font-mono text-xs text-gray-800">{row.original.action}</span>,
+      cell: ({ row }) => <span className="font-mono text-xs text-foreground">{row.original.action}</span>,
     },
     {
       accessorKey: 'resource',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Resource" />,
       cell: ({ row }) => (
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-muted-foreground">
           {row.original.resource}
           {row.original.resourceId && (
-            <span className="text-gray-400 ml-1">#{row.original.resourceId.slice(0, 8)}</span>
+            <span className="text-muted-foreground/70 ml-1">#{row.original.resourceId.slice(0, 8)}</span>
           )}
         </span>
       ),
@@ -116,10 +117,10 @@ export default function ActivityLogsPage() {
       accessorFn: (l) => l.tenant?.name ?? '',
       header: ({ column }) => <DataTableColumnHeader column={column} title="Tenant" />,
       cell: ({ row }) => (
-        <div className="text-xs text-gray-600">
+        <div className="text-xs text-muted-foreground">
           {row.original.tenant?.name ?? '—'}
           {row.original.tenant?.subdomain && (
-            <span className="block text-[10px] text-gray-400 font-mono">{row.original.tenant.subdomain}</span>
+            <span className="block text-[10px] text-muted-foreground font-mono">{row.original.tenant.subdomain}</span>
           )}
         </div>
       ),
@@ -128,33 +129,31 @@ export default function ActivityLogsPage() {
       id: 'actor',
       accessorKey: '_actor',
       header: ({ column }) => <DataTableColumnHeader column={column} title="User" />,
-      cell: ({ row }) => <span className="text-xs text-gray-600">{row.original._actor}</span>,
+      cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original._actor}</span>,
     },
   ], [])
 
+  const kpis = [
+    pageKpi('Events', logs.length, ScrollText, 'primary'),
+    pageKpi('Info', logs.filter((l) => l._severity === 'INFO').length, Info, 'info'),
+    pageKpi('Warnings', logs.filter((l) => l._severity === 'WARN').length, AlertTriangle, 'warning'),
+    pageKpi('Errors', logs.filter((l) => l._severity === 'ERROR').length, AlertCircle, 'danger'),
+  ]
+
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <div>
-          <h1 className="text-base font-bold text-gray-900">Activity Logs</h1>
-          <p className="text-sm text-gray-500">
-            {loading ? 'Loading…' : `${logs.length} audit events`}
-          </p>
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="ml-auto"
-          onClick={() => void load()}
-          disabled={loading}
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="Activity Logs"
+        description={loading ? 'Loading…' : `${logs.length} audit events`}
+        onRefresh={() => void load()}
+        refreshing={loading}
+      />
 
       {error && (
-        <p className="text-xs text-red-600 bg-red-50 border border-red-100 px-3 py-2 rounded-lg">{error}</p>
+        <p className="text-xs text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 px-3 py-2 rounded-lg">{error}</p>
       )}
+
+      <PageKpiGrid items={kpis} loading={loading} cols={4} />
 
       <ClientSideTable
         data={logs}

@@ -34,6 +34,8 @@ const STATUS_MAP: Record<string, { variant: TableStatusVariant; label?: string }
   POSTED: { variant: "success", label: "Posted" },
   COMPLETED: { variant: "success", label: "Completed" },
   ACTIVE: { variant: "success", label: "Active" },
+  TRIAL: { variant: "info", label: "Trial" },
+  PUBLISHED: { variant: "success", label: "Published" },
   PAID: { variant: "success", label: "Paid" },
   APPROVED: { variant: "success", label: "Approved" },
   OPEN: { variant: "success", label: "Open" },

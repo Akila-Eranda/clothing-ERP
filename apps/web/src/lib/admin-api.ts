@@ -647,6 +647,341 @@ export async function runSecurityScan(): Promise<SecurityScanResult> {
   return req<SecurityScanResult>('/platform/security-scan', { method: 'POST' })
 }
 
+// ── Platform Ops: Announcements ───────────────────────────────────────────────
+export interface PlatformAnnouncement {
+  id: string
+  title: string
+  body: string
+  type?: string | null
+  target?: string | null
+  targetTenants?: string[] | null
+  dismissible?: boolean
+  status: string
+  scheduledAt?: string | null
+  sentAt?: string | null
+  createdBy?: string | null
+  createdAt: string
+  updatedAt?: string
+  seenCount?: number
+}
+
+export async function fetchAnnouncements() {
+  return req<PlatformAnnouncement[]>('/platform/announcements')
+}
+
+export async function createAnnouncement(data: {
+  title: string
+  body: string
+  type?: string
+  target?: string
+  targetTenants?: string[]
+  dismissible?: boolean
+  scheduledAt?: string | null
+  sendNow?: boolean
+}) {
+  return req<PlatformAnnouncement>('/platform/announcements', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateAnnouncement(id: string, data: Record<string, unknown>) {
+  return req<PlatformAnnouncement>(`/platform/announcements/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function sendAnnouncement(id: string) {
+  return req<PlatformAnnouncement>(`/platform/announcements/${id}/send`, { method: 'PATCH' })
+}
+
+export async function deleteAnnouncement(id: string) {
+  await req<null>(`/platform/announcements/${id}`, { method: 'DELETE' })
+}
+
+// ── Platform Ops: Releases ────────────────────────────────────────────────────
+export interface PlatformReleaseItem {
+  id?: string
+  title: string
+  body?: string
+  type?: string
+}
+
+export interface PlatformRelease {
+  id: string
+  version: string
+  title: string
+  summary?: string | null
+  status: string
+  publishedAt?: string | null
+  createdBy?: string | null
+  createdAt: string
+  items?: PlatformReleaseItem[]
+}
+
+export async function fetchReleases(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : ''
+  return req<PlatformRelease[]>(`/platform/releases${qs}`)
+}
+
+export async function fetchRelease(id: string) {
+  return req<PlatformRelease>(`/platform/releases/${id}`)
+}
+
+export async function createRelease(data: {
+  version: string
+  title: string
+  summary?: string
+  items?: PlatformReleaseItem[]
+}) {
+  return req<PlatformRelease>('/platform/releases', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function updateRelease(id: string, data: Record<string, unknown>) {
+  return req<PlatformRelease>(`/platform/releases/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function publishRelease(id: string) {
+  return req<PlatformRelease>(`/platform/releases/${id}/publish`, { method: 'PATCH' })
+}
+
+export async function deleteRelease(id: string) {
+  await req<null>(`/platform/releases/${id}`, { method: 'DELETE' })
+}
+
+// ── Platform Ops: Feature suggestions ─────────────────────────────────────────
+export interface FeatureSuggestion {
+  id: string
+  title: string
+  description?: string | null
+  status: string
+  priority?: string | null
+  publicResponse?: string | null
+  internalNote?: string | null
+  createdAt: string
+  updatedAt?: string
+  tenant?: { id: string; name: string; subdomain?: string }
+  user?: { id: string; email: string; firstName?: string | null; lastName?: string | null }
+  history?: { id: string; note?: string; status?: string; createdAt: string; createdBy?: string }[]
+}
+
+export async function fetchSuggestionsSummary() {
+  return req<Record<string, number>>('/platform/feature-suggestions/summary')
+}
+
+export async function fetchSuggestions(params?: Record<string, string>) {
+  const qs = params ? '?' + new URLSearchParams(params) : ''
+  return req<{
+    data: FeatureSuggestion[]
+    meta?: { total: number; page: number; limit: number }
+    total?: number
+  }>(`/platform/feature-suggestions${qs}`)
+}
+
+export async function fetchSuggestion(id: string) {
+  return req<FeatureSuggestion>(`/platform/feature-suggestions/${id}`)
+}
+
+export async function updateSuggestion(
+  id: string,
+  data: {
+    status?: string
+    priority?: string
+    publicResponse?: string
+    internalNote?: string
+  },
+) {
+  return req<FeatureSuggestion>(`/platform/feature-suggestions/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  })
+}
+
+// ── Platform Ops: Support ─────────────────────────────────────────────────────
+export interface ImpersonateResult {
+  loginUrl: string
+  code?: string
+  expiresAt?: string
+  ownerEmail?: string
+}
+
+export interface TenantDebugInfo {
+  tenant: TenantRow
+  counts: {
+    products: number
+    customers: number
+    sales: number
+    users: number
+  }
+}
+
+export interface SupportNote {
+  id: string
+  tenantId?: string | null
+  title: string
+  body: string
+  createdBy?: string | null
+  createdAt: string
+  tenant?: { id: string; name: string; subdomain?: string }
+}
+
+export async function impersonateTenant(tenantId: string) {
+  return req<ImpersonateResult>(`/platform/support/impersonate/${tenantId}`, { method: 'POST' })
+}
+
+export async function fetchTenantDebug(tenantId: string) {
+  return req<TenantDebugInfo>(`/platform/support/tenant-debug/${tenantId}`)
+}
+
+export async function fetchSupportNotes(tenantId?: string) {
+  const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : ''
+  return req<SupportNote[]>(`/platform/support/notes${qs}`)
+}
+
+export async function createSupportNote(data: {
+  tenantId?: string
+  title: string
+  body: string
+}) {
+  return req<SupportNote>('/platform/support/notes', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deleteSupportNote(id: string) {
+  await req<null>(`/platform/support/notes/${id}`, { method: 'DELETE' })
+}
+
+export async function revokeTenantSessions(tenantId: string) {
+  return req<{ revoked: number }>(`/platform/tenants/${tenantId}/revoke-sessions`, {
+    method: 'POST',
+  })
+}
+
+export async function resetUserPassword(userId: string) {
+  return req<{ sent: boolean }>(`/platform/users/${userId}/reset-password`, { method: 'POST' })
+}
+
+// ── Platform Ops: Notifications / Analytics / Admins / WhatsApp ───────────────
+export interface PlatformNotification {
+  id?: string
+  type: string
+  severity?: string
+  message: string
+  href?: string
+  createdAt?: string
+  tenantId?: string
+}
+
+export async function fetchPlatformNotifications() {
+  return req<PlatformNotification[]>('/platform/notifications')
+}
+
+export interface PlatformAnalytics {
+  gmv?: number
+  customers?: number
+  planMix?: { plan: string; count: number }[]
+  topTenants?: { id: string; name: string; subdomain?: string; gmv?: number; sales?: number }[]
+  growth?: { month: string; tenants: number }[]
+  inactiveTenants?: { id: string; name: string; subdomain?: string; lastActivity?: string }[]
+  summary?: Record<string, number>
+  [key: string]: unknown
+}
+
+export async function fetchPlatformAnalytics() {
+  return req<PlatformAnalytics>('/platform/analytics')
+}
+
+export async function fetchMrrChart() {
+  return req<{ month: string; mrr: number }[]>('/platform/analytics/mrr-chart')
+}
+
+export interface PlatformAdmin {
+  id: string
+  email: string
+  firstName: string | null
+  lastName: string | null
+  phone?: string | null
+  status: string
+  createdAt: string
+}
+
+export async function fetchPlatformAdmins() {
+  return req<PlatformAdmin[]>('/platform/admins')
+}
+
+export async function createPlatformAdmin(data: {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  phone?: string
+}) {
+  return req<PlatformAdmin>('/platform/admins', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function deactivatePlatformAdmin(id: string) {
+  return req<PlatformAdmin>(`/platform/admins/${id}`, { method: 'DELETE' })
+}
+
+export interface BillingWhatsAppStatus {
+  connected: boolean
+  tenantId?: string | null
+  phone?: string | null
+  status?: string
+  [key: string]: unknown
+}
+
+export async function fetchBillingWhatsAppStatus() {
+  return req<BillingWhatsAppStatus>('/platform/billing/whatsapp/status')
+}
+
+export async function connectBillingWhatsApp() {
+  return req<BillingWhatsAppStatus>('/platform/billing/whatsapp/connect', { method: 'POST' })
+}
+
+export async function disconnectBillingWhatsApp() {
+  return req<BillingWhatsAppStatus>('/platform/billing/whatsapp/disconnect', { method: 'POST' })
+}
+
+export async function sendBillingWhatsAppTest(phone: string, message?: string) {
+  return req('/platform/billing/whatsapp/test-message', {
+    method: 'POST',
+    body: JSON.stringify({ phone, message }),
+  })
+}
+
+export async function sendBillingWhatsAppOnboard(data: {
+  phone: string
+  businessName: string
+  subdomain: string
+  ownerEmail: string
+  tempPassword?: string
+}) {
+  return req('/platform/billing/whatsapp/send-onboard', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export async function setBillingWhatsAppTenant(tenantId: string) {
+  return req('/platform/billing/whatsapp/tenant', {
+    method: 'PUT',
+    body: JSON.stringify({ tenantId }),
+  })
+}
+
 // ── Dashboard Stats (derived) ─────────────────────────────────────────────────
 export async function fetchPlatformStats(): Promise<PlatformStats> {
   const res = await fetchTenants()
@@ -668,3 +1003,4 @@ export async function fetchPlatformStats(): Promise<PlatformStats> {
     planBreakdown,
   }
 }
+

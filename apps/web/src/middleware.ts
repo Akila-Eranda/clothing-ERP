@@ -45,6 +45,16 @@ export function middleware(request: NextRequest) {
       loginUrl.search = '';
       return NextResponse.redirect(loginUrl);
     }
+    // Cookie gate: require admin_token for all admin routes except login
+    if (pathname !== '/admin/login' && !pathname.startsWith('/admin/login/')) {
+      const adminToken = request.cookies.get('admin_token')?.value;
+      if (!adminToken) {
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = '/admin/login';
+        loginUrl.search = '';
+        return NextResponse.redirect(loginUrl);
+      }
+    }
     return NextResponse.next();
   }
 

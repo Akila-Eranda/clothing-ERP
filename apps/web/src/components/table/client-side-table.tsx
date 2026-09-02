@@ -73,6 +73,10 @@ export type AppClientSideTableProps<TData, TValue> = Omit<
   fillHeight?: boolean;
   searchableColumns?: AppTableSearchColumn<TData>[];
   filterableColumns?: AppTableFilterColumn<TData>[];
+  /** Prefill search (e.g. from URL `?search=`). */
+  defaultSearch?: string;
+  /** Prefill column filters (e.g. from URL query params). */
+  defaultFilterValues?: Record<string, string>;
 };
 
 /**
@@ -87,6 +91,8 @@ export function ClientSideTable<TData, TValue>({
   config,
   filterableColumns,
   searchableColumns,
+  defaultSearch = "",
+  defaultFilterValues,
   isShowExportButtons,
   ...props
 }: AppClientSideTableProps<TData, TValue>) {
@@ -95,8 +101,20 @@ export function ClientSideTable<TData, TValue>({
   const filterCols = filterableColumns ?? [];
   const showFilterBar = searchCols.length > 0 || filterCols.length > 0;
 
-  const [search, setSearch] = React.useState("");
-  const [filterValues, setFilterValues] = React.useState<Record<string, string>>({});
+  const [search, setSearch] = React.useState(defaultSearch);
+  const [filterValues, setFilterValues] = React.useState<Record<string, string>>(
+    () => defaultFilterValues ?? {},
+  );
+
+  React.useEffect(() => {
+    if (defaultSearch) setSearch(defaultSearch);
+  }, [defaultSearch]);
+
+  React.useEffect(() => {
+    if (defaultFilterValues && Object.keys(defaultFilterValues).length > 0) {
+      setFilterValues((prev) => ({ ...prev, ...defaultFilterValues }));
+    }
+  }, [defaultFilterValues]);
 
   const deferredSearch = React.useDeferredValue(search);
 

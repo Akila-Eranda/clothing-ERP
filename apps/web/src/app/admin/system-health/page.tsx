@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, CheckCircle, XCircle, AlertTriangle, Activity, Database, Wifi, Server } from 'lucide-react'
+import { CheckCircle, XCircle, AlertTriangle, Activity, Database, Wifi, Server } from 'lucide-react'
 import { fetchHealth } from '@/lib/admin-api'
 import { APP_NAME } from '@/lib/constants'
-import { Button } from '@/components/ui/button'
+import { PageHeader, PageKpiGrid, pageKpi } from '@/components/ui/page-kpi'
+import { ADMIN_CARD } from '@/lib/admin-ui'
+import { cn } from '@/lib/utils'
 
 function StatusDot({ ok }: { ok: boolean }) {
   return (
-    <span className={`inline-flex w-2.5 h-2.5 rounded-full ${ok ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
+    <span className={cn('inline-flex w-2.5 h-2.5 rounded-full animate-pulse', ok ? 'bg-emerald-500' : 'bg-red-500')} />
   )
 }
 
@@ -78,77 +80,85 @@ export default function SystemHealthPage() {
     },
   ]
 
+  const kpis = [
+    pageKpi('Overall', loading ? '…' : allOk ? 'Healthy' : 'Degraded', Activity, allOk ? 'success' : 'danger'),
+    pageKpi('API', apiOk ? 'Up' : 'Down', Server, apiOk ? 'success' : 'danger'),
+    pageKpi('Database', dbOk ? 'Up' : 'Down', Database, dbOk ? 'success' : 'danger'),
+    pageKpi('Redis', redisOk ? 'Up' : 'Down', Activity, redisOk ? 'success' : 'danger'),
+  ]
+
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div>
-          <h1 className="text-base font-bold text-gray-900">System Health</h1>
-          {lastCheck && (
-            <p className="text-sm text-gray-500">Last checked: {lastCheck.toLocaleTimeString()}</p>
-          )}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={load}
-          disabled={loading}
-          className="ml-auto"
-        >
-          <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-        </Button>
-      </div>
+      <PageHeader
+        title="System Health"
+        description={lastCheck ? `Last checked: ${lastCheck.toLocaleTimeString()}` : 'Checking platform services'}
+        onRefresh={load}
+        refreshing={loading}
+      />
 
-      {/* Overall status */}
-      <div className={`rounded-xl border p-5 flex items-center gap-4 ${allOk ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+      <PageKpiGrid items={kpis} loading={loading} cols={4} />
+
+      <div className={cn(
+        'rounded-xl border p-5 flex items-center gap-4',
+        allOk
+          ? 'bg-emerald-500/10 border-emerald-500/20'
+          : 'bg-red-500/10 border-red-500/20',
+      )}>
         {loading ? (
-          <RefreshCw size={20} className="text-gray-400 animate-spin" />
+          <Activity size={20} className="text-muted-foreground animate-spin" />
         ) : allOk ? (
-          <CheckCircle size={28} className="text-green-600 flex-shrink-0" />
+          <CheckCircle size={28} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
         ) : (
           <AlertTriangle size={28} className="text-red-500 flex-shrink-0" />
         )}
         <div>
-          <p className={`text-base font-bold ${allOk ? 'text-green-800' : 'text-red-800'}`}>
+          <p className={cn('text-base font-bold', allOk ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300')}>
             {loading ? 'Checking…' : allOk ? 'All Systems Operational' : 'Service Disruption Detected'}
           </p>
-          <p className={`text-sm ${allOk ? 'text-green-700' : 'text-red-700'}`}>
+          <p className={cn('text-sm', allOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>
             {loading ? 'Running health checks…' : allOk ? `${APP_NAME} platform is running normally.` : 'One or more services are experiencing issues.'}
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
           <StatusDot ok={!loading && allOk} />
-          <span className={`text-xs font-semibold ${allOk ? 'text-green-700' : 'text-red-600'}`}>
+          <span className={cn('text-xs font-semibold', allOk ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
             {loading ? 'Checking' : allOk ? 'Healthy' : 'Degraded'}
           </span>
         </div>
       </div>
 
-      {/* Service cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {services.map(svc => {
           const Icon = svc.icon
           return (
-            <div key={svc.name} className="bg-white rounded-xl border border-gray-200 p-5">
+            <div key={svc.name} className={cn(ADMIN_CARD, 'p-5')}>
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${svc.ok ? 'bg-green-50' : 'bg-red-50'}`}>
-                    <Icon size={18} className={svc.ok ? 'text-green-600' : 'text-red-500'} />
+                  <div className={cn(
+                    'w-10 h-10 rounded-xl flex items-center justify-center',
+                    svc.ok ? 'bg-emerald-500/10' : 'bg-red-500/10',
+                  )}>
+                    <Icon size={18} className={svc.ok ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'} />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{svc.name}</p>
-                    <p className="text-xs text-gray-400">{svc.description}</p>
+                    <p className="text-sm font-semibold text-foreground">{svc.name}</p>
+                    <p className="text-xs text-muted-foreground">{svc.description}</p>
                   </div>
                 </div>
                 {loading ? (
-                  <RefreshCw size={14} className="text-gray-300 animate-spin" />
+                  <Activity size={14} className="text-muted-foreground animate-spin" />
                 ) : svc.ok ? (
-                  <CheckCircle size={16} className="text-green-500" />
+                  <CheckCircle size={16} className="text-emerald-500" />
                 ) : (
                   <XCircle size={16} className="text-red-500" />
                 )}
               </div>
-              <div className={`px-3 py-2 rounded-lg text-xs ${svc.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+              <div className={cn(
+                'px-3 py-2 rounded-lg text-xs',
+                svc.ok
+                  ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                  : 'bg-red-500/10 text-red-600 dark:text-red-400',
+              )}>
                 {loading ? 'Checking…' : svc.detail}
               </div>
             </div>
@@ -156,18 +166,16 @@ export default function SystemHealthPage() {
         })}
       </div>
 
-      {/* Raw health response */}
       {health && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-sm font-semibold text-gray-900 mb-3">Raw Health Response</h2>
-          <pre className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 overflow-x-auto font-mono">
+        <div className={cn(ADMIN_CARD, 'p-5')}>
+          <h2 className="text-sm font-semibold text-foreground mb-3">Raw Health Response</h2>
+          <pre className="text-xs text-muted-foreground bg-muted rounded-lg p-3 overflow-x-auto font-mono">
             {JSON.stringify(health, null, 2)}
           </pre>
         </div>
       )}
 
-      {/* Auto refresh notice */}
-      <p className="text-xs text-gray-400 text-center">Auto-refreshes every 30 seconds</p>
+      <p className="text-xs text-muted-foreground text-center">Auto-refreshes every 30 seconds</p>
     </div>
   )
 }

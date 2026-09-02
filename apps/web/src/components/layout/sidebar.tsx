@@ -19,9 +19,6 @@ import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
-import { APP_NAME } from "@/lib/constants";
-import { AppLogo } from "@/components/brand/app-logo";
-import { useSidebarLogoOnDark } from "@/hooks/use-sidebar-logo-theme";
 import { isDefaultLightSidebar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -283,7 +280,6 @@ export function Sidebar() {
   const isDark = darkUi;
   const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const dreamsDarkChrome = darkUi && isDefaultLightSidebar(sidebarSkin);
-  const logoOnDarkBg = useSidebarLogoOnDark();
   const navGroups = useNavGroups();
 
   const closeMobile = () => setMobileSidebarOpen(false);
@@ -575,29 +571,18 @@ export function Sidebar() {
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
-        {/* ── Header: brand logo + collapse (DreamsPOS compact row) ── */}
+        {/* ── Header: collapse only ── */}
         <div
           className={cn(
-            "hex-sidebar-brand relative flex items-center shrink-0 w-full",
-            sidebarCollapsed ? "px-2 py-2 justify-center" : "px-2.5 py-2 justify-center",
+            "relative flex items-center shrink-0 w-full py-2",
+            sidebarCollapsed ? "px-2 justify-center" : "px-2.5 justify-end",
           )}
         >
-          {!sidebarCollapsed && (
-            <AppLogo
-              variant="sidebar"
-              theme={logoOnDarkBg ? "dark" : "light"}
-              className="mx-auto"
-              alt={APP_NAME}
-            />
-          )}
           <button
             type="button"
             onClick={toggleSidebar}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            className={cn(
-              "flex items-center justify-center rounded-lg border transition-colors shrink-0",
-              sidebarCollapsed ? "h-7 w-7" : "absolute right-2.5 top-1/2 -translate-y-1/2 h-7 w-7",
-            )}
+            className="flex h-7 w-7 items-center justify-center rounded-lg border transition-colors shrink-0"
             style={{ borderColor: border, color: textMut, background: bg }}
             onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
             onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = bg; }}

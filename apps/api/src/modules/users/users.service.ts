@@ -83,8 +83,23 @@ export class UsersService {
     return user;
   }
 
-  async findAllPlatform(query: PaginationDto, tenantId?: string) {
+  async findAllPlatform(query: PaginationDto, tenantIdOrSlug?: string) {
     const { skip, take } = getPaginationArgs(query.page, query.limit);
+
+    let tenantId = tenantIdOrSlug;
+    if (tenantIdOrSlug) {
+      const tenant = await this.prisma.tenant.findFirst({
+        where: {
+          OR: [
+            { id: tenantIdOrSlug },
+            { subdomain: tenantIdOrSlug.toLowerCase() },
+          ],
+        },
+        select: { id: true },
+      });
+      tenantId = tenant?.id;
+    }
+
     const where = {
       ...(tenantId && { tenantId }),
       ...(query.search && {
