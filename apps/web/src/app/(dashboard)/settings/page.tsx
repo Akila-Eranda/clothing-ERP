@@ -590,11 +590,8 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-sm text-muted-foreground">Configure your {APP_NAME} workspace · {profile.emoji} {profile.label}</p>
-      </div>
+    <div className="page-shell">
+      <p className="page-description text-sm text-muted-foreground">Configure your {APP_NAME} workspace · {profile.emoji} {profile.label}</p>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(parseSettingsTab(v))}>
         <TabsList className="flex-wrap h-auto gap-1">

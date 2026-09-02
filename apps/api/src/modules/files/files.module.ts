@@ -14,8 +14,9 @@ import * as fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
 import * as mime from 'mime-types';
 import { memoryStorage } from 'multer';
+import { validateFileMagicBytes } from '@/shared/security/file-magic-bytes';
 
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const DEFAULT_MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
   'image/jpeg',
   'image/png',
@@ -37,6 +38,10 @@ export class FilesService {
   ) {
     const configured = this.config.get<string>('storage.local.uploadDir');
     this.uploadDir = path.resolve(configured || process.env.UPLOAD_DIR || 'uploads');
+  }
+
+  private maxUploadBytes(): number {
+    return this.config.get<number>('app.uploadMaxSize', DEFAULT_MAX_UPLOAD_BYTES);
   }
 
   async uploadFile(
@@ -62,6 +67,12 @@ export class FilesService {
 
     const data = file.buffer ?? (file.path ? await fs.readFile(file.path) : null);
     if (!data) throw new BadRequestException('Upload failed — empty file payload');
+    if (data.length > this.maxUploadBytes()) {
+      throw new BadRequestException(`File exceeds maximum size of ${this.maxUploadBytes()} bytes`);
+    }
+    if (!validateFileMagicBytes(file.mimetype, data)) {
+      throw new BadRequestException('File content does not match declared type');
+    }
     await fs.writeFile(filepath, data);
 
     const url = `/uploads/${tenantId}/${safeFolder}/${filename}`;
@@ -115,7 +126,7 @@ export class FilesController {
   @Post('upload')
   @UseInterceptors(FileInterceptor('file', {
     storage: memoryStorage(),
-    limits: { fileSize: MAX_UPLOAD_BYTES },
+    limits: { fileSize: DEFAULT_MAX_UPLOAD_BYTES },
   }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload a file' })

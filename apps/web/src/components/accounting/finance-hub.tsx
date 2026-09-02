@@ -27,6 +27,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
@@ -416,7 +417,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <Badge variant="secondary" className="text-[9px]">{row.original.type}</Badge>,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="secondary" />,
       },
       {
         id: "description",
@@ -476,7 +477,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.type}</Badge>,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="info" />,
       },
       {
         id: "balance",
@@ -513,7 +514,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.status}</Badge>,
+        cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
       },
       {
         id: "amount",
@@ -596,7 +597,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.status}</Badge>,
+        cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
       },
       {
         id: "actions",

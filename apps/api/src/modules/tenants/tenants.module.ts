@@ -462,7 +462,6 @@ export class TenantsService {
           firstName: adminUser.firstName,
           lastName: adminUser.lastName,
         },
-        initialPassword: adminPassword,
       };
     }).then((result) => {
       this.eventEmitter.emit('tenant.registered', {
@@ -471,7 +470,6 @@ export class TenantsService {
         name: dto.companyName,
         subdomain: dto.subdomain,
         adminName: `${dto.adminFirstName} ${dto.adminLastName}`,
-        initialPassword: adminPassword,
       });
       this.provisionKeycloak(result, adminEmail, adminPassword, dto);
       return result;

@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import Link from "next/link";
 import { parseApiList } from "@/lib/parse-api-list";
+import { useChartTheme } from "@/lib/chart-theme";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Expense {
@@ -360,6 +362,7 @@ function PresetBar({ range, onApply }: { range: { start: string; end: string }; 
 // ── Main Hub ─────────────────────────────────────────────────────────────────
 export function AccountingHub({ section }: { section: AccountingSection }) {
   const router = useRouter();
+  const chartTheme = useChartTheme();
   const go = (s: AccountingSection) => router.push(ACCOUNTING_PATHS[s]);
   const defaultRange = DEFAULT_RANGE;
 
@@ -527,13 +530,12 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
     { accessorKey: "description", header: ({ column }) => <DataTableColumnHeader column={column} title="Description" />, cell: ({ row }) => <span className="text-sm">{row.original.description}</span> },
     { accessorKey: "date",        header: ({ column }) => <DataTableColumnHeader column={column} title="Date" />,        cell: ({ row }) => <span className="text-xs text-muted-foreground">{new Date(row.original.date).toLocaleDateString("en-LK",{ day:"2-digit",month:"short",year:"numeric" })}</span> },
     { id: "lines",                header: ({ column }) => <DataTableColumnHeader column={column} title="Lines" />,       cell: ({ row }) => <span className="text-xs text-muted-foreground">{Math.max(1, Math.floor((row.original.lines?.length ?? 0) / 2))}</span> },
-    { accessorKey: "isPosted",    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,      cell: ({ row }) => <Badge variant={row.original.isPosted ? "success" : "warning"} className="text-[10px]">{row.original.isPosted ? "Posted" : "Draft"}</Badge> },
+    { accessorKey: "isPosted",    header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,      cell: ({ row }) => <TableStatusBadge status={row.original.isPosted ? "POSTED" : "DRAFT"} /> },
   ];
 
   return (
-    <div className="min-h-screen bg-background">
-        <div className="bg-card border-b sticky top-0 z-10">
-          <div className="px-6 flex items-center justify-end h-14 gap-2">
+    <div className="page-shell">
+        <div className="flex items-center justify-end gap-2 flex-wrap">
               <Button variant="outline" size="sm" className="gap-1.5 h-8">
                 <Download className="h-3.5 w-3.5" /> Import Transaction
               </Button>
@@ -541,9 +543,6 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                 <Plus className="h-3.5 w-3.5" /> New Journal Entry
               </Button>
           </div>
-        </div>
-
-        <div className="px-6 py-6">
 
           {/* ══ DASHBOARD ══ */}
           {section === "dashboard" && (
@@ -592,13 +591,13 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                   {Array.isArray(cashFlow?.data) && cashFlow.data.length > 0 ? (
                     <ResponsiveContainer width="100%" height={250}>
                       <LineChart data={cashFlow.data} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }}
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} vertical={false} />
+                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: chartTheme.tick }}
                           tickFormatter={(v) => { const d = new Date(v); return `${d.getDate().toString().padStart(2,"0")} ${d.toLocaleString("default",{month:"short"})}`; }}
                           axisLine={false} tickLine={false} interval={Math.max(0, Math.floor(cashFlow.data.length / 6) - 1)} />
                         <YAxis tickFormatter={(v: number) => v >= 1000000 ? `${(v/1000000).toFixed(1)}M` : v >= 1000 ? `${(v/1000).toFixed(0)}K` : String(v)}
-                          tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                        <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "11px" }} />
+                          tick={{ fontSize: 10, fill: chartTheme.tick }} axisLine={false} tickLine={false} />
+                        <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={chartTheme.tooltipStyle} />
                         <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: "12px", paddingTop: "8px" }} />
                         <Line type="monotone" dataKey="inflow"  name="Cash In"   stroke="#3b82f6" strokeWidth={2.5} dot={false} activeDot={{ r: 4 }} />
                         <Line type="monotone" dataKey="outflow" name="Cash Out" stroke="#ef4444" strokeWidth={2}   dot={false} activeDot={{ r: 4 }} />
@@ -627,7 +626,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                           <Pie data={expByCat} cx={70} cy={87} innerRadius={42} outerRadius={68} paddingAngle={2} dataKey="value">
                             {expByCat.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                           </Pie>
-                          <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "8px", fontSize: "11px" }} />
+                          <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={chartTheme.tooltipStyle} />
                         </PieChart>
                       </div>
                       <div className="flex-1 space-y-2.5 min-w-0 pr-1">
@@ -691,7 +690,11 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                     </table>
                   </div>
                   <div className="px-4 py-2.5 border-t bg-muted/30">
-                    <p className="text-xs text-muted-foreground">Showing 1 to {Math.min(5, recentExp.length)} of {expenses.length} entries</p>
+                    <p className="text-xs text-muted-foreground">
+                      {expenses.length === 0
+                        ? "No entries to show"
+                        : `Showing 1 to ${Math.min(5, recentExp.length)} of ${expenses.length} entries`}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -920,7 +923,7 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                         <AreaChart data={monthlyPL}>
                           <defs><linearGradient id="pGradR" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.3} /><stop offset="95%" stopColor="#10b981" stopOpacity={0} /></linearGradient></defs>
                           <XAxis dataKey="month" tick={{ fontSize: 9 }} axisLine={false} tickLine={false} />
-                          <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "10px", fontSize: "11px" }} />
+                          <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={chartTheme.tooltipStyle} />
                           <Area type="monotone" dataKey="profit" stroke="#10b981" fill="url(#pGradR)" strokeWidth={2.5} dot={false} />
                         </AreaChart>
                       </ResponsiveContainer>
@@ -1089,10 +1092,10 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
                         <linearGradient id="bkiGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient>
                         <linearGradient id="bkoGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f43f5e" stopOpacity={0.2}/><stop offset="95%" stopColor="#f43f5e" stopOpacity={0}/></linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-                      <XAxis dataKey="date" tick={{ fontSize: 9 }} tickFormatter={(v) => v.slice(5)} axisLine={false} tickLine={false} />
-                      <YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} />
-                      <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={{ borderRadius: "10px", fontSize: "12px" }} />
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} vertical={false} />
+                      <XAxis dataKey="date" tick={{ fontSize: 9, fill: chartTheme.tick }} tickFormatter={(v) => v.slice(5)} axisLine={false} tickLine={false} />
+                      <YAxis tickFormatter={(v) => `${(v/1000).toFixed(0)}K`} tick={{ fontSize: 10, fill: chartTheme.tick }} axisLine={false} tickLine={false} />
+                      <Tooltip formatter={(v: number) => [`LKR ${formatNumber(v)}`, ""]} contentStyle={chartTheme.tooltipStyle} />
                       <Legend />
                       <Area type="monotone" dataKey="inflow"  name="Inflow"  stroke="#10b981" fill="url(#bkiGrad)" strokeWidth={2} dot={false} />
                       <Area type="monotone" dataKey="outflow" name="Outflow" stroke="#f43f5e" fill="url(#bkoGrad)" strokeWidth={2} dot={false} />
@@ -1168,8 +1171,6 @@ export function AccountingHub({ section }: { section: AccountingSection }) {
             </div>
           </div>
           )}
-
-        </div>
 
       {/* Modals */}
       {(addExpenseOpen || editExpense) && (

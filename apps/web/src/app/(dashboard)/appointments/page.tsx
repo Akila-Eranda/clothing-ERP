@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ColumnDef } from "@tanstack/react-table";
@@ -152,10 +153,7 @@ function buildColumns(
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const cfg = STATUS_CFG[row.original.status] ?? { label: row.original.status.replace(/_/g, " "), variant: "secondary" as const };
-        return <Badge variant={cfg.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{cfg.label}</Badge>;
-      },
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",

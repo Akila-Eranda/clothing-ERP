@@ -3606,17 +3606,82 @@ model LeaveRequest {
   @@map("leave_requests")
 }
 
+model HrDepartment {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  description    String?
+  headEmployeeId String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  designations   HrDesignation[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("hr_departments")
+}
+
+model HrDesignation {
+  id           String   @id @default(cuid())
+  tenantId     String
+  departmentId String?
+  name         String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department   HrDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("hr_designations")
+}
+
+model HrHoliday {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, startDate])
+  @@map("hr_holidays")
+}
+
+model HrLeaveType {
+  id        String   @id @default(cuid())
+  tenantId  String
+  name      String
+  quota     Int      @default(14)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("hr_leave_types")
+}
+
 model Shift {
   id          String   @id @default(cuid())
   tenantId    String
   name        String
   startTime   String
   endTime     String
+  weekOff     String?
+  description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   employees   EmployeeShift[]
 
+  @@index([tenantId])
   @@map("shifts")
 }
 

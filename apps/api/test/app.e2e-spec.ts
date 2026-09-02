@@ -57,7 +57,7 @@ describe('HexaOne API (e2e)', () => {
 
       expect(res.body.data.tenant).toBeDefined();
       expect(res.body.data.tenant.subdomain).toBe(registerDto.subdomain);
-      expect(res.body.data.initialPassword).toBe(registerDto.adminPassword);
+      expect(res.body.data.adminUser.email).toBe(registerDto.adminEmail);
     });
 
     it('should return 400 when adminPassword is missing', () => {

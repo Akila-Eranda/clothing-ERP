@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
@@ -169,11 +170,7 @@ function buildColumns(
     {
       id: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: () => (
-        <Badge variant="warning" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
-          <Clock className="h-2.5 w-2.5" /> Pending
-        </Badge>
-      ),
+      cell: () => <TableStatusBadge status="PENDING" />,
     },
     {
       id: "actions",

@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TableValueBadge } from "@/components/ui/table-status-badge";
+import type { TableStatusVariant } from "@/lib/table-status";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -41,6 +43,14 @@ type CoaNode = {
   openingBalanceDate?: string | null;
   depth: number;
   children: CoaNode[];
+};
+
+const TYPE_VARIANT: Record<AccountType, TableStatusVariant> = {
+  ASSET: "success",
+  LIABILITY: "danger",
+  EQUITY: "info",
+  REVENUE: "purple",
+  EXPENSE: "gold",
 };
 
 const TYPE_META: Record<AccountType, { label: string; color: string; bg: string }> = {
@@ -375,11 +385,9 @@ export function ChartOfAccountsHub() {
           const meta = TYPE_META[row.original.type];
           return (
             <div className="flex flex-wrap items-center gap-1">
-              <span className={`rounded px-2 py-0.5 text-[10px] font-semibold ${meta.bg} ${meta.color}`}>
-                {meta.label}
-              </span>
-              {row.original.isSystem && <Badge variant="outline" className="text-[9px]">System</Badge>}
-              {!row.original.isActive && <Badge variant="secondary" className="text-[9px]">Inactive</Badge>}
+              <TableValueBadge label={meta.label} variant={TYPE_VARIANT[row.original.type]} />
+              {row.original.isSystem && <TableValueBadge label="System" variant="secondary" />}
+              {!row.original.isActive && <TableValueBadge label="Inactive" variant="secondary" />}
             </div>
           );
         },

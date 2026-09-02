@@ -10,7 +10,6 @@ interface TenantRegisteredPayload {
   name: string;
   subdomain: string;
   adminName: string;
-  initialPassword: string;
 }
 
 @Injectable()
@@ -77,7 +76,7 @@ export class MailService {
   }
 
   @OnEvent('tenant.registered')
-  async onTenantRegistered({ email, name, subdomain, adminName, initialPassword }: TenantRegisteredPayload) {
+  async onTenantRegistered({ email, name, subdomain, adminName }: TenantRegisteredPayload) {
     const loginUrl = `https://${subdomain}.shop.hexalyte.com/login`;
     await this.send(email, `Welcome to HexaOne — ${name} is ready!`, `
       <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;background:#fff">
@@ -89,15 +88,15 @@ export class MailService {
           <p style="color:#666;font-size:14px;margin:0">Your workspace is ready</p>
         </div>
         <p style="color:#333;line-height:1.6">Hi <strong>${adminName}</strong>,</p>
-        <p style="color:#333;line-height:1.6">Your <strong>${name}</strong> workspace has been created. Here are your details:</p>
+        <p style="color:#333;line-height:1.6">Your <strong>${name}</strong> workspace has been created. Sign in with the email and password you chose during registration.</p>
         <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;margin:20px 0">
           <table style="width:100%;border-collapse:collapse">
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Workspace</td><td style="font-weight:600;font-size:14px;color:#111">${name}</td></tr>
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Shop URL</td><td style="font-weight:600;font-size:14px;color:#4f46e5">${subdomain}.shop.hexalyte.com</td></tr>
             <tr><td style="color:#888;font-size:13px;padding:5px 0">Login Email</td><td style="font-weight:600;font-size:14px;color:#111">${email}</td></tr>
-            <tr><td style="color:#888;font-size:13px;padding:5px 0">Password</td><td style="font-weight:600;font-size:14px;font-family:monospace;color:#111">${initialPassword}</td></tr>
           </table>
         </div>
+        <p style="color:#888;font-size:13px;line-height:1.6">For security, your password is never sent by email. Use <strong>Forgot password</strong> on the login page if you need to reset it.</p>
         <div style="text-align:center;margin:28px 0">
           <a href="${loginUrl}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 32px;border-radius:10px;text-decoration:none;font-size:15px;font-weight:600">
             Go to Dashboard →

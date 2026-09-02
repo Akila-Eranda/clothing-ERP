@@ -29,6 +29,12 @@ import {
 } from "@/components/products/product-inventory-fields";
 import { genSku, uniqueSku, ensureUniqueVariantSkus } from "@/lib/product-sku";
 import { parseApiList } from "@/lib/parse-api-list";
+import { cn } from "@/lib/utils";
+import {
+  FORM_PAGE, FORM_CARD, FORM_CARD_HEADER, FORM_FIELD, FORM_LABEL,
+  FORM_ORANGE_BTN, FORM_OUTLINE_BTN, FORM_HEADER_ICON_WRAP, FORM_HEADER_ICON,
+  FORM_STATUS_BADGE, FORM_SUBTITLE,
+} from "@/lib/form-shell-theme";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Category { id: string; name: string; }
@@ -385,30 +391,63 @@ export default function EditProductPage() {
 
   // ── Return ────────────────────────────────────────────────────────────
   return (
-    <div className="h-full flex flex-col bg-background">
-
-      {/* ── Top bar ── */}
-      <div className="bg-card border-b px-6 py-3 flex items-center justify-between shrink-0">
-        <button onClick={() => router.push(`/products/${id}`)}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+    <div className={cn(FORM_PAGE, "h-full flex flex-col pb-8")}>
+      <div className={cn("px-4 sm:px-6 py-4 shrink-0", FORM_CARD_HEADER)}>
+        <button
+          type="button"
+          onClick={() => router.push(`/products/${id}`)}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium mb-4"
+        >
           <ArrowLeft className="h-4 w-4" /> Back to Product
         </button>
-        <div className="flex flex-col items-center">
-          <h1 className="text-base font-semibold">Edit Product</h1>
-          <p className="text-xs text-muted-foreground truncate max-w-[240px]">{productName}</p>
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className={FORM_HEADER_ICON_WRAP}>
+                <Package className={FORM_HEADER_ICON} />
+              </div>
+              <span className={FORM_STATUS_BADGE}>
+                {form.status === "ACTIVE" ? "Active" : "Draft"}
+              </span>
+            </div>
+            <p className={cn("text-sm mt-1.5 ml-12 sm:ml-[3.25rem]", FORM_SUBTITLE)}>
+              {productName || "Product"} · Edit master data
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => submit("DRAFT")}
+              className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
+            >
+              <Package className="h-3.5 w-3.5" />
+              Save as Draft
+            </Button>
+            <Button
+              size="sm"
+              disabled={loading}
+              onClick={() => submit("ACTIVE")}
+              className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+              Update Product
+            </Button>
+          </div>
         </div>
-        <div className="w-36" />
       </div>
 
-      {/* ── 2-column layout ── */}
       <div className="flex-1 overflow-y-auto">
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 items-start">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-5 lg:gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══ */}
         <div className="space-y-5">
 
           {/* Basic Info */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 space-y-1.5">
@@ -485,7 +524,7 @@ export default function EditProductPage() {
           </div>
 
           {/* Images */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <h2 className="font-semibold text-base border-b pb-2">Product Images</h2>
             <p className="text-xs text-muted-foreground">The first image is shown as the cover in listings.</p>
             <ProductImageUpload
@@ -496,7 +535,7 @@ export default function EditProductPage() {
           </div>
 
           {/* Pricing */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <div className="border-b pb-2 space-y-1">
               <h2 className="font-semibold text-base">Pricing <span className="text-xs font-normal text-muted-foreground">(LKR)</span></h2>
               {form.hasVariants && (
@@ -603,7 +642,7 @@ export default function EditProductPage() {
           </div>
 
           {/* Variants */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <div className="flex items-center justify-between border-b pb-2">
               <h2 className="font-semibold text-base">Variants</h2>
               <div className="flex items-center gap-2">
@@ -837,7 +876,7 @@ export default function EditProductPage() {
           </div>
 
           {/* Assign Suppliers */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <div className="border-b pb-2 space-y-1">
               <h2 className="font-semibold text-base">Assign Suppliers</h2>
               <p className="text-xs text-muted-foreground">
@@ -894,7 +933,7 @@ export default function EditProductPage() {
           </div>
 
           {/* Status & Inventory — main column (roomy) */}
-          <div className="panel-edge p-6 space-y-5">
+          <div className={cn(FORM_CARD, "p-6 space-y-5")}>
             <div className="border-b pb-3 space-y-1">
               <h2 className="font-semibold text-base">Status & Settings</h2>
               <p className="text-sm text-muted-foreground">
@@ -940,7 +979,7 @@ export default function EditProductPage() {
         <div className="space-y-4 lg:sticky lg:top-6">
 
           {/* Summary */}
-          <div className="panel-edge p-5  space-y-2 text-sm">
+          <div className={cn(FORM_CARD, "p-5 space-y-2 text-sm")}>
             <h3 className="font-semibold text-sm border-b pb-2">Summary</h3>
             {[
               ["Name",     form.name     || <span className="text-muted-foreground italic">Not set</span>],
@@ -957,16 +996,8 @@ export default function EditProductPage() {
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="panel-edge p-5  space-y-3">
-            <Button className="w-full gap-2" disabled={loading} onClick={() => submit("ACTIVE")}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Update Product
-            </Button>
-            <Button variant="outline" className="w-full" disabled={loading} onClick={() => submit("DRAFT")}>
-              <Package className="h-4 w-4 mr-2" /> Save as Draft
-            </Button>
-            <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push(`/products/${id}`)}>
+          <div className={cn(FORM_CARD, "p-5")}>
+            <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground" onClick={() => router.push(`/products/${id}`)}>
               Cancel
             </Button>
           </div>

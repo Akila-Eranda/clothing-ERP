@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { PlusCircle, Upload, Package, FileText, TrendingUp, Archive, RefreshCw, Tag } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
@@ -18,13 +18,6 @@ import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { APP_NAME } from "@/lib/constants";
 import { resolvePublicAssetUrl } from "@/lib/upload";
-
-const STATUS_BADGE: Record<string, "success" | "secondary" | "danger" | "warning"> = {
-  ACTIVE: "success",
-  DRAFT: "warning",
-  INACTIVE: "secondary",
-  OUT_OF_STOCK: "danger",
-};
 
 function ProductListThumb({ src }: { src: string }) {
   const [broken, setBroken] = useState(false);
@@ -213,9 +206,7 @@ function buildColumns(
       cell: ({ row }) => (
         <div className="whitespace-nowrap">
           {row.original.isVariant ? (
-            <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
-              {row.original.variantName}
-            </Badge>
+            <TableValueBadge label={row.original.variantName} variant="secondary" />
           ) : (
             <span className="text-xs text-muted-foreground">—</span>
           )}
@@ -247,13 +238,11 @@ function buildColumns(
       size: 130,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
       cell: ({ row }) => (
-        <Badge
-          variant="secondary"
-          className="h-6 max-w-[140px] truncate rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center"
-          title={row.original.categoryName}
-        >
-          {row.original.categoryName ?? "—"}
-        </Badge>
+        row.original.categoryName ? (
+          <TableValueBadge label={row.original.categoryName} variant="secondary" className="max-w-[140px] truncate" />
+        ) : (
+          <span className="text-xs text-muted-foreground">—</span>
+        )
       ),
     },
     {
@@ -270,11 +259,7 @@ function buildColumns(
       accessorKey: "status",
       size: 100,
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => (
-        <Badge variant={STATUS_BADGE[row.original.status] ?? "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
-          {row.original.status.replace("_", " ")}
-        </Badge>
-      ),
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",

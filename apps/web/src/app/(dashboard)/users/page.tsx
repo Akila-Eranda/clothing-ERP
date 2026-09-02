@@ -20,6 +20,7 @@ import { api, tokenStorage } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { PermissionMatrix } from "@/components/users/permission-matrix";
 import { RolePermissionDiff } from "@/components/users/role-permission-diff";
 import { type AppPermission } from "@/lib/permissions";
@@ -308,18 +309,7 @@ export default function UsersPage() {
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) =>
-          row.original.status === "ACTIVE" ? (
-            <span className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-              <CheckCircle className="h-3.5 w-3.5" />
-              Active
-            </span>
-          ) : (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              <XCircle className="h-3.5 w-3.5" />
-              Inactive
-            </span>
-          ),
+        cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
       },
       {
         id: "joined",

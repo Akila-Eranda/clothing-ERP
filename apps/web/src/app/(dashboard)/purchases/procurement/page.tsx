@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { GrnSourceBadge } from "@/components/purchases/purchase-table-badges";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
@@ -63,30 +64,6 @@ type InvoiceRow = {
 
 type Supplier = { id: string; name: string };
 type BankAccount = { id: string; name: string; code: string };
-
-const STATUS_BADGE: Record<string, string> = {
-  DRAFT: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/20",
-  PENDING: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  PENDING_APPROVAL: "bg-amber-500/10 text-amber-600 border-amber-500/20",
-  APPROVED: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  POSTED: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  PAID: "bg-emerald-500/10 text-emerald-600 border-emerald-500/20",
-  PARTIALLY_PAID: "bg-indigo-500/10 text-indigo-600 border-indigo-500/20",
-  CONVERTED: "bg-violet-500/10 text-violet-600 border-violet-500/20",
-  REJECTED: "bg-red-500/10 text-red-600 border-red-500/20",
-  CANCELLED: "bg-red-500/10 text-red-600 border-red-500/20",
-};
-
-function StatusBadge({ status }: { status: string }) {
-  return (
-    <Badge
-      variant="outline"
-      className={`h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center ${STATUS_BADGE[status] ?? "bg-muted text-muted-foreground"}`}
-    >
-      {status.replace(/_/g, " ")}
-    </Badge>
-  );
-}
 
 export default function ProcurementHubPage() {
   const router = useRouter();
@@ -182,7 +159,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "createdAt",
@@ -231,7 +208,7 @@ export default function ProcurementHubPage() {
       id: "source",
       accessorKey: "source",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Source" />,
-      cell: ({ row }) => <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.source}</Badge>,
+      cell: ({ row }) => <GrnSourceBadge source={row.original.source} />,
     },
     {
       id: "supplier",
@@ -286,7 +263,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",
@@ -352,7 +329,7 @@ export default function ProcurementHubPage() {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",

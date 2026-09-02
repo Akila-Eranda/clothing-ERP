@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -293,7 +294,7 @@ function AssetListPanel({ onOpenSchedule }: { onOpenSchedule: () => void }) {
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) => <Badge className="text-[10px]">{row.original.status}</Badge>,
+        cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
       },
       {
         id: "actions",

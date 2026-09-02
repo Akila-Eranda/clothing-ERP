@@ -12,6 +12,12 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSupplierPageCopy } from "@/lib/shop-vertical";
+import { cn } from "@/lib/utils";
+import {
+  FORM_PAGE, FORM_CARD, FORM_CARD_HEADER, FORM_FIELD, FORM_LABEL,
+  FORM_ORANGE_BTN, FORM_OUTLINE_BTN, FORM_HEADER_ICON_WRAP, FORM_HEADER_ICON,
+  FORM_STATUS_BADGE, FORM_SUBTITLE,
+} from "@/lib/form-shell-theme";
 
 // ── Types ────────────────────────────────────────────────────────────────
 interface Form {
@@ -32,7 +38,7 @@ const INIT: Form = {
 function F({ label, req, children }: { label: string; req?: boolean; children: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs font-semibold">{label}{req && <span className="text-destructive ml-0.5">*</span>}</Label>
+      <Label className={FORM_LABEL}>{label}{req && <span className="text-destructive ml-0.5">*</span>}</Label>
       {children}
     </div>
   );
@@ -78,54 +84,77 @@ export default function NewSupplierPage() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-background">
-
-      {/* ── Top bar ── */}
-      <div className="bg-card border-b px-6 py-3 flex items-center justify-between shrink-0">
-        <button onClick={() => router.push("/suppliers")}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium">
+    <div className={cn(FORM_PAGE, "h-full flex flex-col pb-8")}>
+      <div className={cn("px-4 sm:px-6 py-4 shrink-0", FORM_CARD_HEADER)}>
+        <button
+          type="button"
+          onClick={() => router.push("/suppliers")}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium mb-4"
+        >
           <ArrowLeft className="h-4 w-4" /> {copy.backLabel}
         </button>
-        <h1 className="text-base font-semibold">{copy.addPageTitle}</h1>
-        <div className="w-40" />
+
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <div className={FORM_HEADER_ICON_WRAP}>
+                <Truck className={FORM_HEADER_ICON} />
+              </div>
+              <span className={FORM_STATUS_BADGE}>
+                {form.isActive ? "Active" : "Inactive"}
+              </span>
+            </div>
+            <p className={cn("text-sm mt-1.5 ml-12 sm:ml-[3.25rem]", FORM_SUBTITLE)}>
+              {profile.label} · New {copy.singular}
+            </p>
+          </div>
+
+          <Button
+            size="sm"
+            disabled={loading}
+            onClick={submit}
+            className={cn("gap-1.5 h-9 shrink-0", FORM_ORANGE_BTN)}
+          >
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+            {copy.saveButton}
+          </Button>
+        </div>
       </div>
 
-      {/* ── 2-column layout ── */}
       <div className="flex-1 overflow-y-auto">
-      <div className="p-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+      <div className="p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-5 lg:gap-6 items-start">
 
         {/* ══ LEFT COLUMN ══ */}
         <div className="space-y-5">
 
-          {/* Basic Info */}
-          <div className="panel-edge p-6  space-y-4">
-            <h2 className="font-semibold text-base border-b pb-2">Basic Information</h2>
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
+            <h2 className="font-semibold text-base border-b border-border pb-2">Basic Information</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <F label={copy.nameLabel} req>
-                  <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)} />
+                  <Input placeholder={copy.namePlaceholder} value={form.name} onChange={(e) => set("name", e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </F>
               </div>
               <div className="space-y-1.5">
                 <F label="Contact Person">
-                  <Input placeholder="e.g. Kamal Perera" value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} />
+                  <Input placeholder="e.g. Kamal Perera" value={form.contactPerson} onChange={(e) => set("contactPerson", e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </F>
               </div>
               <div className="space-y-1.5">
                 <F label="Phone" req>
-                  <Input placeholder="+94 77 123 4567" value={form.phone} onChange={(e) => set("phone", e.target.value)} />
+                  <Input placeholder="+94 77 123 4567" value={form.phone} onChange={(e) => set("phone", e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </F>
               </div>
               <div className="space-y-1.5">
                 <F label="Email">
-                  <Input type="email" placeholder="contact@supplier.com" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                  <Input type="email" placeholder="contact@supplier.com" value={form.email} onChange={(e) => set("email", e.target.value)} className={cn(FORM_FIELD, "h-10")} />
                 </F>
               </div>
             </div>
           </div>
 
           {/* Address */}
-          <div className="panel-edge p-6  space-y-4">
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
             <h2 className="font-semibold text-base border-b pb-2">Address</h2>
             <div className="col-span-2 space-y-1.5">
               <F label="Street Address">
@@ -146,8 +175,8 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Business / Tax */}
-          <div className="panel-edge p-6  space-y-4">
-            <h2 className="font-semibold text-base border-b pb-2">Business Details</h2>
+          <div className={cn(FORM_CARD, "p-6 space-y-4")}>
+            <h2 className="font-semibold text-base border-b border-border pb-2">Business Details</h2>
             <div className="grid grid-cols-2 gap-4">
               <F label="GST / VAT Number">
                 <Input placeholder="e.g. 27AABCU9603R1ZX" value={form.gstNumber} onChange={(e) => set("gstNumber", e.target.value)} />
@@ -165,8 +194,8 @@ export default function NewSupplierPage() {
         <div className="space-y-4 lg:sticky lg:top-6">
 
           {/* Status */}
-          <div className="panel-edge p-5  space-y-3">
-            <h3 className="font-semibold text-sm border-b pb-2">Status</h3>
+          <div className={cn(FORM_CARD, "p-5 space-y-3")}>
+            <h3 className="font-semibold text-sm border-b border-border pb-2">Status</h3>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium">{copy.activeLabel}</p>
@@ -177,8 +206,8 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Credit Terms */}
-          <div className="panel-edge p-5  space-y-3">
-            <h3 className="font-semibold text-sm border-b pb-2">Credit Terms (LKR)</h3>
+          <div className={cn(FORM_CARD, "p-5 space-y-3")}>
+            <h3 className="font-semibold text-sm border-b border-border pb-2">Credit Terms (LKR)</h3>
             <F label="Credit Days">
               <Input type="number" min={0} value={form.creditDays} onChange={(e) => set("creditDays", e.target.value)} />
             </F>
@@ -193,15 +222,15 @@ export default function NewSupplierPage() {
           </div>
 
           {/* Notes */}
-          <div className="panel-edge p-5  space-y-2">
-            <h3 className="font-semibold text-sm border-b pb-2">Notes</h3>
+          <div className={cn(FORM_CARD, "p-5 space-y-2")}>
+            <h3 className="font-semibold text-sm border-b border-border pb-2">Notes</h3>
             <Textarea rows={3} placeholder={copy.notesPlaceholder} value={form.notes}
               onChange={(e) => set("notes", e.target.value)} />
           </div>
 
           {/* Summary */}
-          <div className="panel-edge p-5  space-y-2 text-sm">
-            <h3 className="font-semibold text-sm border-b pb-2">Summary</h3>
+          <div className={cn(FORM_CARD, "p-5 space-y-2 text-sm")}>
+            <h3 className="font-semibold text-sm border-b border-border pb-2">Summary</h3>
             {[
               ["Name",    form.name    || <span className="text-muted-foreground italic">Not set</span>],
               ["Phone",   form.phone   || <span className="text-muted-foreground italic">Not set</span>],
@@ -216,13 +245,8 @@ export default function NewSupplierPage() {
             ))}
           </div>
 
-          {/* Actions */}
-          <div className="panel-edge p-5  space-y-3">
-            <Button className="w-full gap-2" disabled={loading} onClick={submit}>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {copy.saveButton}
-            </Button>
-            <Button variant="ghost" className="w-full text-muted-foreground" onClick={() => router.push("/suppliers")}>
+          <div className={cn(FORM_CARD, "p-5")}>
+            <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground" onClick={() => router.push("/suppliers")}>
               Cancel
             </Button>
           </div>

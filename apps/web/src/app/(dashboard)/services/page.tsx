@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ColumnDef } from "@tanstack/react-table";
@@ -138,7 +138,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
     {
       accessorKey: "category",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Category" />,
-      cell: ({ row }) => <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.category}</Badge>,
+      cell: ({ row }) => <TableValueBadge label={row.original.category} variant="secondary" />,
     },
     {
       accessorKey: "durationMinutes",
@@ -160,9 +160,7 @@ function buildServiceColumns(onView: (s: Service) => void): ColumnDef<Service>[]
       accessorKey: "isActive",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <TableStatusBadge status={row.original.isActive ? "ACTIVE" : "INACTIVE"} />
       ),
     },
     {
@@ -191,7 +189,7 @@ function buildReminderColumns(onSend: (id: string) => void): ColumnDef<Reminder>
     {
       accessorKey: "channel",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Channel" />,
-      cell: ({ row }) => <Badge variant="outline" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{row.original.channel}</Badge>,
+      cell: ({ row }) => <TableValueBadge label={row.original.channel} variant="info" />,
     },
     {
       accessorKey: "scheduledFor",
@@ -210,10 +208,7 @@ function buildReminderColumns(onSend: (id: string) => void): ColumnDef<Reminder>
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const cfg = REMINDER_STATUS_CFG[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
-        return <Badge variant={cfg.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{cfg.label}</Badge>;
-      },
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",
@@ -244,9 +239,10 @@ function buildFleetColumns(onToggle: (id: string, isFleet: boolean) => void): Co
       id: "fleet",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Fleet" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isFleet ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
-          {row.original.isFleet ? "Fleet Account" : "Retail"}
-        </Badge>
+        <TableValueBadge
+          label={row.original.isFleet ? "Fleet Account" : "Retail"}
+          variant={row.original.isFleet ? "success" : "secondary"}
+        />
       ),
     },
     {
@@ -299,10 +295,7 @@ function buildSerialColumns(): ColumnDef<Serial>[] {
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const cfg = SERIAL_STATUS_CFG[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
-        return <Badge variant={cfg.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">{cfg.label}</Badge>;
-      },
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
   ];
 }

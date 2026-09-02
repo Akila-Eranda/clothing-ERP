@@ -4,13 +4,15 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { IsString, IsOptional, IsNumber, IsEnum, IsDateString, IsInt, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Gender, AttendanceStatus, PaymentMethod } from '@prisma/client';
+import { Gender, AttendanceStatus, PaymentMethod, EmploymentType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { createLinkedExpense } from '@/shared/expense.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { PaginationDto } from '@/common/dto/pagination.dto';
+import { HrMastersService } from './hr-masters.service';
+import { HrMastersController } from './hr-masters.controller';
 import * as dayjs from 'dayjs';
 
 export class CreateEmployeeDto {
@@ -24,6 +26,13 @@ export class CreateEmployeeDto {
   @ApiPropertyOptional() @IsOptional() @IsString() branchId?: string;
   @ApiProperty() @IsNumber() @Min(0) basicSalary: number;
   @ApiPropertyOptional({ enum: Gender }) @IsOptional() @IsEnum(Gender) gender?: Gender;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() dateOfBirth?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() address?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() nicNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() epfNumber?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() etfNumber?: string;
+  @ApiPropertyOptional() @IsOptional() bankDetails?: Record<string, string>;
+  @ApiPropertyOptional({ enum: EmploymentType }) @IsOptional() @IsEnum(EmploymentType) employmentType?: EmploymentType;
 }
 
 export class MarkAttendanceDto {
@@ -70,6 +79,13 @@ export class HrService {
         branchId: dto.branchId,
         basicSalary: dto.basicSalary,
         gender: dto.gender,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        address: dto.address,
+        nicNumber: dto.nicNumber,
+        epfNumber: dto.epfNumber,
+        etfNumber: dto.etfNumber,
+        bankDetails: dto.bankDetails ?? {},
+        employmentType: dto.employmentType,
       },
       include: { branch: true },
     });
@@ -105,6 +121,7 @@ export class HrService {
         branch: true,
         attendances: { orderBy: { date: 'desc' }, take: 30 },
         payrolls: { orderBy: { year: 'desc' }, take: 12 },
+        leaveRequests: { orderBy: { createdAt: 'desc' }, take: 20 },
       },
     });
     if (!emp) throw new NotFoundException('Employee not found');
@@ -148,6 +165,8 @@ export class HrService {
       data: {
         ...dto,
         joiningDate: dto.joiningDate ? new Date(dto.joiningDate) : undefined,
+        dateOfBirth: dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined,
+        bankDetails: dto.bankDetails,
       },
       include: { branch: true },
     });
@@ -461,8 +480,8 @@ export class HrController {
 }
 
 @Module({
-  controllers: [HrController],
-  providers: [HrService],
-  exports: [HrService],
+  controllers: [HrController, HrMastersController],
+  providers: [HrService, HrMastersService],
+  exports: [HrService, HrMastersService],
 })
 export class HrModule {}

@@ -9,6 +9,7 @@ import {
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
@@ -116,15 +117,15 @@ function unwrapList<T>(payload: unknown): T[] {
 
 function bucketBadge(bucket: string | null, days: number | null) {
   if (bucket === "expired" || (days != null && days < 0)) {
-    return <Badge variant="danger" className="text-[10px]">Expired</Badge>;
+    return <TableValueBadge label="Expired" variant="danger" />;
   }
   if (bucket === "7d" || (days != null && days <= 7)) {
-    return <Badge variant="warning" className="text-[10px]">≤7 days</Badge>;
+    return <TableValueBadge label="≤7 days" variant="warning" />;
   }
   if (bucket === "30d" || (days != null && days <= 30)) {
-    return <Badge variant="secondary" className="text-[10px]">≤30 days</Badge>;
+    return <TableValueBadge label="≤30 days" variant="gold" />;
   }
-  return <Badge variant="outline" className="text-[10px]">OK</Badge>;
+  return <TableValueBadge label="OK" variant="success" />;
 }
 
 function buildLotColumns(onAction: (lot: LotRow, mode: LotActionMode) => void): ColumnDef<LotRow>[] {
@@ -339,7 +340,7 @@ function buildReconcileColumns(): ColumnDef<ReconcileRow>[] {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="warning" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
   ];
 }

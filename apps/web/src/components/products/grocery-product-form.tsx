@@ -765,7 +765,6 @@ return (
               <div className={FORM_HEADER_ICON_WRAP}>
                 <Package className={FORM_HEADER_ICON} />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">New Product</h1>
               <span className={FORM_STATUS_BADGE}>
                 {statusActive ? "Active" : "Draft"}
               </span>
@@ -775,7 +774,7 @@ return (
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <Button
               variant="outline"
               size="sm"
@@ -785,6 +784,16 @@ return (
             >
               <Save className="h-3.5 w-3.5" />
               Save Draft
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={loading}
+              onClick={() => submit("ADD_ANOTHER")}
+              className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Save & Add Another
             </Button>
             <Button
               size="sm"
@@ -1161,17 +1170,6 @@ return (
             </SidebarCard>
 
             <SidebarCard>
-              <Button className={cn("w-full gap-2 h-10", FORM_ORANGE_BTN)} disabled={loading} onClick={() => submit("ACTIVE")}>
-                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                Save Product
-              </Button>
-              <Button variant="outline" className={cn("w-full gap-2 h-10", FORM_OUTLINE_BTN)} disabled={loading} onClick={() => submit("ADD_ANOTHER")}>
-                <Plus className="h-4 w-4" />
-                Save & Add Another
-              </Button>
-              <Button variant="outline" className={cn("w-full h-10", FORM_OUTLINE_BTN)} disabled={loading} onClick={() => submit("DRAFT")}>
-                Save Draft
-              </Button>
               <Button variant="ghost" className="w-full h-9 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/products")}>
                 Cancel
               </Button>

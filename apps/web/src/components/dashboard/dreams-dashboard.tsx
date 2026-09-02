@@ -323,7 +323,7 @@ export function DreamsDashboard() {
     { title: "Total Sales", value: monthSales, prev: prevMonthSales, icon: FileText, bg: "bg-primary", href: "/sales" },
     { title: "Total Sales Return", value: monthReturns, prev: prevReturns, icon: Repeat, bg: "bg-secondary", href: "/returns" },
     { title: "Total Purchase", value: monthPurchases, prev: prevPurchases, icon: Gift, bg: "bg-teal", href: "/purchases" },
-    { title: "Total Purchase Return", value: monthPurchaseReturn, prev: prevPurchaseReturn, icon: Wallet, bg: "bg-info", href: "/purchases" },
+    { title: "Total Purchase Return", value: monthPurchaseReturn, prev: prevPurchaseReturn, icon: Wallet, bg: "bg-info", href: "/purchases/purchase-returns" },
   ];
 
   const secondary = [

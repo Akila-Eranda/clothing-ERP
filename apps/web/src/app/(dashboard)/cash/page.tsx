@@ -27,6 +27,7 @@ import { CashMovementLedger, type CashMovement } from "@/components/cash/cash-mo
 import { ShiftDetailSheet } from "@/components/cash/shift-detail-sheet";
 import { PosCountersPanel } from "@/components/cash/pos-counters-panel";
 import { useAuthStore } from "@/stores/auth-store";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { bypassesWorkflowApproval, isWorkflowApproverRole } from "@/lib/workflow-access";
 import { readPosCounterId, writePosCounterId } from "@/lib/pos-counter";
 import { parseApiList } from "@/lib/parse-api-list";
@@ -108,12 +109,6 @@ const DATE_PRESETS = [
 function formatRangeLabel(from: string, to: string) {
   const fmt = (s: string) => new Date(`${s}T12:00:00`).toLocaleDateString("en-LK", { day: "2-digit", month: "short", year: "numeric" });
   return from === to ? fmt(from) : `${fmt(from)} – ${fmt(to)}`;
-}
-
-function statusBadge(status: CashRegister["status"]) {
-  if (status === "OPEN") return <Badge variant="success" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Open</Badge>;
-  if (status === "PENDING_APPROVAL") return <Badge variant="warning" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Pending Approval</Badge>;
-  return <Badge variant="secondary" className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">Closed</Badge>;
 }
 
 export default function CashManagementPage() {
@@ -494,7 +489,7 @@ export default function CashManagementPage() {
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => statusBadge(row.original.status),
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "variance",
@@ -1100,7 +1095,7 @@ export default function CashManagementPage() {
                                 {r.closingTime ? new Date(r.closingTime).toLocaleDateString("en-LK") : "—"}
                               </p>
                             </div>
-                            {r.status === "PENDING_APPROVAL" && statusBadge(r.status)}
+                            {r.status === "PENDING_APPROVAL" && <TableStatusBadge status={r.status} />}
                           </div>
                           <div className="flex items-center gap-2">
                             <span className={cn(

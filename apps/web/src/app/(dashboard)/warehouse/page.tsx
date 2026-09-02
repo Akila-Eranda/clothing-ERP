@@ -20,6 +20,7 @@ import {
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
@@ -403,16 +404,10 @@ export default function WarehousePage() {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => {
-        const conf = TRANSFER_STATUS[row.original.status] ?? { label: row.original.status, variant: "secondary" as const };
         const showPendingApproval = row.original.status === "PENDING" && row.original.workflow?.status === "IN_PROGRESS";
         return (
           <div>
-            <Badge variant={conf.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
-              {row.original.status === "IN_TRANSIT" && <Truck className="h-2.5 w-2.5" />}
-              {row.original.status === "RECEIVED" && <CheckCircle2 className="h-2.5 w-2.5" />}
-              {row.original.status === "PENDING" && <Clock className="h-2.5 w-2.5" />}
-              {conf.label}
-            </Badge>
+            <TableStatusBadge status={row.original.status} />
             {showPendingApproval && (
               <p className="text-[10px] text-amber-600 mt-1 font-medium">Awaiting approval</p>
             )}

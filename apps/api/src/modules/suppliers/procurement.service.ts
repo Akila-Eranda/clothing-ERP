@@ -825,6 +825,20 @@ export class ProcurementService {
     return paginate(data, total, query.page ?? 1, query.limit ?? 20);
   }
 
+  async getSupplierReturn(id: string, tenantId: string) {
+    const doc = await this.prisma.supplierReturn.findFirst({
+      where: { id, tenantId },
+      include: {
+        supplier: { select: { id: true, name: true, phone: true, email: true } },
+        purchase: { select: { id: true, poNumber: true } },
+        goodsReceipt: { select: { id: true, grnNumber: true } },
+        items: true,
+      },
+    });
+    if (!doc) throw new NotFoundException('Supplier return not found');
+    return doc;
+  }
+
   // ── Supplier Invoices ─────────────────────────────────────────────
 
   async createSupplierInvoice(

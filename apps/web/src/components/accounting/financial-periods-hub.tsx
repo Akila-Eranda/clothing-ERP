@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -451,7 +452,7 @@ export function FinancialPeriodsHub() {
                         <span className="col-span-3 text-xs font-mono text-muted-foreground">
                           {fmt(p.startDate)} → {fmt(p.endDate)}
                         </span>
-                        <span className="col-span-2">{statusBadge(p.status)}</span>
+                        <span className="col-span-2"><TableStatusBadge status={p.status} /></span>
                         <div className="col-span-2 flex justify-end">
                           {selected.status === "CLOSED" || p.status === "LOCKED" ? (
                             <span className="text-[10px] text-muted-foreground">—</span>

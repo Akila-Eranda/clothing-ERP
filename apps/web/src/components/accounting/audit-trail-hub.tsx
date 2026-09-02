@@ -7,7 +7,8 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { TableValueBadge } from "@/components/ui/table-status-badge";
+import type { TableStatusVariant } from "@/lib/table-status";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,27 +51,28 @@ const ACTION_FILTERS = [
   "APPROVE", "REJECT", "PRINT", "EXPORT",
 ] as const;
 
-const ACTION_STYLES: Record<string, string> = {
-  CREATE: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30",
-  UPDATE: "bg-blue-500/15 text-blue-600 border-blue-500/30",
-  DELETE: "bg-red-500/15 text-red-600 border-red-500/30",
-  LOGIN: "bg-teal-500/15 text-teal-600 border-teal-500/30",
-  LOGOUT: "bg-slate-500/15 text-slate-600 border-slate-500/30",
-  LOGIN_FAILED: "bg-orange-500/15 text-orange-600 border-orange-500/30",
-  APPROVE: "bg-violet-500/15 text-violet-600 border-violet-500/30",
-  REJECT: "bg-rose-500/15 text-rose-600 border-rose-500/30",
-  PRINT: "bg-cyan-500/15 text-cyan-600 border-cyan-500/30",
-  EXPORT: "bg-indigo-500/15 text-indigo-600 border-indigo-500/30",
-  DAY_END: "bg-amber-500/15 text-amber-600 border-amber-500/30",
+const ACTION_VARIANTS: Record<string, TableStatusVariant> = {
+  CREATE: "success",
+  UPDATE: "info",
+  DELETE: "danger",
+  LOGIN: "teal",
+  LOGOUT: "secondary",
+  LOGIN_FAILED: "warning",
+  APPROVE: "purple",
+  REJECT: "danger",
+  PRINT: "info",
+  EXPORT: "purple",
+  DAY_END: "gold",
 };
 
 function actionBadge(action: string) {
   const key = action?.toUpperCase?.() ?? action;
-  const cls = ACTION_STYLES[key] ?? "bg-muted text-muted-foreground";
   return (
-    <Badge variant="outline" className={`text-[10px] font-mono ${cls}`}>
-      {action || "—"}
-    </Badge>
+    <TableValueBadge
+      label={action || "—"}
+      variant={ACTION_VARIANTS[key] ?? "secondary"}
+      className="font-mono normal-case"
+    />
   );
 }
 

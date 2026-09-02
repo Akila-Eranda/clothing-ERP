@@ -6,7 +6,8 @@ import {
   Layers, Clock, Skull, CheckCircle2, XCircle, Loader2, ArrowLeftRight, Truck, Ban, Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
+import type { TableStatusVariant } from "@/lib/table-status";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
@@ -77,10 +78,10 @@ interface AgingDetail {
   qty: number;
 }
 
-function gradeBadge(grade: string) {
-  if (grade === "A") return "bg-emerald-500/15 text-emerald-700 border-emerald-500/25";
-  if (grade === "B") return "bg-amber-500/15 text-amber-700 border-amber-500/25";
-  return "bg-slate-500/15 text-slate-700 border-slate-500/25";
+function gradeVariant(grade: string): TableStatusVariant {
+  if (grade === "A") return "success";
+  if (grade === "B") return "gold";
+  return "secondary";
 }
 
 function ageBucket(days: number) {
@@ -94,11 +95,7 @@ const ABC_COLUMNS: ColumnDef<AbcRow>[] = [
   {
     accessorKey: "grade",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Grade" />,
-    cell: ({ row }) => (
-      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-bold ${gradeBadge(row.original.grade)}`}>
-        {row.original.grade}
-      </span>
-    ),
+    cell: ({ row }) => <TableValueBadge label={row.original.grade} variant={gradeVariant(row.original.grade)} />,
     filterFn: (row, _id, value: string[]) => !value?.length || value.includes(row.original.grade),
   },
   {
@@ -195,7 +192,7 @@ interface StockTransferRow {
 }
 
 const TRANSFER_STATUS: Record<StockTransferRow["status"], { label: string; variant: "warning" | "success" | "secondary" | "danger" | "info" }> = {
-  PENDING: { label: "Pending", variant: "warning" },
+  PENDING: { label: "Pending", variant: "info" },
   IN_TRANSIT: { label: "In Transit", variant: "info" },
   RECEIVED: { label: "Received", variant: "success" },
   CANCELLED: { label: "Cancelled", variant: "danger" },
@@ -266,13 +263,7 @@ function buildTransferColumns(opts: {
         const showPendingApproval = t.status === "PENDING" && t.workflow?.status === "IN_PROGRESS";
         return (
           <div>
-            <Badge variant={st.variant} className="text-[10px] gap-1">
-              {t.status === "IN_TRANSIT" && <Truck className="h-2.5 w-2.5" />}
-              {t.status === "RECEIVED" && <CheckCircle2 className="h-2.5 w-2.5" />}
-              {t.status === "PENDING" && <Clock className="h-2.5 w-2.5" />}
-              {t.status === "CANCELLED" && <Ban className="h-2.5 w-2.5" />}
-              {st.label}
-            </Badge>
+            <TableStatusBadge status={t.status} label={st.label} variant={st.variant} />
             {showPendingApproval && (
               <p className="text-[10px] text-amber-600 mt-1 font-medium">Awaiting approval</p>
             )}
@@ -426,11 +417,7 @@ function buildStockColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => {
         const s = getStockStatus(row.original.quantity);
-        return (
-          <Badge variant={s === "negative" || s === "out_of_stock" ? "danger" : s === "low_stock" ? "warning" : "success"} className="text-[10px]">
-            {s === "negative" ? "Negative" : s === "out_of_stock" ? "Out of Stock" : s === "low_stock" ? "Low Stock" : "In Stock"}
-          </Badge>
-        );
+        return <TableStatusBadge status={s} />;
       },
     },
   ];
@@ -643,12 +630,9 @@ export function InventoryHub({ section }: { section: InventorySection }) {
           : `${profile.label} · ${workspace.productLabel} · ${meta.description}`;
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="page-shell">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">{meta.title}</h1>
-          <p className="text-sm text-muted-foreground">{sectionSubtitle}</p>
-        </div>
+        <p className="page-description text-sm text-muted-foreground">{sectionSubtitle}</p>
         <div className="flex items-center gap-2 flex-wrap shrink-0">
           <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" onClick={fetchData} className={HEX_BTN}>
@@ -761,7 +745,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
                         <p className="font-medium text-xs">{log.variant.product.name}</p>
                         <p className="text-[10px] text-muted-foreground">{log.variant.sku}</p>
                       </td>
-                      <td className="px-3 py-2"><Badge variant="secondary" className="text-[9px]">{log.movementType}</Badge></td>
+                      <td className="px-3 py-2"><TableValueBadge label={log.movementType} variant="secondary" /></td>
                       <td className={`px-3 py-2 font-bold ${log.quantityChange >= 0 ? "text-emerald-600" : "text-red-500"}`}>{log.quantityChange >= 0 ? "+" : ""}{log.quantityChange}</td>
                       <td className="px-3 py-2">{log.quantityBefore}</td>
                       <td className="px-3 py-2 font-semibold">{log.quantityAfter}</td>

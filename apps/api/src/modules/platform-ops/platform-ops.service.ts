@@ -568,7 +568,7 @@ export class PlatformOpsService {
       audience: this.config.get('jwt.audience'),
     })
 
-    const code = createImpersonationCode(accessToken)
+    const code = await createImpersonationCode(accessToken)
     const base = (this.config.get<string>('app.frontendUrl') || 'http://localhost:3000').replace(
       /\/$/,
       '',

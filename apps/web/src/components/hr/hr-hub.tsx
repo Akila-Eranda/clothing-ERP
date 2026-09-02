@@ -6,11 +6,12 @@ import {
   UserCog, Plus, Users, Clock, DollarSign, RefreshCw,
   Phone, Mail, CheckCircle2, XCircle, AlertCircle, Loader2,
   CalendarDays, Banknote, ChevronLeft, ChevronRight,
-  X, FileText, BarChart3, Printer,
+  X, FileText, BarChart3, Printer, LayoutGrid, List, UserX,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { ColumnDef } from "@tanstack/react-table";
@@ -19,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { HEX_SEGMENT, hexTabButton } from "@/lib/app-button-classes";
 import { parseApiList } from "@/lib/parse-api-list";
@@ -26,7 +28,10 @@ import { AddEmployeeModal, type Employee } from "@/components/hr/add-employee-mo
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { usePayslipSettings } from "@/lib/use-payslip-settings";
 import { printThermalPayslip } from "@/lib/payslip-print";
-import Link from "next/link";
+import { ReportKpiGrid, ReportsPageHeader, type ReportKpiItem } from "@/components/reports/reports-ui";
+import { HrEmptyState } from "@/components/hr/hr-empty-state";
+import { EmployeeGridView } from "@/components/hr/employee-grid-view";
+import { cn } from "@/lib/utils";
 
 function fmtLkr(value: number | null | undefined) {
   return `LKR ${(value ?? 0).toLocaleString()}`;
@@ -34,7 +39,12 @@ function fmtLkr(value: number | null | undefined) {
 
 // ── Types ────────────────────────────────────────────────────────────────
 type AttendanceStatus = "PRESENT" | "ABSENT" | "HALF_DAY" | "ON_LEAVE" | "LATE" | "LEAVE" | "HOLIDAY";
-interface EmpWithAttendance extends Employee { todayAttendance: { status: AttendanceStatus } | null }
+interface EmpWithAttendance extends Employee {
+  todayAttendance: { status: AttendanceStatus; checkIn?: string | null; checkOut?: string | null } | null;
+}
+interface LeaveTypeOpt { id: string; name: string; quota: number; isActive: boolean }
+interface HrmStats { total: number; active: number; inactive: number; newJoiners: number; pendingLeaves: number; todayPresent: number }
+interface AttnTimes { checkIn?: string; checkOut?: string }
 interface LeaveRequest {
   id: string; employeeId: string; startDate: string; endDate: string;
   leaveType: string; reason?: string | null; status: string;
@@ -127,13 +137,22 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
 }
 
 // ── NewLeaveModal ────────────────────────────────────────────────────────
-function NewLeaveModal({ employees, onClose, onSaved }: { employees: Employee[]; onClose: () => void; onSaved: () => void }) {
+function NewLeaveModal({ employees, leaveTypes, onClose, onSaved }: {
+  employees: Employee[];
+  leaveTypes: LeaveTypeOpt[];
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const types = leaveTypes.length ? leaveTypes.filter((t) => t.isActive) : [];
+  const defaultType = types[0]?.name ?? "CASUAL";
   const [empId, setEmpId]         = useState("");
   const [startDate, setStart]     = useState(new Date().toISOString().split("T")[0]);
   const [endDate, setEnd]         = useState(new Date().toISOString().split("T")[0]);
-  const [leaveType, setType]      = useState("CASUAL");
+  const [leaveType, setType]      = useState(defaultType);
   const [reason, setReason]       = useState("");
   const [loading, setLoading]     = useState(false);
+
+  useEffect(() => { setType(defaultType); }, [defaultType]);
 
   const days = Math.max(1, Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / 86400000) + 1);
 
@@ -168,7 +187,11 @@ function NewLeaveModal({ employees, onClose, onSaved }: { employees: Employee[];
             <Label className="text-xs font-semibold">Leave Type</Label>
             <Select value={leaveType} onValueChange={setType}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{LEAVE_TYPES.map((t) => <SelectItem key={t} value={t}>{t.charAt(0)+t.slice(1).toLowerCase()} Leave</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {(types.length ? types : LEAVE_TYPES.map((n) => ({ name: n }))).map((t) => (
+                  <SelectItem key={t.name} value={t.name}>{t.name.charAt(0) + t.name.slice(1).toLowerCase()}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -217,16 +240,17 @@ function buildLeaveColumns(onUpdate: (id: string, status: string) => void): Colu
       cell: ({ row }) => {
         const emp = row.original.employee;
         if (!emp) return <span className="text-xs text-muted-foreground">—</span>;
+        const empId = row.original.employeeId;
         return (
-          <div>
+          <Link href={`/hr/employees/${empId}`} className="hover:opacity-80">
             <p className="font-medium text-sm">{emp.firstName} {emp.lastName}</p>
             <p className="text-[10px] text-muted-foreground font-mono">{emp.code ?? "—"}</p>
-          </div>
+          </Link>
         );
       },
     },
     { accessorKey: "leaveType", header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-      cell: ({ row }) => <Badge variant="secondary" className="text-[10px] uppercase">{row.original.leaveType}</Badge> },
+      cell: ({ row }) => <TableValueBadge label={row.original.leaveType} variant="teal" className="uppercase" /> },
     { id: "dates", header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
       cell: ({ row }) => {
         const s = new Date(row.original.startDate), e = new Date(row.original.endDate);
@@ -237,11 +261,7 @@ function buildLeaveColumns(onUpdate: (id: string, status: string) => void): Colu
     { accessorKey: "reason", header: ({ column }) => <DataTableColumnHeader column={column} title="Reason" />,
       cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.reason ?? "—"}</span> },
     { id: "status", accessorKey: "status", header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const s = row.original.status;
-        const v = s==="APPROVED"?"success":s==="REJECTED"?"danger":"warning";
-        return <Badge variant={v as "success"|"danger"|"warning"} className="text-[10px]">{s}</Badge>;
-      },
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     { id: "actions", cell: ({ row }) => {
         if (row.original.status !== "PENDING") return null;
@@ -260,6 +280,8 @@ function buildLeaveColumns(onUpdate: (id: string, status: string) => void): Colu
 function buildAttnColumns(
   attnMap: Record<string, AttendanceStatus>,
   setAttnMap: React.Dispatch<React.SetStateAction<Record<string, AttendanceStatus>>>,
+  attnTimes: Record<string, AttnTimes>,
+  setAttnTimes: React.Dispatch<React.SetStateAction<Record<string, AttnTimes>>>,
 ): ColumnDef<EmpWithAttendance>[] {
   return [
     {
@@ -287,27 +309,46 @@ function buildAttnColumns(
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => {
         const status = attnMap[row.original.id] as AttendanceStatus | undefined;
-        const conf = status ? ATTN_STATUS[status] : null;
-        return conf ? (
-          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${conf.bg} ${conf.color}`}>
-            <conf.icon className="h-2.5 w-2.5" />{conf.label}
-          </span>
-        ) : <span className="text-xs text-muted-foreground">—</span>;
+        return status ? <TableStatusBadge status={status} /> : <span className="text-xs text-muted-foreground">—</span>;
       },
+    },
+    {
+      id: "clockIn",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Clock In" />,
+      cell: ({ row }) => (
+        <Input
+          type="time"
+          className="h-8 w-28 text-xs"
+          value={attnTimes[row.original.id]?.checkIn ?? ""}
+          onChange={(e) => setAttnTimes((p) => ({ ...p, [row.original.id]: { ...p[row.original.id], checkIn: e.target.value } }))}
+        />
+      ),
+    },
+    {
+      id: "clockOut",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Clock Out" />,
+      cell: ({ row }) => (
+        <Input
+          type="time"
+          className="h-8 w-28 text-xs"
+          value={attnTimes[row.original.id]?.checkOut ?? ""}
+          onChange={(e) => setAttnTimes((p) => ({ ...p, [row.original.id]: { ...p[row.original.id], checkOut: e.target.value } }))}
+        />
+      ),
     },
     {
       id: "markAs",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Mark As" />,
       cell: ({ row }) => (
-        <div className="flex gap-1">
-          {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as AttendanceStatus[]).map((s) => {
+        <div className="flex gap-1 flex-wrap">
+          {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE","HOLIDAY"] as AttendanceStatus[]).map((s) => {
             const c = ATTN_STATUS[s];
             return (
-              <button key={s} onClick={() => setAttnMap((p) => ({ ...p, [row.original.id]: s }))}
+              <button key={s} type="button" onClick={() => setAttnMap((p) => ({ ...p, [row.original.id]: s }))}
                 className={`text-[9px] font-bold px-1.5 py-1 rounded border transition-all ${
                   attnMap[row.original.id] === s ? `${c.bg} ${c.color} border-current` : "border-border hover:bg-muted"
                 }`}>
-                {s === "HALF_DAY" ? "H" : s === "ON_LEAVE" ? "L" : s[0]}
+                {s === "HALF_DAY" ? "H" : s === "ON_LEAVE" ? "L" : s === "HOLIDAY" ? "Ho" : s[0]}
               </button>
             );
           })}
@@ -366,9 +407,7 @@ function buildPayrollColumns(
       id: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isPaid ? "success" : "warning"} className="text-[10px]">
-          {row.original.isPaid ? "Paid" : "Pending"}
-        </Badge>
+        <TableStatusBadge status={row.original.isPaid ? "PAID" : "PENDING"} />
       ),
     },
     {
@@ -408,7 +447,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
         const e = row.original;
         const initials = `${e.firstName?.[0] ?? ""}${e.lastName?.[0] ?? ""}`.toUpperCase() || "?";
         return (
-          <div className="flex items-center gap-2.5">
+          <Link href={`/hr/employees/${e.id}`} className="flex items-center gap-2.5 hover:opacity-80">
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary shrink-0">
               {initials}
             </div>
@@ -416,7 +455,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
               <p className="text-sm font-semibold">{e.firstName} {e.lastName}</p>
               <p className="text-[10px] text-muted-foreground font-mono">{e.code}</p>
             </div>
-          </div>
+          </Link>
         );
       },
     },
@@ -465,9 +504,7 @@ function buildEmpColumns(onEdit: (e: Employee) => void, onDeactivate: (e: Employ
       id: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="text-[10px]">
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <TableStatusBadge status={row.original.isActive ? "ACTIVE" : "INACTIVE"} />
       ),
     },
     {
@@ -500,6 +537,9 @@ export function HrHub({ section }: { section: HrSection }) {
   // Employees
   const [employees, setEmployees]       = useState<Employee[]>([]);
   const [empLoading, setEmpLoading]     = useState(true);
+  const [empViewMode, setEmpViewMode]   = useState<"table" | "grid">("table");
+  const [hrStats, setHrStats]           = useState<HrmStats | null>(null);
+  const [leaveTypes, setLeaveTypes]     = useState<LeaveTypeOpt[]>([]);
   const [addOpen, setAddOpen]           = useState(false);
   const [editEmployee, setEditEmployee] = useState<Employee | undefined>();
 
@@ -507,6 +547,7 @@ export function HrHub({ section }: { section: HrSection }) {
   const [attnDate, setAttnDate]         = useState(today);
   const [attnRows, setAttnRows]         = useState<EmpWithAttendance[]>([]);
   const [attnMap, setAttnMap]           = useState<Record<string, AttendanceStatus>>({});
+  const [attnTimes, setAttnTimes]       = useState<Record<string, AttnTimes>>({});
   const [attnLoading, setAttnLoading]   = useState(false);
   const [attnSaving, setAttnSaving]     = useState(false);
 
@@ -533,7 +574,19 @@ export function HrHub({ section }: { section: HrSection }) {
   const [leaves, setLeaves]           = useState<LeaveRequest[]>([]);
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [leaveStatus, setLeaveStatus] = useState("ALL");
+  const [leaveMonth, setLeaveMonth]   = useState(now.toISOString().slice(0, 7));
   const [newLeaveOpen, setNewLeaveOpen] = useState(false);
+
+  const fetchHrMeta = useCallback(async () => {
+    try {
+      const [statsRes, typesRes] = await Promise.all([
+        api.get<HrmStats>("/hr/masters/stats"),
+        api.get<LeaveTypeOpt[]>("/hr/masters/leave-types"),
+      ]);
+      setHrStats(statsRes.data ?? null);
+      setLeaveTypes(Array.isArray(typesRes.data) ? typesRes.data : []);
+    } catch { /* optional */ }
+  }, []);
 
   // ── Fetch employees ───────────────────────────────────────────────────
   const fetchEmployees = useCallback(async () => {
@@ -545,7 +598,7 @@ export function HrHub({ section }: { section: HrSection }) {
     finally { setEmpLoading(false); }
   }, []);
 
-  useEffect(() => { fetchEmployees(); }, [fetchEmployees]);
+  useEffect(() => { fetchEmployees(); fetchHrMeta(); }, [fetchEmployees, fetchHrMeta]);
 
   const handleDeactivate = async (emp: Employee) => {
     if (!window.confirm(`Deactivate ${emp.firstName}?`)) return;
@@ -561,8 +614,22 @@ export function HrHub({ section }: { section: HrSection }) {
       const rows = parseApiList<EmpWithAttendance>(res.data);
       setAttnRows(rows);
       const map: Record<string, AttendanceStatus> = {};
-      rows.forEach((r) => { if (r.todayAttendance) map[r.id] = r.todayAttendance.status; });
+      const times: Record<string, AttnTimes> = {};
+      rows.forEach((r) => {
+        if (r.todayAttendance) {
+          map[r.id] = r.todayAttendance.status;
+          const ci = r.todayAttendance.checkIn;
+          const co = r.todayAttendance.checkOut;
+          if (ci || co) {
+            times[r.id] = {
+              checkIn: ci ? new Date(ci).toISOString().slice(11, 16) : undefined,
+              checkOut: co ? new Date(co).toISOString().slice(11, 16) : undefined,
+            };
+          }
+        }
+      });
       setAttnMap(map);
+      setAttnTimes(times);
     } catch { toast.error("Failed to load attendance"); }
     finally { setAttnLoading(false); }
   }, [attnDate]);
@@ -608,7 +675,16 @@ export function HrHub({ section }: { section: HrSection }) {
   }, [section, attnView, fetchAttendance, fetchMonthlySummary, fetchPayrolls, fetchLeaves]);
 
   const saveAttendance = async () => {
-    const rows = Object.entries(attnMap).map(([employeeId, status]) => ({ employeeId, status }));
+    const rows = Object.entries(attnMap).map(([employeeId, status]) => {
+      const t = attnTimes[employeeId];
+      const datePrefix = attnDate;
+      return {
+        employeeId,
+        status,
+        checkIn: t?.checkIn ? `${datePrefix}T${t.checkIn}:00` : undefined,
+        checkOut: t?.checkOut ? `${datePrefix}T${t.checkOut}:00` : undefined,
+      };
+    });
     if (!rows.length) { toast.error("Mark at least one employee"); return; }
     setAttnSaving(true);
     try {
@@ -640,6 +716,7 @@ export function HrHub({ section }: { section: HrSection }) {
       await api.put(`/hr/employees/leaves/${id}/status`, { status });
       toast.success(status === "APPROVED" ? "Leave approved" : "Leave rejected");
       fetchLeaves();
+      fetchHrMeta();
     } catch { toast.error("Failed to update leave"); }
   };
 
@@ -660,88 +737,145 @@ export function HrHub({ section }: { section: HrSection }) {
     }
   };
 
+  const markAllPresent = () => {
+    const map: Record<string, AttendanceStatus> = {};
+    attnRows.forEach((r) => { map[r.id] = "PRESENT"; });
+    setAttnMap(map);
+    toast.success("All employees marked present — click Save to confirm");
+  };
+
   // Stats
   const employeeList   = Array.isArray(employees) ? employees : [];
   const leaveList      = Array.isArray(leaves) ? leaves : [];
-  const activeCount    = employeeList.filter((e) => e.isActive).length;
+  const activeCount    = hrStats?.active ?? employeeList.filter((e) => e.isActive).length;
   const totalPayroll   = employeeList.reduce((s, e) => s + (e.basicSalary ?? 0), 0);
-  const pendingLeaves  = leaveList.filter((l) => l.status === "PENDING").length;
-  const STATS = [
-    { label: "Total Employees", value: employeeList.length, icon: Users,     color: "text-blue-500",    bg: "bg-blue-500/10" },
-    { label: "Active",          value: activeCount,      icon: UserCog,   color: "text-emerald-500", bg: "bg-emerald-500/10" },
-    { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, icon: DollarSign, color: "text-purple-500", bg: "bg-purple-500/10" },
-    { label: "Pending Leaves",  value: pendingLeaves,    icon: FileText,  color: "text-amber-500",   bg: "bg-amber-500/10" },
+  const pendingLeaves  = hrStats?.pendingLeaves ?? leaveList.filter((l) => l.status === "PENDING").length;
+  const kpis: ReportKpiItem[] = [
+    { label: "Total Employees", value: String(hrStats?.total ?? employeeList.length), sub: "All staff records", icon: Users, tone: "blue" },
+    { label: "Active", value: String(activeCount), sub: "Currently working", icon: UserCog, tone: "emerald" },
+    { label: "Monthly Payroll", value: `LKR ${(totalPayroll / 1000).toFixed(0)}K`, sub: "Basic salary total", icon: DollarSign, tone: "violet" },
+    { label: "Pending Leaves", value: String(pendingLeaves), sub: "Awaiting approval", icon: FileText, tone: "amber" },
   ];
 
   const empColumns         = buildEmpColumns((e) => { setEditEmployee(e); setAddOpen(true); }, handleDeactivate);
-  const attnColumns        = buildAttnColumns(attnMap, setAttnMap);
+  const attnColumns        = buildAttnColumns(attnMap, setAttnMap, attnTimes, setAttnTimes);
   const attnSummaryColumns = buildAttnSummaryColumns();
   const payrollColumns     = buildPayrollColumns(markPaid, handlePrintPayslip, printingPayslipId);
   const leaveColumns       = buildLeaveColumns(updateLeaveStatus);
 
   const payrollList = Array.isArray(payrolls) ? payrolls : [];
   const unpaidEmployees = employeeList.filter((e) => e.isActive && !payrollList.find((p) => p.employeeId === e.id));
+  const filteredLeaves = leaveList.filter((l) => {
+    if (!leaveMonth) return true;
+    const start = l.startDate.slice(0, 7);
+    const end = l.endDate.slice(0, 7);
+    return start <= leaveMonth && end >= leaveMonth;
+  });
+  const leaveTypeOptions = (leaveTypes.length ? leaveTypes : LEAVE_TYPES.map((n) => ({ name: n }))).map((t) => ({
+    value: t.name,
+    label: t.name.charAt(0) + t.name.slice(1).toLowerCase(),
+  }));
+
+  const sectionIcon = {
+    employees: Users,
+    attendance: Clock,
+    payroll: DollarSign,
+    leaves: CalendarDays,
+  }[section];
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">{SECTION_META[section].title}</h1>
-          <p className="text-sm text-muted-foreground">{SECTION_META[section].description}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (section === "employees") void fetchEmployees();
-              else if (section === "attendance") void (attnView === "daily" ? fetchAttendance() : fetchMonthlySummary());
-              else if (section === "payroll") void fetchPayrolls();
-              else void fetchLeaves();
-            }}
-            className="h-10 rounded-[12px] gap-1.5 text-sm px-3.5"
-          >
-            <RefreshCw className={`h-[18px] w-[18px] ${empLoading || attnLoading || payLoading || leaveLoading ? "animate-spin" : ""}`} /> Refresh
-          </Button>
-          {section === "employees" && (
-            <>
-              <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-white/10 mx-0.5" aria-hidden />
-              <Button className="h-10 rounded-[12px] gap-1.5 text-sm px-4" onClick={() => { setEditEmployee(undefined); setAddOpen(true); }}>
-                <Plus className="h-[18px] w-[18px]" /> Add Employee
-              </Button>
-            </>
-          )}
+    <div className="hr-hub min-h-screen bg-background">
+      <div className="sticky top-0 z-20 bg-card/95 backdrop-blur-md border-b border-border">
+        <div className="page-shell py-4">
+          <ReportsPageHeader
+            title={SECTION_META[section].title}
+            description={SECTION_META[section].description}
+            icon={sectionIcon}
+            actions={
+              <>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (section === "employees") void fetchEmployees();
+                    else if (section === "attendance") void (attnView === "daily" ? fetchAttendance() : fetchMonthlySummary());
+                    else if (section === "payroll") void fetchPayrolls();
+                    else void fetchLeaves();
+                  }}
+                  className="h-9 gap-1.5"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${empLoading || attnLoading || payLoading || leaveLoading ? "animate-spin" : ""}`} />
+                  Refresh
+                </Button>
+                {section === "employees" && (
+                  <Button type="button" variant="default" size="sm" className="h-9 gap-1.5" onClick={() => { setEditEmployee(undefined); setAddOpen(true); }}>
+                    <Plus className="h-3.5 w-3.5" /> Add Employee
+                  </Button>
+                )}
+              </>
+            }
+          />
         </div>
       </div>
 
-      {section === "employees" && (
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATS.map((st) => (
-          <Card key={st.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${st.bg}`}><st.icon className={`h-5 w-5 ${st.color}`} /></div>
-              <div><p className="text-xl font-bold">{st.value}</p><p className="text-xs text-muted-foreground">{st.label}</p></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      )}
+      <div className="page-shell py-6 space-y-5">
+      {section === "employees" && <ReportKpiGrid items={kpis} loading={empLoading} cols={4} />}
 
         {/* ── Employees ── */}
         {section === "employees" && (
-        <div className="mt-0">
-          <ClientSideTable
-          fillHeight={false}
-            data={employeeList}
-            columns={empColumns}
-            pageCount={Math.ceil(employeeList.length / 10)}
-            searchableColumns={[{ id: "designation", title: "Role" }]}
-            filterableColumns={[{
-              id: "isActive", title: "Status",
-              options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],
-            }]}
-            isShowExportButtons={{ isShow: true, fileName: "employees-export" }}
-          />
+        <div className="mt-0 space-y-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">{employeeList.length} employee{employeeList.length !== 1 ? "s" : ""} · {activeCount} active</p>
+            <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setEmpViewMode("grid")}
+                className={cn("p-2 rounded-md transition-all", empViewMode === "grid" ? "bg-background shadow-sm text-primary" : "text-muted-foreground")}
+                title="Grid view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEmpViewMode("table")}
+                className={cn("p-2 rounded-md transition-all", empViewMode === "table" ? "bg-background shadow-sm text-primary" : "text-muted-foreground")}
+                title="Table view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+          {empLoading ? (
+            <LoadingCenter />
+          ) : employeeList.length === 0 ? (
+            <HrEmptyState
+              icon={Users}
+              title="No employees yet"
+              description="Add your first team member to start managing HR, attendance, and payroll."
+              actionLabel="Add Employee"
+              onAction={() => { setEditEmployee(undefined); setAddOpen(true); }}
+            />
+          ) : empViewMode === "grid" ? (
+            <EmployeeGridView
+              employees={employeeList}
+              onEdit={(e) => { setEditEmployee(e); setAddOpen(true); }}
+              onDeactivate={handleDeactivate}
+            />
+          ) : (
+            <ClientSideTable
+              fillHeight={false}
+              data={employeeList}
+              columns={empColumns}
+              pageCount={Math.ceil(employeeList.length / 10)}
+              searchableColumns={[{ id: "designation", title: "Role" }]}
+              filterableColumns={[{
+                id: "isActive", title: "Status",
+                options: [{ value: "true", label: "Active" }, { value: "false", label: "Inactive" }],
+              }]}
+              isShowExportButtons={{ isShow: true, fileName: "employees-export" }}
+            />
+          )}
         </div>
         )}
 
@@ -765,10 +899,13 @@ export function HrHub({ section }: { section: HrSection }) {
                     className="p-1.5 rounded-lg border hover:bg-muted"><ChevronRight className="h-4 w-4" /></button>
                 </div>
                 <Button size="sm" variant="outline" onClick={fetchAttendance} className="gap-1.5" disabled={attnLoading}>
-                  <RefreshCw className={`h-3.5 w-3.5 ${attnLoading ? "animate-spin" : ""}`} /> Load
+                  <RefreshCw className={`h-3.5 w-3.5 ${attnLoading ? "animate-spin" : ""}`} /> Refresh
+                </Button>
+                <Button size="sm" variant="secondary" onClick={markAllPresent} className="gap-1.5" disabled={attnLoading || attnRows.length === 0}>
+                  <CheckCircle2 className="h-3.5 w-3.5" /> Mark All Present
                 </Button>
                 <div className="flex gap-1.5 ml-auto flex-wrap">
-                  {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as const).map((k) => {
+                  {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE","HOLIDAY"] as const).map((k) => {
                     const v = ATTN_STATUS[k]; const Icon = v.icon;
                     return <span key={k} className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full ${v.bg} ${v.color}`}><Icon className="h-2.5 w-2.5" />{v.label}</span>;
                   })}
@@ -777,14 +914,20 @@ export function HrHub({ section }: { section: HrSection }) {
               {attnLoading ? (
                 <LoadingCenter />
               ) : attnRows.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground border rounded-xl"><Users className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load to fetch employees for this date</p></div>
+                <HrEmptyState
+                  icon={Users}
+                  title="No employees found"
+                  description="Add active employees first, then mark daily attendance here."
+                  actionLabel="Go to Employees"
+                  onAction={() => window.location.assign("/hr")}
+                />
               ) : (
                 <>
                   <ClientSideTable
           fillHeight={false} data={attnRows} columns={attnColumns} pageCount={Math.ceil(attnRows.length/10)} searchableColumns={[{id:"designation",title:"Employee / Role"}]} filterableColumns={[]} isShowExportButtons={{isShow:false,fileName:""}} />
                   <div className="flex justify-between items-center">
                     <div className="flex gap-3 text-xs flex-wrap">
-                      {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE"] as const).map((k) => {
+                      {(["PRESENT","ABSENT","HALF_DAY","ON_LEAVE","LATE","HOLIDAY"] as const).map((k) => {
                         const v = ATTN_STATUS[k]; const Icon = v.icon;
                         const count = Object.values(attnMap).filter((s) => s === k).length;
                         return count > 0 ? <span key={k} className={`inline-flex items-center gap-1 font-semibold ${v.color}`}><Icon className="h-3 w-3" />{count} {v.label}</span> : null;
@@ -809,7 +952,11 @@ export function HrHub({ section }: { section: HrSection }) {
               {summaryLoading ? (
                 <LoadingCenter />
               ) : summaryRows.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground border rounded-xl"><BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-30" /><p>Click Load Summary to view monthly attendance</p></div>
+                <HrEmptyState
+                  icon={BarChart3}
+                  title="No attendance data"
+                  description="Mark daily attendance first — monthly summary will appear here."
+                />
               ) : (
                 <ClientSideTable
           fillHeight={false} data={summaryRows} columns={attnSummaryColumns} pageCount={Math.ceil(summaryRows.length/10)} searchableColumns={[]} filterableColumns={[]} isShowExportButtons={{isShow:true,fileName:`attendance-${summaryMonth}`}} />
@@ -888,14 +1035,35 @@ export function HrHub({ section }: { section: HrSection }) {
             </div>
           </div>
 
+          {/* Unpaid / missing payroll */}
+          {!payLoading && unpaidEmployees.length > 0 ? (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <UserX className="h-4 w-4 text-amber-600" />
+                <p className="text-sm font-semibold">{unpaidEmployees.length} active employee{unpaidEmployees.length > 1 ? "s" : ""} without payroll for {MONTHS[payMonth - 1]} {payYear}</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {unpaidEmployees.slice(0, 8).map((e) => (
+                  <Link key={e.id} href={`/hr/employees/${e.id}`} className="text-xs px-2.5 py-1 rounded-full bg-background border hover:border-primary/50 transition-colors">
+                    {e.firstName} {e.lastName}
+                  </Link>
+                ))}
+                {unpaidEmployees.length > 8 ? <span className="text-xs text-muted-foreground self-center">+{unpaidEmployees.length - 8} more</span> : null}
+              </div>
+            </div>
+          ) : null}
+
           {/* Payroll table */}
           {payLoading ? (
             <LoadingCenter />
           ) : payrolls.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-xl">
-              <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>No payroll for {MONTHS[payMonth-1]} {payYear} — click Load or Generate All</p>
-            </div>
+            <HrEmptyState
+              icon={DollarSign}
+              title={`No payroll for ${MONTHS[payMonth - 1]} ${payYear}`}
+              description="Generate payroll for individual employees or use Generate All for the whole team."
+              actionLabel="Generate All"
+              onAction={() => setGenAllOpen(true)}
+            />
           ) : (
             <>
               <ClientSideTable
@@ -930,12 +1098,13 @@ export function HrHub({ section }: { section: HrSection }) {
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-1 border rounded-lg p-1 bg-muted/30 text-xs">
               {["ALL","PENDING","APPROVED","REJECTED"].map((s) => (
-                <button key={s} onClick={() => { setLeaveStatus(s); }}
+                <button key={s} type="button" onClick={() => { setLeaveStatus(s); }}
                   className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
                     leaveStatus === s ? "bg-background shadow text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}>{s}</button>
               ))}
             </div>
+            <Input type="month" value={leaveMonth} onChange={(e) => setLeaveMonth(e.target.value)} className="w-40 h-9 text-sm" />
             <Button size="sm" variant="outline" onClick={fetchLeaves} className="gap-1.5" disabled={leaveLoading}>
               <RefreshCw className={`h-3.5 w-3.5 ${leaveLoading ? "animate-spin" : ""}`} /> Refresh
             </Button>
@@ -946,32 +1115,35 @@ export function HrHub({ section }: { section: HrSection }) {
 
           {leaveLoading ? (
             <LoadingCenter />
-          ) : leaves.length === 0 ? (
-            <div className="text-center py-12 text-muted-foreground border rounded-xl">
-              <CalendarDays className="h-8 w-8 mx-auto mb-2 opacity-30" />
-              <p>No leave requests found</p>
-            </div>
+          ) : filteredLeaves.length === 0 ? (
+            <HrEmptyState
+              icon={CalendarDays}
+              title="No leave requests"
+              description={leaveStatus !== "ALL" ? `No ${leaveStatus.toLowerCase()} leaves for this period.` : "Create a leave request for any employee."}
+              actionLabel="New Leave Request"
+              onAction={() => setNewLeaveOpen(true)}
+            />
           ) : (
             <>
               <ClientSideTable
           fillHeight={false}
-                data={leaves} columns={leaveColumns}
-                pageCount={Math.ceil(leaves.length / 10)}
+                data={filteredLeaves} columns={leaveColumns}
+                pageCount={Math.ceil(filteredLeaves.length / 10)}
                 searchableColumns={[]}
                 filterableColumns={[{
                   id: "status", title: "Status",
                   options: [{ value: "PENDING", label: "Pending" }, { value: "APPROVED", label: "Approved" }, { value: "REJECTED", label: "Rejected" }],
                 }, {
                   id: "leaveType", title: "Type",
-                  options: LEAVE_TYPES.map((t) => ({ value: t, label: t.charAt(0)+t.slice(1).toLowerCase() })),
+                  options: leaveTypeOptions,
                 }]}
                 isShowExportButtons={{ isShow: true, fileName: "leave-requests" }}
               />
               <div className="rounded-xl border bg-muted/10 p-4 flex flex-wrap gap-6 text-sm">
-                <div><p className="text-xs text-muted-foreground">Total Requests</p><p className="font-bold">{leaves.length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{leaves.filter((l)=>l.status==="PENDING").length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{leaves.filter((l)=>l.status==="APPROVED").length}</p></div>
-                <div><p className="text-xs text-muted-foreground">Rejected</p><p className="font-bold text-red-500">{leaves.filter((l)=>l.status==="REJECTED").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Showing</p><p className="font-bold">{filteredLeaves.length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Pending</p><p className="font-bold text-amber-600">{filteredLeaves.filter((l)=>l.status==="PENDING").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Approved</p><p className="font-bold text-emerald-600">{filteredLeaves.filter((l)=>l.status==="APPROVED").length}</p></div>
+                <div><p className="text-xs text-muted-foreground">Rejected</p><p className="font-bold text-red-500">{filteredLeaves.filter((l)=>l.status==="REJECTED").length}</p></div>
               </div>
             </>
           )}
@@ -986,7 +1158,8 @@ export function HrHub({ section }: { section: HrSection }) {
         editEmployee={editEmployee}
       />
       {genAllOpen && <GenerateAllModal month={payMonth} year={payYear} onClose={() => setGenAllOpen(false)} onDone={fetchPayrolls} />}
-      {newLeaveOpen && <NewLeaveModal employees={employeeList} onClose={() => setNewLeaveOpen(false)} onSaved={fetchLeaves} />}
+      {newLeaveOpen && <NewLeaveModal employees={employeeList} leaveTypes={leaveTypes} onClose={() => setNewLeaveOpen(false)} onSaved={() => { fetchLeaves(); fetchHrMeta(); }} />}
+      </div>
     </div>
   );
 }

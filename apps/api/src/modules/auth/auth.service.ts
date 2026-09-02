@@ -560,7 +560,7 @@ export class AuthService {
     const { consumeImpersonationCode } = await import(
       '@/modules/platform-ops/impersonation-codes'
     );
-    const token = consumeImpersonationCode(code);
+    const token = await consumeImpersonationCode(code);
     if (!token) throw new UnauthorizedException('Invalid or expired impersonation code');
 
     let payload: IJwtPayload;

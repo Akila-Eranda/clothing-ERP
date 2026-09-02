@@ -15,9 +15,19 @@ import { ConfigService } from '@nestjs/config';
 import { OnEvent } from '@nestjs/event-emitter';
 import { Logger } from '@nestjs/common';
 import { AuthModule } from '@/modules/auth/auth.module';
+import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaModule } from '@/prisma/prisma.module';
+
+function resolveWsCorsOrigins(): string[] | boolean {
+  const configured = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+  return configured.length ? configured : false;
+}
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: { origin: resolveWsCorsOrigins(), credentials: true },
   namespace: '/ws',
   transports: ['websocket', 'polling'],
 })
@@ -33,6 +43,7 @@ export class AppGateway
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) {}
 
   afterInit(server: Server): void {
@@ -71,8 +82,20 @@ export class AppGateway
   }
 
   @SubscribeMessage('join-branch')
-  handleJoinBranch(@ConnectedSocket() client: Socket, @MessageBody() branchId: string): void {
-    void client.join(`branch:${branchId}`);
+  async handleJoinBranch(@ConnectedSocket() client: Socket, @MessageBody() branchId: string): Promise<void> {
+    const clientInfo = this.connectedClients.get(client.id);
+    if (!clientInfo?.tenantId || !branchId) return;
+
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, tenantId: clientInfo.tenantId, isActive: true },
+      select: { id: true },
+    });
+    if (!branch) {
+      this.logger.warn(`Rejected join-branch ${branchId} for client ${client.id}`);
+      return;
+    }
+
+    void client.join(`branch:${branch.id}`);
   }
 
   // ── Event handlers ────────────────────────────────────────
@@ -107,7 +130,7 @@ export class AppGateway
 }
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, PrismaModule],
   providers: [AppGateway],
   exports: [AppGateway],
 })

@@ -9,6 +9,7 @@ import {
   Banknote, Receipt, type LucideIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
@@ -563,24 +564,18 @@ export default function SalesPage() {
       header: ({ column }) => <DataTableColumnHeader column={column} title="Payment" />,
       cell: ({ row }) => {
         const pay = paymentLabel(row.original);
-        return (
-          <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", pay.className)}>
-            {pay.label}
-          </span>
-        );
+        const statusKey =
+          pay.label === "Paid" ? "PAID"
+          : pay.label === "Partial" ? "PARTIALLY_PAID"
+          : pay.label === "Refunded" ? "REFUNDED"
+          : "UNPAID";
+        return <TableStatusBadge status={statusKey} label={pay.label} />;
       },
     },
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => (
-        <Badge
-          variant={row.original.status === "COMPLETED" ? "success" : row.original.status === "REFUNDED" ? "danger" : "warning"}
-          className="h-6 rounded-md px-2.5 text-[11px] font-semibold inline-flex items-center capitalize"
-        >
-          {row.original.status?.toLowerCase()}
-        </Badge>
-      ),
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",

@@ -13,8 +13,10 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { PrismaExceptionFilter } from './common/filters/prisma-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { validateSecurityConfig } from './shared/security/bootstrap-validation';
 
 async function bootstrap(): Promise<void> {
+  validateSecurityConfig();
   const logger = new Logger('Bootstrap');
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {

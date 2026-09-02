@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -353,7 +354,7 @@ export function PromotionsHub() {
                 <p className="text-[11px] text-muted-foreground truncate max-w-[220px] mt-0.5">{p.description}</p>
               ) : null}
               <div className="mt-1.5">
-                <StatusBadge status={status} />
+                <TableStatusBadge status={status} />
               </div>
             </div>
           );

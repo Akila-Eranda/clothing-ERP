@@ -11,7 +11,7 @@ import {
   Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield, Briefcase, Tag, Undo2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
@@ -213,6 +213,7 @@ function useNavGroups(): NavGroup[] {
         { label: L["/suppliers"], href: "/suppliers", icon: Truck },
         { label: L["/purchases"], href: "/purchases", icon: ShoppingBag },
         { label: L["/purchases/grn"] ?? "Goods Receipt", href: "/purchases/grn", icon: PackageCheck },
+        { label: L["/purchases/purchase-returns"] ?? "Purchase Returns", href: "/purchases/purchase-returns", icon: Undo2 },
         { label: L["/purchases/procurement"] ?? "Procurement Hub", href: "/purchases/procurement", icon: ClipboardList },
         { label: L["/purchases/supplier-payments"] ?? "Supplier Payments", href: "/purchases/supplier-payments", icon: Wallet },
       ],
@@ -237,9 +238,14 @@ function useNavGroups(): NavGroup[] {
           href: "/hr",
           children: [
             { label: L["/hr"] ?? "Employees", href: "/hr", icon: Users },
+            { label: "Departments", href: "/hr/departments", icon: Building2 },
+            { label: "Designations", href: "/hr/designations", icon: Briefcase },
+            { label: "Shifts", href: "/hr/shifts", icon: Clock },
             { label: L["/hr/attendance"] ?? "Attendance", href: "/hr/attendance", icon: Clock },
-            { label: L["/hr/payroll"] ?? "Payroll", href: "/hr/payroll", icon: Banknote },
             { label: L["/hr/leaves"] ?? "Leaves", href: "/hr/leaves", icon: CalendarDays },
+            { label: "Leave Types", href: "/hr/leave-types", icon: Tag },
+            { label: "Holidays", href: "/hr/holidays", icon: CalendarDays },
+            { label: L["/hr/payroll"] ?? "Payroll", href: "/hr/payroll", icon: Banknote },
           ],
         },
         { label: L["/branches"], href: "/branches", icon: Building2 },

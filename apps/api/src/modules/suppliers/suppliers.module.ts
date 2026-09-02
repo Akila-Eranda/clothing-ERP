@@ -1033,6 +1033,12 @@ export class ProcurementController {
     return this.procurement.listSupplierReturns(user.tenantId, query);
   }
 
+  @Get('supplier-returns/:id')
+  @RequirePermissions('purchases:read')
+  getReturn(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
+    return this.procurement.getSupplierReturn(id, user.tenantId);
+  }
+
   @Post('supplier-returns/:id/post')
   @RequirePermissions('purchases:update')
   postReturn(@CurrentUser() user: IAuthUser, @Param('id') id: string) {

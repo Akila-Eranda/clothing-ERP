@@ -19,6 +19,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -298,14 +299,7 @@ export function ChequesHub() {
         id: "status",
         accessorKey: "status",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-        cell: ({ row }) => {
-          const meta = STATUS_META[row.original.status] ?? STATUS_META.RECEIVED;
-          return (
-            <Badge variant={meta.variant} className="text-[10px]">
-              {meta.label}
-            </Badge>
-          );
-        },
+        cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
       },
       {
         id: "amount",

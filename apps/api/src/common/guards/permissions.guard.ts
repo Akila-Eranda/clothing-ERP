@@ -27,8 +27,9 @@ export class PermissionsGuard implements CanActivate {
 
     if (!user) throw new ForbiddenException('Authentication required');
 
-    const isSuperAdmin = user.roles.includes('SUPER_ADMIN') || user.roles.includes('TENANT_ADMIN');
-    if (isSuperAdmin) return true;
+    // Only platform super admins bypass permission checks.
+    // Tenant admins receive all tenant permissions via role assignment.
+    if (user.roles.includes('SUPER_ADMIN')) return true;
 
     if (anyPermissions?.length) {
       const hasAny = anyPermissions.some((p) => user.permissions.includes(p));

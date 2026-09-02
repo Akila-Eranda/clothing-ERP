@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Plus, Package, Upload, RefreshCw, CheckCircle2, Ban, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
@@ -93,9 +94,7 @@ function buildColumns(
       accessorKey: "isActive",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
       cell: ({ row }) => (
-        <Badge variant={row.original.isActive ? "success" : "secondary"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center">
-          {row.original.isActive ? "Active" : "Inactive"}
-        </Badge>
+        <TableStatusBadge status={row.original.isActive ? "ACTIVE" : "INACTIVE"} />
       ),
     },
     {

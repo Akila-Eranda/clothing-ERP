@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { modalFooterButtonClass } from "@/components/ui/modal-footer";
-import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
@@ -45,14 +45,6 @@ interface VariantLookup {
   product: { name: string };
   size?: string | null; color?: string | null;
 }
-
-const STATUS_CFG: Record<string, { label: string; variant: string; icon: React.ElementType }> = {
-  INITIATED:        { label: "Initiated",        variant: "warning", icon: Clock },
-  APPROVED:         { label: "Approved",         variant: "success", icon: CheckCircle },
-  REJECTED:         { label: "Rejected",         variant: "danger",  icon: XCircle },
-  COMPLETED:        { label: "Completed",        variant: "default", icon: CheckCircle },
-  REFUND_PROCESSED: { label: "Refund Processed", variant: "success", icon: DollarSign },
-};
 
 const STEPS = ["Type", "Invoice", "Items", "Confirm"];
 
@@ -608,15 +600,7 @@ export default function ReturnsPage() {
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const cfg = STATUS_CFG[row.original.status] ?? STATUS_CFG.INITIATED;
-        const Icon = cfg.icon;
-        return (
-          <Badge variant={cfg.variant as "success"|"warning"|"danger"|"default"} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
-            <Icon className="h-3 w-3" />{cfg.label}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",

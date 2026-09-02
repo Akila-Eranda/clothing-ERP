@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
@@ -326,7 +327,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       id: "status",
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => <Badge variant="outline" className="text-[10px]">{row.original.status}</Badge>,
+      cell: ({ row }) => <TableStatusBadge status={row.original.status} />,
     },
     {
       id: "sent",

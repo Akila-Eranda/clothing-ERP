@@ -1012,7 +1012,8 @@ html.dark .hex-header {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 12rem;
+  max-width: min(20rem, 42vw);
+  flex-shrink: 0;
 }
 
 .hex-header__title {

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Banknote, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info } from "lucide-react";
+import { ArrowLeft, Banknote, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -16,9 +16,9 @@ import {
   FORM_PAGE, FORM_CARD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
   FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_STATUS_BADGE,
   FORM_HEADER_ICON_WRAP, FORM_HEADER_ICON, FORM_DROPDOWN, FORM_INNER_PANEL,
-  FORM_TABLE_HEAD, FORM_TABLE_HEAD_ROW, FORM_TABLE_BODY, FORM_ROW_HOVER,
+  FORM_TABLE_HEAD, FORM_TABLE_HEAD_ROW, FORM_TABLE_BODY, FORM_ROW_HOVER, FORM_ROW_SELECTED,
   FORM_THUMB, FORM_EMPTY_ICON_WRAP, FORM_STICKY_BAR, FORM_META_VALUE,
-  FORM_ACCENT_ICON, FORM_HINT, FORM_SCAN_BTN, PO_FIELD,
+  FORM_ACCENT_ICON, FORM_ACCENT_TEXT, FORM_HINT, FORM_SCAN_BTN, PO_FIELD, FORM_LINE_INPUT,
 } from "@/lib/form-shell-theme";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -876,9 +876,6 @@ export default function CreatePOPage() {
               <div className={FORM_HEADER_ICON_WRAP}>
                 <FileText className={FORM_HEADER_ICON} />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
-                {fromGrnId ? "Create PO from GRN" : "New Purchase Order"}
-              </h1>
               <span className={FORM_STATUS_BADGE}>
                 Draft
               </span>
@@ -1066,7 +1063,7 @@ export default function CreatePOPage() {
                             onClick={() => addVariantToItems(v)}
                             className={cn(
                               "flex w-full items-start gap-3 border-b px-3 py-2.5 text-left last:border-0 sm:px-4",
-                              i === searchHighlight ? "bg-orange-500/10 ring-1 ring-inset ring-orange-500/30" : "hover:bg-muted/50",
+                              i === searchHighlight ? FORM_ROW_SELECTED : FORM_ROW_HOVER,
                             )}
                           >
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted border border-border">
@@ -1193,9 +1190,11 @@ export default function CreatePOPage() {
                               <button
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); clearVariant(idx); }}
-                                className="text-[11px] font-semibold text-primary hover:underline"
+                                className={cn("rounded-md p-1.5", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
+                                aria-label="Change product"
+                                title="Change product"
                               >
-                                Change
+                                <RefreshCw className="h-4 w-4" />
                               </button>
                               <button
                                 type="button"
@@ -1254,7 +1253,7 @@ export default function CreatePOPage() {
                               min={1}
                               value={item.orderedQty}
                               onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
-                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
                           <div className="space-y-1">
@@ -1265,7 +1264,7 @@ export default function CreatePOPage() {
                               step="0.01"
                               value={item.unitCost}
                               onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
-                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
                           <div className="space-y-1">
@@ -1276,7 +1275,7 @@ export default function CreatePOPage() {
                               step="0.01"
                               value={item.discount}
                               onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
-                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
                           <div className="space-y-1">
@@ -1288,7 +1287,7 @@ export default function CreatePOPage() {
                               step="0.1"
                               value={item.taxRate}
                               onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                              className="h-9 w-full rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
+                              className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
                         </div>
@@ -1305,23 +1304,23 @@ export default function CreatePOPage() {
 
               {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[1100px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead className={FORM_TABLE_HEAD}>
                     <tr className={FORM_TABLE_HEAD_ROW}>
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
-                      <th className="px-4 py-3 text-left font-semibold min-w-[260px]">Product</th>
-                      <th className="px-3 py-3 text-left font-semibold w-32">SKU</th>
+                      <th className="px-4 py-3 text-left font-semibold min-w-[300px] max-w-[360px]">Product</th>
+                      <th className="px-3 py-3 text-left font-semibold w-36">SKU</th>
                       <th className="px-3 py-3 text-right font-semibold w-16">
                         <span className="inline-flex items-center gap-1 justify-end">Stock <Info className="h-3 w-3" /></span>
                       </th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap min-w-[6.5rem]">Last PO</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Last Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Order Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Buying Price</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Discount</th>
-                      <th className="px-3 py-3 text-right font-semibold">Tax</th>
-                      <th className="px-3 py-3 text-right font-semibold">Total</th>
-                      <th className="w-12 px-2 py-3 text-center font-semibold">Action</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Order Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-32">Buying Price</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Discount</th>
+                      <th className="px-3 py-3 text-right font-semibold w-20">Tax</th>
+                      <th className="px-3 py-3 text-right font-semibold w-28">Total</th>
+                      <th className="w-20 px-2 py-3 text-center font-semibold">Action</th>
                     </tr>
                   </thead>
                   <tbody className={FORM_TABLE_BODY}>
@@ -1346,14 +1345,14 @@ export default function CreatePOPage() {
                           className={cn(
                             "cursor-pointer align-top transition-colors",
                             FORM_ROW_HOVER,
-                            selectedRowIdx === idx && "bg-orange-500/5 ring-1 ring-inset ring-orange-500/30",
+                            selectedRowIdx === idx && FORM_ROW_SELECTED,
                           )}
                         >
                           <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
-                          <td className="px-4 py-3">
+                          <td className="px-4 py-3 align-top">
                             {item.variantId ? (
                               <div className="flex min-w-0 items-start gap-3">
-                                <div className={cn("flex h-10 w-10 shrink-0", FORM_THUMB)}>
+                                <div className={cn("flex h-11 w-11 shrink-0", FORM_THUMB)}>
                                   {item.imageUrl || v?.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
@@ -1361,31 +1360,26 @@ export default function CreatePOPage() {
                                     <Package className="h-4 w-4 text-muted-foreground" />
                                   )}
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-foreground">{item.productName}</p>
-                                  {item.variantName && (
-                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.variantName}</p>
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <p className="text-sm font-semibold leading-snug text-foreground line-clamp-2 break-words">
+                                    {item.productName}
+                                  </p>
+                                  {item.variantName && item.variantName !== "Default" && (
+                                    <p className="text-xs text-muted-foreground">{item.variantName}</p>
                                   )}
-                                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
                                     {status !== "unknown" && (
-                                      <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-semibold ${statusPill}`}>
+                                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold capitalize ${statusPill}`}>
                                         {status.replaceAll("_", " ")}
                                       </span>
                                     )}
                                     {(item.size || item.color) && (
-                                      <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                                      <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[10px] text-muted-foreground">
                                         {[item.size, item.color].filter(Boolean).join(" · ")}
                                       </span>
                                     )}
                                   </div>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); clearVariant(idx); }}
-                                  className="shrink-0 text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline"
-                                >
-                                  Change
-                                </button>
                               </div>
                             ) : (
                               <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -1432,72 +1426,93 @@ export default function CreatePOPage() {
                           <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{stock ?? "—"}</td>
                           <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{fmtDate(v?.lastPurchaseDate)}</td>
                           <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{dash(v?.lastPurchaseQty)}</td>
-                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              ref={(el) => { qtyInputRefs.current[idx] = el; }}
-                              type="number"
-                              min={1}
-                              value={item.orderedQty}
-                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  costInputRefs.current[idx]?.focus();
-                                }
-                              }}
-                              className="h-9 w-[4.5rem] rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                ref={(el) => { qtyInputRefs.current[idx] = el; }}
+                                type="number"
+                                min={1}
+                                value={item.orderedQty}
+                                onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    costInputRefs.current[idx]?.focus();
+                                  }
+                                }}
+                                className={cn(FORM_LINE_INPUT, "w-[5rem]")}
+                              />
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              ref={(el) => { costInputRefs.current[idx] = el; }}
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={item.unitCost}
-                              onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") {
-                                  e.preventDefault();
-                                  productSearchRef.current?.focus();
-                                  setProductSearchOpen(true);
-                                }
-                              }}
-                              className="h-9 w-24 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                ref={(el) => { costInputRefs.current[idx] = el; }}
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={item.unitCost}
+                                onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    productSearchRef.current?.focus();
+                                    setProductSearchOpen(true);
+                                  }
+                                }}
+                                className={cn(FORM_LINE_INPUT, "w-[6.5rem]")}
+                              />
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="number"
-                              min={0}
-                              step="0.01"
-                              value={item.discount}
-                              onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
-                              className="h-9 w-20 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={item.discount}
+                                onChange={(e) => updateItem(idx, "discount", parseFloat(e.target.value) || 0)}
+                                className={cn(FORM_LINE_INPUT, "w-[5.5rem]")}
+                              />
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step="0.1"
-                              value={item.taxRate}
-                              onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                              className="h-9 w-16 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
-                            />
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                type="number"
+                                min={0}
+                                max={100}
+                                step="0.1"
+                                value={item.taxRate}
+                                onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
+                                className={cn(FORM_LINE_INPUT, "w-[4.5rem]")}
+                              />
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-right font-bold tabular-nums text-orange-600 dark:text-orange-400 whitespace-nowrap">{fmt(total)}</td>
-                          <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              type="button"
-                              onClick={() => removeRow(idx)}
-                              className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                              aria-label="Remove row"
-                              disabled={saving}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          <td className={cn("px-3 py-3 text-right align-top font-bold tabular-nums whitespace-nowrap", FORM_ACCENT_TEXT)}>{fmt(total)}</td>
+                          <td className="px-2 py-3 text-center align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-0.5">
+                              {item.variantId && (
+                                <button
+                                  type="button"
+                                  onClick={() => clearVariant(idx)}
+                                  className={cn("rounded-md p-1.5", FORM_ACCENT_TEXT, "hover:bg-primary/10")}
+                                  aria-label="Change product"
+                                  title="Change product"
+                                >
+                                  <RefreshCw className="h-4 w-4" />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => removeRow(idx)}
+                                className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                                aria-label="Remove row"
+                                disabled={saving}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1511,8 +1526,8 @@ export default function CreatePOPage() {
                               <Package className="h-6 w-6 opacity-40" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-foreground">No items added yet</p>
-                              <p className="mt-1 text-xs">Search products above or click &apos;Add Row&apos; to get started.</p>
+                              <p className="text-sm font-medium text-foreground">No items yet</p>
+                              <p className="mt-1 text-xs">Search above or click &apos;Add Row&apos; to get started.</p>
                             </div>
                             <Button
                               size="sm"
@@ -1533,16 +1548,20 @@ export default function CreatePOPage() {
               </div>
 
               {items.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t bg-muted/10 px-4 py-3 text-sm sm:px-5 shrink-0">
-                  <span className="text-xs text-muted-foreground sm:text-sm">
-                    {items.length} line{items.length === 1 ? "" : "s"} · {totalQty} units
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-muted/20 px-4 py-3.5 text-sm sm:px-5 shrink-0">
+                  <span className="text-xs font-medium text-muted-foreground sm:text-sm">
+                    {items.length} line{items.length === 1 ? "" : "s"} · <span className="text-foreground tabular-nums">{totalQty}</span> units
                   </span>
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm">
-                    <span className="tabular-nums text-muted-foreground">Sub <strong className="text-foreground">LKR {fmt(subtotal)}</strong></span>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs sm:text-sm">
+                    <span className="tabular-nums text-muted-foreground">
+                      Subtotal <strong className="text-foreground">LKR {fmt(subtotal)}</strong>
+                    </span>
                     {totalDisc > 0 && (
-                      <span className="tabular-nums text-emerald-600">Disc −LKR {fmt(totalDisc)}</span>
+                      <span className="tabular-nums text-emerald-600">Discount −LKR {fmt(totalDisc)}</span>
                     )}
-                    <span className="font-bold tabular-nums text-orange-600 dark:text-orange-400">Total LKR {fmt(grandTotal)}</span>
+                    <span className={cn("text-base font-bold tabular-nums", FORM_ACCENT_TEXT)}>
+                      Total LKR {fmt(grandTotal)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -1563,14 +1582,14 @@ export default function CreatePOPage() {
                         setPayNow(e.target.checked);
                         if (!e.target.checked) setPayAmountTouched(false);
                       }}
-                      className="h-4 w-4 rounded border-border accent-orange-500"
+                      className="h-4 w-4 rounded border-border accent-primary"
                     />
-                    <Banknote className="h-4 w-4 text-orange-400" />
+                    <Banknote className={cn("h-4 w-4", FORM_ACCENT_ICON)} />
                     Pay supplier now
                   </label>
                   <span className="text-xs text-muted-foreground">
                     PO Total:{" "}
-                    <span className="font-bold text-orange-400">
+                    <span className={cn("font-bold", FORM_ACCENT_TEXT)}>
                       LKR {fmtMoney(grandTotal)}
                     </span>
                   </span>
@@ -1666,7 +1685,7 @@ export default function CreatePOPage() {
               <MetaRow label="Tax" value={`LKR ${fmt(totalTax)}`} />
               <div className="flex justify-between gap-3 border-t border-border pt-2.5 text-sm">
                 <span className="font-bold text-foreground">Grand Total</span>
-                <span className="font-bold tabular-nums text-orange-400">LKR {fmt(grandTotal)}</span>
+                <span className={cn("font-bold tabular-nums", FORM_ACCENT_TEXT)}>LKR {fmt(grandTotal)}</span>
               </div>
             </SidebarBlock>
 
@@ -1727,7 +1746,7 @@ export default function CreatePOPage() {
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div>
             <p className="text-[10px] text-muted-foreground">Grand Total</p>
-            <p className="text-sm font-bold tabular-nums text-orange-400">LKR {fmt(grandTotal)}</p>
+            <p className={cn("text-sm font-bold tabular-nums", FORM_ACCENT_TEXT)}>LKR {fmt(grandTotal)}</p>
           </div>
           <Button
             size="sm"
