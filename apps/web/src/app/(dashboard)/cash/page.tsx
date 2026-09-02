@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageKpiGrid } from "@/components/ui/page-kpi";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -405,6 +406,7 @@ export default function CashManagementPage() {
       label: "Shift Status",
       value: isViewingToday && shiftOpen ? "Open" : isViewingToday && shiftPending ? "Pending" : `${today?.closedToday ?? 0} closed`,
       icon: isViewingToday && shiftOpen ? CheckCircle2 : Clock,
+      color: "text-white",
       bg: isViewingToday && shiftOpen ? "bg-primary" : isViewingToday && shiftPending ? "bg-amber-500" : "bg-slate-500",
       tint: isViewingToday && shiftOpen
         ? "border-primary/20 bg-gradient-to-br from-primary/5 to-white dark:border-primary/20 dark:from-primary/10 dark:to-transparent"
@@ -421,6 +423,7 @@ export default function CashManagementPage() {
       label: "Expected Cash",
       value: `LKR ${formatNumber(periodExpected)}`,
       icon: DollarSign,
+      color: "text-white",
       bg: "bg-blue-600",
       tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent",
       sub: isViewingToday && shiftOpen ? "Live · updates from POS" : rangeLabel,
@@ -429,6 +432,7 @@ export default function CashManagementPage() {
       label: "Cash Difference",
       value: `LKR ${formatNumber(Math.abs(today?.difference ?? 0))}`,
       icon: Activity,
+      color: "text-white",
       bg: (today?.difference ?? 0) < 0 ? "bg-red-500" : "bg-teal-600",
       tint: (today?.difference ?? 0) < 0
         ? "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent"
@@ -439,6 +443,7 @@ export default function CashManagementPage() {
       label: "Pending Approvals",
       value: String(today?.pendingApproval ?? varianceReport?.pendingApproval ?? 0),
       icon: AlertTriangle,
+      color: "text-white",
       bg: "bg-orange-500",
       tint: "border-orange-200/70 bg-gradient-to-br from-orange-50 to-white dark:border-orange-500/20 dark:from-orange-500/10 dark:to-transparent",
       sub: rangeLabel,
@@ -646,26 +651,7 @@ export default function CashManagementPage() {
           )}
 
           {/* KPI row — compact cards */}
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <Card key={i} className="rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)]"><CardContent className="p-4"><Skeleton className="h-12 w-full" /></CardContent></Card>
-                ))
-              : KPI.map((kpi) => (
-                  <Card key={kpi.label} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${kpi.tint}`}>
-                    <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
-                      <div className={cn(kpi.bg, "h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0")}>
-                        <kpi.icon className="h-[18px] w-[18px] text-white" strokeWidth={1.75} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-lg font-bold leading-none tabular-nums text-foreground truncate">{kpi.value}</p>
-                        <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{kpi.label}</p>
-                        <p className="text-[11px] text-muted-foreground truncate">{kpi.sub}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-          </div>
+          <PageKpiGrid items={KPI} loading={loading} />
 
           {/* Overview — live shift dashboard */}
           <TabsContent value="overview" className="m-0 mt-0 space-y-4">

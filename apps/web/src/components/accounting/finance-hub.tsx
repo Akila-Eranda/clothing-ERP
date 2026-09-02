@@ -417,7 +417,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="secondary" />,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} />,
       },
       {
         id: "description",
@@ -477,7 +477,7 @@ export function FinanceHubProvider({ children }: { children: ReactNode }) {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="info" />,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} />,
       },
       {
         id: "balance",

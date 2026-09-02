@@ -10,7 +10,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { PageKpiGrid, PAGE_KPI_PRESETS, pageKpi } from "@/components/ui/page-kpi";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -451,8 +451,9 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       value: formatNumber(dash?.summary.expired.qty ?? 0),
       sub: `${dash?.summary.expired.lots ?? 0} lots`,
       icon: Skull,
-      color: "text-red-500",
-      bg: "bg-red-500/10",
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-500/15",
+      tint: PAGE_KPI_PRESETS.red.tint,
       href: "/inventory/expiry/expired",
     },
     {
@@ -460,8 +461,9 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       value: formatNumber(dash?.summary.within7Days.qty ?? 0),
       sub: `${dash?.summary.within7Days.lots ?? 0} lots`,
       icon: AlertTriangle,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/15",
+      tint: PAGE_KPI_PRESETS.amber.tint,
       href: "/inventory/expiry/near",
     },
     {
@@ -469,8 +471,9 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       value: formatNumber(dash?.summary.within30Days.qty ?? 0),
       sub: `${dash?.summary.within30Days.lots ?? 0} lots`,
       icon: Clock,
-      color: "text-orange-500",
-      bg: "bg-orange-500/10",
+      color: "text-orange-600 dark:text-orange-400",
+      bg: "bg-orange-500/15",
+      tint: PAGE_KPI_PRESETS.orange.tint,
       href: "/inventory/expiry/near",
     },
     {
@@ -478,10 +481,18 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       value: reconcile?.summary.matched ?? 0,
       sub: `${reconcile?.summary.totalSkus ?? 0} total`,
       icon: CheckCircle2,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-500/15",
+      tint: PAGE_KPI_PRESETS.emerald.tint,
       href: "/inventory/expiry/reconcile",
     },
+  ];
+
+  const RECONCILE_KPI = [
+    pageKpi("Matched", reconcile?.summary.matched ?? 0, CheckCircle2, "emerald"),
+    pageKpi("Lot Short", reconcile?.summary.lotShort ?? 0, TrendingDown, "amber"),
+    pageKpi("Lot Over", reconcile?.summary.lotOver ?? 0, AlertTriangle, "orange"),
+    pageKpi("No Lots", reconcile?.summary.noLots ?? 0, Package, "red"),
   ];
 
   const lotSearch = [
@@ -554,26 +565,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
       )}
 
       {showSummaryStats && (
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-          {STATS.map((s) => (
-            <Card
-              key={s.label}
-              className="cursor-pointer transition-colors hover:border-primary/40"
-              onClick={() => router.push(s.href)}
-            >
-              <CardContent className="p-4 flex items-center gap-3">
-                <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                  <s.icon className={`h-5 w-5 ${s.color}`} />
-                </div>
-                <div>
-                  <p className="text-xl font-bold leading-tight">{s.value}</p>
-                  <p className="text-xs text-muted-foreground">{s.label}</p>
-                  <p className="text-[10px] text-muted-foreground">{s.sub}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <PageKpiGrid items={STATS} />
       )}
 
       {section === "dashboard" && (
@@ -682,26 +674,7 @@ export function ExpiryHub({ section }: { section: ExpirySection }) {
             </Button>
           </div>
 
-          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-            {[
-              { label: "Matched", value: reconcile?.summary.matched ?? 0, icon: CheckCircle2, color: "text-emerald-500", bg: "bg-emerald-500/10" },
-              { label: "Lot Short", value: reconcile?.summary.lotShort ?? 0, icon: TrendingDown, color: "text-amber-500", bg: "bg-amber-500/10" },
-              { label: "Lot Over", value: reconcile?.summary.lotOver ?? 0, icon: AlertTriangle, color: "text-orange-500", bg: "bg-orange-500/10" },
-              { label: "No Lots", value: reconcile?.summary.noLots ?? 0, icon: Package, color: "text-red-500", bg: "bg-red-500/10" },
-            ].map((s) => (
-              <Card key={s.label}>
-                <CardContent className="p-3 flex items-center gap-2.5">
-                  <div className={`p-2 rounded-lg ${s.bg}`}>
-                    <s.icon className={`h-4 w-4 ${s.color}`} />
-                  </div>
-                  <div>
-                    <p className="text-lg font-bold leading-tight">{s.value}</p>
-                    <p className="text-[10px] text-muted-foreground">{s.label}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <PageKpiGrid items={RECONCILE_KPI} />
 
           {loading ? (
             <LoadingCenter />

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge, TableValueBadge } from "@/components/ui/table-status-badge";
+import { PageKpiGrid } from "@/components/ui/page-kpi";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -490,25 +491,7 @@ function AccountsOverviewPanel({
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {summaryRows.map((s) => (
-          <Card
-            key={s.label}
-            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
-          >
-            <CardContent className="h-[72px] p-4 flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
-                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg font-bold leading-none tabular-nums truncate">{s.value}</p>
-                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
-                <p className="text-[10px] text-muted-foreground/80 truncate">{s.sub}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PageKpiGrid items={summaryRows} />
 
       <div className="space-y-4">
         {section("cash-registers", "Cash registers", <Banknote className="h-4 w-4" />, "bg-emerald-500/15 text-emerald-600", cashAccounts)}
@@ -745,7 +728,7 @@ function CashBookPanel() {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="info" />,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} />,
       },
       {
         id: "description",
@@ -1122,7 +1105,7 @@ function BankBookPanel({ initialAccountId }: { initialAccountId?: string }) {
         id: "type",
         accessorKey: "type",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-        cell: ({ row }) => <TableValueBadge label={row.original.type} variant="info" />,
+        cell: ({ row }) => <TableValueBadge label={row.original.type} />,
       },
       {
         id: "description",

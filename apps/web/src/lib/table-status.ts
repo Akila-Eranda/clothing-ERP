@@ -1,5 +1,8 @@
 export const TABLE_STATUS_BADGE_CLASS =
-  "inline-flex min-w-[5.5rem] items-center justify-center rounded px-3 py-1 text-xs font-semibold capitalize whitespace-nowrap border-0 shadow-none";
+  "inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-semibold capitalize whitespace-nowrap border-0 shadow-none leading-tight";
+
+export const TABLE_VALUE_BADGE_CLASS =
+  "inline-flex max-w-full items-center justify-center rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap border-0 shadow-none leading-tight truncate";
 
 export type TableStatusVariant =
   | "success"
@@ -68,6 +71,103 @@ const STATUS_MAP: Record<string, { variant: TableStatusVariant; label?: string }
   UNPAID: { variant: "danger", label: "Unpaid" },
   PARTIAL: { variant: "gold", label: "Partial" },
 };
+
+/** Semantic colors for categorical column values (type, category, channel, etc.) */
+const VALUE_MAP: Record<string, TableStatusVariant> = {
+  // Channels
+  SMS: "info",
+  EMAIL: "purple",
+  WHATSAPP: "success",
+  PHONE: "teal",
+  CALL: "teal",
+  WALK_IN: "gold",
+  WALKIN: "gold",
+  ONLINE: "info",
+  POS: "default",
+  WEB: "purple",
+
+  // Leave types
+  ANNUAL: "teal",
+  SICK: "danger",
+  CASUAL: "info",
+  MATERNITY: "purple",
+  PATERNITY: "purple",
+  UNPAID_LEAVE: "warning",
+  NO_PAY: "warning",
+
+  // Stock movement
+  IN: "success",
+  OUT: "danger",
+  ADJUSTMENT: "gold",
+  ADJUST: "gold",
+  TRANSFER: "info",
+  TRANSFER_IN: "success",
+  TRANSFER_OUT: "warning",
+  RETURN: "purple",
+  DAMAGE: "danger",
+  DISPOSAL: "danger",
+  SALE: "success",
+  PURCHASE: "info",
+
+  // Accounting entry types
+  DEBIT: "success",
+  CREDIT: "danger",
+  RECEIPT: "success",
+  PAYMENT: "info",
+  JOURNAL: "purple",
+  CONTRA: "gold",
+  DEPOSIT: "success",
+  WITHDRAWAL: "danger",
+  TRANSFER_PAYMENT: "teal",
+
+  // GRN / procurement sources
+  FROM_PO: "info",
+  QUICK: "gold",
+  DIRECT: "teal",
+
+  // Fleet / account kinds
+  FLEET: "success",
+  FLEET_ACCOUNT: "success",
+  RETAIL: "secondary",
+
+  // Grades
+  A: "success",
+  B: "gold",
+  C: "secondary",
+
+  // System flags
+  SYSTEM: "purple",
+};
+
+const VALUE_PALETTE: TableStatusVariant[] = [
+  "info",
+  "teal",
+  "purple",
+  "gold",
+  "success",
+  "warning",
+  "default",
+  "danger",
+];
+
+function hashValueVariant(value: string): TableStatusVariant {
+  const key = normalizeStatusKey(value);
+  if (!key) return "secondary";
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return VALUE_PALETTE[Math.abs(hash) % VALUE_PALETTE.length];
+}
+
+/** Pick a solid badge color for any categorical table value */
+export function resolveValueVariant(value: string): TableStatusVariant {
+  const key = normalizeStatusKey(value);
+  if (!key) return "secondary";
+  if (VALUE_MAP[key]) return VALUE_MAP[key];
+  if (STATUS_MAP[key]) return STATUS_MAP[key].variant;
+  return hashValueVariant(value);
+}
 
 function inferVariant(key: string): TableStatusVariant {
   if (key.includes("PEND") || key.includes("INIT")) return "info";

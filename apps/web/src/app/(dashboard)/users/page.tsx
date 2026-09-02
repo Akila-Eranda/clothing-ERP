@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
+import { PageKpiGrid, pageKpi } from "@/components/ui/page-kpi";
 import { PermissionMatrix } from "@/components/users/permission-matrix";
 import { RolePermissionDiff } from "@/components/users/role-permission-diff";
 import { type AppPermission } from "@/lib/permissions";
@@ -380,30 +381,10 @@ export default function UsersPage() {
   const inactiveCount = users.length - activeCount;
 
   const statCards = [
-    {
-      label: "Total Users",
-      value: users.length,
-      valueClass: "text-foreground",
-      accentClass: "border-l-slate-400",
-    },
-    {
-      label: "Active",
-      value: activeCount,
-      valueClass: "text-emerald-600",
-      accentClass: "border-l-emerald-500",
-    },
-    {
-      label: "Inactive",
-      value: inactiveCount,
-      valueClass: "text-foreground",
-      accentClass: "border-l-slate-300",
-    },
-    {
-      label: "Total Roles",
-      value: tenantRoleCards.length,
-      valueClass: "text-blue-600",
-      accentClass: "border-l-blue-500",
-    },
+    pageKpi("Total Users", users.length, User, "slate"),
+    pageKpi("Active", activeCount, CheckCircle, "emerald"),
+    pageKpi("Inactive", inactiveCount, XCircle, "slate"),
+    pageKpi("Total Roles", tenantRoleCards.length, Shield, "blue"),
   ];
 
   return (
@@ -432,19 +413,7 @@ export default function UsersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {statCards.map((s) => (
-          <div
-            key={s.label}
-            className={`rounded-xl border border-border/60 bg-card shadow-sm px-5 py-4 border-l-4 ${s.accentClass}`}
-          >
-            <p className={`text-3xl font-bold tabular-nums leading-none ${s.valueClass}`}>
-              {loading ? "—" : s.value}
-            </p>
-            <p className="text-sm text-muted-foreground mt-2">{s.label}</p>
-          </div>
-        ))}
-      </div>
+      <PageKpiGrid items={statCards} loading={loading} />
 
       <Tabs defaultValue="users">
         <TabsList>

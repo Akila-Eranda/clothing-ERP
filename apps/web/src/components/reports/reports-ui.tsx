@@ -20,6 +20,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { PageKpiGrid, PAGE_KPI_PRESETS } from "@/components/ui/page-kpi";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -198,23 +199,13 @@ export function ReportKpiGrid({
   loading?: boolean;
   cols?: 2 | 3 | 4 | 5 | 6;
 }) {
-  const grid =
-    cols === 6
-      ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-6"
-      : cols === 5
-        ? "grid-cols-2 md:grid-cols-3 xl:grid-cols-5"
-      : cols === 4
-        ? "grid-cols-2 md:grid-cols-4"
-        : cols === 3
-          ? "grid-cols-1 sm:grid-cols-3"
-          : "grid-cols-2";
-  return (
-    <div className={cn("grid gap-3 md:gap-4", grid)}>
-      {items.map((k) => (
-        <ReportKpiCard key={k.label} {...k} loading={loading} />
-      ))}
-    </div>
-  );
+  const pageItems = items.map((k) => ({
+    label: k.label,
+    value: k.value,
+    icon: k.icon,
+    ...PAGE_KPI_PRESETS[k.tone ?? "blue"],
+  }));
+  return <PageKpiGrid items={pageItems} loading={loading} cols={cols} />;
 }
 
 // ── Cards & empty states ──────────────────────────────────────────────────────

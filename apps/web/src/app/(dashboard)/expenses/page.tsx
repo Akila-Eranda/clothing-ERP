@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { EXPENSE_CATEGORIES, normalizeExpenseCategory } from "@/lib/expense-categories";
 import { parseApiList } from "@/lib/parse-api-list";
+import { PageKpiGrid, pageKpi } from "@/components/ui/page-kpi";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const PAY_METHODS = ["CASH", "CARD", "BANK_TRANSFER", "CHEQUE", "UPI", "WALLET"];
@@ -148,6 +149,13 @@ export default function ExpensesPage() {
   const total   = summary?.total ?? expenses.reduce((s, e) => s + e.amount, 0);
   const avg     = expenses.length > 0 ? total / expenses.length : 0;
   const largest = expenses.length > 0 ? Math.max(...expenses.map((e) => e.amount)) : 0;
+
+  const EXPENSE_KPIS = [
+    { ...pageKpi("Total Expenses", `LKR ${formatNumber(total)}`, TrendingDown, "red"), sub: `${expenses.length} entries in period` },
+    { ...pageKpi("Average per Entry", `LKR ${formatNumber(avg)}`, Activity, "amber"), sub: "Per recorded expense" },
+    { ...pageKpi("Largest Expense", `LKR ${formatNumber(largest)}`, ArrowUpRight, "violet"), sub: "Single highest entry" },
+    { ...pageKpi("Categories Used", String(catData.length), BarChart2, "blue"), sub: `of ${EXPENSE_CATEGORIES.length} total categories` },
+  ];
   const catData = (summary?.byCategory ?? []).map((c, i) => ({ ...c, color: CAT_COLORS[i % CAT_COLORS.length] }));
   const methodData = (summary?.byPaymentMethod ?? []).map((m) => ({ name: m.method.replace(/_/g, " "), value: m.amount }));
 
@@ -219,25 +227,7 @@ export default function ExpensesPage() {
         </div>
 
         {/* ── KPI Cards — compact ─────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-          {([
-            { label: "Total Expenses",    value: `LKR ${formatNumber(total)}`,   icon: TrendingDown, bg: "bg-red-500",    sub: `${expenses.length} entries in period`, tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent" },
-            { label: "Average per Entry", value: `LKR ${formatNumber(avg)}`,     icon: Activity,     bg: "bg-amber-500",  sub: "Per recorded expense", tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent" },
-            { label: "Largest Expense",   value: `LKR ${formatNumber(largest)}`, icon: ArrowUpRight, bg: "bg-purple-500", sub: "Single highest entry", tint: "border-purple-200/70 bg-gradient-to-br from-purple-50 to-white dark:border-purple-500/20 dark:from-purple-500/10 dark:to-transparent" },
-            { label: "Categories Used",   value: String(catData.length),         icon: BarChart2,    bg: "bg-blue-500",   sub: `of ${EXPENSE_CATEGORIES.length} total categories`, tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-          ] as { label: string; value: string; icon: React.ComponentType<{ className?: string }>; bg: string; sub: string; tint: string }[]).map((kpi) => (
-            <Card key={kpi.label} className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${kpi.tint}`}>
-              <CardContent className="min-h-[68px] p-4 flex items-center gap-3">
-                <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${kpi.bg}`}><kpi.icon className="h-[18px] w-[18px] text-white" /></div>
-                <div className="min-w-0">
-                  <p className="text-lg font-bold leading-none tabular-nums truncate">{kpi.value}</p>
-                  <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{kpi.label}</p>
-                  <p className="text-[11px] text-muted-foreground truncate">{kpi.sub}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <PageKpiGrid items={EXPENSE_KPIS} loading={loading} />
 
         {/* ── Charts ──────────────────────────────────────────────────────── */}
         {catData.length > 0 && (

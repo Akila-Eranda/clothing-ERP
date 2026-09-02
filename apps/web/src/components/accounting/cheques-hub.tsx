@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button";
 import { modalBarFooterClass } from "@/components/ui/modal-footer";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { PageKpiGrid, PAGE_KPI_PRESETS } from "@/components/ui/page-kpi";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -388,48 +388,54 @@ export function ChequesHub() {
       value: dash ? `LKR ${formatNumber(dash.outstandingAmount)}` : "—",
       sub: dash ? `${dash.outstandingCount} open` : "",
       icon: FileCheck,
-      color: "text-violet-600",
-      bg: "bg-violet-500/10",
+      color: PAGE_KPI_PRESETS.violet.color,
+      bg: PAGE_KPI_PRESETS.violet.bg,
+      tint: PAGE_KPI_PRESETS.violet.tint,
     },
     {
       label: "Receivable",
       value: dash ? `LKR ${formatNumber(dash.receivedOpen.amount)}` : "—",
       sub: dash ? `${dash.receivedOpen.count} in` : "",
       icon: ArrowDownLeft,
-      color: "text-emerald-600",
-      bg: "bg-emerald-500/10",
+      color: PAGE_KPI_PRESETS.emerald.color,
+      bg: PAGE_KPI_PRESETS.emerald.bg,
+      tint: PAGE_KPI_PRESETS.emerald.tint,
     },
     {
       label: "Payable",
       value: dash ? `LKR ${formatNumber(dash.issuedOpen.amount)}` : "—",
       sub: dash ? `${dash.issuedOpen.count} out` : "",
       icon: ArrowUpRight,
-      color: "text-amber-600",
-      bg: "bg-amber-500/10",
+      color: PAGE_KPI_PRESETS.amber.color,
+      bg: PAGE_KPI_PRESETS.amber.bg,
+      tint: PAGE_KPI_PRESETS.amber.tint,
     },
     {
       label: "Due soon",
       value: String(dash?.dueSoonCount ?? "—"),
       sub: "next 7 days",
       icon: Clock,
-      color: "text-blue-600",
-      bg: "bg-blue-500/10",
+      color: PAGE_KPI_PRESETS.blue.color,
+      bg: PAGE_KPI_PRESETS.blue.bg,
+      tint: PAGE_KPI_PRESETS.blue.tint,
     },
     {
       label: "Overdue",
       value: String(dash?.overdueCount ?? "—"),
       sub: "past due date",
       icon: AlertTriangle,
-      color: "text-red-600",
-      bg: "bg-red-500/10",
+      color: PAGE_KPI_PRESETS.red.color,
+      bg: PAGE_KPI_PRESETS.red.bg,
+      tint: PAGE_KPI_PRESETS.red.tint,
     },
     {
       label: "Cleared",
       value: String(dash?.clearedCount ?? "—"),
       sub: dash ? `${dash.bouncedCount} bounced` : "",
       icon: CheckCircle2,
-      color: "text-teal-600",
-      bg: "bg-teal-500/10",
+      color: PAGE_KPI_PRESETS.teal.color,
+      bg: PAGE_KPI_PRESETS.teal.bg,
+      tint: PAGE_KPI_PRESETS.teal.tint,
     },
   ];
 
@@ -462,22 +468,7 @@ export function ChequesHub() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-        {kpis.map((k) => (
-          <Card key={k.label}>
-            <CardContent className="p-4 flex items-start gap-3">
-              <div className={`p-2 rounded-xl ${k.bg} ${k.color} shrink-0`}>
-                <k.icon className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] text-muted-foreground font-medium">{k.label}</p>
-                <p className="text-sm font-bold tabular-nums truncate mt-0.5">{k.value}</p>
-                {k.sub && <p className="text-[10px] text-muted-foreground mt-0.5">{k.sub}</p>}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PageKpiGrid items={kpis} cols={6} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-1.5">

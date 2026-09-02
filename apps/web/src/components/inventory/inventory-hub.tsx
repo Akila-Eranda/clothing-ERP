@@ -745,7 +745,7 @@ export function InventoryHub({ section }: { section: InventorySection }) {
                         <p className="font-medium text-xs">{log.variant.product.name}</p>
                         <p className="text-[10px] text-muted-foreground">{log.variant.sku}</p>
                       </td>
-                      <td className="px-3 py-2"><TableValueBadge label={log.movementType} variant="secondary" /></td>
+                      <td className="px-3 py-2"><TableValueBadge label={log.movementType} /></td>
                       <td className={`px-3 py-2 font-bold ${log.quantityChange >= 0 ? "text-emerald-600" : "text-red-500"}`}>{log.quantityChange >= 0 ? "+" : ""}{log.quantityChange}</td>
                       <td className="px-3 py-2">{log.quantityBefore}</td>
                       <td className="px-3 py-2 font-semibold">{log.quantityAfter}</td>

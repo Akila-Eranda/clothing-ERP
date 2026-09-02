@@ -290,7 +290,7 @@ export function HrmMastersHub({ section }: { section: HrmSection }) {
         }
       />
 
-      <HrStatCards stats={sectionStats} loading={loading && !stats} />
+      <HrStatCards items={sectionStats} loading={loading && !stats} />
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />

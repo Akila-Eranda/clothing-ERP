@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageKpiGrid, PAGE_KPI_PRESETS } from "@/components/ui/page-kpi";
 import { ClientSideTable, DataTableColumnHeader } from "@/components/table";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
@@ -402,29 +403,33 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       label: "Outstanding",
       value: `LKR ${formatNumber(report?.outstanding ?? 0)}`,
       icon: Wallet,
-      color: "text-blue-500",
-      bg: "bg-blue-500/10",
+      color: PAGE_KPI_PRESETS.blue.color,
+      bg: PAGE_KPI_PRESETS.blue.bg,
+      tint: PAGE_KPI_PRESETS.blue.tint,
     },
     {
       label: "Overdue",
       value: `LKR ${formatNumber(report?.overdueAmount ?? 0)}`,
       icon: AlertTriangle,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
+      color: PAGE_KPI_PRESETS.amber.color,
+      bg: PAGE_KPI_PRESETS.amber.bg,
+      tint: PAGE_KPI_PRESETS.amber.tint,
     },
     {
       label: "Collected (period)",
       value: `LKR ${formatNumber(report?.collectedInPeriod ?? 0)}`,
       icon: CheckCircle2,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      color: PAGE_KPI_PRESETS.emerald.color,
+      bg: PAGE_KPI_PRESETS.emerald.bg,
+      tint: PAGE_KPI_PRESETS.emerald.tint,
     },
     {
       label: "Recovery Rate",
       value: `${report?.recoveryRate ?? 0}%`,
       icon: TrendingUp,
-      color: "text-indigo-500",
-      bg: "bg-indigo-500/10",
+      color: PAGE_KPI_PRESETS.indigo.color,
+      bg: PAGE_KPI_PRESETS.indigo.bg,
+      tint: PAGE_KPI_PRESETS.indigo.tint,
     },
   ];
 
@@ -448,21 +453,7 @@ export function CustomerCreditHub({ section }: { section: CreditSection }) {
       </div>
 
       {(section === "customers" || section === "collections") && (
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-        {STATS.map((st) => (
-          <Card key={st.label}>
-            <CardContent className="p-4 flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${st.bg}`}>
-                <st.icon className={`h-5 w-5 ${st.color}`} />
-              </div>
-              <div>
-                <p className="text-xl font-bold leading-tight">{st.value}</p>
-                <p className="text-xs text-muted-foreground">{st.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PageKpiGrid items={STATS} />
       )}
 
         {section === "customers" && (

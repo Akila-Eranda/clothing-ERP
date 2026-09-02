@@ -7,10 +7,11 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Package, CheckCircle2, XCircle, Clock, Printer, Download, Ban, Tag, Send,
   ArrowLeft, Phone, Mail, MapPin, Calendar, Hash, FileText,
-  Truck, MoreHorizontal, ChevronRight,
+  Truck, MoreHorizontal, ChevronRight, Banknote, DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageKpiGrid, pageKpi } from "@/components/ui/page-kpi";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -225,10 +226,10 @@ export default function PODetailPage() {
   const canCancel = !["RECEIVED", "CANCELLED", "PENDING_APPROVAL"].includes(po.status);
 
   const KPI = [
-    { label: "Total Amount", value: fmt(po.total), tint: "text-primary" },
-    { label: "Amount Paid", value: fmt(po.paidAmount), tint: "text-emerald-600" },
-    { label: "Amount Due", value: fmt(totals.due), tint: totals.due > 0 ? "text-red-600" : "text-muted-foreground" },
-    { label: "Line Items", value: String(totals.items), tint: "text-foreground" },
+    pageKpi("Total Amount", fmt(po.total), DollarSign, "blue"),
+    pageKpi("Amount Paid", fmt(po.paidAmount), CheckCircle2, "emerald"),
+    pageKpi("Amount Due", fmt(totals.due), Banknote, totals.due > 0 ? "red" : "slate"),
+    pageKpi("Line Items", String(totals.items), Package, "violet"),
   ];
 
   return (
@@ -320,16 +321,7 @@ export default function PODetailPage() {
       </div>
 
       {/* ── KPI strip ── */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {KPI.map((k) => (
-          <Card key={k.label} className="rounded-[18px] border bg-card shadow-[0_2px_10px_rgba(15,23,42,0.04)]">
-            <CardContent className="p-4">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{k.label}</p>
-              <p className={cn("text-xl font-bold tabular-nums mt-1", k.tint)}>{k.value}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PageKpiGrid items={KPI} />
 
       {/* ── Meta + Supplier + Totals ── */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">

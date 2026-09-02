@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { PageKpiGrid } from "@/components/ui/page-kpi";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
@@ -184,32 +185,38 @@ export default function BusinessCalendarPage() {
       value: `LKR ${formatNumber(day.sales.net)}`,
       sub: `${day.sales.count} orders`,
       icon: TrendingUp,
-      color: "text-emerald-500",
-      bg: "bg-emerald-500/10",
+      color: "text-emerald-600 dark:text-emerald-400",
+      bg: "bg-emerald-500/15",
+      tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent",
     },
     {
       label: "Net Profit",
       value: `LKR ${formatNumber(day.profit.netProfit)}`,
       sub: `${day.profit.netMarginPct}% margin`,
       icon: Wallet,
-      color: day.profit.netProfit >= 0 ? "text-indigo-500" : "text-rose-500",
-      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/10" : "bg-rose-500/10",
+      color: day.profit.netProfit >= 0 ? "text-indigo-600 dark:text-indigo-400" : "text-red-600 dark:text-red-400",
+      bg: day.profit.netProfit >= 0 ? "bg-indigo-500/15" : "bg-red-500/15",
+      tint: day.profit.netProfit >= 0
+        ? "border-indigo-200/70 bg-gradient-to-br from-indigo-50 to-white dark:border-indigo-500/20 dark:from-indigo-500/10 dark:to-transparent"
+        : "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent",
     },
     {
       label: "Expenses",
       value: `LKR ${formatNumber(day.expenses.total)}`,
       sub: `${day.expenses.items.length} items`,
       icon: Banknote,
-      color: "text-amber-500",
-      bg: "bg-amber-500/10",
+      color: "text-amber-600 dark:text-amber-400",
+      bg: "bg-amber-500/15",
+      tint: "border-amber-200/70 bg-gradient-to-br from-amber-50 to-white dark:border-amber-500/20 dark:from-amber-500/10 dark:to-transparent",
     },
     {
       label: "Customer Due",
       value: `LKR ${formatNumber(day.customerDue.reduce((s, c) => s + c.amount, 0))}`,
       sub: `${day.customerDue.length} due`,
       icon: AlertTriangle,
-      color: "text-rose-500",
-      bg: "bg-rose-500/10",
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-500/15",
+      tint: "border-red-200/70 bg-gradient-to-br from-red-50 to-white dark:border-red-500/20 dark:from-red-500/10 dark:to-transparent",
     },
   ] : [];
 
@@ -302,22 +309,7 @@ export default function BusinessCalendarPage() {
 
           {day && (
             <>
-              <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
-                {DAY_STATS.map((s) => (
-                  <Card key={s.label}>
-                    <CardContent className="p-4 flex items-center gap-3">
-                      <div className={`p-2.5 rounded-xl ${s.bg}`}>
-                        <s.icon className={`h-5 w-5 ${s.color}`} />
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold leading-tight">{s.value}</p>
-                        <p className="text-xs text-muted-foreground">{s.label}</p>
-                        <p className="text-[10px] text-muted-foreground">{s.sub}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <PageKpiGrid items={DAY_STATS} />
 
               <div className="grid md:grid-cols-2 gap-4">
                 <Section title="Expenses" icon={Banknote}>

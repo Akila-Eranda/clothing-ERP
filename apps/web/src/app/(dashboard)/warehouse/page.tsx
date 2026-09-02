@@ -21,7 +21,7 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { TableStatusBadge } from "@/components/ui/table-status-badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { PageKpiGrid } from "@/components/ui/page-kpi";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
@@ -516,26 +516,7 @@ export default function WarehousePage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
-        {STATS.map((s) => (
-          <Card
-            key={s.label}
-            className={`rounded-[18px] shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}
-          >
-            <CardContent className="h-[68px] p-4 flex items-center gap-3">
-              <div className={`h-9 w-9 rounded-[12px] flex items-center justify-center shrink-0 ${s.bg}`}>
-                <s.icon className={`h-[18px] w-[18px] ${s.color}`} strokeWidth={1.75} />
-              </div>
-              <div className="min-w-0">
-                <p className={`${typeof s.value === "string" && s.value.startsWith("LKR") ? "text-lg" : "text-[22px]"} font-bold leading-none tabular-nums`}>
-                  {s.value}
-                </p>
-                <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      <PageKpiGrid items={STATS} />
 
       {lowStockTotal > 0 && (
         <div className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 flex items-center gap-2 text-sm text-amber-800 dark:text-amber-300">

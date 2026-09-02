@@ -30,7 +30,7 @@ import { usePayslipSettings } from "@/lib/use-payslip-settings";
 import { printThermalPayslip } from "@/lib/payslip-print";
 import { HrEmptyState } from "@/components/hr/hr-empty-state";
 import { EmployeeGridView } from "@/components/hr/employee-grid-view";
-import { HrPageHeader, HrPageShell, HrPanel, HrStatCards, hrStat } from "@/components/hr/hr-ui";
+import { HrPageHeader, HrPageShell, HrStatCards, hrStat } from "@/components/hr/hr-ui";
 import { cn } from "@/lib/utils";
 import { formatNumber } from "@/lib/utils";
 
@@ -130,6 +130,100 @@ function GenerateAllModal({ month, year, onClose, onDone }: { month: number; yea
           <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
           <Button variant="success" onClick={submit} disabled={loading} className="gap-1.5 min-w-[140px]">
             {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <DollarSign className="h-3.5 w-3.5" />} Generate All
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── GeneratePayrollModal ─────────────────────────────────────────────────
+function GeneratePayrollModal({
+  employees,
+  month,
+  year,
+  onClose,
+  onDone,
+}: {
+  employees: Employee[];
+  month: number;
+  year: number;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const [empId, setEmpId] = useState("");
+  const [allowances, setAllowances] = useState("0");
+  const [bonus, setBonus] = useState("0");
+  const [deductions, setDeductions] = useState("0");
+  const [loading, setLoading] = useState(false);
+
+  const submit = async () => {
+    if (!empId) { toast.error("Select an employee"); return; }
+    setLoading(true);
+    try {
+      await api.post("/hr/employees/payroll", {
+        employeeId: empId,
+        month,
+        year,
+        allowances: parseFloat(allowances) || 0,
+        bonus: parseFloat(bonus) || 0,
+        deductions: parseFloat(deductions) || 0,
+      });
+      toast.success("Payroll generated");
+      onDone();
+      onClose();
+    } catch (e: unknown) {
+      toast.error((e as Error).message ?? "Failed to generate payroll");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="bg-background rounded-2xl shadow-2xl border w-full max-w-md overflow-hidden">
+        <div className="flex items-center gap-3 px-6 py-4 border-b">
+          <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Banknote className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-bold text-base">Generate Payroll</h2>
+            <p className="text-xs text-muted-foreground">{MONTHS[month - 1]} {year} · Single employee</p>
+          </div>
+          <button type="button" onClick={onClose} className="ml-auto p-1.5 rounded-lg hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="px-6 py-5 space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-xs font-semibold">Employee *</Label>
+            <Select value={empId} onValueChange={setEmpId}>
+              <SelectTrigger><SelectValue placeholder="Select employee…" /></SelectTrigger>
+              <SelectContent>
+                {employees.filter((e) => e.isActive).map((e) => (
+                  <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName} ({e.code})</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Allowances (LKR)</Label>
+              <Input type="number" min={0} value={allowances} onChange={(e) => setAllowances(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Bonus (LKR)</Label>
+              <Input type="number" min={0} value={bonus} onChange={(e) => setBonus(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">Deductions (LKR)</Label>
+              <Input type="number" min={0} value={deductions} onChange={(e) => setDeductions(e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <div className={modalBarFooterClass}>
+          <Button variant="outline" onClick={onClose} disabled={loading}>Cancel</Button>
+          <Button onClick={submit} disabled={loading || !empId} className="gap-1.5 min-w-[130px]">
+            {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+            Generate
           </Button>
         </div>
       </div>
@@ -251,7 +345,7 @@ function buildLeaveColumns(onUpdate: (id: string, status: string) => void): Colu
       },
     },
     { accessorKey: "leaveType", header: ({ column }) => <DataTableColumnHeader column={column} title="Type" />,
-      cell: ({ row }) => <TableValueBadge label={row.original.leaveType} variant="teal" className="uppercase" /> },
+      cell: ({ row }) => <TableValueBadge label={row.original.leaveType} className="uppercase" /> },
     { id: "dates", header: ({ column }) => <DataTableColumnHeader column={column} title="Period" />,
       cell: ({ row }) => {
         const s = new Date(row.original.startDate), e = new Date(row.original.endDate);
@@ -563,11 +657,7 @@ export function HrHub({ section }: { section: HrSection }) {
   const [payYear, setPayYear]         = useState(now.getFullYear());
   const [payrolls, setPayrolls]       = useState<Payroll[]>([]);
   const [payLoading, setPayLoading]   = useState(false);
-  const [genEmpId, setGenEmpId]       = useState("");
-  const [genAllowances, setGenAllowances] = useState("0");
-  const [genBonus, setGenBonus]       = useState("0");
-  const [genDeduct, setGenDeduct]     = useState("0");
-  const [genLoading, setGenLoading]   = useState(false);
+  const [genOneOpen, setGenOneOpen]   = useState(false);
   const [genAllOpen, setGenAllOpen]   = useState(false);
   const [printingPayslipId, setPrintingPayslipId] = useState<string | null>(null);
 
@@ -695,23 +785,6 @@ export function HrHub({ section }: { section: HrSection }) {
     finally { setAttnSaving(false); }
   };
 
-  const generatePayroll = async () => {
-    if (!genEmpId) { toast.error("Select employee"); return; }
-    setGenLoading(true);
-    try {
-      await api.post("/hr/employees/payroll", {
-        employeeId: genEmpId, month: payMonth, year: payYear,
-        allowances: parseFloat(genAllowances) || 0,
-        bonus: parseFloat(genBonus) || 0,
-        deductions: parseFloat(genDeduct) || 0,
-      });
-      toast.success("Payroll generated");
-      setGenEmpId(""); setGenAllowances("0"); setGenBonus("0"); setGenDeduct("0");
-      fetchPayrolls();
-    } catch { toast.error("Failed to generate payroll"); }
-    finally { setGenLoading(false); }
-  };
-
   const updateLeaveStatus = async (id: string, status: string) => {
     try {
       await api.put(`/hr/employees/leaves/${id}/status`, { status });
@@ -826,9 +899,14 @@ export function HrHub({ section }: { section: HrSection }) {
     ),
     attendance: null,
     payroll: (
-      <Button type="button" variant="success" onClick={() => setGenAllOpen(true)} className="gap-1.5">
-        <DollarSign className="h-[18px] w-[18px]" /> Generate All
-      </Button>
+      <>
+        <Button type="button" variant="outline" onClick={() => setGenOneOpen(true)} className="gap-1.5">
+          <Plus className="h-[18px] w-[18px]" /> Generate Payroll
+        </Button>
+        <Button type="button" variant="success" onClick={() => setGenAllOpen(true)} className="gap-1.5">
+          <DollarSign className="h-[18px] w-[18px]" /> Generate All
+        </Button>
+      </>
     ),
     leaves: (
       <Button type="button" onClick={() => setNewLeaveOpen(true)} className="gap-1.5">
@@ -847,7 +925,7 @@ export function HrHub({ section }: { section: HrSection }) {
         actions={headerActions}
       />
 
-      <HrStatCards stats={sectionStats} loading={sectionLoading} />
+      <HrStatCards items={sectionStats} loading={sectionLoading} />
 
         {/* ── Employees ── */}
         {section === "employees" && (
@@ -1026,39 +1104,6 @@ export function HrHub({ section }: { section: HrSection }) {
             </Button>
           </div>
 
-          {/* Generate for individual */}
-          <HrPanel>
-            <p className="text-xs font-semibold mb-3">Generate Payroll for an Employee</p>
-            <div className="flex gap-2 flex-wrap items-end">
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Employee</Label>
-                <Select value={genEmpId} onValueChange={setGenEmpId}>
-                  <SelectTrigger className="w-44 h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
-                  <SelectContent>
-                    {employeeList.filter((e) => e.isActive).map((e) => (
-                      <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Allowances (LKR)</Label>
-                <Input className="w-24 h-8 text-xs" type="number" min={0} value={genAllowances} onChange={(e) => setGenAllowances(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Bonus (LKR)</Label>
-                <Input className="w-24 h-8 text-xs" type="number" min={0} value={genBonus} onChange={(e) => setGenBonus(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground">Deductions (LKR)</Label>
-                <Input className="w-24 h-8 text-xs" type="number" min={0} value={genDeduct} onChange={(e) => setGenDeduct(e.target.value)} />
-              </div>
-              <Button size="sm" onClick={generatePayroll} disabled={genLoading || !genEmpId} className="gap-1.5">
-                {genLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />} Generate
-              </Button>
-            </div>
-          </HrPanel>
-
           {/* Unpaid / missing payroll */}
           {!payLoading && unpaidEmployees.length > 0 ? (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
@@ -1175,6 +1220,15 @@ export function HrHub({ section }: { section: HrSection }) {
         onSaved={() => { fetchEmployees(); setAddOpen(false); setEditEmployee(undefined); }}
         editEmployee={editEmployee}
       />
+      {genOneOpen && (
+        <GeneratePayrollModal
+          employees={employeeList}
+          month={payMonth}
+          year={payYear}
+          onClose={() => setGenOneOpen(false)}
+          onDone={fetchPayrolls}
+        />
+      )}
       {genAllOpen && <GenerateAllModal month={payMonth} year={payYear} onClose={() => setGenAllOpen(false)} onDone={fetchPayrolls} />}
       {newLeaveOpen && <NewLeaveModal employees={employeeList} leaveTypes={leaveTypes} onClose={() => setNewLeaveOpen(false)} onSaved={() => { fetchLeaves(); fetchHrMeta(); }} />}
     </HrPageShell>
