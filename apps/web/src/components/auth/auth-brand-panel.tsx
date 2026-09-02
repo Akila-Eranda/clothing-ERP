@@ -46,8 +46,8 @@ export function AuthBrandPanel({
       <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#0d1f3c]/95 to-[#070d1a]" />
 
       <div className="relative z-10 flex flex-col flex-1 p-8 xl:p-10 max-w-md mx-auto w-full">
-        {/* Logo */}
-        <div className="shrink-0">
+        {/* Logo — compact, no black matte box (transparent PNG) */}
+        <div className="shrink-0 mb-1">
           <AppLogo variant="hero" theme="dark" className="items-start" />
         </div>
 
