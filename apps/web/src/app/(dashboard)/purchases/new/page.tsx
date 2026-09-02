@@ -12,6 +12,14 @@ import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
+import {
+  FORM_PAGE, FORM_CARD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
+  FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_STATUS_BADGE,
+  FORM_HEADER_ICON_WRAP, FORM_HEADER_ICON, FORM_DROPDOWN, FORM_INNER_PANEL,
+  FORM_TABLE_HEAD, FORM_TABLE_HEAD_ROW, FORM_TABLE_BODY, FORM_ROW_HOVER,
+  FORM_THUMB, FORM_EMPTY_ICON_WRAP, FORM_STICKY_BAR, FORM_META_VALUE,
+  FORM_ACCENT_ICON, FORM_HINT, FORM_SCAN_BTN, PO_FIELD,
+} from "@/lib/form-shell-theme";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface Supplier {
@@ -94,13 +102,7 @@ function dash<T>(v: T | null | undefined, format?: (x: T) => string): string {
 
 const PAYMENT_TERMS = ["Immediate", "15 Days", "30 Days", "45 Days", "60 Days", "90 Days"];
 
-const PO_PAGE = "min-h-screen bg-[#0a0c10] text-white pb-28";
-const PO_CARD = "rounded-xl border border-white/10 bg-[#12151a] overflow-hidden";
-const PO_LABEL = "text-xs font-medium text-white/50";
-const PO_FIELD =
-  "h-10 w-full rounded-lg border border-white/15 bg-[#0a0c10] px-3 text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-orange-500/40 disabled:opacity-50";
-const PO_ORANGE_BTN = "bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold";
-const PO_OUTLINE_BTN = "border-white/15 bg-transparent text-white hover:bg-white/10";
+const PO_PAGE = cn(FORM_PAGE, "pb-28");
 
 function SectionCard({
   step,
@@ -111,6 +113,7 @@ function SectionCard({
   collapsible,
   collapsed,
   onToggleCollapse,
+  className,
 }: {
   step?: string;
   title: string;
@@ -120,25 +123,22 @@ function SectionCard({
   collapsible?: boolean;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  className?: string;
 }) {
   return (
-    <section className={PO_CARD}>
-      <div className="flex items-start justify-between gap-3 border-b border-white/10 px-4 py-3.5 sm:px-5">
+    <section className={cn(FORM_CARD, "overflow-visible", className)}>
+      <div className={cn("flex items-start justify-between gap-3 px-4 py-3.5 sm:px-5", FORM_CARD_HEADER)}>
         <div className="flex items-start gap-3 min-w-0">
-          {step ? (
-            <span className="mt-0.5 h-7 w-7 rounded-full bg-orange-500 text-white text-xs font-bold flex items-center justify-center shrink-0">
-              {step}
-            </span>
-          ) : null}
+          {step ? <span className={FORM_STEP_BADGE}>{step}</span> : null}
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white">{title}</h2>
-            {subtitle ? <p className="text-xs text-white/45 mt-0.5">{subtitle}</p> : null}
+            <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+            {subtitle ? <p className={FORM_SUBTITLE}>{subtitle}</p> : null}
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {action}
           {collapsible ? (
-            <button type="button" onClick={onToggleCollapse} className="p-1.5 rounded-lg hover:bg-white/10 text-white/60">
+            <button type="button" onClick={onToggleCollapse} className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground">
               {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </button>
           ) : null}
@@ -156,11 +156,11 @@ function SidebarBlock({ title, icon: Icon, children, action }: {
   action?: React.ReactNode;
 }) {
   return (
-    <div className={PO_CARD}>
-      <div className="border-b border-white/10 px-4 py-3 flex items-center justify-between gap-2">
+    <div className={FORM_CARD}>
+      <div className={cn("px-4 py-3 flex items-center justify-between gap-2", FORM_CARD_HEADER)}>
         <div className="flex items-center gap-2">
-          {Icon ? <Icon className="h-4 w-4 text-orange-400 shrink-0" /> : null}
-          <h3 className="text-sm font-semibold text-white">{title}</h3>
+          {Icon ? <Icon className={cn("h-4 w-4 shrink-0", FORM_ACCENT_ICON)} /> : null}
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         </div>
         {action}
       </div>
@@ -172,8 +172,8 @@ function SidebarBlock({ title, icon: Icon, children, action }: {
 function MetaRow({ label, value, valueClass }: { label: string; value: React.ReactNode; valueClass?: string }) {
   return (
     <div className="flex justify-between gap-3 text-sm">
-      <span className="text-white/45 shrink-0 text-xs">{label}</span>
-      <span className={cn("font-medium text-right text-xs truncate max-w-[160px] text-white/90", valueClass)}>{value}</span>
+      <span className="text-muted-foreground shrink-0 text-xs">{label}</span>
+      <span className={cn(FORM_META_VALUE, valueClass)}>{value}</span>
     </div>
   );
 }
@@ -665,6 +665,7 @@ export default function CreatePOPage() {
       setSelectedRowIdx(existingIdx);
       setProductSearchOpen(false);
       setProductSearchQ("");
+      productSearchRef.current?.blur();
       window.setTimeout(() => qtyInputRefs.current[existingIdx]?.focus(), 30);
       toast.message("Qty increased for existing line");
       return;
@@ -694,6 +695,7 @@ export default function CreatePOPage() {
     setProductSearchOpen(false);
     setProductSearchQ("");
     setSearchHighlight(0);
+    productSearchRef.current?.blur();
     scrollToItems();
     window.setTimeout(() => qtyInputRefs.current[newIdx]?.focus(), 40);
   };
@@ -708,8 +710,10 @@ export default function CreatePOPage() {
     const matches = filteredVariants(productSearchQ);
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setProductSearchOpen(true);
-      setSearchHighlight((h) => Math.min(h + 1, Math.max(matches.length - 1, 0)));
+      if (productSearchQ.trim()) {
+        setProductSearchOpen(true);
+        setSearchHighlight((h) => Math.min(h + 1, Math.max(matches.length - 1, 0)));
+      }
       return;
     }
     if (e.key === "ArrowUp") {
@@ -855,12 +859,12 @@ export default function CreatePOPage() {
   return (
     <div className={PO_PAGE}>
       {/* Header — DreamsPOS New PO style */}
-      <div className="border-b border-white/10 px-4 sm:px-6 py-4">
+      <div className={cn("px-4 sm:px-6 py-4", FORM_CARD_HEADER)}>
         <button
           type="button"
           onClick={() => router.push("/purchases")}
           disabled={saving}
-          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors font-medium disabled:opacity-50 mb-4"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium disabled:opacity-50 mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Purchases
@@ -869,17 +873,17 @@ export default function CreatePOPage() {
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="h-10 w-10 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
-                <FileText className="h-5 w-5 text-orange-400" />
+              <div className={FORM_HEADER_ICON_WRAP}>
+                <FileText className={FORM_HEADER_ICON} />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">
                 {fromGrnId ? "Create PO from GRN" : "New Purchase Order"}
               </h1>
-              <span className="rounded-md border border-orange-500/50 bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
+              <span className={FORM_STATUS_BADGE}>
                 Draft
               </span>
             </div>
-            <p className="text-sm text-white/45 mt-1.5 ml-12 sm:ml-[3.25rem]">
+            <p className={cn("text-sm mt-1.5 ml-12 sm:ml-[3.25rem]", FORM_SUBTITLE)}>
               {activeBranchName || "Main Store"} · Created by {user?.name ?? "Admin"}
               {fromGrnNumber ? ` · From ${fromGrnNumber}` : ""}
             </p>
@@ -891,7 +895,7 @@ export default function CreatePOPage() {
               size="sm"
               onClick={() => submit(false)}
               disabled={saving || !supplierId || items.length === 0}
-              className={cn("gap-1.5 h-9", PO_OUTLINE_BTN)}
+              className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
             >
               <Save className="h-3.5 w-3.5" />
               Save Draft
@@ -901,7 +905,7 @@ export default function CreatePOPage() {
                 size="sm"
                 onClick={() => submit(false)}
                 disabled={saving || !supplierId || items.length === 0 || grnPrefillLoading}
-                className={cn("gap-1.5 h-9", PO_ORANGE_BTN)}
+                className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                 Create & Link GRN
@@ -911,7 +915,7 @@ export default function CreatePOPage() {
                 size="sm"
                 onClick={() => submit(true)}
                 disabled={saving || !supplierId || items.length === 0}
-                className={cn("gap-1.5 h-9", PO_ORANGE_BTN)}
+                className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                 Create Purchase Order
@@ -953,7 +957,7 @@ export default function CreatePOPage() {
             >
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-                  <label className={PO_LABEL}>Supplier *</label>
+                  <label className={FORM_LABEL}>Supplier *</label>
                   <select
                     ref={supplierSelectRef}
                     value={supplierId}
@@ -967,11 +971,11 @@ export default function CreatePOPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className={PO_LABEL}>Expected Delivery</label>
+                  <label className={FORM_LABEL}>Expected Delivery</label>
                   <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={cn(PO_FIELD, "h-10")} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className={PO_LABEL}>Payment Terms</label>
+                  <label className={FORM_LABEL}>Payment Terms</label>
                   <select
                     value={paymentTerms}
                     onChange={(e) => setPaymentTerms(e.target.value)}
@@ -981,15 +985,15 @@ export default function CreatePOPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className={PO_LABEL}>Reference Number</label>
+                  <label className={FORM_LABEL}>Reference Number</label>
                   <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="REF-…" className={cn(PO_FIELD, "h-10")} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className={PO_LABEL}>Currency</label>
+                  <label className={FORM_LABEL}>Currency</label>
                   <Input value="LKR" disabled className={cn(PO_FIELD, "h-10 opacity-60")} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-                  <label className={PO_LABEL}>Notes</label>
+                  <label className={FORM_LABEL}>Notes</label>
                   <textarea
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
@@ -1026,26 +1030,29 @@ export default function CreatePOPage() {
               step="2"
               title="Add Products"
               subtitle="Search or scan products to add to order"
+              className={productSearchOpen && productSearchQ.trim() ? "relative z-30" : undefined}
             >
               <div className="flex flex-col sm:flex-row gap-2">
-                <div className="relative flex-1 shrink-0">
-                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/40" />
+                <div className="relative z-20 flex-1 shrink-0">
+                  <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <input
                     ref={productSearchRef}
                     value={productSearchQ}
                     disabled={!supplierId || loadingProducts}
                     onChange={(e) => {
                       setProductSearchQ(e.target.value);
-                      setProductSearchOpen(true);
+                      setProductSearchOpen(e.target.value.trim().length > 0);
                       setSearchHighlight(0);
                     }}
-                    onFocus={() => setProductSearchOpen(true)}
+                    onFocus={() => {
+                      if (productSearchQ.trim()) setProductSearchOpen(true);
+                    }}
                     onKeyDown={handleBigSearchKeyDown}
                     placeholder={supplierId ? "Search by product name, SKU or scan barcode…" : "Select supplier above first"}
                     className={cn(PO_FIELD, "h-12 pl-10")}
                   />
-                {productSearchOpen && supplierId && (
-                  <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-white/15 bg-[#12151a] shadow-2xl">
+                {productSearchOpen && supplierId && productSearchQ.trim().length > 0 && (
+                  <div className={cn(FORM_DROPDOWN, "z-[100]")}>
                     <div className="max-h-80 overflow-y-auto">
                       {bigMatches.length === 0 ? (
                         <p className="px-4 py-6 text-center text-xs text-muted-foreground">
@@ -1059,10 +1066,10 @@ export default function CreatePOPage() {
                             onClick={() => addVariantToItems(v)}
                             className={cn(
                               "flex w-full items-start gap-3 border-b px-3 py-2.5 text-left last:border-0 sm:px-4",
-                              i === searchHighlight ? "bg-primary/10" : "hover:bg-muted/50",
+                              i === searchHighlight ? "bg-orange-500/10 ring-1 ring-inset ring-orange-500/30" : "hover:bg-muted/50",
                             )}
                           >
-                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-background">
+                            <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted border border-border">
                               {v.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
                                 <img src={v.imageUrl} alt={v.productName} className="h-full w-full object-cover" />
@@ -1073,8 +1080,7 @@ export default function CreatePOPage() {
                             <div className="min-w-0 flex-1">
                               <p className="truncate text-sm font-medium">{v.productName}</p>
                               <p className="truncate text-[11px] text-muted-foreground">
-                                {dash(v.brand)} · {dash(v.category)}
-                                {v.variantName ? ` · ${v.variantName}` : ""}
+                                {[v.brand, v.category, v.variantName !== "Default" ? v.variantName : null].filter(Boolean).join(" · ") || "—"}
                               </p>
                               <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
                                 SKU {v.sku}
@@ -1098,14 +1104,14 @@ export default function CreatePOPage() {
                   variant="outline"
                   disabled={!supplierId || loadingProducts}
                   onClick={() => productSearchRef.current?.focus()}
-                  className={cn("h-12 shrink-0 gap-2 border-orange-500/40 text-orange-400 hover:bg-orange-500/10", PO_OUTLINE_BTN)}
+                  className={cn("h-12 shrink-0 gap-2", FORM_SCAN_BTN, FORM_OUTLINE_BTN)}
                 >
                   <ScanLine className="h-4 w-4" />
                   Scan Barcode
                 </Button>
               </div>
               {supplierId && (
-                <p className="text-[11px] text-white/40">
+                <p className={FORM_HINT}>
                   {loadingProducts
                     ? "Loading product catalog…"
                     : catalogFallback
@@ -1125,13 +1131,13 @@ export default function CreatePOPage() {
                   size="sm"
                   onClick={addRow}
                   disabled={saving || !supplierId}
-                  className={cn("gap-1.5 h-8 border-orange-500/40 text-orange-400 hover:bg-orange-500/10", PO_OUTLINE_BTN)}
+                  className={cn("gap-1.5 h-8", FORM_ORANGE_BTN)}
                 >
                   <Plus className="h-3.5 w-3.5" /> Add Row
                 </Button>
               }
             >
-              <div ref={itemsSectionRef} className="max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain rounded-xl border border-white/10 bg-[#0a0c10]/50">
+              <div ref={itemsSectionRef} className={cn("max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain", FORM_INNER_PANEL)}>
               {/* Mobile / tablet cards */}
               <div className="divide-y lg:hidden">
                 {items.length === 0 ? (
@@ -1300,25 +1306,25 @@ export default function CreatePOPage() {
               {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
                 <table className="w-full min-w-[1100px] text-sm">
-                  <thead className="sticky top-0 z-10 border-b border-white/10 bg-[#12151a]">
-                    <tr className="text-[10px] uppercase tracking-wider text-white/40">
+                  <thead className={FORM_TABLE_HEAD}>
+                    <tr className={FORM_TABLE_HEAD_ROW}>
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
-                      <th className="px-4 py-3 text-left font-semibold">Product</th>
-                      <th className="px-3 py-3 text-left font-semibold w-28">SKU</th>
-                      <th className="px-3 py-3 text-right font-semibold">
+                      <th className="px-4 py-3 text-left font-semibold min-w-[260px]">Product</th>
+                      <th className="px-3 py-3 text-left font-semibold w-32">SKU</th>
+                      <th className="px-3 py-3 text-right font-semibold w-16">
                         <span className="inline-flex items-center gap-1 justify-end">Stock <Info className="h-3 w-3" /></span>
                       </th>
-                      <th className="px-3 py-3 text-right font-semibold">Last PO</th>
-                      <th className="px-3 py-3 text-right font-semibold">Last Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold">Order Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold">Buying Price</th>
-                      <th className="px-3 py-3 text-right font-semibold">Discount</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap min-w-[6.5rem]">Last PO</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Last Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Order Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Buying Price</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Discount</th>
                       <th className="px-3 py-3 text-right font-semibold">Tax</th>
                       <th className="px-3 py-3 text-right font-semibold">Total</th>
                       <th className="w-12 px-2 py-3 text-center font-semibold">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className={FORM_TABLE_BODY}>
                     {items.map((item, idx) => {
                       const v = item.variantId ? variantById.get(item.variantId) : undefined;
                       const { total } = calcItem(item);
@@ -1328,36 +1334,37 @@ export default function CreatePOPage() {
                       const status = v?.status ?? (stock !== null ? (stock <= 0 ? "out_of_stock" : stock < 5 ? "low_stock" : "in_stock") : "unknown");
                       const statusPill =
                         status === "in_stock"
-                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/20"
+                          ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20"
                           : status === "low_stock"
-                            ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
-                            : "bg-rose-500/10 text-rose-700 border-rose-500/20";
+                            ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                            : "bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/20";
 
                       return (
                         <tr
                           key={idx}
                           onClick={() => setSelectedRowIdx(idx)}
                           className={cn(
-                            "cursor-pointer align-top transition-colors hover:bg-white/[0.03]",
+                            "cursor-pointer align-top transition-colors",
+                            FORM_ROW_HOVER,
                             selectedRowIdx === idx && "bg-orange-500/5 ring-1 ring-inset ring-orange-500/30",
                           )}
                         >
-                          <td className="px-3 py-3 text-xs text-white/40 tabular-nums">{idx + 1}</td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
                           <td className="px-4 py-3">
                             {item.variantId ? (
                               <div className="flex min-w-0 items-start gap-3">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white/5 border border-white/10">
+                                <div className={cn("flex h-10 w-10 shrink-0", FORM_THUMB)}>
                                   {item.imageUrl || v?.imageUrl ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img src={item.imageUrl || v?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
                                   ) : (
-                                    <Package className="h-4 w-4 text-white/30" />
+                                    <Package className="h-4 w-4 text-muted-foreground" />
                                   )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium text-white">{item.productName}</p>
+                                  <p className="truncate text-sm font-medium text-foreground">{item.productName}</p>
                                   {item.variantName && (
-                                    <p className="mt-0.5 truncate text-xs text-white/45">{item.variantName}</p>
+                                    <p className="mt-0.5 truncate text-xs text-muted-foreground">{item.variantName}</p>
                                   )}
                                   <div className="mt-1.5 flex flex-wrap gap-1.5">
                                     {status !== "unknown" && (
@@ -1366,7 +1373,7 @@ export default function CreatePOPage() {
                                       </span>
                                     )}
                                     {(item.size || item.color) && (
-                                      <span className="rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[10px] text-white/45">
+                                      <span className="rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                                         {[item.size, item.color].filter(Boolean).join(" · ")}
                                       </span>
                                     )}
@@ -1375,7 +1382,7 @@ export default function CreatePOPage() {
                                 <button
                                   type="button"
                                   onClick={(e) => { e.stopPropagation(); clearVariant(idx); }}
-                                  className="shrink-0 text-[11px] font-semibold text-orange-400 hover:underline"
+                                  className="shrink-0 text-[11px] font-semibold text-orange-600 dark:text-orange-400 hover:underline"
                                 >
                                   Change
                                 </button>
@@ -1421,10 +1428,10 @@ export default function CreatePOPage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-3 font-mono text-xs text-white/55">{item.sku || "—"}</td>
-                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-white">{stock ?? "—"}</td>
-                          <td className="px-3 py-3 text-right text-xs tabular-nums text-white/45">{fmtDate(v?.lastPurchaseDate)}</td>
-                          <td className="px-3 py-3 text-right text-xs tabular-nums text-white/45">{dash(v?.lastPurchaseQty)}</td>
+                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{item.sku || "—"}</td>
+                          <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{stock ?? "—"}</td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{fmtDate(v?.lastPurchaseDate)}</td>
+                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{dash(v?.lastPurchaseQty)}</td>
                           <td className="px-3 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <input
                               ref={(el) => { qtyInputRefs.current[idx] = el; }}
@@ -1480,7 +1487,7 @@ export default function CreatePOPage() {
                               className="h-9 w-16 rounded-lg border bg-background px-2 text-right text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-ring"
                             />
                           </td>
-                          <td className="px-3 py-3 text-right font-bold tabular-nums text-orange-400 whitespace-nowrap">{fmt(total)}</td>
+                          <td className="px-3 py-3 text-right font-bold tabular-nums text-orange-600 dark:text-orange-400 whitespace-nowrap">{fmt(total)}</td>
                           <td className="px-2 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
@@ -1499,12 +1506,12 @@ export default function CreatePOPage() {
                     {items.length === 0 && (
                       <tr>
                         <td colSpan={12} className="py-16 text-center">
-                          <div className="flex flex-col items-center gap-3 text-white/40">
-                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/5 border border-white/10">
+                          <div className="flex flex-col items-center gap-3 text-muted-foreground">
+                            <div className={FORM_EMPTY_ICON_WRAP}>
                               <Package className="h-6 w-6 opacity-40" />
                             </div>
                             <div>
-                              <p className="text-sm font-medium text-white/80">No items added yet</p>
+                              <p className="text-sm font-medium text-foreground">No items added yet</p>
                               <p className="mt-1 text-xs">Search products above or click &apos;Add Row&apos; to get started.</p>
                             </div>
                             <Button
@@ -1512,7 +1519,7 @@ export default function CreatePOPage() {
                               variant="outline"
                               onClick={addRow}
                               disabled={saving}
-                              className={cn("mt-1 gap-1.5", PO_OUTLINE_BTN)}
+                              className={cn("mt-1 gap-1.5", FORM_OUTLINE_BTN)}
                             >
                               <Plus className="h-3.5 w-3.5" /> Add Row
                             </Button>
@@ -1535,7 +1542,7 @@ export default function CreatePOPage() {
                     {totalDisc > 0 && (
                       <span className="tabular-nums text-emerald-600">Disc −LKR {fmt(totalDisc)}</span>
                     )}
-                    <span className="font-bold tabular-nums text-primary">Total LKR {fmt(grandTotal)}</span>
+                    <span className="font-bold tabular-nums text-orange-600 dark:text-orange-400">Total LKR {fmt(grandTotal)}</span>
                   </div>
                 </div>
               )}
@@ -1546,9 +1553,9 @@ export default function CreatePOPage() {
               title="Supplier Payment"
               subtitle="Optional — record advance / pay now when creating this PO"
             >
-              <div className="rounded-xl border border-white/10 p-4 space-y-3 bg-[#0a0c10]/50">
+              <div className={cn("rounded-xl p-4 space-y-3", FORM_INNER_PANEL)}>
                 <div className="flex items-center justify-between gap-3 flex-wrap">
-                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-white">
+                  <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-foreground">
                     <input
                       type="checkbox"
                       checked={payNow}
@@ -1556,12 +1563,12 @@ export default function CreatePOPage() {
                         setPayNow(e.target.checked);
                         if (!e.target.checked) setPayAmountTouched(false);
                       }}
-                      className="h-4 w-4 rounded border-white/20 accent-orange-500"
+                      className="h-4 w-4 rounded border-border accent-orange-500"
                     />
                     <Banknote className="h-4 w-4 text-orange-400" />
                     Pay supplier now
                   </label>
-                  <span className="text-xs text-white/45">
+                  <span className="text-xs text-muted-foreground">
                     PO Total:{" "}
                     <span className="font-bold text-orange-400">
                       LKR {fmtMoney(grandTotal)}
@@ -1657,8 +1664,8 @@ export default function CreatePOPage() {
               <MetaRow label="Subtotal" value={`LKR ${fmt(subtotal)}`} />
               <MetaRow label="Discount" value={<span className="text-emerald-400">− LKR {fmt(totalDisc)}</span>} />
               <MetaRow label="Tax" value={`LKR ${fmt(totalTax)}`} />
-              <div className="flex justify-between gap-3 border-t border-white/10 pt-2.5 text-sm">
-                <span className="font-bold text-white">Grand Total</span>
+              <div className="flex justify-between gap-3 border-t border-border pt-2.5 text-sm">
+                <span className="font-bold text-foreground">Grand Total</span>
                 <span className="font-bold tabular-nums text-orange-400">LKR {fmt(grandTotal)}</span>
               </div>
             </SidebarBlock>
@@ -1666,12 +1673,12 @@ export default function CreatePOPage() {
             <SidebarBlock
               title="Supplier Summary"
               icon={Users}
-              action={<ChevronRight className="h-4 w-4 text-white/30" />}
+              action={<ChevronRight className="h-4 w-4 text-muted-foreground" />}
             >
               {!supplierId ? (
-                <p className="text-xs text-white/45">Select a supplier to view credit & purchase history.</p>
+                <p className="text-xs text-muted-foreground">Select a supplier to view credit & purchase history.</p>
               ) : loadingSupplierDetail && !supplier ? (
-                <p className="text-xs text-white/45">Loading supplier details…</p>
+                <p className="text-xs text-muted-foreground">Loading supplier details…</p>
               ) : (
                 <>
                   <MetaRow label="Supplier" value={supplier?.name ?? "—"} />
@@ -1694,17 +1701,17 @@ export default function CreatePOPage() {
               <MetaRow label="Warehouse" value={<span className="inline-flex items-center gap-1"><Warehouse className="h-3 w-3" />Default</span>} />
             </SidebarBlock>
 
-            <div className={cn(PO_CARD, "hidden xl:block")}>
-              <div className="border-b border-white/10 px-4 py-3 flex items-center gap-2">
-                <Package className="h-4 w-4 text-orange-400 shrink-0" />
-                <h3 className="text-sm font-semibold text-white">Selected Product</h3>
+            <div className={cn(FORM_CARD, "hidden xl:block")}>
+              <div className={cn("px-4 py-3 flex items-center gap-2", FORM_CARD_HEADER)}>
+                <Package className={cn("h-4 w-4 shrink-0", FORM_ACCENT_ICON)} />
+                <h3 className="text-sm font-semibold text-foreground">Selected Product</h3>
               </div>
               <div className="p-4">
-                <p className="text-xs text-white/45 mb-3">Click a row in the table to view and edit product details.</p>
+                <p className="text-xs text-muted-foreground mb-3">Click a row in the table to view and edit product details.</p>
                 {!selectedItem ? (
-                  <div className="rounded-xl border border-dashed border-white/15 px-3 py-8 text-center">
-                    <Package className="h-8 w-8 text-white/20 mx-auto mb-2" />
-                    <p className="text-xs text-white/40">No product selected</p>
+                  <div className="rounded-xl border border-dashed border-border px-3 py-8 text-center">
+                    <Package className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
+                    <p className="text-xs text-muted-foreground">No product selected</p>
                   </div>
                 ) : (
                   <SelectedProductPanel item={selectedItem} variant={selectedVariant} supplierName={supplier?.name} compact />
@@ -1716,17 +1723,17 @@ export default function CreatePOPage() {
       </div>
 
       {/* Mobile sticky total bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0a0c10]/95 backdrop-blur xl:hidden">
+      <div className={cn(FORM_STICKY_BAR, "xl:hidden")}>
         <div className="flex items-center justify-between gap-3 px-4 py-3">
           <div>
-            <p className="text-[10px] text-white/45">Grand Total</p>
+            <p className="text-[10px] text-muted-foreground">Grand Total</p>
             <p className="text-sm font-bold tabular-nums text-orange-400">LKR {fmt(grandTotal)}</p>
           </div>
           <Button
             size="sm"
             onClick={() => submit(fromGrnId ? false : true)}
             disabled={saving || !supplierId || items.length === 0}
-            className={cn("gap-1.5", PO_ORANGE_BTN)}
+            className={cn("gap-1.5", FORM_ORANGE_BTN)}
           >
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
             Create PO
@@ -1780,7 +1787,7 @@ function SelectedProductPanel({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <div className={`flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/5 border border-white/10 ${compact ? "h-12 w-12" : "h-14 w-14"}`}>
+        <div className={cn("flex shrink-0", FORM_THUMB, compact ? "h-12 w-12" : "h-14 w-14")}>
           {(item.imageUrl || variant?.imageUrl) ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={item.imageUrl || variant?.imageUrl || ""} alt={item.productName} className="h-full w-full object-cover" />
@@ -1789,20 +1796,20 @@ function SelectedProductPanel({
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-white">{item.productName}</p>
-          <p className="truncate font-mono text-xs text-white/45">{item.sku}</p>
-          {item.variantName && <p className="truncate text-xs text-white/45">{item.variantName}</p>}
+          <p className="truncate text-sm font-semibold text-foreground">{item.productName}</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">{item.sku}</p>
+          {item.variantName && <p className="truncate text-xs text-muted-foreground">{item.variantName}</p>}
         </div>
       </div>
       <div className={`grid gap-2 ${compact ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
         {rows.map(([label, value]) => (
-          <div key={label} className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-2.5 py-2">
-            <p className="text-[10px] uppercase tracking-wide text-white/40">{label}</p>
-            <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-white/85">{value}</p>
+          <div key={label} className="min-w-0 rounded-lg border border-border bg-muted/30 px-2.5 py-2">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+            <p className="mt-0.5 truncate text-xs font-semibold tabular-nums text-foreground">{value}</p>
           </div>
         ))}
       </div>
-      <p className="text-[10px] text-white/35">Read only · values from supplier catalog</p>
+      <p className="text-[10px] text-muted-foreground/70">Read only · values from supplier catalog</p>
     </div>
   );
 }

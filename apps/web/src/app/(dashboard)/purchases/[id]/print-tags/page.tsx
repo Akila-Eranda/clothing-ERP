@@ -14,6 +14,11 @@ import { executeReceiptPrint } from "@/lib/receipt-print";
 import { buildPrintTagsHtml, type LabelFormat as TagLabelFormat } from "@/lib/print-tag-document";
 import { cn } from "@/lib/utils";
 import {
+  FORM_PAGE, FORM_CARD, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
+  FORM_TAB_GROUP, FORM_TAB_ACTIVE, FORM_TAB_INACTIVE, FORM_TABLE_HEAD_ROW, FORM_TABLE_BODY,
+  FORM_ROW_HOVER, FORM_THUMB, FORM_INNER_PANEL, FORM_ACCENT_ICON,
+} from "@/lib/form-shell-theme";
+import {
   printTagBaseCode,
   printTagBarcodeValue,
   sanitizeBarcodeText,
@@ -424,10 +429,10 @@ export default function PrintTagsPage() {
   }, [totalLabels, po, qtys, shopName, format, expandedLabels, shopProfile.defaultUnit, receiptSettings]);
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen bg-[#0a0c10] text-white/50">Loading...</div>;
+    return <div className={cn("flex items-center justify-center min-h-screen text-muted-foreground", FORM_PAGE)}>Loading...</div>;
   }
   if (!po) {
-    return <div className="flex items-center justify-center min-h-screen bg-[#0a0c10] text-white/50">PO not found</div>;
+    return <div className={cn("flex items-center justify-center min-h-screen text-muted-foreground", FORM_PAGE)}>PO not found</div>;
   }
 
   const [colA, colB] = variantColumnLabelsFromProfile(shopProfile);
@@ -463,24 +468,24 @@ export default function PrintTagsPage() {
     <div className="print-root">
       <style>{PRINT_CSS}</style>
 
-      <div className="no-print min-h-screen bg-[#0a0c10] text-white">
+      <div className={cn("no-print", FORM_PAGE)}>
         {/* Header */}
-        <div className="border-b border-white/10 px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div className={cn("px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-4", FORM_CARD_HEADER)}>
           <div className="flex items-center gap-3 min-w-0">
             <Button
               variant="ghost"
               size="icon"
               onClick={() => router.push(`/purchases/${id}`)}
-              className="shrink-0 text-white/80 hover:text-white hover:bg-white/10"
+              className="shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-white">
-                <Tag className="h-5 w-5 text-orange-400 shrink-0" />
+              <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2 text-foreground">
+                <Tag className={cn("h-5 w-5 shrink-0", FORM_ACCENT_ICON)} />
                 Print Barcode Tags
               </h1>
-              <p className="text-sm text-white/50 truncate">
+              <p className="text-sm text-muted-foreground truncate">
                 {po.poNumber} · {po.supplier.name}
               </p>
             </div>
@@ -488,21 +493,21 @@ export default function PrintTagsPage() {
 
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <div className="text-right">
-              <p className="text-[11px] uppercase tracking-wide text-white/45 font-semibold">Total Labels</p>
-              <p className="text-2xl font-bold tabular-nums leading-none">{totalLabels}</p>
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold">Total Labels</p>
+              <p className="text-2xl font-bold tabular-nums leading-none text-foreground">{totalLabels}</p>
             </div>
 
             {receiptSettings.printServerEnabled && receiptSettings.printServerUrl ? (
-              <span className="text-xs text-white/50 hidden lg:inline max-w-[140px]">
-                Printer: <strong className="text-white">{receiptSettings.printerName || "default"}</strong>
+              <span className="text-xs text-muted-foreground hidden lg:inline max-w-[140px]">
+                Printer: <strong className="text-foreground">{receiptSettings.printerName || "default"}</strong>
               </span>
             ) : (
-              <span className="text-xs text-orange-400 font-medium hidden sm:inline">
+              <span className="text-xs text-orange-600 dark:text-orange-400 font-medium hidden sm:inline">
                 Enable Store Print Server in Settings
               </span>
             )}
 
-            <div className="flex rounded-lg border border-white/15 overflow-hidden bg-[#12151a]">
+            <div className={FORM_TAB_GROUP}>
               {templates.map((tpl, i) => (
                 <button
                   key={tpl}
@@ -510,10 +515,8 @@ export default function PrintTagsPage() {
                   onClick={() => setFormat(tpl)}
                   className={cn(
                     "px-4 py-2 text-xs font-semibold transition-colors inline-flex items-center gap-1.5",
-                    i > 0 && "border-l border-white/10",
-                    format === tpl
-                      ? "bg-orange-500 text-white"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
+                    i > 0 && "border-l border-border",
+                    format === tpl ? FORM_TAB_ACTIVE : FORM_TAB_INACTIVE,
                   )}
                 >
                   {format === tpl && <Check className="h-3.5 w-3.5" />}
@@ -525,7 +528,7 @@ export default function PrintTagsPage() {
             <Button
               onClick={handlePrint}
               disabled={printing || totalLabels === 0}
-              className="gap-2 px-5 bg-orange-500 hover:bg-orange-600 text-white border-0 font-semibold"
+              className={cn("gap-2 px-5", FORM_ORANGE_BTN)}
             >
               <Printer className="h-4 w-4" />
               {printing ? "Sending…" : "Print to Printer"}
@@ -535,11 +538,11 @@ export default function PrintTagsPage() {
 
         <div className="p-4 sm:p-6 space-y-5">
           {/* Quantity table */}
-          <div className="rounded-xl border border-white/10 bg-[#12151a] overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-start justify-between gap-3">
+          <div className={FORM_CARD}>
+            <div className={cn("px-5 py-4 flex flex-wrap items-start justify-between gap-3", FORM_CARD_HEADER)}>
               <div>
-                <h3 className="font-semibold text-sm text-white">Set Label Quantity Per Variant</h3>
-                <p className="text-xs text-white/45 mt-1 max-w-2xl">
+                <h3 className="font-semibold text-sm text-foreground">Set Label Quantity Per Variant</h3>
+                <p className={cn("mt-1 max-w-2xl", FORM_SUBTITLE)}>
                   Defaults to received quantity. Each tag gets a unique serial suffix (001, 002, …) for POS scanning.
                 </p>
               </div>
@@ -550,7 +553,7 @@ export default function PrintTagsPage() {
                   size="sm"
                   onClick={handlePrint}
                   disabled={printing || totalLabels === 0}
-                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                  className={cn("gap-1.5", FORM_OUTLINE_BTN)}
                 >
                   <Printer className="h-3.5 w-3.5" />
                   Print All ({totalLabels})
@@ -560,7 +563,7 @@ export default function PrintTagsPage() {
                   variant="outline"
                   size="sm"
                   onClick={resetQtys}
-                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                  className={cn("gap-1.5", FORM_OUTLINE_BTN)}
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                   Reset
@@ -570,7 +573,7 @@ export default function PrintTagsPage() {
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[960px]">
-                <thead className="text-[10px] uppercase tracking-wider text-white/40 border-b border-white/10 bg-white/[0.02]">
+                <thead className={cn(FORM_TABLE_HEAD_ROW, "border-b border-border bg-muted/30")}>
                   <tr>
                     <th className="px-5 py-3 text-left font-semibold">Item</th>
                     <th className="px-4 py-3 text-left font-semibold w-32">SKU</th>
@@ -583,53 +586,53 @@ export default function PrintTagsPage() {
                     <th className="px-4 py-3 text-center font-semibold w-36">Print Qty</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-white/5">
+                <tbody className={FORM_TABLE_BODY}>
                   {po.items.map((item) => {
                     const base = printTagBaseCode(item);
                     const sample = base ? printTagBarcodeValue(base, 1) : "";
                     const thumb = itemThumb(item);
                     return (
-                      <tr key={item.id} className="hover:bg-white/[0.03]">
+                      <tr key={item.id} className={FORM_ROW_HOVER}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-lg border border-white/10 bg-white/5 overflow-hidden shrink-0 flex items-center justify-center">
+                            <div className={cn("h-10 w-10 overflow-hidden shrink-0", FORM_THUMB)}>
                               {thumb ? (
                                 <img src={thumb} alt="" className="h-full w-full object-cover" />
                               ) : (
-                                <Package className="h-4 w-4 text-white/30" />
+                                <Package className="h-4 w-4 text-muted-foreground" />
                               )}
                             </div>
-                            <span className="font-medium text-white text-sm leading-snug">{item.productName}</span>
+                            <span className="font-medium text-foreground text-sm leading-snug">{item.productName}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 font-mono text-xs text-white/55">{item.sku}</td>
-                        <td className="px-4 py-3 font-mono text-xs text-white/55" title={sample}>
-                          {base || <span className="text-red-400">Missing</span>}
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.sku}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground" title={sample}>
+                          {base || <span className="text-red-500 dark:text-red-400">Missing</span>}
                           {sample && qtys[item.id] > 0 && (
-                            <span className="block text-[10px] text-white/35 mt-0.5">→ {sample}</span>
+                            <span className="block text-[10px] text-muted-foreground/70 mt-0.5">→ {sample}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-xs text-white/55 max-w-[7rem] truncate" title={tagsLine(item)}>
+                        <td className="px-4 py-3 text-xs text-muted-foreground max-w-[7rem] truncate" title={tagsLine(item)}>
                           {tagsLine(item) || "—"}
                         </td>
-                        <td className="px-4 py-3 text-xs text-white/70">{variantFieldValue(item.variant, attrA)}</td>
-                        <td className="px-4 py-3 text-xs text-white/70">{variantFieldValue(item.variant, attrB)}</td>
-                        <td className="px-4 py-3 text-right text-white/50 tabular-nums">{item.orderedQty}</td>
-                        <td className="px-4 py-3 text-right text-emerald-400 font-semibold tabular-nums">{item.receivedQty}</td>
+                        <td className="px-4 py-3 text-xs text-foreground">{variantFieldValue(item.variant, attrA)}</td>
+                        <td className="px-4 py-3 text-xs text-foreground">{variantFieldValue(item.variant, attrB)}</td>
+                        <td className="px-4 py-3 text-right text-muted-foreground tabular-nums">{item.orderedQty}</td>
+                        <td className="px-4 py-3 text-right text-emerald-600 dark:text-emerald-400 font-semibold tabular-nums">{item.receivedQty}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-2">
                             <button
                               type="button"
                               onClick={() => adjustQty(item.id, -1)}
-                              className="h-8 w-8 rounded-lg border border-white/15 flex items-center justify-center hover:bg-white/10 transition-colors text-white/70"
+                              className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground"
                             >
                               <Minus className="h-3.5 w-3.5" />
                             </button>
-                            <span className="w-8 text-center font-bold tabular-nums">{qtys[item.id] ?? 0}</span>
+                            <span className="w-8 text-center font-bold tabular-nums text-foreground">{qtys[item.id] ?? 0}</span>
                             <button
                               type="button"
                               onClick={() => adjustQty(item.id, 1)}
-                              className="h-8 w-8 rounded-lg border border-white/15 flex items-center justify-center hover:bg-white/10 transition-colors text-white/70"
+                              className="h-8 w-8 rounded-lg border border-border flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground"
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
@@ -644,23 +647,23 @@ export default function PrintTagsPage() {
           </div>
 
           {/* Label preview */}
-          <div className="rounded-xl border border-white/10 bg-[#12151a] overflow-hidden">
-            <div className="px-5 py-4 border-b border-white/10 flex flex-wrap items-center justify-between gap-3">
-              <h3 className="font-semibold text-sm text-white">Label Preview</h3>
+          <div className={FORM_CARD}>
+            <div className={cn("px-5 py-4 flex flex-wrap items-center justify-between gap-3", FORM_CARD_HEADER)}>
+              <h3 className="font-semibold text-sm text-foreground">Label Preview</h3>
               <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center rounded-lg border border-white/15 overflow-hidden">
+                <div className="flex items-center rounded-lg border border-border overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setPreviewZoom((z) => Math.max(50, z - 10))}
-                    className="h-8 w-8 flex items-center justify-center hover:bg-white/10 text-white/70"
+                    className="h-8 w-8 flex items-center justify-center hover:bg-muted text-muted-foreground"
                   >
                     <Minus className="h-3.5 w-3.5" />
                   </button>
-                  <span className="px-3 text-xs font-semibold tabular-nums min-w-[52px] text-center">{previewZoom}%</span>
+                  <span className="px-3 text-xs font-semibold tabular-nums min-w-[52px] text-center text-foreground">{previewZoom}%</span>
                   <button
                     type="button"
                     onClick={() => setPreviewZoom((z) => Math.min(150, z + 10))}
-                    className="h-8 w-8 flex items-center justify-center hover:bg-white/10 text-white/70"
+                    className="h-8 w-8 flex items-center justify-center hover:bg-muted text-muted-foreground"
                   >
                     <Plus className="h-3.5 w-3.5" />
                   </button>
@@ -668,7 +671,7 @@ export default function PrintTagsPage() {
                 <select
                   value={previewCols}
                   onChange={(e) => setPreviewCols(Number(e.target.value))}
-                  className="h-8 rounded-lg border border-white/15 bg-[#0a0c10] text-xs font-medium px-3 text-white/80"
+                  className="h-8 rounded-lg border border-border bg-background text-xs font-medium px-3 text-foreground"
                 >
                   {[3, 4, 5, 6].map((n) => (
                     <option key={n} value={n}>Grid: {n} × 4</option>
@@ -680,7 +683,7 @@ export default function PrintTagsPage() {
                   size="sm"
                   onClick={() => setFullPreview(true)}
                   disabled={totalLabels === 0}
-                  className="gap-1.5 border-white/15 bg-transparent text-white hover:bg-white/10"
+                  className={cn("gap-1.5", FORM_OUTLINE_BTN)}
                 >
                   <Maximize2 className="h-3.5 w-3.5" />
                   Full Preview
@@ -688,9 +691,9 @@ export default function PrintTagsPage() {
               </div>
             </div>
 
-            <div className="p-5 min-h-[280px] overflow-auto bg-[#0a0c10]/50">
+            <div className={cn("p-5 min-h-[280px] overflow-auto", FORM_INNER_PANEL)}>
               {totalLabels === 0 ? (
-                <div className="py-16 text-center text-white/40 text-sm">Set qty above to preview labels</div>
+                <div className="py-16 text-center text-muted-foreground text-sm">Set qty above to preview labels</div>
               ) : (
                 <PreviewGrid />
               )}
@@ -701,14 +704,14 @@ export default function PrintTagsPage() {
 
       {/* Full preview overlay */}
       {fullPreview && totalLabels > 0 && (
-        <div className="no-print fixed inset-0 z-50 bg-black/90 flex flex-col">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-            <h3 className="font-semibold text-white">Label Preview — {totalLabels} labels</h3>
+        <div className="no-print fixed inset-0 z-50 bg-background/95 backdrop-blur flex flex-col">
+          <div className={cn("flex items-center justify-between px-5 py-4", FORM_CARD_HEADER)}>
+            <h3 className="font-semibold text-foreground">Label Preview — {totalLabels} labels</h3>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setFullPreview(false)}
-              className="border-white/15 text-white hover:bg-white/10"
+              className={FORM_OUTLINE_BTN}
             >
               Close
             </Button>

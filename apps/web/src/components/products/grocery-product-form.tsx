@@ -32,6 +32,9 @@ import { cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import {
   FORM_CARD, FORM_FIELD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN, FORM_PAGE,
+  FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_HINT, FORM_ACCENT_ICON,
+  FORM_INNER_PANEL, FORM_TABLE_HEAD_ROW, FORM_DROPDOWN, FORM_META_VALUE,
+  FORM_HEADER_ICON_WRAP, FORM_HEADER_ICON, FORM_STATUS_BADGE, FORM_STICKY_BAR,
 } from "@/lib/form-shell-theme";
 import { useAuthStore } from "@/stores/auth-store";
 
@@ -116,16 +119,12 @@ function Section({
 }) {
   return (
     <section className={FORM_CARD}>
-      <div className="px-5 py-3.5 border-b border-white/10 flex items-center justify-between gap-3">
+      <div className={cn("px-5 py-3.5 flex items-center justify-between gap-3", FORM_CARD_HEADER)}>
         <div className="flex items-start gap-3 min-w-0">
-          {step ? (
-            <span className="mt-0.5 h-7 w-7 rounded-full bg-orange-500 text-white text-xs font-bold tabular-nums flex items-center justify-center shrink-0">
-              {step}
-            </span>
-          ) : null}
+          {step ? <span className={FORM_STEP_BADGE}>{step}</span> : null}
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-white tracking-tight">{title}</h2>
-            {subtitle ? <p className="text-xs text-white/45 mt-0.5 leading-relaxed">{subtitle}</p> : null}
+            <h2 className="text-sm font-semibold text-foreground tracking-tight">{title}</h2>
+            {subtitle ? <p className={cn(FORM_SUBTITLE, "leading-relaxed")}>{subtitle}</p> : null}
           </div>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
@@ -155,7 +154,7 @@ function Field({
         {required ? <span className="text-orange-400 ml-0.5">*</span> : null}
       </Label>
       {children}
-      {hint ? <p className="text-[11px] text-white/40 leading-snug">{hint}</p> : null}
+      {hint ? <p className={cn(FORM_HINT, "leading-snug")}>{hint}</p> : null}
     </div>
   );
 }
@@ -181,7 +180,7 @@ function ChoiceCard({
         "rounded-xl border p-3.5 text-left transition-all h-full",
         selected
           ? "border-orange-500 bg-orange-500/10"
-          : "border-white/10 bg-[#0a0c10]/50 hover:border-orange-500/40 hover:bg-white/[0.03]",
+          : "border-border bg-muted/30 hover:border-orange-500/40 hover:bg-muted/50",
       )}
     >
       <div className="flex items-start gap-3">
@@ -191,7 +190,7 @@ function ChoiceCard({
               "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 border",
               selected
                 ? "bg-orange-500 text-white border-orange-500"
-                : "bg-white/5 text-white/50 border-white/10",
+                : "bg-muted text-muted-foreground border-border",
             )}
           >
             <Icon className="h-4 w-4" />
@@ -199,17 +198,17 @@ function ChoiceCard({
         ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-white">{title}</p>
+            <p className="text-sm font-semibold text-foreground">{title}</p>
             <span
               className={cn(
                 "h-4 w-4 rounded-full border-2 shrink-0 flex items-center justify-center",
-                selected ? "border-orange-500 bg-orange-500" : "border-white/30",
+                selected ? "border-orange-500 bg-orange-500" : "border-border",
               )}
             >
               {selected ? <Check className="h-2.5 w-2.5 text-white" /> : null}
             </span>
           </div>
-          <p className="text-[11px] mt-1 leading-snug text-white/45">{hint}</p>
+          <p className="text-[11px] mt-1 leading-snug text-muted-foreground">{hint}</p>
         </div>
       </div>
     </button>
@@ -230,9 +229,9 @@ function SidebarCard({
   return (
     <div className={cn(FORM_CARD, className)}>
       {title ? (
-        <div className="px-4 py-3 border-b border-white/10 flex items-center gap-2">
-          {Icon ? <Icon className="h-4 w-4 text-orange-400 shrink-0" /> : null}
-          <h3 className="text-sm font-semibold text-white">{title}</h3>
+        <div className={cn("px-4 py-3 flex items-center gap-2", FORM_CARD_HEADER)}>
+          {Icon ? <Icon className={cn("h-4 w-4 shrink-0", FORM_ACCENT_ICON)} /> : null}
+          <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         </div>
       ) : null}
       <div className="p-4 space-y-3">{children}</div>
@@ -282,7 +281,7 @@ function SearchableBrandSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={cn("w-full h-10 px-3 text-sm text-left flex items-center justify-between gap-2 hover:border-white/25 focus:outline-none focus:ring-2 focus:ring-orange-500/40", FORM_FIELD)}
+        className={cn("w-full h-10 px-3 text-sm text-left flex items-center justify-between gap-2 hover:border-border focus:outline-none focus:ring-2 focus:ring-orange-500/40", FORM_FIELD)}
       >
         <span className={selected ? "text-foreground truncate" : "text-muted-foreground"}>
           {selected?.name ?? "Search or create brand…"}
@@ -292,7 +291,7 @@ function SearchableBrandSelect({
       {open ? (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute z-50 mt-1 w-full rounded-xl border border-white/15 bg-[#12151a] shadow-2xl overflow-hidden">
+          <div className={FORM_DROPDOWN}>
             <div className="p-2 border-b">
               <Input
                 autoFocus
@@ -750,11 +749,11 @@ export function GroceryProductForm() {
 
 return (
     <div className={cn(FORM_PAGE, "h-full flex flex-col pb-8")}>
-      <div className="border-b border-white/10 px-4 sm:px-6 py-4 shrink-0">
+      <div className={cn("px-4 sm:px-6 py-4 shrink-0", FORM_CARD_HEADER)}>
         <button
           type="button"
           onClick={() => router.push("/products")}
-          className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors font-medium mb-4"
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors font-medium mb-4"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Products
@@ -763,15 +762,15 @@ return (
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <div className="h-10 w-10 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
-                <Package className="h-5 w-5 text-orange-400" />
+              <div className={FORM_HEADER_ICON_WRAP}>
+                <Package className={FORM_HEADER_ICON} />
               </div>
-              <h1 className="text-xl sm:text-2xl font-bold text-white">New Product</h1>
-              <span className="rounded-md border border-orange-500/50 bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-orange-400">
+              <h1 className="text-xl sm:text-2xl font-bold text-foreground">New Product</h1>
+              <span className={FORM_STATUS_BADGE}>
                 {statusActive ? "Active" : "Draft"}
               </span>
             </div>
-            <p className="text-sm text-white/45 mt-1.5 ml-12 sm:ml-[3.25rem]">
+            <p className={cn("text-sm mt-1.5 ml-12 sm:ml-[3.25rem]", FORM_SUBTITLE)}>
               Grocery product master · {activeBranchName || "Main Store"} · Created by {userName ?? "Admin"}
             </p>
           </div>
@@ -864,7 +863,7 @@ return (
                   </Field>
                 ) : (
                   <Field label="Barcode" hint="Not required for weighted products">
-                    <Input disabled placeholder="Not required" className={cn(FORM_FIELD, "h-10 bg-white/5")} />
+                    <Input disabled placeholder="Not required" className={cn(FORM_FIELD, "h-10 bg-muted/50")} />
                   </Field>
                 )}
                 <Field label="SKU" hint="Optional — leave blank to auto-generate">
@@ -918,14 +917,14 @@ return (
                   </Select>
                 </Field>
                 <Field label="Profit Margin" hint="Auto from buying & selling">
-                  <div className="h-10 rounded-lg border border-white/10 bg-white/[0.03] px-3 flex items-center justify-between text-sm">
-                    <span className="font-semibold text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
-                    <span className="text-white/45 tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
+                  <div className={cn("h-10 rounded-lg px-3 flex items-center justify-between text-sm", FORM_INNER_PANEL)}>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400 tabular-nums">{profitMargin.pct}%</span>
+                    <span className="text-muted-foreground tabular-nums text-xs">LKR {profitMargin.amount.toLocaleString("en-LK", { maximumFractionDigits: 2 })}</span>
                   </div>
                 </Field>
               </div>
               {hasVariants ? (
-                <p className="text-xs text-white/45 rounded-lg bg-white/[0.03] border border-dashed border-white/10 px-3 py-2">
+                <p className="text-xs text-muted-foreground rounded-lg bg-muted/30 border border-dashed border-border px-3 py-2">
                   Selling price and MRP are set on each variant row below.
                 </p>
               ) : null}
@@ -934,17 +933,17 @@ return (
             {isWeighted ? (
               <Section step="4" title="Weight Sale Settings" subtitle="Loose / scale-sold items">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-[#0a0c10]/50">
+                  <div className={cn("flex items-center justify-between rounded-xl px-4 py-3", FORM_INNER_PANEL)}>
                     <div>
-                      <p className="text-sm font-medium text-white">Allow Decimal Selling</p>
-                      <p className="text-[11px] text-white/45">e.g. 0.350 kg</p>
+                      <p className="text-sm font-medium text-foreground">Allow Decimal Selling</p>
+                      <p className={FORM_HINT}>e.g. 0.350 kg</p>
                     </div>
                     <Switch checked={allowDecimalSelling} onCheckedChange={setAllowDecimalSelling} />
                   </div>
-                  <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 bg-[#0a0c10]/50">
+                  <div className={cn("flex items-center justify-between rounded-xl px-4 py-3", FORM_INNER_PANEL)}>
                     <div>
-                      <p className="text-sm font-medium text-white">Weight Scale Ready</p>
-                      <p className="text-[11px] text-white/45">POS scale workflows</p>
+                      <p className="text-sm font-medium text-foreground">Weight Scale Ready</p>
+                      <p className={FORM_HINT}>POS scale workflows</p>
                     </div>
                     <Switch checked={weightScaleReady} onCheckedChange={setWeightScaleReady} />
                   </div>
@@ -970,11 +969,11 @@ return (
                     </button>
                   ))}
                 </div>
-                <div className="rounded-xl border border-white/10 overflow-hidden">
+                <div className={cn("rounded-xl overflow-hidden border border-border")}>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="bg-white/[0.03] border-b border-white/10">
-                        <tr className="text-[10px] uppercase tracking-wider text-white/40">
+                      <thead className="bg-muted/30 border-b border-border">
+                        <tr className={FORM_TABLE_HEAD_ROW}>
                           <th className="px-3 py-2.5 text-left font-medium">Variant</th>
                           <th className="px-3 py-2.5 text-left font-medium">Weight</th>
                           <th className="px-3 py-2.5 text-left font-medium">SKU</th>
@@ -1132,8 +1131,8 @@ return (
                   ["Status", statusActive ? "Active" : "Draft"],
                 ] as const).map(([label, val]) => (
                   <div key={label} className="flex justify-between gap-3 text-xs">
-                    <span className="text-white/45 shrink-0">{label}</span>
-                    <span className="font-medium text-right text-white/90 truncate max-w-[150px]">{val}</span>
+                    <span className="text-muted-foreground shrink-0">{label}</span>
+                    <span className={cn(FORM_META_VALUE, "max-w-[150px]")}>{val}</span>
                   </div>
                 ))}
               </div>
@@ -1142,21 +1141,21 @@ return (
             <SidebarCard title="Status & Availability" icon={FileText}>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Active</p>
-                  <p className="text-[11px] text-white/45">Visible in POS</p>
+                  <p className="text-sm font-medium text-foreground">Active</p>
+                  <p className={FORM_HINT}>Visible in POS</p>
                 </div>
                 <Switch checked={statusActive} onCheckedChange={setStatusActive} />
               </div>
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-white">Track Inventory</p>
-                  <p className="text-[11px] text-white/45">Stock monitoring</p>
+                  <p className="text-sm font-medium text-foreground">Track Inventory</p>
+                  <p className={FORM_HINT}>Stock monitoring</p>
                 </div>
                 <Switch checked={trackInventory} onCheckedChange={setTrackInventory} />
               </div>
               {trackInventory ? (
-                <div className="rounded-lg bg-white/[0.03] border border-white/10 px-3 py-2 text-[11px] text-white/45">
-                  Branches: <span className="font-semibold text-white">{branchScope === "ALL" ? "All Branches" : "Single Branch"}</span>
+                <div className={cn("rounded-lg px-3 py-2", FORM_INNER_PANEL, FORM_HINT)}>
+                  Branches: <span className="font-semibold text-foreground">{branchScope === "ALL" ? "All Branches" : "Single Branch"}</span>
                 </div>
               ) : null}
             </SidebarCard>
@@ -1173,12 +1172,12 @@ return (
               <Button variant="outline" className={cn("w-full h-10", FORM_OUTLINE_BTN)} disabled={loading} onClick={() => submit("DRAFT")}>
                 Save Draft
               </Button>
-              <Button variant="ghost" className="w-full h-9 text-white/45 hover:text-white hover:bg-white/5" onClick={() => router.push("/products")}>
+              <Button variant="ghost" className="w-full h-9 text-muted-foreground hover:text-foreground hover:bg-muted" onClick={() => router.push("/products")}>
                 Cancel
               </Button>
             </SidebarCard>
 
-            <p className="text-[11px] text-white/40 leading-relaxed px-1">
+            <p className={cn(FORM_HINT, "leading-relaxed px-1")}>
               <Package className="h-3.5 w-3.5 inline mr-1 opacity-70" />
               Assigned suppliers only see this product when creating a PO.
             </p>
