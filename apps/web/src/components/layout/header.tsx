@@ -121,6 +121,7 @@ const BASE_ROUTE_LABELS: Record<string, string> = {
 export function Header() {
   const pathname = usePathname();
   const { resolvedTheme, setTheme } = useTheme();
+  const isDarkHeader = resolvedTheme === "dark";
   const { user, logoutApi } = useAuthStore();
   const { toggleMobileSidebar, openPos } = useUIStore();
   const router = useRouter();

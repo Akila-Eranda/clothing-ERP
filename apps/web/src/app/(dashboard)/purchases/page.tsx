@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ShoppingBag, Plus, FileText, Clock, CheckCircle2, XCircle, RefreshCw, Truck, PackageCheck } from "lucide-react";
+import { ShoppingBag, Plus, FileText, CheckCircle2, RefreshCw, Truck, PackageCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ColumnDef } from "@tanstack/react-table";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
@@ -16,17 +15,8 @@ import Link from "next/link";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { parseApiList } from "@/lib/parse-api-list";
-// ── Status config ─────────────────────────────────────────────────────────
-type Variant = "success" | "secondary" | "danger" | "warning" | "info";
-const STATUS_CONFIG: Record<string, { label: string; variant: Variant; icon: React.ElementType }> = {
-  DRAFT:              { label: "Draft",    variant: "secondary", icon: FileText },
-  PENDING_APPROVAL:   { label: "Pending Approval", variant: "warning", icon: Clock },
-  CONFIRMED:          { label: "Ordered",  variant: "info",      icon: Clock },
-  SENT:               { label: "Ordered",  variant: "info",      icon: Clock },
-  PARTIALLY_RECEIVED: { label: "Partial",  variant: "warning",   icon: Clock },
-  RECEIVED:           { label: "Received", variant: "success",   icon: CheckCircle2 },
-  CANCELLED:          { label: "Cancelled",variant: "danger",    icon: XCircle },
-};
+import { POStatusBadge, PO_STATUS } from "@/components/purchases/purchase-table-badges";
+// ── Status config (filters) ───────────────────────────────────────────────
 
 const RECEIVABLE = ["CONFIRMED", "SENT", "PARTIALLY_RECEIVED"];
 const ORDERABLE  = ["DRAFT"];
@@ -88,15 +78,7 @@ function buildColumns(
     {
       accessorKey: "status",
       header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
-      cell: ({ row }) => {
-        const conf = STATUS_CONFIG[row.original.status] ?? STATUS_CONFIG.DRAFT;
-        const Icon = conf.icon;
-        return (
-          <Badge variant={conf.variant} className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center gap-1">
-            <Icon className="h-2.5 w-2.5" />{conf.label}
-          </Badge>
-        );
-      },
+      cell: ({ row }) => <POStatusBadge status={row.original.status} />,
     },
     {
       id: "actions",
@@ -235,7 +217,7 @@ export default function PurchasesPage() {
             {
               id: "status",
               title: "Status",
-              options: Object.entries(STATUS_CONFIG).map(([v, c]) => ({ value: v, label: c.label })),
+              options: Object.entries(PO_STATUS).map(([v, c]) => ({ value: v, label: c.label })),
             },
           ]}
           isShowExportButtons={{ isShow: true, fileName: "purchase-orders-export" }}

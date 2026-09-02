@@ -70,7 +70,7 @@ export function AppLogo({
   };
 
   return (
-    <div className={cn("flex flex-col items-start", isSidebar && "w-full", className)}>
+    <div className={cn("flex flex-col", isSidebar ? "items-center w-full" : "items-start", className)}>
       <img
         key={imgSrc}
         src={imgSrc}
@@ -78,7 +78,7 @@ export function AppLogo({
         onError={handleLogoError}
         className={cn(
           isSidebar
-            ? "hex-sidebar-logo block h-10 w-auto max-w-full object-contain object-left"
+            ? "hex-sidebar-logo block h-10 w-auto max-w-[calc(100%-2.5rem)] object-contain object-center mx-auto"
             : "w-auto object-contain object-left",
           !isSidebar && HEIGHT[variant],
           MAX_WIDTH[variant],

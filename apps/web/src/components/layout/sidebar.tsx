@@ -571,15 +571,15 @@ export function Sidebar() {
         {/* ── Header: brand logo + collapse (DreamsPOS compact row) ── */}
         <div
           className={cn(
-            "hex-sidebar-brand flex items-center gap-1 shrink-0 w-full",
-            sidebarCollapsed ? "px-2 py-2 justify-center" : "px-2.5 py-2",
+            "hex-sidebar-brand relative flex items-center shrink-0 w-full",
+            sidebarCollapsed ? "px-2 py-2 justify-center" : "px-2.5 py-2 justify-center",
           )}
         >
           {!sidebarCollapsed && (
             <AppLogo
               variant="sidebar"
               theme={logoOnDarkBg ? "dark" : "light"}
-              className="flex-1 min-w-0 overflow-hidden"
+              className="mx-auto"
               alt={APP_NAME}
             />
           )}
@@ -589,7 +589,7 @@ export function Sidebar() {
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
               "flex items-center justify-center rounded-lg border transition-colors shrink-0",
-              sidebarCollapsed ? "h-7 w-7" : "h-7 w-7",
+              sidebarCollapsed ? "h-7 w-7" : "absolute right-2.5 top-1/2 -translate-y-1/2 h-7 w-7",
             )}
             style={{ borderColor: border, color: textMut, background: bg }}
             onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}

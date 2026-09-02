@@ -8,7 +8,6 @@ import {
 } from "lucide-react";
 import { ColumnDef } from "@tanstack/react-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from "@/components/table";
 import { toast } from "sonner";
@@ -17,12 +16,14 @@ import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
 import { AddGrnModal } from "@/components/purchases/add-grn-modal";
 import { GrnDetailsModal } from "@/components/purchases/grn-details-modal";
+import { GrnSourceBadge, GrnStatusBadge } from "@/components/purchases/purchase-table-badges";
 import { parseApiList } from "@/lib/parse-api-list";
 
 type GrnRow = {
   id: string;
   grnNumber: string;
   source: string;
+  status?: string;
   receivedAt: string;
   supplier: { name: string };
   purchase?: { poNumber: string; id?: string } | null;
@@ -75,22 +76,15 @@ export default function GrnPage() {
         id: "source",
         accessorKey: "source",
         header: ({ column }) => <DataTableColumnHeader column={column} title="Source" />,
-        cell: ({ row }) => {
-          const src = row.original.source;
-          const label =
-            src === "FROM_PO" ? "From PO"
-              : src === "QUICK" ? "Quick"
-                : src === "DIRECT" ? "Direct"
-                  : src;
-          return (
-            <Badge
-              variant="outline"
-              className="h-6 rounded-full px-2.5 text-[11px] font-semibold inline-flex items-center"
-            >
-              {label}
-            </Badge>
-          );
-        },
+        cell: ({ row }) => <GrnSourceBadge source={row.original.source} />,
+      },
+      {
+        id: "status",
+        accessorKey: "status",
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />,
+        cell: ({ row }) => (
+          <GrnStatusBadge status={row.original.status ?? "POSTED"} />
+        ),
       },
       {
         id: "supplier",
@@ -257,6 +251,16 @@ export default function GrnPage() {
                 options: [
                   { value: "FROM_PO", label: "From PO" },
                   { value: "QUICK", label: "Quick" },
+                  { value: "DIRECT", label: "Direct" },
+                ],
+              },
+              {
+                id: "status",
+                title: "Status",
+                options: [
+                  { value: "POSTED", label: "Posted" },
+                  { value: "DRAFT", label: "Draft" },
+                  { value: "CANCELLED", label: "Cancelled" },
                 ],
               },
             ]}

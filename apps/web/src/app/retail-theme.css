@@ -720,9 +720,10 @@ body.mini-sidebar .hex-retail-sidebar {
   display: block;
   height: 2.5rem;
   width: auto;
-  max-width: 100%;
+  max-width: calc(100% - 2.5rem);
+  margin-inline: auto;
   object-fit: contain;
-  object-position: left center;
+  object-position: center center;
 }
 
 /* Light sidebar: transparent blue INNOVATION logo — no blend needed */
