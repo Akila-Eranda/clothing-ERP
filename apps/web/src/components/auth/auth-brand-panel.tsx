@@ -33,22 +33,17 @@ export function AuthBrandPanel({
 
   return (
     <div className="hidden lg:flex lg:w-[38%] xl:w-[36%] lg:max-w-[520px] relative flex-col min-h-screen overflow-hidden bg-[#070d1a] text-white shrink-0">
-      {/* Sri Lanka hero — Sigiriya; dark overlay keeps logo + copy readable */}
       <div
-        className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
-        style={{ backgroundImage: "url(/auth/login-side.png)" }}
-        aria-hidden
-      />
-      <div className="absolute inset-0 bg-gradient-to-br from-[#070d1a]/92 via-[#0a1628]/88 to-[#0d1f3c]/80" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#070d1a]/95 via-transparent to-[#070d1a]/40" />
-      <div
-        className="absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 opacity-[0.03]"
         style={{
           backgroundImage:
             "linear-gradient(rgba(99,102,241,1) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,1) 1px, transparent 1px)",
           backgroundSize: "56px 56px",
         }}
       />
+      <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-indigo-600/20 blur-3xl" />
+      <div className="absolute bottom-0 right-0 h-80 w-80 rounded-full bg-violet-600/15 blur-3xl" />
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0a1628] via-[#0d1f3c]/95 to-[#070d1a]" />
 
       <div className="relative z-10 flex flex-col flex-1 p-8 xl:p-10 max-w-md mx-auto w-full">
         {/* Logo — compact, no black matte box (transparent PNG) */}

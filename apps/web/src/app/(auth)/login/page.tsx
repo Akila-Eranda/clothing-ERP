@@ -211,10 +211,14 @@ function LoginContent() {
         loading={Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview)}
       />
 
-      <div className="flex-1 flex flex-col min-h-screen bg-white relative overflow-hidden text-slate-900">
-        <div className="absolute inset-0 mesh-bg opacity-30 pointer-events-none" />
-        <div className="absolute top-0 right-0 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-0 h-48 w-48 rounded-full bg-violet-100/50 blur-3xl pointer-events-none" />
+      <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden text-slate-900">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          style={{ backgroundImage: "url(/auth/login-side.png)" }}
+          aria-hidden
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-white/92 via-white/88 to-white/80" />
+        <div className="absolute inset-0 bg-gradient-to-t from-white/95 via-transparent to-white/70" />
 
         <div className="relative flex-1 flex flex-col items-center justify-center px-6 py-10 sm:px-10">
           <motion.div
@@ -429,7 +433,13 @@ function LoginFallback() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       <div className="hidden lg:block lg:w-[38%] xl:w-[36%] lg:max-w-[520px] shrink-0 bg-[#070d1a]" />
-      <div className="flex-1 flex items-center justify-center bg-white min-h-screen">
+      <div className="flex-1 flex items-center justify-center min-h-screen relative overflow-hidden">
+        <div
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: "url(/auth/login-side.png)" }}
+          aria-hidden
+        />
+        <div className="absolute inset-0 bg-white/90" />
         <Loading size={96} />
       </div>
     </div>
