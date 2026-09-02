@@ -7,7 +7,6 @@ import { cn } from "@/lib/utils";
 import type { ReportsSection } from "@/components/reports/reports-config";
 import {
   ReportDateFilterBar,
-  ReportTabNav,
   ReportsPageHeader,
   SECTION_META,
   type ReportDateRange,
@@ -71,7 +70,6 @@ export function ReportsShell({
               </>
             }
           />
-          <ReportTabNav active={section} />
         </div>
         <div className="border-t border-border/80 bg-muted/20">
           <div className="page-shell py-3">

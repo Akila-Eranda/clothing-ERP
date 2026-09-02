@@ -567,43 +567,39 @@ export function Sidebar() {
         style={{ background: bg, borderRight: `1px solid ${border}` }}
       >
 
-        {/* ── Header: brand logo only (DreamsPOS compact) ── */}
+        {/* ── Header: brand logo + collapse (DreamsPOS compact row) ── */}
         <div
           className={cn(
-            "hex-sidebar-brand relative shrink-0 w-full",
-            sidebarCollapsed ? "px-2 py-2" : "px-3 py-2.5",
+            "hex-sidebar-brand flex items-center gap-1 shrink-0 w-full",
+            sidebarCollapsed ? "px-2 py-2 justify-center" : "px-2.5 py-2",
           )}
         >
+          {!sidebarCollapsed && (
+            <AppLogo
+              variant="sidebar"
+              theme={logoOnDarkBg ? "dark" : "light"}
+              className="flex-1 min-w-0 overflow-hidden"
+              alt={APP_NAME}
+            />
+          )}
           <button
             type="button"
             onClick={toggleSidebar}
             aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             className={cn(
-              "absolute flex items-center justify-center rounded-lg border transition-colors z-10",
-              sidebarCollapsed
-                ? "right-0.5 top-1.5 h-6 w-6"
-                : "right-2 top-2 h-7 w-7",
+              "flex items-center justify-center rounded-lg border transition-colors shrink-0",
+              sidebarCollapsed ? "h-7 w-7" : "h-7 w-7",
             )}
             style={{ borderColor: border, color: textMut, background: bg }}
             onMouseEnter={e => { e.currentTarget.style.color = textFull; e.currentTarget.style.background = hoverBg; }}
             onMouseLeave={e => { e.currentTarget.style.color = textMut; e.currentTarget.style.background = bg; }}
           >
             {sidebarCollapsed ? (
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3.5 w-3.5" />
             ) : (
               <ChevronLeft className="h-3.5 w-3.5" />
             )}
           </button>
-
-          <AppLogo
-            variant="sidebar"
-            theme={logoOnDarkBg ? "dark" : "light"}
-            className={cn(
-              "w-full",
-              sidebarCollapsed ? "items-center px-0.5" : "items-start pr-9",
-            )}
-            alt={APP_NAME}
-          />
         </div>
 
         <div className="mx-3 h-px shrink-0" style={{ background: border }} />

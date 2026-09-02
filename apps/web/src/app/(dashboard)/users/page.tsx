@@ -386,9 +386,37 @@ export default function UsersPage() {
   );
 
   const activeCount = users.filter((u) => u.status === "ACTIVE").length;
+  const inactiveCount = users.length - activeCount;
+
+  const statCards = [
+    {
+      label: "Total Users",
+      value: users.length,
+      valueClass: "text-foreground",
+      accentClass: "border-l-slate-400",
+    },
+    {
+      label: "Active",
+      value: activeCount,
+      valueClass: "text-emerald-600",
+      accentClass: "border-l-emerald-500",
+    },
+    {
+      label: "Inactive",
+      value: inactiveCount,
+      valueClass: "text-foreground",
+      accentClass: "border-l-slate-300",
+    },
+    {
+      label: "Total Roles",
+      value: tenantRoleCards.length,
+      valueClass: "text-blue-600",
+      accentClass: "border-l-blue-500",
+    },
+  ];
 
   return (
-    <div className="page-shell">
+    <div className="page-shell space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="min-w-0">
@@ -413,16 +441,16 @@ export default function UsersPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: "Total Users",   value: users.length,                   color: "text-foreground",        tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-          { label: "Active",        value: activeCount,                    color: "text-emerald-600",       tint: "border-emerald-200/70 bg-gradient-to-br from-emerald-50 to-white dark:border-emerald-500/20 dark:from-emerald-500/10 dark:to-transparent" },
-          { label: "Inactive",      value: users.length - activeCount,     color: "text-muted-foreground",  tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-          { label: "Total Roles",   value: tenantRoleCards.length,         color: "text-primary",           tint: "border-blue-200/70 bg-gradient-to-br from-blue-50 to-white dark:border-blue-500/20 dark:from-blue-500/10 dark:to-transparent" },
-        ].map((s) => (
-          <div key={s.label} className={`rounded-[18px] border bg-card h-[68px] px-4 py-2 flex flex-col justify-center overflow-hidden shadow-[0_2px_10px_rgba(15,23,42,0.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_14px_rgba(15,23,42,0.07)] transition-all duration-150 ${s.tint}`}>
-            <p className={`text-[22px] font-bold leading-none tabular-nums ${s.color}`}>{s.value}</p>
-            <p className="text-[11px] text-muted-foreground font-medium mt-1 truncate">{s.label}</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {statCards.map((s) => (
+          <div
+            key={s.label}
+            className={`rounded-xl border border-border/60 bg-card shadow-sm px-5 py-4 border-l-4 ${s.accentClass}`}
+          >
+            <p className={`text-3xl font-bold tabular-nums leading-none ${s.valueClass}`}>
+              {loading ? "—" : s.value}
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">{s.label}</p>
           </div>
         ))}
       </div>

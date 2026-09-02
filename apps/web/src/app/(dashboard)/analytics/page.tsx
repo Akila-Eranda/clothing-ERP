@@ -21,7 +21,6 @@ import { api } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import {
   ReportDateFilterBar,
-  ReportTabNav,
   ReportsPageHeader,
   type ReportDateRange,
 } from "@/components/reports/reports-ui";
@@ -151,7 +150,6 @@ export default function AnalyticsPage() {
               </Button>
             }
           />
-          <ReportTabNav active="overview" />
         </div>
         <div className="border-t border-border/80 bg-muted/20">
           <div className="page-shell py-3">

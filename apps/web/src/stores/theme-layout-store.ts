@@ -56,17 +56,22 @@ export const useThemeLayoutStore = create<ThemeLayoutStore>()(
       reset: () => {
         set({ ...DEFAULT_THEME_LAYOUT });
         applyThemeLayout(DEFAULT_THEME_LAYOUT);
+        refreshChromeColors();
       },
 
       apply: () => {
         applyThemeLayout(get());
+        refreshChromeColors();
       },
     }),
     {
       name: "hexalyte-theme-layout-v1",
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
-        if (state) applyThemeLayout(state);
+        if (state) {
+          applyThemeLayout(state);
+          refreshChromeColors();
+        }
       },
     },
   ),

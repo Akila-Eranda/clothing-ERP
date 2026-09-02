@@ -213,7 +213,9 @@ export function getTopbarSkinChromePatch(
   skin: TopbarSkin,
   isDarkMode: boolean,
 ): Partial<import("@/lib/theme-colors").ThemeColorsState> {
-  return getSidebarSkinChromePatch(topbarSkinToSidebarSkin(skin), isDarkMode);
+  const sidebarSkin = topbarSkinToSidebarSkin(skin);
+  /* Topbar keeps its swatch palette — do not force DreamsPOS dark chrome like sidebar */
+  return paletteToChromePatch(SIDEBAR_SKIN_PALETTES[sidebarSkin], isDarkMode ? "dark" : "light");
 }
 
 /** Solid + gradient sidebar swatches (from DreamsPOS variables). */

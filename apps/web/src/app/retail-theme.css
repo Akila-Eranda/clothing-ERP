@@ -710,18 +710,19 @@ body.mini-sidebar .hex-retail-sidebar {
   transition: background 0.25s ease, color 0.25s ease;
 }
 
-/* DreamsPOS-style compact logo row — visible on light sidebar, no excess height */
+/* DreamsPOS-style compact logo row */
 .hex-sidebar-brand {
-  min-height: 3.25rem;
-  max-height: 4rem;
-  display: flex;
-  align-items: center;
+  min-height: 3rem;
+  max-height: 3.25rem;
 }
 
 .hex-sidebar-brand .hex-sidebar-logo {
   display: block;
-  width: 100%;
-  max-height: 4rem;
+  height: 2.5rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: left center;
 }
 
 /* Light sidebar: colored wordmark — never blend (hides logo on white) */
@@ -827,56 +828,64 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
 [data-sidebar="sidebarcolorthirteen"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(90deg, #760762 1.92%, #883907 100%)); }
 [data-sidebar="sidebarcolorfourteen"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(90deg, #4471cc 1.92%, #ae7bd4 100%)); }
 
-/* ── Topbar skins (data-topbar on html) ── */
+/* ── Topbar skins — colors come from :root --retail-topbar-* (set per topbar skin in JS) ── */
 .hex-retail-header {
   transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
   border-bottom: 1px solid var(--retail-topbar-border, hsl(var(--border)));
   backdrop-filter: blur(16px) saturate(160%);
   -webkit-backdrop-filter: blur(16px) saturate(160%);
+  background: var(--retail-topbar-bg, hsl(var(--background) / 0.98));
+  color: var(--retail-topbar-fg, hsl(var(--foreground)));
 }
 
-[data-topbar="white"] .hex-retail-header {
-  --retail-topbar-bg: var(--chrome-bg, rgba(255, 255, 255, 0.96));
-  --retail-topbar-fg: var(--chrome-fg, #212b36);
-  --retail-topbar-border: var(--chrome-border, rgba(15, 23, 42, 0.07));
+/* Light text on colored topbar skins */
+[data-topbar="topbarcolortwo"] .hex-retail-header,
+[data-topbar="topbarcolorthree"] .hex-retail-header,
+[data-topbar="topbarcolorfour"] .hex-retail-header,
+[data-topbar="topbarcolorfive"] .hex-retail-header,
+[data-topbar="topbarcolorsix"] .hex-retail-header,
+[data-topbar="topbarcolorseven"] .hex-retail-header,
+[data-topbar="topbarcoloreight"] .hex-retail-header,
+[data-topbar="topbarcolornine"] .hex-retail-header,
+[data-topbar="topbarcolorten"] .hex-retail-header,
+[data-topbar="topbarcoloreleven"] .hex-retail-header,
+[data-topbar="topbarcolortwelve"] .hex-retail-header,
+[data-topbar="topbarcolorthirteen"] .hex-retail-header,
+[data-topbar="topbarcolorfourteen"] .hex-retail-header {
+  color: var(--retail-topbar-fg, #ffffff);
 }
 
-html.dark[data-topbar="white"] .hex-retail-header,
-html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
-  --retail-topbar-bg: rgba(13, 13, 13, 0.92);
-  --retail-topbar-fg: #d8dfee;
-  --retail-topbar-border: rgba(255, 255, 255, 0.06);
-  color: #d8dfee;
+[data-topbar="topbarcolortwo"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorthree"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorfour"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorfive"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorsix"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorseven"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcoloreight"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolornine"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorten"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcoloreleven"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolortwelve"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorthirteen"] .hex-retail-header .text-foreground,
+[data-topbar="topbarcolorfourteen"] .hex-retail-header .text-foreground {
+  color: var(--retail-topbar-fg, #ffffff);
 }
 
-html.dark[data-topbar="white"] .hex-retail-header .text-foreground,
-html.dark[data-topbar="topbarcolorone"] .hex-retail-header .text-foreground {
-  color: #d8dfee;
+[data-topbar="topbarcolortwo"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorthree"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorfour"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorfive"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorsix"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorseven"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcoloreight"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolornine"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorten"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcoloreleven"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolortwelve"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorthirteen"] .hex-retail-header .text-muted-foreground,
+[data-topbar="topbarcolorfourteen"] .hex-retail-header .text-muted-foreground {
+  color: var(--retail-topbar-muted, rgba(255, 255, 255, 0.72));
 }
-
-html.dark[data-topbar="white"] .hex-retail-header .text-muted-foreground,
-html.dark[data-topbar="topbarcolorone"] .hex-retail-header .text-muted-foreground {
-  color: #9ca3af;
-}
-
-[data-topbar="topbarcolorone"] .hex-retail-header {
-  --retail-topbar-bg: var(--chrome-bg, rgba(251, 251, 251, 0.92));
-  --retail-topbar-fg: var(--chrome-fg, #1f2937);
-  --retail-topbar-border: var(--chrome-border, rgba(0, 0, 0, 0.06));
-}
-[data-topbar="topbarcolortwo"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, #505969); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, rgba(255,255,255,0.1)); }
-[data-topbar="topbarcolorthree"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, #2c2c2c); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, rgba(255,255,255,0.1)); }
-[data-topbar="topbarcolorfour"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, #1d51b6); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, rgba(255,255,255,0.1)); }
-[data-topbar="topbarcolorfive"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, #6c0ba9); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, rgba(255,255,255,0.1)); }
-[data-topbar="topbarcolorsix"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, #0b897d); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, rgba(255,255,255,0.1)); }
-[data-topbar="topbarcolorseven"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #4b749f, #243748)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcoloreight"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #18accf, #0f59ad)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcolornine"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #7d90b8, #103783)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcolorten"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #8e4beb, #472282)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcoloreleven"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #309f92, #0c5666)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcolortwelve"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #ff9966, #ff5e62)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcolorthirteen"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #760762, #883907)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
-[data-topbar="topbarcolorfourteen"] .hex-retail-header { --retail-topbar-bg: var(--chrome-bg, linear-gradient(90deg, #4471cc, #ae7bd4)); --retail-topbar-fg: var(--chrome-fg, #fff); --retail-topbar-border: var(--chrome-border, transparent); }
 
 .hex-retail-header--dreams-dark .text-foreground {
   color: #d8dfee;
@@ -892,9 +901,9 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header .text-muted-foregroun
 .hex-header {
   --hex-header-h: 4rem;
   --hex-header-pad: 1rem;
-  --hex-header-surface: color-mix(in srgb, var(--chrome-bg, #ffffff) 72%, transparent);
-  --hex-header-surface-border: var(--chrome-border, rgba(15, 23, 42, 0.08));
-  --hex-header-muted: var(--chrome-muted, rgba(15, 23, 42, 0.55));
+  --hex-header-surface: color-mix(in srgb, var(--retail-topbar-bg, #ffffff) 72%, transparent);
+  --hex-header-surface-border: var(--retail-topbar-border, rgba(15, 23, 42, 0.08));
+  --hex-header-muted: var(--retail-topbar-muted, rgba(15, 23, 42, 0.55));
 }
 
 .hex-header--chrome,

@@ -25,7 +25,6 @@ import { APP_NAME } from "@/lib/constants";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
 import { SupportDialog } from "@/components/layout/support-dialog";
-import { isDefaultLightTopbar } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 
 function isTypingTarget(target: EventTarget | null): boolean {
@@ -130,9 +129,7 @@ export function Header() {
   const [supportOpen, setSupportOpen] = React.useState(false);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
   const { profile, workspace } = useShopWorkspace();
-  const isDarkHeader = resolvedTheme === "dark";
-  const topbarSkin = useThemeLayoutStore((s) => s.topbarSkin);
-  const dreamsDarkHeader = isDarkHeader && isDefaultLightTopbar(topbarSkin);
+  useThemeLayoutStore((s) => s.topbarSkin);
   const routeLabels = React.useMemo(
     () => ({ ...BASE_ROUTE_LABELS, ...getRouteLabels(workspace, profile) }),
     [workspace, profile],
@@ -204,22 +201,11 @@ export function Header() {
 
   return (
     <header
-      className={cn(
-        "hex-retail-header hex-header sticky top-0 z-40 shrink-0",
-        dreamsDarkHeader && "hex-retail-header--dreams-dark hex-header--chrome",
-      )}
+      className="hex-retail-header hex-header sticky top-0 z-40 shrink-0"
       style={{
-        background: dreamsDarkHeader
-          ? "var(--chrome-bg, #0d0d0d)"
-          : isDarkHeader
-            ? "var(--retail-topbar-bg, #0d0d0d)"
-            : "var(--retail-topbar-bg, hsl(var(--background) / 0.98))",
-        color: dreamsDarkHeader
-          ? "var(--chrome-fg, #d8dfee)"
-          : "var(--retail-topbar-fg, hsl(var(--foreground)))",
-        borderColor: dreamsDarkHeader
-          ? "var(--chrome-border, #1f2228)"
-          : "var(--retail-topbar-border, hsl(var(--border)))",
+        background: "var(--retail-topbar-bg, hsl(var(--background) / 0.98))",
+        color: "var(--retail-topbar-fg, hsl(var(--foreground)))",
+        borderColor: "var(--retail-topbar-border, hsl(var(--border)))",
       }}
     >
       <div className="hex-header__inner">

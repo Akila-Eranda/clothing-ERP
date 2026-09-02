@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { api, tokenStorage, logClientAuditEvent } from "@/lib/api";
 import { formatNumber } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
-import { ReportsPageHeader, ReportTabNav } from "@/components/reports/reports-ui";
+import { ReportsPageHeader } from "@/components/reports/reports-ui";
 import "@/components/reports/reports-hub.css";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/api/v1";
@@ -210,7 +210,6 @@ export function FinancialReportsHub() {
               </Button>
             }
           />
-          <ReportTabNav active="financial" />
         </div>
       </div>
 

@@ -13,8 +13,6 @@ import {
 import {
   getSidebarSkinChromePatch,
   getTopbarSkinChromePatch,
-  isDefaultLightSidebar,
-  isDefaultLightTopbar,
   type SidebarSkin,
   type TopbarSkin,
 } from "@/lib/theme-layout";
@@ -282,61 +280,11 @@ function chromeFromPatch(
 
 function resolveSidebarChrome(state: ThemeColorsState, isDark: boolean): ChromeTokens {
   const skin = (document.documentElement.dataset.sidebar ?? "light") as SidebarSkin;
-  if (isDefaultLightSidebar(skin)) {
-    return chromeFromPatch(
-      isDark
-        ? {
-            darkChromeBg: state.darkChromeBg,
-            darkChromeBgCss: state.darkChromeBgCss,
-            darkChromeFg: state.darkChromeFg,
-            darkChromeBorder: state.darkChromeBorder,
-            darkChromeMuted: state.darkChromeMuted,
-            darkChromeActive: state.darkChromeActive,
-            darkChromeLogoBg: state.darkChromeLogoBg,
-          }
-        : {
-            lightChromeBg: state.lightChromeBg,
-            lightChromeBgCss: state.lightChromeBgCss,
-            lightChromeFg: state.lightChromeFg,
-            lightChromeBorder: state.lightChromeBorder,
-            lightChromeMuted: state.lightChromeMuted,
-            lightChromeActive: state.lightChromeActive,
-            lightChromeLogoBg: state.lightChromeLogoBg,
-          },
-      state,
-      isDark,
-    );
-  }
   return chromeFromPatch(getSidebarSkinChromePatch(skin, isDark), state, isDark);
 }
 
 function resolveTopbarChrome(state: ThemeColorsState, isDark: boolean): ChromeTokens {
   const skin = (document.documentElement.dataset.topbar ?? "white") as TopbarSkin;
-  if (isDefaultLightTopbar(skin)) {
-    return chromeFromPatch(
-      isDark
-        ? {
-            darkChromeBg: state.darkChromeBg,
-            darkChromeBgCss: state.darkChromeBgCss,
-            darkChromeFg: state.darkChromeFg,
-            darkChromeBorder: state.darkChromeBorder,
-            darkChromeMuted: state.darkChromeMuted,
-            darkChromeActive: state.darkChromeActive,
-            darkChromeLogoBg: state.darkChromeLogoBg,
-          }
-        : {
-            lightChromeBg: state.lightChromeBg,
-            lightChromeBgCss: state.lightChromeBgCss,
-            lightChromeFg: state.lightChromeFg,
-            lightChromeBorder: state.lightChromeBorder,
-            lightChromeMuted: state.lightChromeMuted,
-            lightChromeActive: state.lightChromeActive,
-            lightChromeLogoBg: state.lightChromeLogoBg,
-          },
-      state,
-      isDark,
-    );
-  }
   return chromeFromPatch(getTopbarSkinChromePatch(skin, isDark), state, isDark);
 }
 
@@ -434,6 +382,7 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--retail-topbar-bg", topbarChrome.bg);
     root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
     root.style.setProperty("--retail-topbar-border", topbarChrome.border);
+    root.style.setProperty("--retail-topbar-muted", topbarChrome.muted);
 
     root.style.setProperty("--chrome-bg", sidebarChrome.bg);
     root.style.setProperty("--chrome-fg", sidebarChrome.fg);
@@ -465,6 +414,7 @@ export function applyThemeColors(state: ThemeColorsState) {
     root.style.setProperty("--retail-topbar-bg", topbarChrome.bg);
     root.style.setProperty("--retail-topbar-fg", topbarChrome.fg);
     root.style.setProperty("--retail-topbar-border", topbarChrome.border);
+    root.style.setProperty("--retail-topbar-muted", topbarChrome.muted);
 
     root.style.setProperty("--chrome-bg", sidebarChrome.bg);
     root.style.setProperty("--chrome-fg", sidebarChrome.fg);
