@@ -163,7 +163,7 @@ export default function PODetailPage() {
     finally { setLoading(false); }
   }, [id]);
 
-  useEffect(() { load(); }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const updateStatus = async (status: string) => {
     if (!po) return;
