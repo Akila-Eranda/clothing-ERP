@@ -2,12 +2,14 @@ export const APP_NAME = "HEXALYTE";
 /** Free trial length for new Starter tenants (days). */
 export const STARTER_TRIAL_DAYS = 7;
 export const APP_TAGLINE = "INNOVATION";
+/** Bust nginx/browser cache when brand PNGs change (nginx serves /brand/* with long TTL). */
+const BRAND_ASSET_VERSION = "20260902";
 /** HEXALYTE INNOVATION wordmark — light UI / light sidebar */
-export const APP_LOGO_LIGHT_PATH = "/brand/hexalyte-innovation.png";
+export const APP_LOGO_LIGHT_PATH = `/brand/hexalyte-innovation.png?v=${BRAND_ASSET_VERSION}`;
 /** White HEXALYTE INNOVATION — dark sidebar / dark UI */
-export const APP_LOGO_DARK_PATH = "/brand/hexalyte-white.png";
+export const APP_LOGO_DARK_PATH = `/brand/hexalyte-white.png?v=${BRAND_ASSET_VERSION}`;
 /** Default brand mark */
-export const APP_LOGO_PATH = "/brand/hexalyte-innovation.png";
+export const APP_LOGO_PATH = `/brand/hexalyte-innovation.png?v=${BRAND_ASSET_VERSION}`;
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 
