@@ -627,4 +627,66 @@ export class PlatformOpsService {
       throw new ForbiddenException('SUPER_ADMIN required')
     }
   }
+
+  /** Tenant-facing: SENT announcements visible to this tenant/user (not dismissed). */
+  async listActiveAnnouncementsForTenant(tenantId: string, userId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true, plan: true, subdomain: true },
+    })
+    if (!tenant) return []
+
+    const platformSlug =
+      this.config.get<string>('app.platformTenantSubdomain') ?? 'platform'
+    if (tenant.subdomain === platformSlug) return []
+
+    const now = new Date()
+    const rows = await this.prisma.platformAnnouncement.findMany({
+      where: {
+        status: 'SENT',
+        OR: [{ scheduledAt: null }, { scheduledAt: { lte: now } }],
+        dismissals: { none: { userId } },
+      },
+      orderBy: [{ sentAt: 'desc' }, { createdAt: 'desc' }],
+      take: 20,
+    })
+
+    return rows.filter((row) => {
+      const target = String(row.target || 'ALL').toUpperCase()
+      if (target === 'ALL' || target === '') return true
+      if (Array.isArray(row.targetTenants) && row.targetTenants.length > 0) {
+        return row.targetTenants.includes(tenantId) || row.targetTenants.includes(tenant.subdomain)
+      }
+      // Plan-scoped: target = STARTER / PROFESSIONAL / …
+      if (['STARTER', 'PROFESSIONAL', 'ENTERPRISE', 'CUSTOM'].includes(target)) {
+        return String(tenant.plan || '').toUpperCase() === target
+      }
+      return true
+    })
+  }
+
+  async dismissAnnouncementForUser(userId: string, announcementId: string) {
+    const row = await this.requireAnnouncement(announcementId)
+    if (row.status !== 'SENT') {
+      throw new BadRequestException('Only published announcements can be dismissed')
+    }
+    if (!row.dismissible) {
+      throw new BadRequestException('This announcement cannot be dismissed')
+    }
+
+    await this.prisma.announcementDismissal.upsert({
+      where: {
+        userId_announcementId: { userId, announcementId },
+      },
+      create: { userId, announcementId },
+      update: { dismissedAt: new Date() },
+    })
+
+    await this.prisma.platformAnnouncement.update({
+      where: { id: announcementId },
+      data: { seenCount: { increment: 1 } },
+    }).catch(() => undefined)
+
+    return { ok: true }
+  }
 }

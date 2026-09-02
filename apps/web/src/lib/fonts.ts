@@ -1,9 +1,10 @@
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 
-/** Primary UI font — English-only, full Latin glyph coverage */
-export const fontSans = Inter({
+/** Primary UI font — professional Google Font for ERP / retail dashboards */
+export const fontSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
   subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700", "800"],
   display: "swap",
   adjustFontFallback: true,
 });

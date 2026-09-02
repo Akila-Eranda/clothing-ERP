@@ -14,6 +14,7 @@ import { isPosOnlyRole } from "@/lib/role-access";
 import { PosOnlyLanding } from "@/components/pos/pos-only-landing";
 import { useReceiptSettings } from "@/lib/use-receipt-settings";
 import { MaintenanceBanner } from "@/components/maintenance/maintenance-banner";
+import { PlatformAnnouncementsBanner } from "@/components/announcements/platform-announcements-banner";
 import { ThemeCustomizer } from "@/components/layout/theme-customizer";
 import { ThemeLayoutApplier } from "@/components/layout/theme-layout-applier";
 
@@ -75,6 +76,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return (
       <BranchProvider>
         <MaintenanceBanner />
+        <div className="px-3 pt-2">
+          <PlatformAnnouncementsBanner />
+        </div>
         <POSOverlay key={`pos-${activeBranchId ?? "none"}-${branchRevision}`} posOnly />
         {!posOpen && (
           <PosOnlyLanding
@@ -113,6 +117,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex flex-1 flex-col overflow-hidden min-w-0">
           <Header />
           <MaintenanceBanner />
+          <div className="px-4 pt-3 lg:px-6">
+            <PlatformAnnouncementsBanner />
+          </div>
             <main className="flex-1 overflow-y-auto">
             <div className="min-h-full" key={`${activeBranchId ?? "none"}-${branchRevision}`}>
               {children}

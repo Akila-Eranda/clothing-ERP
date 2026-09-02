@@ -157,7 +157,7 @@ export default function AnnouncementsPage() {
     setActionId(row.id);
     try {
       await sendAnnouncement(row.id);
-      toast.success("Published to platform feed");
+      toast.success("Published — now visible to tenants");
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Publish failed");
