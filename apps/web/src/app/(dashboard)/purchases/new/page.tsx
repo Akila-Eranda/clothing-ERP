@@ -235,11 +235,11 @@ export default function CreatePOPage() {
     }, 80);
   }, []);
 
-  const loadSupplierCatalog = useCallback(async (sid: string) => {
+  const loadSupplierCatalog = useCallback(async (sid: string): Promise<{ rows: VariantOpt[]; fallback: boolean }> => {
     if (!sid) {
       setAllVariants([]);
       setCatalogFallback(false);
-      return;
+      return { rows: [], fallback: false };
     }
     const reqId = ++catalogReqRef.current;
     setLoadingProducts(true);
@@ -249,35 +249,53 @@ export default function CreatePOPage() {
       const res = await api.get<VariantOpt[] | { items: VariantOpt[] }>(
         `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
       );
-      if (reqId !== catalogReqRef.current) return;
+      if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
       let rows = parsePosProducts<VariantOpt>(res);
       let fallback = false;
       if (!rows.length) {
         const allRes = await api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000");
-        if (reqId !== catalogReqRef.current) return;
+        if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
         rows = parsePosProducts<VariantOpt>(allRes);
         fallback = rows.length > 0;
         if (fallback) {
           toast.info("No products linked to this supplier — showing full catalog");
         }
       }
+      const mapped = fallback
+        ? rows
+        : rows
+            .filter((v) => !v.supplierId || v.supplierId === sid)
+            .map((v) => ({ ...v, supplierId: sid }));
       setCatalogFallback(fallback);
-      setAllVariants(
-        fallback
-          ? rows
-          : rows
-              .filter((v) => !v.supplierId || v.supplierId === sid)
-              .map((v) => ({ ...v, supplierId: sid })),
-      );
+      setAllVariants(mapped);
+      return { rows: mapped, fallback };
     } catch {
-      if (reqId !== catalogReqRef.current) return;
+      if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
       setAllVariants([]);
       setCatalogFallback(false);
       toast.error("Failed to load supplier products");
+      return { rows: [], fallback: false };
     } finally {
       if (reqId === catalogReqRef.current) setLoadingProducts(false);
     }
   }, []);
+
+  const variantsToOrderLines = useCallback((rows: VariantOpt[]): LineItem[] => (
+    rows.map((v) => ({
+      variantId: v.variantId,
+      productName: v.productName,
+      variantName: v.variantName,
+      sku: v.sku,
+      size: v.size ?? undefined,
+      color: v.color ?? undefined,
+      barcode: v.barcode ?? undefined,
+      imageUrl: v.imageUrl ?? undefined,
+      orderedQty: 1,
+      unitCost: v.lastBuyingPrice ?? v.costPrice ?? 0,
+      discount: 0,
+      taxRate: v.taxRate ?? 0,
+    }))
+  ), []);
 
   const mapSupplierDetail = useCallback((raw: Record<string, unknown> | Supplier | null | undefined): Supplier | null => {
     if (!raw || typeof raw !== "object" || !("id" in raw) || !raw.id) return null;
@@ -339,7 +357,7 @@ export default function CreatePOPage() {
     ).catch(() => {});
   }, []);
 
-  const handleSupplierChange = useCallback((id: string) => {
+  const handleSupplierChange = useCallback(async (id: string) => {
     setSupplierId(id);
     const fromList = suppliers.find((s) => s.id === id) ?? null;
     // Optimistic list row — detail effect below replaces with full credit / last-PO data
@@ -355,8 +373,19 @@ export default function CreatePOPage() {
       setSearchQ([]);
     }
     if (id) {
-      void loadSupplierCatalog(id);
-      window.setTimeout(() => productSearchRef.current?.focus(), 120);
+      const { rows, fallback } = await loadSupplierCatalog(id);
+      // Auto-fill Order Lines with all products linked to this supplier
+      if (!fromGrnId && !fallback && rows.length > 0) {
+        const lines = variantsToOrderLines(rows);
+        setItems(lines);
+        setSearchQ(lines.map(() => ""));
+        setSelectedRowIdx(0);
+        toast.success(`Loaded ${lines.length} product${lines.length === 1 ? "" : "s"} into Order Lines`);
+        scrollToItems();
+        window.setTimeout(() => qtyInputRefs.current[0]?.focus(), 160);
+      } else {
+        window.setTimeout(() => productSearchRef.current?.focus(), 120);
+      }
     } else {
       catalogReqRef.current += 1;
       setAllVariants([]);
@@ -365,7 +394,7 @@ export default function CreatePOPage() {
       supplierDetailReqRef.current += 1;
       setLoadingSupplierDetail(false);
     }
-  }, [suppliers, loadSupplierCatalog, mapSupplierDetail, fromGrnId]);
+  }, [suppliers, loadSupplierCatalog, mapSupplierDetail, fromGrnId, variantsToOrderLines, scrollToItems]);
 
   // Always fetch full supplier summary when selection changes
   useEffect(() => {
