@@ -1494,6 +1494,7 @@ export class PosService {
       page?: number;
       category?: string;
       supplierId?: string;
+      includeImages?: boolean;
     },
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
@@ -1552,7 +1553,8 @@ export class PosService {
         : {}),
     };
 
-    const includeImages = take <= 100;
+    // Default: only for small pages (POS grid). Purchase flows can force images on.
+    const includeImages = opts?.includeImages === true || take <= 100;
     const [total, variants, categoryRows] = await Promise.all([
       paginated
         ? this.prisma.productVariant.count({ where })
@@ -2485,13 +2487,16 @@ export class PosController {
     @Query('page') page?: string,
     @Query('category') category?: string,
     @Query('supplierId') supplierId?: string,
+    @Query('includeImages') includeImages?: string,
   ) {
+    const imagesFlag = includeImages === '1' || includeImages === 'true';
     return this.posService.getProducts(user.tenantId, user.branchId ?? '', {
       search,
       limit: limit ? parseInt(limit, 10) : undefined,
       page: page ? parseInt(page, 10) : undefined,
       category,
       supplierId,
+      includeImages: imagesFlag,
     });
   }
 

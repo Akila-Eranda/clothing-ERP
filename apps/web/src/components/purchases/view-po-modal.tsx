@@ -28,7 +28,13 @@ export interface POItem {
   taxRate: number;
   taxAmount: number;
   total: number;
-  variant?: { size?: string | null; color?: string | null; images?: string[] };
+  variant?: {
+    size?: string | null;
+    color?: string | null;
+    barcode?: string | null;
+    images?: string[];
+    product?: { barcode?: string | null; images?: string[] };
+  };
 }
 
 export interface FullPurchaseOrder extends PurchaseOrder {
@@ -260,7 +266,7 @@ export function ViewPOModal({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {["#", "Product", "SKU", "Ordered", "Received", "Unit", "Total"].map((h, i) => (
+                            {["#", "Product", "Barcode", "Ordered", "Received", "Unit", "Total"].map((h, i) => (
                               <th key={h} className={cn("px-3 py-2.5 font-semibold", i >= 3 ? "text-right" : "text-left")}>{h}</th>
                             ))}
                           </tr>
@@ -268,17 +274,41 @@ export function ViewPOModal({
                         <tbody className="divide-y">
                           {(data.items ?? []).length === 0 ? (
                             <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground text-sm">No items</td></tr>
-                          ) : (data.items ?? []).map((item, i) => (
+                          ) : (data.items ?? []).map((item, i) => {
+                            const imageUrl =
+                              item.variant?.images?.[0]
+                              || item.variant?.product?.images?.[0]
+                              || null;
+                            const barcode =
+                              item.variant?.barcode
+                              || item.variant?.product?.barcode
+                              || "—";
+                            return (
                             <tr key={item.id} className="hover:bg-muted/20">
                               <td className="px-3 py-3 text-muted-foreground text-xs">{i + 1}</td>
-                              <td className="px-3 py-3 text-xs font-medium">{item.productName}{item.variantName ? ` · ${item.variantName}` : ""}</td>
-                              <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{item.sku}</td>
+                              <td className="px-3 py-3">
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/50">
+                                    {imageUrl ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                      <Package className="h-4 w-4 text-muted-foreground/60" />
+                                    )}
+                                  </div>
+                                  <span className="text-xs font-medium truncate">
+                                    {item.productName}{item.variantName ? ` · ${item.variantName}` : ""}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{barcode}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums font-semibold">{item.orderedQty}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>
                               <td className="px-3 py-3 text-xs text-right font-bold tabular-nums">{fmtMoney(item.total)}</td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -323,17 +353,38 @@ export function ViewPOModal({
                   <table className="w-full text-sm min-w-[700px]">
                     <thead>
                       <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {["#", "Product", "SKU", "Variant", "Ordered", "Received", "Rejected", "Unit Cost", "Discount", "Tax", "Amount"].map((h, i) => (
+                        {["#", "Product", "Barcode", "Variant", "Ordered", "Received", "Rejected", "Unit Cost", "Discount", "Tax", "Amount"].map((h, i) => (
                           <th key={h} className={cn("px-3 py-2.5 font-semibold whitespace-nowrap", i >= 4 ? "text-right" : "text-left")}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y">
-                      {(data.items ?? []).map((item, i) => (
+                      {(data.items ?? []).map((item, i) => {
+                        const imageUrl =
+                          item.variant?.images?.[0]
+                          || item.variant?.product?.images?.[0]
+                          || null;
+                        const barcode =
+                          item.variant?.barcode
+                          || item.variant?.product?.barcode
+                          || "—";
+                        return (
                         <tr key={item.id} className="hover:bg-muted/20">
                           <td className="px-3 py-3 text-xs text-muted-foreground">{i + 1}</td>
-                          <td className="px-3 py-3 text-xs font-medium">{item.productName}</td>
-                          <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{item.sku}</td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/50">
+                                {imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+                                ) : (
+                                  <Package className="h-4 w-4 text-muted-foreground/60" />
+                                )}
+                              </div>
+                              <span className="text-xs font-medium truncate">{item.productName}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{barcode}</td>
                           <td className="px-3 py-3 text-xs">{item.variantName || "—"}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums font-semibold">{item.orderedQty}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
@@ -343,7 +394,8 @@ export function ViewPOModal({
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.taxAmount ?? 0)}</td>
                           <td className="px-3 py-3 text-xs text-right font-bold tabular-nums">{fmtMoney(item.total)}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

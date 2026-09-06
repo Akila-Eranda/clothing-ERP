@@ -32,7 +32,13 @@ interface POItem {
   id: string; variantId: string; productName: string; variantName: string; sku: string;
   orderedQty: number; receivedQty: number; rejectedQty: number;
   unitCost: number; discount: number; taxRate: number; taxAmount: number; total: number;
-  variant?: { size?: string | null; color?: string | null; images?: string[] };
+  variant?: {
+    size?: string | null;
+    color?: string | null;
+    barcode?: string | null;
+    images?: string[];
+    product?: { barcode?: string | null; images?: string[] };
+  };
 }
 interface Supplier {
   id: string; name: string; phone?: string | null; email?: string | null;
@@ -443,22 +449,32 @@ export default function PODetailPage() {
           <table className="enterprise-table w-full text-sm">
             <thead>
               <tr>
-                {["#", "Item", "SKU", "Variant", "Qty", "Unit Cost", "Discount", "Tax", "Amount"].map((h) => (
-                  <th key={h} className={h === "#" || h === "Item" || h === "SKU" || h === "Variant" ? "text-left" : "text-right"}>
+                {["#", "Item", "Barcode", "Variant", "Qty", "Unit Cost", "Discount", "Tax", "Amount"].map((h) => (
+                  <th key={h} className={h === "#" || h === "Item" || h === "Barcode" || h === "Variant" ? "text-left" : "text-right"}>
                     {h}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {(po.items ?? []).map((item, i) => (
+              {(po.items ?? []).map((item, i) => {
+                const imageUrl =
+                  item.variant?.images?.[0]
+                  || item.variant?.product?.images?.[0]
+                  || null;
+                const barcode =
+                  item.variant?.barcode
+                  || item.variant?.product?.barcode
+                  || "—";
+                return (
                 <tr key={item.id}>
                   <td className="text-muted-foreground text-xs">{i + 1}</td>
                   <td>
                     <div className="flex items-center gap-2.5 min-w-[180px]">
                       <div className="h-9 w-9 rounded-lg bg-muted/50 flex items-center justify-center shrink-0 overflow-hidden">
-                        {item.variant?.images?.[0] ? (
-                          <img src={item.variant.images[0]} alt="" className="h-full w-full object-cover" />
+                        {imageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={imageUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <Package className="h-4 w-4 text-muted-foreground" />
                         )}
@@ -466,7 +482,7 @@ export default function PODetailPage() {
                       <span className="font-medium text-sm">{item.productName}</span>
                     </div>
                   </td>
-                  <td className="font-mono text-xs text-muted-foreground">{item.sku}</td>
+                  <td className="font-mono text-xs text-muted-foreground">{barcode}</td>
                   <td className="text-sm">{item.variantName || "—"}</td>
                   <td className="text-right font-semibold tabular-nums">{item.orderedQty}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.unitCost)}</td>
@@ -474,7 +490,8 @@ export default function PODetailPage() {
                   <td className="text-right tabular-nums">{formatNumber(item.taxAmount)}</td>
                   <td className="text-right font-bold tabular-nums">{formatNumber(item.total)}</td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
             <tfoot>
               <tr className="bg-muted/30 font-semibold">

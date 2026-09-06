@@ -12,6 +12,7 @@ import { useBranchStore } from "@/stores/branch-store";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
+import { resolvePublicAssetUrl } from "@/lib/upload";
 import {
   FORM_PAGE, FORM_CARD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
   FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_STATUS_BADGE,
@@ -250,9 +251,9 @@ export default function CreatePOPage() {
     try {
       const [supplierRes, allRes] = await Promise.all([
         api.get<VariantOpt[] | { items: VariantOpt[] }>(
-          `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
+          `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000&includeImages=1`,
         ),
-        api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000"),
+        api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000&includeImages=1"),
       ]);
       if (reqId !== catalogReqRef.current) return { rows: [], linkedRows: [], fallback: false };
 
@@ -1097,8 +1098,7 @@ export default function CreatePOPage() {
                                 {[v.brand, v.category, v.variantName !== "Default" ? v.variantName : null].filter(Boolean).join(" · ") || "—"}
                               </p>
                               <p className="mt-0.5 truncate font-mono text-[10px] text-muted-foreground">
-                                SKU {v.sku}
-                                {v.barcode ? ` · ${v.barcode}` : ""}
+                                {v.barcode ? `Barcode ${v.barcode}` : "No barcode"}
                                 {v.supplierProductCode ? ` · SPC ${v.supplierProductCode}` : ""}
                               </p>
                             </div>
@@ -1195,7 +1195,8 @@ export default function CreatePOPage() {
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold leading-snug">{item.productName}</p>
                               <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">
-                                {item.sku}{item.variantName ? ` · ${item.variantName}` : ""}
+                                {item.barcode || v?.barcode || "—"}
+                                {item.variantName && item.variantName !== "Default" ? ` · ${item.variantName}` : ""}
                               </p>
                               <p className="mt-1 text-xs text-muted-foreground">
                                 Stock {stock ?? "—"}
@@ -1249,9 +1250,22 @@ export default function CreatePOPage() {
                                       onClick={() => selectVariant(idx, vv)}
                                       className="flex w-full items-center justify-between gap-2 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50"
                                     >
-                                      <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">{vv.productName}</p>
-                                        <p className="truncate text-xs text-muted-foreground">{vv.sku} · {vv.variantName}</p>
+                                      <div className="flex min-w-0 items-center gap-2.5">
+                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/50">
+                                          {vv.imageUrl ? (
+                                            // eslint-disable-next-line @next/next/no-img-element
+                                            <img src={vv.imageUrl} alt="" className="h-full w-full object-cover" />
+                                          ) : (
+                                            <Package className="h-4 w-4 text-muted-foreground/60" />
+                                          )}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="truncate text-sm font-medium">{vv.productName}</p>
+                                          <p className="truncate font-mono text-xs text-muted-foreground">
+                                            {vv.barcode || "—"}
+                                            {vv.variantName && vv.variantName !== "Default" ? ` · ${vv.variantName}` : ""}
+                                          </p>
+                                        </div>
                                       </div>
                                       <span className="shrink-0 text-xs font-semibold tabular-nums">LKR {vv.costPrice.toLocaleString()}</span>
                                     </button>
@@ -1326,7 +1340,7 @@ export default function CreatePOPage() {
                     <tr className={FORM_TABLE_HEAD_ROW}>
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
                       <th className="px-4 py-3 text-left font-semibold min-w-[300px] max-w-[360px]">Product</th>
-                      <th className="px-3 py-3 text-left font-semibold w-36">SKU</th>
+                      <th className="px-3 py-3 text-left font-semibold w-36">Barcode</th>
                       <th className="px-3 py-3 text-right font-semibold w-16">
                         <span className="inline-flex items-center gap-1 justify-end">Stock <Info className="h-3 w-3" /></span>
                       </th>
@@ -1423,9 +1437,20 @@ export default function CreatePOPage() {
                                           onClick={() => selectVariant(idx, vv)}
                                           className="flex w-full items-center gap-3 border-b px-3 py-2.5 text-left last:border-0 hover:bg-muted/50"
                                         >
+                                          <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted/50">
+                                            {vv.imageUrl ? (
+                                              // eslint-disable-next-line @next/next/no-img-element
+                                              <img src={vv.imageUrl} alt="" className="h-full w-full object-cover" />
+                                            ) : (
+                                              <Package className="h-4 w-4 text-muted-foreground/60" />
+                                            )}
+                                          </div>
                                           <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm font-medium">{vv.productName}</p>
-                                            <p className="truncate text-xs text-muted-foreground">{vv.sku} · {vv.variantName}</p>
+                                            <p className="truncate font-mono text-xs text-muted-foreground">
+                                              {vv.barcode || "—"}
+                                              {vv.variantName && vv.variantName !== "Default" ? ` · ${vv.variantName}` : ""}
+                                            </p>
                                           </div>
                                           <div className="shrink-0 text-right">
                                             <p className="text-xs font-semibold tabular-nums">LKR {vv.costPrice.toLocaleString()}</p>
@@ -1439,7 +1464,9 @@ export default function CreatePOPage() {
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground">{item.sku || "—"}</td>
+                          <td className="px-3 py-3 font-mono text-xs text-muted-foreground">
+                            {item.barcode || v?.barcode || "—"}
+                          </td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{stock ?? "—"}</td>
                           <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{fmtDate(v?.lastPurchaseDate)}</td>
                           <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{dash(v?.lastPurchaseQty)}</td>
@@ -1805,7 +1832,6 @@ function SelectedProductPanel({
     ["Brand", dash(variant?.brand)],
     ["Category", dash(variant?.category)],
     ["Barcode", variant?.barcode ?? item.barcode ?? "—"],
-    ["SKU", item.sku || "—"],
     ["Current Stock", variant?.stock ?? "—"],
     ["Reserved Stock", variant?.reservedStock ?? "—"],
     ["Available Stock", variant?.availableStock ?? (variant?.stock != null ? variant.stock : "—")],
@@ -1833,7 +1859,9 @@ function SelectedProductPanel({
         </div>
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-foreground">{item.productName}</p>
-          <p className="truncate font-mono text-xs text-muted-foreground">{item.sku}</p>
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {item.barcode || variant?.barcode || "—"}
+          </p>
           {item.variantName && <p className="truncate text-xs text-muted-foreground">{item.variantName}</p>}
         </div>
       </div>
