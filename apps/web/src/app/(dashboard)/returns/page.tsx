@@ -21,7 +21,9 @@ import { formatNumber, cn } from "@/lib/utils";
 import { parseApiList } from "@/lib/parse-api-list";
 import { useShopProfile } from "@/lib/use-shop-profile";
 import { getReturnReasons } from "@/lib/shop-vertical";
+import { ShopType } from "@/lib/shop-profiles";
 import { ModuleGate } from "@/components/shop/module-gate";
+import { SizeSwapPicker } from "@/components/clothing/size-swap-picker";
 import { ViewReturnModal, printReturnBill, type ReturnRecord } from "@/components/returns/view-return-modal";
 type ReasonOption = { value: string; label: string };
 
@@ -38,7 +40,12 @@ interface ExchangeItem { variantId: string; quantity: number; unitPrice: number;
 interface SaleLookup {
   id: string; invoiceNumber: string; total: number;
   customer?: { firstName: string; lastName?: string } | null;
-  items: { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number }[];
+  items: {
+    id: string; variantId: string; productId?: string;
+    productName: string; variantName: string; sku: string;
+    quantity: number; unitPrice: number;
+    size?: string | null; color?: string | null;
+  }[];
 }
 interface VariantLookup {
   id: string; sku: string; price: number;
@@ -49,6 +56,8 @@ interface VariantLookup {
 const STEPS = ["Type", "Invoice", "Items", "Confirm"];
 
 function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose: () => void; onSaved: () => void; initialInvoice?: string; reasons: ReasonOption[] }) {
+  const profile = useShopProfile();
+  const isClothing = profile.type === ShopType.CLOTHING;
   const [step, setStep]                   = useState(initialInvoice ? 1 : 0);
   const [mode, setMode]                   = useState<"RETURN" | "EXCHANGE">("RETURN");
   const [invoiceSearch, setInvoiceSearch] = useState(initialInvoice ?? "");
@@ -58,6 +67,7 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
   const [skuSearch, setSkuSearch]         = useState("");
   const [skuLoading, setSkuLoading]       = useState(false);
   const [exchangeItems, setExchangeItems] = useState<ExchangeItem[]>([]);
+  const [sizeSwapFocusId, setSizeSwapFocusId] = useState<string | null>(null);
   const [reason, setReason]               = useState("");
   const [notes, setNotes]                 = useState("");
   const [restock, setRestock]             = useState(true);
@@ -78,16 +88,20 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
         customer: s.customer ? { firstName: s.customer.firstName, lastName: s.customer.lastName } : null,
         items: (s.items ?? []).map((item: any) => ({
           id: item.id, variantId: item.variantId,
+          productId: item.variant?.productId ?? item.variant?.product?.id,
           productName: item.productName ?? item.variant?.product?.name ?? "Unknown",
           variantName: item.variantName ?? "",
           sku: item.sku ?? item.variant?.sku ?? "",
           quantity: item.quantity, unitPrice: item.unitPrice,
+          size: item.variant?.size ?? null,
+          color: item.variant?.color ?? null,
         })),
       };
       setFoundSale(sale);
       const init: Record<string, { selected: boolean; quantity: number }> = {};
       sale.items.forEach((item) => { init[item.id] = { selected: true, quantity: item.quantity }; });
       setSelectedItems(init);
+      setSizeSwapFocusId(sale.items[0]?.id ?? null);
       setStep(2);
     } catch { toast.error("Invoice not found"); }
     finally { setSearchLoading(false); }
@@ -299,6 +313,58 @@ function NewReturnModal({ onClose, onSaved, initialInvoice, reasons }: { onClose
               {/* Exchange items */}
               {isExchange && (
                 <div className="space-y-2 pt-2 border-t">
+                  {isClothing && (
+                    <div className="rounded-xl border border-violet-200 bg-violet-500/5 p-3 space-y-2">
+                      <p className="text-[10px] font-bold text-violet-700 uppercase tracking-wide">Exchange Size</p>
+                      <p className="text-[10px] text-muted-foreground">
+                        Select a returned line, then pick a sibling size (same color).
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {foundSale.items
+                          .filter((i) => selectedItems[i.id]?.selected)
+                          .map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setSizeSwapFocusId(item.id)}
+                              className={`text-[10px] px-2 py-1 rounded-md border ${
+                                sizeSwapFocusId === item.id
+                                  ? "border-violet-500 bg-violet-500/15 text-violet-800"
+                                  : "border-border bg-card"
+                              }`}
+                            >
+                              {item.productName}
+                              {item.size || item.color ? ` · ${[item.size, item.color].filter(Boolean).join("/")}` : ""}
+                            </button>
+                          ))}
+                      </div>
+                      {(() => {
+                        const focus =
+                          foundSale.items.find((i) => i.id === sizeSwapFocusId && selectedItems[i.id]?.selected)
+                          ?? foundSale.items.find((i) => selectedItems[i.id]?.selected);
+                        if (!focus?.productId) return null;
+                        return (
+                          <SizeSwapPicker
+                            productId={focus.productId}
+                            sourceVariantId={focus.variantId}
+                            color={focus.color}
+                            selectedVariantId={exchangeItems[0]?.variantId}
+                            onSelect={(opt) => {
+                              setExchangeItems([{
+                                variantId: opt.id,
+                                quantity: selectedItems[focus.id]?.quantity ?? 1,
+                                unitPrice: opt.sellingPrice,
+                                productName: opt.productName,
+                                variantName: opt.variantName ?? [opt.size, opt.color].filter(Boolean).join(" / "),
+                                sku: opt.sku,
+                              }]);
+                              toast.success(`Exchange size: ${opt.size ?? opt.sku}`);
+                            }}
+                          />
+                        );
+                      })()}
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <div className="h-5 w-5 rounded-md bg-violet-500/10 flex items-center justify-center"><ArrowLeftRight className="h-3 w-3 text-violet-600" /></div>
                     <p className="text-xs font-bold text-violet-700">Items to Give Customer (Exchange)</p>

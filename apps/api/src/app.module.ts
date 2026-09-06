@@ -45,6 +45,7 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { AuditLogModule } from './modules/audit-log/audit-log.module';
 import { MailModule } from './modules/mail/mail.module';
 import { CollectionsModule } from './modules/collections/collections.module';
+import { ClothingModule } from './modules/clothing/clothing.module';
 import { WebsocketModule } from './websocket/websocket.module';
 import { QueuesModule } from './queues/queues.module';
 import { HealthModule } from './health/health.module';
@@ -114,6 +115,7 @@ import { PlatformOpsModule } from './modules/platform-ops/platform-ops.module';
     PromotionsModule,
     AuditLogModule,
     CollectionsModule,
+    ClothingModule,
     WorkflowModule,
     CashManagementModule,
     SparePartsModule,

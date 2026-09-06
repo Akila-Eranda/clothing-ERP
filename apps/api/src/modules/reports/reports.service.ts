@@ -1,10 +1,12 @@
 /** Report Engine — operational report queries (Prisma). */
 
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { SaleStatus, ShopType } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import * as dayjs from 'dayjs';
 import {
   dayRange,
+  round2,
   summarizeChequeRows,
   summarizeCommissionRows,
   summarizeCustomerRows,
@@ -13,6 +15,8 @@ import {
   sumField,
 } from './report-engine.helper';
 import { daysUntilExpiry, expiryReportStatus } from '@/modules/inventory/inventory-lots.helper';
+
+const FASHION_SALE_STATUSES: SaleStatus[] = [SaleStatus.COMPLETED, SaleStatus.PARTIALLY_REFUNDED];
 
 @Injectable()
 export class ReportsService {
@@ -642,5 +646,156 @@ export class ReportsService {
     return Object.values(map)
       .map((r) => ({ ...r, name: nameMap[r.technicianId] ?? r.technicianId }))
       .sort((a, b) => b.revenue - a.revenue);
+  }
+
+  /**
+   * Clothing-only fashion analytics: size/color mix, top variants, dead stock, sell-through.
+   * Aggregates SaleItem + ProductVariant + Inventory (no dedicated fashion tables).
+   */
+  async fashionAnalytics(tenantId: string, from: string, to: string, branchId?: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { shopType: true },
+    });
+    if (tenant?.shopType !== ShopType.CLOTHING) {
+      throw new ForbiddenException('Fashion analytics is only available for Clothing shops');
+    }
+
+    if (branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: branchId, tenantId },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new ForbiddenException('Branch is not available for this tenant');
+      }
+    }
+
+    const dateRange = dayRange(from, to);
+    const items = await this.prisma.saleItem.findMany({
+      where: {
+        variantId: { not: null },
+        sale: {
+          tenantId,
+          ...(branchId ? { branchId } : {}),
+          status: { in: FASHION_SALE_STATUSES },
+          invoiceDate: dateRange,
+        },
+      },
+      select: {
+        quantity: true,
+        total: true,
+        variantId: true,
+        productName: true,
+        sku: true,
+        variant: {
+          select: {
+            size: true,
+            color: true,
+            sku: true,
+            product: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    const sizeMap: Record<string, { size: string; units: number; revenue: number }> = {};
+    const colorMap: Record<string, { color: string; units: number; revenue: number }> = {};
+    const variantMap: Record<
+      string,
+      { productName: string; size: string | null; color: string | null; sku: string; units: number; revenue: number }
+    > = {};
+    let unitsSold = 0;
+
+    for (const item of items) {
+      const size = item.variant?.size ?? 'Unknown';
+      const color = item.variant?.color ?? 'Unknown';
+      const sku = item.variant?.sku ?? item.sku;
+      const productName = item.variant?.product?.name ?? item.productName;
+      const variantKey = item.variantId!;
+
+      unitsSold += item.quantity;
+
+      if (!sizeMap[size]) sizeMap[size] = { size, units: 0, revenue: 0 };
+      sizeMap[size].units += item.quantity;
+      sizeMap[size].revenue += item.total;
+
+      if (!colorMap[color]) colorMap[color] = { color, units: 0, revenue: 0 };
+      colorMap[color].units += item.quantity;
+      colorMap[color].revenue += item.total;
+
+      if (!variantMap[variantKey]) {
+        variantMap[variantKey] = {
+          productName,
+          size: item.variant?.size ?? null,
+          color: item.variant?.color ?? null,
+          sku,
+          units: 0,
+          revenue: 0,
+        };
+      }
+      variantMap[variantKey].units += item.quantity;
+      variantMap[variantKey].revenue += item.total;
+    }
+
+    const soldVariantIds = Object.keys(variantMap);
+
+    const inventoryAgg = await this.prisma.inventory.groupBy({
+      by: ['variantId'],
+      where: { tenantId, ...(branchId ? { branchId } : {}) },
+      _sum: { quantity: true },
+    });
+
+    const remainingStock = Math.max(0, inventoryAgg.reduce((sum, row) => sum + (row._sum.quantity ?? 0), 0));
+    const denom = unitsSold + remainingStock;
+    const sellThroughRaw = denom > 0 ? round2((unitsSold / denom) * 100) : 0;
+    const sellThrough = Math.min(100, Math.max(0, sellThroughRaw));
+
+    const soldSet = new Set(soldVariantIds);
+    const stockedUnsold = inventoryAgg
+      .filter((row) => (row._sum.quantity ?? 0) > 0 && !soldSet.has(row.variantId))
+      .sort((a, b) => (b._sum.quantity ?? 0) - (a._sum.quantity ?? 0))
+      .slice(0, 50);
+
+    const deadVariantIds = stockedUnsold.map((r) => r.variantId);
+    const deadVariants = deadVariantIds.length
+      ? await this.prisma.productVariant.findMany({
+          where: { id: { in: deadVariantIds } },
+          select: {
+            id: true,
+            size: true,
+            color: true,
+            sku: true,
+            product: { select: { name: true } },
+          },
+        })
+      : [];
+    const deadMeta = Object.fromEntries(deadVariants.map((v) => [v.id, v]));
+
+    const deadStock = stockedUnsold.map((row) => {
+      const meta = deadMeta[row.variantId];
+      return {
+        productName: meta?.product?.name ?? 'Unknown',
+        size: meta?.size ?? null,
+        color: meta?.color ?? null,
+        sku: meta?.sku ?? '',
+        qty: row._sum.quantity ?? 0,
+      };
+    });
+
+    return {
+      sizeSales: Object.values(sizeMap)
+        .map((r) => ({ ...r, revenue: round2(r.revenue) }))
+        .sort((a, b) => b.units - a.units),
+      colorSales: Object.values(colorMap)
+        .map((r) => ({ ...r, revenue: round2(r.revenue) }))
+        .sort((a, b) => b.units - a.units),
+      topVariants: Object.values(variantMap)
+        .map((r) => ({ ...r, revenue: round2(r.revenue) }))
+        .sort((a, b) => b.units - a.units || b.revenue - a.revenue)
+        .slice(0, 20),
+      deadStock,
+      sellThrough,
+    };
   }
 }

@@ -5,6 +5,8 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import {
   applyThemeLayout,
   DEFAULT_THEME_LAYOUT,
+  getSidebarSkinChromePatch,
+  getTopbarSkinChromePatch,
   type LayoutMode,
   type LayoutWidth,
   type SidebarSkin,
@@ -13,8 +15,27 @@ import {
 } from "@/lib/theme-layout";
 import { useThemeColorsStore } from "@/stores/theme-colors-store";
 
-function refreshChromeColors() {
-  useThemeColorsStore.getState().apply();
+function isDarkDocument() {
+  if (typeof document === "undefined") return false;
+  return document.documentElement.classList.contains("dark");
+}
+
+function syncChromeFromSidebarSkin(sidebarSkin: SidebarSkin) {
+  const patch = getSidebarSkinChromePatch(sidebarSkin, isDarkDocument());
+  if (Object.keys(patch).length > 0) {
+    useThemeColorsStore.getState().patchColors(patch);
+  } else {
+    useThemeColorsStore.getState().apply();
+  }
+}
+
+function syncChromeFromTopbarSkin(topbarSkin: TopbarSkin) {
+  const patch = getTopbarSkinChromePatch(topbarSkin, isDarkDocument());
+  if (Object.keys(patch).length > 0) {
+    useThemeColorsStore.getState().patchColors(patch);
+  } else {
+    useThemeColorsStore.getState().apply();
+  }
 }
 
 interface ThemeLayoutStore extends ThemeLayoutState {
@@ -44,24 +65,25 @@ export const useThemeLayoutStore = create<ThemeLayoutStore>()(
       setSidebarSkin: (sidebarSkin) => {
         set({ sidebarSkin });
         applyThemeLayout({ ...get(), sidebarSkin });
-        refreshChromeColors();
+        syncChromeFromSidebarSkin(sidebarSkin);
       },
 
       setTopbarSkin: (topbarSkin) => {
         set({ topbarSkin });
         applyThemeLayout({ ...get(), topbarSkin });
-        refreshChromeColors();
+        syncChromeFromTopbarSkin(topbarSkin);
       },
 
       reset: () => {
         set({ ...DEFAULT_THEME_LAYOUT });
         applyThemeLayout(DEFAULT_THEME_LAYOUT);
-        refreshChromeColors();
+        syncChromeFromSidebarSkin(DEFAULT_THEME_LAYOUT.sidebarSkin);
       },
 
       apply: () => {
-        applyThemeLayout(get());
-        refreshChromeColors();
+        const state = get();
+        applyThemeLayout(state);
+        syncChromeFromSidebarSkin(state.sidebarSkin);
       },
     }),
     {
@@ -70,7 +92,7 @@ export const useThemeLayoutStore = create<ThemeLayoutStore>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           applyThemeLayout(state);
-          refreshChromeColors();
+          syncChromeFromSidebarSkin(state.sidebarSkin);
         }
       },
     },

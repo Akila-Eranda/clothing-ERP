@@ -6,7 +6,7 @@ import {
   TrendingUp, TrendingDown, DollarSign, ShoppingCart, Users, Package,
   FileText,
   CreditCard, AlertTriangle, BarChart2, Percent, Award, Banknote,
-  Building2, Store, Truck, Wallet, Receipt,
+  Building2, Store, Truck, Wallet, Receipt, Shirt,
 } from "lucide-react";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -24,6 +24,9 @@ import {
   reportsPath,
   type ReportsSection,
 } from "@/components/reports/reports-config";
+import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
+import Link from "next/link";
 
 export { REPORTS_TABS, reportsPath, type ReportsSection };
 
@@ -117,6 +120,9 @@ function ShareCell({ value, total }: { value: number; total: number }) {
 // ── Hub ───────────────────────────────────────────────────────────────────
 export function ReportsHub({ section }: { section: ReportsSection }) {
   const router = useRouter();
+  const profile = useShopProfile();
+  const showFashion =
+    profile.type === ShopType.CLOTHING || hasShopModule(profile, "collections");
   const activeBranchId = useBranchStore((s) => s.activeBranchId);
   const activeBranchName = useBranchStore((s) => s.activeBranchName);
   const [range, setRange]           = useState({ label: "This Month", start: monthStart(), end: today() });
@@ -456,6 +462,44 @@ export function ReportsHub({ section }: { section: ReportsSection }) {
 
           {section === "overview" && (
           <div className="m-0 space-y-5">
+            {showFashion ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Link
+                  href="/reports/fashion"
+                  className="block rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Shirt className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold">Fashion Analytics</p>
+                      <p className="text-xs text-muted-foreground">
+                        Size &amp; color sales, collection sell-through
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+                {profile.type === ShopType.CLOTHING ? (
+                  <Link
+                    href="/reports/fashion-reorder"
+                    className="block rounded-xl border border-border bg-card p-4 hover:border-primary/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                        <Package className="h-5 w-5 text-amber-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold">Fashion Reorder</p>
+                        <p className="text-xs text-muted-foreground">
+                          Size/color velocity &amp; suggested qty
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
             <ReportKpiGrid items={kpis} loading={loading} />
 
             {/* 12-month trend + cash flow */}

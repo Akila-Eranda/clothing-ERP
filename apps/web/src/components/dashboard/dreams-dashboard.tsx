@@ -6,14 +6,17 @@ import { useRouter } from "next/navigation";
 import {
   FileText, Repeat, Gift, Wallet, Layers, PieChart, LifeBuoy, Hash,
   Info, UserCheck, Users, ShoppingCart, CalendarDays, Package,
-  AlertTriangle, Box, Flag, MapPin,
+  AlertTriangle, Box, Flag, MapPin, Shirt, BarChart3,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { parseApiList } from "@/lib/parse-api-list";
 import { formatNumber, getInitials } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/auth-store";
+import { useBranchStore } from "@/stores/branch-store";
 import { useShopProfile } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
+import { hasShopModule } from "@/lib/shop-vertical";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
   DreamsSalesPurchaseChart,
@@ -111,6 +114,123 @@ function custName(s: SaleRow) {
   if (s.customer?.name) return s.customer.name;
   return `${s.customer?.firstName ?? ""} ${s.customer?.lastName ?? ""}`.trim() || "Walk-in";
 }
+
+function FashionPulseStrip() {
+  const router = useRouter();
+  const shopProfile = useShopProfile();
+  const activeBranchId = useBranchStore((s) => s.activeBranchId);
+  const userBranchId = useAuthStore((s) => s.user?.branchId);
+  const branchId = activeBranchId ?? userBranchId ?? "";
+  const [metrics, setMetrics] = React.useState({
+    reorderHigh: 0,
+    reorderTotal: 0,
+    fittingsOpen: 0,
+    loading: true,
+  });
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const q = branchId ? `branchId=${encodeURIComponent(branchId)}&days=30` : "days=30";
+        const [reorderRes, fittingRes] = await Promise.all([
+          branchId
+            ? api.get<{ demandLevel?: string }[]>(`/clothing/reorder-suggestions?${q}`).catch(() => ({ data: [] }))
+            : Promise.resolve({ data: [] as { demandLevel?: string }[] }),
+          branchId && hasShopModule(shopProfile, "fittingRoom")
+            ? api
+                .get<{ status?: string }[]>(
+                  `/clothing/fitting-sessions?branchId=${encodeURIComponent(branchId)}&status=IN_FITTING,RESERVED`,
+                )
+                .catch(() => ({ data: [] }))
+            : Promise.resolve({ data: [] as { status?: string }[] }),
+        ]);
+        const reorder = parseApiList(reorderRes.data);
+        const fittings = parseApiList(fittingRes.data);
+        if (cancelled) return;
+        setMetrics({
+          reorderHigh: reorder.filter((r) => (r.demandLevel || "").toUpperCase() === "HIGH").length,
+          reorderTotal: reorder.length,
+          fittingsOpen: fittings.length,
+          loading: false,
+        });
+      } catch {
+        if (!cancelled) setMetrics((m) => ({ ...m, loading: false }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [branchId, shopProfile]);
+
+  return (
+    <div className="row mb-3">
+      <div className="col-12">
+        <div className="card flex-fill border">
+          <div className="card-body d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
+            <div className="d-flex align-items-center gap-2">
+              <span className="bg-primary/10 rounded-circle p-2 d-inline-flex">
+                <Shirt size={18} className="text-primary" />
+              </span>
+              <div>
+                <h6 className="mb-0">Fashion pulse</h6>
+                <p className="mb-0 text-muted fs-13">
+                  {metrics.loading
+                    ? "Loading fashion metrics…"
+                    : `${metrics.reorderHigh} high-velocity reorders · ${metrics.reorderTotal} suggestions · ${metrics.fittingsOpen} open fittings`}
+                </p>
+              </div>
+            </div>
+            <div className="d-flex flex-wrap gap-2">
+              {hasShopModule(shopProfile, "collections") ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                  onClick={() => router.push("/collections")}
+                >
+                  <Layers size={14} /> Collections
+                </button>
+              ) : null}
+              {hasShopModule(shopProfile, "storeLocations") ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                  onClick={() => router.push("/store-locations")}
+                >
+                  <MapPin size={14} /> Locations
+                </button>
+              ) : null}
+              {hasShopModule(shopProfile, "fittingRoom") ? (
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                  onClick={() => router.push("/fitting-rooms")}
+                >
+                  <Shirt size={14} /> Fitting rooms
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1"
+                onClick={() => router.push("/reports/fashion-reorder")}
+              >
+                <Package size={14} /> Reorder
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-primary d-inline-flex align-items-center gap-1"
+                onClick={() => router.push("/reports/fashion")}
+              >
+                <BarChart3 size={14} /> Fashion reports
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function statusBadge(status: string) {
   const s = status.toUpperCase();
   if (s === "COMPLETED" || s === "RECEIVED") return "badge-success";
@@ -375,6 +495,10 @@ export function DreamsDashboard() {
             );
           })}
         </div>
+
+        {shopProfile.type === ShopType.CLOTHING ? (
+          <FashionPulseStrip />
+        ) : null}
 
         {/* Secondary row */}
         <div className="row">

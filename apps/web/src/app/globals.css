@@ -346,6 +346,17 @@
     color: hsl(var(--muted-foreground));
   }
 
+  /* ── System buttons — match header POS / toolbar design ── */
+  .dashboard-shell main .inline-flex.items-center.justify-center,
+  .admin-app-shell main .inline-flex.items-center.justify-center {
+    letter-spacing: 0.01em;
+  }
+
+  .dashboard-shell main button[data-slot="button"],
+  .admin-app-shell main button[data-slot="button"] {
+    border-radius: 0.5rem;
+  }
+
   /* Hub section tabs — enterprise underline style */
   .dashboard-shell .hex-section-tabs button[type="button"],
   .admin-app-shell .hex-section-tabs button[type="button"] {
@@ -655,6 +666,10 @@
     border: 1px solid hsl(var(--border)) !important;
     color: hsl(var(--foreground)) !important;
     box-shadow: none;
+    border-radius: 0.5rem !important;
+    font-size: 0.8125rem !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em;
   }
   .dark [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) {
     background: hsl(var(--card)) !important;
@@ -667,10 +682,12 @@
 
   [data-table-craft] > .max-md\:hidden button:not([role="combobox"]):not([role="checkbox"]) svg {
     color: hsl(var(--muted-foreground)) !important;
+    width: 18px !important;
+    height: 18px !important;
   }
   [data-table-craft] > .max-md\:hidden button:hover {
-    background: hsl(var(--muted)) !important;
-    border-color: hsl(var(--primary) / 0.3) !important;
+    background: hsl(var(--primary) / 0.06) !important;
+    border-color: hsl(var(--primary) / 0.35) !important;
     color: hsl(var(--primary)) !important;
   }
 

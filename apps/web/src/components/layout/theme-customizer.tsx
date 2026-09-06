@@ -257,15 +257,19 @@ function resolveAccentHex(
 
 function ThemePreviewStrip({ isDark }: { isDark: boolean }) {
   const colors = useThemeColorsStore();
+  const sidebarSkin = useThemeLayoutStore((s) => s.sidebarSkin);
   const bg = isDark ? colors.darkBackground : colors.lightBackground;
   const card = isDark ? colors.darkCard : colors.lightCard;
   const accent = resolveAccentHex(colors, isDark);
   const fg = isDark ? colors.darkForeground : colors.lightForeground;
+  const sidebarBg =
+    SIDEBAR_SKIN_SWATCHES.find((s) => s.id === sidebarSkin)?.css
+    ?? (isDark ? (colors.darkChromeBgCss || colors.darkChromeBg) : (colors.lightChromeBgCss || colors.lightChromeBg));
 
   return (
     <div className="tc-preview">
       <div className="tc-preview__frame" style={{ background: bg }}>
-        <div className="tc-preview__sidebar" style={{ background: isDark ? (colors.darkChromeBgCss || colors.darkChromeBg) : (colors.lightChromeBgCss || colors.lightChromeBg) }} />
+        <div className="tc-preview__sidebar" style={{ background: sidebarBg }} />
         <div className="tc-preview__main">
           <div className="tc-preview__topbar" style={{ background: card, borderColor: isDark ? colors.darkBorder : colors.lightBorder }} />
           <div className="tc-preview__card" style={{ background: card, borderColor: isDark ? colors.darkBorder : colors.lightBorder }}>

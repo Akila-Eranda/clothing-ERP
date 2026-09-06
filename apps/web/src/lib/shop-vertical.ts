@@ -17,7 +17,14 @@ export function getReturnReasons(type: ShopType | string | null | undefined) {
     { v: 'OTHER', l: 'Other' },
   ];
   if (t === ShopType.CLOTHING) {
-    return [{ v: 'SIZE_ISSUE', l: 'Size Issue' }, ...common];
+    return [
+      { v: 'SIZE_ISSUE', l: 'Size Issue' },
+      { v: 'COLOR_ISSUE', l: 'Color Issue' },
+      { v: 'WRONG_ITEM', l: 'Wrong Item' },
+      { v: 'DEFECTIVE', l: 'Defective' },
+      { v: 'CUSTOMER_CHANGED_MIND', l: 'Changed Mind' },
+      { v: 'OTHER', l: 'Other' },
+    ];
   }
   if (t === ShopType.GROCERY) {
     return [{ v: 'EXPIRED', l: 'Expired Product' }, { v: 'QUALITY_ISSUE', l: 'Quality Issue' }, ...common];
@@ -51,6 +58,13 @@ export function getRouteLabels(ws: WorkspaceConfig, profile: ShopProfile): Recor
     '/products': ws.productLabel,
     '/categories': 'Categories',
     '/brands': brandRouteLabel,
+    '/collections': 'Collections',
+    '/store-locations': 'Store Locations',
+    '/fashion-colors': 'Colors',
+    '/outfits': 'Outfits',
+    '/fitting-rooms': 'Fitting Rooms',
+    '/reports/fashion': 'Fashion Analytics',
+    '/reports/fashion-reorder': 'Fashion Reorder',
     '/inventory': 'Stock Levels',
     '/inventory/ledger': 'Inventory Ledger',
     '/inventory/abc': 'ABC Analysis',
@@ -213,6 +227,7 @@ export function getSidebarSectionTitles(profile: ShopProfile) {
       : product === 'AGRI PRODUCTS' ? 'Agri Catalog'
       : product === 'ITEMS & STOCK' ? 'Items'
       : 'Catalog',
+    fashion: 'Fashion',
     inventory: 'Inventory',
     procurement: 'Procurement',
     finance: 'Finance',

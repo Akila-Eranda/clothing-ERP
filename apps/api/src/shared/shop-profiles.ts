@@ -42,9 +42,27 @@ export interface ShopProfile {
     quotations: boolean;
     workshop: boolean;
     appointments: boolean;
+    storeLocations: boolean;
+    fittingRoom: boolean;
+    outfits: boolean;
+    colorMaster: boolean;
   };
   labelTemplates: Array<'sticker' | 'hangtag' | 'shelf'>;
 }
+
+const FASHION_OFF = {
+  storeLocations: false,
+  fittingRoom: false,
+  outfits: false,
+  colorMaster: false,
+} as const;
+
+const FASHION_ON = {
+  storeLocations: true,
+  fittingRoom: true,
+  outfits: true,
+  colorMaster: true,
+} as const;
 
 export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.CLOTHING]: {
@@ -53,14 +71,22 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     labelSi: 'Apparel, fashion, boutiques',
     emoji: '👕',
     description: 'Apparel, fashion, boutiques — sizes, colors, hang tags',
-    defaultCategories: ["Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear'],
+    defaultCategories: [
+      "Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear',
+      'T-Shirts', 'Shirts', 'Trousers', 'Jeans', 'Dresses', 'Jackets',
+    ],
     variantAttributes: [
       { name: 'Size', presets: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], mapsTo: 'size' },
-      { name: 'Color', presets: ['Black', 'White', 'Navy', 'Red', 'Blue', 'Green'], mapsTo: 'color' },
+      { name: 'Color', presets: ['Black', 'White', 'Navy', 'Red', 'Blue', 'Green', 'Grey', 'Beige', 'Pink', 'Maroon'], mapsTo: 'color' },
     ],
     defaultUnit: 'pcs',
     units: ['pcs'],
-    modules: { brands: true, collections: true, hangTags: true, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: true, hangTags: true, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: false, batch: false,
+      vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false,
+      ...FASHION_ON,
+    },
     labelTemplates: ['sticker', 'hangtag'],
   },
   [ShopType.GROCERY]: {
@@ -75,7 +101,12 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['pcs', 'kg', 'g', 'L', 'ml'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: true, loyalty: false, expiry: true, batch: true,
+      vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.HARDWARE]: {
@@ -91,13 +122,18 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'piece', 'kg', 'feet', 'meter', 'box', 'set', 'roll'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: false, loyalty: false, expiry: false, batch: false,
+      vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.AGRICULTURE]: {
     type: ShopType.AGRICULTURE,
     label: 'Agriculture Shop',
-    labelSi: 'කෘෂිකර්ම කඩය',
+    labelSi: 'Agriculture',
     emoji: '🌾',
     description: 'Seeds, fertilizer, equipment — grade, batch, season',
     defaultCategories: ['Seeds', 'Fertilizer', 'Pesticides', 'Equipment', 'Animal Feed', 'Irrigation'],
@@ -107,13 +143,18 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'kg',
     units: ['kg', 'bag', 'pcs', 'liter', 'acre'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: true, batch: true, vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: false, loyalty: false, expiry: true, batch: true,
+      vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.SPARE_PARTS]: {
     type: ShopType.SPARE_PARTS,
     label: 'Spare Parts Shop',
-    labelSi: 'Spare Parts කඩය',
+    labelSi: 'Spare Parts',
     emoji: '🚗',
     description: 'Auto spare parts — vehicle compatibility, warranty, quotations',
     defaultCategories: ['Engine Parts', 'Brakes & Suspension', 'Filters', 'Electrical', 'Body Parts', 'Lubricants', 'Accessories'],
@@ -123,7 +164,12 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'liter'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: false, batch: true,
+      vehicles: true, warranty: true, quotations: true, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.TIRE_SHOP]: {
@@ -140,13 +186,18 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: true, appointments: true },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: false, batch: true,
+      vehicles: true, warranty: true, quotations: true, workshop: true, appointments: true,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.GENERAL]: {
     type: ShopType.GENERAL,
     label: 'General Shop',
-    labelSi: 'සාමාන්‍ය කඩය',
+    labelSi: 'General',
     emoji: '🏪',
     description: 'General retail — mixed products, simple variants, POS & inventory',
     defaultCategories: ['General Merchandise', 'Electronics', 'Home & Living', 'Health & Beauty', 'Stationery', 'Other'],
@@ -156,7 +207,12 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'kg', 'pack'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: false, batch: false,
+      vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.BAKERY]: {
@@ -172,22 +228,17 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'kg', 'g', 'box', 'pack', 'L', 'ml'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: true, batch: true, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    modules: {
+      brands: true, collections: false, hangTags: false, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: true, batch: true,
+      vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false,
+      ...FASHION_OFF,
+    },
     labelTemplates: ['sticker', 'shelf'],
   },
 };
 
-export const SHOP_TYPE_LIST = Object.values(SHOP_PROFILES);
-
 export function getShopProfile(type: ShopType | string | null | undefined): ShopProfile {
   const key = (type ?? ShopType.CLOTHING) as ShopType;
   return SHOP_PROFILES[key] ?? SHOP_PROFILES[ShopType.CLOTHING];
-}
-
-export function slugifyCategory(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-export function defaultVariantAttributes(type: ShopType | string | null | undefined): VariantAttributeDef[] {
-  return getShopProfile(type).variantAttributes.map((a) => ({ ...a, presets: [...a.presets] }));
 }

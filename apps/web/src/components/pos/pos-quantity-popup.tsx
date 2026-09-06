@@ -6,6 +6,8 @@ import { formatNumber } from "@/lib/utils";
 import { posListPrice } from "@/lib/pos-totals";
 import { variantDisplayLabel } from "@/lib/shop-vertical";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
+import { clothingColorHex } from "@/lib/clothing-fashion";
 import {
   cartQtyToGrams,
   formatPosWeightQty,
@@ -31,6 +33,8 @@ export type PosAddPopupVariant = {
   productKind?: string;
   unit?: string | null;
   allowDecimalSelling?: boolean;
+  /** Optional shelf / store location label when API provides it (clothing) */
+  locationLabel?: string | null;
 };
 
 type Props = {
@@ -72,6 +76,33 @@ export function PosQuantityPopup({
 }: Props) {
   const { profile } = useShopWorkspace();
   const hasVariants = variants.length > 1;
+  const clothingMatrixPick =
+    profile.type === ShopType.CLOTHING &&
+    hasVariants &&
+    variants.some((v) => !!v.size) &&
+    variants.some((v) => !!v.color);
+  const [selectedColor, setSelectedColor] = React.useState(() => {
+    const first = variants.find((v) => v.color)?.color ?? "";
+    return first;
+  });
+  const clothingColors = React.useMemo(() => {
+    if (!clothingMatrixPick) return [] as string[];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const v of variants) {
+      const c = (v.color ?? "").trim();
+      if (!c || seen.has(c.toLowerCase())) continue;
+      seen.add(c.toLowerCase());
+      out.push(c);
+    }
+    return out;
+  }, [clothingMatrixPick, variants]);
+  const clothingSizesForColor = React.useMemo(() => {
+    if (!clothingMatrixPick || !selectedColor) return [] as PosAddPopupVariant[];
+    return variants.filter(
+      (v) => (v.color ?? "").toLowerCase() === selectedColor.toLowerCase() && !!v.size,
+    );
+  }, [clothingMatrixPick, variants, selectedColor]);
   const [selectedVariantId, setSelectedVariantId] = React.useState(() => variants[0]?.variantId ?? "");
   const weightSeed = {
     productKind: productKind ?? variants[0]?.productKind,
@@ -142,7 +173,31 @@ export function PosQuantityPopup({
     setSelectedVariantId(next.variantId);
     setQtyRaw(w ? "100" : "1");
     setPriceRaw(String(next.unitPrice));
+    if (next.color) setSelectedColor(next.color);
   }, [productKey, variants, unitPrice, productKind, unit, allowDecimalSelling]);
+
+  React.useEffect(() => {
+    if (!clothingMatrixPick) return;
+    if (!selectedColor && clothingColors[0]) {
+      setSelectedColor(clothingColors[0]);
+      return;
+    }
+    const match =
+      clothingSizesForColor.find((v) => v.variantId === selectedVariantId) ??
+      clothingSizesForColor.find((v) => v.stock > 0) ??
+      clothingSizesForColor[0];
+    if (match && match.variantId !== selectedVariantId) {
+      setSelectedVariantId(match.variantId);
+      setQtyRaw(isPosWeightedProduct(match) ? "100" : "1");
+      setPriceRaw(String(match.unitPrice));
+    }
+  }, [
+    clothingMatrixPick,
+    selectedColor,
+    clothingColors,
+    clothingSizesForColor,
+    selectedVariantId,
+  ]);
 
   const refreshScrollHint = React.useCallback(() => {
     const el = scrollRef.current;
@@ -348,12 +403,95 @@ export function PosQuantityPopup({
                 ? `${formatPosWeightQty(selectedVariant?.stock ?? maxQty, activeWeight)} in stock`
                 : `${selectedVariant?.stock ?? maxQty} in stock`}
             </span>
+            {profile.type === ShopType.CLOTHING && selectedVariant?.locationLabel ? (
+              <span
+                className="text-[10px] font-semibold px-2.5 py-1 rounded-full max-w-[160px] truncate"
+                style={{ background: "rgba(148,163,184,0.15)", color: "var(--pos-muted)" }}
+                title={selectedVariant.locationLabel}
+              >
+                {selectedVariant.locationLabel}
+              </span>
+            ) : null}
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5">
           {/* Variants */}
-          {hasVariants && (
+          {hasVariants && clothingMatrixPick && (
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
+                  Color
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {clothingColors.map((color) => {
+                    const active = selectedColor.toLowerCase() === color.toLowerCase();
+                    const hex = clothingColorHex(color);
+                    const anyStock = variants.some(
+                      (v) => (v.color ?? "").toLowerCase() === color.toLowerCase() && v.stock > 0,
+                    );
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        disabled={!allowNegativeStock && !anyStock}
+                        onClick={() => setSelectedColor(color)}
+                        className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold disabled:opacity-40"
+                        style={{
+                          background: active ? "rgba(59,130,246,0.18)" : "var(--pos-input)",
+                          borderColor: active ? "#3b82f6" : "var(--pos-border)",
+                          color: "var(--pos-text)",
+                        }}
+                      >
+                        {hex ? (
+                          <span className="h-3 w-3 rounded-full border shrink-0" style={{ backgroundColor: hex }} />
+                        ) : null}
+                        {color}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
+                  Size
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {clothingSizesForColor.map((v) => {
+                    const active = selectedVariantId === v.variantId;
+                    const out = !allowNegativeStock && v.stock <= 0;
+                    return (
+                      <button
+                        key={v.variantId}
+                        type="button"
+                        disabled={out}
+                        onClick={() => pickVariant(v)}
+                        className="min-w-[2.75rem] rounded-xl border px-3 py-2 text-center disabled:opacity-40"
+                        style={{
+                          background: active ? "rgba(59,130,246,0.18)" : "var(--pos-input)",
+                          borderColor: active ? "#3b82f6" : "var(--pos-border)",
+                        }}
+                      >
+                        <p className="text-sm font-bold text-white">{v.size}</p>
+                        <p className="text-[10px] mt-0.5 tabular-nums" style={{ color: v.stock > 0 ? "var(--pos-success-soft)" : "#dc2626" }}>
+                          {v.stock} left
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              {selectedVariant ? (
+                <p className="text-xs tabular-nums" style={{ color: "var(--pos-muted)" }}>
+                  Selected stock: {selectedVariant.stock} · {money(selectedVariant.unitPrice)}
+                  {profile.type === ShopType.CLOTHING && selectedVariant.locationLabel
+                    ? ` · ${selectedVariant.locationLabel}`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+          )}
+          {hasVariants && !clothingMatrixPick && (
             <div className="space-y-2.5">
               <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--pos-muted)" }}>
                 {crossProductPick ? "Same barcode — pick item" : "Pick variant"}

@@ -18,7 +18,15 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile, hasShopModule, isTireShop } from "@/lib/use-shop-profile";
 import { buildProductFormDefaults, nextVariantAttributeName, variantTableColumns, variantVariantHint } from "@/lib/shop-vertical";
-import { variantAttrsFromProfile } from "@/lib/shop-profiles";
+import { ShopType, variantAttrsFromProfile } from "@/lib/shop-profiles";
+import {
+  ClothingVariantMatrix,
+  ClothingColorChips,
+  SizeGroupPicker,
+  buildCartesianClothingVariants,
+  type ClothingMatrixVariant,
+} from "@/components/products/clothing-variant-matrix";
+import { CLOTHING_SIZE_GROUPS } from "@/lib/clothing-fashion";
 import { buildProductTags, splitProductTags } from "@/lib/product-tags";
 import { ProductImageUpload } from "@/components/products/product-image-upload";
 import {
@@ -115,6 +123,7 @@ export default function EditProductPage() {
   const { id }  = useParams<{ id: string }>();
   const router  = useRouter();
   const shopProfile = useShopProfile();
+  const isClothing = shopProfile.type === ShopType.CLOTHING;
   const showWarranty = hasShopModule(shopProfile, "warranty");
   const showTireMeta = isTireShop(shopProfile);
   const variantCols = variantTableColumns(shopProfile);
@@ -147,6 +156,9 @@ export default function EditProductPage() {
   const [productName, setProductName] = useState("");
   const [systemTags, setSystemTags] = useState<string[]>([]);
   const [currentStock, setCurrentStock] = useState<number | null>(null);
+  const [sizeGroupId, setSizeGroupId] = useState(CLOTHING_SIZE_GROUPS[0]?.id ?? "mens");
+  const [matrixSizes, setMatrixSizes] = useState<string[]>([]);
+  const [matrixColors, setMatrixColors] = useState<string[]>([]);
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((p) => ({ ...p, [k]: v }));
   const getColorHex = (val: string) => COLOR_HEX[val.toLowerCase()] ?? null;
@@ -208,7 +220,7 @@ export default function EditProductPage() {
         supplierIds: assignedSupplierIds,
       });
       if (p.variants.length > 0) {
-        setVariantRows(p.variants.map((v) => ({
+        const mapped = p.variants.map((v) => ({
           id:           v.id,
           key:          v.id,
           sku:          v.sku,
@@ -221,8 +233,15 @@ export default function EditProductPage() {
           costPrice:    String(v.costPrice),
           mrp:          String(v.mrp),
           active:       v.isActive,
-        })));
+        }));
+        setVariantRows(mapped);
         setListView(true);
+        if (shopProfile.type === ShopType.CLOTHING) {
+          const sizes = [...new Set(mapped.map((v) => v.size).filter(Boolean) as string[])];
+          const colors = [...new Set(mapped.map((v) => v.color).filter(Boolean) as string[])];
+          setMatrixSizes(sizes);
+          setMatrixColors(colors);
+        }
       }
     } catch {
       toast.error("Failed to load product");
@@ -269,6 +288,50 @@ export default function EditProductPage() {
     if (!combos.length) { toast.error("Add attribute values first"); return; }
     setVariantRows((prev) => [...prev, ...buildRows(combos, form.attributes)]);
     setListView(true);
+  };
+
+  const applyClothingMatrix = (matrix: ClothingMatrixVariant[]) => {
+    const used = new Set(variantRows.map((r) => r.sku).filter(Boolean));
+    setVariantRows(
+      matrix.map((m) => {
+        const existing = variantRows.find(
+          (r) =>
+            (r.size ?? "").toLowerCase() === (m.size ?? "").toLowerCase() &&
+            (r.color ?? "").toLowerCase() === (m.color ?? "").toLowerCase(),
+        );
+        const name = m.name || `${m.size} / ${m.color}`;
+        const sku =
+          existing?.sku ||
+          uniqueSku(genSku(form.name || "PRD", [m.size ?? "", m.color ?? ""]), used);
+        used.add(sku);
+        return {
+          id: existing?.id,
+          key: existing?.key ?? m.key ?? `${m.color}|${m.size}`,
+          sku,
+          name,
+          size: m.size,
+          color: m.color,
+          sellingPrice: String(m.sellingPrice ?? existing?.sellingPrice ?? form.sellingPrice),
+          costPrice: String(m.costPrice ?? existing?.costPrice ?? form.costPrice),
+          mrp: String(m.mrp ?? existing?.mrp ?? form.mrp),
+          active: existing?.active ?? true,
+        } satisfies VariantRow;
+      }),
+    );
+  };
+
+  const regenerateClothingMatrix = () => {
+    const next = buildCartesianClothingVariants(matrixSizes, matrixColors, variantRows, {
+      sellingPrice: form.sellingPrice,
+      costPrice: form.costPrice,
+      mrp: form.mrp,
+    });
+    applyClothingMatrix(next);
+    setListView(true);
+    set("attributes", [
+      { name: "Size", values: [...matrixSizes], input: "" },
+      { name: "Color", values: [...matrixColors], input: "" },
+    ]);
   };
 
   const updateRow = (key: string, field: keyof VariantRow, value: string | boolean) =>
@@ -692,7 +755,7 @@ export default function EditProductPage() {
                       <Plus className="h-3 w-3" /> Add row
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() => setListView(false)}>
-                      Attributes
+                      {isClothing ? "Size × Color" : "Attributes"}
                     </Button>
                     <Button variant="outline" size="sm" className="h-7 text-xs gap-1" onClick={() =>
                       setVariantRows(buildRows(cartesian(form.attributes), form.attributes))}>
@@ -781,6 +844,44 @@ export default function EditProductPage() {
                       <Trash2 className="h-3 w-3" /> Clear All
                     </Button>
                   </div>
+                </div>
+              </div>
+            ) : isClothing ? (
+              /* ── Clothing Size × Color matrix ── */
+              <div className="space-y-4">
+                {variantRows.length > 0 && (
+                  <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-3 flex items-center justify-between text-sm">
+                    <span className="text-blue-700">{variantRows.length} existing variants loaded</span>
+                    <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => setListView(true)}>
+                      <List className="h-3 w-3" /> View/Edit Existing
+                    </Button>
+                  </div>
+                )}
+                <SizeGroupPicker
+                  selectedGroupId={sizeGroupId}
+                  onSelectGroup={(g) => setSizeGroupId(g.id)}
+                  selectedSizes={matrixSizes}
+                  onSizesChange={setMatrixSizes}
+                />
+                <ClothingColorChips selectedColors={matrixColors} onChange={setMatrixColors} />
+                <ClothingVariantMatrix
+                  sizes={matrixSizes}
+                  colors={matrixColors}
+                  variants={variantRows}
+                  onChange={applyClothingMatrix}
+                  showStock={false}
+                />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs gap-1"
+                    onClick={regenerateClothingMatrix}
+                    disabled={!matrixSizes.length || !matrixColors.length}
+                  >
+                    <Zap className="h-3 w-3" /> Apply matrix to variants
+                  </Button>
                 </div>
               </div>
             ) : (

@@ -16,12 +16,20 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import { useShopProfile, hasMultiUnit, hasBatchTracking, hasShopModule, useShopWorkspace, isTireShop, isGroceryShop } from "@/lib/use-shop-profile";
-import { getShopProfile } from "@/lib/shop-profiles";
+import { ShopType, getShopProfile } from "@/lib/shop-profiles";
 import { getWorkspace } from "@/lib/shop-workspace";
 import {
   buildProductFormDefaults, variantTableColumns, variantVariantHint,
   applyVariantCombo, getProductFormCopy,
 } from "@/lib/shop-vertical";
+import {
+  ClothingVariantMatrix,
+  ClothingColorChips,
+  SizeGroupPicker,
+  buildCartesianClothingVariants,
+  type ClothingMatrixVariant,
+} from "@/components/products/clothing-variant-matrix";
+import { CLOTHING_SIZE_GROUPS } from "@/lib/clothing-fashion";
 import { ProductBranchScopeSelect, type ProductBranchScope } from "@/components/products/product-branch-scope";
 import {
   EMPTY_INVENTORY,
@@ -121,6 +129,7 @@ function StandardAddProductPage() {
   const showBatch = hasBatchTracking(shopProfile);
   const showWarranty = hasShopModule(shopProfile, "warranty");
   const showTireMeta = isTireShop(shopProfile);
+  const isClothing = shopProfile.type === ShopType.CLOTHING;
   const [form, setForm]             = useState<Form>(() => buildInitial(shopProfile.type));
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands]         = useState<Brand[]>([]);
@@ -128,6 +137,9 @@ function StandardAddProductPage() {
   const [supplierPick, setSupplierPick] = useState("");
   const [loading, setLoading]       = useState(false);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
+  const [sizeGroupId, setSizeGroupId] = useState(CLOTHING_SIZE_GROUPS[0]?.id ?? "mens");
+  const [matrixSizes, setMatrixSizes] = useState<string[]>([...(CLOTHING_SIZE_GROUPS[0]?.sizes ?? [])]);
+  const [matrixColors, setMatrixColors] = useState<string[]>(["Black", "White"]);
 
   useEffect(() => {
     setForm(buildInitial(shopProfile.type));
@@ -633,6 +645,104 @@ function StandardAddProductPage() {
                     </Select>
                   </div>
                 )}
+                {isClothing ? (
+                  <div className="space-y-3 rounded-xl border border-border bg-card p-4">
+                    <SizeGroupPicker
+                      selectedGroupId={sizeGroupId}
+                      onSelectGroup={(g) => setSizeGroupId(g.id)}
+                      selectedSizes={matrixSizes}
+                      onSizesChange={setMatrixSizes}
+                    />
+                    <ClothingColorChips selectedColors={matrixColors} onChange={setMatrixColors} />
+                    <ClothingVariantMatrix
+                      sizes={matrixSizes}
+                      colors={matrixColors}
+                      variants={variantRows}
+                      showStock={false}
+                      onChange={(matrix: ClothingMatrixVariant[]) => {
+                        const used = new Set<string>();
+                        setVariantRows(
+                          matrix.map((m) => {
+                            const existing = variantRows.find(
+                              (r) =>
+                                (r.size ?? "").toLowerCase() === (m.size ?? "").toLowerCase() &&
+                                (r.color ?? "").toLowerCase() === (m.color ?? "").toLowerCase(),
+                            );
+                            const sku =
+                              existing?.sku ||
+                              uniqueSku(
+                                genSku(form.name || "PRD", [m.size ?? "", m.color ?? ""]),
+                                [...used],
+                              );
+                            used.add(sku);
+                            return {
+                              key: existing?.key ?? `${m.color}|${m.size}`,
+                              sku,
+                              name: m.name || `${m.size} / ${m.color}`,
+                              size: m.size,
+                              color: m.color,
+                              sellingPrice: String(m.sellingPrice ?? existing?.sellingPrice ?? form.sellingPrice),
+                              costPrice: String(m.costPrice ?? existing?.costPrice ?? form.costPrice),
+                              mrp: String(m.mrp ?? existing?.mrp ?? form.mrp),
+                              active: existing?.active ?? true,
+                            };
+                          }),
+                        );
+                      }}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1.5"
+                        disabled={!matrixSizes.length || !matrixColors.length}
+                        onClick={() => {
+                          const next = buildCartesianClothingVariants(
+                            matrixSizes,
+                            matrixColors,
+                            variantRows,
+                            {
+                              sellingPrice: form.sellingPrice,
+                              costPrice: form.costPrice,
+                              mrp: form.mrp,
+                            },
+                          );
+                          const used = new Set<string>();
+                          setVariantRows(
+                            next.map((m) => {
+                              const existing = variantRows.find(
+                                (r) =>
+                                  (r.size ?? "").toLowerCase() === (m.size ?? "").toLowerCase() &&
+                                  (r.color ?? "").toLowerCase() === (m.color ?? "").toLowerCase(),
+                              );
+                              const sku =
+                                existing?.sku ||
+                                uniqueSku(
+                                  genSku(form.name || "PRD", [m.size ?? "", m.color ?? ""]),
+                                  [...used],
+                                );
+                              used.add(sku);
+                              return {
+                                key: existing?.key ?? `${m.color}|${m.size}`,
+                                sku,
+                                name: m.name || `${m.size} / ${m.color}`,
+                                size: m.size,
+                                color: m.color,
+                                sellingPrice: String(m.sellingPrice ?? form.sellingPrice),
+                                costPrice: String(m.costPrice ?? form.costPrice),
+                                mrp: String(m.mrp ?? form.mrp),
+                                active: true,
+                              };
+                            }),
+                          );
+                        }}
+                      >
+                        Generate size × color variants
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-2">
                     <Button type="button" size="sm" className="h-8 text-xs gap-1.5" onClick={() => addVariantRow()}>

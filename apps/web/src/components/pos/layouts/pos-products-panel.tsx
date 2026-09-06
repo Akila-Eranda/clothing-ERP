@@ -22,8 +22,11 @@ export type PosProductsPanelProduct = {
   stock: number;
   category: string;
   color?: string;
+  size?: string;
   material?: string;
   imageUrl?: string;
+  locationLabel?: string | null;
+  productKind?: string;
 };
 
 export type PosProductsPanelCard = {
@@ -350,6 +353,7 @@ export function PosProductsPanel(props: Props) {
                     </p>
                     <p className="text-xs truncate" style={{ color: "var(--pos-product-sub)" }}>
                       {variantLabel(p)}
+                      {p.locationLabel ? ` · ${p.locationLabel}` : ""}
                     </p>
                   </div>
                   <span className="text-sm font-bold shrink-0" style={{ color: "var(--pos-product-price)" }}>

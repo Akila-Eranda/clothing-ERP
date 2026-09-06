@@ -2,13 +2,17 @@ import { Controller, Get, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { ClothingService } from '@/modules/clothing/clothing.service';
 import { ReportsService } from './reports.service';
 
 @ApiTags('Reports')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'reports', version: '1' })
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(
+    private readonly reportsService: ReportsService,
+    private readonly clothingService: ClothingService,
+  ) {}
 
   @Get('sales')
   @RequirePermissions('reports:read')
@@ -168,5 +172,61 @@ export class ReportsController {
   @ApiOperation({ summary: 'Technician job count and revenue' })
   technicianPerformance(@CurrentUser() user: IAuthUser, @Query('startDate') start: string, @Query('endDate') end: string) {
     return this.reportsService.technicianPerformanceReport(user.tenantId, start, end);
+  }
+
+  @Get('fashion-analytics')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Fashion analytics (Clothing shops only): size/color mix, top variants, dead stock, sell-through' })
+  fashionAnalytics(
+    @CurrentUser() user: IAuthUser,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('branchId') branchId?: string,
+  ) {
+    return this.reportsService.fashionAnalytics(
+      user.tenantId,
+      from,
+      to,
+      branchId || user.branchId || undefined,
+    );
+  }
+
+  @Get('fashion-reorder')
+  @RequirePermissions('reports:read')
+  @ApiOperation({ summary: 'Fashion reorder suggestions (Clothing shops only)' })
+  fashionReorder(
+    @CurrentUser() user: IAuthUser,
+    @Query('branchId') branchId?: string,
+    @Query('days') days?: string,
+    @Query('productId') productId?: string,
+    @Query('categoryId') categoryId?: string,
+    @Query('brandId') brandId?: string,
+    @Query('collectionId') collectionId?: string,
+    @Query('season') season?: string,
+    @Query('size') size?: string,
+    @Query('color') color?: string,
+    @Query('supplierId') supplierId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.clothingService.getReorderSuggestions(
+      user.tenantId,
+      branchId || user.branchId || '',
+      {
+        days: days ? parseInt(days, 10) : 30,
+        productId,
+        categoryId,
+        brandId,
+        collectionId,
+        season,
+        size,
+        color,
+        supplierId,
+        from,
+        to,
+        search,
+      },
+    );
   }
 }

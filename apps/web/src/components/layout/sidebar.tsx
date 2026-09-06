@@ -11,15 +11,17 @@ import {
   Wallet, TrendingDown,   BarChart3, Zap, FileBarChart,
   UserCog, Building2, GitBranch, Settings, LogOut, Moon, ChevronLeft, ChevronRight,
   Car, FileText, Wrench, KeyRound, Banknote, ClipboardList, Calendar, Cog, CalendarClock, Landmark, UserCheck, CalendarDays, Bell,
-  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield, Briefcase, Tag, Undo2,
+  ChevronDown, Scale, BookOpen, FileCheck, PackageCheck, ScrollText, Skull, Clock3, ArrowLeftRight, AlertTriangle, List, Activity, Clock, Shield, Briefcase, Tag, Undo2, Shirt,
+  MapPin, Palette, DoorOpen, Ruler,
 } from "lucide-react";
+import { ShopType } from "@/lib/shop-profiles";
 import { cn } from "@/lib/utils";
 import { useUIStore } from "@/stores/ui-store";
 import { useAuthStore } from "@/stores/auth-store";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getSidebarLabels, getSidebarSectionTitles, hasShopModule } from "@/lib/shop-vertical";
 import { bypassesWorkflowApproval } from "@/lib/workflow-access";
-import { isDefaultLightSidebar } from "@/lib/theme-layout";
+import { isDefaultLightSidebar, SIDEBAR_SKIN_SWATCHES } from "@/lib/theme-layout";
 import { useThemeLayoutStore } from "@/stores/theme-layout-store";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -91,11 +93,28 @@ function useNavGroups(): NavGroup[] {
     { label: L["/products"], href: "/products", icon: Package },
     { label: L["/categories"], href: "/categories", icon: Layers },
     ...(hasShopModule(profile, "brands") ? [{ label: L["/brands"], href: "/brands", icon: Bookmark }] : []),
+    ...(hasShopModule(profile, "collections") ? [{ label: L["/collections"] ?? "Collections", href: "/collections", icon: Shirt }] : []),
     ...(hasShopModule(profile, "vehicles") ? [{ label: L["/vehicles"], href: "/vehicles", icon: Car }] : []),
     ...(hasShopModule(profile, "warranty") ? [{ label: L["/warranty"], href: "/warranty", icon: Wrench }] : []),
     ...(hasShopModule(profile, "workshop") ? [{ label: L["/job-cards"], href: "/job-cards", icon: ClipboardList }] : []),
     ...(hasShopModule(profile, "workshop") ? [{ label: L["/services"], href: "/services", icon: Cog }] : []),
     ...(hasShopModule(profile, "appointments") ? [{ label: L["/appointments"], href: "/appointments", icon: Calendar }] : []),
+  ];
+
+  /** Clothing fashion ops — module-gated; never shown for other verticals */
+  const fashionItems: NavItem[] = [
+    ...(hasShopModule(profile, "storeLocations")
+      ? [{ label: L["/store-locations"] ?? "Store Locations", href: "/store-locations", icon: MapPin }]
+      : []),
+    ...(hasShopModule(profile, "colorMaster")
+      ? [{ label: L["/fashion-colors"] ?? "Colors", href: "/fashion-colors", icon: Palette }]
+      : []),
+    ...(hasShopModule(profile, "outfits")
+      ? [{ label: L["/outfits"] ?? "Outfits", href: "/outfits", icon: Shirt }]
+      : []),
+    ...(hasShopModule(profile, "fittingRoom")
+      ? [{ label: L["/fitting-rooms"] ?? "Fitting Rooms", href: "/fitting-rooms", icon: DoorOpen }]
+      : []),
   ];
 
   /** Stock, warehouse, expiry — one clear Inventory section */
@@ -189,6 +208,12 @@ function useNavGroups(): NavGroup[] {
         { label: L["/reports/cheques"] ?? "Cheques", href: "/reports/cheques", icon: FileCheck },
         { label: L["/reports/commission"] ?? "Commission", href: "/reports/commission", icon: Banknote },
         { label: L["/reports/financial"] ?? "Financial", href: "/reports/financial", icon: Wallet },
+        ...(profile.type === "CLOTHING" || hasShopModule(profile, "collections")
+          ? [{ label: L["/reports/fashion"] ?? "Fashion Analytics", href: "/reports/fashion", icon: Shirt }]
+          : []),
+        ...(profile.type === ShopType.CLOTHING
+          ? [{ label: L["/reports/fashion-reorder"] ?? "Fashion Reorder", href: "/reports/fashion-reorder", icon: Ruler }]
+          : []),
       ],
     },
     ...(hasShopModule(profile, "promotions") ? [{ label: L["/promotions"], href: "/promotions", icon: Zap }] : []),
@@ -205,6 +230,7 @@ function useNavGroups(): NavGroup[] {
     },
     { title: S.sales, items: salesItems },
     { title: S.products, items: catalogItems },
+    ...(fashionItems.length > 0 ? [{ title: S.fashion ?? "Fashion", items: fashionItems }] : []),
     { title: S.inventory, items: inventoryItems },
     {
       title: S.procurement,
@@ -303,15 +329,22 @@ export function Sidebar() {
     activeBg: "var(--chrome-active-bg, rgba(22,119,255,0.08))",
     activeFg: "var(--chrome-active-fg, hsl(var(--primary)))",
   };
-  const bg       = dreamsDarkChrome ? chrome.bg : (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #ffffff)");
+  const coloredSkinCss = !isDefaultLightSidebar(sidebarSkin)
+    ? SIDEBAR_SKIN_SWATCHES.find((s) => s.id === sidebarSkin)?.css
+    : undefined;
+  /* Colored skins: bind swatch CSS directly so React re-renders on skin change.
+     Light/Snow: CSS vars so Colors-tab chrome overrides still work. */
+  const bg = dreamsDarkChrome
+    ? chrome.bg
+    : (coloredSkinCss ?? (darkUi ? "var(--retail-sidebar-bg, #0d0d0d)" : "var(--retail-sidebar-bg, #ffffff)"));
   const border   = dreamsDarkChrome ? chrome.border : "var(--retail-sidebar-border, " + (darkUi ? "rgba(255,255,255,0.06)" : "rgba(15,23,42,0.08)") + ")";
-  const textMut  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")";
-  const textFull = dreamsDarkChrome ? chrome.fg : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")";
-  const hoverBg  = dreamsDarkChrome ? chrome.hover : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")";
-  const sectLbl  = dreamsDarkChrome ? chrome.muted : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")";
-  const activeBg = dreamsDarkChrome ? chrome.activeBg : "var(--retail-sidebar-active-bg, hsl(var(--primary) / 0.08))";
-  const activeFg = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, hsl(var(--primary)))";
-  const activeIcon = dreamsDarkChrome ? chrome.activeFg : "var(--retail-sidebar-active-fg, hsl(var(--primary)))";
+  const textMut  = dreamsDarkChrome ? chrome.muted : (coloredSkinCss ? "rgba(255,255,255,0.72)" : "var(--retail-sidebar-muted, " + (darkUi ? "#94A3B8" : "#64748B") + ")");
+  const textFull = dreamsDarkChrome ? chrome.fg : (coloredSkinCss ? "#ffffff" : "var(--retail-sidebar-fg, " + (darkUi ? "#F8FAFC" : "#0F172A") + ")");
+  const hoverBg  = dreamsDarkChrome ? chrome.hover : (coloredSkinCss ? "rgba(255,255,255,0.08)" : "var(--retail-sidebar-hover, " + (darkUi ? "rgba(255,255,255,0.04)" : "#F1F5F9") + ")");
+  const sectLbl  = dreamsDarkChrome ? chrome.muted : (coloredSkinCss ? "rgba(255,255,255,0.55)" : "var(--retail-sidebar-muted, " + (darkUi ? "rgba(148,163,184,0.7)" : "#94A3B8") + ")");
+  const activeBg = dreamsDarkChrome ? chrome.activeBg : (coloredSkinCss ? "rgba(255,255,255,0.16)" : "var(--retail-sidebar-active-bg, hsl(var(--primary) / 0.08))");
+  const activeFg = dreamsDarkChrome ? chrome.activeFg : (coloredSkinCss ? "#ffffff" : "var(--retail-sidebar-active-fg, hsl(var(--primary)))");
+  const activeIcon = dreamsDarkChrome ? chrome.activeFg : (coloredSkinCss ? "#ffffff" : "var(--retail-sidebar-active-fg, hsl(var(--primary)))");
 
   const [openMenus, setOpenMenus] = React.useState<Record<string, boolean>>({});
 

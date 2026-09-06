@@ -29,6 +29,8 @@ export class CreatePromotionDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() endsAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() couponCode?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() applicableTo?: string;
+  /** STANDARD | CLEARANCE | MARKDOWN | FINAL_SALE — metadata only; does not change discount math */
+  @ApiPropertyOptional({ default: 'STANDARD' }) @IsOptional() @IsString() campaignKind?: string;
 }
 
 export class UpdatePromotionDto {
@@ -42,6 +44,8 @@ export class UpdatePromotionDto {
   @ApiPropertyOptional() @IsOptional() @IsDateString() startsAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsDateString() endsAt?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() applicableTo?: string;
+  /** STANDARD | CLEARANCE | MARKDOWN | FINAL_SALE — metadata only; does not change discount math */
+  @ApiPropertyOptional() @IsOptional() @IsString() campaignKind?: string;
 }
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -77,6 +81,7 @@ export class PromotionsService {
         endsAt: dto.endsAt ? new Date(dto.endsAt) : null,
         couponCode: dto.couponCode ? dto.couponCode.toUpperCase() : null,
         applicableTo: dto.applicableTo ?? 'ALL',
+        campaignKind: dto.campaignKind ?? 'STANDARD',
         isActive: true,
       },
     });

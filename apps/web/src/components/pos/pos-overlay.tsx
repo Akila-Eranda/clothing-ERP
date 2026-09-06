@@ -38,7 +38,9 @@ import { executeReceiptPrint } from "@/lib/receipt-print";
 import { resolvePublicAssetUrl } from "@/lib/upload";
 import { receiptInvoiceBarcodeHtml } from "@/lib/print-tag-document";
 import { useShopWorkspace, hasShopModule } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
 import { getReturnReasons, variantDisplayLabel } from "@/lib/shop-vertical";
+import { SizeSwapPicker, type SizeSwapOption } from "@/components/clothing/size-swap-picker";
 import { APP_NAME } from "@/lib/constants";
 import { PosPaymentPanel, buildCheckoutPayments, type PosPaymentState, type PosBankAccountOption } from "@/components/pos/pos-payment-panel";
 import { PosWarrantyPanel } from "@/components/pos/pos-warranty-panel";
@@ -309,7 +311,7 @@ interface CustomerInsight {
   creditLimit?: number;
   creditAvailable?: number;
 }
-interface SaleItemDetail { id: string; variantId: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; }
+interface SaleItemDetail { id: string; variantId: string; productId?: string; productName: string; variantName: string; sku: string; quantity: number; unitPrice: number; total: number; size?: string | null; color?: string | null; }
 interface SaleDetail { id: string; invoiceNumber: string; total: number; invoiceDate: string; status: string; customer?: SaleCustomer | null; items: SaleItemDetail[]; }
 interface ReturnItemSel { qty: number; unitPrice: number; name: string; maxQty: number; }
 interface ServerHeldBill { id: string; label?: string | null; data: HeldBillData; createdAt: string; }
@@ -3182,6 +3184,25 @@ ${rows}
       const netRefund = returnType === "EXCHANGE" ? Math.max(0, refundTotal - exchangeTotal) : refundTotal;
       const exchangeDue = returnType === "EXCHANGE" ? Math.max(0, exchangeTotal - refundTotal) : 0;
       const exchangeProducts = products.filter(p=>{const q=exchangeSearch.toLowerCase();return !q||p.productName.toLowerCase().includes(q)||p.variantName.toLowerCase().includes(q)||p.sku.toLowerCase().includes(q)||p.color?.toLowerCase().includes(q)||p.size?.toLowerCase().includes(q);}).slice(0,30);
+      const isClothingPos = profile.type === ShopType.CLOTHING;
+      const selectedReturnLines = returnSale
+        ? returnSale.items.filter((it) => (returnItems.get(it.variantId)?.qty ?? 0) > 0)
+        : [];
+      const sizeSwapSource = selectedReturnLines[0] ?? null;
+      const sizeSwapOptions: SizeSwapOption[] | undefined = sizeSwapSource
+        ? products
+            .filter((p) => p.productId && sizeSwapSource.productId && p.productId === sizeSwapSource.productId)
+            .map((p) => ({
+              id: p.variantId,
+              size: p.size,
+              color: p.color,
+              sku: p.sku,
+              sellingPrice: p.unitPrice,
+              productName: p.productName,
+              stock: p.stock,
+              variantName: p.variantName,
+            }))
+        : undefined;
 
       const searchSale = async () => {
         if (!returnQuery.trim()) return;
@@ -3194,9 +3215,16 @@ ${rows}
         setReturnSaleLoading(true);
         try {
           const r = await api.get<SaleDetail>(`/sales/${row.id}`);
-          setReturnSale(r.data);
+          const detail = r.data;
+          const items = (detail.items ?? []).map((it: SaleItemDetail & { variant?: { productId?: string; product?: { id?: string }; size?: string; color?: string } }) => ({
+            ...it,
+            productId: it.productId ?? it.variant?.productId ?? it.variant?.product?.id ?? products.find((p) => p.variantId === it.variantId)?.productId,
+            size: it.size ?? it.variant?.size ?? products.find((p) => p.variantId === it.variantId)?.size,
+            color: it.color ?? it.variant?.color ?? products.find((p) => p.variantId === it.variantId)?.color,
+          }));
+          setReturnSale({ ...detail, items });
           const m = new Map<string,ReturnItemSel>();
-          for (const it of r.data.items) m.set(it.variantId, { qty: it.quantity, unitPrice: it.unitPrice, name: `${it.productName} ${it.variantName}`.trim(), maxQty: it.quantity });
+          for (const it of items) m.set(it.variantId, { qty: it.quantity, unitPrice: it.unitPrice, name: `${it.productName} ${it.variantName}`.trim(), maxQty: it.quantity });
           setReturnItems(m); setReturnStep("items");
         } catch { toast.error("Failed to load sale"); } finally { setReturnSaleLoading(false); }
       };
@@ -3302,7 +3330,31 @@ ${rows}
                   })}
                 </div>
                 {returnType==="EXCHANGE"&&(
-                  <div className="shrink-0 rounded-xl border p-2 space-y-2" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)",maxHeight:"230px"}}>
+                  <div className="shrink-0 rounded-xl border p-2 space-y-2" style={{background:"var(--pos-panel)",borderColor:"var(--pos-border)",maxHeight:"280px"}}>
+                    {isClothingPos && sizeSwapSource ? (
+                      <SizeSwapPicker
+                        appearance="pos"
+                        productId={sizeSwapSource.productId}
+                        sourceVariantId={sizeSwapSource.variantId}
+                        color={sizeSwapSource.color}
+                        options={sizeSwapOptions && sizeSwapOptions.length > 0 ? sizeSwapOptions : undefined}
+                        selectedVariantId={mapEntries(exchangeItems).find(([, s]) => s.qty > 0)?.[0]}
+                        onSelect={(opt) => {
+                          const qty = returnItems.get(sizeSwapSource.variantId)?.qty || 1;
+                          setExchangeItems((m) => {
+                            const n = new Map<string, ReturnItemSel>();
+                            n.set(opt.id, {
+                              qty,
+                              unitPrice: opt.sellingPrice,
+                              name: `${opt.productName ?? sizeSwapSource.productName} ${opt.variantName ?? opt.size ?? ""}`.trim(),
+                              maxQty: opt.stock ?? 999,
+                            });
+                            return n;
+                          });
+                          toast.success(`Exchange size ${opt.size ?? ""}`);
+                        }}
+                      />
+                    ) : null}
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-semibold shrink-0" style={{color:"var(--pos-muted)"}}>EXCHANGE ITEM</p>
                       <input value={exchangeSearch} onChange={e=>setExchangeSearch(e.target.value)} placeholder="Search product / SKU..." className="flex-1 h-7 px-2 rounded-lg text-xs text-white outline-none" style={{background:"var(--pos-input)",border:"1px solid var(--pos-border)"}}/>

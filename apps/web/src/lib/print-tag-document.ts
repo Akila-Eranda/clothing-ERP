@@ -15,6 +15,7 @@ export interface PrintTagItem {
   variant?: {
     barcode?: string | null;
     sellingPrice: number;
+    mrp?: number | null;
     color?: string | null;
     size?: string | null;
     style?: string | null;
@@ -25,6 +26,9 @@ export interface PrintTagItem {
       tags?: string[];
       loadIndex?: string | null;
       speedRating?: string | null;
+      mrp?: number | null;
+      brand?: { name?: string | null } | null;
+      collections?: { collection?: { name?: string | null } | null }[] | null;
     };
   };
 }
@@ -156,16 +160,25 @@ function stickerHtml(item: PrintTagItem, shopName: string, serial: number): stri
 function hangtagHtml(item: PrintTagItem, shopName: string, serial: number): string {
   const barcodeVal = printTagBarcodeValue(printTagBaseCode(item), serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
+  const mrp = item.variant?.mrp ?? item.variant?.product?.mrp ?? null;
   const tags = tagsLine(item);
   const size = item.variant?.size;
   const color = item.variant?.color;
+  const brand = item.variant?.product?.brand?.name?.trim() || "";
+  const collectionName =
+    item.variant?.product?.collections
+      ?.map((c) => c.collection?.name?.trim())
+      .filter(Boolean)?.[0] ?? "";
   return `
     <div class="label hangtag">
       <div class="band">${escapeHtml(shopName)}</div>
+      ${brand ? `<p class="brand">${escapeHtml(brand)}</p>` : ""}
       <p class="name">${escapeHtml(item.productName)}</p>
+      ${collectionName ? `<p class="collection">${escapeHtml(collectionName)}</p>` : ""}
       ${size || color ? `<p class="chips">${size ? `<span>${escapeHtml(size)}</span>` : ""}${color ? `<span>${escapeHtml(color)}</span>` : ""}</p>` : ""}
       ${tags ? `<p class="tags">${escapeHtml(tags)}</p>` : ""}
       <p class="price">LKR ${price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
+      ${mrp != null && Number(mrp) > Number(price) ? `<p class="mrp">MRP LKR ${Number(mrp).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>` : ""}
       <div class="barcode">${barcodeSvgMarkup(barcodeVal)}</div>
       <p class="code">${escapeHtml(barcodeVal)}</p>
     </div>`;
@@ -256,6 +269,15 @@ export function buildPrintTagsHtml(opts: {
     font-size: 8px;
     margin: 0 1mm;
   }
+  .hangtag .brand {
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #666;
+  }
+  .hangtag .collection { font-size: 8px; color: #555; }
+  .hangtag .mrp { font-size: 8px; color: #666; }
   .shelf { text-align: left; align-items: stretch; }
   .shelf .band {
     background: #047857;

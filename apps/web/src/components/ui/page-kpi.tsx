@@ -10,10 +10,10 @@ import { ERP_KPI_CARD_CLASS, ERP_TYPOGRAPHY } from "@/lib/design-tokens";
 
 export const PAGE_KPI_CARD_CLASS = ERP_KPI_CARD_CLASS;
 
-/** Secondary header actions — neutral outline, not rainbow tones */
+/** Secondary header actions — match header toolbar (soft primary hover) */
 export const PAGE_HEADER_BTN_TONES = {
-  blue: "border-border bg-card text-foreground hover:bg-muted hover:text-foreground",
-  secondary: "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+  blue: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+  secondary: "border-border bg-card text-foreground hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
 } as const;
 
 export type PageHeaderBtnTone = keyof typeof PAGE_HEADER_BTN_TONES;
@@ -248,11 +248,10 @@ export function PageHeader({
             <Button
               type="button"
               variant="outline"
-              size="sm"
               onClick={onRefresh}
-              className={cn("gap-1.5", PAGE_HEADER_BTN_TONES[refreshTone])}
+              className={cn(PAGE_HEADER_BTN_TONES[refreshTone])}
             >
-              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              <RefreshCw className={cn(refreshing && "animate-spin")} />
               Refresh
             </Button>
           ) : null}

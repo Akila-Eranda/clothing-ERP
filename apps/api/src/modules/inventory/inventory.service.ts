@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Prisma, StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus } from '@prisma/client';
+import { Prisma, StockMovementType, TransferStatus, InventoryReservationStatus, StockCountStatus, WorkflowStatus, ProductKind } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
@@ -36,6 +36,7 @@ import {
   CreateTransferDto,
   LotAdjustDto,
 } from './inventory.dto';
+import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 
 @Injectable()
 export class InventoryService {
@@ -171,7 +172,8 @@ export class InventoryService {
       });
       const page = low.slice(skip, skip + take);
       const enriched = await this.enrichStockLotMeta(tenantId, branchId, page);
-      return paginate(enriched, low.length, query.page ?? 1, query.limit ?? 20);
+      const withLoc = await this.enrichStockLocationLabels(tenantId, branchId, enriched);
+      return paginate(withLoc, low.length, query.page ?? 1, query.limit ?? 20);
     }
 
     const [data, total] = await this.prisma.$transaction([
@@ -188,7 +190,8 @@ export class InventoryService {
     ]);
 
     const enriched = await this.enrichStockLotMeta(tenantId, branchId, data);
-    return paginate(enriched, total, query.page ?? 1, query.limit ?? 20);
+    const withLoc = await this.enrichStockLocationLabels(tenantId, branchId, enriched);
+    return paginate(withLoc, total, query.page ?? 1, query.limit ?? 20);
   }
 
   private async enrichStockLotMeta<
@@ -231,6 +234,32 @@ export class InventoryService {
         activeLotCount: meta?.lotCount ?? 0,
       };
     });
+  }
+
+  private async enrichStockLocationLabels<
+    T extends { variantId: string },
+  >(tenantId: string, branchId: string, data: T[]) {
+    if (!branchId || !data.length) {
+      return data.map((row) => ({ ...row, locationLabel: null as string | null }));
+    }
+    const variantIds = data.map((row) => row.variantId);
+    const locs = await this.prisma.variantShelfLocation.findMany({
+      where: { tenantId, branchId, variantId: { in: variantIds } },
+      include: {
+        shelf: {
+          include: {
+            rack: { include: { section: { include: { floor: true } } } },
+          },
+        },
+      },
+    });
+    const byVariant = new Map(
+      locs.map((l) => [l.variantId, formatShelfLocationLabel(l)]),
+    );
+    return data.map((row) => ({
+      ...row,
+      locationLabel: byVariant.get(row.variantId) ?? null,
+    }));
   }
 
   async getLowStock(tenantId: string, branchId: string) {
@@ -299,6 +328,57 @@ export class InventoryService {
     };
   }
 
+  /**
+   * Expand BUNDLE (outfit) sale lines into component variant qty for stock checks/mutations.
+   * Non-bundle items pass through unchanged. Safe for all shop types.
+   */
+  async expandSaleStockItems(
+    tenantId: string,
+    items: { variantId: string; quantity: number }[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ variantId: string; quantity: number }[]> {
+    if (!items.length) return [];
+    const client = tx ?? this.prisma;
+    const variantIds = [...new Set(items.map((i) => i.variantId))];
+    const variants = await client.productVariant.findMany({
+      where: { id: { in: variantIds }, product: { tenantId } },
+      select: {
+        id: true,
+        product: {
+          select: {
+            productKind: true,
+            bundleComponents: {
+              select: { componentVariantId: true, quantity: true },
+            },
+          },
+        },
+      },
+    });
+    const byId = new Map(variants.map((v) => [v.id, v]));
+    const expanded: { variantId: string; quantity: number }[] = [];
+
+    for (const item of items) {
+      const v = byId.get(item.variantId);
+      const components = v?.product.bundleComponents ?? [];
+      if (v?.product.productKind === ProductKind.BUNDLE && components.length > 0) {
+        for (const c of components) {
+          expanded.push({
+            variantId: c.componentVariantId,
+            quantity: item.quantity * Math.max(1, c.quantity),
+          });
+        }
+      } else {
+        expanded.push(item);
+      }
+    }
+
+    const merged = new Map<string, number>();
+    for (const row of expanded) {
+      merged.set(row.variantId, (merged.get(row.variantId) ?? 0) + row.quantity);
+    }
+    return [...merged.entries()].map(([variantId, quantity]) => ({ variantId, quantity }));
+  }
+
   async assertSaleStockAvailable(
     tenantId: string,
     branchId: string,
@@ -327,7 +407,9 @@ export class InventoryService {
       }
     }
 
-    for (const item of items) {
+    const stockItems = await this.expandSaleStockItems(tenantId, items, tx);
+
+    for (const item of stockItems) {
       const inv = await client.inventory.findFirst({
         where: { tenantId, warehouseId, variantId: item.variantId },
       });

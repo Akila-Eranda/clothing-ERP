@@ -206,6 +206,10 @@ export function getSidebarSkinChromePatch(
       "dark",
     );
   }
+  /* Light / Snow in light mode: keep stored custom chrome (Colors tab). */
+  if (!isDarkMode && isDefaultLightSidebar(skin)) {
+    return {};
+  }
   return paletteToChromePatch(SIDEBAR_SKIN_PALETTES[skin], isDarkMode ? "dark" : "light");
 }
 

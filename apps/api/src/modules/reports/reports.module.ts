@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { ClothingModule } from '@/modules/clothing/clothing.module';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 
@@ -13,6 +14,7 @@ import { ReportsController } from './reports.controller';
  * Dashboard KPIs stay on DashboardService.
  */
 @Module({
+  imports: [ClothingModule],
   controllers: [ReportsController],
   providers: [ReportsService],
   exports: [ReportsService],

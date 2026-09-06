@@ -42,11 +42,44 @@ export interface ShopProfile {
     quotations: boolean;
     workshop: boolean;
     appointments: boolean;
+    /** Clothing: Floor → Section → Rack → Shelf */
+    storeLocations: boolean;
+    /** Clothing: Fitting room workflow */
+    fittingRoom: boolean;
+    /** Clothing: Outfit / bundle kits */
+    outfits: boolean;
+    /** Clothing: Dedicated color master */
+    colorMaster: boolean;
   };
   labelTemplates: Array<'sticker' | 'hangtag' | 'shelf'>;
 }
 
-const OFF = { vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false } as const;
+const AUTO_OFF = {
+  vehicles: false,
+  warranty: false,
+  quotations: false,
+  workshop: false,
+  appointments: false,
+} as const;
+
+const FASHION_OFF = {
+  storeLocations: false,
+  fittingRoom: false,
+  outfits: false,
+  colorMaster: false,
+} as const;
+
+const FASHION_ON = {
+  storeLocations: true,
+  fittingRoom: true,
+  outfits: true,
+  colorMaster: true,
+} as const;
+
+/** @deprecated use AUTO_OFF + FASHION_OFF */
+const OFF = { ...AUTO_OFF, ...FASHION_OFF } as const;
+
+const CLOTHING_FASHION = FASHION_ON;
 
 export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
   [ShopType.CLOTHING]: {
@@ -55,15 +88,24 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     labelSi: 'Apparel, fashion, boutiques',
     emoji: '👕',
     description: 'Apparel, fashion, boutiques — sizes, colors, hang tags',
-    defaultCategories: ["Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear'],
+    defaultCategories: [
+      "Men's Wear", "Women's Wear", "Kids' Wear", 'Accessories', 'Footwear',
+      'T-Shirts', 'Shirts', 'Trousers', 'Jeans', 'Dresses', 'Jackets',
+    ],
     variantAttributes: [
       { name: 'Size', presets: ['XS', 'S', 'M', 'L', 'XL', 'XXL'], mapsTo: 'size' },
-      { name: 'Color', presets: ['Black', 'White', 'Navy', 'Red', 'Blue', 'Green'], mapsTo: 'color' },
+      { name: 'Color', presets: ['Black', 'White', 'Navy', 'Red', 'Blue', 'Green', 'Grey', 'Beige', 'Pink', 'Maroon'], mapsTo: 'color' },
     ],
     defaultUnit: 'pcs',
     units: ['pcs'],
-    modules: { brands: true, collections: true, hangTags: true, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, ...OFF },
+    modules: {
+      brands: true, collections: true, hangTags: true, variants: true, returns: true,
+      promotions: true, loyalty: true, expiry: false, batch: false,
+      vehicles: false, warranty: false, quotations: false, workshop: false, appointments: false,
+      ...CLOTHING_FASHION,
+    },
     labelTemplates: ['sticker', 'hangtag'],
+    // Clothing defaults lean on Size×Color; enable variants by default for new products
   },
   [ShopType.GROCERY]: {
     type: ShopType.GROCERY,
@@ -93,7 +135,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'piece', 'kg', 'feet', 'meter', 'box', 'set', 'roll'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: false, loyalty: false, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false, ...FASHION_OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.AGRICULTURE]: {
@@ -125,7 +167,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'liter'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: false, appointments: false },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: false, appointments: false, ...FASHION_OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.TIRE_SHOP]: {
@@ -142,7 +184,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: true, appointments: true },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: true, vehicles: true, warranty: true, quotations: true, workshop: true, appointments: true, ...FASHION_OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.GENERAL]: {
@@ -158,7 +200,7 @@ export const SHOP_PROFILES: Record<ShopType, ShopProfile> = {
     ],
     defaultUnit: 'pcs',
     units: ['pcs', 'set', 'pair', 'box', 'kg', 'pack'],
-    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false },
+    modules: { brands: true, collections: false, hangTags: false, variants: true, returns: true, promotions: true, loyalty: true, expiry: false, batch: false, vehicles: false, warranty: false, quotations: true, workshop: false, appointments: false, ...FASHION_OFF },
     labelTemplates: ['sticker', 'shelf'],
   },
   [ShopType.BAKERY]: {
@@ -199,8 +241,9 @@ export function variantAttrsFromProfile(type: ShopType | string | null | undefin
 }
 
 export function defaultHasVariants(type: ShopType | string | null | undefined): boolean {
-  const key = (type ?? ShopType.CLOTHING) as ShopType;
-  return key !== ShopType.CLOTHING;
+  // All verticals default to variants on; Clothing needs Size×Color matrix
+  void type;
+  return true;
 }
 
 export function variantColumnLabels(type: ShopType | string | null | undefined): [string, string] {

@@ -22,6 +22,7 @@ export interface InventoryItem {
   damagedQty?: number;
   returnedQty?: number;
   reorderPoint?: number | null;
+  locationLabel?: string | null;
   variant: {
     id: string;
     name: string;

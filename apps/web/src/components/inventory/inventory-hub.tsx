@@ -379,6 +379,15 @@ function buildStockColumns(
       ),
     })),
     {
+      id: "location",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Location" />,
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground truncate max-w-[140px] block" title={row.original.locationLabel ?? undefined}>
+          {row.original.locationLabel || "—"}
+        </span>
+      ),
+    },
+    {
       accessorKey: "quantity",
       header: ({ column }) => <DataTableColumnHeader column={column} title="On Hand" />,
       cell: ({ row }) => (

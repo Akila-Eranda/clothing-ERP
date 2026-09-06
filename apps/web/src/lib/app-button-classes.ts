@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
-/** Shared DreamsPOS button spacing for page headers / hubs. */
-export const HEX_BTN = "gap-1.5 text-sm px-3.5";
+/** Shared DreamsPOS / header-matched button spacing for page headers / hubs. */
+export const HEX_BTN = "gap-[0.4375rem] text-[0.8125rem] font-semibold px-3.5 h-9";
 
 /** Section tab bar wrapper (Accounting hubs, etc.). */
 export const HEX_SECTION_TABS =

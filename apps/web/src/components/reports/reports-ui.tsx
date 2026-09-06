@@ -14,6 +14,7 @@ import {
   Percent,
   Receipt,
   ShoppingCart,
+  Shirt,
   Store,
   Truck,
   Users,
@@ -31,6 +32,8 @@ import {
   reportsPath,
   type ReportsSection,
 } from "@/components/reports/reports-config";
+import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
 
 // ── Date presets ────────────────────────────────────────────────────────────
 export type ReportDateRange = { label: string; start: string; end: string };
@@ -305,6 +308,47 @@ export function ReportDateFilterBar({
 }
 
 // ── Tab navigation ────────────────────────────────────────────────────────────
+function FashionReportsTabLink({ pathname }: { pathname: string | null }) {
+  const profile = useShopProfile();
+  const show =
+    profile.type === ShopType.CLOTHING || hasShopModule(profile, "collections");
+  if (!show) return null;
+  const fashionActive =
+    pathname === "/reports/fashion" || !!pathname?.startsWith("/reports/fashion/");
+  const reorderActive =
+    pathname === "/reports/fashion-reorder" || !!pathname?.startsWith("/reports/fashion-reorder/");
+  return (
+    <>
+      <Link
+        href="/reports/fashion"
+        className={cn(
+          "reports-tab-nav__item shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-colors",
+          fashionActive
+            ? "border-primary text-primary bg-primary/5"
+            : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
+        )}
+      >
+        <Shirt className="h-3.5 w-3.5" />
+        <span className="whitespace-nowrap">Fashion</span>
+      </Link>
+      {profile.type === ShopType.CLOTHING ? (
+        <Link
+          href="/reports/fashion-reorder"
+          className={cn(
+            "reports-tab-nav__item shrink-0 inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold rounded-t-lg border-b-2 transition-colors",
+            reorderActive
+              ? "border-primary text-primary bg-primary/5"
+              : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40",
+          )}
+        >
+          <Package className="h-3.5 w-3.5" />
+          <span className="whitespace-nowrap">Reorder</span>
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
 export function ReportTabNav({ active }: { active: ReportsSection }) {
   const pathname = usePathname();
   return (
@@ -353,6 +397,7 @@ export function ReportTabNav({ active }: { active: ReportsSection }) {
         <BarChart3 className="h-3.5 w-3.5" />
         <span className="whitespace-nowrap">Analytics</span>
       </Link>
+      <FashionReportsTabLink pathname={pathname} />
     </nav>
   );
 }

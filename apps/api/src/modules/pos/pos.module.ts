@@ -23,6 +23,7 @@ import {
   resolveUnitPrice,
 } from '@/modules/pricing/pricing.helper';
 import { assertShopModule } from '@/shared/shop-module.helper';
+import { formatShelfLocationLabel } from '@/modules/clothing/clothing.helpers';
 import { buildPaymentsSummary } from './pos-sale.helpers';
 import { applyGiftVoucherRedeem, computeHelperCommission, computeReloadCommission, generateGiftVoucherCode, maskReloadPin, round2 } from './pos-phase6.helper';
 import { assertCreditAvailable } from '@/modules/customers/customer-credit.helper';
@@ -517,13 +518,20 @@ export class PosService {
       for (const item of dto.items) {
         const isCustom = item.isCustom || !item.variantId?.trim() || item.variantId.startsWith('custom-');
         if (isCustom) continue;
-        await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
-          variantId: item.variantId!,
-          quantity: item.quantity,
-          movementType: StockMovementType.SALE,
-          referenceId: created.id,
-          referenceType: 'Sale',
-        }, tx);
+        const stockLines = await this.inventoryService.expandSaleStockItems(
+          tenantId,
+          [{ variantId: item.variantId!, quantity: item.quantity }],
+          tx,
+        );
+        for (const line of stockLines) {
+          await this.inventoryService.adjustStock(tenantId, branchId, cashierId, {
+            variantId: line.variantId,
+            quantity: line.quantity,
+            movementType: StockMovementType.SALE,
+            referenceId: created.id,
+            referenceType: 'Sale',
+          }, tx);
+        }
       }
 
       await this.recordReloadSalesFromItems(tx, tenantId, branchId, created.id, dto.items);
@@ -1100,6 +1108,10 @@ export class PosService {
         ? scale.asWeightKg
         : undefined;
       const assignment = Array.isArray(variant.supplierAssignments) ? variant.supplierAssignments[0] : undefined;
+      const shelfLocations = (variant as VariantRow & {
+        shelfLocations?: Parameters<typeof formatShelfLocationLabel>[0][];
+      }).shelfLocations;
+      const locRow = Array.isArray(shelfLocations) ? shelfLocations[0] : undefined;
       return {
         variantId: variant.id,
         productId: variant.productId,
@@ -1127,6 +1139,7 @@ export class PosService {
         reservedStock: reserved,
         availableStock: available,
         imageUrl: variant.images?.[0] ?? variant.product.images?.[0] ?? null,
+        locationLabel: formatShelfLocationLabel(locRow),
         supplierId: assignment?.supplierId ?? null,
         supplierProductCode: assignment?.supplierProductCode ?? null,
         leadTimeDays: assignment?.leadTimeDays ?? null,
@@ -1152,6 +1165,31 @@ export class PosService {
         include: {
           product: { include: { category: true, brand: true } },
           inventory: { where: { branchId: resolvedBranchId }, select: { quantity: true, reservedQty: true }, take: 1 },
+          shelfLocations: {
+            where: { branchId: resolvedBranchId },
+            take: 1,
+            select: {
+              shelf: {
+                select: {
+                  name: true,
+                  code: true,
+                  rack: {
+                    select: {
+                      name: true,
+                      code: true,
+                      section: {
+                        select: {
+                          name: true,
+                          code: true,
+                          floor: { select: { name: true, code: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
       }) as VariantRow[];
       if (variants.length === 0) continue;
@@ -1530,6 +1568,27 @@ export class PosService {
               { name: { contains: search, mode: 'insensitive' as const } },
               { product: { name: { contains: search, mode: 'insensitive' as const } } },
               { product: { barcode: { contains: search, mode: 'insensitive' as const } } },
+              {
+                shelfLocations: {
+                  some: {
+                    branchId: resolvedBranchId,
+                    OR: [
+                      { shelf: { code: { contains: search, mode: 'insensitive' as const } } },
+                      { shelf: { name: { contains: search, mode: 'insensitive' as const } } },
+                      {
+                        shelf: {
+                          rack: { code: { contains: search, mode: 'insensitive' as const } },
+                        },
+                      },
+                      {
+                        shelf: {
+                          rack: { name: { contains: search, mode: 'insensitive' as const } },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
               ...(opts?.supplierId
                 ? [{
                     supplierAssignments: {
@@ -1610,6 +1669,31 @@ export class PosService {
             select: { quantity: true, reservedQty: true },
             take: 1,
           },
+          shelfLocations: {
+            where: { branchId: resolvedBranchId },
+            take: 1,
+            select: {
+              shelf: {
+                select: {
+                  name: true,
+                  code: true,
+                  rack: {
+                    select: {
+                      name: true,
+                      code: true,
+                      section: {
+                        select: {
+                          name: true,
+                          code: true,
+                          floor: { select: { name: true, code: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         },
         orderBy: [{ product: { name: 'asc' } }, { name: 'asc' }],
         ...(paginated ? { skip, take } : { take }),
@@ -1636,6 +1720,8 @@ export class PosService {
       const pImages = includeImages && v.product && 'images' in v.product
         ? (v.product as { images?: string[] }).images
         : undefined;
+      const locRow = Array.isArray(v.shelfLocations) ? v.shelfLocations[0] : undefined;
+      const locationLabel = formatShelfLocationLabel(locRow);
       return {
         assignment,
         variantId:   v.id,
@@ -1665,6 +1751,7 @@ export class PosService {
         imageUrl:    vImages?.[0] ?? pImages?.[0] ?? null,
         barcode:     v.barcode ?? v.product.barcode ?? undefined,
         warrantyMonths: v.product.warrantyMonths ?? null,
+        locationLabel,
         supplierId: assignment?.supplierId ?? opts?.supplierId ?? null,
         supplierProductCode: assignment?.supplierProductCode ?? null,
         leadTimeDays: assignment?.leadTimeDays ?? null,
@@ -1673,6 +1760,59 @@ export class PosService {
         isPreferredSupplier: assignment?.isPreferred ?? null,
       };
     }).filter((row): row is NonNullable<typeof row> => row != null);
+
+    // Outfit bundles: available stock = min component sets (not phantom SKU qty).
+    const bundleProductIds = [
+      ...new Set(
+        mapped
+          .filter((m) => m.productKind === 'BUNDLE' && m.productId)
+          .map((m) => m.productId as string),
+      ),
+    ];
+    if (bundleProductIds.length) {
+      const components = await this.prisma.productBundleComponent.findMany({
+        where: { tenantId, bundleProductId: { in: bundleProductIds } },
+      });
+      const componentVariantIds = [
+        ...new Set(components.map((c) => c.componentVariantId)),
+      ];
+      const invRows = componentVariantIds.length
+        ? await this.prisma.inventory.findMany({
+            where: {
+              tenantId,
+              branchId: resolvedBranchId,
+              variantId: { in: componentVariantIds },
+            },
+            select: { variantId: true, quantity: true, reservedQty: true },
+          })
+        : [];
+      const stockByVariant = new Map(
+        invRows.map((r) => [
+          r.variantId,
+          Math.max(0, r.quantity - r.reservedQty),
+        ]),
+      );
+      const availByProduct = new Map<string, number>();
+      for (const pid of bundleProductIds) {
+        const comps = components.filter((c) => c.bundleProductId === pid);
+        let sets: number | null = null;
+        for (const c of comps) {
+          const stock = stockByVariant.get(c.componentVariantId) ?? 0;
+          const need = Math.max(1, c.quantity);
+          const s = Math.floor(stock / need);
+          sets = sets == null ? s : Math.min(sets, s);
+        }
+        availByProduct.set(pid, sets ?? 0);
+      }
+      for (const m of mapped) {
+        if (m.productKind === 'BUNDLE' && m.productId) {
+          const a = availByProduct.get(m.productId) ?? 0;
+          m.stock = a;
+          m.availableStock = a;
+          m.currentStock = a;
+        }
+      }
+    }
 
     let items = mapped.map(({ assignment: _a, ...rest }) => rest);
     if (opts?.supplierId) {

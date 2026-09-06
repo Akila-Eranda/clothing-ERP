@@ -23,6 +23,9 @@ import { api } from "@/lib/api";
 import { cn, formatNumber } from "@/lib/utils";
 import { ReportKpiGrid, ReportsPageHeader, type ReportKpiItem } from "@/components/reports/reports-ui";
 import { ClientSideTable, DataTableColumnHeader, TableActionsRow, OpenRecordButton } from "@/components/table";
+import { useShopProfile, hasShopModule } from "@/lib/use-shop-profile";
+import { ShopType } from "@/lib/shop-profiles";
+import { CLOTHING_CAMPAIGN_KINDS } from "@/lib/clothing-fashion";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export interface Promotion {
@@ -41,6 +44,7 @@ export interface Promotion {
   isActive: boolean;
   couponCode?: string | null;
   applicableTo: string;
+  campaignKind?: string | null;
 }
 
 type PromoStatus = "live" | "scheduled" | "expired" | "inactive";
@@ -60,6 +64,7 @@ type PromotionForm = {
   endsAt: string;
   couponCode: string;
   applicableTo: string;
+  campaignKind: string;
 };
 
 const EMPTY_FORM: PromotionForm = {
@@ -75,6 +80,7 @@ const EMPTY_FORM: PromotionForm = {
   endsAt: "",
   couponCode: "",
   applicableTo: "ALL",
+  campaignKind: "STANDARD",
 };
 
 const DISCOUNT_CFG = {
@@ -182,6 +188,9 @@ function UsageBar({ count, limit }: { count: number; limit?: number | null }) {
 
 // ── Hub ─────────────────────────────────────────────────────────────────────────
 export function PromotionsHub() {
+  const profile = useShopProfile();
+  const showCampaignKind =
+    profile.type === ShopType.CLOTHING && hasShopModule(profile, "promotions");
   const [promos, setPromos] = useState<Promotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -265,6 +274,7 @@ export function PromotionsHub() {
       startsAt: p.startsAt.slice(0, 10),
       endsAt: p.endsAt?.slice(0, 10) ?? "",
       applicableTo: p.applicableTo,
+      campaignKind: p.campaignKind ?? "STANDARD",
     });
     setModalOpen(true);
   };
@@ -276,7 +286,7 @@ export function PromotionsHub() {
     }
     setSaving(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         name: form.name,
         description: form.description || undefined,
         discountType: form.discountType,
@@ -290,6 +300,9 @@ export function PromotionsHub() {
         couponCode: form.couponCode || undefined,
         applicableTo: form.applicableTo,
       };
+      if (showCampaignKind) {
+        payload.campaignKind = form.campaignKind || "STANDARD";
+      }
       if (editing) {
         await api.put(`/promotions/${editing.id}`, payload);
         toast.success("Promotion updated");
@@ -703,6 +716,22 @@ export function PromotionsHub() {
                     className="resize-none"
                   />
                 </div>
+                {showCampaignKind ? (
+                  <div>
+                    <Label className="text-xs mb-1.5 block">Campaign kind</Label>
+                    <Select
+                      value={form.campaignKind}
+                      onValueChange={(v) => setForm((f) => ({ ...f, campaignKind: v }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {CLOTHING_CAMPAIGN_KINDS.map((k) => (
+                          <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
               </div>
             </section>
 

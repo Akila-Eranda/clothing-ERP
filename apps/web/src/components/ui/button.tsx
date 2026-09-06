@@ -3,42 +3,59 @@ import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
+/**
+ * System button styles — matched to header POS / toolbar design:
+ * flat primary, soft outline with primary hover tint, 18px icons, 0.5rem radius.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-medium leading-none transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  [
+    "inline-flex items-center justify-center gap-[0.4375rem] whitespace-nowrap",
+    "rounded-lg text-[0.8125rem] font-semibold leading-none tracking-[0.01em]",
+    "transition-[background-color,border-color,color,opacity,filter] duration-150",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 focus-visible:ring-offset-1",
+    "disabled:pointer-events-none disabled:opacity-50",
+    "[&_svg]:pointer-events-none [&_svg]:size-[18px] [&_svg]:shrink-0",
+  ].join(" "),
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))] shadow-none",
+          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
         secondary:
-          "border border-border bg-card text-foreground hover:bg-muted",
+          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
         outline:
-          "border border-border bg-card text-foreground hover:bg-muted hover:text-foreground",
+          "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
         ghost:
-          "text-muted-foreground hover:bg-muted hover:text-foreground",
+          "border-0 bg-transparent text-muted-foreground shadow-none hover:bg-primary/10 hover:text-primary",
         link:
-          "text-primary underline-offset-4 hover:underline bg-transparent",
+          "border-0 bg-transparent text-primary underline-offset-4 shadow-none hover:underline",
         destructive:
-          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+          "border-0 bg-destructive text-white shadow-none hover:bg-destructive/90 active:brightness-[0.96]",
         success:
-          "bg-[hsl(var(--success))] text-white hover:opacity-90",
-        /* backward-compatible aliases */
-        pos: "border border-border bg-card text-foreground hover:bg-muted",
-        gradient: "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))]",
-        danger: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-        warning: "bg-[hsl(var(--warning))] text-white hover:opacity-90",
-        info: "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))]",
-        violet: "bg-primary text-primary-foreground hover:bg-[hsl(var(--primary-hover))]",
-        chip: "bg-muted text-muted-foreground hover:bg-muted/80",
+          "border-0 bg-[hsl(var(--success))] text-white shadow-none hover:opacity-90 active:brightness-[0.96]",
+        /* aliases */
+        pos: "border border-border bg-card text-foreground shadow-none hover:border-primary/35 hover:bg-primary/[0.06] hover:text-primary",
+        gradient:
+          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+        danger:
+          "border-0 bg-destructive text-white shadow-none hover:bg-destructive/90 active:brightness-[0.96]",
+        warning:
+          "border-0 bg-[hsl(var(--warning))] text-white shadow-none hover:opacity-90 active:brightness-[0.96]",
+        info:
+          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+        violet:
+          "border-0 bg-primary text-white shadow-none hover:bg-[hsl(var(--primary-hover))] active:brightness-[0.96]",
+        chip:
+          "border-0 bg-muted text-muted-foreground shadow-none hover:bg-muted/80",
       },
       size: {
-        default: "h-9 min-h-9 px-4 py-0",
-        sm: "h-8 min-h-8 px-3 text-xs py-0",
-        lg: "h-10 min-h-10 px-5 text-sm py-0",
-        xl: "h-11 min-h-11 px-6 text-base py-0",
-        icon: "h-9 w-9 min-h-9",
-        "icon-sm": "h-8 w-8 min-h-8",
-        "icon-lg": "h-10 w-10 min-h-10",
+        default: "h-9 min-h-9 px-3.5 py-0",
+        sm: "h-8 min-h-8 px-3 text-xs py-0 [&_svg]:size-4",
+        lg: "h-10 min-h-10 px-4 text-sm py-0",
+        xl: "h-11 min-h-11 px-5 text-sm py-0",
+        icon: "h-9 w-9 min-h-9 px-0",
+        "icon-sm": "h-8 w-8 min-h-8 px-0 [&_svg]:size-4",
+        "icon-lg": "h-10 w-10 min-h-10 px-0",
       },
     },
     defaultVariants: {
@@ -59,6 +76,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const Comp = asChild ? Slot : "button";
     return (
       <Comp
+        data-slot="button"
         className={cn(buttonVariants({ variant, size }), className)}
         ref={ref}
         {...props}
