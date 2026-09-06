@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'"
+    />
+    <title>Server URL</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f5f1;
+        --ink: #1c1917;
+        --muted: #78716c;
+        --line: #e7e5e4;
+        --accent: #0f766e;
+        --accent-ink: #fff;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+        padding: 24px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 18px;
+        font-weight: 650;
+      }
+      p {
+        margin: 0 0 16px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.4;
+      }
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+      }
+      input {
+        width: 100%;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font-size: 14px;
+        outline: none;
+        background: #fff;
+      }
+      input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+      }
+      .actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        margin-top: 18px;
+      }
+      button {
+        border: 0;
+        border-radius: 8px;
+        padding: 9px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .secondary {
+        background: #fff;
+        border: 1px solid var(--line);
+        color: var(--ink);
+      }
+      .primary {
+        background: var(--accent);
+        color: var(--accent-ink);
+      }
+      .error {
+        margin-top: 10px;
+        color: #b91c1c;
+        font-size: 12px;
+        min-height: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Server URL</h1>
+    <p>Point this desktop app at your HexaOne web URL (local or tenant).</p>
+    <label for="url">App URL</label>
+    <input id="url" type="url" placeholder="https://your-shop.hexalyte.com" />
+    <div class="error" id="error"></div>
+    <div class="actions">
+      <button class="secondary" id="cancel" type="button">Cancel</button>
+      <button class="primary" id="save" type="button">Save &amp; Open</button>
+    </div>
+    <script src="./settings.js"></script>
+  </body>
+</html>

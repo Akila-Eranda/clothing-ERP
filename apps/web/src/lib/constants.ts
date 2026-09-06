@@ -13,6 +13,10 @@ export const APP_LOGO_PATH = `/brand/hexalyte-innovation.png?v=${BRAND_ASSET_VER
 export const APP_VERSION = "2.0.0";
 export const APP_DESCRIPTION = "Unified retail & business management — clothing, grocery, hardware, agriculture & more";
 
+/** Windows Electron installer (override with CDN/release URL in production). */
+export const DESKTOP_DOWNLOAD_URL =
+  process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL || "/downloads/HexaOne-Setup.exe";
+
 export const CURRENCY = "LKR";
 export const CURRENCY_SYMBOL = "LKR";
 export const LOCALE = "en-LK";

@@ -16,7 +16,10 @@
     "db:seed": "ts-node prisma/seed.ts",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f"
+    "docker:logs": "docker-compose logs -f",
+    "desktop:dev": "pnpm --filter @fashion-erp/desktop dev",
+    "desktop:dist": "pnpm --filter @fashion-erp/desktop dist",
+    "desktop:publish": "pnpm --filter @fashion-erp/desktop dist:publish"
   },
   "devDependencies": {
     "turbo": "^2.1.3",

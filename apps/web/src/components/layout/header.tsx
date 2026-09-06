@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Bell, Search, Moon, Sun, Menu, RefreshCw, ChevronRight,
-  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor, Home,
+  Settings, User, LogOut, LifeBuoy, Keyboard, Monitor, Home, Download,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ import { BranchSwitcher } from "@/components/branch/branch-switcher";
 import { cn, getInitials } from "@/lib/utils";
 import { useShopWorkspace } from "@/lib/use-shop-profile";
 import { getRouteLabels } from "@/lib/shop-vertical";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, DESKTOP_DOWNLOAD_URL } from "@/lib/constants";
 import { useMaintenanceStatus } from "@/components/maintenance/maintenance-banner";
 import { KeyboardShortcutsDialog } from "@/components/layout/keyboard-shortcuts-dialog";
 import { SupportDialog } from "@/components/layout/support-dialog";
@@ -135,6 +135,7 @@ export function Header() {
   const searchRef = React.useRef<HTMLInputElement>(null);
   const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
   const [supportOpen, setSupportOpen] = React.useState(false);
+  const [showDesktopDownload, setShowDesktopDownload] = React.useState(true);
   const { status: maintenance, isMaintenance } = useMaintenanceStatus(60_000);
   const { profile, workspace } = useShopWorkspace();
   useThemeLayoutStore((s) => s.topbarSkin);
@@ -155,6 +156,10 @@ export function Header() {
   const goSettings = React.useCallback(() => {
     router.push("/settings");
   }, [router]);
+
+  React.useEffect(() => {
+    if (/Electron/i.test(navigator.userAgent)) setShowDesktopDownload(false);
+  }, []);
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -286,6 +291,19 @@ export function Header() {
                 <Monitor className="h-[18px] w-[18px]" />
                 <span className="hidden sm:inline">POS</span>
               </button>
+
+              {showDesktopDownload && (
+                <a
+                  href={DESKTOP_DOWNLOAD_URL}
+                  download
+                  className="hex-header__desktop hidden sm:inline-flex"
+                  title="Download desktop app"
+                  aria-label="Download desktop app"
+                >
+                  <Download className="h-[16px] w-[16px]" />
+                  <span className="hidden md:inline">Desktop</span>
+                </a>
+              )}
 
               <div className="hex-header__live hidden md:flex">
                 <span className="hex-header__live-dot" />
@@ -420,6 +438,16 @@ export function Header() {
                 <LifeBuoy className="mr-2 h-4 w-4" />
                 <span>Support</span>
               </DropdownMenuItem>
+              {showDesktopDownload && (
+                <DropdownMenuItem
+                  onSelect={() => {
+                    window.location.href = DESKTOP_DOWNLOAD_URL;
+                  }}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  <span>Download desktop app</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"

@@ -1,0 +1,67 @@
+{
+  "name": "@fashion-erp/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HexaOne desktop shell (Electron)",
+  "author": "Hexalyte",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:portable": "electron-builder --win portable --publish never",
+    "publish:web": "node scripts/publish-web-downloads.js",
+    "dist:publish": "pnpm dist && pnpm publish:web"
+  },
+  "dependencies": {
+    "electron-updater": "^6.6.2"
+  },
+  "devDependencies": {
+    "electron": "^34.5.8",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.hexalyte.hexaone",
+    "productName": "HexaOne",
+    "copyright": "Copyright Hexalyte",
+    "directories": {
+      "buildResources": "build",
+      "output": "release"
+    },
+    "icon": "build/icon.png",
+    "files": [
+      "src/**/*",
+      "build/icon.ico",
+      "build/icon.png",
+      "package.json"
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://updates.hexalyte.com/downloads"
+      }
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "HexaOne-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "HexaOne",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico"
+    }
+  }
+}

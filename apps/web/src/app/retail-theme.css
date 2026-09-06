@@ -752,6 +752,7 @@ html:not(.dark) [data-sidebar="sidebarcolorfourteen"] .hex-sidebar-brand .hex-si
   filter: none;
 }
 
+/* Light / Snow: allow Theme Customizer Colors tab via --chrome-* */
 [data-sidebar="light"] .hex-retail-sidebar {
   --retail-sidebar-bg: var(--chrome-bg, #ffffff);
   --retail-sidebar-fg: var(--chrome-fg, #212b36);
@@ -795,6 +796,11 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
   --retail-sidebar-active-fg: var(--chrome-active-fg, #1d4ed8);
 }
 
+/*
+ * Colored skins: hardcode palette on the element.
+ * Do NOT use var(--chrome-bg) here — a stale :root --chrome-bg (e.g. white)
+ * would otherwise override the selected skin and look like "colors don't change".
+ */
 [data-sidebar="sidebarcolortwo"] .hex-retail-sidebar,
 [data-sidebar="sidebarcolorthree"] .hex-retail-sidebar,
 [data-sidebar="sidebarcolorfour"] .hex-retail-sidebar,
@@ -808,27 +814,27 @@ html.dark[data-topbar="topbarcolorone"] .hex-retail-header {
 [data-sidebar="sidebarcolortwelve"] .hex-retail-sidebar,
 [data-sidebar="sidebarcolorthirteen"] .hex-retail-sidebar,
 [data-sidebar="sidebarcolorfourteen"] .hex-retail-sidebar {
-  --retail-sidebar-fg: var(--chrome-fg, #ffffff);
-  --retail-sidebar-muted: var(--chrome-muted, rgba(255, 255, 255, 0.72));
-  --retail-sidebar-border: var(--chrome-border, rgba(255, 255, 255, 0.12));
-  --retail-sidebar-hover: var(--chrome-hover, rgba(255, 255, 255, 0.08));
-  --retail-sidebar-active-bg: var(--chrome-active-bg, rgba(255, 255, 255, 0.16));
-  --retail-sidebar-active-fg: var(--chrome-active-fg, #ffffff);
+  --retail-sidebar-fg: #ffffff;
+  --retail-sidebar-muted: rgba(255, 255, 255, 0.72);
+  --retail-sidebar-border: rgba(255, 255, 255, 0.12);
+  --retail-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --retail-sidebar-active-bg: rgba(255, 255, 255, 0.16);
+  --retail-sidebar-active-fg: #ffffff;
 }
 
-[data-sidebar="sidebarcolortwo"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, #505969); }
-[data-sidebar="sidebarcolorthree"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, #2c2c2c); }
-[data-sidebar="sidebarcolorfour"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, #1d51b6); }
-[data-sidebar="sidebarcolorfive"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, #6c0ba9); }
-[data-sidebar="sidebarcolorsix"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, #0b897d); }
-[data-sidebar="sidebarcolorseven"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(180deg, #4b749f 0%, #243748 100%)); }
-[data-sidebar="sidebarcoloreight"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(180deg, #18accf 0%, #0f59ad 100%)); }
-[data-sidebar="sidebarcolornine"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(180deg, #7d90b8 0%, #103783 100%)); }
-[data-sidebar="sidebarcolorten"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(180deg, #8e4beb 0%, #472282 100%)); }
-[data-sidebar="sidebarcoloreleven"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(180deg, #309f92 0%, #0c5666 100%)); }
-[data-sidebar="sidebarcolortwelve"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(90deg, #ff9966 1.92%, #ff5e62 100%)); }
-[data-sidebar="sidebarcolorthirteen"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(90deg, #760762 1.92%, #883907 100%)); }
-[data-sidebar="sidebarcolorfourteen"] .hex-retail-sidebar { --retail-sidebar-bg: var(--chrome-bg, linear-gradient(90deg, #4471cc 1.92%, #ae7bd4 100%)); }
+[data-sidebar="sidebarcolortwo"] .hex-retail-sidebar { --retail-sidebar-bg: #505969; }
+[data-sidebar="sidebarcolorthree"] .hex-retail-sidebar { --retail-sidebar-bg: #2c2c2c; }
+[data-sidebar="sidebarcolorfour"] .hex-retail-sidebar { --retail-sidebar-bg: #1d51b6; }
+[data-sidebar="sidebarcolorfive"] .hex-retail-sidebar { --retail-sidebar-bg: #6c0ba9; }
+[data-sidebar="sidebarcolorsix"] .hex-retail-sidebar { --retail-sidebar-bg: #0b897d; }
+[data-sidebar="sidebarcolorseven"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(180deg, #4b749f 0%, #243748 100%); }
+[data-sidebar="sidebarcoloreight"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(180deg, #18accf 0%, #0f59ad 100%); }
+[data-sidebar="sidebarcolornine"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(180deg, #7d90b8 0%, #103783 100%); }
+[data-sidebar="sidebarcolorten"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(180deg, #8e4beb 0%, #472282 100%); }
+[data-sidebar="sidebarcoloreleven"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(180deg, #309f92 0%, #0c5666 100%); }
+[data-sidebar="sidebarcolortwelve"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(90deg, #ff9966 1.92%, #ff5e62 100%); }
+[data-sidebar="sidebarcolorthirteen"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(90deg, #760762 1.92%, #883907 100%); }
+[data-sidebar="sidebarcolorfourteen"] .hex-retail-sidebar { --retail-sidebar-bg: linear-gradient(90deg, #4471cc 1.92%, #ae7bd4 100%); }
 
 /* ── Topbar skins — colors come from :root --retail-topbar-* (set per topbar skin in JS) ── */
 .hex-retail-header {
@@ -1233,6 +1239,29 @@ html.dark .hex-header-branch__icon {
 .hex-header__pos:active {
   transform: none;
   filter: brightness(0.96);
+}
+
+.hex-header__desktop {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.hex-header__desktop:hover {
+  border-color: hsl(var(--primary) / 0.35);
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--primary));
 }
 
 .hex-header__live {
