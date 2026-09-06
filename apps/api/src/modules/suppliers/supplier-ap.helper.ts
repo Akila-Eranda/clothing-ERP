@@ -54,7 +54,7 @@ export async function computeSupplierOutstanding(
   const [pos, invoices, supplier] = await Promise.all([
     db.purchaseOrder.findMany({
       where: { tenantId, supplierId, status: { in: AP_PO_STATUSES } },
-      include: { items: { select: { receivedQty: true, unitCost: true } } },
+      include: { items: { select: { receivedQty: true, orderedQty: true, unitCost: true } } },
     }),
     db.supplierInvoice.findMany({
       where: { tenantId, supplierId, status: { in: AP_INVOICE_STATUSES } },
