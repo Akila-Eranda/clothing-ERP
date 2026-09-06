@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, Menu, dialog, ipcMain } = require('electron')
+const { app, BrowserWindow, shell, Menu, dialog, ipcMain, globalShortcut } = require('electron')
 const path = require('path')
 const fs = require('fs')
 const { setupAutoUpdater } = require('./updater')
@@ -95,7 +95,7 @@ function createMainWindow() {
     show: false,
     title: 'HexaOne',
     icon: APP_ICON,
-    autoHideMenuBar: false,
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -147,8 +147,6 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
-
-  buildMenu()
 }
 
 function openSettings() {
@@ -182,80 +180,18 @@ function openSettings() {
   })
 }
 
-function buildMenu() {
-  const template = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'Reload',
-          accelerator: 'CmdOrCtrl+R',
-          click: () => {
-            mainWindow?.loadURL(getAppUrl())
-          },
-        },
-        {
-          label: 'Server URL…',
-          click: () => openSettings(),
-        },
-        { type: 'separator' },
-        {
-          label: 'Quit',
-          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Alt+F4',
-          click: () => app.quit(),
-        },
-      ],
-    },
-    {
-      label: 'View',
-      submenu: [
-        { role: 'togglefullscreen' },
-        { type: 'separator' },
-        {
-          label: 'Toggle DevTools',
-          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
-          click: () => mainWindow?.webContents.toggleDevTools(),
-        },
-        {
-          label: 'Actual Size',
-          role: 'resetZoom',
-        },
-        {
-          label: 'Zoom In',
-          role: 'zoomIn',
-        },
-        {
-          label: 'Zoom Out',
-          role: 'zoomOut',
-        },
-      ],
-    },
-    {
-      label: 'Help',
-      submenu: [
-        {
-          label: 'Check for Updates…',
-          click: () => {
-            void updaterApi?.checkForUpdates({ silent: false })
-          },
-        },
-        { type: 'separator' },
-        {
-          label: 'About HexaOne Desktop',
-          click: () => {
-            dialog.showMessageBox(mainWindow ?? undefined, {
-              type: 'info',
-              title: 'About',
-              message: 'HexaOne Desktop',
-              detail: `Version ${app.getVersion()}\nLoading: ${getAppUrl() || '(not configured)'}`,
-            })
-          },
-        },
-      ],
-    },
-  ]
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+function registerShortcuts() {
+  globalShortcut.register('CommandOrControl+R', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.loadURL(getAppUrl())
+  })
+  globalShortcut.register('F5', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.reload()
+  })
+  if (isDev) {
+    globalShortcut.register('CommandOrControl+Shift+I', () => {
+      mainWindow?.webContents.toggleDevTools()
+    })
+  }
 }
 
 ipcMain.handle('desktop:get-config', () => ({
@@ -307,7 +243,9 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    Menu.setApplicationMenu(null)
     createMainWindow()
+    registerShortcuts()
     updaterApi = setupAutoUpdater({
       getMainWindow: () => mainWindow,
       getAppUrl,
@@ -319,6 +257,10 @@ if (!gotLock) {
     })
   })
 }
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll()
+})
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()

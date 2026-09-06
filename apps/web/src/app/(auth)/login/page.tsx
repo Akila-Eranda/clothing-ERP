@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
-  Eye, EyeOff, Lock, Mail, ArrowRight, Tag, ExternalLink, ShieldCheck,
+  Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -23,7 +23,6 @@ import {
   getHostnameTenantSlug,
   isMainShopLoginDomain,
   SHOP_DOMAIN_SUFFIX,
-  tenantLoginUrl,
 } from "@/lib/auth-host";
 import { safeInternalPath } from "@/lib/safe-redirect";
 import { ShopType } from "@/lib/shop-profiles";
@@ -206,7 +205,7 @@ function LoginContent() {
     tenantPreview?.shopType
     ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())?.shopType
     ?? null;
-  const showSubdomainField = isMainDomain;
+  const showWorkspacePicker = isMainDomain && emailWorkspaces.length > 1;
   const selectedWorkspace =
     tenantPreview
     ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())
@@ -251,7 +250,7 @@ function LoginContent() {
       }
     }
     if (isMainDomain && !slug) {
-      toast.error("Enter your email so we can find your shop, or type the workspace name");
+      toast.error("No shop found for this email. Check the address and try again.");
       return;
     }
     if (!isMainDomain && !slug) {
@@ -299,15 +298,6 @@ function LoginContent() {
     }
   };
 
-  const openWorkspace = () => {
-    const slug = subdomain.trim().toLowerCase();
-    if (!slug) {
-      toast.error("Enter your shop subdomain first");
-      return;
-    }
-    window.location.href = tenantLoginUrl(slug);
-  };
-
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       <AuthBrandPanel
@@ -351,10 +341,8 @@ function LoginContent() {
                 {pending2fa
                   ? "Enter the 6-digit code from your authenticator app"
                   : selectedWorkspace
-                    ? `Enter your credentials for ${selectedWorkspace.name}`
-                    : isMainDomain
-                      ? "Enter your email — we will find your shop automatically"
-                      : "Enter your credentials to continue"}
+                    ? `Sign in to ${selectedWorkspace.name}`
+                    : "Enter your email and password to continue"}
               </p>
             </div>
 
@@ -437,83 +425,46 @@ function LoginContent() {
                     <p className="text-xs text-slate-500">Finding your shop…</p>
                   )}
                   {isMainDomain && !emailLookupLoading && watchedEmail?.includes("@") && emailWorkspaces.length === 0 && (
-                    <p className="text-xs text-slate-500">
-                      No shop found for this email — type your workspace below if needed.
+                    <p className="text-xs text-destructive">
+                      No shop found for this email.
                     </p>
                   )}
                 </div>
 
-                {showSubdomainField && (
+                {showWorkspacePicker && (
                   <div className="space-y-2">
-                    <Label htmlFor="subdomain" className="text-slate-800 font-medium">
-                      Shop workspace
-                      {selectedWorkspace && !subdomainManualRef.current ? (
-                        <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
-                          Auto detected
-                        </span>
-                      ) : null}
-                    </Label>
-                    {emailWorkspaces.length > 1 ? (
-                      <div className="flex flex-col gap-2">
-                        {emailWorkspaces.map((ws) => {
-                          const active = subdomain.trim() === ws.subdomain;
-                          return (
-                            <button
-                              key={ws.subdomain}
-                              type="button"
-                              onClick={() => {
-                                subdomainManualRef.current = true;
-                                setSubdomain(ws.subdomain);
-                                setTenantPreview(ws);
-                              }}
-                              className={
-                                active
-                                  ? "flex items-center justify-between rounded-xl border border-primary bg-primary/5 px-3 py-2.5 text-left"
-                                  : "flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-slate-300"
-                              }
-                            >
-                              <span>
-                                <span className="block text-sm font-semibold text-slate-900">{ws.name}</span>
-                                <span className="block text-xs text-slate-500">
-                                  {ws.subdomain}{SHOP_DOMAIN_SUFFIX}
-                                </span>
+                    <Label className="text-slate-800 font-medium">Choose your shop</Label>
+                    <div className="flex flex-col gap-2">
+                      {emailWorkspaces.map((ws) => {
+                        const active = subdomain.trim() === ws.subdomain;
+                        return (
+                          <button
+                            key={ws.subdomain}
+                            type="button"
+                            onClick={() => {
+                              subdomainManualRef.current = true;
+                              setSubdomain(ws.subdomain);
+                              setTenantPreview(ws);
+                            }}
+                            className={
+                              active
+                                ? "flex items-center justify-between rounded-xl border border-primary bg-primary/5 px-3 py-2.5 text-left"
+                                : "flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-slate-300"
+                            }
+                          >
+                            <span>
+                              <span className="block text-sm font-semibold text-slate-900">{ws.name}</span>
+                              <span className="block text-xs text-slate-500">
+                                {ws.subdomain}{SHOP_DOMAIN_SUFFIX}
                               </span>
-                              {active ? (
-                                <span className="text-[11px] font-bold uppercase text-primary">Selected</span>
-                              ) : null}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="relative">
-                        <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="subdomain"
-                          type="text"
-                          placeholder="your-shop"
-                          value={subdomain}
-                          className="pl-10 pr-[8rem] h-12 rounded-xl border-slate-200 bg-white lowercase text-base text-slate-900 shadow-sm focus-visible:ring-primary/30"
-                          onChange={(e) => {
-                            subdomainManualRef.current = true;
-                            setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
-                          }}
-                        />
-                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none font-medium">
-                          {SHOP_DOMAIN_SUFFIX}
-                        </span>
-                      </div>
-                    )}
-                    {subdomain.trim() && (
-                      <button
-                        type="button"
-                        onClick={openWorkspace}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                      >
-                        Go to {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    )}
+                            </span>
+                            {active ? (
+                              <span className="text-[11px] font-bold uppercase text-primary">Selected</span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
 

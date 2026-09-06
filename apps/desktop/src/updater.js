@@ -1,4 +1,5 @@
-const { app, dialog } = require('electron')
+const { app, dialog, BrowserWindow, Notification, ipcMain, screen } = require('electron')
+const path = require('path')
 const { autoUpdater } = require('electron-updater')
 
 /**
@@ -31,6 +32,97 @@ function resolveUpdateFeedUrl({ getAppUrl, readConfig }) {
  * }} opts
  */
 function setupAutoUpdater(opts) {
+  /** @type {BrowserWindow | null} */
+  let bannerWindow = null
+  /** @type {{ mode: 'available' | 'downloading' | 'ready', version?: string, percent?: number } | null} */
+  let bannerState = null
+  let pendingInfo = null
+  let manualCheckPending = false
+  let silentStartup = true
+
+  function sendBannerState() {
+    if (!bannerWindow || bannerWindow.isDestroyed() || !bannerState) return
+    bannerWindow.webContents.send('desktop:update-banner-state', bannerState)
+  }
+
+  function positionBanner(win) {
+    if (!bannerWindow || bannerWindow.isDestroyed()) return
+    const width = 360
+    const height = 150
+    let x = 40
+    let y = 40
+    const parent = win && !win.isDestroyed() ? win : opts.getMainWindow()
+    if (parent && !parent.isDestroyed()) {
+      const b = parent.getBounds()
+      x = Math.round(b.x + b.width - width - 24)
+      y = Math.round(b.y + b.height - height - 24)
+    } else {
+      const display = screen.getPrimaryDisplay().workArea
+      x = Math.round(display.x + display.width - width - 24)
+      y = Math.round(display.y + display.height - height - 24)
+    }
+    bannerWindow.setBounds({ x, y, width, height })
+  }
+
+  function showBanner(state) {
+    bannerState = state
+    const parent = opts.getMainWindow()
+    if (!bannerWindow || bannerWindow.isDestroyed()) {
+      bannerWindow = new BrowserWindow({
+        width: 360,
+        height: 150,
+        frame: false,
+        transparent: true,
+        resizable: false,
+        maximizable: false,
+        minimizable: false,
+        skipTaskbar: true,
+        alwaysOnTop: true,
+        show: false,
+        parent: parent && !parent.isDestroyed() ? parent : undefined,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      })
+      bannerWindow.setMenuBarVisibility(false)
+      bannerWindow.loadFile(path.join(__dirname, 'update-banner.html'))
+      bannerWindow.once('ready-to-show', () => {
+        positionBanner(parent)
+        bannerWindow?.showInactive()
+        sendBannerState()
+      })
+      bannerWindow.on('closed', () => {
+        bannerWindow = null
+      })
+    } else {
+      positionBanner(parent)
+      if (!bannerWindow.isVisible()) bannerWindow.showInactive()
+      sendBannerState()
+    }
+  }
+
+  function hideBanner() {
+    bannerState = null
+    if (bannerWindow && !bannerWindow.isDestroyed()) {
+      bannerWindow.close()
+    }
+    bannerWindow = null
+  }
+
+  function notifyOs(title, body) {
+    try {
+      if (Notification.isSupported()) {
+        const n = new Notification({ title, body, silent: false })
+        n.show()
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   const checkForUpdates = async ({ silent = false } = {}) => {
     if (!app.isPackaged) {
       if (!silent) {
@@ -65,27 +157,19 @@ function setupAutoUpdater(opts) {
     return { checkForUpdates }
   }
 
-  autoUpdater.autoDownload = true
+  // Wait for user to click Update before downloading
+  autoUpdater.autoDownload = false
   autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.allowDowngrade = false
 
-  autoUpdater.on('checking-for-update', () => {
-    // no-op
-  })
-
   autoUpdater.on('update-available', (info) => {
-    const win = opts.getMainWindow()
-    void dialog.showMessageBox(win ?? undefined, {
-      type: 'info',
-      title: 'Update available',
-      message: `HexaOne ${info.version} is available`,
-      detail: 'Downloading in the background. You can keep working.',
-      buttons: ['OK'],
-    })
+    pendingInfo = info
+    manualCheckPending = false
+    showBanner({ mode: 'available', version: info.version })
+    notifyOs('Update available', `HexaOne ${info.version} is available. Click Update to install.`)
   })
 
   autoUpdater.on('update-not-available', (info) => {
-    // Only show when user manually checked (tracked via flag)
     if (!manualCheckPending) return
     manualCheckPending = false
     const win = opts.getMainWindow()
@@ -111,34 +195,58 @@ function setupAutoUpdater(opts) {
 
   autoUpdater.on('download-progress', (progress) => {
     const win = opts.getMainWindow()
-    if (!win || win.isDestroyed()) return
     const pct = Math.max(0, Math.min(100, Math.round(progress.percent || 0)))
-    win.setProgressBar(pct / 100)
-    win.setTitle(`HexaOne — downloading update ${pct}%`)
+    if (win && !win.isDestroyed()) {
+      win.setProgressBar(pct / 100)
+      win.setTitle(`HexaOne — downloading update ${pct}%`)
+    }
+    showBanner({
+      mode: 'downloading',
+      version: pendingInfo?.version,
+      percent: pct,
+    })
   })
 
-  autoUpdater.on('update-downloaded', async (info) => {
+  autoUpdater.on('update-downloaded', (info) => {
+    pendingInfo = info
     const win = opts.getMainWindow()
     if (win && !win.isDestroyed()) {
       win.setProgressBar(-1)
       win.setTitle('HexaOne')
     }
-    const { response } = await dialog.showMessageBox(win ?? undefined, {
-      type: 'info',
-      title: 'Update ready',
-      message: `Version ${info.version} is ready to install`,
-      detail: 'Restart now to apply the update, or choose Later and it will install when you quit.',
-      buttons: ['Restart now', 'Later'],
-      defaultId: 0,
-      cancelId: 1,
-    })
-    if (response === 0) {
-      autoUpdater.quitAndInstall(false, true)
-    }
+    showBanner({ mode: 'ready', version: info.version, percent: 100 })
+    notifyOs('Update ready', `HexaOne ${info.version} is ready. Click Restart & Update.`)
   })
 
-  let manualCheckPending = false
-  let silentStartup = true
+  ipcMain.handle('desktop:get-update-banner-state', () => bannerState)
+  ipcMain.handle('desktop:dismiss-update', () => {
+    hideBanner()
+    return { ok: true }
+  })
+  ipcMain.handle('desktop:start-update-download', async () => {
+    showBanner({
+      mode: 'downloading',
+      version: pendingInfo?.version,
+      percent: 0,
+    })
+    try {
+      await autoUpdater.downloadUpdate()
+      return { ok: true }
+    } catch (err) {
+      hideBanner()
+      await dialog.showMessageBox(opts.getMainWindow() ?? undefined, {
+        type: 'error',
+        title: 'Download failed',
+        message: 'Could not download the update.',
+        detail: err?.message || String(err),
+      })
+      return { ok: false, error: err?.message || String(err) }
+    }
+  })
+  ipcMain.handle('desktop:install-update-now', () => {
+    autoUpdater.quitAndInstall(false, true)
+    return { ok: true }
+  })
 
   const wrappedCheck = async ({ silent = false } = {}) => {
     if (!silent) manualCheckPending = true
@@ -159,14 +267,12 @@ function setupAutoUpdater(opts) {
     }
   }
 
-  // Startup check after UI is up
   setTimeout(() => {
     void wrappedCheck({ silent: true }).finally(() => {
       silentStartup = false
     })
   }, 8000)
 
-  // Recheck every 6 hours
   setInterval(() => {
     void wrappedCheck({ silent: true })
   }, 6 * 60 * 60 * 1000)
