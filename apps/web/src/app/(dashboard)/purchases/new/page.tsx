@@ -235,46 +235,51 @@ export default function CreatePOPage() {
     }, 80);
   }, []);
 
-  const loadSupplierCatalog = useCallback(async (sid: string): Promise<{ rows: VariantOpt[]; fallback: boolean }> => {
+  const loadSupplierCatalog = useCallback(async (
+    sid: string,
+  ): Promise<{ rows: VariantOpt[]; linkedRows: VariantOpt[]; fallback: boolean }> => {
     if (!sid) {
       setAllVariants([]);
       setCatalogFallback(false);
-      return { rows: [], fallback: false };
+      return { rows: [], linkedRows: [], fallback: false };
     }
     const reqId = ++catalogReqRef.current;
     setLoadingProducts(true);
     setAllVariants([]);
     setCatalogFallback(false);
     try {
-      const res = await api.get<VariantOpt[] | { items: VariantOpt[] }>(
-        `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
-      );
-      if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
-      let rows = parsePosProducts<VariantOpt>(res);
-      let fallback = false;
-      if (!rows.length) {
-        const allRes = await api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000");
-        if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
-        rows = parsePosProducts<VariantOpt>(allRes);
-        fallback = rows.length > 0;
-        if (fallback) {
-          toast.info("No products linked to this supplier — showing full catalog");
-        }
+      const [supplierRes, allRes] = await Promise.all([
+        api.get<VariantOpt[] | { items: VariantOpt[] }>(
+          `/pos/products?supplierId=${encodeURIComponent(sid)}&limit=2000`,
+        ),
+        api.get<VariantOpt[] | { items: VariantOpt[] }>("/pos/products?limit=2000"),
+      ]);
+      if (reqId !== catalogReqRef.current) return { rows: [], linkedRows: [], fallback: false };
+
+      const linkedRows = parsePosProducts<VariantOpt>(supplierRes)
+        .filter((v) => !v.supplierId || v.supplierId === sid)
+        .map((v) => ({ ...v, supplierId: sid }));
+      const allRows = parsePosProducts<VariantOpt>(allRes);
+
+      // Prefer linked pricing/meta; keep every other product so Add Products can include unassigned
+      const byId = new Map<string, VariantOpt>();
+      for (const v of allRows) byId.set(v.variantId, v);
+      for (const v of linkedRows) byId.set(v.variantId, v);
+      const rows = Array.from(byId.values());
+      const fallback = linkedRows.length === 0 && rows.length > 0;
+      if (fallback) {
+        toast.info("No products linked to this supplier — showing full catalog");
       }
-      const mapped = fallback
-        ? rows
-        : rows
-            .filter((v) => !v.supplierId || v.supplierId === sid)
-            .map((v) => ({ ...v, supplierId: sid }));
+
       setCatalogFallback(fallback);
-      setAllVariants(mapped);
-      return { rows: mapped, fallback };
+      setAllVariants(rows);
+      return { rows, linkedRows, fallback };
     } catch {
-      if (reqId !== catalogReqRef.current) return { rows: [], fallback: false };
+      if (reqId !== catalogReqRef.current) return { rows: [], linkedRows: [], fallback: false };
       setAllVariants([]);
       setCatalogFallback(false);
       toast.error("Failed to load supplier products");
-      return { rows: [], fallback: false };
+      return { rows: [], linkedRows: [], fallback: false };
     } finally {
       if (reqId === catalogReqRef.current) setLoadingProducts(false);
     }
@@ -373,10 +378,10 @@ export default function CreatePOPage() {
       setSearchQ([]);
     }
     if (id) {
-      const { rows, fallback } = await loadSupplierCatalog(id);
-      // Auto-fill Order Lines with all products linked to this supplier
-      if (!fromGrnId && !fallback && rows.length > 0) {
-        const lines = variantsToOrderLines(rows);
+      const { linkedRows, fallback } = await loadSupplierCatalog(id);
+      // Auto-fill Order Lines with products linked to this supplier only
+      if (!fromGrnId && !fallback && linkedRows.length > 0) {
+        const lines = variantsToOrderLines(linkedRows);
         setItems(lines);
         setSearchQ(lines.map(() => ""));
         setSelectedRowIdx(0);
@@ -559,9 +564,8 @@ export default function CreatePOPage() {
 
   const filteredVariants = (q: string) => {
     if (!supplierId) return [];
-    const scoped = catalogFallback
-      ? allVariants
-      : allVariants.filter((v) => !v.supplierId || v.supplierId === supplierId);
+    // Catalog already includes supplier-linked + unassigned (or full catalog in fallback)
+    const scoped = allVariants;
     if (!q.trim()) return scoped.slice(0, 40);
     const lq = q.trim().toLowerCase();
     return scoped
@@ -580,15 +584,11 @@ export default function CreatePOPage() {
   const resolveVariantByCode = async (code: string): Promise<VariantOpt | null> => {
     const trimmed = code.trim();
     if (!trimmed || !supplierId) return null;
-    // Prefer in-catalog match only (already supplier-scoped)
-    const local = allVariants.find((v) =>
-      v.supplierId === supplierId
-      && (
-        v.sku.toLowerCase() === trimmed.toLowerCase()
-        || v.barcode?.toLowerCase() === trimmed.toLowerCase()
-        || v.supplierProductCode?.toLowerCase() === trimmed.toLowerCase()
-      )
-    );
+    const codeMatch = (v: VariantOpt) =>
+      v.sku.toLowerCase() === trimmed.toLowerCase()
+      || v.barcode?.toLowerCase() === trimmed.toLowerCase()
+      || v.supplierProductCode?.toLowerCase() === trimmed.toLowerCase();
+    const local = allVariants.find(codeMatch);
     if (local) return local;
     try {
       const res = await api.get<{
@@ -615,7 +615,7 @@ export default function CreatePOPage() {
         supplierAssigned?: boolean;
       }>(`/pos/barcode/${encodeURIComponent(trimmed)}?supplierId=${encodeURIComponent(supplierId)}`);
       const d = res.data;
-      if (!d?.variantId || d.supplierId !== supplierId) return null;
+      if (!d?.variantId) return null;
       return {
         variantId: d.variantId,
         productName: d.productName,
@@ -638,7 +638,7 @@ export default function CreatePOPage() {
         lastPurchaseQty: d.lastPurchaseQty ?? undefined,
         soldAfterLastPurchase: d.soldAfterLastPurchase ?? undefined,
         lastBuyingPrice: d.lastBuyingPrice ?? undefined,
-        supplierId,
+        supplierId: d.supplierAssigned ? supplierId : (d.supplierId ?? null),
         supplierProductCode: d.supplierProductCode ?? undefined,
       };
     } catch {
@@ -668,24 +668,16 @@ export default function CreatePOPage() {
 
     const resolved = await resolveVariantByCode(q);
     if (resolved) {
-      if (!resolved.supplierId || resolved.supplierId !== supplierId) {
-        toast.error("Product is not assigned to this supplier — assign it on the product or supplier page first");
-        return;
-      }
       selectVariant(idx, resolved);
       toast.success(`Added ${resolved.productName}`);
     } else {
-      toast.error(`Product not found or not assigned to this supplier: ${q}`);
+      toast.error(`Product not found: ${q}`);
     }
   };
 
   const addVariantToItems = (v: VariantOpt) => {
     if (!supplierId) {
       toast.error("Select a supplier first");
-      return;
-    }
-    if (!catalogFallback && v.supplierId && v.supplierId !== supplierId) {
-      toast.error("Product is not assigned to this supplier");
       return;
     }
     const existingIdx = items.findIndex((i) => i.variantId === v.variantId);
@@ -771,14 +763,10 @@ export default function CreatePOPage() {
 
     const resolved = await resolveVariantByCode(q);
     if (resolved) {
-      if (!resolved.supplierId || resolved.supplierId !== supplierId) {
-        toast.error("Product is not assigned to this supplier — assign it on the product or supplier page first");
-        return;
-      }
       toast.success(`Added ${resolved.productName}`);
       addVariantToItems(resolved);
     } else {
-      toast.error(`Product not found or not assigned to this supplier: ${q}`);
+      toast.error(`Product not found: ${q}`);
     }
   };
 
@@ -1142,7 +1130,7 @@ export default function CreatePOPage() {
                     ? "Loading product catalog…"
                     : catalogFallback
                       ? `${allVariants.length} products (full catalog)`
-                      : `${allVariants.length} products for this supplier`}
+                      : `${allVariants.length} products (supplier + unassigned)`}
                   {" · "}↑↓ pick · Enter adds to order lines
                 </p>
               )}
