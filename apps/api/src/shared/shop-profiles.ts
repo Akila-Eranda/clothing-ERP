@@ -242,3 +242,12 @@ export function getShopProfile(type: ShopType | string | null | undefined): Shop
   const key = (type ?? ShopType.CLOTHING) as ShopType;
   return SHOP_PROFILES[key] ?? SHOP_PROFILES[ShopType.CLOTHING];
 }
+
+export function slugifyCategory(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
+export const SHOP_TYPE_LIST = Object.values(ShopType);
