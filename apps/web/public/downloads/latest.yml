@@ -1,0 +1,8 @@
+version: 1.0.0
+files:
+  - url: HexaOne-Setup.exe
+    sha512: d5pUAlMpR2wOSbg09SyJx3/9BBX5gulTXJHl+SzS71AtML1NDwEc0efAPE+AICwhU4MX8ERSpYYXdOh+map4NQ==
+    size: 83604837
+path: HexaOne-Setup.exe
+sha512: d5pUAlMpR2wOSbg09SyJx3/9BBX5gulTXJHl+SzS71AtML1NDwEc0efAPE+AICwhU4MX8ERSpYYXdOh+map4NQ==
+releaseDate: '2026-09-06T05:36:26.743Z'

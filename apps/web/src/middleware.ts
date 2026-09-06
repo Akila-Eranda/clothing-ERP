@@ -58,6 +58,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // Desktop installer + electron-updater (latest.yml) must be public — no auth cookie on updater requests
+  if (pathname.startsWith('/downloads')) {
+    return NextResponse.next();
+  }
+
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   const token = request.cookies.get('fe_access_token')?.value;
 
