@@ -48,7 +48,7 @@ export class PurchaseItemDto {
   @ApiProperty() @IsString() productName: string;
   @ApiProperty() @IsString() variantName: string;
   @ApiProperty() @IsString() sku: string;
-  @ApiProperty() @IsInt() @Min(1) orderedQty: number;
+  @ApiProperty() @IsInt() @Min(0) orderedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) freeQty?: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) mrp?: number;
@@ -266,7 +266,12 @@ export class SuppliersService {
       ? await this.numbering.allocateStandalone(tenantId, 'PURCHASE_ORDER')
       : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
     const itemsData = dto.items.map((item) => {
-      const lineTotal = item.unitCost * item.orderedQty;
+      const orderedQty = Math.max(0, item.orderedQty ?? 0);
+      const freeQty = Math.max(0, item.freeQty ?? 0);
+      if (orderedQty + freeQty < 1) {
+        throw new BadRequestException(`Add Order Qty or Free Qty for ${item.productName || item.sku}`);
+      }
+      const lineTotal = item.unitCost * orderedQty;
       const disc = item.discount ?? 0;
       const taxable = lineTotal - disc;
       const tax = (taxable * (item.taxRate ?? 0)) / 100;
@@ -275,8 +280,8 @@ export class SuppliersService {
         productName: item.productName,
         variantName: item.variantName,
         sku: item.sku,
-        orderedQty: item.orderedQty,
-        freeQty: item.freeQty ?? 0,
+        orderedQty,
+        freeQty,
         unitCost: item.unitCost,
         mrp: item.mrp != null && item.mrp > 0 ? item.mrp : null,
         expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,

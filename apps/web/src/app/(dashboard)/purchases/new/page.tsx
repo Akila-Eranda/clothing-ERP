@@ -300,7 +300,7 @@ export default function CreatePOPage() {
       color: v.color ?? undefined,
       barcode: v.barcode ?? undefined,
       imageUrl: v.imageUrl ?? undefined,
-      orderedQty: 1,
+      orderedQty: 0,
       freeQty: 0,
       unitCost: v.lastBuyingPrice ?? v.costPrice ?? 0,
       mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
@@ -515,7 +515,7 @@ export default function CreatePOPage() {
         color: undefined,
         barcode: undefined,
         imageUrl: undefined,
-        orderedQty: 1,
+        orderedQty: 0,
         freeQty: 0,
         unitCost: 0,
         mrp: 0,
@@ -724,7 +724,7 @@ export default function CreatePOPage() {
         color: v.color ?? undefined,
         barcode: v.barcode ?? undefined,
         imageUrl: v.imageUrl ?? undefined,
-        orderedQty: 1,
+        orderedQty: 0,
         freeQty: 0,
         unitCost: v.lastBuyingPrice ?? v.costPrice,
         mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
@@ -811,8 +811,8 @@ export default function CreatePOPage() {
     if (!supplierId) { toast.error("Please select a supplier"); return; }
     if (!items.length) { toast.error("Add at least one product"); return; }
     if (items.some((i) => !i.variantId)) { toast.error("All rows must have a product selected"); return; }
-    if (items.some((i) => !i.orderedQty || i.orderedQty <= 0)) {
-      toast.error("Quantity must be greater than zero");
+    if (items.some((i) => (i.orderedQty || 0) + (i.freeQty || 0) < 1)) {
+      toast.error("Set Order Qty or Free Qty on every line");
       return;
     }
     if (items.some((i) => i.unitCost === null || i.unitCost === undefined || Number.isNaN(i.unitCost))) {
@@ -1306,9 +1306,9 @@ export default function CreatePOPage() {
                             <label className="text-[10px] font-semibold uppercase text-muted-foreground">Order Qty</label>
                             <input
                               type="number"
-                              min={1}
+                              min={0}
                               value={item.orderedQty}
-                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                              onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
                               className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
@@ -1530,8 +1530,9 @@ export default function CreatePOPage() {
                                 ref={(el) => { qtyInputRefs.current[idx] = el; }}
                                 type="number"
                                 min={1}
+                                min={0}
                                 value={item.orderedQty}
-                                onChange={(e) => updateItem(idx, "orderedQty", Math.max(1, parseInt(e.target.value, 10) || 1))}
+                                onChange={(e) => updateItem(idx, "orderedQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
                                 onKeyDown={(e) => {
                                   if (e.key === "Enter") {
                                     e.preventDefault();
