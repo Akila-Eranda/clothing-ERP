@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Banknote, FileText, Package, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw } from "lucide-react";
+import { ArrowLeft, Banknote, CalendarDays, FileText, Package, PackageCheck, Plus, Save, Search, ScanLine, Trash2, Warehouse, Loader2, ChevronDown, ChevronRight, Users, ClipboardList, Info, RefreshCw, BarChart3 } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ import { bypassesWorkflowApproval } from "@/lib/workflow-access";
 import { cn } from "@/lib/utils";
 import { parseApiList, parsePosProducts } from "@/lib/parse-api-list";
 import { resolvePublicAssetUrl } from "@/lib/upload";
+import { PoProductSalesModal } from "@/components/purchases/po-product-sales-modal";
 import {
   FORM_PAGE, FORM_CARD, FORM_LABEL, FORM_ORANGE_BTN, FORM_OUTLINE_BTN,
   FORM_STEP_BADGE, FORM_CARD_HEADER, FORM_SUBTITLE, FORM_STATUS_BADGE,
@@ -78,13 +80,14 @@ interface LineItem {
   expiryDate: string;
   discount: number;
   taxRate: number;
+  /** Only ticked lines are sent when creating the PO */
+  includeInPo: boolean;
 }
 
 function calcItem(i: LineItem) {
   const line    = i.unitCost * i.orderedQty;
   const taxable = line - i.discount;
-  const tax     = (taxable * i.taxRate) / 100;
-  return { line, taxable, tax, total: taxable + tax };
+  return { line, taxable, tax: 0, total: taxable };
 }
 
 function fmtMoney(n: number) {
@@ -196,6 +199,7 @@ export default function CreatePOPage() {
   const [supplierId,   setSupplierId]   = useState("");
   const [supplier,     setSupplier]     = useState<Supplier | null>(null);
   const [expectedDate, setExpectedDate] = useState("");
+  const [paymentDueDate, setPaymentDueDate] = useState("");
   const [reference,    setReference]    = useState("");
   const [paymentTerms, setPaymentTerms] = useState("30 Days");
   const [notes,        setNotes]        = useState("");
@@ -206,6 +210,7 @@ export default function CreatePOPage() {
   const [fromGrnId, setFromGrnId] = useState<string | null>(null);
   const [fromGrnNumber, setFromGrnNumber] = useState<string | null>(null);
   const [grnPrefillLoading, setGrnPrefillLoading] = useState(false);
+  const [salesModalOpen, setSalesModalOpen] = useState(false);
   const [loadingSupplierDetail, setLoadingSupplierDetail] = useState(false);
   const [payNow, setPayNow] = useState(false);
   const [payAmount, setPayAmount] = useState("");
@@ -290,7 +295,7 @@ export default function CreatePOPage() {
     }
   }, []);
 
-  const variantsToOrderLines = useCallback((rows: VariantOpt[]): LineItem[] => (
+  const variantsToOrderLines = useCallback((rows: VariantOpt[], includeInPo = false): LineItem[] => (
     rows.map((v) => ({
       variantId: v.variantId,
       productName: v.productName,
@@ -307,6 +312,7 @@ export default function CreatePOPage() {
       expiryDate: "",
       discount: 0,
       taxRate: v.taxRate ?? 0,
+      includeInPo,
     }))
   ), []);
 
@@ -373,29 +379,26 @@ export default function CreatePOPage() {
   const handleSupplierChange = useCallback(async (id: string) => {
     setSupplierId(id);
     const fromList = suppliers.find((s) => s.id === id) ?? null;
-    // Optimistic list row — detail effect below replaces with full credit / last-PO data
     setSupplier(fromList ? mapSupplierDetail(fromList) : null);
     setProductSearchQ("");
     setProductSearchOpen(false);
     setSearchHighlight(0);
     setSearchOpen(null);
     setSelectedRowIdx(null);
-    // Switching supplier resets lines so other-supplier products cannot remain
     if (!fromGrnId) {
       setItems([]);
       setSearchQ([]);
     }
     if (id) {
       const { linkedRows, fallback } = await loadSupplierCatalog(id);
-      // Auto-fill Order Lines with products linked to this supplier only
+      // Load all supplier products into Order Lines — user ticks which ones to include on PO
       if (!fromGrnId && !fallback && linkedRows.length > 0) {
-        const lines = variantsToOrderLines(linkedRows);
+        const lines = variantsToOrderLines(linkedRows, false);
         setItems(lines);
         setSearchQ(lines.map(() => ""));
         setSelectedRowIdx(0);
-        toast.success(`Loaded ${lines.length} product${lines.length === 1 ? "" : "s"} into Order Lines`);
+        toast.success(`Loaded ${lines.length} product${lines.length === 1 ? "" : "s"} — tick the ones for this PO`);
         scrollToItems();
-        window.setTimeout(() => qtyInputRefs.current[0]?.focus(), 160);
       } else {
         window.setTimeout(() => productSearchRef.current?.focus(), 120);
       }
@@ -480,6 +483,7 @@ export default function CreatePOPage() {
             expiryDate: "",
             discount: 0,
             taxRate: 0,
+            includeInPo: true,
           }));
         setItems(lines);
         setSearchQ(lines.map(() => ""));
@@ -522,6 +526,7 @@ export default function CreatePOPage() {
         expiryDate: "",
         discount: 0,
         taxRate: 0,
+        includeInPo: true,
       },
     ]);
     setSearchQ((p) => [...p, ""]);
@@ -556,6 +561,7 @@ export default function CreatePOPage() {
       unitCost: v.lastBuyingPrice ?? v.costPrice,
       mrp: v.mrp && v.mrp > 0 ? v.mrp : it.mrp,
       taxRate: v.taxRate ?? 0,
+      includeInPo: true,
     } : it));
     setSearchQ((p) => p.map((q, i) => i === idx ? "" : q));
     setSearchOpen(null);
@@ -575,6 +581,7 @@ export default function CreatePOPage() {
       expiryDate: it.expiryDate,
       discount: it.discount,
       taxRate: 0,
+      includeInPo: it.includeInPo,
     } : it));
     setSearchQ((p) => p.map((q, i) => i === idx ? "" : q));
     setSearchOpen(idx);
@@ -702,7 +709,7 @@ export default function CreatePOPage() {
     }
     const existingIdx = items.findIndex((i) => i.variantId === v.variantId);
     if (existingIdx >= 0) {
-      setItems((p) => p.map((it, i) => i === existingIdx ? { ...it, orderedQty: it.orderedQty + 1 } : it));
+      setItems((p) => p.map((it, i) => i === existingIdx ? { ...it, orderedQty: it.orderedQty + 1, includeInPo: true } : it));
       setSelectedRowIdx(existingIdx);
       setProductSearchOpen(false);
       setProductSearchQ("");
@@ -731,6 +738,7 @@ export default function CreatePOPage() {
         expiryDate: "",
         discount: 0,
         taxRate: v.taxRate ?? 0,
+        includeInPo: true,
       },
     ]);
     setSearchQ((p) => [...p, ""]);
@@ -742,6 +750,10 @@ export default function CreatePOPage() {
     productSearchRef.current?.blur();
     scrollToItems();
     window.setTimeout(() => qtyInputRefs.current[newIdx]?.focus(), 40);
+  };
+
+  const setAllLinesIncluded = (includeInPo: boolean) => {
+    setItems((p) => p.map((it) => ({ ...it, includeInPo })));
   };
 
   const handleBigSearchKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -793,12 +805,19 @@ export default function CreatePOPage() {
     }
   };
 
-  // ── Summary ────────────────────────────────────────────────────────────
-  const subtotal  = items.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
-  const totalDisc = items.reduce((s, i) => s + i.discount, 0);
-  const totalTax  = items.reduce((s, i) => s + calcItem(i).tax, 0);
-  const grandTotal = subtotal - totalDisc + totalTax;
-  const totalQty   = items.reduce((s, i) => s + i.orderedQty, 0);
+  // ── Summary (ticked lines only) ────────────────────────────────────────
+  const poLines = items.filter((i) => i.includeInPo && i.variantId);
+  const subtotal  = poLines.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
+  const totalDisc = poLines.reduce((s, i) => s + i.discount, 0);
+  const grandTotal = subtotal - totalDisc;
+  const totalQty   = poLines.reduce((s, i) => s + i.orderedQty, 0);
+  const includedCount = poLines.length;
+  const payNowAmt = payNow ? Math.max(0, parseFloat(payAmount) || 0) : 0;
+  const calendarDueAmount = Math.max(0, Math.round((grandTotal - payNowAmt) * 100) / 100);
+  const orderLineVariantIds = useMemo(
+    () => items.map((i) => i.variantId).filter(Boolean),
+    [items],
+  );
 
   useEffect(() => {
     if (payNow && !payAmountTouched) {
@@ -807,16 +826,17 @@ export default function CreatePOPage() {
   }, [payNow, payAmountTouched, grandTotal]);
 
   // ── Submit ─────────────────────────────────────────────────────────────
-  const submit = async (submitForApproval: boolean) => {
+  const submit = async (mode: "draft" | "order" | "orderAndReceive" = "order") => {
     if (!supplierId) { toast.error("Please select a supplier"); return; }
-    if (!items.length) { toast.error("Add at least one product"); return; }
-    if (items.some((i) => !i.variantId)) { toast.error("All rows must have a product selected"); return; }
-    if (items.some((i) => (i.orderedQty || 0) + (i.freeQty || 0) < 1)) {
-      toast.error("Set Order Qty or Free Qty on every line");
+    const selected = items.filter((i) => i.includeInPo);
+    if (!selected.length) { toast.error("Tick at least one product for this PO"); return; }
+    if (selected.some((i) => !i.variantId)) { toast.error("All ticked rows must have a product selected"); return; }
+    if (selected.some((i) => (i.orderedQty || 0) + (i.freeQty || 0) < 1)) {
+      toast.error("Set Order Qty or Free Qty on every ticked line");
       return;
     }
-    if (items.some((i) => i.unitCost === null || i.unitCost === undefined || Number.isNaN(i.unitCost))) {
-      toast.error("Buying price is required on all lines");
+    if (selected.some((i) => i.unitCost === null || i.unitCost === undefined || Number.isNaN(i.unitCost))) {
+      toast.error("Buying price is required on all ticked lines");
       return;
     }
     if (payNow) {
@@ -840,17 +860,20 @@ export default function CreatePOPage() {
     }
     setSaving(true);
     try {
+      const createAndReceive = mode === "orderAndReceive" && !fromGrnId;
       const payload = {
         supplierId, expectedDate: expectedDate || undefined,
+        paymentDueDate: paymentDueDate || undefined,
         notes: notes || undefined, reference: reference || undefined, paymentTerms,
         fromGrnId: fromGrnId || undefined,
-        items: items.map((i) => ({
+        createAndReceive: createAndReceive || undefined,
+        items: selected.map((i) => ({
           variantId: i.variantId, productName: i.productName, variantName: i.variantName,
           sku: i.sku, orderedQty: i.orderedQty, freeQty: i.freeQty || 0,
           unitCost: i.unitCost,
           mrp: i.mrp > 0 ? i.mrp : undefined,
           expiryDate: i.expiryDate || undefined,
-          discount: i.discount, taxRate: i.taxRate,
+          discount: i.discount, taxRate: 0,
         })),
         ...(payNow
           ? {
@@ -858,7 +881,7 @@ export default function CreatePOPage() {
                 amount: parseFloat(payAmount),
                 method: payMethod,
                 reference: payReference.trim() || undefined,
-                notes: "Paid on PO create",
+                notes: createAndReceive ? "Paid on PO + GRN create" : "Paid on PO create",
                 ...(payMethod === "CHEQUE"
                   ? {
                       chequeNumber: chequeNumber.trim(),
@@ -870,14 +893,25 @@ export default function CreatePOPage() {
             }
           : {}),
       };
-      const res = await api.post<{ id: string }>("/purchases", payload);
+      const res = await api.post<{
+        id: string;
+        grn?: { grnNumber?: string };
+        paymentError?: string;
+      }>("/purchases", payload);
       if (fromGrnId) {
         toast.success(
           fromGrnNumber
             ? `PO created & linked to ${fromGrnNumber}${payNow ? " · supplier paid" : " (already received)"}`
             : `PO created and linked to GRN${payNow ? " · supplier paid" : ""}`,
         );
-      } else if (submitForApproval) {
+      } else if (createAndReceive) {
+        const grnNo = res.data?.grn?.grnNumber;
+        toast.success(
+          grnNo
+            ? `PO + GRN created (${grnNo})${payNow && !res.data?.paymentError ? " · supplier paid" : ""} — stock updated`
+            : `PO + GRN created${payNow && !res.data?.paymentError ? " · supplier paid" : ""} — stock updated`,
+        );
+      } else if (mode === "order") {
         await api.post(`/purchases/${res.data.id}/submit-approval`);
         toast.success(
           adminBypass
@@ -886,6 +920,9 @@ export default function CreatePOPage() {
         );
       } else {
         toast.success(`Purchase order saved as draft${payNow ? " · supplier paid" : ""}`);
+      }
+      if (res.data?.paymentError) {
+        toast.warning(`PO saved but payment failed: ${res.data.paymentError}`);
       }
       router.push(`/purchases/${res.data.id}`);
     } catch (e: unknown) { toast.error((e as Error).message ?? "Failed to create PO"); }
@@ -929,12 +966,12 @@ export default function CreatePOPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => submit(false)}
-              disabled={saving || !supplierId || items.length === 0}
+              onClick={() => submit("draft")}
+              disabled={saving || !supplierId || includedCount === 0}
               className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
             >
               <Save className="h-3.5 w-3.5" />
@@ -943,23 +980,35 @@ export default function CreatePOPage() {
             {fromGrnId ? (
               <Button
                 size="sm"
-                onClick={() => submit(false)}
-                disabled={saving || !supplierId || items.length === 0 || grnPrefillLoading}
+                onClick={() => submit("draft")}
+                disabled={saving || !supplierId || includedCount === 0 || grnPrefillLoading}
                 className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
               >
                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
                 Create & Link GRN
               </Button>
             ) : (
-              <Button
-                size="sm"
-                onClick={() => submit(true)}
-                disabled={saving || !supplierId || items.length === 0}
-                className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
-              >
-                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-                Create Purchase Order
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => submit("order")}
+                  disabled={saving || !supplierId || includedCount === 0}
+                  className={cn("gap-1.5 h-9", FORM_OUTLINE_BTN)}
+                >
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+                  Create PO only
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => submit("orderAndReceive")}
+                  disabled={saving || !supplierId || includedCount === 0}
+                  className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
+                >
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
+                  Create PO + GRN
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -982,6 +1031,14 @@ export default function CreatePOPage() {
             <span className="w-fit shrink-0 rounded-full border bg-background/80 px-2.5 py-1 font-mono text-xs">
               {fromGrnNumber}
             </span>
+          </div>
+        )}
+        {!fromGrnId && (
+          <div className="rounded-xl border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground sm:px-4">
+            <span className="font-semibold text-foreground">Flow:</span>{" "}
+            1) Supplier · 2) Products · 3) Tick lines · 4) Payment date · then{" "}
+            <span className="font-semibold text-foreground">Create PO + GRN</span> (stock in) or{" "}
+            <span className="font-semibold text-foreground">Create PO only</span> (order later).
           </div>
         )}
 
@@ -1011,7 +1068,7 @@ export default function CreatePOPage() {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className={FORM_LABEL}>Expected Delivery</label>
+                  <label className={FORM_LABEL}>Supplier Next Come Date</label>
                   <Input type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} className={cn(PO_FIELD, "h-10")} />
                 </div>
                 <div className="space-y-1.5">
@@ -1054,6 +1111,13 @@ export default function CreatePOPage() {
                     ["Outstanding", supplier.balance != null ? `LKR ${fmt(supplier.balance)}` : "—"],
                     ["Credit Limit", supplier.creditLimit != null ? `LKR ${fmt(supplier.creditLimit)}` : "—"],
                     ["Last Purchase", loadingSupplierDetail && !supplier.lastPurchaseDate ? "Loading…" : fmtDate(supplier.lastPurchaseDate)],
+                    ["Next Come Date", expectedDate ? fmtDate(expectedDate) : "—"],
+                    [
+                      "Payment Date",
+                      paymentDueDate
+                        ? `${fmtDate(paymentDueDate)}${calendarDueAmount > 0 ? ` · LKR ${fmt(calendarDueAmount)}` : ""}`
+                        : "—",
+                    ],
                   ].map(([label, value]) => (
                     <div key={label} className="min-w-0 rounded-lg border bg-background/80 px-2.5 py-2">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -1069,7 +1133,7 @@ export default function CreatePOPage() {
             <SectionCard
               step="2"
               title="Add Products"
-              subtitle="Search or scan products to add to order"
+              subtitle="Search or scan extra products to add to the list"
               className={productSearchOpen && productSearchQ.trim() ? "relative z-30" : undefined}
             >
               <div className="flex flex-col sm:flex-row gap-2">
@@ -1153,10 +1217,8 @@ export default function CreatePOPage() {
                 <p className={FORM_HINT}>
                   {loadingProducts
                     ? "Loading product catalog…"
-                    : catalogFallback
-                      ? `${allVariants.length} products (full catalog)`
-                      : `${allVariants.length} products (supplier + unassigned)`}
-                  {" · "}↑↓ pick · Enter adds to order lines
+                    : `${allVariants.length} products in catalog · supplier products load into Order Lines below`}
+                  {" · "}tick lines to include on this PO
                 </p>
               )}
             </SectionCard>
@@ -1164,16 +1226,49 @@ export default function CreatePOPage() {
             <SectionCard
               step="3"
               title="Order Lines"
-              subtitle="Added products will appear here"
+              subtitle={`${includedCount} of ${items.length} selected for PO`}
               action={
-                <Button
-                  size="sm"
-                  onClick={addRow}
-                  disabled={saving || !supplierId}
-                  className={cn("gap-1.5 h-8", FORM_ORANGE_BTN)}
-                >
-                  <Plus className="h-3.5 w-3.5" /> Add Row
-                </Button>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={saving}
+                    className={cn("h-8 gap-1.5", FORM_OUTLINE_BTN)}
+                    onClick={() => setSalesModalOpen(true)}
+                  >
+                    <BarChart3 className="h-3.5 w-3.5" />
+                    Check sales
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={saving || items.length === 0}
+                    className={cn("h-8", FORM_OUTLINE_BTN)}
+                    onClick={() => setAllLinesIncluded(true)}
+                  >
+                    Select all
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={saving || includedCount === 0}
+                    className={cn("h-8", FORM_OUTLINE_BTN)}
+                    onClick={() => setAllLinesIncluded(false)}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={addRow}
+                    disabled={saving || !supplierId}
+                    className={cn("gap-1.5 h-8", FORM_ORANGE_BTN)}
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Add Row
+                  </Button>
+                </div>
               }
             >
               <div ref={itemsSectionRef} className={cn("max-h-[min(52vh,560px)] min-h-[12rem] overflow-y-auto overscroll-contain", FORM_INNER_PANEL)}>
@@ -1186,7 +1281,7 @@ export default function CreatePOPage() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground">No items yet</p>
-                      <p className="mt-1 text-xs">Search above or add a blank row</p>
+                      <p className="mt-1 text-xs">Select a supplier to load products</p>
                     </div>
                     <Button size="sm" variant="outline" onClick={addRow} disabled={saving} className="mt-1 gap-1.5">
                       <Plus className="h-3.5 w-3.5" /> Add first item
@@ -1205,10 +1300,22 @@ export default function CreatePOPage() {
                       <div
                         key={idx}
                         onClick={() => setSelectedRowIdx(idx)}
-                        className={`space-y-3 p-3 sm:p-4 ${selected ? "bg-primary/5" : ""}`}
+                        className={cn(
+                          "space-y-3 p-3 sm:p-4",
+                          selected ? "bg-primary/5" : "",
+                          !item.includeInPo && item.variantId ? "opacity-55" : "",
+                        )}
                       >
                         {item.variantId ? (
                           <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-4 w-4 shrink-0 rounded border-border accent-primary"
+                              checked={item.includeInPo}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => updateItem(idx, "includeInPo", e.target.checked)}
+                              aria-label="Include in PO"
+                            />
                             <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background">
                               {item.imageUrl || v?.imageUrl ? (
                                 // eslint-disable-next-line @next/next/no-img-element
@@ -1364,18 +1471,6 @@ export default function CreatePOPage() {
                               className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
-                          <div className="space-y-1">
-                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Tax %</label>
-                            <input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step="0.1"
-                              value={item.taxRate}
-                              onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                              className={cn(FORM_LINE_INPUT, "w-full")}
-                            />
-                          </div>
                         </div>
 
                         <div className="flex items-center justify-between border-t pt-2 text-sm">
@@ -1393,6 +1488,18 @@ export default function CreatePOPage() {
                 <table className="w-full min-w-[1480px] text-sm">
                   <thead className={FORM_TABLE_HEAD}>
                     <tr className={FORM_TABLE_HEAD_ROW}>
+                      <th className="px-2 py-3 text-center font-semibold w-10">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-border accent-primary"
+                          checked={items.length > 0 && includedCount === items.length}
+                          ref={(el) => {
+                            if (el) el.indeterminate = includedCount > 0 && includedCount < items.length;
+                          }}
+                          onChange={(e) => setAllLinesIncluded(e.target.checked)}
+                          aria-label="Select all lines for PO"
+                        />
+                      </th>
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
                       <th className="px-4 py-3 text-left font-semibold min-w-[280px] max-w-[360px]">Product</th>
                       <th className="px-3 py-3 text-left font-semibold w-36">Barcode</th>
@@ -1405,7 +1512,6 @@ export default function CreatePOPage() {
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Buying</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">MRP</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Discount</th>
-                      <th className="px-3 py-3 text-right font-semibold w-20">Tax</th>
                       <th className="px-3 py-3 text-right font-semibold w-28">Total</th>
                       <th className="w-20 px-2 py-3 text-center font-semibold">Action</th>
                     </tr>
@@ -1433,8 +1539,18 @@ export default function CreatePOPage() {
                             "cursor-pointer align-top transition-colors",
                             FORM_ROW_HOVER,
                             selectedRowIdx === idx && FORM_ROW_SELECTED,
+                            !item.includeInPo && item.variantId && "opacity-50",
                           )}
                         >
+                          <td className="px-2 py-3 text-center align-top" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 rounded border-border accent-primary"
+                              checked={item.includeInPo}
+                              onChange={(e) => updateItem(idx, "includeInPo", e.target.checked)}
+                              aria-label={`Include ${item.productName || "line"} in PO`}
+                            />
+                          </td>
                           <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums">{idx + 1}</td>
                           <td className="px-4 py-3 align-top">
                             {item.variantId ? (
@@ -1606,19 +1722,6 @@ export default function CreatePOPage() {
                               />
                             </div>
                           </td>
-                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex justify-end">
-                              <input
-                                type="number"
-                                min={0}
-                                max={100}
-                                step="0.1"
-                                value={item.taxRate}
-                                onChange={(e) => updateItem(idx, "taxRate", parseFloat(e.target.value) || 0)}
-                                className={cn(FORM_LINE_INPUT, "w-[4.5rem]")}
-                              />
-                            </div>
-                          </td>
                           <td className={cn("px-3 py-3 text-right align-top font-bold tabular-nums whitespace-nowrap", FORM_ACCENT_TEXT)}>{fmt(total)}</td>
                           <td className="px-2 py-3 text-center align-top" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center justify-center gap-0.5">
@@ -1699,11 +1802,54 @@ export default function CreatePOPage() {
 
             <SectionCard
               step="4"
-              title="Supplier Payment"
-              subtitle="Optional — record advance / pay now when creating this PO"
+              title="Payment & Calendar"
+              subtitle="Schedule payment date for Business Calendar · optional pay now"
             >
               <div className={cn("rounded-xl p-4 space-y-3", FORM_INNER_PANEL)}>
-                <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-semibold text-muted-foreground block mb-1">
+                      Payment Date (Business Calendar)
+                    </label>
+                    <Input
+                      type="date"
+                      value={paymentDueDate}
+                      onChange={(e) => setPaymentDueDate(e.target.value)}
+                      className="h-9"
+                    />
+                    <p className={cn("text-[10px] mt-1 leading-snug", FORM_HINT)}>
+                      Shows supplier + due amount on{" "}
+                      <Link href="/calendar" className="underline underline-offset-2 hover:text-foreground">
+                        Business Calendar
+                      </Link>
+                    </p>
+                  </div>
+                  <div className="rounded-lg border bg-background/70 px-3 py-2 flex flex-col justify-center">
+                    <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Amount due on calendar</p>
+                    <p className={cn("text-sm font-bold tabular-nums mt-0.5", FORM_ACCENT_TEXT)}>
+                      LKR {fmtMoney(calendarDueAmount)}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                      {supplier?.name || "Select supplier"} · PO total − pay now
+                    </p>
+                  </div>
+                </div>
+
+                {paymentDueDate && calendarDueAmount > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg border border-rose-200/70 bg-rose-50/60 px-3 py-2 text-xs text-rose-900 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-100">
+                    <CalendarDays className="h-4 w-4 shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        Calendar · {fmtDate(paymentDueDate)} · LKR {fmtMoney(calendarDueAmount)}
+                      </p>
+                      <p className="text-[11px] opacity-80 mt-0.5">
+                        Appears under Supplier due after PO is confirmed / received
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-border/60 pt-3 flex items-center justify-between gap-3 flex-wrap">
                   <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-foreground">
                     <input
                       type="checkbox"
@@ -1808,11 +1954,10 @@ export default function CreatePOPage() {
 
           <aside className="space-y-4 xl:sticky xl:top-6">
             <SidebarBlock title="Summary" icon={ClipboardList}>
-              <MetaRow label="Products" value={items.length} />
+              <MetaRow label="Products" value={`${includedCount} / ${items.length}`} />
               <MetaRow label="Total Quantity" value={totalQty} />
               <MetaRow label="Subtotal" value={`LKR ${fmt(subtotal)}`} />
               <MetaRow label="Discount" value={<span className="text-emerald-400">− LKR {fmt(totalDisc)}</span>} />
-              <MetaRow label="Tax" value={`LKR ${fmt(totalTax)}`} />
               <div className="flex justify-between gap-3 border-t border-border pt-2.5 text-sm">
                 <span className="font-bold text-foreground">Grand Total</span>
                 <span className={cn("font-bold tabular-nums", FORM_ACCENT_TEXT)}>LKR {fmt(grandTotal)}</span>
@@ -1873,20 +2018,32 @@ export default function CreatePOPage() {
 
       {/* Mobile sticky total bar */}
       <div className={cn(FORM_STICKY_BAR, "xl:hidden")}>
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <div>
+        <div className="flex items-center justify-between gap-2 px-3 py-3">
+          <div className="min-w-0">
             <p className="text-[10px] text-muted-foreground">Grand Total</p>
             <p className={cn("text-sm font-bold tabular-nums", FORM_ACCENT_TEXT)}>LKR {fmt(grandTotal)}</p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => submit(fromGrnId ? false : true)}
-            disabled={saving || !supplierId || items.length === 0}
-            className={cn("gap-1.5", FORM_ORANGE_BTN)}
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
-            Create PO
-          </Button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => submit("draft")}
+              disabled={saving || !supplierId || includedCount === 0}
+              className={cn("gap-1 h-9 px-2.5", FORM_OUTLINE_BTN)}
+            >
+              <Save className="h-3.5 w-3.5" />
+              Draft
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => submit(fromGrnId ? "draft" : "orderAndReceive")}
+              disabled={saving || !supplierId || includedCount === 0}
+              className={cn("gap-1.5 h-9", FORM_ORANGE_BTN)}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PackageCheck className="h-3.5 w-3.5" />}
+              {fromGrnId ? "Link GRN" : "PO + GRN"}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1899,6 +2056,12 @@ export default function CreatePOPage() {
           }}
         />
       )}
+
+      <PoProductSalesModal
+        open={salesModalOpen}
+        onClose={() => setSalesModalOpen(false)}
+        orderLineVariantIds={orderLineVariantIds}
+      />
     </div>
   );
 }

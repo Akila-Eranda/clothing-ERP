@@ -68,12 +68,31 @@ function buildColumns(
     },
     {
       accessorKey: "expectedDate",
-      header: ({ column }) => <DataTableColumnHeader column={column} title="Expected" />,
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Next Come" />,
       cell: ({ row }) => row.original.expectedDate ? (
         <span className="text-xs text-muted-foreground">
           {new Date(row.original.expectedDate).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
         </span>
       ) : <span className="text-xs text-muted-foreground">—</span>,
+    },
+    {
+      accessorKey: "paymentDueDate",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Pay Date" />,
+      cell: ({ row }) => {
+        const d = row.original.paymentDueDate;
+        if (!d) return <span className="text-xs text-muted-foreground">—</span>;
+        const due = Math.max(0, (row.original.total ?? 0) - (row.original.paidAmount ?? 0));
+        return (
+          <div className="text-xs">
+            <p className="text-muted-foreground">
+              {new Date(d).toLocaleDateString("en-LK", { day: "2-digit", month: "short" })}
+            </p>
+            {due > 0.01 && (
+              <p className="font-semibold text-rose-600 tabular-nums">LKR {due.toFixed(0)}</p>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: "status",

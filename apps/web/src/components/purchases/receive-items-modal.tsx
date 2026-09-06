@@ -34,6 +34,7 @@ export interface PurchaseOrder {
   paidAmount?: number;
   orderDate: string;
   expectedDate?: string | null;
+  paymentDueDate?: string | null;
   notes?: string | null;
   supplier: { id: string; name: string; phone?: string | null };
   items?: POItem[];

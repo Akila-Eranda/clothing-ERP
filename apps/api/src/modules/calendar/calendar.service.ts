@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import {
   CalendarTaskStatus,
   ChequeStatus,
+  PurchaseOrderStatus,
   SupplierInvoiceStatus,
 } from '@prisma/client';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -31,6 +32,7 @@ export class CalendarService {
       creditCharges,
       scheduleLines,
       supplierInvoices,
+      poPaymentDues,
       notes,
       tasks,
       meetings,
@@ -72,6 +74,20 @@ export class CalendarService {
         },
         select: { dueDate: true },
       }),
+      this.prisma.purchaseOrder.findMany({
+        where: {
+          tenantId,
+          paymentDueDate: { gte: start, lte: end },
+          status: {
+            notIn: [
+              PurchaseOrderStatus.CANCELLED,
+              PurchaseOrderStatus.DRAFT,
+              PurchaseOrderStatus.PENDING_APPROVAL,
+            ],
+          },
+        },
+        select: { paymentDueDate: true, total: true, paidAmount: true },
+      }),
       this.prisma.calendarNote.findMany({
         where: { tenantId, date: { gte: start, lte: end } },
         select: { date: true },
@@ -102,6 +118,11 @@ export class CalendarService {
     for (const c of creditCharges) if (c.dueDate) bumpBadge(badges, toDateKey(c.dueDate), 'customerDue');
     for (const l of scheduleLines) bumpBadge(badges, toDateKey(l.dueDate), 'customerDue');
     for (const i of supplierInvoices) if (i.dueDate) bumpBadge(badges, toDateKey(i.dueDate), 'supplierDue');
+    for (const po of poPaymentDues) {
+      if (!po.paymentDueDate) continue;
+      if (round2(Math.max(0, po.total - po.paidAmount)) <= 0.01) continue;
+      bumpBadge(badges, toDateKey(po.paymentDueDate), 'supplierDue');
+    }
     for (const n of notes) bumpBadge(badges, toDateKey(n.date), 'notes');
     for (const t of tasks) bumpBadge(badges, toDateKey(t.date), 'tasks');
     for (const m of meetings) bumpBadge(badges, toDateKey(m.startsAt), 'meetings');
@@ -126,6 +147,7 @@ export class CalendarService {
       creditCharges,
       scheduleLines,
       supplierInvoices,
+      poPaymentDues,
       supplierPayments,
       notes,
       tasks,
@@ -196,6 +218,21 @@ export class CalendarService {
         },
         include: { supplier: { select: { id: true, name: true } } },
       }),
+      this.prisma.purchaseOrder.findMany({
+        where: {
+          tenantId,
+          paymentDueDate: { gte: start, lte: end },
+          status: {
+            notIn: [
+              PurchaseOrderStatus.CANCELLED,
+              PurchaseOrderStatus.DRAFT,
+              PurchaseOrderStatus.PENDING_APPROVAL,
+            ],
+          },
+        },
+        include: { supplier: { select: { id: true, name: true } } },
+        orderBy: { paymentDueDate: 'asc' },
+      }),
       this.prisma.supplierPayment.findMany({
         where: { tenantId, paidAt: { gte: start, lte: end } },
         include: { supplier: { select: { id: true, name: true } } },
@@ -255,13 +292,26 @@ export class CalendarService {
         supplier: p.supplier,
         reference: p.reference,
       })),
-      supplierDue: supplierInvoices.map((i) => ({
-        id: i.id,
-        invoiceNumber: i.invoiceNumber,
-        due: round2(i.total - i.paidAmount),
-        dueDate: i.dueDate,
-        supplier: i.supplier,
-      })),
+      supplierDue: [
+        ...supplierInvoices.map((i) => ({
+          id: i.id,
+          invoiceNumber: i.invoiceNumber,
+          due: round2(i.total - i.paidAmount),
+          dueDate: i.dueDate,
+          source: 'INVOICE' as const,
+          supplier: i.supplier,
+        })),
+        ...poPaymentDues
+          .map((po) => ({
+            id: po.id,
+            invoiceNumber: po.poNumber,
+            due: round2(Math.max(0, po.total - po.paidAmount)),
+            dueDate: po.paymentDueDate,
+            source: 'PO' as const,
+            supplier: po.supplier,
+          }))
+          .filter((row) => row.due > 0.01),
+      ],
       chequesDue: cheques,
       customerDue: [
         ...creditCharges.map((c) => ({

@@ -29,7 +29,13 @@ type DayDetail = {
   profit: { cogs: number; grossProfit: number; expenses: number; netProfit: number; netMarginPct: number };
   expenses: { total: number; items: { id: string; description: string; amount: number }[] };
   supplierPayments: { id: string; amount: number; supplier: { name: string }; paidAt: string }[];
-  supplierDue: { id: string; invoiceNumber: string; due: number; supplier: { name: string } }[];
+  supplierDue: {
+    id: string;
+    invoiceNumber: string;
+    due: number;
+    source?: 'INVOICE' | 'PO';
+    supplier: { name: string };
+  }[];
   chequesDue: { id: string; chequeNumber: string; amount: number; partyName?: string | null; direction: string }[];
   customerDue: { id: string; amount: number; source: string; customer: { firstName: string; lastName?: string | null; phone: string } }[];
   notes: { id: string; title: string; body?: string | null }[];
@@ -328,7 +334,11 @@ export default function BusinessCalendarPage() {
 
                 <Section title="Supplier due" icon={FileText}>
                   {day.supplierDue.map((i) => (
-                    <Row key={i.id} label={`${i.supplier.name} · ${i.invoiceNumber}`} value={`LKR ${formatNumber(i.due)}`} />
+                    <Row
+                      key={i.id}
+                      label={`${i.supplier.name} · ${i.source === 'PO' ? `PO ${i.invoiceNumber}` : i.invoiceNumber}`}
+                      value={`LKR ${formatNumber(i.due)}`}
+                    />
                   ))}
                   {!day.supplierDue.length && <Empty />}
                 </Section>

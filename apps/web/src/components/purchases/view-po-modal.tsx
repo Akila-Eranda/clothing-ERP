@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   X, ShoppingBag, CheckCircle2, Clock, XCircle, Package, FileText,
   Calendar, Hash, Truck, Loader2, PackageCheck, Ban, Send,
-  Building2, Phone, Mail, MapPin, Tag,
+  Building2, Phone, Mail, MapPin, Tag, Banknote,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -233,7 +233,20 @@ export function ViewPOModal({
               <div className="grid grid-cols-1 xl:grid-cols-[1fr_240px] gap-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 rounded-xl border bg-card p-5">
                   <InfoRow icon={Calendar} label="Order date" value={fmtDate(data.orderDate)} />
-                  <InfoRow icon={Truck} label="Expected date" value={fmtDate(data.expectedDate)} />
+                  <InfoRow icon={Truck} label="Next come date" value={fmtDate(data.expectedDate)} />
+                  <InfoRow
+                    icon={Banknote}
+                    label="Payment date"
+                    value={
+                      data.paymentDueDate
+                        ? `${fmtDate(data.paymentDueDate)}${
+                            (data.total ?? 0) - (data.paidAmount ?? 0) > 0.01
+                              ? ` · due LKR ${fmtMoney(Math.max(0, (data.total ?? 0) - (data.paidAmount ?? 0)))}`
+                              : ""
+                          }`
+                        : "—"
+                    }
+                  />
                   <InfoRow icon={Building2} label="Supplier" value={data.supplier?.name ?? "—"} />
                   <InfoRow icon={Phone} label="Supplier phone" value={data.supplier?.phone ?? "—"} />
                   <InfoRow icon={Hash} label="Reference" value={data.reference ?? "—"} />
@@ -250,7 +263,6 @@ export function ViewPOModal({
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between"><span className="text-muted-foreground">Subtotal</span><span className="font-semibold tabular-nums">{fmtMoney(data.subtotal ?? data.total)}</span></div>
                     <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span className="font-semibold tabular-nums">{fmtMoney(data.discountAmount ?? 0)}</span></div>
-                    <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span className="font-semibold tabular-nums">{fmtMoney(data.taxAmount ?? 0)}</span></div>
                     <div className="flex justify-between pt-2 border-t font-bold">
                       <span>Total</span>
                       <span className="tabular-nums text-primary">{fmtMoney(data.total)}</span>
@@ -357,7 +369,7 @@ export function ViewPOModal({
                   <table className="w-full text-sm min-w-[700px]">
                     <thead>
                       <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {["#", "Product", "Barcode", "Variant", "Ordered", "Free", "Expiry", "MRP", "Received", "Rejected", "Unit Cost", "Discount", "Tax", "Amount"].map((h, i) => (
+                        {["#", "Product", "Barcode", "Variant", "Ordered", "Free", "Expiry", "MRP", "Received", "Rejected", "Unit Cost", "Discount", "Amount"].map((h, i) => (
                           <th key={h} className={cn("px-3 py-2.5 font-semibold whitespace-nowrap", i >= 4 && h !== "Variant" && h !== "Expiry" && h !== "Barcode" && h !== "Product" ? "text-right" : "text-left")}>{h}</th>
                         ))}
                       </tr>
@@ -402,7 +414,6 @@ export function ViewPOModal({
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{item.rejectedQty || "—"}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.discount ?? 0)}</td>
-                          <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.taxAmount ?? 0)}</td>
                           <td className="px-3 py-3 text-xs text-right font-bold tabular-nums">{fmtMoney(item.total)}</td>
                         </tr>
                         );

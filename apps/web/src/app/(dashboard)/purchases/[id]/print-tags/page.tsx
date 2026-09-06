@@ -51,7 +51,11 @@ interface POItem {
       modelNumber?: string | null;
       loadIndex?: string | null;
       speedRating?: string | null;
+      brand?: { name?: string | null } | null;
+      collections?: { collection?: { name?: string | null } | null }[] | null;
+      mrp?: number | null;
     };
+    mrp?: number | null;
   };
 }
 interface PO {
@@ -193,8 +197,14 @@ function StickerLabel({ item, shopName, serial }: { item: POItem; shopName: stri
 function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; serial: number }) {
   const barcodeVal = labelBarcode(item, serial);
   const price = item.variant?.sellingPrice ?? item.unitCost;
+  const mrp = item.variant?.mrp ?? item.variant?.product?.mrp ?? null;
   const color = item.variant?.color;
   const size = item.variant?.size;
+  const brand = item.variant?.product?.brand?.name?.trim() || null;
+  const collectionName =
+    item.variant?.product?.collections
+      ?.map((c) => c.collection?.name?.trim())
+      .filter(Boolean)?.[0] ?? null;
   return (
     <div
       className="label-card label-format-hangtag bg-white border-2 border-gray-800 rounded-lg flex flex-col items-center gap-1 text-center overflow-hidden"
@@ -205,7 +215,11 @@ function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; s
       </div>
       <div className="w-5 h-5 rounded-full border-2 border-gray-400 mt-1" />
       <div className="px-3 py-1 flex flex-col items-center gap-1 flex-1">
+        {brand ? <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500">{brand}</p> : null}
         <p className="text-[13px] font-bold leading-snug text-gray-900">{item.productName}</p>
+        {collectionName ? (
+          <p className="text-[9px] text-gray-500 font-medium">{collectionName}</p>
+        ) : null}
         {(color || size) && (
           <div className="flex gap-2 mt-0.5">
             {size && <span className="text-[9px] border border-gray-300 rounded px-1.5 py-0.5 font-semibold text-gray-600">{size}</span>}
@@ -214,6 +228,9 @@ function HangTag({ item, shopName, serial }: { item: POItem; shopName: string; s
         )}
         <TagRow item={item} className="mt-0.5" />
         <p className="text-[20px] font-extrabold text-gray-900 mt-1">LKR {price.toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
+        {mrp != null && Number(mrp) > Number(price) ? (
+          <p className="text-[9px] text-gray-500">MRP LKR {Number(mrp).toLocaleString("en-LK", { minimumFractionDigits: 2 })}</p>
+        ) : null}
         <div className="border-t w-full mt-1 pt-1">
           <BarcodeEl value={barcodeVal} renderKey={`hang-${item.id}-${serial}`} />
           <p className="text-[8px] font-mono text-gray-400">{barcodeVal || "—"}</p>

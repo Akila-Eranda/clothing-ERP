@@ -11,7 +11,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { PaginationDto } from '@/common/dto/pagination.dto';
 import { paginate, getPaginationArgs } from '@/shared/pagination.helper';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
-import { RequirePermissions } from '@/common/decorators/permissions.decorator';
+import { RequirePermissions, RequireAnyPermissions } from '@/common/decorators/permissions.decorator';
 import { InventoryService, InventoryModule } from '@/modules/inventory/inventory.module';
 import { WorkflowService, WorkflowModule } from '@/modules/workflow/workflow.module';
 import { bypassesWorkflowApproval } from '@/shared/workflow-bypass.helper';
@@ -71,11 +71,17 @@ export class ReceivePaymentDto {
 export class CreatePurchaseOrderDto {
   @ApiProperty() @IsString() supplierId: string;
   @ApiPropertyOptional() @IsOptional() @IsString() expectedDate?: string;
+  @ApiPropertyOptional({ description: 'Scheduled supplier payment date (Business Calendar)' })
+  @IsOptional() @IsDateString() paymentDueDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() notes?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() reference?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() paymentTerms?: string;
   @ApiPropertyOptional({ description: 'Link an existing Quick/Direct GRN (stock already posted)' })
   @IsOptional() @IsString() fromGrnId?: string;
+  @ApiPropertyOptional({
+    description: 'Create PO and immediately post full GRN (receive all ordered + free qty)',
+  })
+  @IsOptional() @IsBoolean() createAndReceive?: boolean;
   @ApiProperty({ type: [PurchaseItemDto] }) @IsArray() @ValidateNested({ each: true }) @Type(() => PurchaseItemDto) items: PurchaseItemDto[];
   @ApiPropertyOptional({ type: ReceivePaymentDto, description: 'Optional advance / pay-now against this PO' })
   @IsOptional() @ValidateNested() @Type(() => ReceivePaymentDto)
@@ -261,7 +267,41 @@ export class SuppliersService {
     return this.prisma.supplier.delete({ where: { id } });
   }
 
-  async createPurchaseOrder(tenantId: string, branchId: string, userId: string, dto: CreatePurchaseOrderDto) {
+  async createPurchaseOrder(
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: CreatePurchaseOrderDto,
+    opts?: { permissions?: string[]; roles?: string[] },
+  ) {
+    if (dto.fromGrnId && dto.createAndReceive) {
+      throw new BadRequestException('Cannot use createAndReceive together with fromGrnId');
+    }
+    if (dto.createAndReceive) {
+      if (!branchId?.trim()) {
+        throw new BadRequestException('Select a branch before Create PO + GRN');
+      }
+      const perms = opts?.permissions ?? [];
+      const roles = opts?.roles ?? [];
+      const canReceive =
+        perms.includes('purchases:update')
+        || perms.includes('*')
+        || bypassesWorkflowApproval(roles);
+      if (!canReceive) {
+        throw new BadRequestException(
+          'Create PO + GRN requires purchase receive permission (purchases:update)',
+        );
+      }
+    }
+    if (dto.payment && dto.payment.amount > 0) {
+      if (dto.payment.method === PaymentMethod.CHEQUE && !(dto.payment.chequeNumber ?? dto.payment.reference)?.trim()) {
+        throw new BadRequestException('Cheque number is required for cheque payments');
+      }
+      if (dto.payment.method === PaymentMethod.CHEQUE && !dto.payment.chequeDueDate?.trim()) {
+        throw new BadRequestException('Cheque due date is required');
+      }
+    }
+
     const poNumber = this.numbering.isEngineEnabled()
       ? await this.numbering.allocateStandalone(tenantId, 'PURCHASE_ORDER')
       : `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-5)}`;
@@ -274,7 +314,7 @@ export class SuppliersService {
       const lineTotal = item.unitCost * orderedQty;
       const disc = item.discount ?? 0;
       const taxable = lineTotal - disc;
-      const tax = (taxable * (item.taxRate ?? 0)) / 100;
+      const tax = 0;
       return {
         variantId: item.variantId,
         productName: item.productName,
@@ -286,7 +326,7 @@ export class SuppliersService {
         mrp: item.mrp != null && item.mrp > 0 ? item.mrp : null,
         expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
         discount: disc,
-        taxRate: item.taxRate ?? 0,
+        taxRate: 0,
         taxAmount: tax,
         total: taxable + tax,
       };
@@ -296,8 +336,8 @@ export class SuppliersService {
     const taxAmount  = itemsData.reduce((s, i) => s + i.taxAmount, 0);
     const poTotal = subtotal - discountAmount + taxAmount;
 
-    // Credit limit: only enforce when PO will immediately become payable (from GRN / received)
-    if (dto.fromGrnId) {
+    // Credit limit: enforce when PO becomes payable immediately (from GRN / create+receive)
+    if (dto.fromGrnId || dto.createAndReceive) {
       try {
         await assertSupplierCreditLimit(this.prisma, tenantId, dto.supplierId, poTotal);
       } catch (e) {
@@ -334,6 +374,7 @@ export class SuppliersService {
         poNumber, subtotal, discountAmount, taxAmount,
         total: subtotal - discountAmount + taxAmount,
         expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
+        paymentDueDate: dto.paymentDueDate ? new Date(dto.paymentDueDate) : undefined,
         notes: dto.notes, reference: dto.reference, paymentTerms: dto.paymentTerms,
         createdBy: userId,
         items: { create: itemsData },
@@ -342,7 +383,9 @@ export class SuppliersService {
               status: PurchaseOrderStatus.RECEIVED,
               receivedDate: grnToLink.receivedAt,
             }
-          : {}),
+          : dto.createAndReceive
+            ? { status: PurchaseOrderStatus.CONFIRMED }
+            : {}),
       } as any,
       include: { items: true, supplier: true },
     });
@@ -352,7 +395,7 @@ export class SuppliersService {
         for (const pi of po.items) {
           await tx.purchaseOrderItem.update({
             where: { id: pi.id },
-            data: { receivedQty: pi.orderedQty },
+            data: { receivedQty: pi.orderedQty + Math.max(0, (pi as { freeQty?: number }).freeQty ?? 0) },
           });
         }
         await tx.goodsReceipt.update({
@@ -379,28 +422,77 @@ export class SuppliersService {
       });
     }
 
+    let createReceiveGrn: { id: string; grnNumber: string } | null = null;
+    if (dto.createAndReceive && !grnToLink) {
+      const receiveItems = po.items.map((pi) => {
+        const freeQty = Math.max(0, (pi as { freeQty?: number }).freeQty ?? 0);
+        return {
+          itemId: pi.id,
+          receivedQty: pi.orderedQty + freeQty,
+          expiryDate: (pi as { expiryDate?: Date | null }).expiryDate
+            ? new Date((pi as { expiryDate: Date }).expiryDate).toISOString().slice(0, 10)
+            : undefined,
+        };
+      }).filter((i) => i.receivedQty > 0);
+
+      if (!receiveItems.length) {
+        await this.prisma.purchaseOrder.update({
+          where: { id: po.id },
+          data: { status: PurchaseOrderStatus.CANCELLED },
+        }).catch(() => undefined);
+        throw new BadRequestException('No quantities to receive for GRN');
+      }
+
+      try {
+        const received = await this.procurementService.receiveFromPurchaseOrder(
+          po.id,
+          tenantId,
+          branchId,
+          userId,
+          receiveItems,
+        );
+        createReceiveGrn = received.grn
+          ? { id: received.grn.id, grnNumber: received.grn.grnNumber }
+          : null;
+      } catch (e) {
+        await this.prisma.purchaseOrder.update({
+          where: { id: po.id },
+          data: { status: PurchaseOrderStatus.CANCELLED },
+        }).catch(() => undefined);
+        throw e;
+      }
+    }
+
     let paymentResult: unknown = null;
+    let paymentError: string | null = null;
     if (dto.payment && dto.payment.amount > 0) {
-      if (dto.payment.method === PaymentMethod.CHEQUE && !(dto.payment.chequeNumber ?? dto.payment.reference)?.trim()) {
-        throw new BadRequestException('Cheque number is required for cheque payments');
+      try {
+        paymentResult = await this.recordPayment(dto.supplierId, tenantId, branchId, userId, {
+          amount: dto.payment.amount,
+          method: dto.payment.method,
+          purchaseId: po.id,
+          reference: dto.payment.reference,
+          notes: dto.payment.notes ?? `Payment on PO ${po.poNumber}`,
+          chequeNumber: dto.payment.chequeNumber,
+          chequeDueDate: dto.payment.chequeDueDate,
+          chequeBankName: dto.payment.chequeBankName,
+        });
+      } catch (e) {
+        if (createReceiveGrn || grnToLink) {
+          paymentError = (e as Error).message || 'Payment failed after GRN';
+        } else {
+          throw e;
+        }
       }
-      if (dto.payment.method === PaymentMethod.CHEQUE && !dto.payment.chequeDueDate?.trim()) {
-        throw new BadRequestException('Cheque due date is required');
-      }
-      paymentResult = await this.recordPayment(dto.supplierId, tenantId, branchId, userId, {
-        amount: dto.payment.amount,
-        method: dto.payment.method,
-        purchaseId: po.id,
-        reference: dto.payment.reference,
-        notes: dto.payment.notes ?? `Payment on PO ${po.poNumber}`,
-        chequeNumber: dto.payment.chequeNumber,
-        chequeDueDate: dto.payment.chequeDueDate,
-        chequeBankName: dto.payment.chequeBankName,
-      });
     }
 
     const refreshed = await this.findOnePO(po.id, tenantId);
-    return paymentResult ? { ...refreshed, payment: paymentResult } : refreshed;
+    return {
+      ...refreshed,
+      ...(paymentResult ? { payment: paymentResult } : {}),
+      ...(paymentError ? { paymentError } : {}),
+      ...(createReceiveGrn ? { grn: createReceiveGrn } : {}),
+    };
   }
 
   async findAllPOs(tenantId: string, query: PaginationDto & { status?: PurchaseOrderStatus }) {
@@ -636,6 +728,219 @@ export class SuppliersService {
       }))
       .sort((a, b) => a.currentQty - b.currentQty);
   }
+
+  /**
+   * Product sales lookup for PO planning — read-only; does not mutate POs.
+   * Returns stock, last PO qty, and sold qty / revenue by variant within date range.
+   */
+  async getProductSalesForPo(
+    tenantId: string,
+    branchId: string | undefined,
+    opts: {
+      startDate: string;
+      endDate: string;
+      search?: string;
+      variantIds?: string[];
+      limit?: number;
+    },
+  ) {
+    const start = new Date(opts.startDate);
+    const end = new Date(opts.endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new BadRequestException('Invalid startDate or endDate');
+    }
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    if (end < start) throw new BadRequestException('endDate must be on or after startDate');
+
+    const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
+    const search = opts.search?.trim();
+    const scopedIds = (opts.variantIds ?? []).filter(Boolean);
+
+    const items = await this.prisma.saleItem.findMany({
+      where: {
+        ...(scopedIds.length ? { variantId: { in: scopedIds } } : { variantId: { not: null } }),
+        ...(search
+          ? {
+              OR: [
+                { productName: { contains: search, mode: 'insensitive' } },
+                { sku: { contains: search, mode: 'insensitive' } },
+                { variantName: { contains: search, mode: 'insensitive' } },
+                { variant: { barcode: { contains: search, mode: 'insensitive' } } },
+              ],
+            }
+          : {}),
+        sale: {
+          tenantId,
+          status: { not: 'CANCELLED' },
+          invoiceDate: { gte: start, lte: end },
+          ...(branchId ? { branchId } : {}),
+        },
+      },
+      select: {
+        variantId: true,
+        productName: true,
+        variantName: true,
+        sku: true,
+        quantity: true,
+        total: true,
+      },
+    });
+
+    type Agg = {
+      variantId: string;
+      productName: string;
+      variantName: string;
+      sku: string;
+      barcode: string | null;
+      soldQty: number;
+      revenue: number;
+      stock: number;
+      lastPoQty: number | null;
+      lastPoDate: string | null;
+      lastPoNumber: string | null;
+    };
+    const map = new Map<string, Agg>();
+
+    for (const i of items) {
+      if (!i.variantId) continue;
+      const cur = map.get(i.variantId);
+      if (!cur) {
+        map.set(i.variantId, {
+          variantId: i.variantId,
+          productName: i.productName,
+          variantName: i.variantName,
+          sku: i.sku,
+          barcode: null,
+          soldQty: i.quantity,
+          revenue: i.total,
+          stock: 0,
+          lastPoQty: null,
+          lastPoDate: null,
+          lastPoNumber: null,
+        });
+      } else {
+        cur.soldQty += i.quantity;
+        cur.revenue += i.total;
+      }
+    }
+
+    // Order-lines scope: include products with zero sales in range
+    if (scopedIds.length) {
+      const missing = scopedIds.filter((id) => !map.has(id));
+      if (missing.length) {
+        const variants = await this.prisma.productVariant.findMany({
+          where: { id: { in: missing }, product: { tenantId } },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            barcode: true,
+            product: { select: { name: true } },
+          },
+        });
+        for (const v of variants) {
+          if (search) {
+            const hay = `${v.product.name} ${v.name} ${v.sku} ${v.barcode ?? ""}`.toLowerCase();
+            if (!hay.includes(search.toLowerCase())) continue;
+          }
+          map.set(v.id, {
+            variantId: v.id,
+            productName: v.product.name,
+            variantName: v.name,
+            sku: v.sku,
+            barcode: v.barcode ?? null,
+            soldQty: 0,
+            revenue: 0,
+            stock: 0,
+            lastPoQty: null,
+            lastPoDate: null,
+            lastPoNumber: null,
+          });
+        }
+      }
+    }
+
+    const ids = Array.from(map.keys());
+    if (ids.length) {
+      const [variants, poItems] = await Promise.all([
+        this.prisma.productVariant.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true,
+            barcode: true,
+            inventory: branchId
+              ? { where: { branchId }, select: { quantity: true, reservedQty: true }, take: 1 }
+              : { select: { quantity: true, reservedQty: true }, take: 8 },
+          },
+        }),
+        this.prisma.purchaseOrderItem.findMany({
+          where: {
+            variantId: { in: ids },
+            purchase: {
+              tenantId,
+              status: { not: 'CANCELLED' },
+              ...(branchId ? { branchId } : {}),
+            },
+          },
+          orderBy: { purchase: { orderDate: 'desc' } },
+          select: {
+            variantId: true,
+            orderedQty: true,
+            freeQty: true,
+            purchase: { select: { orderDate: true, poNumber: true } },
+          },
+        }),
+      ]);
+
+      const stockById = new Map(
+        variants.map((v) => {
+          const stock = (v.inventory ?? []).reduce(
+            (s, r) => s + Math.max(0, (r.quantity ?? 0) - (r.reservedQty ?? 0)),
+            0,
+          );
+          return [v.id, { stock, barcode: v.barcode ?? null }] as const;
+        }),
+      );
+
+      const lastPoById = new Map<string, { qty: number; date: string; poNumber: string }>();
+      for (const row of poItems) {
+        if (lastPoById.has(row.variantId)) continue;
+        lastPoById.set(row.variantId, {
+          qty: row.orderedQty + Math.max(0, row.freeQty ?? 0),
+          date: row.purchase.orderDate.toISOString(),
+          poNumber: row.purchase.poNumber,
+        });
+      }
+
+      for (const row of map.values()) {
+        const meta = stockById.get(row.variantId);
+        if (meta) {
+          row.stock = meta.stock;
+          if (!row.barcode) row.barcode = meta.barcode;
+        }
+        const last = lastPoById.get(row.variantId);
+        if (last) {
+          row.lastPoQty = last.qty;
+          row.lastPoDate = last.date;
+          row.lastPoNumber = last.poNumber;
+        }
+      }
+    }
+
+    const rows = Array.from(map.values())
+      .sort((a, b) => b.soldQty - a.soldQty || a.productName.localeCompare(b.productName))
+      .slice(0, limit);
+
+    return {
+      startDate: opts.startDate,
+      endDate: opts.endDate,
+      productCount: rows.length,
+      totalSoldQty: rows.reduce((s, r) => s + r.soldQty, 0),
+      totalRevenue: rows.reduce((s, r) => s + r.revenue, 0),
+      rows,
+    };
+  }
 }
 
 @ApiTags('Suppliers')
@@ -842,13 +1147,44 @@ export class PurchasesController {
   @RequirePermissions('purchases:create')
   @ApiOperation({ summary: 'Create purchase order' })
   create(@CurrentUser() user: IAuthUser, @Body() dto: CreatePurchaseOrderDto) {
-    return this.suppliersService.createPurchaseOrder(user.tenantId, user.branchId ?? '', user.id, dto);
+    return this.suppliersService.createPurchaseOrder(
+      user.tenantId,
+      user.branchId ?? '',
+      user.id,
+      dto,
+      { permissions: user.permissions ?? [], roles: user.roles ?? [] },
+    );
   }
 
   @Get()
   @RequirePermissions('purchases:read')
   findAll(@CurrentUser() user: IAuthUser, @Query() query: PaginationDto & { status?: PurchaseOrderStatus }) {
     return this.suppliersService.findAllPOs(user.tenantId, query);
+  }
+
+  @Get('product-sales')
+  @RequireAnyPermissions('purchases:read', 'purchases:create', 'reports:read')
+  @ApiOperation({ summary: 'Product sales by date range (PO planning lookup — read only)' })
+  productSales(
+    @CurrentUser() user: IAuthUser,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('search') search?: string,
+    @Query('variantIds') variantIds?: string,
+    @Query('limit') limit?: string,
+  ) {
+    if (!startDate || !endDate) {
+      throw new BadRequestException('startDate and endDate are required');
+    }
+    return this.suppliersService.getProductSalesForPo(user.tenantId, user.branchId ?? undefined, {
+      startDate,
+      endDate,
+      search,
+      variantIds: variantIds
+        ? variantIds.split(',').map((s) => s.trim()).filter(Boolean)
+        : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get('reorder-suggestions')

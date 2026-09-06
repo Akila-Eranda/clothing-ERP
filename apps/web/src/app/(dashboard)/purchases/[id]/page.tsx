@@ -47,7 +47,7 @@ interface Supplier {
 }
 interface PO {
   id: string; poNumber: string; status: string;
-  orderDate: string; expectedDate?: string | null; receivedDate?: string | null;
+  orderDate: string; expectedDate?: string | null; paymentDueDate?: string | null; receivedDate?: string | null;
   subtotal: number; taxAmount: number; discountAmount: number; total: number; paidAmount: number;
   notes?: string | null; reference?: string | null; paymentTerms?: string | null;
   createdAt: string; updatedAt: string; createdBy?: string | null;
@@ -337,7 +337,20 @@ export default function PODetailPage() {
             <h3 className="text-sm font-bold">Order Details</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-4">
               <MetaItem icon={Calendar} label="Order Date" value={fmtDate(po.orderDate)} />
-              <MetaItem icon={Truck} label="Expected Date" value={fmtDate(po.expectedDate)} />
+              <MetaItem icon={Truck} label="Next Come Date" value={fmtDate(po.expectedDate)} />
+              <MetaItem
+                icon={Banknote}
+                label="Payment Date"
+                value={
+                  po.paymentDueDate
+                    ? `${fmtDate(po.paymentDueDate)}${
+                        (po.total ?? 0) - (po.paidAmount ?? 0) > 0.01
+                          ? ` · due LKR ${formatNumber(Math.max(0, (po.total ?? 0) - (po.paidAmount ?? 0)))}`
+                          : ""
+                      }`
+                    : "—"
+                }
+              />
               <MetaItem icon={Hash} label="Reference" value={po.reference ?? "—"} />
               <MetaItem icon={FileText} label="Payment Terms" value={po.paymentTerms ?? "—"} />
             </div>
@@ -409,7 +422,6 @@ export default function PODetailPage() {
             {[
               ["Sub Total", fmt(po.subtotal)],
               ["Discount", fmt(po.discountAmount)],
-              ["Tax", fmt(po.taxAmount)],
             ].map(([label, val]) => (
               <div key={label} className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{label}</span>
@@ -450,7 +462,7 @@ export default function PODetailPage() {
           <table className="enterprise-table w-full text-sm">
             <thead>
               <tr>
-                {["#", "Item", "Barcode", "Variant", "Qty", "Free", "Expiry", "MRP", "Unit Cost", "Discount", "Tax", "Amount"].map((h) => (
+                {["#", "Item", "Barcode", "Variant", "Qty", "Free", "Expiry", "MRP", "Unit Cost", "Discount", "Amount"].map((h) => (
                   <th key={h} className={h === "#" || h === "Item" || h === "Barcode" || h === "Variant" || h === "Expiry" ? "text-left" : "text-right"}>
                     {h}
                   </th>
@@ -491,7 +503,6 @@ export default function PODetailPage() {
                   <td className="text-right tabular-nums">{item.mrp != null && item.mrp > 0 ? formatNumber(item.mrp) : "—"}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.unitCost)}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.discount ?? 0)}</td>
-                  <td className="text-right tabular-nums">{formatNumber(item.taxAmount)}</td>
                   <td className="text-right font-bold tabular-nums">{formatNumber(item.total)}</td>
                 </tr>
                 );
@@ -499,7 +510,7 @@ export default function PODetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-muted/30 font-semibold">
-                <td colSpan={7} className="px-4 py-3 text-sm">
+                <td colSpan={6} className="px-4 py-3 text-sm">
                   Total: {totals.items} items · {totals.qty} qty
                 </td>
                 <td colSpan={4} />

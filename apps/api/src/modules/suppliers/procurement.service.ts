@@ -301,10 +301,12 @@ export class ProcurementService {
     notes?: string;
     supplierInvoiceRef?: string;
     lines: GrnLineInput[];
+    /** Optional payable amount for AP/ledger (excludes free qty). Defaults to sum(receivedQty * unitCost). */
+    payableAmount?: number;
     /** Runs inside the same DB transaction after stock is posted (e.g. PO qty updates). */
     afterStock?: (tx: Prisma.TransactionClient, grn: { id: string; items: { id: string; variantId: string; lotId: string | null }[] }) => Promise<void>;
   }) {
-    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines, afterStock } = params;
+    const { tenantId, branchId, userId, supplierId, source, purchaseId, notes, supplierInvoiceRef, lines, afterStock, payableAmount } = params;
     if (!lines?.length) throw new BadRequestException('At least one GRN line is required');
     if (!branchId) throw new BadRequestException('Branch is required to post GRN');
 
@@ -411,10 +413,14 @@ export class ProcurementService {
       }
 
       // Direct/Quick GRN (no PO): auto-post supplier invoice so Outstanding includes it
-      const receivedValue = effectiveLines.reduce(
+      const stockValue = effectiveLines.reduce(
         (s, l) => s + Math.max(0, l.receivedQty) * l.unitCost,
         0,
       );
+      const receivedValue =
+        payableAmount != null && Number.isFinite(payableAmount)
+          ? Math.max(0, payableAmount)
+          : stockValue;
       if (!purchaseId && receivedValue > 0.01) {
         try {
           await assertSupplierCreditLimit(tx, tenantId, supplierId, receivedValue);
@@ -551,6 +557,7 @@ export class ProcurementService {
       purchaseId: poId,
       notes: `GRN from PO ${po.poNumber}`,
       lines: grnLines,
+      payableAmount: receiveValue,
       afterStock: async (tx) => {
         for (const item of items) {
           if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;

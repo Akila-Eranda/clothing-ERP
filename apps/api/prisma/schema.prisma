@@ -2177,6 +2177,7 @@ model PurchaseOrder {
   status          PurchaseOrderStatus @default(DRAFT)
   orderDate       DateTime            @default(now())
   expectedDate    DateTime?
+  paymentDueDate  DateTime?
   receivedDate    DateTime?
   subtotal        Float               @default(0)
   taxAmount       Float               @default(0)
@@ -2203,6 +2204,7 @@ model PurchaseOrder {
 
   @@unique([tenantId, poNumber])
   @@index([tenantId])
+  @@index([paymentDueDate])
   @@map("purchase_orders")
 }
 

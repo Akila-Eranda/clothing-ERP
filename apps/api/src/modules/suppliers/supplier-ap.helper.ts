@@ -100,12 +100,17 @@ export async function computeSupplierOutstanding(
   for (const po of pos) {
     if (invoicedPoIds.has(po.id)) continue;
     const receivedValue = round2(
-      po.items.reduce((s, i) => s + i.receivedQty * i.unitCost, 0),
+      po.items.reduce(
+        (s, i) => s + Math.min(Math.max(0, i.receivedQty), Math.max(0, i.orderedQty)) * i.unitCost,
+        0,
+      ),
     );
     const liabilityBase = receivedValue > 0.01 ? receivedValue : po.total;
     const due = round2(Math.max(0, liabilityBase - po.paidAmount));
     if (due <= 0.01) continue;
-    const dueDate = new Date(po.orderDate.getTime() + creditDays * 86400000);
+    const dueDate =
+      po.paymentDueDate
+      ?? new Date(po.orderDate.getTime() + creditDays * 86400000);
     lines.push({
       id: po.id,
       source: 'PO',
