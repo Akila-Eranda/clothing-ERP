@@ -250,4 +250,4 @@ export function slugifyCategory(name: string): string {
     .replace(/^-|-$/g, '');
 }
 
-export const SHOP_TYPE_LIST = Object.values(ShopType);
+export const SHOP_TYPE_LIST = Object.values(SHOP_PROFILES);
