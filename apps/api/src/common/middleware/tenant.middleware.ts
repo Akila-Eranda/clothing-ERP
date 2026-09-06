@@ -18,6 +18,7 @@ export class TenantMiddleware implements NestMiddleware {
       req.path.includes('/tenants/register') ||
       req.path.includes('/tenants/platform-status') ||
       req.path.includes('/tenants/resolve/') ||
+      req.path.includes('/tenants/resolve-email') ||
       req.path.includes('/tenants/shop-types');
 
     if (skip) return next();

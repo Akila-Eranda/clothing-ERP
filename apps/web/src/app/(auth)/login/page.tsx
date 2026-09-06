@@ -59,6 +59,8 @@ function LoginContent() {
   const [hostnameSlug, setHostnameSlug] = React.useState<string | null>(null);
   const [tenantPreview, setTenantPreview] = React.useState<TenantPreview | null>(null);
   const [tenantPreviewLoading, setTenantPreviewLoading] = React.useState(false);
+  const [emailWorkspaces, setEmailWorkspaces] = React.useState<TenantPreview[]>([]);
+  const [emailLookupLoading, setEmailLookupLoading] = React.useState(false);
   const [pending2fa, setPending2fa] = React.useState<{
     email: string;
     password: string;
@@ -69,6 +71,7 @@ function LoginContent() {
   const urlTenant = searchParams.get("tenant");
   const urlEmail = searchParams.get("email");
   const [subdomain, setSubdomain] = React.useState(urlTenant || "");
+  const subdomainManualRef = React.useRef(Boolean(urlTenant));
 
   React.useEffect(() => {
     setIsMainDomain(isMainShopLoginDomain());
@@ -78,8 +81,9 @@ function LoginContent() {
   }, [urlTenant]);
 
   React.useEffect(() => {
+    if (isMainDomain) return;
     const slug = hostnameSlug ?? (subdomain.trim() || null);
-    if (!slug || isMainDomain) {
+    if (!slug) {
       setTenantPreview(null);
       setTenantPreviewLoading(false);
       return;
@@ -106,10 +110,11 @@ function LoginContent() {
     return () => { cancelled = true; };
   }, [hostnameSlug, subdomain, isMainDomain]);
 
-  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginForm>({
+  const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: urlEmail ?? "", password: "" },
   });
+  const watchedEmail = watch("email");
 
   const {
     register: registerTotp,
@@ -125,9 +130,87 @@ function LoginContent() {
     if (urlEmail) setValue("email", urlEmail);
   }, [urlEmail, setValue]);
 
+  // Main portal: auto-detect workspace(s) from email
+  React.useEffect(() => {
+    if (!isMainDomain) {
+      setEmailWorkspaces([]);
+      setEmailLookupLoading(false);
+      return;
+    }
+    const email = (watchedEmail || "").trim().toLowerCase();
+    if (!email.includes("@") || email.length < 5) {
+      setEmailWorkspaces([]);
+      setEmailLookupLoading(false);
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      setEmailLookupLoading(true);
+      fetch(`${API_BASE}/tenants/resolve-email?email=${encodeURIComponent(email)}`)
+        .then(async (res) => {
+          if (!res.ok) return { workspaces: [] as TenantPreview[] };
+          const json = await res.json();
+          const payload = (json.data ?? json) as { workspaces?: TenantPreview[] };
+          return { workspaces: payload.workspaces ?? [] };
+        })
+        .then(({ workspaces }) => {
+          if (cancelled) return;
+          setEmailWorkspaces(workspaces);
+          if (subdomainManualRef.current) return;
+          if (workspaces.length >= 1) {
+            setSubdomain(workspaces[0].subdomain);
+            setTenantPreview(workspaces[0]);
+          } else {
+            setSubdomain("");
+            setTenantPreview(null);
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setEmailWorkspaces([]);
+        })
+        .finally(() => {
+          if (!cancelled) setEmailLookupLoading(false);
+        });
+    }, 450);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [watchedEmail, isMainDomain]);
+
+  React.useEffect(() => {
+    if (!isMainDomain) return;
+    const slug = subdomain.trim();
+    if (!slug) return;
+    const fromEmail = emailWorkspaces.find((w) => w.subdomain === slug);
+    if (fromEmail) {
+      setTenantPreview(fromEmail);
+      return;
+    }
+    let cancelled = false;
+    fetch(`${API_BASE}/tenants/resolve/${encodeURIComponent(slug)}`)
+      .then(async (res) => {
+        if (!res.ok) return null;
+        const json = await res.json();
+        return (json.data ?? json) as TenantPreview;
+      })
+      .then((data) => {
+        if (!cancelled && data?.subdomain) setTenantPreview(data);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [isMainDomain, subdomain, emailWorkspaces]);
+
   const effectiveSlug = hostnameSlug ?? (subdomain.trim() || undefined);
-  const shopType = tenantPreview?.shopType ?? null;
+  const shopType =
+    tenantPreview?.shopType
+    ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())?.shopType
+    ?? null;
   const showSubdomainField = isMainDomain;
+  const selectedWorkspace =
+    tenantPreview
+    ?? emailWorkspaces.find((w) => w.subdomain === subdomain.trim())
+    ?? null;
 
   const redirectAfterLogin = () => {
     toast.success("Welcome back!");
@@ -144,20 +227,43 @@ function LoginContent() {
       toast.error(maintenance?.message ?? "System is under maintenance");
       return;
     }
-    if (isMainDomain && !subdomain.trim()) {
-      toast.error("Enter your shop subdomain to continue");
+    let slug = effectiveSlug;
+    if (isMainDomain && !slug) {
+      const email = data.email.trim().toLowerCase();
+      try {
+        const res = await fetch(`${API_BASE}/tenants/resolve-email?email=${encodeURIComponent(email)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const payload = (json.data ?? json) as { workspaces?: TenantPreview[] };
+          const list = payload.workspaces ?? [];
+          if (list.length === 1) {
+            slug = list[0].subdomain;
+            setSubdomain(list[0].subdomain);
+            setTenantPreview(list[0]);
+          } else if (list.length > 1) {
+            toast.error("Select your shop workspace to continue");
+            setEmailWorkspaces(list);
+            return;
+          }
+        }
+      } catch {
+        // fall through
+      }
+    }
+    if (isMainDomain && !slug) {
+      toast.error("Enter your email so we can find your shop, or type the workspace name");
       return;
     }
-    if (!isMainDomain && !effectiveSlug) {
+    if (!isMainDomain && !slug) {
       toast.error("Open your shop login URL (your-shop.shop.hexalyte.com)");
       return;
     }
     setIsLoading(true);
     try {
       const email = data.email.trim().toLowerCase();
-      const result = await loginWithApi(email, data.password, effectiveSlug);
+      const result = await loginWithApi(email, data.password, slug);
       if (result.status === "requires_2fa") {
-        setPending2fa({ email, password: data.password, tenantSlug: effectiveSlug });
+        setPending2fa({ email, password: data.password, tenantSlug: slug });
         resetTotp({ code: "" });
         toast.message("Enter your authenticator code to continue");
         return;
@@ -206,9 +312,12 @@ function LoginContent() {
     <div className="min-h-screen flex flex-col lg:flex-row">
       <AuthBrandPanel
         shopType={shopType}
-        tenantName={tenantPreview?.name}
-        tenantSubdomain={tenantPreview?.subdomain ?? hostnameSlug}
-        loading={Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview)}
+        tenantName={selectedWorkspace?.name}
+        tenantSubdomain={selectedWorkspace?.subdomain ?? hostnameSlug}
+        loading={
+          (Boolean(hostnameSlug) && !isMainDomain && (tenantPreviewLoading || !tenantPreview))
+          || (isMainDomain && emailLookupLoading)
+        }
       />
 
       <div className="flex-1 flex flex-col min-h-screen relative overflow-hidden">
@@ -241,10 +350,10 @@ function LoginContent() {
               <p className="text-sm text-slate-600 mt-2 leading-relaxed">
                 {pending2fa
                   ? "Enter the 6-digit code from your authenticator app"
-                  : tenantPreview
-                    ? `Enter your credentials for ${tenantPreview.name}`
+                  : selectedWorkspace
+                    ? `Enter your credentials for ${selectedWorkspace.name}`
                     : isMainDomain
-                      ? "Enter your workspace URL and credentials"
+                      ? "Enter your email — we will find your shop automatically"
                       : "Enter your credentials to continue"}
               </p>
             </div>
@@ -310,40 +419,6 @@ function LoginContent() {
               </form>
             ) : (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                {showSubdomainField && (
-                  <div className="space-y-2">
-                    <Label htmlFor="subdomain" className="text-slate-800 font-medium">
-                      Workspace subdomain
-                    </Label>
-                    <div className="relative">
-                      <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="subdomain"
-                        type="text"
-                        placeholder="your-shop"
-                        value={subdomain}
-                        className="pl-10 pr-[8rem] h-12 rounded-xl border-slate-200 bg-white lowercase text-base text-slate-900 shadow-sm focus-visible:ring-primary/30"
-                        onChange={(e) =>
-                          setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))
-                        }
-                      />
-                      <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none font-medium">
-                        {SHOP_DOMAIN_SUFFIX}
-                      </span>
-                    </div>
-                    {subdomain.trim() && (
-                      <button
-                        type="button"
-                        onClick={openWorkspace}
-                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-                      >
-                        Go to {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-slate-800 font-medium">Email address</Label>
                   <div className="relative">
@@ -358,7 +433,89 @@ function LoginContent() {
                     />
                   </div>
                   {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+                  {isMainDomain && emailLookupLoading && (
+                    <p className="text-xs text-slate-500">Finding your shop…</p>
+                  )}
+                  {isMainDomain && !emailLookupLoading && watchedEmail?.includes("@") && emailWorkspaces.length === 0 && (
+                    <p className="text-xs text-slate-500">
+                      No shop found for this email — type your workspace below if needed.
+                    </p>
+                  )}
                 </div>
+
+                {showSubdomainField && (
+                  <div className="space-y-2">
+                    <Label htmlFor="subdomain" className="text-slate-800 font-medium">
+                      Shop workspace
+                      {selectedWorkspace && !subdomainManualRef.current ? (
+                        <span className="ml-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                          Auto detected
+                        </span>
+                      ) : null}
+                    </Label>
+                    {emailWorkspaces.length > 1 ? (
+                      <div className="flex flex-col gap-2">
+                        {emailWorkspaces.map((ws) => {
+                          const active = subdomain.trim() === ws.subdomain;
+                          return (
+                            <button
+                              key={ws.subdomain}
+                              type="button"
+                              onClick={() => {
+                                subdomainManualRef.current = true;
+                                setSubdomain(ws.subdomain);
+                                setTenantPreview(ws);
+                              }}
+                              className={
+                                active
+                                  ? "flex items-center justify-between rounded-xl border border-primary bg-primary/5 px-3 py-2.5 text-left"
+                                  : "flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left hover:border-slate-300"
+                              }
+                            >
+                              <span>
+                                <span className="block text-sm font-semibold text-slate-900">{ws.name}</span>
+                                <span className="block text-xs text-slate-500">
+                                  {ws.subdomain}{SHOP_DOMAIN_SUFFIX}
+                                </span>
+                              </span>
+                              {active ? (
+                                <span className="text-[11px] font-bold uppercase text-primary">Selected</span>
+                              ) : null}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="relative">
+                        <Tag className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="subdomain"
+                          type="text"
+                          placeholder="your-shop"
+                          value={subdomain}
+                          className="pl-10 pr-[8rem] h-12 rounded-xl border-slate-200 bg-white lowercase text-base text-slate-900 shadow-sm focus-visible:ring-primary/30"
+                          onChange={(e) => {
+                            subdomainManualRef.current = true;
+                            setSubdomain(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                          }}
+                        />
+                        <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[10px] sm:text-xs text-muted-foreground pointer-events-none font-medium">
+                          {SHOP_DOMAIN_SUFFIX}
+                        </span>
+                      </div>
+                    )}
+                    {subdomain.trim() && (
+                      <button
+                        type="button"
+                        onClick={openWorkspace}
+                        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                      >
+                        Go to {subdomain.trim()}{SHOP_DOMAIN_SUFFIX}
+                        <ExternalLink className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

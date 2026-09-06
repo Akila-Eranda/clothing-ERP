@@ -147,6 +147,7 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'api/v1/tenants/register', method: RequestMethod.POST },
         { path: 'api/v1/tenants/shop-types', method: RequestMethod.GET },
+        { path: 'api/v1/tenants/resolve-email', method: RequestMethod.GET },
         { path: 'api/v1/auth/login', method: RequestMethod.POST },
         { path: 'api/v1/auth/platform-login', method: RequestMethod.POST },
         { path: 'api/v1/auth/impersonate-exchange', method: RequestMethod.POST },

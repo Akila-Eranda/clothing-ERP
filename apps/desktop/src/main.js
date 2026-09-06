@@ -3,9 +3,11 @@ const path = require('path')
 const fs = require('fs')
 const { setupAutoUpdater } = require('./updater')
 
-const DEFAULT_URL = process.env.DESKTOP_APP_URL || 'http://localhost:3000'
 const isDev = !app.isPackaged
 const APP_ICON = path.join(__dirname, '..', 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+const SETUP_PAGE = path.join(__dirname, 'setup.html')
+const DEFAULT_PROD_URL = process.env.DESKTOP_APP_URL || 'https://shop.hexalyte.com/login'
+const DEFAULT_DEV_URL = process.env.DESKTOP_APP_URL || 'http://localhost:3000/login'
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null
@@ -13,6 +15,7 @@ let mainWindow = null
 let settingsWindow = null
 /** @type {{ checkForUpdates: (opts?: { silent?: boolean }) => Promise<unknown> } | null} */
 let updaterApi = null
+let lastLoadError = ''
 
 function getConfigPath() {
   return path.join(app.getPath('userData'), 'config.json')
@@ -33,12 +36,54 @@ function writeConfig(patch) {
   return next
 }
 
+function isLocalhostUrl(url) {
+  try {
+    const host = new URL(url).hostname
+    return host === 'localhost' || host === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
+/** Always land on login unless a deeper path was already chosen. */
+function withLoginPath(url) {
+  try {
+    const parsed = new URL(url)
+    const path = parsed.pathname.replace(/\/+$/, '') || '/'
+    if (path === '/' || path === '') {
+      parsed.pathname = '/login'
+      parsed.search = ''
+      parsed.hash = ''
+      return parsed.toString()
+    }
+    return parsed.toString()
+  } catch {
+    return url
+  }
+}
+
 function getAppUrl() {
   const arg = process.argv.find((a) => a.startsWith('--url='))
-  if (arg) return arg.slice('--url='.length).trim()
+  if (arg) return withLoginPath(arg.slice('--url='.length).trim())
   const cfg = readConfig()
-  if (cfg.appUrl && String(cfg.appUrl).trim()) return String(cfg.appUrl).trim()
-  return DEFAULT_URL
+  const saved = cfg.appUrl && String(cfg.appUrl).trim() ? String(cfg.appUrl).trim() : ''
+  // Ignore stale localhost config in packaged installs (causes blank window).
+  if (saved && !( !isDev && isLocalhostUrl(saved) )) {
+    return withLoginPath(saved)
+  }
+  return withLoginPath(isDev ? DEFAULT_DEV_URL : DEFAULT_PROD_URL)
+}
+
+function showSetupPage(errorMessage = '') {
+  lastLoadError = errorMessage || lastLoadError
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  mainWindow.loadFile(SETUP_PAGE)
+}
+
+function loadAppOrSetup() {
+  const url = getAppUrl()
+  lastLoadError = ''
+  mainWindow?.loadURL(url)
 }
 
 function createMainWindow() {
@@ -59,12 +104,21 @@ function createMainWindow() {
     },
   })
 
-  const url = getAppUrl()
-  mainWindow.loadURL(url)
+  loadAppOrSetup()
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show()
     if (isDev) mainWindow?.webContents.openDevTools({ mode: 'detach' })
+  })
+
+  mainWindow.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (!isMainFrame) return
+    // Ignore aborted loads (user navigated away / we replaced URL)
+    if (errorCode === -3) return
+    const detail = `${errorDescription || 'Load failed'} (${errorCode})`
+    const target = validatedURL || getAppUrl() || 'unknown'
+    lastLoadError = `Could not open ${target}\n${detail}`
+    showSetupPage(lastLoadError)
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -74,7 +128,12 @@ function createMainWindow() {
 
   mainWindow.webContents.on('will-navigate', (event, target) => {
     try {
-      const current = new URL(mainWindow.webContents.getURL())
+      const currentRaw = mainWindow.webContents.getURL()
+      // Allow leaving local setup/settings pages
+      if (!currentRaw || currentRaw === 'about:blank' || currentRaw.startsWith('file://')) {
+        return
+      }
+      const current = new URL(currentRaw)
       const next = new URL(target)
       if (current.origin !== next.origin) {
         event.preventDefault()
@@ -131,7 +190,9 @@ function buildMenu() {
         {
           label: 'Reload',
           accelerator: 'CmdOrCtrl+R',
-          click: () => mainWindow?.webContents.reload(),
+          click: () => {
+            mainWindow?.loadURL(getAppUrl())
+          },
         },
         {
           label: 'Server URL…',
@@ -186,7 +247,7 @@ function buildMenu() {
               type: 'info',
               title: 'About',
               message: 'HexaOne Desktop',
-              detail: `Version ${app.getVersion()}\nLoading: ${getAppUrl()}`,
+              detail: `Version ${app.getVersion()}\nLoading: ${getAppUrl() || '(not configured)'}`,
             })
           },
         },
@@ -201,19 +262,31 @@ ipcMain.handle('desktop:get-config', () => ({
   appUrl: getAppUrl(),
   version: app.getVersion(),
   packaged: app.isPackaged,
+  loadError: lastLoadError,
 }))
 
 ipcMain.handle('desktop:set-app-url', (_event, appUrl) => {
   const url = String(appUrl || '').trim()
   if (!url) throw new Error('URL is required')
+  let parsed
   try {
-    new URL(url)
+    parsed = new URL(url)
   } catch {
     throw new Error('Invalid URL')
   }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('URL must start with https:// or http://')
+  }
+  if (!isDev && isLocalhostUrl(url)) {
+    throw new Error('Use your live shop URL (not localhost) in the installed app.')
+  }
   writeConfig({ appUrl: url })
+  lastLoadError = ''
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.loadURL(url)
+    mainWindow.loadURL(withLoginPath(url))
+  }
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.close()
   }
   return { ok: true, appUrl: url }
 })

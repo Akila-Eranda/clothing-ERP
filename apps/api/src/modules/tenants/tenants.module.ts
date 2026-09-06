@@ -929,6 +929,46 @@ export class TenantsService {
     return tenant;
   }
 
+  /** Public login helper: find active workspaces for an email (no secrets). */
+  async resolvePublicByEmail(emailRaw: string) {
+    const email = emailRaw.trim().toLowerCase();
+    if (!email || !email.includes('@') || email.length > 254) {
+      return { workspaces: [] as Array<{ name: string; subdomain: string; shopType: ShopType }> };
+    }
+
+    const users = await this.prisma.user.findMany({
+      where: {
+        email,
+        status: UserStatus.ACTIVE,
+        tenant: {
+          status: { notIn: [TenantStatus.SUSPENDED, TenantStatus.CANCELLED] },
+          NOT: { subdomain: PLATFORM_CONFIG_SUBDOMAIN },
+        },
+      },
+      select: {
+        tenant: {
+          select: { name: true, subdomain: true, shopType: true },
+        },
+      },
+      take: 20,
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const seen = new Set<string>();
+    const workspaces: Array<{ name: string; subdomain: string; shopType: ShopType }> = [];
+    for (const row of users) {
+      const slug = row.tenant?.subdomain;
+      if (!slug || seen.has(slug)) continue;
+      seen.add(slug);
+      workspaces.push({
+        name: row.tenant.name,
+        subdomain: row.tenant.subdomain,
+        shopType: row.tenant.shopType,
+      });
+    }
+    return { workspaces };
+  }
+
   async update(id: string, dto: Partial<RegisterTenantDto>) {
     return this.prisma.tenant.update({
       where: { id },
@@ -1307,6 +1347,13 @@ export class TenantsController {
   @ApiOperation({ summary: 'Public platform maintenance status' })
   getPlatformStatus() {
     return this.tenantsService.getPlatformStatus();
+  }
+
+  @Public()
+  @Get('resolve-email')
+  @ApiOperation({ summary: 'Public workspace lookup by user email (login helper)' })
+  resolveByEmail(@Query('email') email = '') {
+    return this.tenantsService.resolvePublicByEmail(email);
   }
 
   @Public()
