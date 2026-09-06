@@ -16,11 +16,14 @@ export interface POItem {
   variantName: string;
   sku: string;
   orderedQty: number;
+  freeQty?: number;
   receivedQty: number;
   rejectedQty: number;
   unitCost: number;
   taxRate: number;
   total: number;
+  expiryDate?: string | null;
+  mrp?: number | null;
 }
 
 export interface PurchaseOrder {
@@ -75,14 +78,21 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
 
   useEffect(() => {
     if (po) {
-      setRows((po.items ?? []).map((i) => ({
-        itemId: i.id,
-        receivedQty: Math.max(0, i.orderedQty - i.receivedQty),
-        rejectedQty: 0,
-        batchNumber: "",
-        expiryDate: "",
-        manufactureDate: "",
-      })));
+      setRows((po.items ?? []).map((i) => {
+        const expected = i.orderedQty + Math.max(0, i.freeQty ?? 0);
+        const remaining = Math.max(0, expected - i.receivedQty);
+        const expiryIso = i.expiryDate
+          ? new Date(i.expiryDate).toISOString().slice(0, 10)
+          : "";
+        return {
+          itemId: i.id,
+          receivedQty: remaining,
+          rejectedQty: 0,
+          batchNumber: "",
+          expiryDate: expiryIso,
+          manufactureDate: "",
+        };
+      }));
       setPayNow(false);
       setPayAmount("");
       setPayMethod("CASH");
@@ -97,7 +107,11 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     if (!po) return 0;
     return rows.reduce((s, r) => {
       const item = po.items?.find((i) => i.id === r.itemId);
-      return s + (r.receivedQty || 0) * (item?.unitCost ?? 0);
+      if (!item || !(r.receivedQty > 0)) return s;
+      // Charge only paid ordered qty — free bonus units are not billed
+      const paidAlready = Math.min(item.receivedQty, item.orderedQty);
+      const paidThis = Math.min(r.receivedQty, Math.max(0, item.orderedQty - paidAlready));
+      return s + paidThis * (item.unitCost ?? 0);
     }, 0);
   }, [po, rows]);
 
@@ -189,7 +203,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
     CANCELLED: "bg-red-500/10 text-red-600 border-red-500/30",
   };
 
-  const headers = ["Product / SKU", "Ordered", "Already", "Receive", "Reject"];
+  const headers = ["Product / SKU", "Ordered", "Free", "Already", "Receive", "Reject"];
   if (showBatch) headers.push("Batch");
   if (showExpiry) headers.push("MFD", "Expiry");
   else if (showBatch) headers.push("MFD");
@@ -235,7 +249,8 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
               </thead>
               <tbody>
                 {(po.items ?? []).map((item, idx) => {
-                  const remaining = item.orderedQty - item.receivedQty;
+                  const expected = item.orderedQty + Math.max(0, item.freeQty ?? 0);
+                  const remaining = expected - item.receivedQty;
                   const fullyReceived = remaining <= 0;
                   return (
                     <tr key={item.id} className={`border-t ${fullyReceived ? "opacity-50" : ""}`}>
@@ -244,6 +259,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                         <p className="text-[10px] text-muted-foreground font-mono">{item.sku}</p>
                       </td>
                       <td className="px-3 py-2.5 text-xs font-bold">{item.orderedQty}</td>
+                      <td className="px-3 py-2.5 text-xs text-muted-foreground">{item.freeQty ?? 0}</td>
                       <td className="px-3 py-2.5 text-xs">
                         {item.receivedQty > 0 ? (
                           <span className="flex items-center gap-1 text-emerald-600">
@@ -253,7 +269,7 @@ export function ReceiveItemsModal({ po, onClose, onReceived }: Props) {
                       </td>
                       <td className="px-3 py-2.5 w-20">
                         <Input
-                          type="number" min={0} max={remaining}
+                          type="number" min={0} max={Math.max(0, remaining)}
                           value={rows[idx]?.receivedQty ?? 0}
                           disabled={fullyReceived}
                           className="h-7 text-xs px-2 w-20"

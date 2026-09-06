@@ -47,6 +47,7 @@ interface VariantOpt {
   imageUrl?: string | null;
   sellingPrice?: number | null;
   unitPrice?: number | null;
+  mrp?: number | null;
   currentStock?: number | null;
   availableStock?: number | null;
   reservedStock?: number | null;
@@ -71,7 +72,10 @@ interface LineItem {
   barcode?: string | null;
   imageUrl?: string | null;
   orderedQty: number;
+  freeQty: number;
   unitCost: number;
+  mrp: number;
+  expiryDate: string;
   discount: number;
   taxRate: number;
 }
@@ -297,7 +301,10 @@ export default function CreatePOPage() {
       barcode: v.barcode ?? undefined,
       imageUrl: v.imageUrl ?? undefined,
       orderedQty: 1,
+      freeQty: 0,
       unitCost: v.lastBuyingPrice ?? v.costPrice ?? 0,
+      mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
+      expiryDate: "",
       discount: 0,
       taxRate: v.taxRate ?? 0,
     }))
@@ -467,7 +474,10 @@ export default function CreatePOPage() {
             variantName: i.variantName,
             sku: i.sku,
             orderedQty: i.receivedQty,
+            freeQty: 0,
             unitCost: i.unitCost,
+            mrp: 0,
+            expiryDate: "",
             discount: 0,
             taxRate: 0,
           }));
@@ -506,7 +516,10 @@ export default function CreatePOPage() {
         barcode: undefined,
         imageUrl: undefined,
         orderedQty: 1,
+        freeQty: 0,
         unitCost: 0,
+        mrp: 0,
+        expiryDate: "",
         discount: 0,
         taxRate: 0,
       },
@@ -540,7 +553,8 @@ export default function CreatePOPage() {
       color: v.color ?? undefined,
       barcode: v.barcode ?? undefined,
       imageUrl: v.imageUrl ?? undefined,
-      unitCost: v.costPrice,
+      unitCost: v.lastBuyingPrice ?? v.costPrice,
+      mrp: v.mrp && v.mrp > 0 ? v.mrp : it.mrp,
       taxRate: v.taxRate ?? 0,
     } : it));
     setSearchQ((p) => p.map((q, i) => i === idx ? "" : q));
@@ -555,7 +569,10 @@ export default function CreatePOPage() {
       barcode: undefined,
       imageUrl: undefined,
       orderedQty: it.orderedQty,
+      freeQty: it.freeQty,
       unitCost: 0,
+      mrp: 0,
+      expiryDate: it.expiryDate,
       discount: it.discount,
       taxRate: 0,
     } : it));
@@ -614,6 +631,7 @@ export default function CreatePOPage() {
         supplierId?: string | null;
         supplierProductCode?: string | null;
         supplierAssigned?: boolean;
+        mrp?: number | null;
       }>(`/pos/barcode/${encodeURIComponent(trimmed)}?supplierId=${encodeURIComponent(supplierId)}`);
       const d = res.data;
       if (!d?.variantId) return null;
@@ -631,6 +649,7 @@ export default function CreatePOPage() {
         brand: d.brand ?? undefined,
         category: d.category ?? undefined,
         sellingPrice: d.sellingPrice ?? undefined,
+        mrp: d.mrp ?? undefined,
         currentStock: d.currentStock ?? undefined,
         availableStock: d.availableStock ?? undefined,
         reservedStock: d.reservedStock ?? undefined,
@@ -706,7 +725,10 @@ export default function CreatePOPage() {
         barcode: v.barcode ?? undefined,
         imageUrl: v.imageUrl ?? undefined,
         orderedQty: 1,
+        freeQty: 0,
         unitCost: v.lastBuyingPrice ?? v.costPrice,
+        mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
+        expiryDate: "",
         discount: 0,
         taxRate: v.taxRate ?? 0,
       },
@@ -824,7 +846,10 @@ export default function CreatePOPage() {
         fromGrnId: fromGrnId || undefined,
         items: items.map((i) => ({
           variantId: i.variantId, productName: i.productName, variantName: i.variantName,
-          sku: i.sku, orderedQty: i.orderedQty, unitCost: i.unitCost,
+          sku: i.sku, orderedQty: i.orderedQty, freeQty: i.freeQty || 0,
+          unitCost: i.unitCost,
+          mrp: i.mrp > 0 ? i.mrp : undefined,
+          expiryDate: i.expiryDate || undefined,
           discount: i.discount, taxRate: i.taxRate,
         })),
         ...(payNow
@@ -1276,9 +1301,9 @@ export default function CreatePOPage() {
                           </div>
                         )}
 
-                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" onClick={(e) => e.stopPropagation()}>
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" onClick={(e) => e.stopPropagation()}>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Qty</label>
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Order Qty</label>
                             <input
                               type="number"
                               min={1}
@@ -1288,13 +1313,43 @@ export default function CreatePOPage() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Cost</label>
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Free Qty</label>
+                            <input
+                              type="number"
+                              min={0}
+                              value={item.freeQty}
+                              onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              className={cn(FORM_LINE_INPUT, "w-full")}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Expiry</label>
+                            <input
+                              type="date"
+                              value={item.expiryDate}
+                              onChange={(e) => updateItem(idx, "expiryDate", e.target.value)}
+                              className={cn(FORM_LINE_INPUT, "w-full")}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Buying</label>
                             <input
                               type="number"
                               min={0}
                               step="0.01"
                               value={item.unitCost}
                               onChange={(e) => updateItem(idx, "unitCost", parseFloat(e.target.value) || 0)}
+                              className={cn(FORM_LINE_INPUT, "w-full")}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">MRP</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={item.mrp}
+                              onChange={(e) => updateItem(idx, "mrp", parseFloat(e.target.value) || 0)}
                               className={cn(FORM_LINE_INPUT, "w-full")}
                             />
                           </div>
@@ -1335,20 +1390,21 @@ export default function CreatePOPage() {
 
               {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[1180px] text-sm">
+                <table className="w-full min-w-[1480px] text-sm">
                   <thead className={FORM_TABLE_HEAD}>
                     <tr className={FORM_TABLE_HEAD_ROW}>
                       <th className="px-3 py-3 text-left font-semibold w-10">#</th>
-                      <th className="px-4 py-3 text-left font-semibold min-w-[300px] max-w-[360px]">Product</th>
+                      <th className="px-4 py-3 text-left font-semibold min-w-[280px] max-w-[360px]">Product</th>
                       <th className="px-3 py-3 text-left font-semibold w-36">Barcode</th>
                       <th className="px-3 py-3 text-right font-semibold w-16">
                         <span className="inline-flex items-center gap-1 justify-end">Stock <Info className="h-3 w-3" /></span>
                       </th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap min-w-[6.5rem]">Last PO</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Last Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Order Qty</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-32">Buying Price</th>
-                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Discount</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Order Qty</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Free Qty</th>
+                      <th className="px-3 py-3 text-left font-semibold whitespace-nowrap w-36">Expiry</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Buying</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">MRP</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Discount</th>
                       <th className="px-3 py-3 text-right font-semibold w-20">Tax</th>
                       <th className="px-3 py-3 text-right font-semibold w-28">Total</th>
                       <th className="w-20 px-2 py-3 text-center font-semibold">Action</th>
@@ -1468,8 +1524,6 @@ export default function CreatePOPage() {
                             {item.barcode || v?.barcode || "—"}
                           </td>
                           <td className="px-3 py-3 text-right font-semibold tabular-nums text-foreground">{stock ?? "—"}</td>
-                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{fmtDate(v?.lastPurchaseDate)}</td>
-                          <td className="px-3 py-3 text-right text-xs tabular-nums text-muted-foreground whitespace-nowrap">{dash(v?.lastPurchaseQty)}</td>
                           <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end">
                               <input
@@ -1491,6 +1545,25 @@ export default function CreatePOPage() {
                           <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
                             <div className="flex justify-end">
                               <input
+                                type="number"
+                                min={0}
+                                value={item.freeQty}
+                                onChange={(e) => updateItem(idx, "freeQty", Math.max(0, parseInt(e.target.value, 10) || 0))}
+                                className={cn(FORM_LINE_INPUT, "w-[4.5rem]")}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 align-top" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="date"
+                              value={item.expiryDate}
+                              onChange={(e) => updateItem(idx, "expiryDate", e.target.value)}
+                              className={cn(FORM_LINE_INPUT, "w-full min-w-[8.5rem]")}
+                            />
+                          </td>
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
                                 ref={(el) => { costInputRefs.current[idx] = el; }}
                                 type="number"
                                 min={0}
@@ -1505,6 +1578,18 @@ export default function CreatePOPage() {
                                   }
                                 }}
                                 className={cn(FORM_LINE_INPUT, "w-[6.5rem]")}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={item.mrp}
+                                onChange={(e) => updateItem(idx, "mrp", parseFloat(e.target.value) || 0)}
+                                className={cn(FORM_LINE_INPUT, "w-[6rem]")}
                               />
                             </div>
                           </td>
@@ -1564,7 +1649,7 @@ export default function CreatePOPage() {
 
                     {items.length === 0 && (
                       <tr>
-                        <td colSpan={12} className="py-16 text-center">
+                        <td colSpan={13} className="py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-muted-foreground">
                             <div className={FORM_EMPTY_ICON_WRAP}>
                               <Package className="h-6 w-6 opacity-40" />

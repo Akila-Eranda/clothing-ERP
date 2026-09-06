@@ -30,8 +30,9 @@ import type { WorkflowInstanceLike } from "@/lib/workflow-access";
 
 interface POItem {
   id: string; variantId: string; productName: string; variantName: string; sku: string;
-  orderedQty: number; receivedQty: number; rejectedQty: number;
-  unitCost: number; discount: number; taxRate: number; taxAmount: number; total: number;
+  orderedQty: number; freeQty?: number; receivedQty: number; rejectedQty: number;
+  unitCost: number; mrp?: number | null; expiryDate?: string | null;
+  discount: number; taxRate: number; taxAmount: number; total: number;
   variant?: {
     size?: string | null;
     color?: string | null;
@@ -449,8 +450,8 @@ export default function PODetailPage() {
           <table className="enterprise-table w-full text-sm">
             <thead>
               <tr>
-                {["#", "Item", "Barcode", "Variant", "Qty", "Unit Cost", "Discount", "Tax", "Amount"].map((h) => (
-                  <th key={h} className={h === "#" || h === "Item" || h === "Barcode" || h === "Variant" ? "text-left" : "text-right"}>
+                {["#", "Item", "Barcode", "Variant", "Qty", "Free", "Expiry", "MRP", "Unit Cost", "Discount", "Tax", "Amount"].map((h) => (
+                  <th key={h} className={h === "#" || h === "Item" || h === "Barcode" || h === "Variant" || h === "Expiry" ? "text-left" : "text-right"}>
                     {h}
                   </th>
                 ))}
@@ -485,6 +486,9 @@ export default function PODetailPage() {
                   <td className="font-mono text-xs text-muted-foreground">{barcode}</td>
                   <td className="text-sm">{item.variantName || "—"}</td>
                   <td className="text-right font-semibold tabular-nums">{item.orderedQty}</td>
+                  <td className="text-right tabular-nums text-muted-foreground">{item.freeQty ?? 0}</td>
+                  <td className="text-left text-xs tabular-nums">{item.expiryDate ? fmtDate(item.expiryDate) : "—"}</td>
+                  <td className="text-right tabular-nums">{item.mrp != null && item.mrp > 0 ? formatNumber(item.mrp) : "—"}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.unitCost)}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.discount ?? 0)}</td>
                   <td className="text-right tabular-nums">{formatNumber(item.taxAmount)}</td>
@@ -495,7 +499,7 @@ export default function PODetailPage() {
             </tbody>
             <tfoot>
               <tr className="bg-muted/30 font-semibold">
-                <td colSpan={4} className="px-4 py-3 text-sm">
+                <td colSpan={7} className="px-4 py-3 text-sm">
                   Total: {totals.items} items · {totals.qty} qty
                 </td>
                 <td colSpan={4} />

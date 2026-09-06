@@ -490,8 +490,10 @@ export class ProcurementService {
 
     const planLines = po.items.map((pi) => {
       const incoming = items.find((i) => i.itemId === pi.id);
+      const freeQty = (pi as { freeQty?: number }).freeQty ?? 0;
+      const expectedQty = pi.orderedQty + Math.max(0, freeQty);
       return {
-        orderedQty: pi.orderedQty,
+        orderedQty: expectedQty,
         receivedQty: pi.receivedQty,
         thisReceive: incoming?.receivedQty ?? 0,
       };
@@ -503,6 +505,13 @@ export class ProcurementService {
       const poItem = po.items.find((i) => i.id === item.itemId);
       if (!poItem) throw new BadRequestException(`Invalid line item: ${item.itemId}`);
       if (item.receivedQty <= 0 && (item.rejectedQty ?? 0) <= 0) continue;
+      const freeQty = (poItem as { freeQty?: number }).freeQty ?? 0;
+      const expectedQty = poItem.orderedQty + Math.max(0, freeQty);
+      const expiry =
+        item.expiryDate
+        || ((poItem as { expiryDate?: Date | null }).expiryDate
+          ? new Date((poItem as { expiryDate: Date }).expiryDate).toISOString().slice(0, 10)
+          : undefined);
       grnLines.push({
         variantId: poItem.variantId,
         productName: poItem.productName,
@@ -511,15 +520,22 @@ export class ProcurementService {
         receivedQty: item.receivedQty,
         rejectedQty: item.rejectedQty,
         unitCost: poItem.unitCost,
-        orderedQty: poItem.orderedQty,
+        orderedQty: expectedQty,
         purchaseItemId: poItem.id,
         batchNumber: item.batchNumber,
-        expiryDate: item.expiryDate,
+        expiryDate: expiry,
         manufactureDate: item.manufactureDate,
       });
     }
 
-    const receiveValue = grnLines.reduce((s, l) => s + Math.max(0, l.receivedQty) * l.unitCost, 0);
+    // Payable value: only ordered (paid) qty, not free bonus units
+    const receiveValue = items.reduce((sum, item) => {
+      const poItem = po.items.find((i) => i.id === item.itemId);
+      if (!poItem || item.receivedQty <= 0) return sum;
+      const paidAlready = Math.min(poItem.receivedQty, poItem.orderedQty);
+      const paidThis = Math.min(item.receivedQty, Math.max(0, poItem.orderedQty - paidAlready));
+      return sum + paidThis * poItem.unitCost;
+    }, 0);
     try {
       await assertSupplierCreditLimit(this.prisma, tenantId, po.supplierId, receiveValue);
     } catch (e) {

@@ -21,9 +21,12 @@ export interface POItem {
   variantName: string;
   sku: string;
   orderedQty: number;
+  freeQty?: number;
   receivedQty: number;
   rejectedQty: number;
   unitCost: number;
+  mrp?: number | null;
+  expiryDate?: string | null;
   discount: number;
   taxRate: number;
   taxAmount: number;
@@ -266,14 +269,14 @@ export function ViewPOModal({
                       <table className="w-full text-sm">
                         <thead>
                           <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                            {["#", "Product", "Barcode", "Ordered", "Received", "Unit", "Total"].map((h, i) => (
+                            {["#", "Product", "Barcode", "Ordered", "Free", "Received", "Unit", "Total"].map((h, i) => (
                               <th key={h} className={cn("px-3 py-2.5 font-semibold", i >= 3 ? "text-right" : "text-left")}>{h}</th>
                             ))}
                           </tr>
                         </thead>
                         <tbody className="divide-y">
                           {(data.items ?? []).length === 0 ? (
-                            <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground text-sm">No items</td></tr>
+                            <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground text-sm">No items</td></tr>
                           ) : (data.items ?? []).map((item, i) => {
                             const imageUrl =
                               item.variant?.images?.[0]
@@ -303,6 +306,7 @@ export function ViewPOModal({
                               </td>
                               <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{barcode}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums font-semibold">{item.orderedQty}</td>
+                              <td className="px-3 py-3 text-xs text-right tabular-nums text-muted-foreground">{item.freeQty ?? 0}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
                               <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>
                               <td className="px-3 py-3 text-xs text-right font-bold tabular-nums">{fmtMoney(item.total)}</td>
@@ -353,8 +357,8 @@ export function ViewPOModal({
                   <table className="w-full text-sm min-w-[700px]">
                     <thead>
                       <tr className="border-b bg-muted/30 text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {["#", "Product", "Barcode", "Variant", "Ordered", "Received", "Rejected", "Unit Cost", "Discount", "Tax", "Amount"].map((h, i) => (
-                          <th key={h} className={cn("px-3 py-2.5 font-semibold whitespace-nowrap", i >= 4 ? "text-right" : "text-left")}>{h}</th>
+                        {["#", "Product", "Barcode", "Variant", "Ordered", "Free", "Expiry", "MRP", "Received", "Rejected", "Unit Cost", "Discount", "Tax", "Amount"].map((h, i) => (
+                          <th key={h} className={cn("px-3 py-2.5 font-semibold whitespace-nowrap", i >= 4 && h !== "Variant" && h !== "Expiry" && h !== "Barcode" && h !== "Product" ? "text-right" : "text-left")}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -387,6 +391,13 @@ export function ViewPOModal({
                           <td className="px-3 py-3 text-xs font-mono text-muted-foreground">{barcode}</td>
                           <td className="px-3 py-3 text-xs">{item.variantName || "—"}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums font-semibold">{item.orderedQty}</td>
+                          <td className="px-3 py-3 text-xs text-right tabular-nums text-muted-foreground">{item.freeQty ?? 0}</td>
+                          <td className="px-3 py-3 text-xs tabular-nums">
+                            {item.expiryDate ? new Date(item.expiryDate).toLocaleDateString("en-LK") : "—"}
+                          </td>
+                          <td className="px-3 py-3 text-xs text-right tabular-nums">
+                            {item.mrp != null && item.mrp > 0 ? fmtMoney(item.mrp) : "—"}
+                          </td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums text-emerald-600">{item.receivedQty}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{item.rejectedQty || "—"}</td>
                           <td className="px-3 py-3 text-xs text-right tabular-nums">{fmtMoney(item.unitCost)}</td>

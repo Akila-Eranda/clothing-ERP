@@ -49,7 +49,10 @@ export class PurchaseItemDto {
   @ApiProperty() @IsString() variantName: string;
   @ApiProperty() @IsString() sku: string;
   @ApiProperty() @IsInt() @Min(1) orderedQty: number;
+  @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) freeQty?: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) mrp?: number;
+  @ApiPropertyOptional() @IsOptional() @IsDateString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) taxRate?: number;
 }
@@ -267,7 +270,21 @@ export class SuppliersService {
       const disc = item.discount ?? 0;
       const taxable = lineTotal - disc;
       const tax = (taxable * (item.taxRate ?? 0)) / 100;
-      return { variantId: item.variantId, productName: item.productName, variantName: item.variantName, sku: item.sku, orderedQty: item.orderedQty, unitCost: item.unitCost, discount: disc, taxRate: item.taxRate ?? 0, taxAmount: tax, total: taxable + tax };
+      return {
+        variantId: item.variantId,
+        productName: item.productName,
+        variantName: item.variantName,
+        sku: item.sku,
+        orderedQty: item.orderedQty,
+        freeQty: item.freeQty ?? 0,
+        unitCost: item.unitCost,
+        mrp: item.mrp != null && item.mrp > 0 ? item.mrp : null,
+        expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
+        discount: disc,
+        taxRate: item.taxRate ?? 0,
+        taxAmount: tax,
+        total: taxable + tax,
+      };
     });
     const subtotal   = itemsData.reduce((s, i) => s + i.unitCost * i.orderedQty, 0);
     const discountAmount = itemsData.reduce((s, i) => s + i.discount, 0);
