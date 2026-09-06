@@ -122,8 +122,50 @@ function createMainWindow() {
   })
 
   mainWindow.webContents.setWindowOpenHandler(({ url: target }) => {
-    shell.openExternal(target)
+    try {
+      const currentRaw = mainWindow?.webContents.getURL() || getAppUrl()
+      const currentOrigin = new URL(currentRaw).origin
+      const next = new URL(target, currentRaw)
+      // Keep same-origin popups (Customer Display, etc.) inside Electron so
+      // BroadcastChannel / localStorage stay connected to the POS window.
+      if (next.origin === currentOrigin) {
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 1280,
+            height: 800,
+            minWidth: 800,
+            minHeight: 500,
+            title: 'HexaOne Customer Display',
+            icon: APP_ICON,
+            autoHideMenuBar: true,
+            webPreferences: {
+              preload: path.join(__dirname, 'preload.js'),
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true,
+            },
+          },
+        }
+      }
+      shell.openExternal(next.toString())
+    } catch {
+      try {
+        shell.openExternal(target)
+      } catch {
+        // ignore
+      }
+    }
     return { action: 'deny' }
+  })
+
+  mainWindow.webContents.on('did-create-window', (child) => {
+    child.setMenuBarVisibility(false)
+    child.setAutoHideMenuBar(true)
+    child.webContents.setWindowOpenHandler(({ url: target }) => {
+      shell.openExternal(target)
+      return { action: 'deny' }
+    })
   })
 
   mainWindow.webContents.on('will-navigate', (event, target) => {
@@ -243,6 +285,9 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('com.hexalyte.hexaone')
+    }
     Menu.setApplicationMenu(null)
     createMainWindow()
     registerShortcuts()
