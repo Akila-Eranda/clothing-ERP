@@ -102,6 +102,13 @@ interface ProductItem extends PosProductsPanelProduct {
   weightScaleReady?: boolean;
 }
 
+function hasMultiPurchasePrices(p: { purchasePrices?: { sellingPrice: number }[] } | null | undefined) {
+  const sells = (p?.purchasePrices ?? [])
+    .map((x) => Number(x.sellingPrice))
+    .filter((n) => Number.isFinite(n) && n > 0);
+  return new Set(sells.map((n) => n.toFixed(2))).size > 1;
+}
+
 function mapEntries<K, V>(map: ReadonlyMap<K, V>): [K, V][] {
   return Array.from(map.entries());
 }
@@ -1327,18 +1334,25 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
   /** Current page only (~20) â€” server already filtered by search/category */
   const filteredProducts = products;
   const productCards = React.useMemo((): PosProductsPanelCard[] => {
+    const sellPrices = (v: ProductItem) => {
+      const fromPo = (v.purchasePrices ?? [])
+        .map((p) => Number(p.sellingPrice))
+        .filter((n) => Number.isFinite(n) && n > 0);
+      return fromPo.length ? fromPo : [v.unitPrice];
+    };
     const map = new Map<string, PosProductsPanelCard>();
     for (const p of filteredProducts) {
       const key = p.productId || p.productName;
       if (map.has(key)) continue;
       const variants = productGroups.get(p.productName) || [p];
       const list = variants.length ? variants : [p];
+      const prices = list.flatMap(sellPrices);
       map.set(key, {
         rep: p,
         variants: list,
         totalStock: list.reduce((s, v) => s + v.stock, 0),
-        minPrice: Math.min(...list.map((v) => v.unitPrice)),
-        maxPrice: Math.max(...list.map((v) => v.unitPrice)),
+        minPrice: Math.min(...prices),
+        maxPrice: Math.max(...prices),
       });
     }
     return Array.from(map.values());
@@ -1427,8 +1441,8 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
 
   const handleAddProduct = React.useCallback((p: PosProductsPanelProduct) => {
     const product = p as ProductItem;
-    // Keyboard / recent-scan add: skip popup unless setting ON or weighted
-    if (confirmQtyPopup || needsPosWeightPopup(product)) {
+    // Keyboard / recent-scan add: skip popup unless setting ON, weighted, or multi PO prices
+    if (confirmQtyPopup || needsPosWeightPopup(product) || hasMultiPurchasePrices(product)) {
       openAddPopup(product);
       return;
     }
@@ -1451,9 +1465,9 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       setScanFlash(true);
       setTimeout(() => setScanFlash(false), 500);
 
-      // Weight (kg/g) always needs gram entry. Qty popup only when setting is ON.
-      // Multi-variant / shared-barcode: auto-pick best match â†’ cart (no slow popup).
-      if (needsPosWeightPopup(pick) || confirmQtyPopup) {
+      // Weight (kg/g) always needs gram entry. Qty popup when setting ON or multi PO prices.
+      // Multi-variant / shared-barcode: auto-pick best match → cart (no slow popup) unless prices differ.
+      if (needsPosWeightPopup(pick) || confirmQtyPopup || hasMultiPurchasePrices(pick)) {
         openAddPopup(pick, matches);
         playPosSound("scan_ok", soundAlerts);
         return;
@@ -1591,7 +1605,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
       // Prefer barcode path if the typed text looks like an id; else add the focused card directly
       if (isLikelyBarcodeScan(q) || matchesCachedBarcode(q, products)) {
         void scanAndAddProduct(q);
-      } else if (confirmQtyPopup) {
+      } else if (confirmQtyPopup || hasMultiPurchasePrices(only)) {
         handleCardClick(only);
       } else {
         commitAddProduct(only, 1, { keepSearchFocus: true });
@@ -1601,7 +1615,7 @@ export function POSOverlay({ posOnly = false }: POSOverlayProps) {
     const idx = focusedProductIdx >= 0 && focusedProductIdx < productCards.length
       ? focusedProductIdx
       : 0;
-    if (confirmQtyPopup) {
+    if (confirmQtyPopup || hasMultiPurchasePrices(productCards[idx].rep)) {
       handleCardClick(productCards[idx].rep);
     } else {
       commitAddProduct(productCards[idx].rep, 1, { keepSearchFocus: true });
@@ -2753,7 +2767,7 @@ ${rows}
         recentScans={recentScans}
         products={products}
         variantLabel={(p) => variantDisplayLabel(p, profile)}
-        onPopularAdd={(p) => commitAddProduct(p as ProductItem, 1, { keepSearchFocus: true })}
+        onPopularAdd={(p) => handleAddProduct(p)}
         onRecentAdd={handleAddProduct}
         onClearRecent={() => setRecentScans([])}
         onViewAll={() => {
@@ -4032,6 +4046,7 @@ ${rows}
               : Math.max(isPosWeightedProduct(addPopup.selected) ? 0.001 : 1, addPopup.selected.stock)}
             unitPrice={addPopup.selected.unitPrice}
             mrp={addPopup.selected.mrp}
+            purchasePrices={addPopup.selected.purchasePrices}
             variants={addPopup.variants.length > 1 ? addPopup.variants : undefined}
             allowNegativeStock={allowNegativeStock}
             productKind={addPopup.selected.productKind}

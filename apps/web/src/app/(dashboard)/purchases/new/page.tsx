@@ -76,6 +76,7 @@ interface LineItem {
   orderedQty: number;
   freeQty: number;
   unitCost: number;
+  sellingPrice: number;
   mrp: number;
   expiryDate: string;
   discount: number;
@@ -88,6 +89,11 @@ function calcItem(i: LineItem) {
   const line    = i.unitCost * i.orderedQty;
   const taxable = line - i.discount;
   return { line, taxable, tax: 0, total: taxable };
+}
+
+function resolveSellingPrice(v?: Pick<VariantOpt, "sellingPrice" | "unitPrice"> | null): number {
+  const n = Number(v?.sellingPrice ?? v?.unitPrice ?? 0);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function fmtMoney(n: number) {
@@ -308,6 +314,7 @@ export default function CreatePOPage() {
       orderedQty: 0,
       freeQty: 0,
       unitCost: v.lastBuyingPrice ?? v.costPrice ?? 0,
+      sellingPrice: resolveSellingPrice(v),
       mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
       expiryDate: "",
       discount: 0,
@@ -479,6 +486,7 @@ export default function CreatePOPage() {
             orderedQty: i.receivedQty,
             freeQty: 0,
             unitCost: i.unitCost,
+            sellingPrice: 0,
             mrp: 0,
             expiryDate: "",
             discount: 0,
@@ -488,7 +496,23 @@ export default function CreatePOPage() {
         setItems(lines);
         setSearchQ(lines.map(() => ""));
         // supplierId change triggers loadSupplierDetail via effect
-        void loadSupplierCatalog(g.supplier.id);
+        void loadSupplierCatalog(g.supplier.id).then(({ rows }) => {
+          if (cancelled || !rows.length) return;
+          const byId = new Map(rows.map((v) => [v.variantId, v]));
+          setItems((prev) =>
+            prev.map((it) => {
+              const v = byId.get(it.variantId);
+              if (!v) return it;
+              return {
+                ...it,
+                sellingPrice: it.sellingPrice > 0 ? it.sellingPrice : resolveSellingPrice(v),
+                mrp: it.mrp > 0 ? it.mrp : (v.mrp && v.mrp > 0 ? v.mrp : 0),
+                barcode: it.barcode || v.barcode || undefined,
+                imageUrl: it.imageUrl || v.imageUrl || undefined,
+              };
+            }),
+          );
+        });
         toast.success(`Loaded ${g.grnNumber} — review & create PO`);
       })
       .catch((e: unknown) => {
@@ -522,6 +546,7 @@ export default function CreatePOPage() {
         orderedQty: 0,
         freeQty: 0,
         unitCost: 0,
+        sellingPrice: 0,
         mrp: 0,
         expiryDate: "",
         discount: 0,
@@ -559,6 +584,7 @@ export default function CreatePOPage() {
       barcode: v.barcode ?? undefined,
       imageUrl: v.imageUrl ?? undefined,
       unitCost: v.lastBuyingPrice ?? v.costPrice,
+      sellingPrice: resolveSellingPrice(v),
       mrp: v.mrp && v.mrp > 0 ? v.mrp : it.mrp,
       taxRate: v.taxRate ?? 0,
       includeInPo: true,
@@ -577,6 +603,7 @@ export default function CreatePOPage() {
       orderedQty: it.orderedQty,
       freeQty: it.freeQty,
       unitCost: 0,
+      sellingPrice: 0,
       mrp: 0,
       expiryDate: it.expiryDate,
       discount: it.discount,
@@ -707,18 +734,8 @@ export default function CreatePOPage() {
       toast.error("Select a supplier first");
       return;
     }
-    const existingIdx = items.findIndex((i) => i.variantId === v.variantId);
-    if (existingIdx >= 0) {
-      setItems((p) => p.map((it, i) => i === existingIdx ? { ...it, orderedQty: it.orderedQty + 1, includeInPo: true } : it));
-      setSelectedRowIdx(existingIdx);
-      setProductSearchOpen(false);
-      setProductSearchQ("");
-      productSearchRef.current?.blur();
-      window.setTimeout(() => qtyInputRefs.current[existingIdx]?.focus(), 30);
-      toast.message("Qty increased for existing line");
-      return;
-    }
 
+    // Same product can appear on multiple lines (different buying / selling / MRP / expiry)
     const newIdx = items.length;
     setItems((p) => [
       ...p,
@@ -734,6 +751,7 @@ export default function CreatePOPage() {
         orderedQty: 0,
         freeQty: 0,
         unitCost: v.lastBuyingPrice ?? v.costPrice,
+        sellingPrice: resolveSellingPrice(v),
         mrp: v.mrp && v.mrp > 0 ? v.mrp : 0,
         expiryDate: "",
         discount: 0,
@@ -871,6 +889,7 @@ export default function CreatePOPage() {
           variantId: i.variantId, productName: i.productName, variantName: i.variantName,
           sku: i.sku, orderedQty: i.orderedQty, freeQty: i.freeQty || 0,
           unitCost: i.unitCost,
+          sellingPrice: i.sellingPrice > 0 ? i.sellingPrice : undefined,
           mrp: i.mrp > 0 ? i.mrp : undefined,
           expiryDate: i.expiryDate || undefined,
           discount: i.discount, taxRate: 0,
@@ -1450,6 +1469,17 @@ export default function CreatePOPage() {
                             />
                           </div>
                           <div className="space-y-1">
+                            <label className="text-[10px] font-semibold uppercase text-muted-foreground">Selling</label>
+                            <input
+                              type="number"
+                              min={0}
+                              step="0.01"
+                              value={item.sellingPrice}
+                              onChange={(e) => updateItem(idx, "sellingPrice", parseFloat(e.target.value) || 0)}
+                              className={cn(FORM_LINE_INPUT, "w-full")}
+                            />
+                          </div>
+                          <div className="space-y-1">
                             <label className="text-[10px] font-semibold uppercase text-muted-foreground">MRP</label>
                             <input
                               type="number"
@@ -1485,7 +1515,7 @@ export default function CreatePOPage() {
 
               {/* Desktop table */}
               <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[1480px] text-sm">
+                <table className="w-full min-w-[1580px] text-sm">
                   <thead className={FORM_TABLE_HEAD}>
                     <tr className={FORM_TABLE_HEAD_ROW}>
                       <th className="px-2 py-3 text-center font-semibold w-10">
@@ -1510,6 +1540,7 @@ export default function CreatePOPage() {
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-20">Free Qty</th>
                       <th className="px-3 py-3 text-left font-semibold whitespace-nowrap w-36">Expiry</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Buying</th>
+                      <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">Selling</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-28">MRP</th>
                       <th className="px-3 py-3 text-right font-semibold whitespace-nowrap w-24">Discount</th>
                       <th className="px-3 py-3 text-right font-semibold w-28">Total</th>
@@ -1695,6 +1726,18 @@ export default function CreatePOPage() {
                                   }
                                 }}
                                 className={cn(FORM_LINE_INPUT, "w-[6.5rem]")}
+                              />
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-right align-top" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end">
+                              <input
+                                type="number"
+                                min={0}
+                                step="0.01"
+                                value={item.sellingPrice}
+                                onChange={(e) => updateItem(idx, "sellingPrice", parseFloat(e.target.value) || 0)}
+                                className={cn(FORM_LINE_INPUT, "w-[6rem]")}
                               />
                             </div>
                           </td>
@@ -2088,9 +2131,7 @@ function SelectedProductPanel({
     ["Last Purchase Qty", dash(variant?.lastPurchaseQty)],
     ["Last Buying Price", variant?.lastBuyingPrice != null ? `LKR ${fmtMoney(variant.lastBuyingPrice)}` : "—"],
     ["Current Buying", `LKR ${fmtMoney(item.unitCost)}`],
-    ["Selling Price", variant?.sellingPrice != null || variant?.unitPrice != null
-      ? `LKR ${fmtMoney(Number(variant.sellingPrice ?? variant.unitPrice))}`
-      : "—"],
+    ["Selling Price", `LKR ${fmtMoney(item.sellingPrice > 0 ? item.sellingPrice : resolveSellingPrice(variant))}`],
     ["Supplier", supplierName ?? "—"],
     ["Lead Time", variant?.leadTimeDays != null ? `${variant.leadTimeDays} days` : "—"],
   ];

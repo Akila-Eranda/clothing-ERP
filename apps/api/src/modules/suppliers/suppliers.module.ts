@@ -51,6 +51,7 @@ export class PurchaseItemDto {
   @ApiProperty() @IsInt() @Min(0) orderedQty: number;
   @ApiPropertyOptional() @IsOptional() @IsInt() @Min(0) freeQty?: number;
   @ApiProperty() @IsNumber() @Min(0) unitCost: number;
+  @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) sellingPrice?: number;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) mrp?: number;
   @ApiPropertyOptional() @IsOptional() @IsDateString() expiryDate?: string;
   @ApiPropertyOptional() @IsOptional() @IsNumber() @Min(0) discount?: number;
@@ -323,6 +324,7 @@ export class SuppliersService {
         orderedQty,
         freeQty,
         unitCost: item.unitCost,
+        sellingPrice: item.sellingPrice != null && item.sellingPrice > 0 ? item.sellingPrice : null,
         mrp: item.mrp != null && item.mrp > 0 ? item.mrp : null,
         expiryDate: item.expiryDate ? new Date(item.expiryDate) : null,
         discount: disc,

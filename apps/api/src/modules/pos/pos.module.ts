@@ -1195,14 +1195,14 @@ export class PosService {
       if (variants.length === 0) continue;
 
       const keyLower = key.toLowerCase();
-      const pickMulti = (rows: VariantRow[]) => {
+      const pickMulti = async (rows: VariantRow[]) => {
         const options = rows.map(mapVariant).sort((a, b) => b.stock - a.stock);
         const primary = options.find((o) => o.stock > 0) ?? options[0];
-        return {
+        return this.withPurchasePrices(tenantId, {
           ...primary,
           requiresVariantPick: true,
           variants: options,
-        };
+        });
       };
 
       const exactSku = variants.filter((v) => v.sku.toLowerCase() === keyLower);
@@ -1320,56 +1320,60 @@ export class PosService {
     result: Record<string, unknown> & { variantId: string; stock: number; requiresVariantPick?: boolean },
     supplierId?: string,
   ) {
+    let enriched: Record<string, unknown> & { variantId: string; stock: number; requiresVariantPick?: boolean } = result;
+
     if (!supplierId || result.requiresVariantPick) {
-      return {
+      enriched = {
         ...result,
         supplierAssigned: supplierId ? Boolean(result.supplierId) : undefined,
       };
+    } else {
+      const assignment = await this.prisma.supplierProductAssignment.findFirst({
+        where: { tenantId, supplierId, variantId: result.variantId },
+        select: {
+          supplierId: true,
+          supplierProductCode: true,
+          leadTimeDays: true,
+          lastBuyingPrice: true,
+          minOrderQty: true,
+          isPreferred: true,
+          isActive: true,
+        },
+      });
+
+      if (!assignment || assignment.isActive === false) {
+        enriched = {
+          ...result,
+          supplierAssigned: false,
+          supplierId,
+          lastBuyingPrice: result.lastBuyingPrice ?? null,
+        };
+      } else {
+        const insights = await this.attachSupplierPurchaseInsights(
+          tenantId,
+          branchId,
+          supplierId,
+          [{ variantId: result.variantId, stock: result.stock }],
+        );
+        const insight = insights.get(result.variantId);
+
+        enriched = {
+          ...result,
+          supplierAssigned: true,
+          supplierId: assignment.supplierId,
+          supplierProductCode: assignment.supplierProductCode ?? null,
+          leadTimeDays: assignment.leadTimeDays ?? null,
+          lastBuyingPrice: assignment.lastBuyingPrice ?? result.lastBuyingPrice ?? null,
+          minOrderQty: assignment.minOrderQty ?? null,
+          lastPurchaseDate: insight?.lastPurchaseDate ?? null,
+          lastPurchaseQty: insight?.lastPurchaseQty ?? null,
+          soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
+          stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
+        };
+      }
     }
 
-    const assignment = await this.prisma.supplierProductAssignment.findFirst({
-      where: { tenantId, supplierId, variantId: result.variantId },
-      select: {
-        supplierId: true,
-        supplierProductCode: true,
-        leadTimeDays: true,
-        lastBuyingPrice: true,
-        minOrderQty: true,
-        isPreferred: true,
-        isActive: true,
-      },
-    });
-
-    if (!assignment || assignment.isActive === false) {
-      return {
-        ...result,
-        supplierAssigned: false,
-        supplierId,
-        lastBuyingPrice: result.lastBuyingPrice ?? null,
-      };
-    }
-
-    const insights = await this.attachSupplierPurchaseInsights(
-      tenantId,
-      branchId,
-      supplierId,
-      [{ variantId: result.variantId, stock: result.stock }],
-    );
-    const insight = insights.get(result.variantId);
-
-    return {
-      ...result,
-      supplierAssigned: true,
-      supplierId: assignment.supplierId,
-      supplierProductCode: assignment.supplierProductCode ?? null,
-      leadTimeDays: assignment.leadTimeDays ?? null,
-      lastBuyingPrice: assignment.lastBuyingPrice ?? result.lastBuyingPrice ?? null,
-      minOrderQty: assignment.minOrderQty ?? null,
-      lastPurchaseDate: insight?.lastPurchaseDate ?? null,
-      lastPurchaseQty: insight?.lastPurchaseQty ?? null,
-      soldAfterLastPurchase: insight?.soldAfterLastPurchase ?? null,
-      stockAtLastPurchase: insight?.stockAtLastPurchase ?? null,
-    };
+    return this.withPurchasePrices(tenantId, enriched);
   }
 
   async processReturn(tenantId: string, branchId: string, userId: string, dto: ReturnSaleDto) {
@@ -1389,6 +1393,84 @@ export class PosService {
       }
     });
     return { refundNumber, total, itemCount: dto.items.length, reason: dto.reason };
+  }
+
+  private async attachPurchasePriceOptions(
+    tenantId: string,
+    variantIds: string[],
+  ) {
+    type PriceOpt = {
+      unitCost: number;
+      sellingPrice: number;
+      mrp: number | null;
+      poNumber: string;
+      orderDate: string;
+    };
+    const out = new Map<string, PriceOpt[]>();
+    const unique = [...new Set(variantIds.filter(Boolean))];
+    if (!unique.length) return out;
+
+    const items = await this.prisma.purchaseOrderItem.findMany({
+      where: {
+        variantId: { in: unique },
+        sellingPrice: { gt: 0 },
+        purchase: {
+          tenantId,
+          status: { notIn: ['DRAFT', 'PENDING_APPROVAL', 'CANCELLED'] },
+        },
+      },
+      select: {
+        variantId: true,
+        unitCost: true,
+        sellingPrice: true,
+        mrp: true,
+        purchase: { select: { poNumber: true, orderDate: true } },
+      },
+      orderBy: { purchase: { orderDate: 'desc' } },
+      take: Math.min(unique.length * 12, 600),
+    });
+
+    for (const i of items) {
+      const selling = Number(i.sellingPrice);
+      if (!(selling > 0)) continue;
+      const list = out.get(i.variantId) ?? [];
+      const key = `${Number(i.unitCost).toFixed(2)}:${selling.toFixed(2)}`;
+      if (list.some((x) => `${x.unitCost.toFixed(2)}:${x.sellingPrice.toFixed(2)}` === key)) continue;
+      if (list.length >= 6) continue;
+      list.push({
+        unitCost: Number(i.unitCost),
+        sellingPrice: selling,
+        mrp: i.mrp != null && i.mrp > 0 ? i.mrp : null,
+        poNumber: i.purchase.poNumber,
+        orderDate: i.purchase.orderDate.toISOString(),
+      });
+      out.set(i.variantId, list);
+    }
+    return out;
+  }
+
+  private async withPurchasePrices<
+    T extends {
+      variantId: string;
+      variants?: Array<{ variantId: string } & Record<string, unknown>>;
+    },
+  >(tenantId: string, result: T) {
+    const ids = [
+      result.variantId,
+      ...(Array.isArray(result.variants) ? result.variants.map((v) => v.variantId) : []),
+    ];
+    const map = await this.attachPurchasePriceOptions(tenantId, ids);
+    const variants = Array.isArray(result.variants)
+      ? result.variants.map((v) => ({
+          ...v,
+          purchasePrices: map.get(v.variantId) ?? [],
+        }))
+      : undefined;
+    return {
+      ...result,
+      purchasePrices: map.get(result.variantId) ?? [],
+      ...(variants ? { variants } : {}),
+    };
   }
 
   private async attachSupplierPurchaseInsights(
@@ -1834,6 +1916,15 @@ export class PosService {
         };
       });
     }
+
+    const priceMap = await this.attachPurchasePriceOptions(
+      tenantId,
+      items.map((i) => i.variantId),
+    );
+    items = items.map((m) => ({
+      ...m,
+      purchasePrices: priceMap.get(m.variantId) ?? [],
+    }));
 
     if (!paginated) return items;
 

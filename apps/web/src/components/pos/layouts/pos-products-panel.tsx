@@ -11,6 +11,14 @@ import { getPosLayoutUi } from "@/lib/pos-layouts";
 import { PosProductCard, type PosProductCardData } from "@/components/pos/shared/pos-product-card";
 import { getCardBg, PosProductThumb } from "@/components/pos/shared/pos-product-thumb";
 
+export type PosPurchasePriceOpt = {
+  unitCost: number;
+  sellingPrice: number;
+  mrp?: number | null;
+  poNumber: string;
+  orderDate: string;
+};
+
 export type PosProductsPanelProduct = {
   variantId: string;
   productId?: string;
@@ -27,6 +35,7 @@ export type PosProductsPanelProduct = {
   imageUrl?: string;
   locationLabel?: string | null;
   productKind?: string;
+  purchasePrices?: PosPurchasePriceOpt[];
 };
 
 export type PosProductsPanelCard = {
@@ -207,7 +216,7 @@ export function PosProductsPanel(props: Props) {
             imageUrl: p.imageUrl,
             color: p.color,
             priceLabel:
-              card.variants.length > 1 && card.minPrice !== card.maxPrice
+              card.minPrice !== card.maxPrice
                 ? `LKR ${formatNumber(card.minPrice)}–${formatNumber(card.maxPrice)}`
                 : `LKR ${formatNumber(card.minPrice)}`,
             varStock: card.totalStock,

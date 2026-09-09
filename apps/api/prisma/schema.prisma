@@ -2220,6 +2220,7 @@ model PurchaseOrderItem {
   receivedQty   Int       @default(0)
   rejectedQty   Int       @default(0)
   unitCost      Float
+  sellingPrice  Float?
   mrp           Float?
   expiryDate    DateTime?
   discount      Float     @default(0)

@@ -53,6 +53,8 @@ export type GrnLineInput = {
   receivedQty: number;
   rejectedQty?: number;
   unitCost: number;
+  sellingPrice?: number | null;
+  mrp?: number | null;
   orderedQty?: number;
   purchaseItemId?: string;
   batchNumber?: string;
@@ -363,6 +365,18 @@ export class ProcurementService {
           notes: line.batchNumber ? `GRN ${grnNumber} batch ${line.batchNumber}` : `GRN ${grnNumber}`,
         }, tx);
 
+        const sell = line.sellingPrice != null && line.sellingPrice > 0 ? line.sellingPrice : null;
+        const mrp = line.mrp != null && line.mrp > 0 ? line.mrp : null;
+        if (sell != null || mrp != null) {
+          await tx.productVariant.update({
+            where: { id: line.variantId },
+            data: {
+              ...(sell != null ? { sellingPrice: sell } : {}),
+              ...(mrp != null ? { mrp } : {}),
+            },
+          });
+        }
+
         const lotLog = await tx.inventoryLog.findFirst({
           where: {
             tenantId,
@@ -518,6 +532,8 @@ export class ProcurementService {
         || ((poItem as { expiryDate?: Date | null }).expiryDate
           ? new Date((poItem as { expiryDate: Date }).expiryDate).toISOString().slice(0, 10)
           : undefined);
+      const poSell = (poItem as { sellingPrice?: number | null }).sellingPrice;
+      const poMrp = (poItem as { mrp?: number | null }).mrp;
       grnLines.push({
         variantId: poItem.variantId,
         productName: poItem.productName,
@@ -526,6 +542,8 @@ export class ProcurementService {
         receivedQty: item.receivedQty,
         rejectedQty: item.rejectedQty,
         unitCost: poItem.unitCost,
+        sellingPrice: poSell != null && poSell > 0 ? poSell : null,
+        mrp: poMrp != null && poMrp > 0 ? poMrp : null,
         orderedQty: expectedQty,
         purchaseItemId: poItem.id,
         batchNumber: item.batchNumber,

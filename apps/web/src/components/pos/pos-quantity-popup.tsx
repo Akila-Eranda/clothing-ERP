@@ -15,6 +15,7 @@ import {
   isPosWeightedProduct,
   parseGramsInput,
 } from "@/lib/pos-weight";
+import type { PosPurchasePriceOpt } from "@/components/pos/layouts/pos-products-panel";
 
 export type PosAddPopupVariant = {
   variantId: string;
@@ -35,6 +36,7 @@ export type PosAddPopupVariant = {
   allowDecimalSelling?: boolean;
   /** Optional shelf / store location label when API provides it (clothing) */
   locationLabel?: string | null;
+  purchasePrices?: PosPurchasePriceOpt[];
 };
 
 type Props = {
@@ -43,6 +45,7 @@ type Props = {
   maxQty: number;
   unitPrice: number;
   mrp?: number;
+  purchasePrices?: PosPurchasePriceOpt[];
   variants?: PosAddPopupVariant[];
   allowNegativeStock?: boolean;
   productKind?: string;
@@ -65,6 +68,7 @@ export function PosQuantityPopup({
   maxQty,
   unitPrice,
   mrp,
+  purchasePrices,
   variants = EMPTY_VARIANTS,
   allowNegativeStock = false,
   productKind,
@@ -120,6 +124,26 @@ export function PosQuantityPopup({
     () => variants.find((v) => v.variantId === selectedVariantId) ?? variants[0] ?? null,
     [variants, selectedVariantId],
   );
+
+  const priceOptions = React.useMemo(() => {
+    const raw = selectedVariant?.purchasePrices ?? purchasePrices ?? [];
+    const seen = new Set<string>();
+    const out: number[] = [];
+    const catalog = Number(selectedVariant?.unitPrice ?? unitPrice);
+    if (Number.isFinite(catalog) && catalog > 0) {
+      seen.add(catalog.toFixed(2));
+      out.push(catalog);
+    }
+    for (const p of raw) {
+      const sell = Number(p.sellingPrice);
+      if (!(sell > 0)) continue;
+      const key = sell.toFixed(2);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(sell);
+    }
+    return out;
+  }, [selectedVariant, purchasePrices, unitPrice]);
 
   const activeWeight = {
     productKind: selectedVariant?.productKind ?? productKind,
@@ -668,6 +692,28 @@ export function PosQuantityPopup({
                   </p>
                 ) : null}
               </div>
+              {priceOptions.length > 1 ? (
+                <div className="flex flex-wrap gap-1.5">
+                  {priceOptions.map((sell) => {
+                    const active = Math.abs(unitPriceValue - sell) < 0.005;
+                    return (
+                      <button
+                        key={sell.toFixed(2)}
+                        type="button"
+                        onClick={() => setPriceRaw(String(sell))}
+                        className="rounded-lg border px-3 py-2 text-sm font-bold tabular-nums transition-colors"
+                        style={{
+                          borderColor: active ? "var(--pos-accent, #3b82f6)" : "var(--pos-border)",
+                          background: active ? "rgba(59,130,246,0.18)" : "var(--pos-input)",
+                          color: "var(--pos-text)",
+                        }}
+                      >
+                        {money(sell)}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
               <input
                 ref={priceInputRef}
                 type="text"

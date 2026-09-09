@@ -529,6 +529,7 @@ export class ReportsService {
       productName: i.productName,
       variantName: i.variantName,
       unitCost: i.unitCost,
+      sellingPrice: (i as { sellingPrice?: number | null }).sellingPrice ?? null,
       orderedQty: i.orderedQty,
       poNumber: i.purchase.poNumber,
       orderDate: i.purchase.orderDate,
