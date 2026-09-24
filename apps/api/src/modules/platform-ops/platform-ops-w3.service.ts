@@ -410,7 +410,11 @@ export class PlatformOpsW3Service {
     const users = await this.prisma.user.findMany({
       where: {
         tenantId: platform.id,
-        roles: { some: { role: { type: RoleType.SUPER_ADMIN } } },
+        roles: {
+          some: {
+            role: { type: { in: [RoleType.SUPER_ADMIN, RoleType.PLATFORM_STAFF] } },
+          },
+        },
       },
       include: {
         roles: { include: { role: true } },
@@ -422,6 +426,7 @@ export class PlatformOpsW3Service {
       email: u.email,
       firstName: u.firstName,
       lastName: u.lastName,
+      phone: u.phone,
       status: u.status,
       lastLoginAt: u.lastLoginAt,
       createdAt: u.createdAt,
@@ -435,6 +440,7 @@ export class PlatformOpsW3Service {
     firstName: string
     lastName: string
     phone?: string
+    roleType?: RoleType.SUPER_ADMIN | RoleType.PLATFORM_STAFF
   }) {
     if (!body.email?.trim() || !body.password || !body.firstName?.trim() || !body.lastName?.trim()) {
       throw new BadRequestException('email, password, firstName, lastName are required')
@@ -442,6 +448,10 @@ export class PlatformOpsW3Service {
     if (body.password.length < 8) {
       throw new BadRequestException('password must be at least 8 characters')
     }
+
+    const roleType =
+      body.roleType === RoleType.PLATFORM_STAFF ? RoleType.PLATFORM_STAFF : RoleType.SUPER_ADMIN
+    const roleName = roleType === RoleType.PLATFORM_STAFF ? 'Platform Staff' : 'Super Admin'
 
     const platform = await this.resolvePlatformTenant()
     await ensureSystemRoles(this.prisma, platform.id)
@@ -452,14 +462,14 @@ export class PlatformOpsW3Service {
     if (existing) throw new BadRequestException('Email already in use on platform tenant')
 
     let role = await this.prisma.role.findFirst({
-      where: { tenantId: platform.id, type: RoleType.SUPER_ADMIN },
+      where: { tenantId: platform.id, type: roleType },
     })
     if (!role) {
       role = await this.prisma.role.create({
         data: {
           tenantId: platform.id,
-          name: 'Super Admin',
-          type: RoleType.SUPER_ADMIN,
+          name: roleName,
+          type: roleType,
           isSystem: true,
         },
       })
@@ -486,6 +496,7 @@ export class PlatformOpsW3Service {
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
+      phone: user.phone,
       status: user.status,
       roles: user.roles.map((r) => r.role.type),
     }
@@ -500,7 +511,11 @@ export class PlatformOpsW3Service {
       where: {
         id: adminId,
         tenantId: platform.id,
-        roles: { some: { role: { type: RoleType.SUPER_ADMIN } } },
+        roles: {
+          some: {
+            role: { type: { in: [RoleType.SUPER_ADMIN, RoleType.PLATFORM_STAFF] } },
+          },
+        },
       },
     })
     if (!user) throw new NotFoundException('Platform admin not found')

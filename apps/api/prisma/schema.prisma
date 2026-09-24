@@ -33,6 +33,7 @@ enum Gender {
 
 enum RoleType {
   SUPER_ADMIN
+  PLATFORM_STAFF
   TENANT_ADMIN
   BRANCH_MANAGER
   CASHIER

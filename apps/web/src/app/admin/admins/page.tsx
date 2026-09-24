@@ -48,6 +48,7 @@ type FormState = {
   firstName: string;
   lastName: string;
   phone: string;
+  roleType: "SUPER_ADMIN" | "PLATFORM_STAFF";
 };
 
 const EMPTY_FORM: FormState = {
@@ -56,6 +57,7 @@ const EMPTY_FORM: FormState = {
   firstName: "",
   lastName: "",
   phone: "",
+  roleType: "PLATFORM_STAFF",
 };
 
 export default function AdminsPage() {
@@ -120,8 +122,13 @@ export default function AdminsPage() {
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         phone: form.phone.trim() || undefined,
+        roleType: form.roleType,
       });
-      toast.success("Platform admin created");
+      toast.success(
+        form.roleType === "PLATFORM_STAFF"
+          ? "Staff admin created (finance hidden)"
+          : "Super admin created",
+      );
       setModalOpen(false);
       setForm(EMPTY_FORM);
       await load();
@@ -185,6 +192,20 @@ export default function AdminsPage() {
         cell: ({ row }) => (
           <span className="text-xs text-muted-foreground">{row.original.phone || "—"}</span>
         ),
+      },
+      {
+        id: "roles",
+        accessorFn: (a) => (a.roles ?? []).join(" "),
+        header: ({ column }) => <DataTableColumnHeader column={column} title="Role" />,
+        cell: ({ row }) => {
+          const roles = row.original.roles ?? [];
+          const label = roles.includes("SUPER_ADMIN")
+            ? "Super Admin"
+            : roles.includes("PLATFORM_STAFF")
+              ? "Staff"
+              : roles[0] || "—";
+          return <span className="text-xs text-muted-foreground">{label}</span>;
+        },
       },
       {
         accessorKey: "status",
@@ -302,6 +323,22 @@ export default function AdminsPage() {
                     onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))}
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground mb-1">Access level</label>
+                <select
+                  className={ADMIN_INPUT}
+                  value={form.roleType}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      roleType: e.target.value === "SUPER_ADMIN" ? "SUPER_ADMIN" : "PLATFORM_STAFF",
+                    }))
+                  }
+                >
+                  <option value="PLATFORM_STAFF">Staff — admin panel, finance hidden</option>
+                  <option value="SUPER_ADMIN">Super Admin — full access including billing</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-foreground mb-1">Email</label>

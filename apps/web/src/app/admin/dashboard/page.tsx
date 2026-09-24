@@ -13,7 +13,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts'
 import { ClientSideTable, DataTableColumnHeader, OpenRecordButton } from '@/components/table'
-import { fetchPlatformOverview, fetchHealth, type PlatformOverview, type HealthData } from '@/lib/admin-api'
+import { fetchPlatformOverview, fetchHealth, adminAuth, type PlatformOverview, type HealthData } from '@/lib/admin-api'
 import { Button } from '@/components/ui/button'
 import { PageHeader, PageKpiGrid, pageKpi } from '@/components/ui/page-kpi'
 import { AdminStatusBadge, AdminPlanBadge } from '@/components/admin/admin-badges'
@@ -128,12 +128,17 @@ export default function AdminDashboardPage() {
   const stats = overview?.stats
   const recentTenants = overview?.recentTenants ?? []
 
+  const canFinance = adminAuth.canAccessFinance()
   const kpiItems = stats ? [
     { ...pageKpi('Total Tenants', stats.totalTenants, Building2, 'primary'), href: '/admin/tenants' },
     { ...pageKpi('Active', stats.activeTenants, CheckCircle, 'success'), href: '/admin/tenants?status=ACTIVE' },
-    { ...pageKpi('On Trial', stats.trialTenants, Clock, 'info'), href: '/admin/subscriptions' },
+    ...(canFinance
+      ? [{ ...pageKpi('On Trial', stats.trialTenants, Clock, 'info'), href: '/admin/subscriptions' }]
+      : [{ ...pageKpi('On Trial', stats.trialTenants, Clock, 'info'), href: '/admin/tenants' }]),
     { ...pageKpi('Total Users', stats.totalUsers, Users, 'neutral'), href: '/admin/users' },
-    { ...pageKpi('MRR', `Rs.${stats.mrr.toLocaleString()}`, DollarSign, 'success'), href: '/admin/subscriptions' },
+    ...(canFinance
+      ? [{ ...pageKpi('MRR', `Rs.${stats.mrr.toLocaleString()}`, DollarSign, 'success'), href: '/admin/subscriptions' }]
+      : []),
     {
       ...pageKpi(
         'System Health',
@@ -291,7 +296,9 @@ export default function AdminDashboardPage() {
         <div className="grid sm:grid-cols-4 gap-3">
           {[
             { label: 'Onboard Tenant', href: '/admin/tenants?create=1', desc: 'New workspace' },
-            { label: 'Manage Plans', href: '/admin/plans', desc: 'Pricing & limits' },
+            ...(canFinance
+              ? [{ label: 'Manage Plans', href: '/admin/plans', desc: 'Pricing & limits' }]
+              : []),
             { label: 'Activity Logs', href: '/admin/activity-logs', desc: 'Audit trail' },
             { label: 'Platform Settings', href: '/admin/settings', desc: 'Configuration' },
           ].map(a => (

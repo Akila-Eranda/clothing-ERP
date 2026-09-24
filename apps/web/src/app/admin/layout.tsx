@@ -25,6 +25,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/admin/admins':        'Admins',
 }
 
+const SUPER_ONLY_PATHS = ['/admin/admins', '/admin/subscriptions', '/admin/plans']
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [ready, setReady] = useState(false)
@@ -34,12 +36,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     if (path === '/admin/login') { setReady(true); return }
     const token = adminAuth.getToken()
-    if (!token || !adminAuth.isSuperAdmin()) {
+    if (!token || !adminAuth.isPlatformAdmin()) {
       adminAuth.clear()
       router.replace('/admin/login')
-    } else {
-      setReady(true)
+      return
     }
+    if (!adminAuth.canAccessFinance() && SUPER_ONLY_PATHS.some((p) => path === p || path.startsWith(p + '/'))) {
+      router.replace('/admin/dashboard')
+      return
+    }
+    setReady(true)
   }, [router, path])
 
   function handleLogout() {

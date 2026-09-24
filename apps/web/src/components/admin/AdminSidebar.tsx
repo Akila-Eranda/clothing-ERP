@@ -12,7 +12,10 @@ import { cn } from "@/lib/utils"
 import { useSidebarLogoOnDark } from "@/hooks/use-sidebar-logo-theme"
 import { adminAuth } from "@/lib/admin-api"
 
-const NAV_GROUPS = [
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard; superOnly?: boolean }
+type NavGroup = { label: string; items: NavItem[]; financeOnly?: boolean; superOnly?: boolean }
+
+const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Overview',
     items: [
@@ -31,9 +34,10 @@ const NAV_GROUPS = [
   },
   {
     label: 'Billing',
+    financeOnly: true,
     items: [
-      { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard },
-      { href: '/admin/plans', label: 'Plans', icon: Tag },
+      { href: '/admin/subscriptions', label: 'Subscriptions', icon: CreditCard, superOnly: true },
+      { href: '/admin/plans', label: 'Plans', icon: Tag, superOnly: true },
     ],
   },
   {
@@ -49,7 +53,7 @@ const NAV_GROUPS = [
     items: [
       { href: '/admin/system-health', label: 'System Health', icon: Activity },
       { href: '/admin/security-scan', label: 'Security Scan', icon: ScanSearch },
-      { href: '/admin/admins', label: 'Admins', icon: UserCog },
+      { href: '/admin/admins', label: 'Admins', icon: UserCog, superOnly: true },
       { href: '/admin/settings', label: 'Settings', icon: Settings },
     ],
   },
@@ -60,7 +64,16 @@ interface Props { onClose?: () => void }
 export default function AdminSidebar({ onClose }: Props) {
   const path = usePathname()
   const logoOnDark = useSidebarLogoOnDark()
+  const isSuper = adminAuth.isSuperAdmin()
   const roles = adminAuth.getRoles()
+
+  const groups = NAV_GROUPS
+    .filter((g) => !g.financeOnly || isSuper)
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((item) => !item.superOnly || isSuper),
+    }))
+    .filter((g) => g.items.length > 0)
 
   return (
     <aside className="flex flex-col h-full bg-card border-r border-border w-[220px] flex-shrink-0">
@@ -85,7 +98,7 @@ export default function AdminSidebar({ onClose }: Props) {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-4">
-        {NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label}>
             <p className="px-3 mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
               {group.label}
@@ -124,7 +137,7 @@ export default function AdminSidebar({ onClose }: Props) {
           <div className="flex-1 min-w-0">
             <p className="text-xs font-semibold text-foreground truncate">Platform Admin</p>
             <p className="text-[10px] text-muted-foreground truncate">
-              {roles.includes('SUPER_ADMIN') ? 'Super Admin' : roles[0] || 'Admin'}
+              {isSuper ? 'Super Admin' : roles.includes('PLATFORM_STAFF') ? 'Staff' : roles[0] || 'Admin'}
             </p>
           </div>
         </div>

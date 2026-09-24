@@ -10,6 +10,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { RoleType, UserStatus } from '@prisma/client';
+import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles';
 
 @ApiTags('Users')
 @ApiBearerAuth('access-token')
@@ -25,8 +26,8 @@ export class UsersController {
   }
 
   @Get('platform')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'List all users across tenants (Super Admin)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'List all users across tenants (Platform Admin)' })
   findAllPlatform(
     @Query() query: PaginationDto,
     @Query('tenantId') tenantId?: string,
@@ -57,14 +58,14 @@ export class UsersController {
   }
 
   @Patch(':id/status')
-  @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
+  @Roles(RoleType.SUPER_ADMIN, RoleType.PLATFORM_STAFF, RoleType.TENANT_ADMIN)
   @ApiOperation({ summary: 'Update user status' })
   updateStatus(
     @CurrentUser() user: IAuthUser,
     @Param('id') id: string,
     @Body('status') status: UserStatus,
   ) {
-    if (user.roles.includes(RoleType.SUPER_ADMIN)) {
+    if (user.roles.includes(RoleType.SUPER_ADMIN) || user.roles.includes(RoleType.PLATFORM_STAFF)) {
       return this.usersService.updateStatusPlatform(id, status);
     }
     return this.usersService.updateStatus(id, user.tenantId, status);
@@ -90,10 +91,10 @@ export class UsersController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Roles(RoleType.SUPER_ADMIN, RoleType.TENANT_ADMIN)
+  @Roles(RoleType.SUPER_ADMIN, RoleType.PLATFORM_STAFF, RoleType.TENANT_ADMIN)
   @ApiOperation({ summary: 'Delete user' })
   remove(@CurrentUser() user: IAuthUser, @Param('id') id: string) {
-    if (user.roles.includes(RoleType.SUPER_ADMIN)) {
+    if (user.roles.includes(RoleType.SUPER_ADMIN) || user.roles.includes(RoleType.PLATFORM_STAFF)) {
       return this.usersService.removePlatform(id);
     }
     return this.usersService.remove(id, user.tenantId);

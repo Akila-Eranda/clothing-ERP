@@ -17,6 +17,7 @@ import {
 } from '@prisma/client'
 import { Roles } from '@/common/decorators/roles.decorator'
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator'
+import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles'
 import { PlatformOpsService } from './platform-ops.service'
 import { PlatformOpsW3Service } from './platform-ops-w3.service'
 import { SecurityScanService } from './security-scan.service'
@@ -24,7 +25,7 @@ import { SecurityScanService } from './security-scan.service'
 @ApiTags('Platform Ops')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'platform', version: '1' })
-@Roles(RoleType.SUPER_ADMIN)
+@Roles(...PLATFORM_ADMIN_ROLES)
 export class PlatformOpsController {
   constructor(
     private readonly ops: PlatformOpsService,
@@ -199,6 +200,7 @@ export class PlatformOpsController {
   }
 
   @Get('analytics/mrr-chart')
+  @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Estimated MRR chart (12 months)' })
   mrrChart() {
     return this.w3.mrrChart()
@@ -211,13 +213,15 @@ export class PlatformOpsController {
   }
 
   @Get('admins')
-  @ApiOperation({ summary: 'List platform SUPER_ADMIN users' })
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'List platform admin users' })
   listAdmins() {
     return this.w3.listPlatformAdmins()
   }
 
   @Post('admins')
-  @ApiOperation({ summary: 'Create platform SUPER_ADMIN user' })
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Create platform admin user (super or staff)' })
   createAdmin(@Body() body: Record<string, unknown>) {
     return this.w3.createPlatformAdmin({
       email: String(body.email || ''),
@@ -225,11 +229,13 @@ export class PlatformOpsController {
       firstName: String(body.firstName || ''),
       lastName: String(body.lastName || ''),
       phone: body.phone ? String(body.phone) : undefined,
+      roleType: body.roleType === 'PLATFORM_STAFF' ? RoleType.PLATFORM_STAFF : RoleType.SUPER_ADMIN,
     })
   }
 
   @Delete('admins/:id')
-  @ApiOperation({ summary: 'Deactivate platform SUPER_ADMIN' })
+  @Roles(RoleType.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Deactivate platform admin' })
   deleteAdmin(@Param('id') id: string, @CurrentUser() user: IAuthUser) {
     return this.w3.deactivatePlatformAdmin(id, user.id)
   }
@@ -241,21 +247,25 @@ export class PlatformOpsController {
   }
 
   @Get('billing/whatsapp/status')
+  @Roles(RoleType.SUPER_ADMIN)
   billingWaStatus() {
     return this.w3.billingWhatsappStatus()
   }
 
   @Post('billing/whatsapp/connect')
+  @Roles(RoleType.SUPER_ADMIN)
   billingWaConnect() {
     return this.w3.billingWhatsappConnect()
   }
 
   @Post('billing/whatsapp/disconnect')
+  @Roles(RoleType.SUPER_ADMIN)
   billingWaDisconnect() {
     return this.w3.billingWhatsappDisconnect()
   }
 
   @Post('billing/whatsapp/test-message')
+  @Roles(RoleType.SUPER_ADMIN)
   billingWaTest(
     @CurrentUser() user: IAuthUser,
     @Body() body: { phone?: string; message?: string },
@@ -264,6 +274,7 @@ export class PlatformOpsController {
   }
 
   @Post('billing/whatsapp/send-onboard')
+  @Roles(RoleType.SUPER_ADMIN)
   billingWaOnboard(
     @CurrentUser() user: IAuthUser,
     @Body()
@@ -286,6 +297,7 @@ export class PlatformOpsController {
   }
 
   @Put('billing/whatsapp/tenant')
+  @Roles(RoleType.SUPER_ADMIN)
   @ApiOperation({ summary: 'Pin which tenant hosts the billing WhatsApp session' })
   setBillingWaTenant(@Body() body: { tenantId?: string }) {
     return this.w3.setBillingWhatsAppTenantId(String(body.tenantId || ''))

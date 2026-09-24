@@ -37,6 +37,10 @@ export const adminAuth = {
     return token ? parseRolesFromToken(token) : []
   },
   isSuperAdmin: (): boolean => adminAuth.getRoles().includes('SUPER_ADMIN'),
+  isPlatformStaff: (): boolean => adminAuth.getRoles().includes('PLATFORM_STAFF'),
+  isPlatformAdmin: (): boolean =>
+    adminAuth.isSuperAdmin() || adminAuth.isPlatformStaff(),
+  canAccessFinance: (): boolean => adminAuth.isSuperAdmin(),
   setSession: (token: string, tenantSlug: string, roles: string[]) => {
     localStorage.setItem(TOKEN_KEY, token)
     localStorage.setItem(TENANT_KEY, tenantSlug)
@@ -379,7 +383,7 @@ export async function adminLogin(email: string, password: string) {
   const data = unwrap<{ accessToken: string; user: { roles: string[] } }>(json)
   if (!data.accessToken) throw new Error('No token received')
   const roles: string[] = data.user?.roles ?? parseRolesFromToken(data.accessToken)
-  if (!roles.includes('SUPER_ADMIN')) {
+  if (!roles.includes('SUPER_ADMIN') && !roles.includes('PLATFORM_STAFF')) {
     throw new Error('This account does not have company admin access.')
   }
   adminAuth.setSession(data.accessToken, PLATFORM_TENANT, roles)
@@ -912,6 +916,7 @@ export interface PlatformAdmin {
   phone?: string | null
   status: string
   createdAt: string
+  roles?: string[]
 }
 
 export async function fetchPlatformAdmins() {
@@ -924,6 +929,7 @@ export async function createPlatformAdmin(data: {
   firstName: string
   lastName: string
   phone?: string
+  roleType?: 'SUPER_ADMIN' | 'PLATFORM_STAFF'
 }) {
   return req<PlatformAdmin>('/platform/admins', {
     method: 'POST',

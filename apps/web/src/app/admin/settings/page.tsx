@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import {
   fetchPlatformConfig, updatePlatformConfig, fetchHealth, fetchBillingSettings, updateBillingSettings,
   fetchBillingWhatsAppStatus, connectBillingWhatsApp, disconnectBillingWhatsApp,
-  sendBillingWhatsAppTest, setBillingWhatsAppTenant,
+  sendBillingWhatsAppTest, setBillingWhatsAppTenant, adminAuth,
   type PlatformConfig, type PlatformBillingSettings, type BillingWhatsAppStatus,
 } from '@/lib/admin-api'
 import MaintenanceModeCard from '@/components/admin/MaintenanceModeCard'
@@ -28,7 +28,11 @@ const SECTIONS: Section[] = [
   { id: 'whatsapp',      label: 'WhatsApp Billing', icon: MessageCircle },
 ]
 
+const FINANCE_SECTIONS = new Set(['billing', 'whatsapp'])
+
 export default function SettingsPage() {
+  const canFinance = adminAuth.canAccessFinance()
+  const sections = SECTIONS.filter((s) => canFinance || !FINANCE_SECTIONS.has(s.id))
   const [active, setActive]   = useState('general')
   const [saved, setSaved]     = useState(false)
   const [loading, setLoading] = useState(true)
@@ -88,35 +92,48 @@ export default function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    Promise.all([
+    const tasks: Promise<unknown>[] = [
       fetchPlatformConfig().catch(() => null),
-      fetchBillingSettings().catch(() => null),
       fetchHealth().catch(() => null),
-      fetchBillingWhatsAppStatus().catch(() => null),
-    ]).then(([cfg, bill, health, wa]) => {
+    ]
+    if (canFinance) {
+      tasks.push(fetchBillingSettings().catch(() => null))
+      tasks.push(fetchBillingWhatsAppStatus().catch(() => null))
+    }
+    Promise.all(tasks).then((results) => {
+      const cfg = results[0] as PlatformConfig | null
+      const health = results[1] as { environment?: string } | null
       if (cfg) setConfig(cfg)
-      if (bill) setBilling(bill)
       if (health?.environment) setHealthEnv(health.environment)
-      if (wa) {
-        setWaStatus(wa)
-        if (wa.tenantId) setWaTenantId(wa.tenantId)
+      if (canFinance) {
+        const bill = results[2] as PlatformBillingSettings | null
+        const wa = results[3] as BillingWhatsAppStatus | null
+        if (bill) setBilling(bill)
+        if (wa) {
+          setWaStatus(wa)
+          if (wa.tenantId) setWaTenantId(wa.tenantId)
+        }
       }
     }).finally(() => setLoading(false))
-  }, [])
+  }, [canFinance])
 
   useEffect(() => {
-    if (active === 'whatsapp') void loadWhatsApp()
-  }, [active, loadWhatsApp])
+    if (canFinance && active === 'whatsapp') void loadWhatsApp()
+  }, [active, loadWhatsApp, canFinance])
+
+  useEffect(() => {
+    if (!canFinance && FINANCE_SECTIONS.has(active)) setActive('general')
+  }, [canFinance, active])
 
   async function handleSave() {
     setSaving(true)
     try {
-      const [updated, bill] = await Promise.all([
-        updatePlatformConfig(config),
-        updateBillingSettings(billing),
-      ])
+      const updated = await updatePlatformConfig(config)
       setConfig(updated)
-      setBilling(bill)
+      if (canFinance) {
+        const bill = await updateBillingSettings(billing)
+        setBilling(bill)
+      }
       setSaved(true)
       toast.success('Platform settings saved')
       setTimeout(() => setSaved(false), 2500)
@@ -150,7 +167,7 @@ export default function SettingsPage() {
 
       <div className="flex gap-5">
         <div className="w-48 flex-shrink-0 space-y-0.5">
-          {SECTIONS.map(s => {
+          {sections.map(s => {
             const Icon = s.icon
             return (
               <Button

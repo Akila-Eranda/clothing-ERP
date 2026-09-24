@@ -20,6 +20,7 @@ import { Public } from '@/common/decorators/public.decorator';
 import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
+import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles';
 import { KeycloakAdminService } from '@/modules/auth/keycloak-admin.service';
 import { AuthModule } from '@/modules/auth/auth.module';
 import { getShopProfile, SHOP_TYPE_LIST, slugifyCategory } from '@/shared/shop-profiles';
@@ -1462,8 +1463,8 @@ export class TenantsController {
 
   @Get()
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'List all tenants (Super Admin only)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'List all tenants (Platform Admin)' })
   findAll(
     @Query('search') search?: string,
     @Query('status') status?: string,
@@ -1490,7 +1491,7 @@ export class TenantsController {
 
   @Get('platform-overview')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
+  @Roles(...PLATFORM_ADMIN_ROLES)
   @ApiOperation({ summary: 'Platform dashboard overview with stats and alerts' })
   getPlatformOverview() {
     return this.tenantsService.getPlatformOverview();
@@ -1498,7 +1499,7 @@ export class TenantsController {
 
   @Get('platform-config')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
+  @Roles(...PLATFORM_ADMIN_ROLES)
   @ApiOperation({ summary: 'Get platform-wide configuration' })
   getPlatformConfig() {
     return this.tenantsService.getPlatformConfig();
@@ -1506,7 +1507,7 @@ export class TenantsController {
 
   @Put('platform-config')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
+  @Roles(...PLATFORM_ADMIN_ROLES)
   @ApiOperation({ summary: 'Update platform-wide configuration' })
   updatePlatformConfig(@Body() dto: UpdatePlatformConfigDto) {
     return this.tenantsService.updatePlatformConfig(dto);
@@ -1541,16 +1542,16 @@ export class TenantsController {
 
   @Get(':id')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Get tenant by ID (Super Admin only)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'Get tenant by ID (Platform Admin)' })
   findOne(@Param('id') id: string) {
     return this.tenantsService.findOne(id);
   }
 
   @Post(':id/provision-ssl')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Provision DNS + SSL for tenant subdomain (Super Admin)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'Provision DNS + SSL for tenant subdomain (Platform Admin)' })
   provisionSsl(@Param('id') id: string) {
     return this.tenantsService.provisionSslById(id);
   }
@@ -1574,8 +1575,8 @@ export class TenantsController {
 
   @Put(':id')
   @ApiBearerAuth('access-token')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Update tenant by ID (Super Admin only)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'Update tenant by ID (Platform Admin)' })
   updateById(@Param('id') id: string, @Body() dto: UpdateTenantAdminDto) {
     return this.tenantsService.updateById(id, dto);
   }

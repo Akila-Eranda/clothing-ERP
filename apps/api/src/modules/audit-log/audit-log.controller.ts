@@ -5,6 +5,7 @@ import { CurrentUser, IAuthUser } from '@/common/decorators/current-user.decorat
 import { RequirePermissions } from '@/common/decorators/permissions.decorator';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { RoleType } from '@prisma/client';
+import { PLATFORM_ADMIN_ROLES } from '@/shared/platform-admin-roles';
 import { AuditLogService } from './audit-log.service';
 import { ClientAuditEventDto } from './audit-log.dto';
 
@@ -15,8 +16,8 @@ export class AuditLogController {
   constructor(private readonly auditLogService: AuditLogService) {}
 
   @Get('platform')
-  @Roles(RoleType.SUPER_ADMIN)
-  @ApiOperation({ summary: 'Platform-wide audit logs (Super Admin)' })
+  @Roles(...PLATFORM_ADMIN_ROLES)
+  @ApiOperation({ summary: 'Platform-wide audit logs (Platform Admin)' })
   findAllPlatform(
     @Query('page') page?: string,
     @Query('limit') limit?: string,

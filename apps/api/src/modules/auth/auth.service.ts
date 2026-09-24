@@ -268,7 +268,7 @@ export class AuthService {
     if ('requiresTwoFactor' in result) return result;
 
     const roles = result.user.roles ?? [];
-    if (!roles.includes('SUPER_ADMIN')) {
+    if (!roles.includes('SUPER_ADMIN') && !roles.includes('PLATFORM_STAFF')) {
       throw new ForbiddenException(
         'This account cannot access the company admin console.',
       );
