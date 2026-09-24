@@ -440,7 +440,7 @@ export class PlatformOpsW3Service {
     firstName: string
     lastName: string
     phone?: string
-    roleType?: RoleType.SUPER_ADMIN | RoleType.PLATFORM_STAFF
+    roleType?: 'SUPER_ADMIN' | 'PLATFORM_STAFF'
   }) {
     if (!body.email?.trim() || !body.password || !body.firstName?.trim() || !body.lastName?.trim()) {
       throw new BadRequestException('email, password, firstName, lastName are required')
@@ -450,7 +450,7 @@ export class PlatformOpsW3Service {
     }
 
     const roleType =
-      body.roleType === RoleType.PLATFORM_STAFF ? RoleType.PLATFORM_STAFF : RoleType.SUPER_ADMIN
+      body.roleType === 'PLATFORM_STAFF' ? RoleType.PLATFORM_STAFF : RoleType.SUPER_ADMIN
     const roleName = roleType === RoleType.PLATFORM_STAFF ? 'Platform Staff' : 'Super Admin'
 
     const platform = await this.resolvePlatformTenant()
