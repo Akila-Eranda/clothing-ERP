@@ -24,6 +24,12 @@ interface PosShiftGateProps {
 
 type CounterRow = { id: string; name: string; code: string; sortOrder?: number };
 
+type CounterCash = {
+  counterId: string;
+  total: number;
+  wallets: { registerId: string; cashierId: string; cashierName: string; status: string; amount: number }[];
+};
+
 export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNameProp }: PosShiftGateProps) {
   const { user } = useAuthStore();
   const { branches, ready: branchReady } = useBranchContext();
@@ -38,26 +44,60 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
   const [counters, setCounters] = React.useState<CounterRow[]>([]);
   const [counterId, setCounterId] = React.useState("");
   const [existingOpen, setExistingOpen] = React.useState(false);
+  const [activeRegisterId, setActiveRegisterId] = React.useState<string | null>(null);
+  const [switching, setSwitching] = React.useState(false);
+  const [counterCash, setCounterCash] = React.useState<Record<string, CounterCash>>({});
   const onShiftReadyRef = React.useRef(onShiftReady);
   onShiftReadyRef.current = onShiftReady;
   const canApprove =
     bypassesWorkflowApproval(user?.role) || isWorkflowApproverRole(user?.role);
+
+  /** The cashier's wallet is per counter — look it up for the selected counter. */
+  const checkWallet = React.useCallback(async (forCounterId: string) => {
+    setPendingApproval(false);
+    setPendingRegisterId(null);
+    setExistingOpen(false);
+    setActiveRegisterId(null);
+    const q = forCounterId ? `?counterId=${encodeURIComponent(forCounterId)}` : "";
+    const [activeRes, suggestRes] = await Promise.all([
+      api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(`/cash/active${q}`),
+      api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
+    ]);
+    if (suggestRes.data?.suggestedOpening != null) {
+      setSuggested(suggestRes.data.suggestedOpening);
+      setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
+    }
+    if (activeRes.data?.status === "OPEN") {
+      setExistingOpen(true);
+      setActiveRegisterId(activeRes.data.id ?? null);
+    } else if (activeRes.data?.status === "PENDING_APPROVAL") {
+      setPendingApproval(true);
+      setPendingRegisterId(activeRes.data.id ?? null);
+    }
+  }, []);
 
   const loadForBranch = React.useCallback(async (branchId: string | null) => {
     setChecking(true);
     setPendingApproval(false);
     setPendingRegisterId(null);
     setExistingOpen(false);
+    setActiveRegisterId(null);
     setSuggested(null);
     try {
       if (!branchId) {
         setCounters([]);
         setCounterId("");
+        setCounterCash({});
         return;
       }
-      const countersRes = await api.get<CounterRow[]>("/cash/counters").catch(() => ({ data: [] as CounterRow[] }));
+      const [countersRes, cashRes] = await Promise.all([
+        api.get<CounterRow[]>("/cash/counters").catch(() => ({ data: [] as CounterRow[] })),
+        api.get<CounterCash[]>("/cash/counters/cash").catch(() => ({ data: [] as CounterCash[] })),
+      ]);
       const list = Array.isArray(countersRes.data) ? countersRes.data : [];
       setCounters(list);
+      const cashRows = Array.isArray(cashRes.data) ? cashRes.data : [];
+      setCounterCash(Object.fromEntries(cashRows.map((c) => [c.counterId, c])));
 
       let selected = readPosCounterId();
       if (!selected || !list.some((c) => c.id === selected)) {
@@ -67,28 +107,13 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
       if (selected) writePosCounterId(selected);
       else clearPosCounterId();
 
-      const [activeRes, suggestRes] = await Promise.all([
-        api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>("/cash/active"),
-        api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
-      ]);
-      if (suggestRes.data?.suggestedOpening != null) {
-        setSuggested(suggestRes.data.suggestedOpening);
-        setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
-      }
-      if (activeRes.data?.status === "OPEN") {
-        setExistingOpen(true);
-        return;
-      }
-      if (activeRes.data?.status === "PENDING_APPROVAL") {
-        setPendingApproval(true);
-        setPendingRegisterId(activeRes.data.id ?? null);
-      }
+      await checkWallet(selected);
     } catch {
       /* show open form */
     } finally {
       setChecking(false);
     }
-  }, []);
+  }, [checkWallet]);
 
   React.useEffect(() => {
     if (!branchReady) {
@@ -112,6 +137,10 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
     setCounterId(next);
     if (next) writePosCounterId(next);
     else clearPosCounterId();
+    setSwitching(true);
+    void checkWallet(next)
+      .catch(() => { /* show open form */ })
+      .finally(() => setSwitching(false));
   };
 
   const handleContinueExisting = () => {
@@ -169,6 +198,7 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
   const today = new Date().toLocaleDateString("en-LK", { day: "2-digit", month: "2-digit", year: "numeric" });
   const FLOAT_PRESETS = [5000, 10000, 15000, 20000];
   const selectedCounter = counters.find((c) => c.id === counterId);
+  const selectedCash = counterId ? counterCash[counterId] : undefined;
   const branchLabel = activeBranchName ?? branches.find((b) => b.id === activeBranchId)?.name ?? "Branch";
 
   if (!branchReady || checking) {
@@ -243,7 +273,7 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
                 {existingOpen ? "Continue cash wallet" : "Start cash wallet"}
               </h2>
               <p className="text-xs" style={{ color: "var(--pos-muted)" }}>
-                Cash you collect goes to your own wallet
+                Cash goes to your wallet on the counter you sell from
               </p>
             </div>
           </div>
@@ -313,15 +343,44 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
               </option>
               {counters.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
+                  {c.name} ({c.code}) · LKR {formatNumber(counterCash[c.id]?.total ?? 0)}
                 </option>
               ))}
             </select>
             {selectedCounter && (
-              <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
-                Sales on this terminal will use {selectedCounter.name}
-                {branchLabel ? ` · ${branchLabel}` : ""}
-              </p>
+              <div
+                className="rounded-xl px-3 py-2.5 space-y-1.5"
+                style={{ background: "var(--pos-card)", border: "1px solid var(--pos-border)" }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs" style={{ color: "var(--pos-muted)" }}>
+                    Cash in {selectedCounter.name}
+                  </p>
+                  <p className="text-base font-bold tabular-nums text-white">
+                    LKR {formatNumber(selectedCash?.total ?? 0)}
+                  </p>
+                </div>
+                {selectedCash && selectedCash.wallets.length > 0 ? (
+                  <div className="space-y-1 border-t pt-1.5" style={{ borderColor: "var(--pos-border)" }}>
+                    {selectedCash.wallets.map((w) => (
+                      <div key={w.registerId} className="flex items-center justify-between gap-2 text-[11px]">
+                        <span className="truncate text-white/80">
+                          {w.cashierName}
+                          {w.registerId === activeRegisterId ? " (you)" : ""}
+                          {w.status !== "OPEN" ? " · closed, not cleared" : ""}
+                        </span>
+                        <span className="tabular-nums text-white/80">LKR {formatNumber(w.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>No cash held at this counter</p>
+                )}
+                <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
+                  Sales on this terminal will use {selectedCounter.name}
+                  {branchLabel ? ` · ${branchLabel}` : ""}
+                </p>
+              </div>
             )}
             {counters.length === 0 && activeBranchId && (
               <p className="text-[10px]" style={{ color: "var(--pos-muted)" }}>
@@ -335,8 +394,10 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
               className="rounded-xl px-3 py-2.5 text-xs space-y-1"
               style={{ background: "rgba(16,185,129,0.12)", border: "1px solid rgba(16,185,129,0.35)" }}
             >
-              <p className="font-semibold text-emerald-300">Your cash wallet is open</p>
-              <p style={{ color: "var(--pos-muted)" }}>Continue selling — cash stays in your wallet until an admin clears it at day end.</p>
+              <p className="font-semibold text-emerald-300">
+                Your cash wallet{selectedCounter ? ` on ${selectedCounter.name}` : ""} is open
+              </p>
+              <p style={{ color: "var(--pos-muted)" }}>Continue selling — cash stays in this wallet until an admin clears it at day end.</p>
             </div>
           ) : (
             <>
@@ -396,12 +457,12 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
 
           <Button
             onClick={() => void handleStart()}
-            disabled={submitting || !activeBranchId}
+            disabled={submitting || switching || !activeBranchId}
             data-pos-accent=""
             className="pos-cta w-full h-11 gap-2 font-bold"
             style={{ background: "var(--pos-success-grad)", color: "#ffffff" }}
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
+            {submitting || switching ? <Loader2 className="h-4 w-4 animate-spin" /> : <PlayCircle className="h-4 w-4" />}
             {existingOpen ? "Continue" : "Start"}
           </Button>
         </div>

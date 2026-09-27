@@ -120,10 +120,10 @@ export class CashManagementService {
     tenantId: string,
     branchId: string | undefined,
     cashierId: string,
-    _counterId?: string | null,
+    counterId?: string | null,
   ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const own = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
+    const own = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId, counterId || undefined);
     return own ? this.buildRegisterView(own) : null;
   }
 
@@ -247,6 +247,40 @@ export class CashManagementService {
     return this.updateCounter(tenantId, branchId, id, { isActive: false });
   }
 
+  /** Cash physically at each counter: every cashier wallet on it that is not yet cleared to main cash. */
+  async getCounterCash(tenantId: string, branchId: string | undefined) {
+    const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
+    const registers = await this.prisma.cashRegister.findMany({
+      where: { tenantId, branchId: resolvedBranchId, clearedAt: null, counterId: { not: null } },
+      orderBy: { openingTime: 'asc' },
+      include: {
+        movements: { select: { type: true, amount: true } },
+        cashier: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    const byCounter = new Map<string, {
+      counterId: string;
+      total: number;
+      wallets: { registerId: string; cashierId: string; cashierName: string; status: CashRegisterStatus; amount: number }[];
+    }>();
+    for (const r of registers) {
+      const counterId = r.counterId as string;
+      const { amountToClear } = this.walletAmountToClear(r);
+      const row = byCounter.get(counterId) ?? { counterId, total: 0, wallets: [] };
+      row.wallets.push({
+        registerId: r.id,
+        cashierId: r.cashierId,
+        cashierName: `${r.cashier.firstName} ${r.cashier.lastName}`.trim(),
+        status: r.status,
+        amount: amountToClear,
+      });
+      row.total = Math.round((row.total + amountToClear) * 100) / 100;
+      byCounter.set(counterId, row);
+    }
+    return [...byCounter.values()];
+  }
+
   async openRegister(
     tenantId: string,
     branchId: string | undefined,
@@ -263,12 +297,16 @@ export class CashManagementService {
     if (requestedCounterId && !counter) throw new BadRequestException('Invalid or inactive cashier counter');
     const counterId = counter?.id ?? null;
 
-    const existing = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId);
+    const existing = await findOpenRegister(this.prisma, tenantId, resolvedBranchId, cashierId, counterId);
     if (existing?.status === CashRegisterStatus.OPEN) {
-      throw new BadRequestException('You already have an open cash wallet. Continue with it or ask an admin to clear it.');
+      throw new BadRequestException(
+        counter
+          ? `You already have an open cash wallet on ${counter.name}. Continue with it or ask an admin to clear it.`
+          : 'You already have an open cash wallet. Continue with it or ask an admin to clear it.',
+      );
     }
     if (existing?.status === CashRegisterStatus.PENDING_APPROVAL) {
-      throw new BadRequestException('Previous shift is pending manager approval. Contact your manager.');
+      throw new BadRequestException('Previous shift on this counter is pending manager approval. Contact your manager.');
     }
 
     const register = await this.prisma.$transaction(async (tx) => {
@@ -1153,6 +1191,13 @@ export class CashManagementController {
     return this.cashService.listCounters(user.tenantId, user.branchId, {
       includeInactive: all === '1' || all === 'true',
     });
+  }
+
+  @Get('counters/cash')
+  @RequireAnyPermissions('cash:read', 'sales:read', 'sales:create')
+  @ApiOperation({ summary: 'Cash currently held at each counter (all cashiers, not yet cleared)' })
+  getCounterCash(@CurrentUser() user: IAuthUser) {
+    return this.cashService.getCounterCash(user.tenantId, user.branchId);
   }
 
   @Post('counters')

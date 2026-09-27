@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { Controller, Get, Post, Put, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, Query, Headers } from '@nestjs/common';
+import { resolveActingCashierId } from '@/modules/pos/pos-pin.helper';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -56,7 +57,13 @@ export class ReturnsService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  async create(tenantId: string, branchId: string, userId: string, dto: CreateReturnDto) {
+  async create(
+    tenantId: string,
+    branchId: string,
+    userId: string,
+    dto: CreateReturnDto,
+    till?: { cashierId?: string; counterId?: string },
+  ) {
     await assertShopModule(this.prisma, tenantId, 'returns');
     const sale = await this.prisma.sale.findFirst({
       where: { id: dto.originalSaleId, tenantId },
@@ -123,10 +130,11 @@ export class ReturnsService {
         this.prisma,
         tenantId,
         branchId,
-        userId,
+        till?.cashierId ?? userId,
         ret.id,
         ret.returnNumber,
         refundAmount,
+        till?.counterId,
       );
     }
 
@@ -288,8 +296,16 @@ export class ReturnsController {
   @Post()
   @RequirePermissions('sales:create')
   @ApiOperation({ summary: 'Create a return or exchange' })
-  create(@CurrentUser() user: IAuthUser, @Body() dto: CreateReturnDto) {
-    return this.returnsService.create(user.tenantId, user.branchId ?? '', user.id, dto);
+  create(
+    @CurrentUser() user: IAuthUser,
+    @Body() dto: CreateReturnDto,
+    @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-pos-counter-id') counterId?: string,
+  ) {
+    return this.returnsService.create(user.tenantId, user.branchId ?? '', user.id, dto, {
+      cashierId: resolveActingCashierId(user.tenantId, user.id, unlockToken),
+      counterId: counterId || undefined,
+    });
   }
 
   @Get()

@@ -62,11 +62,16 @@ export function walletFloatIssued(
   return Math.round(issued * 100) / 100;
 }
 
+/**
+ * The cashier's open (or pending) wallet. `counterId`: a counter id = the wallet on that counter,
+ * null = the wallet with no counter, undefined = the latest wallet on any counter.
+ */
 export async function findOpenRegister(
   db: Db,
   tenantId: string,
   branchId: string,
   cashierId: string,
+  counterId?: string | null,
 ) {
   return db.cashRegister.findFirst({
     where: {
@@ -74,6 +79,7 @@ export async function findOpenRegister(
       branchId,
       cashierId,
       status: { in: [CashRegisterStatus.OPEN, CashRegisterStatus.PENDING_APPROVAL] },
+      ...(counterId !== undefined ? { counterId } : {}),
     },
     orderBy: { openingTime: 'desc' },
     include: {
@@ -110,8 +116,9 @@ export async function findAnyOpenRegisterOnBranch(
 }
 
 /**
- * The cashier's own open wallet (cash shift). Wallets belong to the cashier, never to a counter;
- * one is opened with a zero float when the cashier has none.
+ * The cashier's open wallet for a counter — one wallet per cashier per counter, so each counter's
+ * cash is exactly what was taken there. Without a counter, the wallet the cashier used last.
+ * A wallet is opened with a zero float when none exists.
  */
 export async function ensureCashierWallet(
   db: Db,
@@ -120,12 +127,6 @@ export async function ensureCashierWallet(
   cashierId: string,
   counterId?: string | null,
 ) {
-  const existing = await db.cashRegister.findFirst({
-    where: { tenantId, branchId, cashierId, status: CashRegisterStatus.OPEN },
-    orderBy: { openingTime: 'desc' },
-  });
-  if (existing) return existing;
-
   let validCounterId: string | null = null;
   if (counterId) {
     const counter = await db.posCounter.findFirst({
@@ -134,6 +135,14 @@ export async function ensureCashierWallet(
     });
     validCounterId = counter?.id ?? null;
   }
+
+  const existing = validCounterId
+    ? await db.cashRegister.findFirst({
+        where: { tenantId, branchId, cashierId, counterId: validCounterId, status: CashRegisterStatus.OPEN },
+        orderBy: { openingTime: 'desc' },
+      })
+    : await findOwnOpenWallet(db, tenantId, branchId, cashierId);
+  if (existing) return existing;
 
   return db.cashRegister.create({
     data: {
@@ -148,7 +157,20 @@ export async function ensureCashierWallet(
   });
 }
 
+/** The cashier's open wallet with the most recent cash activity (any counter). */
 async function findOwnOpenWallet(db: Db, tenantId: string, branchId: string, cashierId: string) {
+  const lastMovement = await db.cashMovement.findFirst({
+    where: {
+      tenantId,
+      register: { branchId, cashierId, status: CashRegisterStatus.OPEN },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { registerId: true },
+  });
+  if (lastMovement) {
+    const wallet = await db.cashRegister.findUnique({ where: { id: lastMovement.registerId } });
+    if (wallet) return wallet;
+  }
   return db.cashRegister.findFirst({
     where: { tenantId, branchId, cashierId, status: CashRegisterStatus.OPEN },
     orderBy: { openingTime: 'desc' },
@@ -228,10 +250,11 @@ export async function recordRefundCashMovement(
   returnId: string,
   returnNumber: string,
   amount: number,
+  counterId?: string | null,
 ) {
   if (amount <= 0) return;
 
-  const register = await ensureCashierWallet(prisma, tenantId, branchId, cashierId);
+  const register = await ensureCashierWallet(prisma, tenantId, branchId, cashierId, counterId);
 
   await recordCashMovement(prisma, {
     tenantId,
