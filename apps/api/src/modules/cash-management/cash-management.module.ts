@@ -612,27 +612,36 @@ export class CashManagementService {
     };
   }
 
-  async getOpeningSuggestion(tenantId: string, branchId: string | undefined, cashierId: string) {
+  /** Counted cash from the cashier's last close on this counter (else on any counter). */
+  async getOpeningSuggestion(
+    tenantId: string,
+    branchId: string | undefined,
+    cashierId: string,
+    counterId?: string | null,
+  ) {
     const resolvedBranchId = await this.resolveBranchId(tenantId, branchId);
-    const lastClosed = await this.prisma.cashRegister.findFirst({
-      where: {
-        tenantId,
-        branchId: resolvedBranchId,
-        cashierId,
-        status: CashRegisterStatus.CLOSED,
-      },
-      orderBy: { closingTime: 'desc' },
-      select: {
-        actualCash: true,
-        closingCash: true,
-        openingCash: true,
-        closingTime: true,
-        variance: true,
-        clearedAt: true,
-      },
-    });
+    const findLastClosed = (onCounter?: string) =>
+      this.prisma.cashRegister.findFirst({
+        where: {
+          tenantId,
+          branchId: resolvedBranchId,
+          cashierId,
+          status: CashRegisterStatus.CLOSED,
+          ...(onCounter ? { counterId: onCounter } : {}),
+        },
+        orderBy: { closingTime: 'desc' },
+        select: {
+          actualCash: true,
+          closingCash: true,
+          clearedAmount: true,
+          openingCash: true,
+          closingTime: true,
+          variance: true,
+        },
+      });
+    const lastClosed = (counterId ? await findLastClosed(counterId) : null) ?? (await findLastClosed());
 
-    const raw = lastClosed?.clearedAt ? null : (lastClosed?.actualCash ?? lastClosed?.closingCash ?? null);
+    const raw = lastClosed?.actualCash ?? lastClosed?.clearedAmount ?? lastClosed?.closingCash ?? null;
     return {
       suggestedOpening: raw != null ? Math.round(raw * 100) / 100 : null,
       lastClosedAt: lastClosed?.closingTime ?? null,
@@ -1305,9 +1314,16 @@ export class CashManagementController {
   getOpeningSuggestion(
     @CurrentUser() user: IAuthUser,
     @Headers('x-pos-cashier-token') unlockToken?: string,
+    @Headers('x-pos-counter-id') counterHeader?: string,
+    @Query('counterId') counterId?: string,
   ) {
     const cashierId = resolveActingCashierId(user.tenantId, user.id, unlockToken);
-    return this.cashService.getOpeningSuggestion(user.tenantId, user.branchId, cashierId);
+    return this.cashService.getOpeningSuggestion(
+      user.tenantId,
+      user.branchId,
+      cashierId,
+      counterId || counterHeader || undefined,
+    );
   }
 
   @Get('history')

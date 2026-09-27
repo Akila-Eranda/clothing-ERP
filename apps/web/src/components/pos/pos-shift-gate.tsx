@@ -61,12 +61,11 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
     const q = forCounterId ? `?counterId=${encodeURIComponent(forCounterId)}` : "";
     const [activeRes, suggestRes] = await Promise.all([
       api.get<{ id?: string; status?: string; variance?: number; counterId?: string } | null>(`/cash/active${q}`),
-      api.get<{ suggestedOpening: number | null }>("/cash/opening-suggestion").catch(() => ({ data: null })),
+      api.get<{ suggestedOpening: number | null }>(`/cash/opening-suggestion${q}`).catch(() => ({ data: null })),
     ]);
-    if (suggestRes.data?.suggestedOpening != null) {
-      setSuggested(suggestRes.data.suggestedOpening);
-      setOpeningCash((prev) => (prev === "" ? String(suggestRes.data!.suggestedOpening) : prev));
-    }
+    const suggestion = suggestRes.data?.suggestedOpening ?? null;
+    setSuggested(suggestion);
+    setOpeningCash(suggestion != null ? String(suggestion) : "");
     if (activeRes.data?.status === "OPEN") {
       setExistingOpen(true);
       setActiveRegisterId(activeRes.data.id ?? null);
@@ -403,7 +402,7 @@ export function PosShiftGate({ onShiftReady, onClose, cashierName: cashierNamePr
             <>
               {suggested != null && (
                 <p className="text-[10px]" style={{ color: "var(--pos-success-soft)" }}>
-                  Suggested from last close: LKR {formatNumber(suggested)}
+                  Auto-filled from your last close{selectedCounter ? ` · ${selectedCounter.name}` : ""}: LKR {formatNumber(suggested)}
                 </p>
               )}
               <div className="space-y-2">
