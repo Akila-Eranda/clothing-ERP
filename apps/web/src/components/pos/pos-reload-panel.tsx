@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { createPortal } from "react-dom";
-import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart, ExternalLink, X, CheckCircle2 } from "lucide-react";
+import { Loader2, Smartphone, CreditCard, Phone, ShoppingCart, ExternalLink, X, CheckCircle2, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { CartItem } from "@/types";
@@ -334,8 +334,27 @@ export function PosReloadPanel({
   const quickPayWinRef = React.useRef<Window | null>(null);
   const [quickPayWinClosed, setQuickPayWinClosed] = React.useState(false);
 
+  const [numberCopied, setNumberCopied] = React.useState(false);
+
+  /** Operator page can't be pre-filled (cross-origin, no URL param) — clipboard lets the cashier paste. */
+  const copyReloadNumber = React.useCallback(async (silent = false) => {
+    const msisdn = digitsOnly(phone);
+    if (!msisdn) return false;
+    try {
+      await navigator.clipboard.writeText(msisdn);
+      setNumberCopied(true);
+      if (!silent) toast.success(`${msisdn} copied — press Ctrl+V in the Mobitel window`);
+      return true;
+    } catch {
+      setNumberCopied(false);
+      if (!silent) toast.error("Could not copy — type the number manually");
+      return false;
+    }
+  }, [phone]);
+
   const launchQuickPayWindow = React.useCallback(() => {
     if (!quickPayUrl) return;
+    void copyReloadNumber(true);
     const existing = quickPayWinRef.current;
     if (existing && !existing.closed) {
       try {
@@ -349,7 +368,7 @@ export function PosReloadPanel({
     quickPayWinRef.current = win;
     setQuickPayWinClosed(!win);
     if (!win) toast.error("Popup blocked — allow popups for this site, then tap Open again");
-  }, [quickPayUrl]);
+  }, [quickPayUrl, copyReloadNumber]);
 
   const closeQuickPayWindow = React.useCallback(() => {
     try {
@@ -822,11 +841,27 @@ export function PosReloadPanel({
               <div className="rounded-xl bg-slate-50 px-4 py-3 text-center">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Reload amount</p>
                 <p className="text-3xl font-extrabold text-slate-900">LKR {formatMoney(face)}</p>
-                {phone ? <p className="mt-0.5 text-sm font-semibold text-slate-600">{phone}</p> : null}
+                {phone ? (
+                  <div className="mt-1 flex items-center justify-center gap-2">
+                    <span className="text-sm font-semibold text-slate-600">{phone}</span>
+                    <button
+                      type="button"
+                      onClick={() => void copyReloadNumber()}
+                      className="flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-100"
+                    >
+                      <Copy className="h-3 w-3" />
+                      {numberCopied ? "Copied" : "Copy"}
+                    </button>
+                  </div>
+                ) : null}
               </div>
               <ol className="list-decimal space-y-1 pl-5 text-[13px] text-slate-600">
                 <li>In the {operator.name} window, tap <b>Prepaid Reload</b>.</li>
-                <li>Enter the number and amount above, then pay.</li>
+                <li>
+                  {phone
+                    ? <>Click the mobile number box and press <b>Ctrl+V</b> (number is already copied), choose LKR {formatMoney(face)}, then pay.</>
+                    : <>Enter the number and choose LKR {formatMoney(face)}, then pay.</>}
+                </li>
                 <li>When payment succeeds, tap <b>Paid — Complete sale</b> here.</li>
               </ol>
               <div
